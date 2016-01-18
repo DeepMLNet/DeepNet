@@ -1,14 +1,5 @@
 module NDArray
-
-module List =
-    let rec set lst elem value =
-        match lst, elem with
-            | l::ls, 0 -> value::ls
-            | l::ls, _ -> l::(set ls (elem-1) value)
-            | [], _ -> invalidArg "elem" "element index out of bounds"
-
-    let without elem lst =
-        List.concat [List.take elem lst; List.skip (elem+1) lst] 
+open Util
 
 
 type ndarray = {shape: int list;
@@ -255,9 +246,9 @@ let productAxis = axisReduce product
 let rec dot a b =
     match ndim a, ndim b with
         | 0, _ | _, 0  -> multiply a b
-        | 1, 1 -> multiply a b |> product
+        | 1, 1 -> multiply a b |> sum
         | 2, 1 -> view (dot a (padRight b)) [All; Elem 0]
-        | 1, 2 -> dot (padRight a) b
+        //| 1, 2 -> dot (padRight a) b
         | 2, 2 when a.shape.[1] = b.shape.[0] ->
             let I = a.shape.[0]
             let J = a.shape.[1]

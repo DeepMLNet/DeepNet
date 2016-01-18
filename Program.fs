@@ -17,7 +17,7 @@ let ``Matrix multiplication optimization`` () =
                 |> Map.ofList 
 
     let out = Op.Add(Op.Dot (Op.Var "A", Op.Var "x"), Op.Var "b")
-    let loss = Op.Sum(Op.Power(Op.Substract(out, Op.Var "t"), Op.Const 2.0))
+    let loss = Op.Sum(Op.Power(Op.Substract(out, Op.Var "t"), Op.ScalarConst 2.0))
 
     let gradA = Op.grad loss "A"
     let gradb = Op.grad loss "b"

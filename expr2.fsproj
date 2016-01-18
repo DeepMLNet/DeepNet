@@ -58,6 +58,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Util.fs" />
     <Compile Include="ndarray.fs" />
     <Compile Include="op.fs" />
     <Compile Include="Program.fs" />
