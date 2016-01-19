@@ -23,7 +23,7 @@ let padRight a =
 
 let broadcast a dim size =
     match (shape a).[dim] with
-        | 1 -> {a with shape=List.set a.shape dim size; stride=List.set a.stride dim 0}
+        | 1 -> {a with shape=List.set dim size a.shape; stride=List.set dim 0 a.stride}
         | _ -> failwithf "dimension %d must be of size 1 to broadcast (is %A)" dim (shape a)
 
 let broadcastToSame ain bin =

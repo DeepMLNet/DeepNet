@@ -9,6 +9,7 @@ type SizeSpec =
     | SizeSymbol of string
     | SizeConst of int
     | SizeOne
+    | SizeProduct of SizeSpec list
 
 type ShapeSpecT = SizeSpec list
 
@@ -19,11 +20,21 @@ module ShapeSpec =
     let ndim sa =
         List.length sa
 
+    let flat sa =
+        match ndim sa with
+        | 0 -> SizeOne
+        | 1 -> sa.[0]
+        | _ -> SizeProduct(sa)
+
     let concat sa sb =
         sa @ sb
 
     let transpose sa =
         List.rev sa
+
+    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) =
+        sa  |> List.set ax1 sa.[ax2]
+            |> List.set ax2 sa.[ax1]
 
     let scalar = []
 
@@ -39,7 +50,7 @@ module ShapeSpec =
 
     let broadcast (sa: ShapeSpecT) dim size =
         match sa.[dim] with
-            | SizeOne -> List.set sa dim size
+            | SizeOne -> List.set dim size sa
             | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeOne)" dim sa
 
     let broadcastToSame saIn sbIn =
@@ -61,29 +72,100 @@ type VarSpecT = string * ShapeSpecT
 
 
 type Op =
+    // binary elementwise
     | Add of Op * Op
     | Substract of Op * Op
     | Multiply of Op * Op
     | Divide of Op * Op
     | Power of Op * Op
+    // unary elementwise
     | Negate of Op
-    | Transpose of Op
     | Log of Op
     | Exp of Op
+    // matrix operations
+    | Transpose of Op
     | Dot of Op * Op
+    // tensor operations
     | TensorProduct of Op * Op
+    // reductions
     | Sum of Op 
     | SumAxis of int * Op
+    // tensor creation
+    | Identity of ShapeSpecT
+    | Zeros of ShapeSpecT
     | ScalarConst of float
     | TensorConst of float * ShapeSpecT
-    | Identity of ShapeSpecT
+    // shape operations
+    | Reshape of ShapeSpecT * Op
+    | SwapDim of int * int * Op
+    // varible access
     | Var of VarSpecT
+    // misc
     | Annotated of Op * Annotation
 
 and Annotation =
     | GradOf of Op
     | Text of string
     
+let (|ElemwiseOp|_|) op =
+    match op with
+    | Add _ | Substract _ | Multiply _ | Divide _ | Power _ | Negate _ | Log _ | Exp _ 
+        -> Some ()
+    | _ -> None
+
+let (|BinaryOp|_|) op =
+    match op with
+    | Add(a, b) 
+    | Substract(a, b)
+    | Multiply(a, b) 
+    | Divide(a, b)  
+    | Power(a, b) 
+    | Dot(a, b) 
+    | TensorProduct (a, b)
+        -> Some (a, b)
+    | _ -> None
+
+let (|UnaryOp|_|) op =
+    match op with
+    | Negate a 
+    | Log a 
+    | Exp a 
+    | Transpose a 
+    | Sum a 
+    | SumAxis (_, a) 
+    | Reshape (_, a) 
+    | SwapDim (_, _, a)
+    | Annotated (a, _)
+        -> Some (a)
+    | _ -> None
+
+
+
+let rec mapOperands unaryMap binaryMap op =
+    let subMap = mapOperands unaryMap binaryMap
+    let um a = unaryMap op (subMap a)
+    let bm a b = binaryMap op (subMap a) (subMap b)
+    match op with
+    | Add(a, b) -> Add(bm a b)
+    | Substract(a, b) -> Substract(bm a b)
+    | Multiply(a, b) -> Multiply(bm a b)
+    | Divide(a, b) -> Divide(bm a b)
+    | Power(a, b) -> Power(bm a b)
+    | Negate a -> Negate(um a)
+    | Log a -> Log(um a)
+    | Exp a -> Exp(um a)
+    | Transpose a -> Transpose(um a)
+    | Dot(a, b) -> Dot(bm a b)
+    | TensorProduct(a, b) -> TensorProduct(bm a b)
+    | Sum a -> Sum(um a)
+    | SumAxis(ax, a) -> SumAxis(ax, um a)
+    | Reshape(ss, a) -> Reshape(ss, um a)
+    | SwapDim(ax1, ax2, a) -> SwapDim(ax1, ax2, um a)
+    | Annotated(a, ano) -> Annotated(um a, ano)
+    | _ -> op
+
+
+
 let rec shapeOf op =
     match op with
     | Add(a, b) 
@@ -91,7 +173,7 @@ let rec shapeOf op =
     | Multiply(a, b) 
     | Divide(a, b)
     | Power(a, b)
-        -> ShapeSpec.broadcastToSame (shapeOf a) (shapeOf b) |> fst
+        -> shapeOf a
     | Negate a
     | Log a
     | Exp a
@@ -116,6 +198,8 @@ let rec shapeOf op =
     | TensorProduct(a, b) -> ShapeSpec.concat (shapeOf a) (shapeOf b)
     | Sum a -> ShapeSpec.scalar
     | SumAxis(ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+    | Reshape(ss, a) -> ss
+    | SwapDim(ax1, ax2, a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
     | ScalarConst _ -> ShapeSpec.scalar
     | TensorConst(_, ss) -> ss
     | Identity ss -> ss
@@ -123,9 +207,55 @@ let rec shapeOf op =
     | Annotated (a, _) -> shapeOf a
        
 
+let broadcastForElementwise opa opb =
+    let sa = shapeOf opa
+    let sb = shapeOf opb
+    let bsa, bsb = ShapeSpec.broadcastToSame sa sb
+
+    let bopa = if bsa = sa then opa else Reshape(bsa, opa)
+    let bopb = if bsb = sb then opb else Reshape(bsb, opb)
+    bopa, bopb
+  
+
+let checkAndAdaptShapes =
+    mapOperands 
+        (fun op a -> 
+            match op with
+            | Transpose _ ->
+                let sa = shapeOf a
+                match ShapeSpec.ndim sa with
+                | 2 -> a
+                | _ -> failwithf "cannot transpose array of shape %A" sa
+            | SwapDim(ax1, ax2, _) ->
+                let sa = shapeOf a
+                if 0 <= ax1 && ax1 < ShapeSpec.ndim sa && 
+                   0 <= ax2 && ax2 < ShapeSpec.ndim sa then
+                    a
+                else
+                    failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+            | _ -> a
+        ) 
+        (fun op a b -> 
+            match op with
+            | ElemwiseOp -> broadcastForElementwise a b
+            | Dot(_) -> 
+                let sa, sb = shapeOf a, shapeOf b
+                match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
+                | 1, 1 when sa = sb -> a, b
+                | 2, 1 when sa.[1] = sb.[0] -> a, b
+                | 2, 2 when sa.[1] = sb.[0] -> a, b
+                | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+            | _ -> a, b
+        )
+
+
 let rec grad op wrt =    
-    let g = 
+    let g =
+        // We assume that all operands have compatible size. 
+        // For elementwise operations we assume that a and b are already broadcasted
+        // to have the *same* size.
         let subgrad x = grad x wrt
+        let constGrad ss = Zeros [ShapeSpec.flat ss; ShapeSpec.flat (shapeOf (Var wrt))]
         match op with        
         | Add(a, b) -> Add(subgrad a, subgrad b)
         | Substract(a, b) -> Substract(subgrad a, subgrad b)
@@ -137,10 +267,8 @@ let rec grad op wrt =
         | Log a -> Multiply(Power(a, ScalarConst -1.0), subgrad a)
         | Exp a -> Multiply(Exp a, subgrad a)
         | Dot(a, b) -> 
-            let sa = shapeOf a
-            let sb = shapeOf b
+            let sa, sb = shapeOf a, shapeOf b
             match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
-                | 0, _ | _, 0 -> subgrad (Multiply(a, b))
                 | 1, 1 -> subgrad (Sum(Multiply(a, b)))
                 | 2, 1 -> 
                     Add(Dot(TensorProduct(b, Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
@@ -152,12 +280,29 @@ let rec grad op wrt =
                         Dot(TensorProduct(Identity (ShapeSpec.matrix sb.[1] sb.[1]), a), // wrt b
                             subgrad b))
                 | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-        | Transpose a -> failwith "not implemented"          
+        | TensorProduct(a, b) ->
+            failwith "not implemented"
+        | Transpose a -> subgrad (SwapDim(0, 1, a))
+        | SwapDim (ax1, ax2, a) ->
+            let g = subgrad a
+            let sg, sa = shapeOf g, shapeOf a
+            Reshape(sg, SwapDim(ax1, ax2, Reshape(sa @ [sg.[1]], g)))
+        | Reshape (ss, a) ->
+            let g = subgrad a
+            let sg, sa = shapeOf g, shapeOf a
+            Reshape([ShapeSpec.flat ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
         | Sum a -> Sum(subgrad a)
         | SumAxis (ax, a) -> SumAxis(ax, subgrad a) // TODO: verify
-        | ScalarConst _ -> ScalarConst 0.0
-        | TensorConst (a, _) -> TensorConst (a, 0.0)
-        | Var v -> if v = wrt then TensorConst (op, 1.0) else TensorConst (op, 0.0)
+        | Zeros ss -> constGrad ss
+        | ScalarConst _ -> constGrad ShapeSpec.scalar
+        | TensorConst (_, ss) -> constGrad ss
+        | Identity ss -> constGrad ss
+        | Var v -> 
+            let sv = shapeOf (Var v)
+            if v = wrt then                 
+                Identity [ShapeSpec.flat sv; ShapeSpec.flat sv]
+            else 
+                constGrad sv
         | Annotated(a, ano) -> Annotated(subgrad a, ano)
     Annotated(g, GradOf op)
 
