@@ -178,19 +178,11 @@ let rec shapeOf op =
     | Log a
     | Exp a
         -> shapeOf a
-    | Transpose a ->
-        let sa = shapeOf a
-        match ShapeSpec.ndim sa with
-            | 0 -> sa
-            | 1 -> sa
-            | 2 -> ShapeSpec.transpose sa
-            | d -> failwithf "cannot transpose array of rank %d" d
+    | Transpose a -> ShapeSpec.transpose (shapeOf a)
     | Dot(a, b) -> 
         let sa = shapeOf a
         let sb = shapeOf b
         match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
-            | 0, _ -> sb
-            | _, 0 -> sa
             | 1, 1 -> ShapeSpec.scalar
             | 2, 1 -> ShapeSpec.vector sa.[0]
             | 2, 2 when sa.[1] = sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
