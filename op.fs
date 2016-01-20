@@ -210,35 +210,35 @@ let broadcastForElementwise opa opb =
   
 
 let checkAndAdaptShapes =
-    mapOperands 
-        (fun op a -> 
-            match op with
-            | Transpose _ ->
-                let sa = shapeOf a
-                match ShapeSpec.ndim sa with
-                | 2 -> a
-                | _ -> failwithf "cannot transpose array of shape %A" sa
-            | SwapDim(ax1, ax2, _) ->
-                let sa = shapeOf a
-                if 0 <= ax1 && ax1 < ShapeSpec.ndim sa && 
-                   0 <= ax2 && ax2 < ShapeSpec.ndim sa then
-                    a
-                else
-                    failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
-            | _ -> a
-        ) 
-        (fun op a b -> 
-            match op with
-            | ElemwiseOp -> broadcastForElementwise a b
-            | Dot(_) -> 
-                let sa, sb = shapeOf a, shapeOf b
-                match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
-                | 1, 1 when sa = sb -> a, b
-                | 2, 1 when sa.[1] = sb.[0] -> a, b
-                | 2, 2 when sa.[1] = sb.[0] -> a, b
-                | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-            | _ -> a, b
-        )
+    let mapUnaryOp op a =
+        match op with
+        | Transpose _ ->
+            let sa = shapeOf a
+            match ShapeSpec.ndim sa with
+            | 2 -> a
+            | _ -> failwithf "cannot transpose array of shape %A" sa
+        | SwapDim(ax1, ax2, _) ->
+            let sa = shapeOf a
+            if 0 <= ax1 && ax1 < ShapeSpec.ndim sa && 
+                0 <= ax2 && ax2 < ShapeSpec.ndim sa then
+                a
+            else
+                failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+        | _ -> a
+
+    let mapBinaryOp op a b =
+        match op with
+        | ElemwiseOp -> broadcastForElementwise a b
+        | Dot(_) -> 
+            let sa, sb = shapeOf a, shapeOf b
+            match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
+            | 1, 1 when sa = sb -> a, b
+            | 2, 1 when sa.[1] = sb.[0] -> a, b
+            | 2, 2 when sa.[1] = sb.[0] -> a, b
+            | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+        | _ -> a, b
+
+    mapOperands mapUnaryOp mapBinaryOp
 
 
 let rec grad op wrt =    
@@ -273,7 +273,13 @@ let rec grad op wrt =
                             subgrad b))
                 | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
         | TensorProduct(a, b) ->
-            failwith "not implemented"
+            let ga, gb = subgrad a, subgrad b
+            let sa, sb = shapeOf a, shapeOf b
+            let sga, sgb = shapeOf ga, shapeOf gb
+            let g = Add(TensorProduct(Reshape(sa @ [sga.[1]], ga), b),
+                        TensorProduct(a, Reshape(sb @ [sgb.[1]], gb)))
+            let sg = shapeOf g            
+            Reshape(sg.[0 .. (ShapeSpec.ndim sg) - 1] @ [sga.[1]], g)            
         | Transpose a -> subgrad (SwapDim(0, 1, a))
         | SwapDim (ax1, ax2, a) ->
             let g = subgrad a
@@ -283,8 +289,17 @@ let rec grad op wrt =
             let g = subgrad a
             let sg, sa = shapeOf g, shapeOf a
             Reshape([ShapeSpec.flat ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
-        | Sum a -> Sum(subgrad a)
-        | SumAxis (ax, a) -> SumAxis(ax, subgrad a) // TODO: verify
+        | Sum a -> 
+            let ga = subgrad a
+            let sga = shapeOf ga
+            Reshape([SizeOne; sga.[1]], SumAxis(0, ga))
+        | SumAxis (ax, a) -> 
+            let ga = subgrad a
+            let sa = shapeOf a
+            let sga = shapeOf ga
+            let g = SumAxis(ax, Reshape(sa @ [sga.[1]], ga)) 
+            let sg = shapeOf g
+            Reshape(sg.[0 .. (ShapeSpec.ndim sg) - 1] @ [sga.[1]], g)            
         | Zeros ss -> constGrad ss
         | ScalarConst _ -> constGrad ShapeSpec.scalar
         | TensorConst (_, ss) -> constGrad ss
