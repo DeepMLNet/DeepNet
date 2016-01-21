@@ -62,6 +62,8 @@
     <Compile Include="ndarray.fs" />
     <Compile Include="Shape.fs" />
     <Compile Include="Op.fs" />
+    <Compile Include="OpGrad.fs" />
+    <Compile Include="OpEval.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />

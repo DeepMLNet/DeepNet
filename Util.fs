@@ -10,3 +10,10 @@ module List =
     let without elem lst =
         List.concat [List.take elem lst; List.skip (elem+1) lst] 
 
+
+let rec iterate f n x =
+    match n with
+    | 0 -> x
+    | n when n > 0 -> iterate f (n-1) (f x)
+    | _ -> failwithf "cannot execute negative iterations %d" n
+

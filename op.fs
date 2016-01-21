@@ -9,7 +9,7 @@ type Environment = Map<string, NDArray.ndarray>
 /// variable specification
 type VarSpecT = string * ShapeSpecT
 
-
+/// an op(eration)
 type Op =
     // binary elementwise
     | Add of Op * Op
@@ -21,10 +21,9 @@ type Op =
     | Negate of Op
     | Log of Op
     | Exp of Op
-    // matrix operations
+    // matrix/tensor operations
     | Transpose of Op
     | Dot of Op * Op
-    // tensor operations
     | TensorProduct of Op * Op
     // reductions
     | Sum of Op 
@@ -36,6 +35,7 @@ type Op =
     | TensorConst of float * ShapeSpecT
     // shape operations
     | Reshape of ShapeSpecT * Op
+    | Broadcast of int * ShapeSpecT * Op
     | SwapDim of int * int * Op
     // varible access
     | Var of VarSpecT
@@ -46,12 +46,29 @@ and Annotation =
     | GradOf of Op
     | Text of string
     
+/// matches all ops that work elementwise on their argument(s)
 let (|ElemwiseOp|_|) op =
     match op with
     | Add _ | Substract _ | Multiply _ | Divide _ | Power _ | Negate _ | Log _ | Exp _ 
         -> Some ()
     | _ -> None
 
+/// matches all ops that take one input
+let (|UnaryOp|_|) op =
+    match op with
+    | Negate a 
+    | Log a 
+    | Exp a 
+    | Transpose a 
+    | Sum a 
+    | SumAxis (_, a) 
+    | Reshape (_, a) 
+    | SwapDim (_, _, a)
+    | Broadcast(_, _, a)
+        -> Some (a)
+    | _ -> None
+
+/// matches all ops that take two inputs
 let (|BinaryOp|_|) op =
     match op with
     | Add(a, b) 
@@ -64,243 +81,146 @@ let (|BinaryOp|_|) op =
         -> Some (a, b)
     | _ -> None
 
-let (|UnaryOp|_|) op =
+
+
+/// Traverses the op tree and for each op calls a function on its arguments and replaces 
+/// them by the function's return value(s).
+let rec mapOperands unaryMapping binaryMapping op =
+    let subMap = mapOperands unaryMapping binaryMapping
+    let um a = unaryMapping op (subMap a)
+    let bm a b = binaryMapping op (subMap a) (subMap b)
     match op with
-    | Negate a 
-    | Log a 
-    | Exp a 
-    | Transpose a 
-    | Sum a 
-    | SumAxis (_, a) 
-    | Reshape (_, a) 
-    | SwapDim (_, _, a)
-    | Annotated (a, _)
-        -> Some (a)
-    | _ -> None
-
-
-
-let rec mapOperands unaryMap binaryMap op =
-    let subMap = mapOperands unaryMap binaryMap
-    let um a = unaryMap op (subMap a)
-    let bm a b = binaryMap op (subMap a) (subMap b)
-    match op with
+    // binary elementwise
     | Add(a, b) -> Add(bm a b)
     | Substract(a, b) -> Substract(bm a b)
     | Multiply(a, b) -> Multiply(bm a b)
     | Divide(a, b) -> Divide(bm a b)
     | Power(a, b) -> Power(bm a b)
+    // unary elementwise
     | Negate a -> Negate(um a)
     | Log a -> Log(um a)
     | Exp a -> Exp(um a)
+    // matrix/tensor operations
     | Transpose a -> Transpose(um a)
     | Dot(a, b) -> Dot(bm a b)
     | TensorProduct(a, b) -> TensorProduct(bm a b)
+    // reductions
     | Sum a -> Sum(um a)
     | SumAxis(ax, a) -> SumAxis(ax, um a)
+    // shape operations
     | Reshape(ss, a) -> Reshape(ss, um a)
     | SwapDim(ax1, ax2, a) -> SwapDim(ax1, ax2, um a)
+    | Broadcast(axp, ss, a) -> Broadcast(axp, ss, um a)
+    // misc
     | Annotated(a, ano) -> Annotated(um a, ano)
     | _ -> op
 
 
+/// Produces an error message about incompatible shapes.
+let failshape op sa sb =
+    failwithf "op %A was provided with arrays of incompatible shapes %A and %A" op sa sb
 
+
+/// Returns the shape of the given op.
 let rec shapeOf op =
+    // We assume that all operands have compatible size. 
+    // For elementwise operations we assume that a and b are already broadcasted
+    // to have the *same* size.
     match op with
+    // binary elementwise
     | Add(a, b) 
     | Substract(a, b)
     | Multiply(a, b) 
     | Divide(a, b)
     | Power(a, b)
         -> shapeOf a
+    // unary elementwise
     | Negate a
     | Log a
     | Exp a
         -> shapeOf a
+    // matrix/tensor operations
     | Transpose a -> ShapeSpec.transpose (shapeOf a)
     | Dot(a, b) -> 
-        let sa = shapeOf a
-        let sb = shapeOf b
+        let sa, sb = shapeOf a, shapeOf b
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 -> ShapeSpec.scalar
             | 2, 1 -> ShapeSpec.vector sa.[0]
             | 2, 2 when sa.[1] = sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
-            | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb
-    | TensorProduct(a, b) -> ShapeSpec.concat (shapeOf a) (shapeOf b)
+            | _ -> failshape op sa sb
+    | TensorProduct(a, b) -> 
+        let sa, sb = shapeOf a, shapeOf b
+        List.map2 SizeSpec.multiply sa sb
+    // reductions
     | Sum a -> ShapeSpec.scalar
     | SumAxis(ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
-    | Reshape(ss, a) -> ss
-    | SwapDim(ax1, ax2, a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
+    // tensor creation
+    | Identity ss -> ss
+    | Zeros ss -> ss
     | ScalarConst _ -> ShapeSpec.scalar
     | TensorConst(_, ss) -> ss
-    | Identity ss -> ss
+    // shape operations
+    | Reshape(ss, _) -> ss
+    | Broadcast(_, ss, _) -> ss
+    | SwapDim(ax1, ax2, a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
+    // variable access
     | Var (_, ss) -> ss
+    // misc
     | Annotated (a, _) -> shapeOf a
        
 
-let broadcastForElementwise opa opb =
-    let sa = shapeOf opa
-    let sb = shapeOf opb
-    let bsa, bsb = ShapeSpec.broadcastToSame sa sb
+/// Wraps the given op in a reshape-op if its shape does not match ss.
+let reshapeIfNecessary ss op =
+    if ss = shapeOf op then op else Reshape(ss, op)
 
-    let bopa = if bsa = sa then opa else Reshape(bsa, opa)
-    let bopb = if bsb = sb then opb else Reshape(bsb, opb)
-    bopa, bopb
-  
-
+/// Traverses the op tree and checks ops' arguments for compatible shapes and inserts reshape
+/// ops if necessary.
 let checkAndAdaptShapes =
     let mapUnaryOp op a =
+        let sa = shapeOf a
         match op with
-        | Transpose _ ->
-            let sa = shapeOf a
-            match ShapeSpec.nDim sa with
-            | 2 -> a
-            | _ -> failwithf "cannot transpose array of shape %A" sa
-        | SwapDim(ax1, ax2, _) ->
-            let sa = shapeOf a
-            if 0 <= ax1 && ax1 < ShapeSpec.nDim sa && 
-                0 <= ax2 && ax2 < ShapeSpec.nDim sa then
-                a
-            else
-                failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+        | Transpose _ when ShapeSpec.nDim sa <> 2 ->
+            failwithf "cannot transpose array of shape %A" sa
+        | SumAxis(ax, _) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
+            failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
+        | Reshape(ss, _) when not (SizeSpec.equal (ShapeSpec.nElem sa) (ShapeSpec.nElem ss)) ->
+            failwithf "cannot reshape array of shape %A with %A elements into shape %A with %A elements"
+                sa (ShapeSpec.nElem sa) ss (ShapeSpec.nElem ss)
+        | Broadcast(axp, ss, _) -> 
+            let psa = iterate ShapeSpec.padLeft axp ss
+            if ShapeSpec.nDim ss <> ShapeSpec.nDim psa then
+                failwithf "array of shape %A does not have same number of dimesions as %A after padding %d dimensions"
+                    sa ss axp
+            for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
+                match psa.[dim], ss.[dim] with
+                | SizeBroadcast, _ -> ()
+                | ssa, ssb when SizeSpec.equal ssa ssb -> ()
+                | _ -> failwithf "dimension %d of array with shape %A is not broadcastable to shape %A" dim psa ss
+            a
+        | SwapDim(ax1, ax2, _) when 
+                not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
+            failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
         | _ -> a
 
     let mapBinaryOp op a b =
+        let sa, sb = shapeOf a, shapeOf b
         match op with
-        | ElemwiseOp -> broadcastForElementwise a b
+        | ElemwiseOp -> 
+            // TODO: change to broadcast
+            let bsa, bsb = ShapeSpec.broadcastToSame sa sb
+            reshapeIfNecessary bsa a, reshapeIfNecessary bsb b
         | Dot(_) -> 
-            let sa, sb = shapeOf a, shapeOf b
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 when sa = sb -> a, b
             | 2, 1 when sa.[1] = sb.[0] -> a, b
             | 2, 2 when sa.[1] = sb.[0] -> a, b
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+        | TensorProduct(_) ->
+            let psa, psb = ShapeSpec.padToSame sa sb
+            reshapeIfNecessary psa a, reshapeIfNecessary psb b
         | _ -> a, b
 
     mapOperands mapUnaryOp mapBinaryOp
 
 
-let rec grad op wrt =    
-    let g =
-        // We assume that all operands have compatible size. 
-        // For elementwise operations we assume that a and b are already broadcasted
-        // to have the *same* size.
-        let subgrad x = grad x wrt
-        let constGrad ss = Zeros [ShapeSpec.nElem ss; ShapeSpec.nElem (shapeOf (Var wrt))]
-        match op with        
-        | Add(a, b) -> Add(subgrad a, subgrad b)
-        | Substract(a, b) -> Substract(subgrad a, subgrad b)
-        | Multiply(a, b) -> Add(Multiply(a, subgrad b), Multiply(b, subgrad a))
-        | Divide(a, b) -> subgrad (Multiply(a, Power(b, ScalarConst -1.0))) 
-        | Power(a, b) -> Add(Multiply(Multiply(Power(a, Substract(b, ScalarConst 1.0)), b), subgrad a),
-                             Multiply(Multiply(Power(a, b), Log a), subgrad b))
-        | Negate a -> Negate (subgrad a)
-        | Log a -> Multiply(Power(a, ScalarConst -1.0), subgrad a)
-        | Exp a -> Multiply(Exp a, subgrad a)
-        | Dot(a, b) -> 
-            let sa, sb = shapeOf a, shapeOf b
-            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                | 1, 1 -> subgrad (Sum(Multiply(a, b)))
-                | 2, 1 -> 
-                    Add(Dot(TensorProduct(b, Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
-                            subgrad a), 
-                        Dot(a, subgrad b)) // wrt b
-                | 2, 2 when sa.[1] = sb.[0] -> 
-                    Add(Dot(TensorProduct(Transpose(b), Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
-                            subgrad a),
-                        Dot(TensorProduct(Identity (ShapeSpec.matrix sb.[1] sb.[1]), a), // wrt b
-                            subgrad b))
-                | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-        | TensorProduct(a, b) ->
-            let ga, gb = subgrad a, subgrad b
-            let sa, sb = shapeOf a, shapeOf b
-            let sga, sgb = shapeOf ga, shapeOf gb
-            let g = Add(TensorProduct(Reshape(sa @ [sga.[1]], ga), b),
-                        TensorProduct(a, Reshape(sb @ [sgb.[1]], gb)))
-            let sg = shapeOf g            
-            Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
-        | Transpose a -> subgrad (SwapDim(0, 1, a))
-        | SwapDim (ax1, ax2, a) ->
-            let g = subgrad a
-            let sg, sa = shapeOf g, shapeOf a
-            Reshape(sg, SwapDim(ax1, ax2, Reshape(sa @ [sg.[1]], g)))
-        | Reshape (ss, a) ->
-            let g = subgrad a
-            let sg, sa = shapeOf g, shapeOf a
-            Reshape([ShapeSpec.nElem ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
-        | Sum a -> 
-            let ga = subgrad a
-            let sga = shapeOf ga
-            Reshape([SizeOne; sga.[1]], SumAxis(0, ga))
-        | SumAxis (ax, a) -> 
-            let ga = subgrad a
-            let sa = shapeOf a
-            let sga = shapeOf ga
-            let g = SumAxis(ax, Reshape(sa @ [sga.[1]], ga)) 
-            let sg = shapeOf g
-            Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
-        | Zeros ss -> constGrad ss
-        | ScalarConst _ -> constGrad ShapeSpec.scalar
-        | TensorConst (_, ss) -> constGrad ss
-        | Identity ss -> constGrad ss
-        | Var v -> 
-            let sv = shapeOf (Var v)
-            if v = wrt then                 
-                Identity [ShapeSpec.nElem sv; ShapeSpec.nElem sv]
-            else 
-                constGrad sv
-        | Annotated(a, ano) -> Annotated(subgrad a, ano)
-    Annotated(g, GradOf op)
-
     
-//exception SubEvalException of System.Exception * op
-
-type SubEvalException(op: Op, inner: System.Exception) =
-    inherit System.Exception((sprintf "while evaluating op %A" op), inner)
-    member x.Op = op
-
-type AnnotatedEvalException(anoOp: Op, inner: System.Exception) = 
-    inherit System.Exception(null, inner)
-    let op_, ano =
-        match anoOp with
-        | Annotated(op, ano) -> op, ano
-        | _ -> failwith "op must be Annotated"
-    member x.Op = op_
-    member x.Annotation = ano
-    override x.Message = sprintf "inside %A (which is %A)" op_ ano
-
-let debugEval = false
-
-let rec eval (env: Environment) op =
-    let subeval subop = 
-        let subval = eval env subop
-        if debugEval then printfn "Evaluated %A to %A." subop subval
-        subval
-    try 
-        match op with
-            | Add (a, b) -> NDArray.add (subeval a) (subeval b)
-            | Substract (a, b) -> NDArray.substract (subeval a) (subeval b)
-            | Multiply (a, b) -> NDArray.multiply (subeval a) (subeval b)
-            | Divide (a, b) -> NDArray.divide (subeval a) (subeval b)
-            | Power (a, b) -> NDArray.power (subeval a) (subeval b)
-            | Negate a -> NDArray.negate (subeval a)
-            | Log a -> NDArray.log (subeval a)
-            | Exp a -> NDArray.exp (subeval a)
-            | Dot (a, b) -> NDArray.dot (subeval a) (subeval b)
-            | Sum a -> NDArray.sum (subeval a)
-            | SumAxis (ax, a) -> NDArray.sumAxis ax (subeval a)
-            | Var v -> env.[v]
-            | ScalarConst s -> NDArray.scalar s
-            | TensorConst (a, s) -> NDArray.scalarBroadcastedTo (subeval a) s
-            | Annotated(a, _) -> subeval a
-    with
-        | :? SubEvalException as ex ->
-            match op with
-                | Annotated(_) -> raise (AnnotatedEvalException(op, ex))
-                | _ -> reraise()
-        | :? AnnotatedEvalException -> reraise()
-        | ex -> raise (SubEvalException(op, ex))
-
-
-let a = AnnotatedEvalException(ScalarConst 1.0, new System.Exception())
-

@@ -4,14 +4,47 @@ open Util
 
 
 /// size specification of a dimension (axis)
-type SizeSpec =
+type SizeSpecT =
     | SizeSymbol of string
     | SizeConst of int
-    | SizeOne
-    | SizeProduct of SizeSpec list
+    | SizeBroadcast
+    | SizeProduct of SizeSpecT list
+
+module SizeSpec =
+    let rec simplify ss =
+        match ss with
+        | SizeProduct sp -> simplifyProduct 1 sp
+        | _ -> ss
+
+    and simplifyProduct constProd sp =
+        match sp with
+        | [] -> if constProd = 1 then SizeBroadcast else SizeConst constProd
+        | s::sps ->
+            match simplify s with
+            | SizeConst c -> simplifyProduct (c * constProd) sps
+            | SizeBroadcast -> simplifyProduct constProd sps
+            | SizeProduct spr -> simplifyProduct constProd (spr @ sps)
+            | s -> doMultiply s (simplifyProduct constProd sps)
+
+    and doMultiply ssa ssb =
+        match ssa, ssb with
+        | SizeConst 0, _ | _, SizeConst 0 -> SizeConst 0
+        | SizeBroadcast, _ -> ssb
+        | _, SizeBroadcast -> ssa
+        | SizeProduct spa, SizeProduct spb -> SizeProduct (spa @ spb)
+        | SizeProduct spa, _ -> SizeProduct (ssb::spa)
+        | _, SizeProduct spb -> SizeProduct (ssa::spb)
+        | _, _ -> SizeProduct [ssa; ssb]
+
+    let multiply ssa ssb =
+        doMultiply ssa ssb |> simplify
+
+    let equal ssa ssb =
+        simplify ssa = simplify ssb // TODO
+
 
 /// shape specifcation of a tensor
-type ShapeSpecT = SizeSpec list
+type ShapeSpecT = SizeSpecT list
 
 module ShapeSpec =
     let withoutAxis ax sa =
@@ -22,10 +55,13 @@ module ShapeSpec =
 
     let nElem sa =
         match nDim sa with
-        | 0 -> SizeOne
-        | 1 -> sa.[0]
+        | 0 -> SizeConst 1
+        | 1 -> 
+            match sa.[0] with
+            | SizeBroadcast -> SizeConst 1
+            | s -> s
         | _ -> SizeProduct(sa)
-
+      
     let concat sa sb =
         sa @ sb
 
@@ -38,32 +74,35 @@ module ShapeSpec =
 
     let scalar = []
 
-    let vector (ss: SizeSpec) = [ss]
+    let vector (ss: SizeSpecT) = [ss]
 
-    let matrix (sr: SizeSpec) (sc: SizeSpec) = [sr; sc]
+    let matrix (sr: SizeSpecT) (sc: SizeSpecT) = [sr; sc]
 
     let padLeft sa =
-        (SizeOne)::sa
+        (SizeBroadcast)::sa
 
     let padRight sa =
-        sa @ [SizeOne]
+        sa @ [SizeBroadcast]
+
+    let rec padToSame sa sb =
+        if nDim sa < nDim sb then
+            padToSame (padLeft sa) sb
+        elif nDim sb < nDim sa then
+            padToSame sa (padLeft sb)
+        else
+            sa, sb
 
     let broadcast (sa: ShapeSpecT) dim size =
         match sa.[dim] with
-            | SizeOne -> List.set dim size sa
+            | SizeBroadcast -> List.set dim size sa
             | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeOne)" dim sa
 
     let broadcastToSame saIn sbIn =
-        let mutable sa = saIn
-        let mutable sb = sbIn 
-        while nDim sa < nDim sb do
-            sa <- padLeft sa
-        while nDim sb < nDim sa do
-            sb <- padLeft sb
+        let mutable sa, sb = padToSame saIn sbIn
         for d = 0 to (nDim sa) - 1 do
             match sa.[d], sb.[d] with
                 | al, bl when al = bl -> ()
-                | al, bl when al = SizeOne -> sa <- broadcast sa d bl
-                | al, bl when bl = SizeOne -> sb <- broadcast sb d al
+                | al, bl when al = SizeBroadcast -> sa <- broadcast sa d bl
+                | al, bl when bl = SizeBroadcast -> sb <- broadcast sb d al
                 | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
