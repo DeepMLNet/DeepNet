@@ -60,7 +60,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="ndarray.fs" />
-    <Compile Include="op.fs" />
+    <Compile Include="Shape.fs" />
+    <Compile Include="Op.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />

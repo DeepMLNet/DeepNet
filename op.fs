@@ -1,73 +1,12 @@
 ﻿module Op
 
 open Util
+open Shape
 
 /// variable environment
 type Environment = Map<string, NDArray.ndarray>
 
-type SizeSpec =
-    | SizeSymbol of string
-    | SizeConst of int
-    | SizeOne
-    | SizeProduct of SizeSpec list
-
-type ShapeSpecT = SizeSpec list
-
-module ShapeSpec =
-    let withoutAxis ax sa =
-        List.without ax sa
-
-    let ndim sa =
-        List.length sa
-
-    let flat sa =
-        match ndim sa with
-        | 0 -> SizeOne
-        | 1 -> sa.[0]
-        | _ -> SizeProduct(sa)
-
-    let concat sa sb =
-        sa @ sb
-
-    let transpose sa =
-        List.rev sa
-
-    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) =
-        sa  |> List.set ax1 sa.[ax2]
-            |> List.set ax2 sa.[ax1]
-
-    let scalar = []
-
-    let vector (ss: SizeSpec) = [ss]
-
-    let matrix (sr: SizeSpec) (sc: SizeSpec) = [sr; sc]
-
-    let padLeft sa =
-        (SizeOne)::sa
-
-    let padRight sa =
-        sa @ [SizeOne]
-
-    let broadcast (sa: ShapeSpecT) dim size =
-        match sa.[dim] with
-            | SizeOne -> List.set dim size sa
-            | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeOne)" dim sa
-
-    let broadcastToSame saIn sbIn =
-        let mutable sa = saIn
-        let mutable sb = sbIn 
-        while ndim sa < ndim sb do
-            sa <- padLeft sa
-        while ndim sb < ndim sa do
-            sb <- padLeft sb
-        for d = 0 to (ndim sa) - 1 do
-            match sa.[d], sb.[d] with
-                | al, bl when al = bl -> ()
-                | al, bl when al = SizeOne -> sa <- broadcast sa d bl
-                | al, bl when bl = SizeOne -> sb <- broadcast sb d al
-                | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
-        sa, sb
-
+/// variable specification
 type VarSpecT = string * ShapeSpecT
 
 
@@ -182,7 +121,7 @@ let rec shapeOf op =
     | Dot(a, b) -> 
         let sa = shapeOf a
         let sb = shapeOf b
-        match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
+        match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 -> ShapeSpec.scalar
             | 2, 1 -> ShapeSpec.vector sa.[0]
             | 2, 2 when sa.[1] = sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
@@ -214,13 +153,13 @@ let checkAndAdaptShapes =
         match op with
         | Transpose _ ->
             let sa = shapeOf a
-            match ShapeSpec.ndim sa with
+            match ShapeSpec.nDim sa with
             | 2 -> a
             | _ -> failwithf "cannot transpose array of shape %A" sa
         | SwapDim(ax1, ax2, _) ->
             let sa = shapeOf a
-            if 0 <= ax1 && ax1 < ShapeSpec.ndim sa && 
-                0 <= ax2 && ax2 < ShapeSpec.ndim sa then
+            if 0 <= ax1 && ax1 < ShapeSpec.nDim sa && 
+                0 <= ax2 && ax2 < ShapeSpec.nDim sa then
                 a
             else
                 failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
@@ -231,7 +170,7 @@ let checkAndAdaptShapes =
         | ElemwiseOp -> broadcastForElementwise a b
         | Dot(_) -> 
             let sa, sb = shapeOf a, shapeOf b
-            match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
+            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 when sa = sb -> a, b
             | 2, 1 when sa.[1] = sb.[0] -> a, b
             | 2, 2 when sa.[1] = sb.[0] -> a, b
@@ -247,7 +186,7 @@ let rec grad op wrt =
         // For elementwise operations we assume that a and b are already broadcasted
         // to have the *same* size.
         let subgrad x = grad x wrt
-        let constGrad ss = Zeros [ShapeSpec.flat ss; ShapeSpec.flat (shapeOf (Var wrt))]
+        let constGrad ss = Zeros [ShapeSpec.nElem ss; ShapeSpec.nElem (shapeOf (Var wrt))]
         match op with        
         | Add(a, b) -> Add(subgrad a, subgrad b)
         | Substract(a, b) -> Substract(subgrad a, subgrad b)
@@ -260,7 +199,7 @@ let rec grad op wrt =
         | Exp a -> Multiply(Exp a, subgrad a)
         | Dot(a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
-            match ShapeSpec.ndim sa, ShapeSpec.ndim sb with
+            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                 | 1, 1 -> subgrad (Sum(Multiply(a, b)))
                 | 2, 1 -> 
                     Add(Dot(TensorProduct(b, Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
@@ -279,7 +218,7 @@ let rec grad op wrt =
             let g = Add(TensorProduct(Reshape(sa @ [sga.[1]], ga), b),
                         TensorProduct(a, Reshape(sb @ [sgb.[1]], gb)))
             let sg = shapeOf g            
-            Reshape(sg.[0 .. (ShapeSpec.ndim sg) - 1] @ [sga.[1]], g)            
+            Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
         | Transpose a -> subgrad (SwapDim(0, 1, a))
         | SwapDim (ax1, ax2, a) ->
             let g = subgrad a
@@ -288,7 +227,7 @@ let rec grad op wrt =
         | Reshape (ss, a) ->
             let g = subgrad a
             let sg, sa = shapeOf g, shapeOf a
-            Reshape([ShapeSpec.flat ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
+            Reshape([ShapeSpec.nElem ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
         | Sum a -> 
             let ga = subgrad a
             let sga = shapeOf ga
@@ -299,7 +238,7 @@ let rec grad op wrt =
             let sga = shapeOf ga
             let g = SumAxis(ax, Reshape(sa @ [sga.[1]], ga)) 
             let sg = shapeOf g
-            Reshape(sg.[0 .. (ShapeSpec.ndim sg) - 1] @ [sga.[1]], g)            
+            Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
         | Zeros ss -> constGrad ss
         | ScalarConst _ -> constGrad ShapeSpec.scalar
         | TensorConst (_, ss) -> constGrad ss
@@ -307,7 +246,7 @@ let rec grad op wrt =
         | Var v -> 
             let sv = shapeOf (Var v)
             if v = wrt then                 
-                Identity [ShapeSpec.flat sv; ShapeSpec.flat sv]
+                Identity [ShapeSpec.nElem sv; ShapeSpec.nElem sv]
             else 
                 constGrad sv
         | Annotated(a, ano) -> Annotated(subgrad a, ano)
