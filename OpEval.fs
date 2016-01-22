@@ -2,6 +2,9 @@
 
 open Op
 
+(*
+/// variable environment
+type Environment = Map<string, NDArray.ndarray>
 
 type SubEvalException(op: Op, inner: System.Exception) =
     inherit System.Exception((sprintf "while evaluating op %A" op), inner)
@@ -51,3 +54,4 @@ let rec eval (env: Environment) op =
 
 
 
+*)

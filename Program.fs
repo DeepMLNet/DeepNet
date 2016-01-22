@@ -1,40 +1,33 @@
 ﻿open Xunit
 
-   
+open Shape
+open Op
+open OpGrad
+
 [<Fact>]
-let ``Matrix multiplication optimization`` () =
-    let Aval = NDArray.zeros [2; 3]
-    NDArray.set Aval [1; 1] 3.0
-    let bval = NDArray.zeros [2; 1]
-    NDArray.set Aval [1] 4.0
+let ``Gradient of linear regression`` () =
+    let A = var "A" [SizeSymbol "M"; SizeSymbol "N"]
+    let b = var "b" [SizeSymbol "M"]
+    let x = var "x" [SizeSymbol "N"]
+    let t = var "t" [SizeSymbol "M"]
 
-    let xval = NDArray.zeros [3; 1]
-    NDArray.set xval [1; 0] 2.0
-    let tval = NDArray.zeros [2; 1]
-    NDArray.set tval [1; 0] 1.0
+    let pred = A.*x + b
+    let smplLoss = (pred - t)**2.0
+    let loss = sum smplLoss
 
-    let env = ["A", Aval; "b", bval; "x", xval; "t", tval;]
-                |> Map.ofList 
+    printfn "loss = %A" loss
+    printfn "shape of loss: %A" (shapeOf loss)
 
-    let out = Op.Add(Op.Dot (Op.Var "A", Op.Var "x"), Op.Var "b")
-    let loss = Op.Sum(Op.Power(Op.Substract(out, Op.Var "t"), Op.ScalarConst 2.0))
+    let avar = 
+        match A with
+        | Var avar -> avar
+        | _ -> failwith "not happen"
 
-    let gradA = Op.grad loss "A"
-    let gradb = Op.grad loss "b"
-
-    //let opt = Op.Multiply (Op.Var "v1", Op.Var "v2")
-    //Op.eval env opt
-    //
-    //let g = Op.grad opt "v1"
-    //Op.eval env g
-
-    printfn "loss: %A" (Op.eval env loss)
-
-    printfn "loss wrt A: %A" (Op.eval env gradA)
-    printfn "loss wrt b: %A" (Op.eval env gradb)
-    
+    ()
+    let lossWrtA = grad loss avar
+    printfn "dloss / dA = %A" lossWrtA
 
 [<EntryPoint>]
 let main argv = 
-    ``Matrix multiplication optimization`` ()
+    ``Gradient of linear regression`` ()
     0

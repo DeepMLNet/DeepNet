@@ -59,10 +59,10 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
-    <Compile Include="ndarray.fs" />
     <Compile Include="Shape.fs" />
     <Compile Include="Op.fs" />
     <Compile Include="OpGrad.fs" />
+    <Compile Include="NDArray.fs" />
     <Compile Include="OpEval.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />

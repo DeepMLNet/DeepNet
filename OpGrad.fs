@@ -9,7 +9,11 @@ let rec grad op wrt =
         // We assume that all operands have compatible size. 
         // For elementwise operations we assume that a and b are already broadcasted
         // to have the *same* size.
-        let subgrad x = grad x wrt
+        let subgrad x = 
+            let g = grad x wrt
+            if shapeOf g |> ShapeSpec.nDim <> 2 then
+                failwithf "gradient must have two dimensions but it has shape %A" (shapeOf g)
+            g
         let constGrad ss = Zeros [ShapeSpec.nElem ss; ShapeSpec.nElem (shapeOf (Var wrt))]
         match op with        
         | Add(a, b) -> Add(subgrad a, subgrad b)
@@ -30,7 +34,7 @@ let rec grad op wrt =
                             subgrad a), 
                         Dot(a, subgrad b)) // wrt b
                 | 2, 2 when sa.[1] = sb.[0] -> 
-                    Add(Dot(TensorProduct(Transpose(b), Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
+                    Add(Dot(TensorProduct(SwapDim(0, 1, b), Identity (ShapeSpec.matrix sa.[0] sa.[0])), // wrt a
                             subgrad a),
                         Dot(TensorProduct(Identity (ShapeSpec.matrix sb.[1] sb.[1]), a), // wrt b
                             subgrad b))
@@ -43,7 +47,6 @@ let rec grad op wrt =
                         TensorProduct(a, Reshape(sb @ [sgb.[1]], gb)))
             let sg = shapeOf g            
             Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
-        | Transpose a -> subgrad (SwapDim(0, 1, a))
         | SwapDim (ax1, ax2, a) ->
             let g = subgrad a
             let sg, sa = shapeOf g, shapeOf a
@@ -52,17 +55,18 @@ let rec grad op wrt =
             let g = subgrad a
             let sg, sa = shapeOf g, shapeOf a
             Reshape([ShapeSpec.nElem ss; sg.[1]], Reshape(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
+        | Broadcast (ss, a) ->
+            let g = subgrad a
+            let sg, sa = shapeOf g, shapeOf a
+            Reshape([ShapeSpec.nElem ss; sg.[1]], Broadcast(ss @ [sg.[1]], Reshape(sa @ [sg.[1]], g)))
         | Sum a -> 
             let ga = subgrad a
             let sga = shapeOf ga
-            Reshape([SizeBroadcast; sga.[1]], SumAxis(0, ga))
+            Reshape([SizeConst 1; sga.[1]], SumAxis(0, ga))
         | SumAxis (ax, a) -> 
             let ga = subgrad a
-            let sa = shapeOf a
-            let sga = shapeOf ga
-            let g = SumAxis(ax, Reshape(sa @ [sga.[1]], ga)) 
-            let sg = shapeOf g
-            Reshape(sg.[0 .. (ShapeSpec.nDim sg) - 1] @ [sga.[1]], g)            
+            let sa, sga = shapeOf a, shapeOf ga
+            SumAxis(ax, Reshape(sa @ [sga.[1]], ga)) 
         | Zeros ss -> constGrad ss
         | ScalarConst _ -> constGrad ShapeSpec.scalar
         | TensorConst (_, ss) -> constGrad ss
@@ -74,5 +78,5 @@ let rec grad op wrt =
             else 
                 constGrad sv
         | Annotated(a, ano) -> Annotated(subgrad a, ano)
-    Annotated(g, GradOf op)
+    Annotated(g, GradOf op) |> checkAndAdaptShapes
 

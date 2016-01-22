@@ -3,6 +3,8 @@
 open Util
 
 
+// TODO: implement real equality checking
+
 /// size specification of a dimension (axis)
 type SizeSpecT =
     | SizeSymbol of string
@@ -98,7 +100,9 @@ module ShapeSpec =
             | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeOne)" dim sa
 
     let broadcastToSame saIn sbIn =
-        let mutable sa, sb = padToSame saIn sbIn
+        let mutable sa, sb = saIn, sbIn
+        if nDim sa <> nDim sb then 
+            failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
         for d = 0 to (nDim sa) - 1 do
             match sa.[d], sb.[d] with
                 | al, bl when al = bl -> ()
