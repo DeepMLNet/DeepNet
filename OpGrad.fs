@@ -62,7 +62,7 @@ let rec grad op wrt =
         | Sum a -> 
             let ga = subgrad a
             let sga = shapeOf ga
-            Reshape([SizeConst 1; sga.[1]], SumAxis(0, ga))
+            Reshape([SizeSpec.one; sga.[1]], SumAxis(0, ga))
         | SumAxis (ax, a) -> 
             let ga = subgrad a
             let sa, sga = shapeOf a, shapeOf ga

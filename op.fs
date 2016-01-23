@@ -140,11 +140,11 @@ let rec shapeOf op =
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 -> ShapeSpec.scalar
             | 2, 1 -> ShapeSpec.vector sa.[0]
-            | 2, 2 when sa.[1] = sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
+            | 2, 2 when sa.[1] .= sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
             | _ -> failshape op sa sb
     | TensorProduct(a, b) -> 
         let sa, sb = shapeOf a, shapeOf b
-        List.map2 SizeSpec.multiply sa sb
+        List.map2 (*) sa sb
     // reductions
     | Sum a -> ShapeSpec.scalar
     | SumAxis(ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
@@ -179,7 +179,7 @@ let checkAndAdaptShapes =
         match op with
         | SumAxis(ax, _) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
             failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
-        | Reshape(ss, _) when not (SizeSpec.equal (ShapeSpec.nElem sa) (ShapeSpec.nElem ss)) ->
+        | Reshape(ss, _) when not ((ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss)) ->
             failwithf "cannot reshape array of shape %A with %A elements into shape %A with %A elements"
                 sa (ShapeSpec.nElem sa) ss (ShapeSpec.nElem ss)
         | Broadcast(ss, _) -> 
@@ -188,8 +188,8 @@ let checkAndAdaptShapes =
                     sa ss
             for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                 match sa.[dim], ss.[dim] with
-                | SizeBroadcast, _ -> ()
-                | ssa, ssb when SizeSpec.equal ssa ssb -> ()
+                | Shape.Broadcast, _ -> ()
+                | ssa, ssb when ssa .= ssb -> ()
                 | _ -> failwithf "dimension %d of array with shape %A is not broadcastable to shape %A" dim sa ss
             a
         | SwapDim(ax1, ax2, _) when 
@@ -208,10 +208,12 @@ let checkAndAdaptShapes =
             ba, bb
         | Dot(_) -> 
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 1, 1 when sa = sb -> a, b
-            | 2, 1 when sa.[1] = sb.[0] -> a, b
-            | 2, 2 when sa.[1] = sb.[0] -> a, b
+            | 1, 1 when sa.[0] .= sb.[0] -> ()
+            | 2, 1 when sa.[1] .= sb.[0] -> ()
+            | 2, 2 when sa.[1] .= sb.[0] -> ()
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+            let dsa, dsb = ShapeSpec.disableAllBroadcasts sa, ShapeSpec.disableAllBroadcasts sb
+            reshapeIfNecessary dsa a, reshapeIfNecessary dsb b
         | TensorProduct(_) ->
             let psa, psb = ShapeSpec.padToSame sa sb
             reshapeIfNecessary psa a, reshapeIfNecessary psb b

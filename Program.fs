@@ -6,10 +6,10 @@ open OpGrad
 
 [<Fact>]
 let ``Gradient of linear regression`` () =
-    let A = var "A" [SizeSymbol "M"; SizeSymbol "N"]
-    let b = var "b" [SizeSymbol "M"]
-    let x = var "x" [SizeSymbol "N"]
-    let t = var "t" [SizeSymbol "M"]
+    let A = var "A" [symbol "M"; symbol "N"]
+    let b = var "b" [symbol "M"]
+    let x = var "x" [symbol "N"]
+    let t = var "t" [symbol "M"]
 
     let pred = A.*x + b
     let smplLoss = (pred - t)**2.0
