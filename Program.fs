@@ -20,11 +20,11 @@ let ``Gradient of linear regression`` () =
 
     let avar = 
         match A with
-        | Var avar -> avar
+        | Leaf(Var(avar)) -> avar
         | _ -> failwith "not happen"
 
     ()
-    let lossWrtA = grad loss avar
+    let lossWrtA = grad avar loss
     printfn "dloss / dA = %A" lossWrtA
 
 [<EntryPoint>]
