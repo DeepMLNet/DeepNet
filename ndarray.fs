@@ -2,48 +2,64 @@ module NDArray
 open Util
 
 
-type ndarray = {shape: int list;
-                stride: int list; 
-                offset: int;
-                data: float[]}
+type NDArray = 
+    {Shape: int list;
+     Stride: int list; 
+     Offset: int;
+     Data: float[]}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // shape functions
 ////////////////////////////////////////////////////////////////////////////////////////////////
             
-let ndim a = List.length a.shape
+let nDim a = List.length a.Shape
     
-let shape a = a.shape
+let shape a = a.Shape
 
 let padLeft a =
-    {a with shape=1::a.shape; stride=0::a.stride}
+    {a with Shape=1::a.Shape; Stride=0::a.Stride}
 
 let padRight a =
-    {a with shape=List.append a.shape [1]; stride=List.append a.stride [0]}
+    {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
 
-let broadcast a dim size =
+let broadcastDim a dim size =
     match (shape a).[dim] with
-        | 1 -> {a with shape=List.set dim size a.shape; stride=List.set dim 0 a.stride}
+        | 1 -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0 a.Stride}
         | _ -> failwithf "dimension %d must be of size 1 to broadcast (is %A)" dim (shape a)
 
 let broadcastToSame ain bin =
     let mutable a = ain
     let mutable b = bin 
-    while ndim a < ndim b do
+    while nDim a < nDim b do
         a <- padLeft a
-    while ndim b < ndim a do
+    while nDim b < nDim a do
         b <- padLeft b
-    for d = 0 to (ndim a) - 1 do
+    for d = 0 to (nDim a) - 1 do
         match (shape a).[d], (shape b).[d] with
             | al, bl when al = bl -> ()
-            | al, bl when al = 1 -> a <- broadcast a d bl
-            | al, bl when bl = 1 -> b <- broadcast b d al
+            | al, bl when al = 1 -> a <- broadcastDim a d bl
+            | al, bl when bl = 1 -> b <- broadcastDim b d al
             | _ -> failwithf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
     a, b
 
+let broadcastToShape bs ain =
+    let bsDim = List.length bs
+    let mutable a = ain
+    while nDim a < bsDim do
+        a <- padLeft a
+    if bsDim < nDim a then
+        failwithf "shape %A has less dimensions than NDArray with shape %A" bs (shape ain)
+    for d = 0 to bsDim - 1 do
+        match (shape a).[d], bs.[d] with
+            | al, bl when al = bl -> ()
+            | al, bl when al = 1 -> a <- broadcastDim a d bl
+            | _ -> failwithf "cannot broadcast NDArray with shape %A to shape %A" (shape ain) bs
+    a
+
 let checkSameShape a b =
-    if a.shape <> b.shape then
-        failwithf "inequal shapes:  %A <> %A" a.shape b.shape
+    if a.Shape <> b.Shape then
+        failwithf "inequal shapes:  %A <> %A" a.Shape b.Shape
          
 let rec compactStride (shape: int list) =
     match shape with
@@ -66,7 +82,7 @@ let allIdx a =
                         yield i::is
             | [] -> yield []
     } 
-    allIdxRec a.shape   
+    allIdxRec a.Shape   
 
 let idxOfDim a dim =
     { 0 .. (shape a).[dim] - 1}
@@ -92,31 +108,31 @@ type IdxSpec =
 let rec view a idxs =
     match idxs with
         | (All | Elem _ | Rng(_, _) as idx)::ridxs ->
-            match a.shape, a.stride with
+            match a.Shape, a.Stride with
                 | shp::rShps, str::rStrs ->
-                    let ra = view {a with shape=rShps; stride=rStrs} ridxs
+                    let ra = view {a with Shape=rShps; Stride=rStrs} ridxs
                     match idx with 
                         | All ->
-                            {ra with shape = shp::ra.shape;
-                                     stride = str::ra.stride}
+                            {ra with Shape = shp::ra.Shape;
+                                     Stride = str::ra.Stride}
                         | Elem i -> 
                             checkElementRange shp i
-                            {ra with offset = ra.offset + i*str;
-                                     stride = ra.stride;
-                                     shape = ra.shape} 
+                            {ra with Offset = ra.Offset + i*str;
+                                     Stride = ra.Stride;
+                                     Shape = ra.Shape} 
                         | Rng(start, stop) ->
                             checkElementRange shp start
                             checkElementRange shp stop
-                            {ra with offset = ra.offset + start*str;
-                                     shape = (stop - start)::ra.shape;
-                                     stride = str::ra.stride} 
+                            {ra with Offset = ra.Offset + start*str;
+                                     Shape = (stop - start)::ra.Shape;
+                                     Stride = str::ra.Stride} 
                         | NewAxis -> failwith "impossible"
                 | _ -> failwith "incompatible shapes"
         | NewAxis::ridxs ->
                 let ra = view a ridxs
-                {ra with shape = 1::ra.shape; stride = 0::ra.stride}
+                {ra with Shape = 1::ra.Shape; Stride = 0::ra.Stride}
         | [] -> 
-            match a.shape with
+            match a.Shape with
                 | shp::rShps -> failwith "incompatible shapes"
                 | [] -> a
 
@@ -126,13 +142,13 @@ let rec view a idxs =
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 let addr a idx =
-    Seq.map2 (*) idx a.stride |> Seq.sum
+    Seq.map2 (*) idx a.Stride |> Seq.sum
     
 let get a idx =
-    a.data.[addr a idx]
+    a.Data.[addr a idx]
     
 let set a idx value =
-    a.data.[addr a idx] <- value
+    a.Data.[addr a idx] <- value
 
 let allElems a =
     allIdx a |> Seq.map (get a)
@@ -142,24 +158,28 @@ let allElems a =
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 let scalar s =
-    {shape=[]; stride=[]; offset=0; data=Array.create 1 s}
-
-let scalarBroadcastedTo a s =
-    let _, ss = scalar s |> broadcastToSame a 
-    ss
+    {Shape=[]; Stride=[]; Offset=0; Data=Array.create 1 s}
 
 let zeros shape =
-    {shape=shape; stride=compactStride shape; offset=0; data=Array.zeroCreate (lengthOfShape shape)}
+    {Shape=shape; Stride=compactStride shape; Offset=0; Data=Array.zeroCreate (lengthOfShape shape)}
     
 let zerosLike a =
     zeros (shape a)
 
 let ones shape =
-    {shape=shape; stride=compactStride shape; offset=0; data=Array.create (lengthOfShape shape) 1.0}
+    {Shape=shape; Stride=compactStride shape; Offset=0; Data=Array.create (lengthOfShape shape) 1.0}
 
 let onesLike a =
     ones (shape a)
-    
+
+let identity shape =
+    let m = zeros shape
+    let md = List.length shape
+    let dl = List.min shape
+    for i = 0 to dl - 1 do
+        set m (List.replicate md i) 1.
+    m
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // elementwise operations
 ////////////////////////////////////////////////////////////////////////////////////////////////   
@@ -220,12 +240,12 @@ let allIdxForReduction dim a =
                             yield Elem i::is, i::ws
             | [] -> yield [], []
     } 
-    match a.shape with
+    match a.Shape with
         | [] -> Seq.empty
-        | _ -> allIdxRec a.shape dim  
+        | _ -> allIdxRec a.Shape dim  
        
-let axisReduce (f: ndarray -> ndarray) dim a =
-    let c = zeros (List.without dim a.shape)
+let axisReduce (f: NDArray -> NDArray) dim a =
+    let c = zeros (List.without dim a.Shape)
     for vidx, widx in allIdxForReduction dim a do
         get (f (view a vidx)) [] |> set c widx 
     c
@@ -244,15 +264,15 @@ let productAxis = axisReduce product
 ////////////////////////////////////////////////////////////////////////////////////////////////         
 
 let rec dot a b =
-    match ndim a, ndim b with
+    match nDim a, nDim b with
         | 0, _ | _, 0  -> multiply a b
         | 1, 1 -> multiply a b |> sum
         | 2, 1 -> view (dot a (padRight b)) [All; Elem 0]
         //| 1, 2 -> dot (padRight a) b
-        | 2, 2 when a.shape.[1] = b.shape.[0] ->
-            let I = a.shape.[0]
-            let J = a.shape.[1]
-            let K = b.shape.[1]
+        | 2, 2 when a.Shape.[1] = b.Shape.[0] ->
+            let I = a.Shape.[0]
+            let J = a.Shape.[1]
+            let K = b.Shape.[1]
             let c = zeros [I; K]
             for k=0 to K - 1 do
                 for i=0 to I - 1 do
@@ -262,8 +282,18 @@ let rec dot a b =
                         |> set c [i; k]
             c
         | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" 
-                    a.shape b.shape
+                    a.Shape b.Shape
 
     
-      
+type NDArray with
 
+    // elementwise binary
+    static member (+) (a: NDArray, b: NDArray) = add a b
+    static member (-) (a: NDArray, b: NDArray) = substract a b    
+    static member (*) (a: NDArray, b: NDArray) = multiply a b
+    static member (/) (a: NDArray, b: NDArray) = divide a b
+    static member Pow (a: NDArray, b: NDArray) = power a b
+
+
+    // unary
+    static member (~-) (a: NDArray) = negate a

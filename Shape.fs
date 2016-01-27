@@ -4,6 +4,9 @@ open Util
 
 type SymbolSpec = string
 
+/// symbol value environment
+type SymbolEnv = Map<string, int>
+
 /// elementary size specification, can be either a symbol or a fixed quantity
 type BaseSize =
     | Symbol of SymbolSpec
@@ -84,6 +87,12 @@ module SizeProduct =
         else
             None
 
+    let eval (env: SymbolEnv) (p: SizeProductT) =
+        p.Symbols 
+            |> Map.toSeq
+            |> Seq.map (fun (sym, power) ->  pown env.[sym] power)
+            |> Seq.fold (*) p.Factor
+
 /// size specification of a dimension (axis)
 type SizeSpecT =
     | Base of BaseSize              // fixed size or symbol
@@ -130,6 +139,14 @@ module SizeSpec =
     /// broadcastable size one
     let broadcastable =
         Broadcast
+
+    let eval (env: SymbolEnv) ss =
+        match ss with
+        | Base (Symbol sym) -> env.[sym]
+        | Base (Fixed f) -> f
+        | Broadcast -> 1
+        | Product p -> SizeProduct.eval env p
+
 
 let symbol = SizeSpec.symbol
 
@@ -219,4 +236,9 @@ module ShapeSpec =
 
     let disableAllBroadcasts sa =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
+
+    /// evaluates shape to numeric shape
+    let eval (env: SymbolEnv) (sa: ShapeSpecT) =
+        List.map (SizeSpec.eval env) sa
+
 
