@@ -267,9 +267,9 @@ let sum a = Unary(Sum, a) |> check
 let sumAxis ax a = Unary(SumAxis(ax), a) |> check
 
 /// tensor of given shape with 1s on the diagonal
-let id ss = Leaf(Identity(ss)) |> check
-let eye = id
-let idMatrix rows cols = id (ShapeSpec.matrix rows cols)
+let identity ss = Leaf(Identity(ss)) |> check
+let eye = identity
+let idMatrix rows cols = identity (ShapeSpec.matrix rows cols)
 
 /// zero tensor of given shape
 let zeros ss = Leaf(Zeros(ss)) |> check
@@ -285,7 +285,7 @@ let reshape ss a = Unary(Reshape(ss), a) |> check
 let broadcast ss a = Unary(Broadcast(ss), a) |> check
 
 /// variable of given name and shape
-let var name (ss: ShapeSpecT) = Leaf(Var(name, ss))
+let var name (ss: ShapeSpecT) = Leaf(Var(name, ss)) 
 
 /// annotated expression
 let annotate ano a = Unary(Annotated(ano), a) |> check
