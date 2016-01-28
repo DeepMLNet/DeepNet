@@ -100,6 +100,16 @@ let rec mapOperands unaryMapping binaryMapping expr =
         Binary(op, ma, mb)
     | _ -> expr
 
+/// returns true if subExpr is contained in expr
+let rec contains subExpr expr =
+    if expr = subExpr then
+        true
+    else
+        match expr with
+        | Unary(_, a) -> contains subExpr a
+        | Binary(_, a, b) -> contains subExpr a || contains subExpr b
+        | _ -> false
+
 /// Produces an error message about incompatible shapes.
 let failshape op sa sb =
     failwithf "op %A was provided with arrays of incompatible shapes %A and %A" op sa sb

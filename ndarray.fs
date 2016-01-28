@@ -2,6 +2,15 @@ module NDArray
 open Util
 
 
+/// if true, then an occuring NaN or Inf causes and exception to be thrown.
+let CheckFinite = true
+
+/// if value is NaN or Inf throws an ArithmeticException
+let inline checkFiniteVal value =
+    if CheckFinite then
+        if System.Double.IsInfinity(value) || System.Double.IsNaN(value) then
+            raise (System.ArithmeticException("non-finite value encountered"))
+
 /// an N-dimensional array with reshape and subview abilities
 type NDArray = 
     {Shape: int list;
@@ -32,6 +41,7 @@ let get idx a =
     
 /// set element value
 let set idx value a =
+    checkFiniteVal value
     a.Data.[addr idx a] <- value
 
 
@@ -202,7 +212,8 @@ type Slice =
 
 /// creates a subview of an NDArray
 let rec view slices a =
-    let checkElementRange nElems i =
+    let checkElementRange isEnd nElems i =
+        let nElems = if isEnd then nElems + 1 else nElems
         if not (0 <= i && i < nElems) then
             failwithf "index %d out of range in slice %A for array of shape %A" i slices (shape a)
     let failIncompatible () =
@@ -217,13 +228,13 @@ let rec view slices a =
                 {ra with Shape = shp::ra.Shape;
                          Stride = str::ra.Stride}
             | Elem i -> 
-                checkElementRange shp i
+                checkElementRange false shp i
                 {ra with Offset = ra.Offset + i*str;
                          Stride = ra.Stride;
                          Shape = ra.Shape} 
             | Rng(start, stop) ->
-                checkElementRange shp start
-                checkElementRange shp stop
+                checkElementRange false shp start
+                checkElementRange true shp stop
                 {ra with Offset = ra.Offset + start*str;
                          Shape = (stop - start)::ra.Shape;
                          Stride = str::ra.Stride} 
@@ -244,6 +255,7 @@ let rec view slices a =
 
 /// NDArray with zero dimensions (scalar) and given value
 let scalar f =
+    checkFiniteVal f
     let a = newContinguous [] 
     set [] f a
     a
@@ -283,7 +295,9 @@ let identity shape =
 let elemwise (f: float -> float) a =
     let c = zerosLike a
     for idx in allIdx (shape a) do
-        set idx (f (get idx a)) c
+        let cv = f (get idx a)
+        checkFiniteVal cv
+        set idx cv c
     c
             
 /// Applies the given binary function elementwise to the two given NDArrays.
@@ -291,7 +305,9 @@ let elemwise2 (f: float -> float -> float) a b =
     let a, b = broadcastToSame a b
     let c = zerosLike a
     for idx in allIdx (shape a) do
-        set idx (f (get idx a) (get idx b)) c
+        let cv = f (get idx a) (get idx b)
+        checkFiniteVal cv
+        set idx cv c
     c        
         
 let add a b =
@@ -389,9 +405,10 @@ let rec dot a b =
         | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" 
                     (shape a) (shape b)
 
+/// block array specification
 type BlockSpec =
     | Blocks of BlockSpec list
-    | Arrays of NDArray list
+    | Array of NDArray 
 
 /// array constructed of other arrays
 let blockArray bs =
@@ -418,8 +435,8 @@ let blockArray bs =
         match bs with
         | Blocks blcks ->
             blcks |> List.map (joinedBlocksShape (joinDim + 1)) |> joinShape joinDim
-        | Arrays arys ->
-            arys |> List.map shape |> joinShape joinDim
+        | Array ary ->
+            ary |> shape
 
     let rec blockPosAndContents (joinDim: int) startPos bs = seq {
         match bs with
@@ -429,16 +446,16 @@ let blockArray bs =
                 yield! blockPosAndContents (joinDim + 1) pos blck 
                 let blckShape = joinedBlocksShape joinDim blck
                 pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
-        | Arrays arys ->
-            let mutable pos = startPos
-            for ary in arys do
-                yield pos, ary
-                pos <- List.set joinDim (pos.[joinDim] + (shape ary).[joinDim]) pos
+        | Array ary ->
+            yield startPos, ary
     }
-            
+                   
     let joinedShape = joinedBlocksShape 0 bs
     let joined = zeros joinedShape
     let startPos = List.replicate (List.length joinedShape) 0
+
+    // printfn "joined shape is %A" joinedShape
+    // printfn "blockPosAndContents are %A" (blockPosAndContents 0 startPos bs)
 
     for pos, ary in blockPosAndContents 0 startPos bs do
         let slice = List.map2 (fun p s -> Rng(p, p + s)) pos (shape ary)
@@ -455,17 +472,12 @@ let tensorProduct a b =
 
     let rec generate pos = 
         match List.length pos with
-        | dim when dim = nDim a - 1 ->
-            let arys = seq {
-                for p = 0 to aShp.[dim] - 1 do
-                    let aElem = get (pos @ [p]) a
-                    yield multiply (scalar aElem) b
-            }                     
-            Arrays (Seq.toList arys)
+        | dim when dim = nDim a ->
+            let aElem = get pos a
+            Array (multiply (scalar aElem) b)
         | dim ->
-            let blcks = 
-                seq {for p in 0 .. aShp.[dim] - 1 -> generate (pos @ [p])}
-            Blocks (Seq.toList blcks)   
+            seq {for p in 0 .. aShp.[dim] - 1 -> generate (pos @ [p])}
+                |> Seq.toList |> Blocks
 
     generate [] |> blockArray
 

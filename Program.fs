@@ -34,11 +34,11 @@ let linearRegressionGradient (lr: LinearRegression) =
      LossWrtT = grad (extractVar lr.t) lr.Loss;}
 
 let linearRegressionValueEnv (lr: LinearRegression) =
-    let m, n = 5, 3
-    let aVal = NDArray.zeros [m; n]
+    let m, n = 3, 2
+    let aVal = NDArray.identity [m; n]
     let bVal = NDArray.zeros [m]
-    let xVal = NDArray.zeros [n]
-    let tVal = NDArray.zeros [m]
+    let xVal = NDArray.ones [n]
+    let tVal = NDArray.ones [m]
     let env = 
         VarEnv.empty
         |> VarEnv.add lr.a aVal
@@ -83,7 +83,7 @@ let ``Eval gradient of linear regression`` () =
 [<EntryPoint>]
 let main argv = 
     ``Build linear regression`` ()
-    ``Eval linear regression`` ()
-    //``Gradient of linear regression`` ()
+    //``Eval linear regression`` ()
+    ``Gradient of linear regression`` ()
     ``Eval gradient of linear regression`` ()
     0
