@@ -85,7 +85,7 @@ let rec grad wrt expr =
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                 | 1, 1 -> subgrad (sum(a * b))
                 | 2, 1 -> (b %* (idMatrix sa.[0] sa.[0])) .* ga .+ a .* gb
-                | 2, 2 when sa.[1] = sb.[0] -> 
+                | 2, 2 when sa.[1] = sb.[0] ->  // TODO: fix gradient wrt a
                     ((b ** T) %* (idMatrix sa.[0] sa.[0])) .* ga .+ ((idMatrix sb.[1] sb.[1]) %* a) .* gb
                 | _ -> failshape op sa sb 
         | TensorProduct -> (gaExpanded %* b) .+ (a %* gbExpanded) |> collapse
