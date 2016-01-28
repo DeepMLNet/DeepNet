@@ -64,6 +64,7 @@
     <Compile Include="OpGrad.fs" />
     <Compile Include="NDArray.fs" />
     <Compile Include="OpEval.fs" />
+    <Compile Include="NumGrad.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />

@@ -28,10 +28,10 @@ let linearRegression () =
 
 type LinearRegressionGradient = {LossWrtA: Expr; LossWrtB: Expr; LossWrtX: Expr; LossWrtT: Expr}
 let linearRegressionGradient (lr: LinearRegression) =
-    {LossWrtA = grad (extractVar lr.a) lr.Loss;
-     LossWrtB = grad (extractVar lr.b) lr.Loss;
-     LossWrtX = grad (extractVar lr.x) lr.Loss;
-     LossWrtT = grad (extractVar lr.t) lr.Loss;}
+    {LossWrtA = grad lr.a lr.Loss;
+     LossWrtB = grad lr.b lr.Loss;
+     LossWrtX = grad lr.x lr.Loss;
+     LossWrtT = grad lr.t lr.Loss;}
 
 let linearRegressionValueEnv (lr: LinearRegression) =
     let m, n = 3, 2
@@ -78,12 +78,23 @@ let ``Eval gradient of linear regression`` () =
     printVal "lossWrtB" (eval env lrg.LossWrtB)
     printVal "lossWrtX" (eval env lrg.LossWrtX) 
     printVal "lossWrtT" (eval env lrg.LossWrtT)
+
+
+[<Fact>]
+let ``Check gradient of linear regression`` () =
+    let lr = linearRegression ()
+    let env = linearRegressionValueEnv lr
+    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff lr.Loss env lr.a env.["a"])
+    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff lr.Loss env lr.b env.["b"])
+    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff lr.Loss env lr.x env.["x"])
+    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff lr.Loss env lr.t env.["t"])
        
 
 [<EntryPoint>]
 let main argv = 
     ``Build linear regression`` ()
     //``Eval linear regression`` ()
-    ``Gradient of linear regression`` ()
-    ``Eval gradient of linear regression`` ()
+    //``Gradient of linear regression`` ()
+    //``Eval gradient of linear regression`` ()
+    ``Check gradient of linear regression`` ()
     0

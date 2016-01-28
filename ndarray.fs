@@ -334,6 +334,9 @@ let exp a =
 let log a =
     elemwise log a 
 
+let abs a =
+    elemwise abs a
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // reduction operations
@@ -378,6 +381,12 @@ let product a =
 
 /// elementwise product over given axis
 let productAxis = axisReduce product 
+
+/// value of scalar array
+let value a =
+    match nDim a with
+    | 0 -> get [] a
+    | _ -> failwithf "array of shape %A is not a scalar" (shape a)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // tensor operations

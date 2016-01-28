@@ -70,3 +70,19 @@ let eval (varEnv: VarEnvT) expr =
     doEval varEnv expr
 
 
+let toFun expr =
+    fun varEnv -> eval varEnv expr
+
+let addArg (var: Expr) f =
+    fun (varEnv: VarEnvT) value -> 
+        let ve = varEnv |> VarEnv.add var value
+        f ve
+
+let withArg var f =
+    fun value -> 
+        let ve = VarEnv.empty |> VarEnv.add var value
+        f ve    
+
+//let v = Leaf(Var("a", [Base(Fixed 1)]))
+//let a = Op.zeros [Base(Fixed 1)]
+//let afv6 = a |> toFun |> addArg v |> addArg v |> withArg v
