@@ -5,7 +5,7 @@ open Util
 type SymbolSpec = string
 
 /// symbol value environment
-type SymbolEnv = Map<string, int>
+type SymbolEnvT = Map<string, int>
 
 /// elementary size specification, can be either a symbol or a fixed quantity
 type BaseSize =
@@ -51,7 +51,7 @@ type SizeProductT(factor: int, inSymbols: Map<SymbolSpec, int>) =
                                 txt + t + " ") 
                             ft this.Symbols                
         "'" + txt.Trim() + "'"
-                     
+                        
     override this.Equals(otherObj) =
         match otherObj with
         | :? SizeProductT as other ->
@@ -60,6 +60,15 @@ type SizeProductT(factor: int, inSymbols: Map<SymbolSpec, int>) =
 
     override this.GetHashCode() =
         hash (this.Factor, this.Symbols)
+
+    interface System.IComparable with
+        member this.CompareTo otherObj =
+            match otherObj with
+            | :? SizeProductT as other ->
+                let ms = Map.add "__factor__" this.Factor this.Symbols
+                let os = Map.add "__factor__" other.Factor other.Symbols
+                compare ms os
+            | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 module SizeProduct =
     let isEmpty (p: SizeProductT) =
@@ -87,13 +96,21 @@ module SizeProduct =
         else
             None
 
-    let eval (env: SymbolEnv) (p: SizeProductT) =
+    let eval (env: SymbolEnvT) (p: SizeProductT) =
         p.Symbols 
             |> Map.toSeq
-            |> Seq.map (fun (sym, power) ->  pown env.[sym] power)
+            |> Seq.map (fun (sym, power) -> pown env.[sym] power)
             |> Seq.fold (*) p.Factor
 
+    let canEval (env: SymbolEnvT) (p: SizeProductT) =
+        p.Symbols
+            |> Map.forall (fun sym _ -> Map.containsKey sym env)
+
+    let tryEval (env: SymbolEnvT) (p: SizeProductT) =
+        if canEval env p then Some (eval env p) else None
+
 /// size specification of a dimension (axis)
+[<StructuralEquality; StructuralComparison>]
 type SizeSpecT =
     | Base of BaseSize              // fixed size or symbol
     | Broadcast                     // size 1 and broadcastable
@@ -110,6 +127,7 @@ type SizeSpecT =
 
 module SizeSpec =
 
+    /// simplify size specification
     let simplify (ss: SizeSpecT) = 
         match ss with
         | Product (SizeProduct.SingleFactor f) -> Base (Fixed f)
@@ -140,9 +158,13 @@ module SizeSpec =
     let broadcastable =
         Broadcast
 
-    let eval (env: SymbolEnv) ss =
+    /// evaluate symbolic size specification to a number
+    let eval (env: SymbolEnvT) ss =
         match ss with
-        | Base (Symbol sym) -> env.[sym]
+        | Base (Symbol sym) -> 
+            match Map.tryFind sym env with
+            | Some l -> l
+            | None -> failwithf "no size known for symbol %s" sym
         | Base (Fixed f) -> f
         | Broadcast -> 1
         | Product p -> SizeProduct.eval env p
@@ -238,7 +260,54 @@ module ShapeSpec =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
     /// evaluates shape to numeric shape
-    let eval (env: SymbolEnv) (sa: ShapeSpecT) =
+    let eval (env: SymbolEnvT) (sa: ShapeSpecT) =
         List.map (SizeSpec.eval env) sa
 
 
+module SymbolEnv =
+
+    /// constructs a SymbolEnv from numeric shape values
+    let fromShapeValues (shpSymEnv: Map<string, ShapeSpecT>) (shpValEnv: Map<string, int list>) =
+        let inferAndCheckSizes (knownSizes: SymbolEnvT) = 
+            seq {
+                for name, symShape in Map.toSeq shpSymEnv do
+                    let valShape = 
+                        match Map.tryFind name shpValEnv with
+                        | Some s -> s
+                        | None -> failwithf "no value for variable %s was specified" name
+
+                    if ShapeSpec.nDim symShape <> List.length valShape then
+                        failwithf "variable %s is expected to have shape of form %A but it has shape %A \
+                                    with different rank" 
+                            name symShape valShape
+
+                    for symSize, valSize in List.zip symShape valShape do
+                        let checkInferred symSizeInferred =
+                            if symSizeInferred <> valSize then
+                                failwithf "variable %s with shape of form %A is incompatible with actual shape %A (%d <> %d)"
+                                    name symShape valShape symSizeInferred valSize
+
+                        match symSize with
+                        | Base (Symbol s) -> 
+                            match Map.tryFind s knownSizes with
+                            | Some knownSize ->
+                                if knownSize <> valSize then
+                                    failwithf "variable %s with shape of form %A and actual shape %A \
+                                               requires %s to be %d, but it was inferred to be %d previously"
+                                        name symShape valShape s valSize knownSize
+                            | None -> ()
+                            yield s, valSize
+                        | Base (Fixed f) -> checkInferred f
+                        | Broadcast -> checkInferred 1
+                        | Product sp ->
+                            match SizeProduct.tryEval knownSizes sp with
+                            | Some f -> checkInferred f
+                            | None -> ()
+            } |> Map.ofSeq
+
+        let rec inferUntilStable knownSizes =
+            let newKnownSizes = inferAndCheckSizes knownSizes
+            if knownSizes = newKnownSizes then knownSizes else inferUntilStable newKnownSizes
+
+        inferUntilStable Map.empty
+        

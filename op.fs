@@ -201,9 +201,6 @@ let checkAndAdaptShapes =
 
     mapOperands mapUnaryOp mapBinaryOp
 
-
-   
-
 let check = checkAndAdaptShapes
 
 /// scalar of given value
@@ -300,3 +297,17 @@ let padRight a =
     let sa = shapeOf a
     reshape (ShapeSpec.padRight sa) a
 
+
+/// extract all variables from an expression
+let rec extractVars expr =
+    match expr with
+    | Leaf(Var(v)) -> Set.singleton v
+    | Leaf _ -> Set.empty
+    | Unary(_, a) -> extractVars a
+    | Binary(_, a, b) -> Set.union (extractVars a) (extractVars b)
+
+/// extract VarSpec from variable expression
+let extractVar expr = 
+    match expr with
+    | Leaf(Var(v)) -> v
+    | _ -> invalidArg "expr" "not a expr consisting solely of a variable"
