@@ -22,7 +22,7 @@ let numGradEpsilon epsilon f x =
 let numGrad = numGradEpsilon 1e-5
 
 let exprGradDiff expr env wrt =
-    let g = OpGrad.grad wrt expr
+    let g = ExprForwardDiff.grad wrt expr
     let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) env
     let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) env
 

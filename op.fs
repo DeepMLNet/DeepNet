@@ -291,6 +291,14 @@ let reshape ss a = Unary(Reshape(ss), a) |> check
 /// broadcast of SizeBroadcast dimensions
 let broadcast ss a = Unary(Broadcast(ss), a) |> check
 
+/// enables broadcasting in the given dimension, it must be of size one
+let enableBroadcast dim a = 
+    a |> reshape (shapeOf a |> ShapeSpec.enableBroadcast dim)
+
+/// disables broadcasting in the given dimension
+let disableBroadcast dim a =
+    a |> reshape (shapeOf a |> ShapeSpec.disableBroadcast dim)
+
 /// variable of given name and shape
 let var name (ss: ShapeSpecT) = Leaf(Var(name, ss)) 
 

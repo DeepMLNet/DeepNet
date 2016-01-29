@@ -179,10 +179,16 @@ type SizeSpecT with
 /// shape specifcation of a tensor
 type ShapeSpecT = SizeSpecT list
 
-
+/// shape specification of a tensor
 module ShapeSpec =
     let withoutAxis ax sa =
-        List.without ax sa
+        sa |> List.without ax
+
+    let insertBroadcastAxis ax sa =
+        sa |> List.insert ax Broadcast
+
+    let set ax size sa =
+        sa |> List.set ax size
 
     let nDim sa =
         List.length sa
@@ -198,6 +204,9 @@ module ShapeSpec =
             SizeProduct.empty sa 
             |> Product   
             |> SizeSpec.simplify       
+
+    let flatten sa =
+        [nElem sa]
 
     let concat sa sb =
         sa @ sb
@@ -246,12 +255,12 @@ module ShapeSpec =
                 | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
 
-    let enableBroadcast (sa: ShapeSpecT) dim =
+    let enableBroadcast dim (sa: ShapeSpecT) =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBroadcast (sa: ShapeSpecT) dim =
+    let disableBroadcast dim (sa: ShapeSpecT) =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim (Base (Fixed 1)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa

@@ -10,6 +10,8 @@ module List =
     let without elem lst =
         List.concat [List.take elem lst; List.skip (elem+1) lst] 
 
+    let insert elem value lst =
+        List.concat [List.take elem lst; [value]; List.skip elem lst]
 
 let rec iterate f n x =
     match n with

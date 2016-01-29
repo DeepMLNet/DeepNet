@@ -61,7 +61,8 @@
     <Compile Include="Util.fs" />
     <Compile Include="Shape.fs" />
     <Compile Include="Op.fs" />
-    <Compile Include="OpGrad.fs" />
+    <Compile Include="ExprForwardDiff.fs" />
+    <Compile Include="ExprReverseDiff.fs" />
     <Compile Include="NDArray.fs" />
     <Compile Include="OpEval.fs" />
     <Compile Include="NumGrad.fs" />
