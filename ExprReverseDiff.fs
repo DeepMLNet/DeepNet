@@ -6,6 +6,7 @@ open Op
 
 /// reverse accumulation autodifferentiation of an expression
 let rec reverseDiff (expr: Expr) (eg: Expr) : Map<VarSpecT, Expr> =    
+    let exprShp = shapeOf expr
     let funElems = (shapeOf eg).[0]  
 
     /// expands the second dimension of the the Jacobian into the shape of this expression
@@ -60,15 +61,19 @@ let rec reverseDiff (expr: Expr) (eg: Expr) : Map<VarSpecT, Expr> =
         | Power -> (egExpanded * padLeft (a**(b-1.)) |> collapse |> reverseDiff a) .+ 
                    (egExpanded * padLeft (a**b * log a) |> collapse |> reverseDiff b)
         | Dot -> 
-            let sa, sb = shapeOf a, shapeOf b
-            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                | 1, 1 -> eg |> reverseDiff (sum(a * b))
-                | 2, 1 -> (eg .* (b %* (idMatrix sa.[0] sa.[0])) |> reverseDiff a) .+
-                          (eg .* a |> reverseDiff b)
-                | 2, 2 when sa.[1] = sb.[0] ->  // TODO: fix gradient wrt a
-                    (eg .* ((b ** T) %* (idMatrix sa.[0] sa.[0])) |> reverseDiff a) .+
-                    (eg .* ((idMatrix sb.[1] sb.[1]) %* a) |> reverseDiff b)
-                | _ -> failshape op sa sb 
+            let mxWrtX m x y dy =
+                let xShp, yShp, dyShp = shapeOf x, shapeOf y, shapeOf dy
+                let funElems = dyShp.[0]
+                let dyMat = dy |> swapDim 0 1 |> reshape [yShp.[0]; yShp.[1] * funElems]
+                let dxMat = m**T .* dyMat
+                let dx = dxMat |> reshape [xShp.[0] * xShp.[1]; funElems] |> swapDim 1 0
+                dx
+
+            let bShp = shapeOf b
+            let bg = mxWrtX a b expr eg
+            let ag = mxWrtX (b**T) (a**T) expr eg 
+                     |> reshape [funElems; bShp.[1]; bShp.[0]] |> swapDim 1 2 |> collapse
+
+            (ag |> reverseDiff a) .+ (bg |> reverseDiff b)
         | TensorProduct -> failwith "not implemented"
-        // (gaExpanded %* b) .+ (a %* gbExpanded) |> collapse
 
