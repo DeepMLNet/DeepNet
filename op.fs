@@ -17,9 +17,9 @@ module VarSpec =
 
 
 /// ops with no exprs as arguments
-type LeafOp =
+type LeafOpT =
     // tensor creation
-    | Identity of ShapeSpecT                /// tensor with 1 on diagonal of given shape
+    | DiagonalOne of ShapeSpecT                /// tensor with 1 on diagonal of given shape
     | Zeros of ShapeSpecT                   /// zero tensor of given shape
     | ScalarConst of float                  /// scalar of given value
     | TensorConst of float * ShapeSpecT     /// tensor of given shape filled with given value
@@ -27,7 +27,7 @@ type LeafOp =
     | Var of VarSpecT                       /// variable read
 
 /// ops with one expr as argument
-and UnaryOp =
+and UnaryOpT =
     // unary elementwise
     | Negate                        /// elementwise negation
     | Log                           /// elementwise logarithm
@@ -44,11 +44,11 @@ and UnaryOp =
 
 /// annotation of an op
 and Annotation =
-    | GradOf of Expr                /// expr is gradient of given expr
+    | GradOf of ExprT                /// expr is gradient of given expr
     | Text of string                /// text label
 
 /// ops with two exprs as arguments
-and BinaryOp =
+and BinaryOpT =
     // binary elementwise
     | Add                           /// elementwise addition
     | Substract                     /// elementwise substraction
@@ -61,23 +61,35 @@ and BinaryOp =
 
   
 /// an expression
-and Expr =
-    | Leaf of LeafOp
-    | Unary of UnaryOp * Expr
-    | Binary of BinaryOp * Expr * Expr
+and ExprT =
+    | Leaf of LeafOpT
+    | Unary of UnaryOpT * ExprT
+    | Binary of BinaryOpT * ExprT * ExprT
+
+
+type AnyOp =
+    | LeafOp of LeafOpT
+    | UnaryOp of UnaryOpT
+    | BinaryOp of BinaryOpT
+
+let extractOp expr =
+    match expr with
+    | Leaf op -> LeafOp op
+    | Unary(op, _) -> UnaryOp op
+    | Binary(op, _, _) -> BinaryOp op
 
     
 /// matches all exprs that work elementwise on their argument(s)
 let (|ElemwiseOp|_|) (op: obj) =
     match op with
-    | :? UnaryOp as uop ->
+    | :? UnaryOpT as uop ->
         match uop with
         | Negate
         | Log
         | Exp
             -> Some ()
         | _ -> None
-    | :? BinaryOp as bop ->
+    | :? BinaryOpT as bop ->
         match bop with
         | Add
         | Substract
@@ -139,7 +151,7 @@ let rec shapeOf expr =
     | Unary(Sum, a) -> ShapeSpec.scalar
     | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
     // tensor creation
-    | Leaf(Identity(ss)) -> ss
+    | Leaf(DiagonalOne(ss)) -> ss
     | Leaf(Zeros(ss)) -> ss
     | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
     | Leaf(TensorConst(_, ss)) -> ss
@@ -161,9 +173,8 @@ let reshapeIfNecessary ss expr =
 let broadcastIfNecessary ss expr =
     if ss = shapeOf expr then expr else Unary(Broadcast(ss), expr)
 
-/// Traverses the op tree and checks ops' arguments for compatible shapes and inserts reshape
-/// ops if necessary.
-let checkAndAdaptShapes =
+/// Traverses the expression and checks ops' arguments for compatible shapes.
+let check =
     let mapUnaryOp op a =
         let sa = shapeOf a
         match op with
@@ -190,28 +201,18 @@ let checkAndAdaptShapes =
     let mapBinaryOp op a b =
         let sa, sb = shapeOf a, shapeOf b
         match op with
-        | ElemwiseOp -> 
-            let psa, psb = ShapeSpec.padToSame sa sb
-            let bsa, bsb = ShapeSpec.broadcastToSame psa psb
-            let ba = a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa
-            let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb
-            ba, bb
+        | ElemwiseOp when not (ShapeSpec.equalWithoutBroadcastability sa sb) -> 
+            failwithf "cannot perform elementwise operation %A on arrays of shapes %A and %A" op sa sb
         | Dot -> 
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 1, 1 when sa.[0] .= sb.[0] -> ()
-            | 2, 1 when sa.[1] .= sb.[0] -> ()
-            | 2, 2 when sa.[1] .= sb.[0] -> ()
+            | 2, 2 when sa.[1] .= sb.[0] -> a, b
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-            let dsa, dsb = ShapeSpec.disableAllBroadcasts sa, ShapeSpec.disableAllBroadcasts sb
-            reshapeIfNecessary dsa a, reshapeIfNecessary dsb b
         | TensorProduct ->
             let psa, psb = ShapeSpec.padToSame sa sb
             reshapeIfNecessary psa a, reshapeIfNecessary psb b
         | _ -> a, b
 
     mapOperands mapUnaryOp mapBinaryOp
-
-let check = checkAndAdaptShapes
 
 /// scalar of given value
 let scalar f = Leaf(ScalarConst(f)) |> check
@@ -228,62 +229,43 @@ let transpose a =
 /// transpose 
 type T = T
 
+/// emits an elementwise binary operation with broadcasting of the inputs if necessary
+let constructElementwise op a b =
+    let sa, sb = shapeOf a, shapeOf b
+    let psa, psb = ShapeSpec.padToSame sa sb
+    let bsa, bsb = ShapeSpec.broadcastToSame psa psb
+    let ba = a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa
+    let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
+    Binary(op, ba, bb) |> check
+
 // operators
-type Expr with
-
-    // elementwise binary
-    static member (+) (a: Expr, b: Expr) = Binary(Add, a, b) |> check
-    static member (-) (a: Expr, b: Expr) = Binary(Substract, a, b) |> check
-    static member (*) (a: Expr, b: Expr) = Binary(Multiply, a, b) |> check
-    static member (/) (a: Expr, b: Expr) = Binary(Divide, a, b) |> check
-    static member Pow (a: Expr, b: Expr) = Binary(Power, a, b) |> check 
-
-    // elementwise binary with float
-    static member (+) (a: Expr, b: float) = a + (scalar b)
-    static member (-) (a: Expr, b: float) = a - (scalar b)
-    static member (*) (a: Expr, b: float) = a * (scalar b)
-    static member (/) (a: Expr, b: float) = a / (scalar b)
-    static member Pow (a: Expr, b: float) = a ** (scalar b)
-
-    static member (+) (a: float, b: Expr) = (scalar a) + b
-    static member (-) (a: float, b: Expr) = (scalar a) - b
-    static member (*) (a: float, b: Expr) = (scalar a) * b
-    static member (/) (a: float, b: Expr) = (scalar a) / b
-    static member Pow (a: float, b: Expr) = (scalar a) ** b
-
-    // transposition
-    static member Pow (a: Expr, b: T) = transpose a 
-  
-    // tensor binary
-    static member (.*) (a: Expr, b: Expr) = Binary(Dot, a, b) |> check
-    static member (%*) (a: Expr, b: Expr) = Binary(TensorProduct, a, b) |> check
+type ExprT with
 
     // unary
-    static member (~-) (a: Expr) = Unary(Negate, a) |> check 
+    static member (~-) (a: ExprT) = Unary(Negate, a) |> check 
 
-/// elementwise logarithm
-let log a = Unary(Log, a) |> check
+    // elementwise binary
+    static member (+) (a: ExprT, b: ExprT) = constructElementwise Add a b
+    static member (-) (a: ExprT, b: ExprT) = constructElementwise Substract a b
+    static member (*) (a: ExprT, b: ExprT) = constructElementwise Multiply a b
+    static member (/) (a: ExprT, b: ExprT) = constructElementwise Divide a b
+    static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b
 
-/// elementwise exponential function
-let exp a = Unary(Exp, a) |> check
+    // elementwise binary with float
+    static member (+) (a: ExprT, b: float) = a + (scalar b)
+    static member (-) (a: ExprT, b: float) = a - (scalar b)
+    static member (*) (a: ExprT, b: float) = a * (scalar b)
+    static member (/) (a: ExprT, b: float) = a / (scalar b)
+    static member Pow (a: ExprT, b: float) = a ** (scalar b)
 
-/// summaiton of all elements
-let sum a = Unary(Sum, a) |> check
+    static member (+) (a: float, b: ExprT) = (scalar a) + b
+    static member (-) (a: float, b: ExprT) = (scalar a) - b
+    static member (*) (a: float, b: ExprT) = (scalar a) * b
+    static member (/) (a: float, b: ExprT) = (scalar a) / b
+    static member Pow (a: float, b: ExprT) = (scalar a) ** b
 
-/// summation over given dimension
-let sumAxis ax a = Unary(SumAxis(ax), a) |> check
-
-/// tensor of given shape with 1s on the diagonal
-let identity ss = Leaf(Identity(ss)) |> check
-let eye = identity
-let idMatrix rows cols = identity (ShapeSpec.matrix rows cols)
-
-/// zero tensor of given shape
-let zeros ss = Leaf(Zeros(ss)) |> check
-let zeroMatrix rows cols = zeros (ShapeSpec.matrix rows cols)
-
-/// zero tensor with same shape as given tensor
-let zerosLike a = Leaf(Zeros(shapeOf a)) |> check
+    // transposition
+    static member Pow (a: ExprT, b: T) = transpose a 
 
 /// reshape (assuming C-continguous order) tensor; element count does not change
 let reshape ss a = Unary(Reshape(ss), a) |> check
@@ -298,6 +280,38 @@ let enableBroadcast dim a =
 /// disables broadcasting in the given dimension
 let disableBroadcast dim a =
     a |> reshape (shapeOf a |> ShapeSpec.disableBroadcast dim)
+  
+/// inserts a broadcast axis at the given dimension
+let insertBroadcastAxis dim a =
+    a |> reshape (shapeOf a |> ShapeSpec.insertBroadcastAxis dim)
+
+/// elementwise logarithm
+let log a = Unary(Log, a) |> check
+
+/// elementwise exponential function
+let exp a = Unary(Exp, a) |> check
+
+/// summaiton of all elements
+let sum a = Unary(Sum, a) |> check
+
+/// summation over given dimension
+let sumAxis ax a = Unary(SumAxis(ax), a) |> check
+
+/// summation over given dimension, while keeping the axis with one (broadcastable) element
+let sumKeepingAxis ax a =
+    a |> sumAxis ax |> insertBroadcastAxis ax
+
+/// tensor of given shape with 1s on the diagonal
+let diagonalOne ss = Leaf(DiagonalOne(ss)) |> check
+let idMatrix rows = diagonalOne (ShapeSpec.matrix rows rows)
+
+/// zero tensor of given shape
+let zeros ss = Leaf(Zeros(ss)) |> check
+let zeroMatrix rows cols = zeros (ShapeSpec.matrix rows cols)
+
+/// zero tensor with same shape as given tensor
+let zerosLike a = Leaf(Zeros(shapeOf a)) |> check
+
 
 /// variable of given name and shape
 let var name (ss: ShapeSpecT) = Leaf(Var(name, ss)) 
@@ -315,6 +329,23 @@ let padRight a =
     let sa = shapeOf a
     reshape (ShapeSpec.padRight sa) a
 
+/// dot product
+let dot a b =
+    let sa, sb = shapeOf a, shapeOf b
+    match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+        | 1, 1 when sa.[0] .= sb.[0] -> sum (a * b)
+        | 2, 1 when sa.[1] .= sb.[0] -> 
+            let bm = b |> reshape (ShapeSpec.padRight sb)
+            Binary(Dot, a, bm) |> reshape [sa.[0]]
+        | 2, 2 when sa.[1] .= sb.[0] -> Binary(Dot, a, b)
+        | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+    |> check
+
+type ExprT with
+    // tensor binary
+    static member (.*) (a: ExprT, b: ExprT) = dot a b
+    static member (%*) (a: ExprT, b: ExprT) = Binary(TensorProduct, a, b) |> check
+
 
 /// extract all variables from an expression
 let rec extractVars expr =
@@ -329,3 +360,7 @@ let extractVar expr =
     match expr with
     | Leaf(Var(v)) -> v
     | _ -> invalidArg "expr" "not a expr consisting solely of a variable"
+
+/// make variable expression from VarSpec
+let makeVar v =
+    Leaf(Var(v))

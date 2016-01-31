@@ -34,7 +34,7 @@ let rec grad wrt expr =
 
     match expr with
     | expr when expr = wrt ->
-        idMatrix wrtElems wrtElems
+        idMatrix wrtElems 
     | expr when not (contains wrt expr) ->
         zeroGrad (shapeOf expr)
 
@@ -43,7 +43,7 @@ let rec grad wrt expr =
         | Zeros ss -> zeroGrad ss
         | ScalarConst _ -> zeroGrad ShapeSpec.scalar
         | TensorConst (_, ss) -> zeroGrad ss
-        | Identity ss -> zeroGrad ss
+        | DiagonalOne ss -> zeroGrad ss
         | Var v -> zeroGrad (VarSpec.shape v)                  
 
     | Unary(op, a) ->
@@ -84,9 +84,9 @@ let rec grad wrt expr =
         | Dot -> 
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                 | 1, 1 -> subgrad (sum(a * b))
-                | 2, 1 -> (b %* (idMatrix sa.[0] sa.[0])) .* ga .+ a .* gb
+                | 2, 1 -> (b %* (idMatrix sa.[0])) .* ga .+ a .* gb
                 | 2, 2 when sa.[1] = sb.[0] ->  // TODO: fix gradient wrt a
-                    ((b ** T) %* (idMatrix sa.[0] sa.[0])) .* ga .+ ((idMatrix sb.[1] sb.[1]) %* a) .* gb
+                    ((b ** T) %* (idMatrix sa.[0])) .* ga .+ ((idMatrix sb.[1]) %* a) .* gb
                 | _ -> failshape op sa sb 
         | TensorProduct -> (gaExpanded %* b) .+ (a %* gbExpanded) |> collapse
     |> annotate (GradOf expr) 

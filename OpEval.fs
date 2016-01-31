@@ -1,5 +1,6 @@
 ﻿module OpEval
 
+open Util
 open Shape
 open Op
 open NDArray
@@ -20,14 +21,31 @@ module VarEnv =
     let (empty: VarEnvT) =
         Map.empty
 
-let buildSizeSymbolEnv varEnv expr =
+/// evaluation environment
+type EvalEnvT = {VarEnv: VarEnvT; SizeSymbolEnv: SymbolEnvT}
+let DefaultEvalEnv = {VarEnv = Map.empty; SizeSymbolEnv = Map.empty}
+
+/// builds a size symbol environment from the variables occuring in the expression
+let buildSizeSymbolEnvFromVarEnv varEnv expr =
     let varSymShapes = extractVars expr |> Set.toSeq |> Map.ofSeq
     let varValShapes = varEnv |> Map.map (fun _ ary -> NDArray.shape ary) 
     SymbolEnv.fromShapeValues varSymShapes varValShapes
 
-/// evaluate expression to numeric array
-let eval (varEnv: VarEnvT) expr =
-    let sizeSymEnv = buildSizeSymbolEnv varEnv expr
+module EvalEnv =
+    let fromVarEnvAndExpr varEnv expr = 
+        {DefaultEvalEnv with VarEnv = varEnv; SizeSymbolEnv = buildSizeSymbolEnvFromVarEnv varEnv expr;}
+
+    let fromVarEnv varEnv =
+        {DefaultEvalEnv with VarEnv = varEnv;}
+
+    let addSizeSymbolsFromExpr expr evalEnv =
+        fromVarEnvAndExpr evalEnv.VarEnv expr
+
+/// evaluate expression to numeric array 
+let eval (evalEnv: EvalEnvT) expr =
+    let varEnv = evalEnv.VarEnv
+    let sizeSymbolsFromVars = buildSizeSymbolEnvFromVarEnv varEnv expr
+    let sizeSymEnv = Map.join evalEnv.SizeSymbolEnv sizeSymbolsFromVars
     let shapeEval symShape = ShapeSpec.eval sizeSymEnv symShape
 
     let rec doEval (varEnv: VarEnvT) expr =
@@ -39,7 +57,7 @@ let eval (varEnv: VarEnvT) expr =
         match expr with
             | Leaf(op) ->
                 match op with
-                | Identity ss ->  identity (shapeEval ss)
+                | DiagonalOne ss ->  identity (shapeEval ss)
                 | Zeros ss -> zeros (shapeEval ss)
                 | ScalarConst f -> scalar f
                 | TensorConst(f, ss) -> scalar f |> broadcastToShape (shapeEval ss) 
@@ -69,20 +87,13 @@ let eval (varEnv: VarEnvT) expr =
             
     doEval varEnv expr
 
-
 let toFun expr =
-    fun varEnv -> eval varEnv expr
+    fun evalEnv -> eval evalEnv expr
 
-let addArg (var: Expr) f =
-    fun (varEnv: VarEnvT) value -> 
-        let ve = varEnv |> VarEnv.add var value
-        f ve
+let addArg (var: ExprT) f =
+    fun (evalEnv: EvalEnvT) value -> 
+        f {evalEnv with VarEnv = evalEnv.VarEnv |> VarEnv.add var value}
 
-let withArg var f =
-    fun value -> 
-        let ve = VarEnv.empty |> VarEnv.add var value
-        f ve    
+let usingEvalEnv (evalEnv: EvalEnvT) f =
+    fun value -> f evalEnv value
 
-//let v = Leaf(Var("a", [Base(Fixed 1)]))
-//let a = Op.zeros [Base(Fixed 1)]
-//let afv6 = a |> toFun |> addArg v |> addArg v |> withArg v

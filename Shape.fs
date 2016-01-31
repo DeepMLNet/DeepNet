@@ -272,6 +272,9 @@ module ShapeSpec =
     let eval (env: SymbolEnvT) (sa: ShapeSpecT) =
         List.map (SizeSpec.eval env) sa
 
+    let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
+        List.forall2 (.=) sa sb
+
 
 module SymbolEnv =
 

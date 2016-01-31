@@ -13,6 +13,12 @@ module List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
+
+module Map = 
+    let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
+        Map(Seq.concat [ (Map.toSeq p) ; (Map.toSeq q) ])    
+
+
 let rec iterate f n x =
     match n with
     | 0 -> x

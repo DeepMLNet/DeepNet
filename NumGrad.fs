@@ -2,6 +2,7 @@
 
 open NDArray
 
+
 /// evaluates the Jacobian of f at x numerically with specified finite difference step
 let numGradEpsilon epsilon f x =
     let y = f x
@@ -21,17 +22,36 @@ let numGradEpsilon epsilon f x =
 /// evaluates the Jacobian of f at x numerically
 let numGrad = numGradEpsilon 1e-5
 
-let exprGradDiff expr env wrt =
+let exprGradDiff evalEnv wrt expr =
     let g = ExprForwardDiff.grad wrt expr
-    let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) env
-    let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) env
+    let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
+    let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
 
-    fun value ->
-        let symGradVal = gradFun value
+    let value = evalEnv.VarEnv.[wrt |> Op.extractVar |> Op.VarSpec.name]
+    let symGradVal = gradFun value
+    let exprGradVal = numGrad exprFun value
+    let gradDiff = abs (symGradVal - exprGradVal)
+    sum gradDiff |> NDArray.value
+
+
+let reverseDiffDeviations evalEnv expr =
+    let mutable devs = Map.empty
+    let rDiffs = ExprReverseDiff.reverseDiff expr
+    for wrt, rDiff in rDiffs |> Map.toSeq do
+        let exprFun = (expr |> OpEval.toFun |> OpEval.addArg (Op.makeVar wrt)) |> OpEval.usingEvalEnv evalEnv
+        let rDiffFun = (rDiff |> OpEval.toFun |> OpEval.addArg (Op.makeVar wrt)) |> OpEval.usingEvalEnv evalEnv
+
+        let value = evalEnv.VarEnv.[Op.VarSpec.name wrt]
+        let symGradVal = rDiffFun value
         let exprGradVal = numGrad exprFun value
         let gradDiff = abs (symGradVal - exprGradVal)
-        sum gradDiff |> NDArray.value
+        devs <- devs |> Map.add (Op.VarSpec.name wrt) (sum gradDiff |> NDArray.value)
+    devs
 
-
+let reverseDiffDeviationsOkay evalEnv expr =
+    let maxDeviation = 1e-4
+    reverseDiffDeviations evalEnv expr |> Map.iter
+        (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %s = %f" name dev)
+    reverseDiffDeviations evalEnv expr |> Map.forall (fun _ dev -> dev < maxDeviation) 
 
 

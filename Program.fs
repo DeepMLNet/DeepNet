@@ -3,6 +3,7 @@
 open Shape
 open Op
 open ExprForwardDiff
+open ExprReverseDiff
 open OpEval
 
 
@@ -12,8 +13,8 @@ let printExpr label expr =
 let printVal label value =
     printfn "%s =\n%A\nshape of %s: %A\n" label value label (NDArray.shape value)
 
-type LinearRegression = {a: Expr; b: Expr; x: Expr; t: Expr;
-                         Pred: Expr; Loss: Expr}  
+type LinearRegression = {a: ExprT; b: ExprT; x: ExprT; t: ExprT;
+                         Pred: ExprT; Loss: ExprT}  
 let linearRegression () =
     let a = var "a" [symbol "M"; symbol "N"]
     let b = var "b" [symbol "M"]
@@ -26,26 +27,33 @@ let linearRegression () =
 
     {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss}
 
-type LinearRegressionGradient = {LossWrtA: Expr; LossWrtB: Expr; LossWrtX: Expr; LossWrtT: Expr}
-let linearRegressionGradient (lr: LinearRegression) =
+type LinearRegressionGradient = {LossWrtA: ExprT; LossWrtB: ExprT; LossWrtX: ExprT; LossWrtT: ExprT}
+let linearRegressionForwardGradient (lr: LinearRegression) =
     {LossWrtA = grad lr.a lr.Loss;
      LossWrtB = grad lr.b lr.Loss;
      LossWrtX = grad lr.x lr.Loss;
      LossWrtT = grad lr.t lr.Loss;}
 
-let linearRegressionValueEnv (lr: LinearRegression) =
+let linearRegressionReverseGradient (lr: LinearRegression) =
+    let d = reverseDiff lr.Loss
+    {LossWrtA = diffOf lr.a d;
+     LossWrtB = diffOf lr.b d;
+     LossWrtX = diffOf lr.x d;
+     LossWrtT = diffOf lr.t d;}
+
+let linearRegressionEvalEnv (lr: LinearRegression) =
     let m, n = 3, 2
     let aVal = NDArray.identity [m; n]
     let bVal = NDArray.zeros [m]
     let xVal = NDArray.ones [n]
     let tVal = NDArray.ones [m]
-    let env = 
+    let varEnv = 
         VarEnv.empty
         |> VarEnv.add lr.a aVal
         |> VarEnv.add lr.b bVal
         |> VarEnv.add lr.x xVal
         |> VarEnv.add lr.t tVal
-    env
+    EvalEnv.fromVarEnv varEnv
 
 [<Fact>]
 let ``Build linear regression`` () =
@@ -56,24 +64,47 @@ let ``Build linear regression`` () =
 [<Fact>]
 let ``Eval linear regression`` () =
     let lr = linearRegression ()
-    let env = linearRegressionValueEnv lr
+    let env = linearRegressionEvalEnv lr
     printVal "pred" (eval env lr.Pred)
     printVal "loss" (eval env lr.Loss)
 
 [<Fact>]
-let ``Gradient of linear regression`` () =
-    let lr = linearRegression ()
-    let lrg = linearRegressionGradient lr
-    printExpr "lossWrtA" lrg.LossWrtA
-    printExpr "lossWrtB" lrg.LossWrtB
-    printExpr "lossWrtX" lrg.LossWrtX  
-    printExpr "lossWrtT" lrg.LossWrtT
+let ``Forward gradient of linear regression`` () =
+    let lr = linearRegression ()   
+    printfn "Forward:"
+    let fg = linearRegressionForwardGradient lr
+    printExpr "lossWrtA" fg.LossWrtA
+    printExpr "lossWrtB" fg.LossWrtB
+    printExpr "lossWrtX" fg.LossWrtX  
+    printExpr "lossWrtT" fg.LossWrtT
 
 [<Fact>]
-let ``Eval gradient of linear regression`` () =
+let ``Reverse gradient of linear regression`` () =
+    let lr = linearRegression ()  
+    printfn "Reverse:"
+    let rg = linearRegressionReverseGradient lr
+    printExpr "lossWrtA" rg.LossWrtA
+    printExpr "lossWrtB" rg.LossWrtB
+    printExpr "lossWrtX" rg.LossWrtX  
+    printExpr "lossWrtT" rg.LossWrtT
+
+[<Fact>]
+let ``Eval forward gradient of linear regression`` () =
     let lr = linearRegression ()
-    let lrg = linearRegressionGradient lr
-    let env = linearRegressionValueEnv lr
+    let lrg = linearRegressionForwardGradient lr
+    let env = linearRegressionEvalEnv lr
+    printfn "Forward gradient:"
+    printVal "lossWrtA" (eval env lrg.LossWrtA)
+    printVal "lossWrtB" (eval env lrg.LossWrtB)
+    printVal "lossWrtX" (eval env lrg.LossWrtX) 
+    printVal "lossWrtT" (eval env lrg.LossWrtT)
+
+[<Fact>]
+let ``Eval reverse gradient of linear regression`` () =
+    let lr = linearRegression ()
+    let lrg = linearRegressionReverseGradient lr
+    let env = linearRegressionEvalEnv lr
+    printfn "Reverse gradient:"
     printVal "lossWrtA" (eval env lrg.LossWrtA)
     printVal "lossWrtB" (eval env lrg.LossWrtB)
     printVal "lossWrtX" (eval env lrg.LossWrtX) 
@@ -81,20 +112,31 @@ let ``Eval gradient of linear regression`` () =
 
 
 [<Fact>]
-let ``Check gradient of linear regression`` () =
+let ``Check forward gradient of linear regression`` () =
     let lr = linearRegression ()
-    let env = linearRegressionValueEnv lr
-    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff lr.Loss env lr.a env.["a"])
-    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff lr.Loss env lr.b env.["b"])
-    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff lr.Loss env lr.x env.["x"])
-    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff lr.Loss env lr.t env.["t"])
+    let env = linearRegressionEvalEnv lr
+    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff env lr.a lr.Loss)
+    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff env lr.b lr.Loss)
+    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff env lr.x lr.Loss)
+    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff env lr.t lr.Loss)
+
+[<Fact>]
+let ``Check reverse gradient of linear regression`` () =
+    let lr = linearRegression ()
+    let env = linearRegressionEvalEnv lr
+    DiffCheck.checkReverseDiff env lr.Loss
+    printfn "linear regression gradient checked"
+    //let devs = NumGrad.reverseDiffDeviations env lr.Loss
+    //printfn "reverse accumulation derivatives deviations:\n%A" devs
        
 
 [<EntryPoint>]
 let main argv = 
     ``Build linear regression`` ()
-    //``Eval linear regression`` ()
-    //``Gradient of linear regression`` ()
-    //``Eval gradient of linear regression`` ()
-    ``Check gradient of linear regression`` ()
+    ``Eval linear regression`` ()
+    //``Reverse gradient of linear regression`` ()
+    ``Eval forward gradient of linear regression`` ()
+    ``Eval reverse gradient of linear regression`` ()
+    //``Check gradient of linear regression`` ()
+    ``Check reverse gradient of linear regression`` ()
     0
