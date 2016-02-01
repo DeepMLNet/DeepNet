@@ -7,16 +7,16 @@
 
 class NDArray
 {
+public:
 	size_t *shape;
 	size_t *stride;
 	float *data;
 };
 
 
-__global__ void scalarConst(float *c, const int *a, const int *b)
+__global__ void scalarConst(NDArray *target, const float value)
 {
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
+	*(target->data) = value;
 }
 
 
