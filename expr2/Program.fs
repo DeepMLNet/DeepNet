@@ -146,13 +146,14 @@ let ``Build execution sequence of linear regression gradient`` () =
 
 [<EntryPoint>]
 let main argv = 
-    ``Build linear regression`` ()
-    ``Eval linear regression`` ()
+    CudaCodeGen.testMe ()
+    //``Build linear regression`` ()
+    //``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
     //``Eval forward gradient of linear regression`` ()
     //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
-    ``Build execution sequence of linear regression`` ()
-    ``Build execution sequence of linear regression gradient`` ()
+    //``Build execution sequence of linear regression`` ()
+    //``Build execution sequence of linear regression gradient`` ()
     0
