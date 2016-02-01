@@ -39,8 +39,8 @@ module ExeSequence =
                         | ExeSequenceItem(_, Some e) when expr = e -> true
                         | _ -> false)
 
-let buildSequence (expr: ExprT) =
 
+let buildSequence (expr: ExprT) =
     let mutable storageCount = 0
     let newStorage () : StorageT =
         storageCount <- storageCount + 1
@@ -75,4 +75,5 @@ let buildSequence (expr: ExprT) =
 
     let resStorage, eseq = buildSubsequence ExeSequence.empty expr
     resStorage, eseq
+
 
