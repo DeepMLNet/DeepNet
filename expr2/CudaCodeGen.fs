@@ -34,7 +34,7 @@ module CudaNDArray =
 let testMe () =
     printfn "hallo"
     let cuda = new CudaContext(createNew=false)
-    let cuMod = cuda.LoadModule("NDArray.cu.obj")
+    let cuMod = cuda.LoadModulePTX("NDArray.cu.obj")
     let myKernel = CudaKernel("scalarConst", cuMod, cuda)
     myKernel.Run([| 1 |])
     //CudaNDArray.scalarConst 1 ()
