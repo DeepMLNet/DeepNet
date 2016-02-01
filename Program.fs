@@ -5,6 +5,7 @@ open Op
 open ExprForwardDiff
 open ExprReverseDiff
 open OpEval
+open ExprEvalSequencer
 
 
 let printExpr label expr =
@@ -126,17 +127,32 @@ let ``Check reverse gradient of linear regression`` () =
     let env = linearRegressionEvalEnv lr
     DiffCheck.checkReverseDiff env lr.Loss
     printfn "linear regression gradient checked"
-    //let devs = NumGrad.reverseDiffDeviations env lr.Loss
-    //printfn "reverse accumulation derivatives deviations:\n%A" devs
+
        
+[<Fact>]
+let ``Build execution sequence of linear regression`` () =
+    let lr = linearRegression ()
+    let exeSeq = buildSequence lr.Loss
+    printfn "linear regression exec sequence:\n%A" exeSeq
+
+
+[<Fact>]
+let ``Build execution sequence of linear regression gradient`` () =
+    let lr = linearRegression ()
+    let lrg = linearRegressionReverseGradient lr
+    let exeSeq = buildSequence lrg.LossWrtA
+    printfn "linear regression wrt A exec sequence:\n%A" exeSeq
+
 
 [<EntryPoint>]
 let main argv = 
     ``Build linear regression`` ()
     ``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
-    ``Eval forward gradient of linear regression`` ()
-    ``Eval reverse gradient of linear regression`` ()
+    //``Eval forward gradient of linear regression`` ()
+    //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
-    ``Check reverse gradient of linear regression`` ()
+    //``Check reverse gradient of linear regression`` ()
+    ``Build execution sequence of linear regression`` ()
+    ``Build execution sequence of linear regression gradient`` ()
     0
