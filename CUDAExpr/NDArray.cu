@@ -6,22 +6,35 @@
 
 #include <stdio.h>
 
-template <size_t nDim>
+template <size_t shape, size_t stride, size_t... Args>
 class NDArray
 {
 public:
-	size_t shape[nDim == 0 ? 1 : nDim];
-	size_t stride[nDim == 0 ? 1 : nDim];
 	float *data;
 
-	__forceinline__ __device__ float &element(const size_t *(&pos))
+	__forceinline__ __device__ static size_t index()
 	{
-		size_t idx = 0;
-		#pragma unroll
-		for (size_t d = 0; d < nDim; d++)
-			idx += pos[d] * stride[d];
-		return data[idx];
+		return 0;
 	}
+
+	__forceinline__ __device__ static size_t index(size_t pos)
+	{
+		return stride * pos;
+	}
+
+	__forceinline__ __device__ static size_t index(size_t pos, Args... rpos)
+	{
+		return stride * pos + NDArray<Args...>::index(rpos...);
+	}
+
+	//__forceinline__ __device__ float &element(const size_t *(&pos))
+	//{
+	//	size_t idx = 0;
+	//	#pragma unroll
+	//	for (size_t d = 0; d < nDim; d++)
+	//		idx += pos[d] * stride[d];
+	//	return data[idx];
+	//}
 
 	__forceinline__ __device__ float &element()
 	{
@@ -40,6 +53,7 @@ __device__ void sayHi0()
 template <size_t nDim>
 __device__ void scalarConst(NDArray<nDim> *target, const float value)
 {
+	
 	target->element() = value;
 }
 
