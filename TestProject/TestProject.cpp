@@ -8,37 +8,20 @@
 using namespace std;
 
 
-
-
-
 template <size_t stride, size_t ...rStrides>
-class Indexer
+class Stride
 {
 public:
 	template<class ...size_ts>
-	static inline size_t index(size_t pos, size_ts... rpos)
+	static inline size_t offset(size_t pos, size_ts... rpos)
 	{	
-		return stride * pos + Indexer<rStrides...>::index(rpos...);
+		return stride * pos + Stride<rStrides...>::offset(rpos...);
 	}
-
-	//__forceinline__ __device__ float &element(const size_t *(&pos))
-	//{
-	//	size_t idx = 0;
-	//	#pragma unroll
-	//	for (size_t d = 0; d < nDim; d++)
-	//		idx += pos[d] * stride[d];
-	//	return data[idx];
-	//}
-
-	//__forceinline__ __device__ float &element()
-	//{
-	//	return data[0];
-	//}
 };
 
 
 template <size_t stride>
-class Indexer<stride>
+class Stride<stride>
 {
 public:
 	static size_t index(size_t pos)
@@ -59,9 +42,9 @@ class NDArray
 
 int main()
 {
-	cout << "NDArray<10>::index(2) = " << Indexer<10>::index(2) << endl;
-	cout << "NDArray<10,20>::index(2,3) = " << Indexer<10, 20>::index(2, 3) << endl;
-	cout << "NDArray<10,20,30>::index(2,3,4) = " << Indexer<10,20,30>::index(2, 3, 4) << endl;
+	cout << "NDArray<10>::index(2) = " << Stride<10>::index(2) << endl;
+	cout << "NDArray<10,20>::index(2,3) = " << Stride<10, 20>::offset(2, 3) << endl;
+	cout << "NDArray<10,20,30>::index(2,3,4) = " << Stride<10,20,30>::offset(2, 3, 4) << endl;
     return 0;
 }
 
