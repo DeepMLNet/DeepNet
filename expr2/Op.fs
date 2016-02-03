@@ -23,7 +23,7 @@ type LeafOpT =
     | Zeros of ShapeSpecT                   /// zero tensor of given shape
     | ScalarConst of float                  /// scalar of given value
     | TensorConst of float * ShapeSpecT     /// tensor of given shape filled with given value
-    // varible access
+    // variable access
     | Var of VarSpecT                       /// variable read
 
 /// ops with one expr as argument

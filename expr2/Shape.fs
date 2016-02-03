@@ -179,6 +179,9 @@ type SizeSpecT with
 /// shape specifcation of a tensor
 type ShapeSpecT = SizeSpecT list
 
+/// evaluated shape specification of a tensor
+type NShapeSpecT = int list
+
 /// shape specification of a tensor
 module ShapeSpec =
     let withoutAxis ax sa =
@@ -269,7 +272,7 @@ module ShapeSpec =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
     /// evaluates shape to numeric shape
-    let eval (env: SymbolEnvT) (sa: ShapeSpecT) =
+    let eval (env: SymbolEnvT) (sa: ShapeSpecT) : NShapeSpecT =
         List.map (SizeSpec.eval env) sa
 
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =

@@ -3,15 +3,12 @@
 #include <cassert>
 
 #include "NDArray.cuh"
-
+#include "Ops.cuh"
 
 using namespace std;
 
 
-// This will output the proper CUDA error strings
-// in the event that a CUDA host call returns an error
 #define checkCudaErrors(err)  __checkCudaErrors (err, __FILE__, __LINE__)
-
 inline void __checkCudaErrors(CUresult err, const char *file, const int line)
 {
 	if (CUDA_SUCCESS != err) {
@@ -28,6 +25,55 @@ __global__ void sayHi()
 }
 
 
+template <typename TNDArray>
+void printNDArray(TNDArray *ndArray)
+{
+	for (size_t pos0 = 0; pos0 < ndArray->shape(0); pos0++)
+	{
+		printf("[\n");
+		for (size_t pos1 = 0; pos1 < ndArray->shape(1); pos1++)
+		{
+			for (size_t pos2 = 0; pos2 < ndArray->shape(2); pos2++)
+			{
+				printf("%.3f\t", ndArray->element(pos0, pos1, pos2));
+			}
+			printf("\n");
+		}
+		printf("]\n");
+	}
+}
+
+
+template <typename TNDArray>
+TNDArray *post(const TNDArray *ndArray)
+{
+	size_t bytes = ndArray->allocation();
+	CUdeviceptr dataDevice;
+	checkCudaErrors(cuMemAlloc(&dataDevice, bytes));
+	const float *dataHost = reinterpret_cast<const float *>(ndArray);
+	cuMemcpyHtoD(dataDevice, dataHost, bytes);
+	return reinterpret_cast<TNDArray *>(dataDevice);
+}
+
+template <typename TNDArray>
+TNDArray *gather(const TNDArray *ndArray)
+{
+	size_t bytes = ndArray->allocation();
+	CUdeviceptr dataDevice = reinterpret_cast<CUdeviceptr>(ndArray);
+	float *dataHost = reinterpret_cast<float *>(malloc(bytes));
+	cuMemcpyDtoH(dataHost, dataDevice, bytes);
+	return reinterpret_cast<TNDArray *>(dataHost);
+}
+
+template <typename TNDArray>
+TNDArray *allocDevice()
+{
+	size_t bytes = TNDArray::allocation();
+	CUdeviceptr dataDevice;
+	checkCudaErrors(cuMemAlloc(&dataDevice, bytes));
+	return reinterpret_cast<TNDArray *>(dataDevice);
+}
+
 int main()
 {
 	CUresult res;
@@ -42,33 +88,36 @@ int main()
 	checkCudaErrors(cuCtxCreate(&context, 0, device));
 
 
-	cout << "NDArray<10>::index(2) = " << Stride<10>::offset(2) << endl;
-	cout << "NDArray<10,20>::index(2,3) = " << Stride<10, 20>::offset(2, 3) << endl;
-	cout << "NDArray<10,20,30>::index(2,3,4) = " << Stride<10, 20, 30>::offset(2, 3, 4) << endl;
+	const size_t dataDim0Size = 1, dataDim1Size = 3, dataDim2Size = 4;
+	const size_t dataDim0Stride = dataDim1Size * dataDim2Size, dataDim1Stride = dataDim2Size, dataDim2Stride = 1;
+	typedef NDArray3DPointer<Shape3D<dataDim0Size, dataDim1Size, dataDim2Size>,
+		Stride3D<dataDim0Stride, dataDim1Stride, dataDim2Stride> > TNDArray;
+	TNDArray *aDevice = allocDevice<TNDArray>();
+	TNDArray *bDevice = allocDevice<TNDArray>();
+	TNDArray *cDevice = allocDevice<TNDArray>();
 
+	//CUdeviceptr dataGpuPtr;
+	//size_t dataDim1StrideDummy;
+	//res = cuMemAllocPitch(&dataGpuPtr, &dataDim1StrideDummy,
+	//	dataDim2Size * sizeof(float), dataDim0Size * dataDim1Size * sizeof(float), sizeof(float));
 
-	size_t dataDim0Size = 5;
-	size_t dataDim1Size = 3;
-	CUdeviceptr dataGpuPtr;
-	const size_t dataDim0Stride = 512;
-	size_t dataDim0StrideDummy;
-	const size_t dataDim1Stride = 1 * sizeof(float);
-
-	res = cuMemAllocPitch(&dataGpuPtr, &dataDim0StrideDummy,
-		dataDim0Size * sizeof(float), dataDim1Size * sizeof(float), sizeof(float));
-	
-	cout << "Allocated array of size " << dataDim0Size << "x" << dataDim1Size << endl;
-	cout << "result: " << res << endl;
-	cout << "got: addr: " << dataGpuPtr << "  strides: " << dataDim0StrideDummy << "x" << dataDim1Stride << endl;
-
-	float *dataGpuData = reinterpret_cast<float *>(dataGpuPtr);
-	typedef NDArrayPointer<Stride<dataDim0Stride, dataDim1Stride> > *TPNDArray;
-	TPNDArray data = reinterpret_cast<TPNDArray>(dataGpuData);
+	//cout << "Allocated array of size " << dataDim0Size << "x" << dataDim1Size << endl;
+	//cout << "result: " << res << endl;
+	//cout << "got: addr: " << dataGpuPtr << "  strides: " << dataDim1StrideDummy << "x" << dataDim2Stride << endl;
+	//float *dataGpuData = reinterpret_cast<float *>(dataGpuPtr);
 
 	dim3 grid(1, 1, 1);
-	dim3 block(1, 1, 1);
-	elementwiseUnary<ConstOneElementwiseOp_t><<<grid, block>>>(data, data);
+	dim3 block(1, 10, 10);
 
+	elementwiseUnary<ConstOneElementwiseOp_t> <<<grid, block>>>(aDevice, aDevice);
+	elementwiseUnary<ConstOneElementwiseOp_t> <<<grid, block>>>(bDevice, bDevice);
+
+	elementwiseBinary<AddBinaryElementwiseOp_t> <<<grid, block>>>(cDevice, aDevice, bDevice);
+	elementwiseBinary<AddBinaryElementwiseOp_t> <<<grid, block>>>(cDevice, cDevice, cDevice);
+
+	TNDArray *dataHost = gather(cDevice);
+	cout << "data=" << endl;
+	printNDArray(dataHost);
 
 	//float data[10];
 	//NDArrayPointer<Stride<1, 2>> nd(data);

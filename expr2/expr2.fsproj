@@ -93,6 +93,7 @@
     <Compile Include="NumGrad.fs" />
     <Compile Include="DiffCheck.fs" />
     <Compile Include="ExprEvalSequencer.fs" />
+    <Compile Include="CudaExpr.fs" />
     <Compile Include="CudaCodeGen.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
