@@ -54,7 +54,7 @@ module ExeSeq =
                         | _ -> false)
 
 type EvalResultT = {ExecUnitId: ExecUnitIdT; Storage: StorageTargetT; Shared: bool}
-type EvalReqT = {Expr: ExprT; Storage: StorageTargetT option; Afterwards: EvalResultT -> unit}
+type EvalReqT = {Id: int; Expr: ExprT; Storage: StorageTargetT option; Afterwards: EvalResultT -> unit}
 
 type EvalReqsT = EvalReqT list
 
@@ -124,8 +124,10 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
     let mutable evalRequests : EvalReqT list = []
     let mutable evaluatedExprs : Map<ExprT, EvalResultT> = Map.empty
 
+    let mutable evalRequestIdCounter = 0
     let submitEvalRequest expr storage afterwards =
-        evalRequests <- {Expr=expr; Storage=storage; Afterwards=afterwards} :: evalRequests
+        evalRequestIdCounter <- evalRequestIdCounter + 1
+        evalRequests <- {Id=evalRequestIdCounter; Expr=expr; Storage=storage; Afterwards=afterwards} :: evalRequests
 
     let processEvalRequest () =   
 
@@ -152,12 +154,13 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
         /// stores the evaluation result and executes Afterwards functions of the requestor
         let completeEvalRequest result =
             evaluatedExprs <- evaluatedExprs |> Map.add erqToProcess.Expr result
+            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
             erqToProcess.Afterwards result
 
         match erqResult with
         | Some result ->
             // expr is already evaluated
-            erqToProcess.Afterwards result
+            completeEvalRequest result
         | None ->
             // emit exec unit to evaluate expression
             match erqToProcess.Expr with
