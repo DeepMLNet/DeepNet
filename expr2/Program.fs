@@ -128,13 +128,27 @@ let ``Check reverse gradient of linear regression`` () =
     DiffCheck.checkReverseDiff env lr.Loss
     printfn "linear regression gradient checked"
 
-       
+let printExecSeq execSeq =
+    for i, item in List.indexed execSeq do
+        printfn "%d. %A" (i+1) item
+
+let printStreams streams =
+    for i, stream in List.indexed streams do
+        printfn "==============================================="
+        printfn "stream %d:" i
+        printExecSeq stream
+
 [<Fact>]
 let ``Build execution sequence of linear regression`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
-    let exeSeq = exprToExecRequests env.SizeSymbolEnv lr.Loss
-    printfn "linear regression exec sequence:\n%A" exeSeq
+    
+    let exeSeq, eRes = exprToExecUnits env.SizeSymbolEnv lr.Loss
+    //printfn "linear regression exec sequence:\n%A" exeSeq
+
+    let exeStreams = execUnitsToStreamCommands exeSeq
+    printfn "linear regression exec streams:"
+    printStreams exeStreams
 
 
 [<Fact>]
@@ -142,20 +156,25 @@ let ``Build execution sequence of linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
-    let exeSeq = exprToExecRequests env.SizeSymbolEnv lrg.LossWrtA
-    printfn "linear regression wrt A exec sequence:\n%A" exeSeq
+
+    let exeSeq, eRes = exprToExecUnits env.SizeSymbolEnv lrg.LossWrtA
+    //printfn "linear regression wrt A exec sequence:\n%A" exeSeq
+
+    let exeStreams = execUnitsToStreamCommands exeSeq
+    printfn "linear regression wrt A exec streams:"
+    printStreams exeStreams
 
 
 [<EntryPoint>]
 let main argv = 
     //CudaCodeGen.testMe ()
-    //``Build linear regression`` ()
+    ``Build linear regression`` ()
     //``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
     //``Eval forward gradient of linear regression`` ()
     //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
-    ``Build execution sequence of linear regression`` ()
+    //``Build execution sequence of linear regression`` ()
     ``Build execution sequence of linear regression gradient`` ()
     0

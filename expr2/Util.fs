@@ -10,6 +10,9 @@ module List =
     let without elem lst =
         List.concat [List.take elem lst; List.skip (elem+1) lst] 
 
+    let withoutValue value lst =
+        lst |> List.filter ((<>) value)
+
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
