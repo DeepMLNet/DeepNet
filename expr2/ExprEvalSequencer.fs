@@ -6,7 +6,7 @@ open Op
 
 
 type StreamT = int
-type EventT = int
+type EventT = {EventObjectId: int; CorrelationId: int; SendingExecUnitId: int}
 
 type StrideT = int list
 type StorageT = {Name: string; Elements: int}
@@ -41,13 +41,16 @@ let canWorkInFirstPlace binaryOp =
 
 let canWorkInSecondPlace binaryOp = canWorkInFirstPlace binaryOp
 
+type EventPlaceHolderT = EventT option ref
 
 type ExeOpT =
     | ExecLeaf of StorageT * LeafOpT
     | ExecUnary of StorageT * UnaryOpT * StorageT
     | ExecBinary of StorageT * BinaryOpT * StorageT * StorageT
     | WaitOnEvent of EventT
-    | EmitEvent of EventT
+    | EmitEvent of EventPlaceHolderT
+    | ExecUnitStartInfo of string
+    | ExecUnitEndInfo
 
 type ExecUnitIdT = int
 type ExecUnitT = {Id: ExecUnitIdT; DependsOn: ExecUnitIdT list; Items: ExeOpT list; }
@@ -206,23 +209,31 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
 type MutableList<'a> = System.Collections.Generic.List<'a>
 type StreamSeqT = List<ExeOpT>
 
-type EventIdT = int
-
 /// converts execution units to stream commands
 let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
     /// event counter
-    let mutable eventCnt = 0
+    let mutable eventObjectCnt = 0
+    /// correlation counter
+    let mutable correlationCnt = 0
     /// all allocated streams
     let streams = new MutableList<StreamSeqT>()
     /// stream used by an ExecUnit        
     let mutable streamOfUnit : Map<ExecUnitIdT, StreamT> = Map.empty
+    /// event emitted by an ExecUnit when its execution is finished
+    let mutable eventOfUnit : Map<ExecUnitIdT, EventT> = Map.empty
+    let mutable eventPlaceHolders : Map<ExecUnitIdT, EventPlaceHolderT> = Map.empty
     /// ExecUnits that still need to be processed
     let mutable execUnitsToProcess = execUnits
 
-    /// create a new event
-    let newEvent() : EventIdT =
-        eventCnt <- eventCnt + 1
-        eventCnt
+    /// create a new event object id
+    let newEventObjectId() =
+        eventObjectCnt <- eventObjectCnt + 1
+        eventObjectCnt
+
+    /// creates a new correlation id
+    let newCorrelationId() =
+        correlationCnt <- correlationCnt + 1
+        correlationCnt
 
     /// creates a new stream
     let newStream () =
@@ -238,17 +249,21 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
     let emitToStream s (exeOp: ExeOpT) =
         streams.[s] <- streams.[s] @ [exeOp]
 
+    /// get the ExecUnit with the given id
+    let execUnitById (execUnitId: ExecUnitIdT) =
+        execUnits |> List.find (fun eu -> eu.Id = execUnitId)
+
     /// gets the ExecUnits that depend on the specified unit
     let dependants (execUnitId: ExecUnitIdT) =
         execUnits |> List.filter (fun eu -> eu.DependsOn |> List.contains execUnitId)
 
+    /// gets the ExecUnits on which the specified unit depends
+    let dependsOn (execUnitId: ExecUnitIdT) =
+        (execUnitById execUnitId).DependsOn
+
     /// true if all ExecUnits that eu depends on have already been processed
     let dependsSatisfied eu =
         eu.DependsOn |> List.forall (fun id -> not (List.exists (fun (eutp: ExecUnitT) -> eutp.Id = id) execUnitsToProcess))
-
-    /// get the ExecUnit with the given id
-    let execUnitById (execUnitId: ExecUnitIdT) =
-        execUnits |> List.find (fun eu -> eu.Id = execUnitId)
 
     /// stream used by ExecUnit with Id euId
     let tryGetStreamOfExecUnitId euId =
@@ -272,7 +287,12 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
             eu.DependsOn |> List.map (execUnitById >> availableStreamsBelowExecUnit) |> List.concat |> Set.ofList
         // streams that end with the nodes that we depend on
         let endingHere = 
-            eu.DependsOn |> List.map (fun id -> streamOfUnit.[id]) |> Set.ofList
+            eu.DependsOn 
+            |> List.filter (fun pid -> 
+                pid |> dependants |> List.exists (fun dep -> 
+                    tryGetStreamOfExecUnitId dep.Id = Some streamOfUnit.[pid]) |> not)
+            |> List.map (fun pid -> streamOfUnit.[pid]) 
+            |> Set.ofList
         // my stream
         let myStream = Set.singleton streamOfUnit.[eu.Id]
         // streams that are used by nodes that depend on us
@@ -281,6 +301,23 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
             
         (availFromAbove + endingHere + myStream) - usedBelow |> Set.toList
 
+    /// returns true if sucId is a successor (thus dependent on) pId
+    let rec isSuccessorOf pId sucId =
+        if pId = sucId then true
+        else pId |> dependants |> List.exists (fun d -> isSuccessorOf d.Id sucId) 
+
+    /// find reuseable event objects for the given ExecUnit
+    let tryFindAvailableEventObjectsFor (eu: ExecUnitIdT)  =
+        let rec findRec peu =
+            match eventOfUnit |> Map.tryFind peu with
+            | Some {EventObjectId=eObjId} when 
+                    peu |> dependants |> List.forall (fun d -> isSuccessorOf d.Id eu) 
+                -> Some eObjId
+            | _ -> 
+                peu |> dependsOn |> List.tryPick findRec            
+        findRec eu
+
+    // generate streams
     while not execUnitsToProcess.IsEmpty do
         // find an execution unit that has all dependencies satisfied
         let eu = execUnitsToProcess |> List.find dependsSatisfied
@@ -306,22 +343,45 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
         streamOfUnit <- streamOfUnit |> Map.add eu.Id euStream
                
         // our stream needs to wait on the results of the streams we depend on
-        for endingUnit in eu.DependsOn |> List.filter (fun pId -> streamOfUnit.[pId] <> euStream) do
-            match streams.[streamOfUnit.[endingUnit]] |> List.tryLast with
-            | Some (EmitEvent evt) ->
+        for endingUnitId in eu.DependsOn |> List.filter (fun pId -> streamOfUnit.[pId] <> euStream) do            
+            match eventOfUnit |> Map.tryFind endingUnitId with
+            | Some evt ->
+                // wait on already emitted event, if possible
                 WaitOnEvent evt |> emitToStream euStream
-            | _ ->
-                let evt = newEvent ()
-                EmitEvent evt |> emitToStream streamOfUnit.[endingUnit]
+            | None ->
+                // if possible, reuse an existing event object
+                let evtObjId =
+                    match tryFindAvailableEventObjectsFor endingUnitId with
+                    | Some id -> id
+                    | None -> newEventObjectId()
+                let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); SendingExecUnitId=endingUnitId}
+                eventOfUnit <- eventOfUnit |> Map.add endingUnitId evt
+                
+                // fill in event placeholder and wait for event
+                eventPlaceHolders.[endingUnitId] := Some evt
                 WaitOnEvent evt |> emitToStream euStream
 
         // emit our instructions
+        sprintf "%A" eu |> ExecUnitStartInfo |> emitToStream euStream
         for cmd in eu.Items do
             cmd |> emitToStream euStream
+
+        // emit an event placeholder to allow for synchronization
+        let evtPh = ref None
+        eventPlaceHolders <- eventPlaceHolders |> Map.add eu.Id evtPh
+        EmitEvent evtPh |> emitToStream streamOfUnit.[eu.Id]
 
         // remove from queue
         execUnitsToProcess <- execUnitsToProcess |> List.withoutValue eu
 
-    streams |> List.ofSeq                       
-        
+    streams 
+        |> Seq.map (fun stream -> 
+            stream |> List.filter (fun op -> 
+                match op with
+                | EmitEvent re when !re = None -> false
+                | _ -> true))
+        |> Seq.toList
+       
 
+
+// TODO: variable memory allocation
