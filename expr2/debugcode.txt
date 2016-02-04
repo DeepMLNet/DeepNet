@@ -1,0 +1,11 @@
+﻿                
+                printfn "==================================="
+                for expr, erqsForExpr in erqsByExpr do
+                    printfn "requests for %A" expr
+                    printfn "count:         %d" (List.length erqsForExpr)
+                    printfn "expr occurs:   %d" (exprOccurrences expr)
+                    printfn "------------------------------------------"
+                printfn "==================================="
+
+
+

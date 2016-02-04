@@ -56,7 +56,7 @@ type ExecUnitIdT = int
 type ExecUnitT = {Id: ExecUnitIdT; DependsOn: ExecUnitIdT list; Items: ExeOpT list; }
 
 type EvalResultT = {ExecUnitId: ExecUnitIdT; Storage: StorageT; Shared: bool}
-type EvalReqT = {Id: int; Expr: ExprT; Storage: StorageT option; OnCompletion: EvalResultT -> unit}
+type EvalReqT = {Id: int; Expr: ExprT; Multiplicity: int; Storage: StorageT option; OnCompletion: EvalResultT -> unit}
 
 let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     // number of occurrences of subexpressions
@@ -83,9 +83,10 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     // evaluation requestion
     let mutable evalRequests : EvalReqT list = []
     let mutable evalRequestIdCnt = 0
-    let submitEvalRequest expr storage onCompletion =
+    let submitEvalRequest expr multiplicity storage onCompletion =
         evalRequestIdCnt <- evalRequestIdCnt + 1
-        evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Storage=storage; OnCompletion=onCompletion} :: evalRequests
+        evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Multiplicity=multiplicity; 
+                         Storage=storage; OnCompletion=onCompletion} :: evalRequests
 
     // evaluated requests
     let mutable evaluatedExprs : Map<ExprT, EvalResultT> = Map.empty
@@ -93,29 +94,35 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     /// takes an evaluation request from the evaluation request queue and processes it
     let processEvalRequest () =   
         // find a request to process and target storage
-        let erqToProcess, erqStorage, erqResult =
+        let erqToProcess, erqStorage, erqResult, erqMultiplicity, erqRequestors =
             // First, look if there are any expressions which are already computed.
             match evalRequests |> List.tryFind (fun erq -> evaluatedExprs |> Map.containsKey erq.Expr) with
             | Some computedErq -> computedErq, 
                                   Some evaluatedExprs.[computedErq.Expr].Storage, 
-                                  Some evaluatedExprs.[computedErq.Expr]
+                                  Some evaluatedExprs.[computedErq.Expr],
+                                  0, 0
             | None ->
                 // if none, look if there is a group of request for the same expression whose requestors are all known.
-                let erqsByExpr = evalRequests |> List.groupBy (fun erq -> erq.Expr)
-                let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> List.length rs = exprOccurrences expr)
+                let erqsByExpr = evalRequests |> List.groupBy (fun erq -> erq.Expr)                              
+                let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> 
+                    rs |> List.sumBy (fun r -> r.Multiplicity) = exprOccurrences expr)
+                let multiplicity = erqsForExpr |> List.sumBy (fun r -> r.Multiplicity)
+                let requestors = erqsForExpr |> List.length
 
                 // If a request from the group has a specified storage target, process it first.
                 match List.tryFind (fun erq -> erq.Storage <> None) erqsForExpr with
                 | Some erqWithStorage -> 
-                    erqWithStorage, erqWithStorage.Storage, None
+                    erqWithStorage, erqWithStorage.Storage, None, multiplicity, requestors
                 | None -> 
                     // Otherwise process any (the first) request from the group.
-                    erqsForExpr.[0], None, None
+                    erqsForExpr.[0], None, None, multiplicity, requestors
         
+        /// true, if result is processed by multiple requestors
+        let erqResultShared = erqRequestors > 1
+
         /// stores the evaluation result and executes Afterwards functions of the requestor
         let completeEvalRequest result =
             evaluatedExprs <- evaluatedExprs |> Map.add erqToProcess.Expr result
-            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
             erqToProcess.OnCompletion result
 
         match erqResult with
@@ -131,17 +138,18 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                     match erqStorage with
                     | Some s -> s
                     | None -> newStorage (numShapeOf erqToProcess.Expr)
+                let targetShared = erqResultShared
 
                 // emit execution unit 
                 let eu = {newExecUnit() with Items=[ExecLeaf(targetStorage, op)]}
                 submitExecUnit eu
 
-                completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=false}
+                completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
             | Unary(op, aExpr) -> 
                 // request aExpr to be evaluated directly into our storage, if we can work inplace.
                 let aReqStorage = if canWorkInPlace op then erqStorage else None
 
-                submitEvalRequest aExpr aReqStorage 
+                submitEvalRequest aExpr erqMultiplicity aReqStorage 
                     (fun aRes ->
                         // determine our definitive storage
                         let targetStorage =
@@ -150,7 +158,8 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                             | None when canWorkInPlace op && not aRes.Shared -> aRes.Storage
                             | None -> newStorage (numShapeOf erqToProcess.Expr)                               
                         let targetShared =
-                            if targetStorage = aRes.Storage then aRes.Shared else false
+                            (if targetStorage = aRes.Storage then aRes.Shared else false) ||
+                            erqResultShared
 
                         // emit execution unit 
                         let eu = {newExecUnit() with Items=[ExecUnary(targetStorage, op, aRes.Storage)];
@@ -182,7 +191,8 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                             | None -> newStorage (numShapeOf erqToProcess.Expr)
                         let targetShared = 
                             (if targetStorage = aRes.Storage then aRes.Shared else false) ||
-                            (if targetStorage = bRes.Storage then bRes.Shared else false)
+                            (if targetStorage = bRes.Storage then bRes.Shared else false) ||
+                            erqResultShared
 
                         // emit execution unit 
                         let eu = {newExecUnit() with Items=[ExecBinary(targetStorage, op, aRes.Storage, bRes.Storage)];
@@ -192,12 +202,15 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                         completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
                     | _ -> ()    
                     
-                submitEvalRequest aExpr aReqStorage (fun res -> aRes <- Some res; onMaybeCompleted())
-                submitEvalRequest bExpr bReqStorage (fun res -> bRes <- Some res; onMaybeCompleted())
+                submitEvalRequest aExpr erqMultiplicity aReqStorage (fun res -> aRes <- Some res; onMaybeCompleted())
+                submitEvalRequest bExpr erqMultiplicity bReqStorage (fun res -> bRes <- Some res; onMaybeCompleted())
+        
+        // remove eval request        
+        evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
 
     // create initial evaluation request
     let mutable exprRes = None
-    submitEvalRequest expr None (fun res -> exprRes <- Some res)
+    submitEvalRequest expr 1 None (fun res -> exprRes <- Some res)
 
     // processing loop
     while not (List.isEmpty evalRequests) do
@@ -362,7 +375,7 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
                 WaitOnEvent evt |> emitToStream euStream
 
         // emit our instructions
-        sprintf "%A" eu |> ExecUnitStartInfo |> emitToStream euStream
+        //sprintf "%A" eu |> ExecUnitStartInfo |> emitToStream euStream
         for cmd in eu.Items do
             cmd |> emitToStream euStream
 

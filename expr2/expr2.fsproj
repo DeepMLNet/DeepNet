@@ -99,6 +99,7 @@
     <None Include="App.config" />
     <None Include="test.fsx" />
     <Content Include="packages.config" />
+    <Content Include="debugcode.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
