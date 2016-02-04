@@ -54,7 +54,7 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
         |> VarEnv.add lr.b bVal
         |> VarEnv.add lr.x xVal
         |> VarEnv.add lr.t tVal
-    EvalEnv.fromVarEnv varEnv
+    EvalEnv.fromVarEnvAndExpr varEnv lr.Loss
 
 [<Fact>]
 let ``Build linear regression`` () =
@@ -132,7 +132,8 @@ let ``Check reverse gradient of linear regression`` () =
 [<Fact>]
 let ``Build execution sequence of linear regression`` () =
     let lr = linearRegression ()
-    let exeSeq = buildSequence lr.Loss
+    let env = linearRegressionEvalEnv lr
+    let exeSeq = exprToExecRequests env.SizeSymbolEnv lr.Loss
     printfn "linear regression exec sequence:\n%A" exeSeq
 
 
@@ -140,13 +141,14 @@ let ``Build execution sequence of linear regression`` () =
 let ``Build execution sequence of linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
-    let exeSeq = buildSequence lrg.LossWrtA
+    let env = linearRegressionEvalEnv lr
+    let exeSeq = exprToExecRequests env.SizeSymbolEnv lrg.LossWrtA
     printfn "linear regression wrt A exec sequence:\n%A" exeSeq
 
 
 [<EntryPoint>]
 let main argv = 
-    CudaCodeGen.testMe ()
+    //CudaCodeGen.testMe ()
     //``Build linear regression`` ()
     //``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
@@ -154,6 +156,6 @@ let main argv =
     //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
-    //``Build execution sequence of linear regression`` ()
-    //``Build execution sequence of linear regression gradient`` ()
+    ``Build execution sequence of linear regression`` ()
+    ``Build execution sequence of linear regression gradient`` ()
     0

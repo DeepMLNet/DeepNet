@@ -1,5 +1,7 @@
 ﻿module Op
 
+open System.Collections.Generic
+
 open Util
 open Shape
 
@@ -364,3 +366,22 @@ let extractVar expr =
 /// make variable expression from VarSpec
 let makeVar v =
     Leaf(Var(v))
+
+/// counts how many times subExpr occurs in expr
+let subExprOccurrences expr =
+    let cnt = Dictionary<ExprT, int>()
+    let rec build expr =
+        if cnt.ContainsKey(expr) then
+            cnt.[expr] <- cnt.[expr] + 1
+        else
+            cnt.[expr] <- 1
+
+        match expr with
+        | Leaf _ -> ()
+        | Unary(_, a) -> build a
+        | Binary(_, a, b) -> build a; build b
+    build expr
+
+    fun subExpr ->
+        if cnt.ContainsKey(subExpr) then cnt.[subExpr]
+        else 0

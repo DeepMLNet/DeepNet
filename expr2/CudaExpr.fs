@@ -23,9 +23,3 @@ type Expr =
 
 
 
-
-let rec fromOpExpr (expr: Op.ExprT) =
-    match expr with
-    | Op.Leaf(op) ->
-        
-

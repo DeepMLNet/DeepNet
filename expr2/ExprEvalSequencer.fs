@@ -1,136 +1,94 @@
 ﻿module ExprEvalSequencer
 
 open System.Collections.Generic
-open Op
 open Shape
+open Op
 
-type StrideT = int list
-
-type StorageSlotT = {Name: string; Address: int; Size: int}
-
-type StorageTargetT = {Slot: StorageSlotT; Offset: int; Stride: StrideT}
-
-type StorageAllocationsT = StorageSlotT list
 
 type StreamT = int
-
 type EventT = int
 
+type StrideT = int list
+type StorageT = {Name: string; Shape: NShapeSpecT; Stride: StrideT}
+
+let canWorkInPlace unaryOp = 
+    match unaryOp with
+    // unary elementwise
+    | Negate -> true
+    | Log -> true
+    | Exp -> true
+    // reductions
+    | Sum -> false
+    | SumAxis _ -> false
+    // shape operations
+    | Reshape _ -> true
+    | Broadcast _ -> true
+    | SwapDim _ -> true
+    // misc
+    | Annotated _ -> true
+    
+let canWorkInFirstPlace binaryOp = 
+    match binaryOp with
+    // binary elementwise
+    | Add -> true
+    | Substract -> true
+    | Multiply -> true
+    | Divide -> true
+    | Power -> true
+    // matrix/tensor operations
+    | Dot -> false
+    | TensorProduct -> false
+
+let canWorkInSecondPlace binaryOp = canWorkInFirstPlace binaryOp
+
+
 type ExeOpT =
-    | ExecLeaf of StorageTargetT * LeafOpT
-    | ExecUnary of StorageTargetT * UnaryOpT * StorageTargetT
-    | ExecBinary of StorageTargetT * BinaryOpT * StorageTargetT * StorageTargetT
+    | ExecLeaf of StorageT * LeafOpT
+    | ExecUnary of StorageT * UnaryOpT * StorageT
+    | ExecBinary of StorageT * BinaryOpT * StorageT * StorageT
     | WaitOnEvent of EventT
     | EmitEvent of EventT
 
 type ExecUnitIdT = int
-type ExecUnitT = {Id: ExecUnitIdT; 
-                  DependsOn: ExecUnitIdT list; 
-                  Items: ExeOpT list; 
-                  Computes: ExprT option;
-                  Target: StorageTargetT option;}
+type ExecUnitT = {Id: ExecUnitIdT; DependsOn: ExecUnitIdT list; Items: ExeOpT list; }
 
-//[<StructuredFormatDisplay("{AsString}")>]
-//type ExeSeqItemT = {Stream: StreamT; ExeOp: ExeOpT;}
-//    with member this.AsString = sprintf "%A" this.ExeOp
+type EvalResultT = {ExecUnitId: ExecUnitIdT; Storage: StorageT; Shared: bool}
+type EvalReqT = {Id: int; Expr: ExprT; Storage: StorageT option; OnCompletion: EvalResultT -> unit}
 
+let exprToExecRequests (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
+    // number of occurrences of subexpressions
+    let exprOccurrences = subExprOccurrences expr
 
+    // calculates the numeric shape
+    let numShapeOf expr = shapeOf expr |> ShapeSpec.eval sizeSymbolEnv
 
-module ExeOp =
-    /// returns the target storage of the ExeOp
-    let target eop =
-        match eop with
-        | ExecLeaf(t, _) | ExecUnary(t, _, _) | ExecBinary(t, _, _, _) -> t
-
-
-module ExeSeq =
-    let empty : ExeSeqT = []
-
-    /// finds the ExeSequenceItem that computes expr
-    let tryFindExpr expr eseq =
-        eseq |> List.tryFind 
-            (fun esi -> match esi with
-                        | ExeSequenceItem(_, Some e) when expr = e -> true
-                        | _ -> false)
-
-type EvalResultT = {ExecUnitId: ExecUnitIdT; Storage: StorageTargetT; Shared: bool}
-type EvalReqT = {Id: int; Expr: ExprT; Storage: StorageTargetT option; Afterwards: EvalResultT -> unit}
-
-type EvalReqsT = EvalReqT list
-
-module EvalReq =
-    let reqsCount er =
-        List.length er.Requests
-
-module EvalReqs =
-    let addReq newExpr newReq (ers: EvalReqsT) =
-        let rec addRequestRec ers =
-            match ers with
-            | ({Expr=rExpr} as req)::reqs when rExpr = newExpr ->
-                {req with Requests = newReq::req.Requests} :: reqs
-            | req::reqs -> req :: addRequestRec reqs
-            | [] -> [{Expr=newExpr; Requests=[newReq]}]
-        addRequestRec ers
-
-
-let subExprEvalCount expr =
-    let evalCount = Dictionary<ExprT, int>()
-    let rec build expr =
-        if evalCount.ContainsKey(expr) then
-            evalCount.[expr] <- evalCount.[expr] + 1
-        else
-            evalCount.[expr] <- 1
-
-        match expr with
-        | Leaf _ -> ()
-        | Unary(_, a) -> build a
-        | Binary(_, a, b) -> build a; build b
-    build expr
-
-    fun subExpr ->
-        if evalCount.ContainsKey(subExpr) then
-            evalCount.[subExpr]
-        else 
-            0
-
-
-let canWorkInPlace unaryOp = true
-
-let canWorkInFirstPlace binaryOp = true
-
-let canWorkInSecondPlace binaryOp = true
-
-
-let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
-//    let mutable storageCount = 0
-//    let newStorage () : StorageT =
-//        storageCount <- storageCount + 1
-//        sprintf "s%d" storageCount
-
-    let evalCnt = subExprEvalCount expr
-
+    // execution units
     let mutable execUnits = []
-    let mutable maxExecUnitId = 0
+    let mutable execUnitIdCnt = 0
     let newExecUnit () =
-        maxExecUnitId <- maxExecUnitId + 1
-        {Id=maxExecUnitId; DependsOn=[]; Items=[]; Computes=None;}
+        execUnitIdCnt <- execUnitIdCnt + 1
+        {Id=execUnitIdCnt; DependsOn=[]; Items=[];}
     let submitExecUnit eu =
         execUnits <- eu :: execUnits
 
-    let newStorageTarget shape =
-        // TODO
-        {Slot={Name="TODO"}}
+    // storage space
+    let mutable storageIdCnt = 0
+    let newStorage shape =
+        storageIdCnt <- storageIdCnt + 1
+        {Name=sprintf "s%d" storageIdCnt; Shape=shape; Stride=[]}
 
+    // evaluation requestion
     let mutable evalRequests : EvalReqT list = []
+    let mutable evalRequestIdCnt = 0
+    let submitEvalRequest expr storage onCompletion =
+        evalRequestIdCnt <- evalRequestIdCnt + 1
+        evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Storage=storage; OnCompletion=onCompletion} :: evalRequests
+
+    // evaluated requests
     let mutable evaluatedExprs : Map<ExprT, EvalResultT> = Map.empty
 
-    let mutable evalRequestIdCounter = 0
-    let submitEvalRequest expr storage afterwards =
-        evalRequestIdCounter <- evalRequestIdCounter + 1
-        evalRequests <- {Id=evalRequestIdCounter; Expr=expr; Storage=storage; Afterwards=afterwards} :: evalRequests
-
+    /// takes an evaluation request from the evaluation request queue and processes it
     let processEvalRequest () =   
-
         // find a request to process and target storage
         let erqToProcess, erqStorage, erqResult =
             // First, look if there are any expressions which are already computed.
@@ -141,7 +99,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
             | None ->
                 // if none, look if there is a group of request for the same expression whose requestors are all known.
                 let erqsByExpr = evalRequests |> List.groupBy (fun erq -> erq.Expr)
-                let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> List.length rs = evalCnt expr)
+                let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> List.length rs = exprOccurrences expr)
 
                 // If a request from the group has a specified storage target, process it first.
                 match List.tryFind (fun erq -> erq.Storage <> None) erqsForExpr with
@@ -155,7 +113,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
         let completeEvalRequest result =
             evaluatedExprs <- evaluatedExprs |> Map.add erqToProcess.Expr result
             evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
-            erqToProcess.Afterwards result
+            erqToProcess.OnCompletion result
 
         match erqResult with
         | Some result ->
@@ -169,7 +127,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
                 let targetStorage = 
                     match erqStorage with
                     | Some s -> s
-                    | None -> newStorageTarget (shapeOf erqToProcess.Expr)
+                    | None -> newStorage (numShapeOf erqToProcess.Expr)
 
                 // emit execution unit 
                 let eu = {newExecUnit() with Items=[ExecLeaf(targetStorage, op)]}
@@ -187,7 +145,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
                             match erqStorage with
                             | Some s -> s
                             | None when canWorkInPlace op && not aRes.Shared -> aRes.Storage
-                            | None -> newStorageTarget (shapeOf erqToProcess.Expr)                               
+                            | None -> newStorage (numShapeOf erqToProcess.Expr)                               
                         let targetShared =
                             if targetStorage = aRes.Storage then aRes.Shared else false
 
@@ -209,7 +167,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
                 // callback when aExpr and bExpr requests have been evaluated
                 let mutable aRes = None
                 let mutable bRes = None
-                let maybeCompleted () =
+                let onMaybeCompleted () =
                     match aRes, bRes with
                     | Some aRes, Some bRes ->
                         // determine our definitive storage
@@ -218,7 +176,7 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
                             | Some s -> s
                             | None when canWorkInFirstPlace op && not aRes.Shared -> aRes.Storage
                             | None when canWorkInSecondPlace op && not bRes.Shared -> bRes.Storage
-                            | None -> newStorageTarget (shapeOf erqToProcess.Expr)
+                            | None -> newStorage (numShapeOf erqToProcess.Expr)
                         let targetShared = 
                             (if targetStorage = aRes.Storage then aRes.Shared else false) ||
                             (if targetStorage = bRes.Storage then bRes.Shared else false)
@@ -231,17 +189,18 @@ let buildSequence (sizeSymbolEnv: SymbolEnvT)  (expr: ExprT) =
                         completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
                     | _ -> ()    
                     
-                submitEvalRequest aExpr aReqStorage (fun res -> aRes <- Some res)
-                submitEvalRequest bExpr bReqStorage (fun res -> bRes <- Some res)
+                submitEvalRequest aExpr aReqStorage (fun res -> aRes <- Some res; onMaybeCompleted())
+                submitEvalRequest bExpr bReqStorage (fun res -> bRes <- Some res; onMaybeCompleted())
 
+    // create initial evaluation request
+    let mutable exprRes = None
+    submitEvalRequest expr None (fun res -> exprRes <- Some res)
 
+    // processing loop
+    while not (List.isEmpty evalRequests) do
+        processEvalRequest ()
 
-           
-
-
-
-
-    ()
+    execUnits, exprRes
 
 
 
