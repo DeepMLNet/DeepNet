@@ -100,7 +100,7 @@
     <None Include="test.fsx" />
     <Content Include="packages.config" />
     <Content Include="debugcode.txt" />
-    <None Include="GenerateCudaHeaders.fsx" />
+    <None Include="GenerateNDSupport.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

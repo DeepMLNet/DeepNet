@@ -175,6 +175,6 @@ let main argv =
     //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
-    //``Build execution sequence of linear regression`` ()
+    ``Build execution sequence of linear regression`` ()
     ``Build execution sequence of linear regression gradient`` ()
     0

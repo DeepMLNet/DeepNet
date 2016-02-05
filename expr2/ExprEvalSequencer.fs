@@ -398,3 +398,5 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
 
 
 // TODO: variable memory allocation
+// TODO: CUDA driver call sequencing
+
