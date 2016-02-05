@@ -108,6 +108,14 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CudaRuntime>Static</CudaRuntime>
     </CudaCompile>
+    <PreBuildEvent>
+      <Command>cd "$(ProjectDir)"
+"$(ExtensionSDKDirectoryRoot)\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
+</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Generate NDSupport.cuh</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -153,10 +161,19 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="NDArray.cuh" />
+    <ClInclude Include="NDSupport.cuh" />
     <ClInclude Include="Ops.cuh" />
-    <ClInclude Include="StrideVaraidic.cuh" />
+    <ClInclude Include="Utils.cuh" />
     <CudaCompile Include="Test.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="GenerateNDSupport.fsx">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="OldCode.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

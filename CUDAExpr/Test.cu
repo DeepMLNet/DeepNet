@@ -2,8 +2,8 @@
 #include <iostream>
 #include <cassert>
 
-#include "NDArray.cuh"
 #include "Ops.cuh"
+#include "NDSupport.cuh"
 
 using namespace std;
 

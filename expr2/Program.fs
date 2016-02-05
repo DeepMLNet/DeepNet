@@ -128,7 +128,7 @@ let ``Check reverse gradient of linear regression`` () =
     DiffCheck.checkReverseDiff env lr.Loss
     printfn "linear regression gradient checked"
 
-let printExecSeq execSeq =
+let printList execSeq =
     for i, item in List.indexed execSeq do
         printfn "%d. %A" (i+1) item
 
@@ -136,7 +136,7 @@ let printStreams streams =
     for i, stream in List.indexed streams do
         printfn "==============================================="
         printfn "stream %d:" i
-        printExecSeq stream
+        printList stream
 
 [<Fact>]
 let ``Build execution sequence of linear regression`` () =
@@ -149,6 +149,10 @@ let ``Build execution sequence of linear regression`` () =
     let exeStreams = execUnitsToStreamCommands exeSeq
     printfn "linear regression exec streams:"
     printStreams exeStreams
+
+    let cudaCalls = generateCalls exeStreams
+    printfn "linear regression CUDA calls:"
+    printList cudaCalls
 
 
 [<Fact>]
@@ -163,6 +167,10 @@ let ``Build execution sequence of linear regression gradient`` () =
     let exeStreams = execUnitsToStreamCommands exeSeq
     printfn "linear regression wrt A exec streams:"
     printStreams exeStreams
+
+    let cudaCalls = generateCalls exeStreams
+    printfn "linear regression wrt A CUDA calls:"
+    printList cudaCalls
 
 
 [<EntryPoint>]

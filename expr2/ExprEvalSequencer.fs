@@ -387,6 +387,7 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
         // remove from queue
         execUnitsToProcess <- execUnitsToProcess |> List.withoutValue eu
 
+    // remove empty EmitEvent placeholders
     streams 
         |> Seq.map (fun stream -> 
             stream |> List.filter (fun op -> 
@@ -396,7 +397,133 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
         |> Seq.toList
        
 
-
 // TODO: variable memory allocation
 // TODO: CUDA driver call sequencing
 
+let pitchAlignment = 256 // TODO: get from device
+
+[<Measure>]
+type byte
+
+type CudaFlagsT = int
+type ByteCountT = int<byte>
+
+type EventObjectT = int
+
+type KernelT = int
+type KernelArgsT = obj list
+
+type GridDimT = int * int * int
+type BlockDimT = int * int * int
+
+type CudaCallT =
+    // memory mangement
+    | MemAlloc of ByteCountT * StorageT
+    | MemFree of StorageT
+    // memory operations
+    | MemcpyAsync of StorageT * StorageT * ByteCountT * StreamT
+    | MemcpyHtoDAsync of StorageT * StorageT * ByteCountT * StreamT
+    | MemcpyDtoHAsync of StorageT * StorageT * ByteCountT * StreamT
+    | MemsetD32Async of uint32 * ByteCountT * StreamT
+    // stream management
+    | StreamCreate of StreamT * CudaFlagsT
+    | StreamDestory of StreamT
+    | StreamWaitEvent of StreamT * EventObjectT * CudaFlagsT
+    // event mangement
+    | EventCreate of EventObjectT * CudaFlagsT
+    | EventDestory of EventObjectT
+    | EventRecord of EventObjectT * StreamT
+    | EventSynchronize of EventObjectT
+    // execution control
+    | LaunchKernel of KernelT * GridDimT * BlockDimT * ByteCountT * StreamT * KernelArgsT
+    // dummy op
+    | ExeOp of StreamT * ExeOpT
+
+
+/// generates a sequence of CUDA calls from streams
+let generateCalls streams =
+    
+    /// the number of times WaitOnEvent is called for a particular correlation
+    let correlationIdWaiters =
+        seq {
+            for strm in streams do
+                for exec in strm do
+                    match exec with
+                    | WaitOnEvent evt -> yield evt.CorrelationId
+                    | _ -> ()
+        } |> Seq.countBy id |> Map.ofSeq
+        
+    let rec generate streamCallHistory activeEvents streams =
+        if List.exists ((<>) []) streams then
+            // sort streams by call history
+            let streamsSorted = 
+                streams
+                |> List.indexed
+                |> List.sortByDescending (fun (i, strm) ->                         
+                    let callsBetween = 
+                        match streamCallHistory |> List.tryFindIndex ((=) i) with
+                        | Some ord -> ord
+                        | None -> 9999
+                    let syncPenalty = 
+                        match strm with
+                        | WaitOnEvent _::_ -> -1000
+                        | _ -> 0
+                    callsBetween + syncPenalty) 
+        
+            // find stream to process
+            let strmIdToProcess, strmToProcess = 
+                streamsSorted 
+                |> List.find (fun (strmId, strm) ->
+                    match strm with
+                    | WaitOnEvent evt ::_ when 
+                        activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
+                        // WaitOnEvent can only be called when EmitEvent 
+                        // with same CorrelationId has been called before.
+                    | WaitOnEvent _ ::_ -> false
+                    | EmitEvent evtp ::_ ->
+                        match !evtp with
+                        | Some evt when
+                            activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
+                            // EmitEvent may only be called again for a given event,
+                            // after all necessary calls to WaitOnEvent for a previous correlation.
+                        | _ -> true
+                    | [] -> false
+                    | _ -> true)
+
+            // book keeping
+            let execOp = List.head strmToProcess       
+            let streamCallHistory = strmIdToProcess :: streamCallHistory
+            let remainingStreams = streams |> List.map (fun strm -> 
+                if strm = strmToProcess then List.tail strm
+                else strm)
+
+            match execOp with
+            | WaitOnEvent evt ->
+                // remove active event
+                let activeEvents = activeEvents |> List.removeValueOnce evt
+
+                let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId, 0)
+                cmd :: generate streamCallHistory activeEvents remainingStreams
+            | EmitEvent evtp ->
+                // add active event as many times as it will be waited upon
+                let evt = Option.get !evtp
+                let activeEvents = List.replicate correlationIdWaiters.[evt.CorrelationId] evt @ activeEvents
+
+                let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
+                cmd :: generate streamCallHistory activeEvents remainingStreams
+//            | ExecLeaf (trgt, op) ->
+//                // TODO
+//                generate streamCallHistory activeEvents remainingStreams
+//            | ExecUnary (trgt, op, a) ->
+//                // TODO
+//                generate streamCallHistory activeEvents remainingStreams
+//            | ExecBinary (trgt, op, a, b) ->
+//                // TODO
+//                generate streamCallHistory activeEvents remainingStreams
+            | _ as eop -> 
+                ExeOp(strmIdToProcess, eop) :: generate streamCallHistory activeEvents remainingStreams
+        else
+            // streams are all empty
+            []
+
+    generate [] [] streams

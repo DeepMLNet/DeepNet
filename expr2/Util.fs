@@ -13,6 +13,12 @@ module List =
     let withoutValue value lst =
         lst |> List.filter ((<>) value)
 
+    let rec removeValueOnce value lst =
+        match lst with
+        | v::vs when v = value -> vs
+        | v::vs -> v :: removeValueOnce value vs
+        | [] -> []
+
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
