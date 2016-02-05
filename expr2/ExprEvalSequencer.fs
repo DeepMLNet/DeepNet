@@ -466,6 +466,7 @@ let generateCalls streams =
                         | None -> 9999
                     let syncPenalty = 
                         match strm with
+                        | EmitEvent _::_ -> 1000
                         | WaitOnEvent _::_ -> -1000
                         | _ -> 0
                     callsBetween + syncPenalty) 
@@ -484,7 +485,7 @@ let generateCalls streams =
                         match !evtp with
                         | Some evt when
                             activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
-                            // EmitEvent may only be called again for a given event,
+                            // EmitEvent for a given event must be called
                             // after all necessary calls to WaitOnEvent for a previous correlation.
                         | _ -> true
                     | [] -> false
@@ -492,7 +493,6 @@ let generateCalls streams =
 
             // book keeping
             let execOp = List.head strmToProcess       
-            let streamCallHistory = strmIdToProcess :: streamCallHistory
             let remainingStreams = streams |> List.map (fun strm -> 
                 if strm = strmToProcess then List.tail strm
                 else strm)
@@ -521,6 +521,7 @@ let generateCalls streams =
 //                // TODO
 //                generate streamCallHistory activeEvents remainingStreams
             | _ as eop -> 
+                let streamCallHistory = strmIdToProcess :: streamCallHistory
                 ExeOp(strmIdToProcess, eop) :: generate streamCallHistory activeEvents remainingStreams
         else
             // streams are all empty
