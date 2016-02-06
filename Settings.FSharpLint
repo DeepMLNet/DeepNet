@@ -2,11 +2,23 @@
 <FSharpLintSettings xmlns="https://github.com/fsprojects/FSharpLint/blob/master/ConfigurationSchema.xsd">
   <IgnoreFiles Update="Overwrite"><![CDATA[assemblyinfo.*]]></IgnoreFiles>
   <Analysers>
+    <CyclomaticComplexity>
+      <Rules />
+      <Enabled>False</Enabled>
+    </CyclomaticComplexity>
     <NestedStatements>
       <Rules />
       <Depth>12</Depth>
       <Enabled>True</Enabled>
     </NestedStatements>
+    <NumberOfItems>
+      <Rules>
+        <MaxNumberOfFunctionParameters>
+          <Enabled>True</Enabled>
+          <MaxItems>7</MaxItems>
+        </MaxNumberOfFunctionParameters>
+      </Rules>
+    </NumberOfItems>
     <SourceLength>
       <Rules>
         <MaxLinesInFunction>

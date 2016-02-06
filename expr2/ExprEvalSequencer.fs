@@ -5,27 +5,187 @@ open Shape
 open Op
 
 
+
+
 type StreamT = int
 type EventT = {EventObjectId: int; CorrelationId: int; SendingExecUnitId: int}
 
 type StrideT = int list
-type StorageT = {Name: string; Elements: int}
 
-let canWorkInPlace unaryOp = 
+[<Measure>]
+type MemAllocId
+
+type MemAllocT = {Id: int<MemAllocId>; Size: int}
+type NDArrayViewT = {Memory: MemAllocT; Shape: int list;
+                     Offset: int; Stride: int list;}
+
+module NDArrayView =
+    /// computes the stride given the shape for the NDArray to be continguous (row-major)
+    let rec contiguousStride (shape: int list) =
+        match shape with
+            | [] -> []
+            | [l] -> [1]
+            | l::(lp::lrest) ->
+                match contiguousStride (lp::lrest) with 
+                    | sp::srest -> (lp*sp)::sp::srest
+                    | [] -> failwith "unexpected"    
+
+    /// true if the NDArray is continguous
+    let isContiguous (a: NDArrayViewT) =
+        a.Stride = contiguousStride a.Shape    
+
+    /// number of dimensions
+    let nDim a =
+        List.length a.Shape
+
+
+/// true if views a and b have at least one element in common
+let overlapping a b = false // TODO
+
+
+type KernelT = int
+type KernelArgsT = obj list
+
+type GridDimT = int * int * int
+type BlockDimT = int * int * int
+
+
+type CudaOpT =
+    // memory operations
+    | MemcpyDtoD of NDArrayViewT * NDArrayViewT
+    | MemcpyHtoD of NDArrayViewT * NDArrayViewT
+    | MemcpyDtoH of NDArrayViewT * NDArrayViewT
+    | Memset of float * NDArrayViewT
+    // kernel execution
+    | LaunchKernel of string * GridDimT * BlockDimT * int<bytes> * KernelArgsT
+
+
+type EventPlaceHolderT = EventT option ref
+
+type ExeOpT =
+    | CudaOp of CudaOpT
+    | WaitOnEvent of EventT
+    | EmitEvent of EventPlaceHolderT
+    | ExecUnitStartInfo of string
+    | ExecUnitEndInfo
+
+let combineWith sep items =    
+    let rec combine items = 
+        match items with
+        | [item] -> item
+        | item::rest -> item + sep + combine rest
+        | [] -> ""
+    items |> Seq.toList |> combine
+
+let toStrSeq items =
+    Seq.map (sprintf "%d") items
+
+let cudaNDArrayType view =
+    let dims = NDArrayView.nDim view
+    let shapeStr = if dims = 0 then "" else "<" + (view.Shape |> toStrSeq |> combineWith ",") + ">"
+    let strideStr = "<" + ((view.Offset :: view.Stride) |> toStrSeq |> combineWith ",") + ">"
+    sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s > " dims dims shapeStr dims strideStr
+
+/// template instantiation specification
+type TemplateInstantiationT = {FuncName: string; TmplArgs: string list; 
+                               RetType: string; ArgTypes: string list;}
+
+/// function instantiation state
+type FunctionInstantiationCacheT = {mutable Instantiations: (TemplateInstantiationT * string) list;
+                                    mutable Code: string} 
+
+/// instantiates a template function with C linkage and returns the C function name
+let instantiateTemplateFunction cache (ti: TemplateInstantiationT) =  
+    match cache.Instantiations |> List.tryFind (fun (cti, _) -> cti = ti) with
+    | Some (_, cName) -> cName
+    | None ->
+        // generate C function name
+        let nPrv = 
+            cache.Instantiations 
+            |> List.filter (fun (oti, name) -> oti.FuncName = ti.FuncName) 
+            |> List.length
+        let firstArgStr = 
+            match ti.TmplArgs with
+            | fa::_ when not (fa.Contains("<") || fa.Contains(">")) -> fa
+            | _ -> ""
+        let cName = sprintf "%s_%s_%d" ti.FuncName firstArgStr nPrv
+        cache.Instantiations <- (ti, cName) :: cache.Instantiations
+
+        // generate template instantiation with C linkage
+        let instStr =
+            if List.isEmpty ti.TmplArgs then ti.FuncName
+            else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> combineWith ", ")
+        let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> combineWith ", "
+        let argCallStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "p%d" i) |> combineWith ", "
+        let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
+        let declStr =
+            sprintf "extern \"C\" %s %s (%s);" ti.RetType cName argDeclStr
+                + sprintf "%s %s (%s) {" ti.RetType cName argDeclStr
+                + sprintf "  %s %s (%s);" retCmd instStr argCallStr
+                + sprintf "}"
+                + sprintf ""
+        cache.Code <- cache.Code + declStr
+
+        cName
+
+
+
+let newContinguousView memAllocator shape = 
+    {Memory=memAllocator (List.fold (*) 1 shape); 
+     Shape=shape; Offset=0; 
+     Stride=NDArray.contiguousStride shape}
+
+
+let trgtViewGivenA memAllocator trgtShape reqView unaryOp aView aShared  =
+    // target that shares no elements with aView
+    let outplaceTrgt =
+        match reqView with
+        | Some rv when not (overlapping rv aView) -> rv, false
+        | _ -> newContinguousView memAllocator trgtShape, false        
+
+    // target that reuses aView, if it may be overwritten
+    let inplaceOverwriteTrgt =
+        if not aShared then aView, false
+        else outplaceTrgt    
+
     match unaryOp with
     // unary elementwise
-    | Negate -> true
-    | Log -> true
-    | Exp -> true
+    | Negate -> inplaceOverwriteTrgt
+    | Log -> inplaceOverwriteTrgt
+    | Exp -> inplaceOverwriteTrgt
     // reductions
-    | Sum -> false
-    | SumAxis _ -> false
+    | Sum -> outplaceTrgt
+    | SumAxis _ -> outplaceTrgt
     // shape operations
-    | Reshape _ -> true
-    | Broadcast _ -> true
-    | SwapDim _ -> true
+    | Reshape _ ->        
+        if NDArrayView.isContiguous aView then
+            {aView with Shape=trgtShape; Stride=NDArrayView.contiguousStride trgtShape}, aShared
+        else outplaceTrgt  // will copy
+    | Broadcast _ ->
+        {aView with Shape=trgtShape; 
+                    Stride=List.map3 
+                        (fun aStr aShp tShp -> if aShp = tShp then aStr else 0) 
+                        aView.Stride aView.Shape trgtShape}, aShared
+    | SwapDim (ax1, ax2) ->
+        let str = aView.Stride
+        {aView with Shape=trgtShape; 
+                    Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}, aShared
     // misc
-    | Annotated _ -> true
+    | Annotated _ -> aView, aShared
+      
+
+let execItemsForElemwiseUnary instCache trgtView cOp aView =
+    let kernelName = 
+        instantiateTemplateFunction instCache {FuncName=sprintf "elementwiseUnary%dD" (NDArrayView.nDim trgtView);
+                                               TmplArgs=[cOp; cudaNDArrayType trgtView; cudaNDArrayType aView];
+                                               RetType="void";
+                                               ArgTypes=[cudaNDArrayType trgtView; cudaNDArrayType aView]}
+    [LaunchKernel(kernelName, TODO, TODO, 0<bytes>, [trgtView.Memory, aView.Memory] )]
+
+let execItemsForUnary instCache trgtView unaryOp aView =
+    match unaryOp with 
+    | Negate ->
+        [LaunchKernel()]
     
 let canWorkInFirstPlace binaryOp = 
     match binaryOp with
@@ -41,22 +201,13 @@ let canWorkInFirstPlace binaryOp =
 
 let canWorkInSecondPlace binaryOp = canWorkInFirstPlace binaryOp
 
-type EventPlaceHolderT = EventT option ref
 
-type ExeOpT =
-    | ExecLeaf of StorageT * LeafOpT
-    | ExecUnary of StorageT * UnaryOpT * StorageT
-    | ExecBinary of StorageT * BinaryOpT * StorageT * StorageT
-    | WaitOnEvent of EventT
-    | EmitEvent of EventPlaceHolderT
-    | ExecUnitStartInfo of string
-    | ExecUnitEndInfo
 
 type ExecUnitIdT = int
 type ExecUnitT = {Id: ExecUnitIdT; DependsOn: ExecUnitIdT list; Items: ExeOpT list; }
 
-type EvalResultT = {ExecUnitId: ExecUnitIdT; Storage: StorageT; Shared: bool}
-type EvalReqT = {Id: int; Expr: ExprT; Multiplicity: int; Storage: StorageT option; OnCompletion: EvalResultT -> unit}
+type EvalResultT = {ExecUnitId: ExecUnitIdT; View: NDArrayViewT; Shared: bool}
+type EvalReqT = {Id: int; Expr: ExprT; Multiplicity: int; View: NDArrayViewT option; OnCompletion: EvalResultT -> unit}
 
 let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     // number of occurrences of subexpressions
@@ -75,10 +226,16 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
         execUnits <- eu :: execUnits
 
     // storage space
-    let mutable storageIdCnt = 0
-    let newStorage shape =
-        storageIdCnt <- storageIdCnt + 1
-        {Name=sprintf "s%d" storageIdCnt; Elements=List.fold (*) 1 shape}
+    let mutable memAllocIdCnt = 0<MemAllocId>
+    let mutable memAllocs = []
+    let newMemory size = 
+        let mem = {Id = 1<MemAllocId> * (List.length memAllocs); Size=size}
+        memAllocs <- mem :: memAllocs
+        mem
+    let newStorageView shape =       
+        {Memory=newMemory (List.fold (*) 1 shape); 
+         Shape=shape; Offset=0; 
+         Stride=NDArray.contiguousStride shape}
 
     // evaluation requestion
     let mutable evalRequests : EvalReqT list = []
@@ -86,7 +243,7 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     let submitEvalRequest expr multiplicity storage onCompletion =
         evalRequestIdCnt <- evalRequestIdCnt + 1
         evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Multiplicity=multiplicity; 
-                         Storage=storage; OnCompletion=onCompletion} :: evalRequests
+                         View=storage; OnCompletion=onCompletion} :: evalRequests
 
     // evaluated requests
     let mutable evaluatedExprs : Map<ExprT, EvalResultT> = Map.empty
@@ -94,11 +251,11 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
     /// takes an evaluation request from the evaluation request queue and processes it
     let processEvalRequest () =   
         // find a request to process and target storage
-        let erqToProcess, erqStorage, erqResult, erqMultiplicity, erqRequestors =
+        let erqToProcess, erqTarget, erqResult, erqMultiplicity, erqRequestors =
             // First, look if there are any expressions which are already computed.
             match evalRequests |> List.tryFind (fun erq -> evaluatedExprs |> Map.containsKey erq.Expr) with
             | Some computedErq -> computedErq, 
-                                  Some evaluatedExprs.[computedErq.Expr].Storage, 
+                                  Some evaluatedExprs.[computedErq.Expr].View, 
                                   Some evaluatedExprs.[computedErq.Expr],
                                   0, 0
             | None ->
@@ -110,9 +267,9 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                 let requestors = erqsForExpr |> List.length
 
                 // If a request from the group has a specified storage target, process it first.
-                match List.tryFind (fun erq -> erq.Storage <> None) erqsForExpr with
+                match List.tryFind (fun erq -> erq.View <> None) erqsForExpr with
                 | Some erqWithStorage -> 
-                    erqWithStorage, erqWithStorage.Storage, None, multiplicity, requestors
+                    erqWithStorage, erqWithStorage.View, None, multiplicity, requestors
                 | None -> 
                     // Otherwise process any (the first) request from the group.
                     erqsForExpr.[0], None, None, multiplicity, requestors
@@ -131,49 +288,45 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
             completeEvalRequest result
         | None ->
             // emit exec unit to evaluate expression
-            match erqToProcess.Expr with
+            let erqExpr = erqToProcess.Expr
+            match erqExpr with
             | Leaf(op) ->
                 // If no desired storage has been specified, we allocate a new one for this leaf.
-                let targetStorage = 
-                    match erqStorage with
+                let trgtStorage = 
+                    match erqTarget with
                     | Some s -> s
-                    | None -> newStorage (numShapeOf erqToProcess.Expr)
-                let targetShared = erqResultShared
+                    | None -> newStorageView (numShapeOf erqToProcess.Expr)
+                let trgtShared = erqResultShared
 
                 // emit execution unit 
-                let eu = {newExecUnit() with Items=[ExecLeaf(targetStorage, op)]}
+                let eu = {newExecUnit() with Items=[ExecLeaf(trgtStorage, op)]}
                 submitExecUnit eu
 
-                completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
+                completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
             | Unary(op, aExpr) -> 
                 // request aExpr to be evaluated directly into our storage, if we can work inplace.
-                let aReqStorage = if canWorkInPlace op then erqStorage else None
+                let aReqStorage = if inplaceUnary op then erqTarget else None
 
                 submitEvalRequest aExpr erqMultiplicity aReqStorage 
                     (fun aRes ->
                         // determine our definitive storage
-                        let targetStorage =
-                            match erqStorage with
-                            | Some s -> s
-                            | None when canWorkInPlace op && not aRes.Shared -> aRes.Storage
-                            | None -> newStorage (numShapeOf erqToProcess.Expr)                               
-                        let targetShared =
-                            (if targetStorage = aRes.Storage then aRes.Shared else false) ||
-                            erqResultShared
+
+                        let trgtStorage, trgtShared =
+                            trgtViewGivenA newMemory (numShapeOf erqExpr) erqTarget op aRes.View aRes.Shared
 
                         // emit execution unit 
-                        let eu = {newExecUnit() with Items=[ExecUnary(targetStorage, op, aRes.Storage)];
+                        let eu = {newExecUnit() with Items=[ExecUnary(trgtStorage, op, aRes.View)];
                                                      DependsOn=[aRes.ExecUnitId]}                                    
                         submitExecUnit eu
 
-                        completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
+                        completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
                     )                                                                       
             | Binary(op, aExpr, bExpr) ->
                 // request aExpr or bExpr to be evaluated directly into our storage, if we can work inplace.
                 let aReqStorage, bReqStorage = 
                     match canWorkInFirstPlace op, canWorkInSecondPlace op with
-                    | true, _ -> erqStorage, None
-                    | _, true -> None, erqStorage
+                    | true, _ -> erqTarget, None
+                    | _, true -> None, erqTarget
                     | false, false -> None, None
 
                 // callback when aExpr and bExpr requests have been evaluated
@@ -183,23 +336,23 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                     match aRes, bRes with
                     | Some aRes, Some bRes ->
                         // determine our definitive storage
-                        let targetStorage =
-                            match erqStorage with
+                        let trgtStorage =
+                            match erqTarget with
                             | Some s -> s
-                            | None when canWorkInFirstPlace op && not aRes.Shared -> aRes.Storage
-                            | None when canWorkInSecondPlace op && not bRes.Shared -> bRes.Storage
-                            | None -> newStorage (numShapeOf erqToProcess.Expr)
-                        let targetShared = 
-                            (if targetStorage = aRes.Storage then aRes.Shared else false) ||
-                            (if targetStorage = bRes.Storage then bRes.Shared else false) ||
+                            | None when canWorkInFirstPlace op && not aRes.Shared -> aRes.View
+                            | None when canWorkInSecondPlace op && not bRes.Shared -> bRes.View
+                            | None -> newStorageView (numShapeOf erqToProcess.Expr)
+                        let trgtShared = 
+                            (if trgtStorage = aRes.View then aRes.Shared else false) ||
+                            (if trgtStorage = bRes.View then bRes.Shared else false) ||
                             erqResultShared
 
                         // emit execution unit 
-                        let eu = {newExecUnit() with Items=[ExecBinary(targetStorage, op, aRes.Storage, bRes.Storage)];
+                        let eu = {newExecUnit() with Items=[ExecBinary(trgtStorage, op, aRes.View, bRes.View)];
                                                      DependsOn=[aRes.ExecUnitId; bRes.ExecUnitId]}
                         submitExecUnit eu
 
-                        completeEvalRequest {ExecUnitId=eu.Id; Storage=targetStorage; Shared=targetShared}
+                        completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
                     | _ -> ()    
                     
                 submitEvalRequest aExpr erqMultiplicity aReqStorage (fun res -> aRes <- Some res; onMaybeCompleted())
@@ -400,31 +553,25 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
 // TODO: variable memory allocation
 // TODO: CUDA driver call sequencing
 
+
+
 let pitchAlignment = 256 // TODO: get from device
 
-[<Measure>]
-type byte
 
 type CudaFlagsT = int
-type ByteCountT = int<byte>
 
 type EventObjectT = int
 
-type KernelT = int
-type KernelArgsT = obj list
-
-type GridDimT = int * int * int
-type BlockDimT = int * int * int
 
 type CudaCallT =
     // memory mangement
-    | MemAlloc of ByteCountT * StorageT
-    | MemFree of StorageT
+    | MemAlloc of int<bytes> * NDArrayViewT
+    | MemFree of NDArrayViewT
     // memory operations
-    | MemcpyAsync of StorageT * StorageT * ByteCountT * StreamT
-    | MemcpyHtoDAsync of StorageT * StorageT * ByteCountT * StreamT
-    | MemcpyDtoHAsync of StorageT * StorageT * ByteCountT * StreamT
-    | MemsetD32Async of uint32 * ByteCountT * StreamT
+    | MemcpyAsync of NDArrayViewT * NDArrayViewT * int<bytes> * StreamT
+    | MemcpyHtoDAsync of NDArrayViewT * NDArrayViewT * int<bytes> * StreamT
+    | MemcpyDtoHAsync of NDArrayViewT * NDArrayViewT * int<bytes> * StreamT
+    | MemsetD32Async of uint32 * int<bytes> * StreamT
     // stream management
     | StreamCreate of StreamT * CudaFlagsT
     | StreamDestory of StreamT
@@ -435,9 +582,15 @@ type CudaCallT =
     | EventRecord of EventObjectT * StreamT
     | EventSynchronize of EventObjectT
     // execution control
-    | LaunchKernel of KernelT * GridDimT * BlockDimT * ByteCountT * StreamT * KernelArgsT
+    | LaunchKernel of KernelT * GridDimT * BlockDimT * int<bytes> * StreamT * KernelArgsT
     // dummy op
     | ExeOp of StreamT * ExeOpT
+
+
+//let genNDArray (storage: St =
+
+//let instantiateKernelForElemwiseOp trgt op a =
+    
 
 
 /// generates a sequence of CUDA calls from streams
@@ -514,9 +667,11 @@ let generateCalls streams =
 //            | ExecLeaf (trgt, op) ->
 //                // TODO
 //                generate streamCallHistory activeEvents remainingStreams
-//            | ExecUnary (trgt, op, a) ->
-//                // TODO
-//                generate streamCallHistory activeEvents remainingStreams
+            | ExecUnary (trgt, op, a) ->
+                match op with
+                | Negate ->
+                    
+                generate streamCallHistory activeEvents remainingStreams
 //            | ExecBinary (trgt, op, a, b) ->
 //                // TODO
 //                generate streamCallHistory activeEvents remainingStreams

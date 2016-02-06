@@ -34,3 +34,10 @@ let rec iterate f n x =
     | n when n > 0 -> iterate f (n-1) (f x)
     | _ -> failwithf "cannot execute negative iterations %d" n
 
+[<Measure>]
+type bytes
+
+[<Measure>]
+type elements
+
+

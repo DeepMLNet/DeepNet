@@ -47,8 +47,11 @@ for dims = 0 to maxDims do
     wrt "};"
     wrt ""
 
-    if dims > 0 then
-        wrt "template <%s>" (ad |>> prn "size_t stride%d" |> cw ", ")
+    if dims = 0 then
+        wrt "template <size_t offset_>"
+    else
+        wrt "template <size_t offset, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
+
     wrt "class Stride%dD {" dims
     wrt "public:"
     wrt "  	_dev static size_t stride(const size_t dim) {"
@@ -59,9 +62,13 @@ for dims = 0 to maxDims do
     wrt "      }"
     wrt "    }"
     wrt ""
-    wrt "  	_dev static size_t offset(%s) {"
+    wrt "   _dev static size_t offset() {"
+    wrt "      return offset_;"
+    wrt "    }"
+    wrt ""
+    wrt "  	_dev static size_t index(%s) {"
         (ad |>> prn "const size_t pos%d" |> cw ", ")
-    wrt "      return %s;"
+    wrt "      return offset_ + %s;"
         (ad |>> (fun i -> prn "stride%d * pos%d" i i) |> cwe "0" " + ")
     wrt "    }"
     wrt "};"
@@ -74,6 +81,7 @@ for dims = 0 to maxDims do
     wrt "  typedef TStride Stride;"
     wrt "  _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }"
     wrt "  _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }"
+    wrt "  _dev static size_t offset() { return Stride::offset(); }"
     wrt "  _dev static size_t size() {"
     wrt "    return %s;"
         (ad |>> prn "shape(%d)" |> cwe "1" " * ")
@@ -82,12 +90,12 @@ for dims = 0 to maxDims do
     wrt "  _dev const float *data() const { return reinterpret_cast<const float *>(this); }"
     wrt "  _dev float &element(%s) {"
         (ad |>> prn "size_t pos%d" |> cw ", ")
-    wrt "    return data()[Stride::offset(%s)];"
+    wrt "    return data()[Stride::index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
     wrt "  _dev const float &element(%s) const {"
         (ad |>> prn "size_t pos%d" |> cw ", ")
-    wrt "    return data()[Stride::offset(%s)];"
+    wrt "    return data()[Stride::index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
     wrt "};"

@@ -12,6 +12,7 @@ public:
       }
 };
 
+template <size_t offset_>
 class Stride0D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -20,8 +21,12 @@ public:
       }
     }
 
-  	_dev static size_t offset() {
-      return 0;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index() {
+      return offset_ + 0;
     }
 };
 
@@ -32,16 +37,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return 1;
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element() {
-    return data()[Stride::offset()];
+    return data()[Stride::index()];
   }
   _dev const float &element() const {
-    return data()[Stride::offset()];
+    return data()[Stride::index()];
   }
 };
 
@@ -71,7 +77,7 @@ public:
       }
 };
 
-template <size_t stride0>
+template <size_t offset, size_t stride0>
 class Stride1D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -81,8 +87,12 @@ public:
       }
     }
 
-  	_dev static size_t offset(const size_t pos0) {
-      return stride0 * pos0;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index(const size_t pos0) {
+      return offset_ + stride0 * pos0;
     }
 };
 
@@ -93,16 +103,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0);
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0) {
-    return data()[Stride::offset(pos0)];
+    return data()[Stride::index(pos0)];
   }
   _dev const float &element(size_t pos0) const {
-    return data()[Stride::offset(pos0)];
+    return data()[Stride::index(pos0)];
   }
 };
 
@@ -137,7 +148,7 @@ public:
       }
 };
 
-template <size_t stride0, size_t stride1>
+template <size_t offset, size_t stride0, size_t stride1>
 class Stride2D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -148,8 +159,12 @@ public:
       }
     }
 
-  	_dev static size_t offset(const size_t pos0, const size_t pos1) {
-      return stride0 * pos0 + stride1 * pos1;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index(const size_t pos0, const size_t pos1) {
+      return offset_ + stride0 * pos0 + stride1 * pos1;
     }
 };
 
@@ -160,16 +175,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1);
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1) {
-    return data()[Stride::offset(pos0, pos1)];
+    return data()[Stride::index(pos0, pos1)];
   }
   _dev const float &element(size_t pos0, size_t pos1) const {
-    return data()[Stride::offset(pos0, pos1)];
+    return data()[Stride::index(pos0, pos1)];
   }
 };
 
@@ -207,7 +223,7 @@ public:
       }
 };
 
-template <size_t stride0, size_t stride1, size_t stride2>
+template <size_t offset, size_t stride0, size_t stride1, size_t stride2>
 class Stride3D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -219,8 +235,12 @@ public:
       }
     }
 
-  	_dev static size_t offset(const size_t pos0, const size_t pos1, const size_t pos2) {
-      return stride0 * pos0 + stride1 * pos1 + stride2 * pos2;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2) {
+      return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2;
     }
 };
 
@@ -231,16 +251,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2);
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2) {
-    return data()[Stride::offset(pos0, pos1, pos2)];
+    return data()[Stride::index(pos0, pos1, pos2)];
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2) const {
-    return data()[Stride::offset(pos0, pos1, pos2)];
+    return data()[Stride::index(pos0, pos1, pos2)];
   }
 };
 
@@ -281,7 +302,7 @@ public:
       }
 };
 
-template <size_t stride0, size_t stride1, size_t stride2, size_t stride3>
+template <size_t offset, size_t stride0, size_t stride1, size_t stride2, size_t stride3>
 class Stride4D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -294,8 +315,12 @@ public:
       }
     }
 
-  	_dev static size_t offset(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3) {
-      return stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3) {
+      return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3;
     }
 };
 
@@ -306,16 +331,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3);
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
-    return data()[Stride::offset(pos0, pos1, pos2, pos3)];
+    return data()[Stride::index(pos0, pos1, pos2, pos3)];
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) const {
-    return data()[Stride::offset(pos0, pos1, pos2, pos3)];
+    return data()[Stride::index(pos0, pos1, pos2, pos3)];
   }
 };
 
@@ -371,7 +397,7 @@ public:
       }
 };
 
-template <size_t stride0, size_t stride1, size_t stride2, size_t stride3, size_t stride4>
+template <size_t offset, size_t stride0, size_t stride1, size_t stride2, size_t stride3, size_t stride4>
 class Stride5D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -385,8 +411,12 @@ public:
       }
     }
 
-  	_dev static size_t offset(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3, const size_t pos4) {
-      return stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3 + stride4 * pos4;
+   _dev static size_t offset() {
+      return offset_;
+    }
+
+  	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3, const size_t pos4) {
+      return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3 + stride4 * pos4;
     }
 };
 
@@ -397,16 +427,17 @@ public:
   typedef TStride Stride;
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
+  _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3) * shape(4);
   }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {
-    return data()[Stride::offset(pos0, pos1, pos2, pos3, pos4)];
+    return data()[Stride::index(pos0, pos1, pos2, pos3, pos4)];
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) const {
-    return data()[Stride::offset(pos0, pos1, pos2, pos3, pos4)];
+    return data()[Stride::index(pos0, pos1, pos2, pos3, pos4)];
   }
 };
 
