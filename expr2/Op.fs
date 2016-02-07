@@ -69,10 +69,14 @@ and ExprT =
     | Binary of BinaryOpT * ExprT * ExprT
 
 
-type AnyOp =
+
+type AnyOpT =
     | LeafOp of LeafOpT
     | UnaryOp of UnaryOpT
     | BinaryOp of BinaryOpT
+
+/// unified expression
+type UExprT = UExpr of AnyOpT * (UExprT list)
 
 let extractOp expr =
     match expr with
@@ -80,6 +84,11 @@ let extractOp expr =
     | Unary(op, _) -> UnaryOp op
     | Binary(op, _, _) -> BinaryOp op
 
+let rec toUExpr expr =
+    match expr with
+    | Leaf op -> UExpr(LeafOp op, [])
+    | Unary(op, a) -> UExpr(UnaryOp op, [toUExpr a])
+    | Binary(op, a, b) -> UExpr(BinaryOp op, [toUExpr a; toUExpr b])
     
 /// matches all exprs that work elementwise on their argument(s)
 let (|ElemwiseOp|_|) (op: obj) =

@@ -2,6 +2,7 @@
 open System.IO
 
 let maxDims = 5
+let maxArity = 2
 
 let combineWith sep items =    
     let rec combine items = 
@@ -101,43 +102,89 @@ for dims = 0 to maxDims do
     wrt "};"
     wrt ""
 
-    let calculateElementwisePos () =
+    let elementwiseLoop withPosArray fBody =
+        wrt "" 
         if dims > 3 then
-            wrt ""
-            wrt "  size_t posRest = threadIdx.z + blockIdx.z * blockDim.z;"
-            wrt "  const size_t incr2 = 1;"
-            for d = 3 to dims - 1 do
-                wrt "  const size_t incr%d = incr%d * TTarget::shape(%d);" d (d-1) (d-1)
-            for d = dims - 1 downto 2 do
-                wrt "  const size_t pos%d = posRest / incr%d;" d d
-                wrt "  posRest -= pos%d * incr%d;" d d
+            let restElements = 
+                {2 .. dims - 1} |> Seq.map (sprintf "TTarget::shape(%d)") |> combineWith " * "
+            wrt "    const size_t itersRest = (%s) / (gridDim.z * blockDim.z) + 1;" restElements
         if dims = 3 then
-            wrt "  const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z;"
+            wrt "    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;"
         if dims >= 2 then
-            wrt "  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;"
+            wrt "    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;"
         if dims >= 1 then
-            wrt "  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;"
-            wrt "  if (!(%s)) return;"
+            wrt "    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;"
+
+        if dims > 3 then
+            wrt "    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {"
+        if dims = 3 then
+            wrt "    for (size_t iter2 = 0; iter2 < iters2; iter2++) {"
+        if dims >= 2 then
+            wrt "    for (size_t iter1 = 0; iter1 < iters1; iter1++) {"
+        if dims >= 1 then
+            wrt "    for (size_t iter0 = 0; iter0 < iters0; iter0++) {"
+
+        if dims > 3 then
+            wrt "    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);"
+            wrt "    const size_t incr2 = 1;"
+            for d = 3 to dims - 1 do
+                wrt "    const size_t incr%d = incr%d * TTarget::shape(%d);" d (d-1) (d-1)
+            for d = dims - 1 downto 2 do
+                wrt "    const size_t pos%d = posRest / incr%d;" d d
+                wrt "    posRest -= pos%d * incr%d;" d d
+        if dims = 3 then
+            wrt "    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);"
+        if dims >= 2 then
+            wrt "    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);"
+        if dims >= 1 then
+            wrt "    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);"
+    
+            wrt "    if (%s) {"
                 (ad |>> (fun i -> prn "(pos%d < trgt->shape(%d))" i i) |> cw " && ")
+
+        if withPosArray then
+            let poses = ad |> Seq.map (sprintf "pos%d")
+            wrt "    const size_t pos[] {%s};" (poses |> cw ", ")
+
+        wrt ""
+        fBody dims
         wrt ""
 
-    wrt "template <typename TUnaryElementwiseOp, typename TTarget, typename TA>"
-    wrt "__global__ void elementwiseUnary%dD(TTarget *trgt, const TA *a) {" dims
-    wrt "  TUnaryElementwiseOp op;"
-    calculateElementwisePos()
-    let poses = ad |>> prn "pos%d" |> cw ", "
-    wrt "  trgt->element(%s) = op(a->element(%s));" poses poses
-    wrt "}"
-    wrt ""
+        if dims >= 1 then
+            wrt "    }"
 
-    wrt "template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>"
-    wrt "__global__ void elementwiseUnary%dD(TTarget *trgt, const TA *a, const TB *b) {" dims
-    wrt "  TBinaryElementwiseOp op;"
-    calculateElementwisePos()
-    let poses = ad |>> prn "pos%d" |> cw ", "
-    wrt "  trgt->element(%s) = op(a->element(%s), b->element(%s));" poses poses poses
-    wrt "}"
-    wrt ""
+        if dims >= 1 then
+            wrt "    }"
+        if dims >= 2 then
+            wrt "    }"
+        if dims >= 3 then
+            wrt "    }"   
+
+
+    let elementwiseWrapper ary withIndexes =
+        let srcTmpl = 
+            {0 .. ary - 1} |> Seq.map (sprintf "typename TSrc%d") |> Seq.toList
+        let allTmpl = "typename TTarget" :: srcTmpl
+        wrt "template <typename TElemwiseOp, %s>" (allTmpl |> cw ", ")
+
+        let srcArgDecls =
+            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d *src%d" i i) |> Seq.toList
+        let allArgDecls = "TTarget *trgt" :: srcArgDecls
+        let indexedName = if withIndexes then "Indexed" else ""
+        wrt "__global__ void elemwise%dAry%dD%s(%s) {" ary dims indexedName (allArgDecls |> cw ", ")
+
+        wrt "  TElemwiseOp op;"
+        elementwiseLoop withIndexes (fun dims ->      
+            let poses = ad |>> prn "pos%d" |> cw ", "
+            let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d->element(%s)" a poses) |> Seq.toList
+            let allArgs = if withIndexes then "pos" :: sprintf "%d" dims :: srcArgs else srcArgs
+            wrt "  trgt->element(%s) = op(%s);" poses (allArgs |> cw ", "))        
+        wrt "}"
+        wrt ""
+
+    for ary = 0 to maxArity do
+        for withIndexes in [true; false] do
+            elementwiseWrapper ary withIndexes
 
     ()
 

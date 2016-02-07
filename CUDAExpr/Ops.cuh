@@ -3,16 +3,38 @@
 #include "Utils.cuh"
 
 
-struct ConstOneElementwiseOp_t
-{
-	_dev float operator() (float a)
-	{
-		return 1.0f;
+struct DiagonalOneIEOP_t {
+	_dev float operator() (const size_t *pos, const size_t dims) {
+		if (dims == 0) {
+			return 1.0;
+		} else {
+			bool allEqual = true;
+			for (size_t dim = 1; dim <= dims; dim++) {
+				if (pos[0] != pos[dim]) {
+					allEqual = false;
+					break;
+				}
+			}
+			if (allEqual)
+				return 1.0;
+			else
+				return 0.0;
+		}
 	}
 };
 
 
-struct NegateElementwiseOp_t
+template <float TValue>
+struct ConstEOp_t
+{
+	_dev float operator() ()
+	{
+		return TValue;
+	}
+};
+
+
+struct NegateEOp_t
 {
 	_dev float operator() (float a)
 	{
@@ -21,7 +43,7 @@ struct NegateElementwiseOp_t
 };
 
 
-struct LogElementwiseOp_t
+struct LogEOp_t
 {
 	_dev float operator() (float a)
 	{
@@ -30,7 +52,7 @@ struct LogElementwiseOp_t
 };
 
 
-struct ExpElementwiseOp_t
+struct ExpEOp_t
 {
 	_dev float operator() (float a)
 	{
@@ -38,7 +60,7 @@ struct ExpElementwiseOp_t
 	}
 };
 
-struct CopyElementwiseOp_t
+struct IdEOp_t
 {
 	_dev float operator() (float a)
 	{
@@ -47,7 +69,7 @@ struct CopyElementwiseOp_t
 };
 
 
-struct AddBinaryElementwiseOp_t
+struct AddEOp_t
 {
 	_dev float operator() (float a, float b)
 	{
@@ -55,7 +77,7 @@ struct AddBinaryElementwiseOp_t
 	}
 };
 
-struct SubstractBinaryElementwiseOp_t
+struct SubstractEOp_t
 {
 	_dev float operator() (float a, float b)
 	{
@@ -63,7 +85,7 @@ struct SubstractBinaryElementwiseOp_t
 	}
 };
 
-struct MultiplyBinaryElementwiseOp_t
+struct MultiplyEOp_t
 {
 	_dev float operator() (float a, float b)
 	{
@@ -71,7 +93,7 @@ struct MultiplyBinaryElementwiseOp_t
 	}
 };
 
-struct DivideBinaryElementwiseOp_t
+struct DivideEOp_t
 {
 	_dev float operator() (float a, float b)
 	{

@@ -51,18 +51,61 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary0D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary0DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element() = op(a->element());
+    const size_t pos[] {};
+
+  trgt->element() = op(pos, 0);
+
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary0D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary0D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element() = op(a->element(), b->element());
+
+  trgt->element() = op();
+
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary0DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t pos[] {};
+
+  trgt->element() = op(pos, 0, src0->element());
+
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary0D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+
+  trgt->element() = op(src0->element());
+
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary0DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t pos[] {};
+
+  trgt->element() = op(pos, 0, src0->element(), src1->element());
+
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary0D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+
+  trgt->element() = op(src0->element(), src1->element());
+
 }
 
 // ======================== dimensionality: 1 ==================================
@@ -117,22 +160,97 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary1D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary1DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0) = op(a->element(pos0));
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+    const size_t pos[] {pos0};
+
+  trgt->element(pos0) = op(pos, 1);
+
+    }
+    }
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary1D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary1D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0) = op(a->element(pos0), b->element(pos0));
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+
+  trgt->element(pos0) = op();
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary1DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+    const size_t pos[] {pos0};
+
+  trgt->element(pos0) = op(pos, 1, src0->element(pos0));
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary1D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+
+  trgt->element(pos0) = op(src0->element(pos0));
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary1DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+    const size_t pos[] {pos0};
+
+  trgt->element(pos0) = op(pos, 1, src0->element(pos0), src1->element(pos0));
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary1D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0))) {
+
+  trgt->element(pos0) = op(src0->element(pos0), src1->element(pos0));
+
+    }
+    }
 }
 
 // ======================== dimensionality: 2 ==================================
@@ -189,24 +307,121 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary2D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary2DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0, pos1) = op(a->element(pos0, pos1));
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+    const size_t pos[] {pos0, pos1};
+
+  trgt->element(pos0, pos1) = op(pos, 2);
+
+    }
+    }
+    }
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary2D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary2D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0, pos1) = op(a->element(pos0, pos1), b->element(pos0, pos1));
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+
+  trgt->element(pos0, pos1) = op();
+
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary2DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+    const size_t pos[] {pos0, pos1};
+
+  trgt->element(pos0, pos1) = op(pos, 2, src0->element(pos0, pos1));
+
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary2D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+
+  trgt->element(pos0, pos1) = op(src0->element(pos0, pos1));
+
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary2DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+    const size_t pos[] {pos0, pos1};
+
+  trgt->element(pos0, pos1) = op(pos, 2, src0->element(pos0, pos1), src1->element(pos0, pos1));
+
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary2D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1))) {
+
+  trgt->element(pos0, pos1) = op(src0->element(pos0, pos1), src1->element(pos0, pos1));
+
+    }
+    }
+    }
 }
 
 // ======================== dimensionality: 3 ==================================
@@ -265,26 +480,145 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary3D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
-  const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary3DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0, pos1, pos2) = op(a->element(pos0, pos1, pos2));
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+    const size_t pos[] {pos0, pos1, pos2};
+
+  trgt->element(pos0, pos1, pos2) = op(pos, 3);
+
+    }
+    }
+    }
+    }
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary3D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
-  const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)))) return;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary3D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  trgt->element(pos0, pos1, pos2) = op(a->element(pos0, pos1, pos2), b->element(pos0, pos1, pos2));
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+
+  trgt->element(pos0, pos1, pos2) = op();
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary3DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+    const size_t pos[] {pos0, pos1, pos2};
+
+  trgt->element(pos0, pos1, pos2) = op(pos, 3, src0->element(pos0, pos1, pos2));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary3D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+
+  trgt->element(pos0, pos1, pos2) = op(src0->element(pos0, pos1, pos2));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary3DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+    const size_t pos[] {pos0, pos1, pos2};
+
+  trgt->element(pos0, pos1, pos2) = op(pos, 3, src0->element(pos0, pos1, pos2), src1->element(pos0, pos1, pos2));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary3D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter2 = 0; iter2 < iters2; iter2++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2))) {
+
+  trgt->element(pos0, pos1, pos2) = op(src0->element(pos0, pos1, pos2), src1->element(pos0, pos1, pos2));
+
+    }
+    }
+    }
+    }
 }
 
 // ======================== dimensionality: 4 ==================================
@@ -345,40 +679,181 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary4D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary4DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  size_t posRest = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t incr2 = 1;
-  const size_t incr3 = incr2 * TTarget::shape(2);
-  const size_t pos3 = posRest / incr3;
-  posRest -= pos3 * incr3;
-  const size_t pos2 = posRest / incr2;
-  posRest -= pos2 * incr2;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)))) return;
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3};
 
-  trgt->element(pos0, pos1, pos2, pos3) = op(a->element(pos0, pos1, pos2, pos3));
+  trgt->element(pos0, pos1, pos2, pos3) = op(pos, 4);
+
+    }
+    }
+    }
+    }
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary4D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary4D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  size_t posRest = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t incr2 = 1;
-  const size_t incr3 = incr2 * TTarget::shape(2);
-  const size_t pos3 = posRest / incr3;
-  posRest -= pos3 * incr3;
-  const size_t pos2 = posRest / incr2;
-  posRest -= pos2 * incr2;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)))) return;
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
 
-  trgt->element(pos0, pos1, pos2, pos3) = op(a->element(pos0, pos1, pos2, pos3), b->element(pos0, pos1, pos2, pos3));
+  trgt->element(pos0, pos1, pos2, pos3) = op();
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary4DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3};
+
+  trgt->element(pos0, pos1, pos2, pos3) = op(pos, 4, src0->element(pos0, pos1, pos2, pos3));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary4D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
+
+  trgt->element(pos0, pos1, pos2, pos3) = op(src0->element(pos0, pos1, pos2, pos3));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary4DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3};
+
+  trgt->element(pos0, pos1, pos2, pos3) = op(pos, 4, src0->element(pos0, pos1, pos2, pos3), src1->element(pos0, pos1, pos2, pos3));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary4D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3))) {
+
+  trgt->element(pos0, pos1, pos2, pos3) = op(src0->element(pos0, pos1, pos2, pos3), src1->element(pos0, pos1, pos2, pos3));
+
+    }
+    }
+    }
+    }
 }
 
 // ======================== dimensionality: 5 ==================================
@@ -441,45 +916,198 @@ public:
   }
 };
 
-template <typename TUnaryElementwiseOp, typename TTarget, typename TA>
-__global__ void elementwiseUnary5D(TTarget *trgt, const TA *a) {
-  TUnaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary5DIndexed(TTarget *trgt) {
+  TElemwiseOp op;
 
-  size_t posRest = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t incr2 = 1;
-  const size_t incr3 = incr2 * TTarget::shape(2);
-  const size_t incr4 = incr3 * TTarget::shape(3);
-  const size_t pos4 = posRest / incr4;
-  posRest -= pos4 * incr4;
-  const size_t pos3 = posRest / incr3;
-  posRest -= pos3 * incr3;
-  const size_t pos2 = posRest / incr2;
-  posRest -= pos2 * incr2;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4)))) return;
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
 
-  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(a->element(pos0, pos1, pos2, pos3, pos4));
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5);
+
+    }
+    }
+    }
+    }
 }
 
-template <typename TBinaryElementwiseOp, typename TTarget, typename TA, typename TB>
-__global__ void elementwiseUnary5D(TTarget *trgt, const TA *a, const TB *b) {
-  TBinaryElementwiseOp op;
+template <typename TElemwiseOp, typename TTarget>
+__global__ void elemwise0Ary5D(TTarget *trgt) {
+  TElemwiseOp op;
 
-  size_t posRest = threadIdx.z + blockIdx.z * blockDim.z;
-  const size_t incr2 = 1;
-  const size_t incr3 = incr2 * TTarget::shape(2);
-  const size_t incr4 = incr3 * TTarget::shape(3);
-  const size_t pos4 = posRest / incr4;
-  posRest -= pos4 * incr4;
-  const size_t pos3 = posRest / incr3;
-  posRest -= pos3 * incr3;
-  const size_t pos2 = posRest / incr2;
-  posRest -= pos2 * incr2;
-  const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y;
-  const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x;
-  if (!((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4)))) return;
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
 
-  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(a->element(pos0, pos1, pos2, pos3, pos4), b->element(pos0, pos1, pos2, pos3, pos4));
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op();
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary5DIndexed(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
+
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5, src0->element(pos0, pos1, pos2, pos3, pos4));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+__global__ void elemwise1Ary5D(TTarget *trgt, const TSrc0 *src0) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
+
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(src0->element(pos0, pos1, pos2, pos3, pos4));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary5DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
+    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
+
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5, src0->element(pos0, pos1, pos2, pos3, pos4), src1->element(pos0, pos1, pos2, pos3, pos4));
+
+    }
+    }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+__global__ void elemwise2Ary5D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+  TElemwiseOp op;
+
+    const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
+    const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
+    const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
+    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
+    for (size_t iter1 = 0; iter1 < iters1; iter1++) {
+    for (size_t iter0 = 0; iter0 < iters0; iter0++) {
+    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);
+    const size_t incr2 = 1;
+    const size_t incr3 = incr2 * TTarget::shape(2);
+    const size_t incr4 = incr3 * TTarget::shape(3);
+    const size_t pos4 = posRest / incr4;
+    posRest -= pos4 * incr4;
+    const size_t pos3 = posRest / incr3;
+    posRest -= pos3 * incr3;
+    const size_t pos2 = posRest / incr2;
+    posRest -= pos2 * incr2;
+    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
+    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
+    if ((pos0 < trgt->shape(0)) && (pos1 < trgt->shape(1)) && (pos2 < trgt->shape(2)) && (pos3 < trgt->shape(3)) && (pos4 < trgt->shape(4))) {
+
+  trgt->element(pos0, pos1, pos2, pos3, pos4) = op(src0->element(pos0, pos1, pos2, pos3, pos4), src1->element(pos0, pos1, pos2, pos3, pos4));
+
+    }
+    }
+    }
+    }
 }
 

@@ -42,12 +42,16 @@ module NDArrayView =
 /// true if views a and b have at least one element in common
 let overlapping a b = false // TODO
 
+/// template instantiation specification
+type TemplateInstantiationT = {FuncName: string; TmplArgs: string list; 
+                               RetType: string; ArgTypes: string list;}
 
 type KernelT = int
 type KernelArgsT = obj list
 
 type GridDimT = int * int * int
 type BlockDimT = int * int * int
+type WorkDimT = int * int * int
 
 
 type CudaOpT =
@@ -57,7 +61,7 @@ type CudaOpT =
     | MemcpyDtoH of NDArrayViewT * NDArrayViewT
     | Memset of float * NDArrayViewT
     // kernel execution
-    | LaunchKernel of string * GridDimT * BlockDimT * int<bytes> * KernelArgsT
+    | LaunchKernel of TemplateInstantiationT * WorkDimT * KernelArgsT
 
 
 type EventPlaceHolderT = EventT option ref
@@ -86,9 +90,6 @@ let cudaNDArrayType view =
     let strideStr = "<" + ((view.Offset :: view.Stride) |> toStrSeq |> combineWith ",") + ">"
     sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s > " dims dims shapeStr dims strideStr
 
-/// template instantiation specification
-type TemplateInstantiationT = {FuncName: string; TmplArgs: string list; 
-                               RetType: string; ArgTypes: string list;}
 
 /// function instantiation state
 type FunctionInstantiationCacheT = {mutable Instantiations: (TemplateInstantiationT * string) list;
@@ -136,56 +137,114 @@ let newContinguousView memAllocator shape =
      Stride=NDArray.contiguousStride shape}
 
 
-let trgtViewGivenA memAllocator trgtShape reqView unaryOp aView aShared  =
-    // target that shares no elements with aView
+let trgtViewGivenSrc memAllocator trgtShape reqView op srcViews srcShared  =
+    // target that shares no elements with any srcView
     let outplaceTrgt =
         match reqView with
-        | Some rv when not (overlapping rv aView) -> rv, false
+        | Some rv when not (List.exists (overlapping rv) srcViews) -> rv, false
         | _ -> newContinguousView memAllocator trgtShape, false        
 
-    // target that reuses aView, if it may be overwritten
+    // target that reuses a srcView, if it may be overwritten
     let inplaceOverwriteTrgt =
-        if not aShared then aView, false
-        else outplaceTrgt    
+        match List.tryFindIndex not srcShared with
+        | Some i -> srcViews.[i], false
+        | None -> outplaceTrgt    
 
-    match unaryOp with
+    match op with
+    // variable access
+    | LeafOp (Var vs) ->
+        // TODO: use variable memory
+        newContinguousView memAllocator trgtShape, false        
+    // tensor creation
+    | LeafOp _ -> outplaceTrgt        
+
     // unary elementwise
-    | Negate -> inplaceOverwriteTrgt
-    | Log -> inplaceOverwriteTrgt
-    | Exp -> inplaceOverwriteTrgt
+    | UnaryOp Negate -> inplaceOverwriteTrgt
+    | UnaryOp Log -> inplaceOverwriteTrgt
+    | UnaryOp Exp -> inplaceOverwriteTrgt
     // reductions
-    | Sum -> outplaceTrgt
-    | SumAxis _ -> outplaceTrgt
+    | UnaryOp Sum -> outplaceTrgt
+    | UnaryOp (SumAxis _) -> outplaceTrgt
     // shape operations
-    | Reshape _ ->        
-        if NDArrayView.isContiguous aView then
-            {aView with Shape=trgtShape; Stride=NDArrayView.contiguousStride trgtShape}, aShared
+    | UnaryOp (Reshape _) ->        
+        // TODO: optimize: check if copy is really necessary
+        if NDArrayView.isContiguous srcViews.[0] then
+            {srcViews.[0] with Shape=trgtShape; Stride=NDArrayView.contiguousStride trgtShape}, srcShared.[0]
         else outplaceTrgt  // will copy
-    | Broadcast _ ->
+    | UnaryOp (Broadcast _) ->
+        let aView, aShared = srcViews.[0], srcShared.[0]
         {aView with Shape=trgtShape; 
                     Stride=List.map3 
                         (fun aStr aShp tShp -> if aShp = tShp then aStr else 0) 
                         aView.Stride aView.Shape trgtShape}, aShared
-    | SwapDim (ax1, ax2) ->
+    | UnaryOp (SwapDim (ax1, ax2)) ->
+        let aView, aShared = srcViews.[0], srcShared.[0]
         let str = aView.Stride
         {aView with Shape=trgtShape; 
                     Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}, aShared
     // misc
-    | Annotated _ -> aView, aShared
+    | UnaryOp (Annotated _) -> srcViews.[0], srcShared.[0]
+
+    // binary elementwise
+    | BinaryOp Add -> inplaceOverwriteTrgt
+    | BinaryOp Substract -> inplaceOverwriteTrgt
+    | BinaryOp Multiply -> inplaceOverwriteTrgt
+    | BinaryOp Divide -> inplaceOverwriteTrgt
+    | BinaryOp Power -> inplaceOverwriteTrgt
+    // matrix/tensor operations
+    | BinaryOp Dot -> outplaceTrgt
+    | BinaryOp TensorProduct -> outplaceTrgt
       
 
-let execItemsForElemwiseUnary instCache trgtView cOp aView =
-    let kernelName = 
-        instantiateTemplateFunction instCache {FuncName=sprintf "elementwiseUnary%dD" (NDArrayView.nDim trgtView);
-                                               TmplArgs=[cOp; cudaNDArrayType trgtView; cudaNDArrayType aView];
-                                               RetType="void";
-                                               ArgTypes=[cudaNDArrayType trgtView; cudaNDArrayType aView]}
-    [LaunchKernel(kernelName, TODO, TODO, 0<bytes>, [trgtView.Memory, aView.Memory] )]
+let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
+    let nSrc = List.length srcViews
+    let argTypes = cudaNDArrayType trgtView :: (List.map cudaNDArrayType srcViews)
+    let argTypesPointers = argTypes |> List.map (fun at -> at + " *")
+    let indexedStr = if cOpIndexed then "Indexed" else ""
+    let kernel = 
+        {FuncName=sprintf "elementwise%dAry%dD%s" nSrc (NDArrayView.nDim trgtView) indexedStr;
+         TmplArgs=cOp :: argTypes;
+         RetType="void";
+         ArgTypes=argTypesPointers}
 
-let execItemsForUnary instCache trgtView unaryOp aView =
-    match unaryOp with 
-    | Negate ->
-        [LaunchKernel()]
+    let workDim = 
+        match NDArrayView.nDim trgtView with
+        | 0 -> (1, 1, 1)
+        | 1 -> (trgtView.Shape.[0], 1, 1)
+        | 2 -> (trgtView.Shape.[0], trgtView.Shape.[1], 1)
+        | 3 -> (trgtView.Shape.[0], trgtView.Shape.[1], trgtView.Shape.[2])
+        | d ->
+            let rest = {2 .. d-1} |> Seq.map (fun i -> trgtView.Shape.[i]) |> Seq.fold (*) 1 
+            (trgtView.Shape.[0], trgtView.Shape.[1], rest)
+
+    [LaunchKernel(kernel, workDim, (trgtView.Memory :> obj) :: (List.map (fun v -> v.Memory :> obj) srcViews))]
+
+let execItemsForOp trgtView op srcViews =
+    match op with 
+    // tensor creation
+    | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView "DiagonalOneIEOp_t" true []
+    | LeafOp (Zeros _) -> execItemsForElemwise trgtView "ZerosEOp_t" true []
+    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
+    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
+    // variable access
+    | LeafOp (Var vs) ->
+        // TODO: use variable memory
+        
+    // unary elementwise
+    | UnaryOp Negate -> execItemsForElemwise trgtView "NegateEOp_t" false srcViews
+    | UnaryOp Log -> execItemsForElemwise trgtView "LogEOp_t" false srcViews
+    | UnaryOp Exp -> execItemsForElemwise trgtView "ExpEOp_t" false srcViews
+    // reductions
+    | UnaryOp Sum -> failwith "not implemented"
+    | UnaryOp (SumAxis _) -> failwith "not implemented"
+    // shape operations
+    | UnaryOp (Reshape _) ->
+        if trgtView <> srcViews.[0] then execItemsForElemwise trgtView "IdEOp_t" false srcViews
+        else []
+    | UnaryOp (Broadcast _) -> []
+    | UnaryOp (SwapDim _) -> []
+    // misc
+    | UnaryOp (Annotated _) -> []
     
 let canWorkInFirstPlace binaryOp = 
     match binaryOp with
@@ -312,7 +371,7 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                         // determine our definitive storage
 
                         let trgtStorage, trgtShared =
-                            trgtViewGivenA newMemory (numShapeOf erqExpr) erqTarget op aRes.View aRes.Shared
+                            trgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op aRes.View aRes.Shared
 
                         // emit execution unit 
                         let eu = {newExecUnit() with Items=[ExecUnary(trgtStorage, op, aRes.View)];
