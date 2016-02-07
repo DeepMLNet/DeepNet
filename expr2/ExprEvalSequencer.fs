@@ -196,6 +196,55 @@ let trgtViewGivenSrc memAllocator trgtShape reqView op srcViews srcShared  =
     | BinaryOp TensorProduct -> outplaceTrgt
       
 
+let srcViewReqsGivenTrgt trgtShape reqView op srcShapes =
+    let nSrcs = List.length srcShapes
+
+    // requests all sources to use separate storage
+    let outplaceTrgt =
+        List.replicate nSrcs None
+
+    // requests one source to be evaluated into our target view
+    let inplaceOverwriteTrgt =
+        reqView :: List.replicate (nSrcs-1) None
+
+    match op with
+    | LeafOp _ -> []
+
+    // unary elementwise
+    | UnaryOp Negate -> inplaceOverwriteTrgt
+    | UnaryOp Log -> inplaceOverwriteTrgt
+    | UnaryOp Exp -> inplaceOverwriteTrgt
+    // reductions
+    | UnaryOp Sum -> outplaceTrgt
+    | UnaryOp (SumAxis _) -> outplaceTrgt
+    // shape operations
+    | UnaryOp (Reshape _) ->        
+        match reqView with
+        | Some rv when NDArrayView.isContiguous rv ->
+            [Some {rv with Shape=srcShapes.[0]; Stride=NDArrayView.contiguousStride srcShapes.[0]}]
+        | _ -> outplaceTrgt
+    | UnaryOp (Broadcast _) -> outplaceTrgt
+    | UnaryOp (SwapDim (ax1, ax2)) ->
+        match reqView with
+        | Some rv ->
+            let str = rv.Stride
+            [Some {rv with Shape=srcShapes.[0]; 
+                           Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}]
+        | _ -> outplaceTrgt
+    // misc
+    | UnaryOp (Annotated _) -> inplaceOverwriteTrgt
+
+    // binary elementwise
+    | BinaryOp Add -> inplaceOverwriteTrgt
+    | BinaryOp Substract -> inplaceOverwriteTrgt
+    | BinaryOp Multiply -> inplaceOverwriteTrgt
+    | BinaryOp Divide -> inplaceOverwriteTrgt
+    | BinaryOp Power -> inplaceOverwriteTrgt
+    // matrix/tensor operations
+    | BinaryOp Dot -> outplaceTrgt
+    | BinaryOp TensorProduct -> outplaceTrgt     
+
+
 let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
     let nSrc = List.length srcViews
     let argTypes = cudaNDArrayType trgtView :: (List.map cudaNDArrayType srcViews)
@@ -227,16 +276,15 @@ let execItemsForOp trgtView op srcViews =
     | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
     | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
     // variable access
-    | LeafOp (Var vs) ->
-        // TODO: use variable memory
+    | LeafOp (Var vs) -> []
         
     // unary elementwise
     | UnaryOp Negate -> execItemsForElemwise trgtView "NegateEOp_t" false srcViews
     | UnaryOp Log -> execItemsForElemwise trgtView "LogEOp_t" false srcViews
     | UnaryOp Exp -> execItemsForElemwise trgtView "ExpEOp_t" false srcViews
     // reductions
-    | UnaryOp Sum -> failwith "not implemented"
-    | UnaryOp (SumAxis _) -> failwith "not implemented"
+    | UnaryOp Sum -> execItemsForElemwise trgtView "Sum" false srcViews // TODO
+    | UnaryOp (SumAxis _) -> execItemsForElemwise trgtView "SumAxis" false srcViews // TODO
     // shape operations
     | UnaryOp (Reshape _) ->
         if trgtView <> srcViews.[0] then execItemsForElemwise trgtView "IdEOp_t" false srcViews
@@ -245,30 +293,25 @@ let execItemsForOp trgtView op srcViews =
     | UnaryOp (SwapDim _) -> []
     // misc
     | UnaryOp (Annotated _) -> []
-    
-let canWorkInFirstPlace binaryOp = 
-    match binaryOp with
+
     // binary elementwise
-    | Add -> true
-    | Substract -> true
-    | Multiply -> true
-    | Divide -> true
-    | Power -> true
+    | BinaryOp Add -> execItemsForElemwise trgtView "AddEOp_t" false srcViews
+    | BinaryOp Substract -> execItemsForElemwise trgtView "SubstractEOp_t" false srcViews
+    | BinaryOp Multiply -> execItemsForElemwise trgtView "MultiplyEOp_t" false srcViews
+    | BinaryOp Divide -> execItemsForElemwise trgtView "DivideEOp_t" false srcViews
+    | BinaryOp Power -> execItemsForElemwise trgtView "PowerEOp_t" false srcViews
     // matrix/tensor operations
-    | Dot -> false
-    | TensorProduct -> false
-
-let canWorkInSecondPlace binaryOp = canWorkInFirstPlace binaryOp
-
-
+    | BinaryOp Dot -> execItemsForElemwise trgtView "Dot" false srcViews // TODO
+    | BinaryOp TensorProduct -> execItemsForElemwise trgtView "TensorProduct" false srcViews // TODO
+    
 
 type ExecUnitIdT = int
 type ExecUnitT = {Id: ExecUnitIdT; DependsOn: ExecUnitIdT list; Items: ExeOpT list; }
 
 type EvalResultT = {ExecUnitId: ExecUnitIdT; View: NDArrayViewT; Shared: bool}
-type EvalReqT = {Id: int; Expr: ExprT; Multiplicity: int; View: NDArrayViewT option; OnCompletion: EvalResultT -> unit}
+type EvalReqT = {Id: int; Expr: UExprT; Multiplicity: int; View: NDArrayViewT option; OnCompletion: EvalResultT -> unit}
 
-let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
+let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: UExprT) =
     // number of occurrences of subexpressions
     let exprOccurrences = subExprOccurrences expr
 
@@ -305,7 +348,7 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
                          View=storage; OnCompletion=onCompletion} :: evalRequests
 
     // evaluated requests
-    let mutable evaluatedExprs : Map<ExprT, EvalResultT> = Map.empty
+    let mutable evaluatedExprs : Map<UExprT, EvalResultT> = Map.empty
 
     /// takes an evaluation request from the evaluation request queue and processes it
     let processEvalRequest () =   
@@ -349,74 +392,35 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: ExprT) =
             // emit exec unit to evaluate expression
             let erqExpr = erqToProcess.Expr
             match erqExpr with
-            | Leaf(op) ->
-                // If no desired storage has been specified, we allocate a new one for this leaf.
-                let trgtStorage = 
-                    match erqTarget with
-                    | Some s -> s
-                    | None -> newStorageView (numShapeOf erqToProcess.Expr)
-                let trgtShared = erqResultShared
+            | UExpr(op, srcs) ->
+                let nSrc = List.length srcs
+                let mutable subreqResults : Map<UExprT, EvalResultT option> = Map.empty
 
-                // emit execution unit 
-                let eu = {newExecUnit() with Items=[ExecLeaf(trgtStorage, op)]}
-                submitExecUnit eu
-
-                completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
-            | Unary(op, aExpr) -> 
-                // request aExpr to be evaluated directly into our storage, if we can work inplace.
-                let aReqStorage = if inplaceUnary op then erqTarget else None
-
-                submitEvalRequest aExpr erqMultiplicity aReqStorage 
-                    (fun aRes ->
-                        // determine our definitive storage
-
-                        let trgtStorage, trgtShared =
-                            trgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op aRes.View aRes.Shared
-
-                        // emit execution unit 
-                        let eu = {newExecUnit() with Items=[ExecUnary(trgtStorage, op, aRes.View)];
-                                                     DependsOn=[aRes.ExecUnitId]}                                    
-                        submitExecUnit eu
-
-                        completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
-                    )                                                                       
-            | Binary(op, aExpr, bExpr) ->
-                // request aExpr or bExpr to be evaluated directly into our storage, if we can work inplace.
-                let aReqStorage, bReqStorage = 
-                    match canWorkInFirstPlace op, canWorkInSecondPlace op with
-                    | true, _ -> erqTarget, None
-                    | _, true -> None, erqTarget
-                    | false, false -> None, None
-
-                // callback when aExpr and bExpr requests have been evaluated
-                let mutable aRes = None
-                let mutable bRes = None
                 let onMaybeCompleted () =
-                    match aRes, bRes with
-                    | Some aRes, Some bRes ->
-                        // determine our definitive storage
-                        let trgtStorage =
-                            match erqTarget with
-                            | Some s -> s
-                            | None when canWorkInFirstPlace op && not aRes.Shared -> aRes.View
-                            | None when canWorkInSecondPlace op && not bRes.Shared -> bRes.View
-                            | None -> newStorageView (numShapeOf erqToProcess.Expr)
-                        let trgtShared = 
-                            (if trgtStorage = aRes.View then aRes.Shared else false) ||
-                            (if trgtStorage = bRes.View then bRes.Shared else false) ||
-                            erqResultShared
+                    if List.forall (fun s -> Map.containsKey s subreqResults) srcs then                       
+                        let subres = Map.map (fun k v -> Option.get v) subreqResults
 
+                        // determine our definitive target storage
+                        let srcViews, srcShared, srcExeUnitIds = 
+                            srcs 
+                            |> List.map (fun s -> subres.[s].View, subres.[s].Shared, subres.[s].ExecUnitId) 
+                            |> List.unzip3
+                        let trgtView, trgtShared =
+                            trgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op srcViews srcShared
+                       
                         // emit execution unit 
-                        let eu = {newExecUnit() with Items=[ExecBinary(trgtStorage, op, aRes.View, bRes.View)];
-                                                     DependsOn=[aRes.ExecUnitId; bRes.ExecUnitId]}
+                        let eu = {newExecUnit() with Items=execItemsForOp trgtView op srcViews;
+                                                     DependsOn=srcExeUnitIds}                                    
                         submitExecUnit eu
 
-                        completeEvalRequest {ExecUnitId=eu.Id; View=trgtStorage; Shared=trgtShared}
-                    | _ -> ()    
-                    
-                submitEvalRequest aExpr erqMultiplicity aReqStorage (fun res -> aRes <- Some res; onMaybeCompleted())
-                submitEvalRequest bExpr erqMultiplicity bReqStorage (fun res -> bRes <- Some res; onMaybeCompleted())
-        
+                        completeEvalRequest {ExecUnitId=eu.Id; View=trgtView; Shared=trgtShared}
+
+                let srcReqStorages = srcViewReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs) 
+                for src, srcReqStorage in List.zip srcs srcReqStorages do
+                    submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
+                        subreqResults <- subreqResults |> Map.add src res
+                        onMaybeCompleted())                                                                       
+
         // remove eval request        
         evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
 

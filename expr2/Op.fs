@@ -376,9 +376,9 @@ let extractVar expr =
 let makeVar v =
     Leaf(Var(v))
 
-/// counts how many times subExpr occurs in expr
-let subExprOccurrences expr =
-    let cnt = Dictionary<ExprT, int>()
+/// counts how many times subExpr occurs in unified expression uexpr
+let subExprOccurrences uexpr =
+    let cnt = Dictionary<UExprT, int>()
     let rec build expr =
         if cnt.ContainsKey(expr) then
             cnt.[expr] <- cnt.[expr] + 1
@@ -386,10 +386,10 @@ let subExprOccurrences expr =
             cnt.[expr] <- 1
 
         match expr with
-        | Leaf _ -> ()
-        | Unary(_, a) -> build a
-        | Binary(_, a, b) -> build a; build b
-    build expr
+        | UExpr (_, srcs) ->
+            for src in srcs do
+                build src
+    build uexpr
 
     fun subExpr ->
         if cnt.ContainsKey(subExpr) then cnt.[subExpr]
