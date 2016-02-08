@@ -4,7 +4,8 @@
   <Analysers>
     <CyclomaticComplexity>
       <Rules />
-      <Enabled>False</Enabled>
+      <Enabled>True</Enabled>
+      <MaxCyclomaticComplexity>15</MaxCyclomaticComplexity>
     </CyclomaticComplexity>
     <NestedStatements>
       <Rules />
@@ -17,6 +18,10 @@
           <Enabled>True</Enabled>
           <MaxItems>7</MaxItems>
         </MaxNumberOfFunctionParameters>
+        <MaxNumberOfItemsInTuple>
+          <Enabled>True</Enabled>
+          <MaxItems>6</MaxItems>
+        </MaxNumberOfItemsInTuple>
       </Rules>
     </NumberOfItems>
     <SourceLength>

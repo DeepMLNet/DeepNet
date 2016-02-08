@@ -266,7 +266,7 @@ let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
             let rest = {2 .. d-1} |> Seq.map (fun i -> trgtView.Shape.[i]) |> Seq.fold (*) 1 
             (trgtView.Shape.[0], trgtView.Shape.[1], rest)
 
-    [LaunchKernel(kernel, workDim, (trgtView.Memory :> obj) :: (List.map (fun v -> v.Memory :> obj) srcViews))]
+    [CudaOp (LaunchKernel(kernel, workDim, (trgtView.Memory :> obj) :: (List.map (fun v -> v.Memory :> obj) srcViews)))]
 
 let execItemsForOp trgtView op srcViews =
     match op with 
@@ -316,7 +316,7 @@ let exprToExecUnits (sizeSymbolEnv: SymbolEnvT) (expr: UExprT) =
     let exprOccurrences = subExprOccurrences expr
 
     // calculates the numeric shape
-    let numShapeOf expr = shapeOf expr |> ShapeSpec.eval sizeSymbolEnv
+    let numShapeOf expr = shapeOfUExpr expr |> ShapeSpec.eval sizeSymbolEnv
 
     // execution units
     let mutable execUnits = []
@@ -591,7 +591,6 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
                 WaitOnEvent evt |> emitToStream euStream
 
         // emit our instructions
-        //sprintf "%A" eu |> ExecUnitStartInfo |> emitToStream euStream
         for cmd in eu.Items do
             cmd |> emitToStream euStream
 
@@ -614,7 +613,6 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT list) =
        
 
 // TODO: variable memory allocation
-// TODO: CUDA driver call sequencing
 
 
 
@@ -622,9 +620,7 @@ let pitchAlignment = 256 // TODO: get from device
 
 
 type CudaFlagsT = int
-
 type EventObjectT = int
-
 
 type CudaCallT =
     // memory mangement
@@ -650,10 +646,12 @@ type CudaCallT =
     | ExeOp of StreamT * ExeOpT
 
 
-//let genNDArray (storage: St =
+type CudaCallGeneratorStateT = {Insts: string}
 
-//let instantiateKernelForElemwiseOp trgt op a =
-    
+let initialCudaCallGeneratorState = {Insts=""}
+
+let cudaCallsForOp state streamId op =
+    state, []    
 
 
 /// generates a sequence of CUDA calls from streams
@@ -669,7 +667,7 @@ let generateCalls streams =
                     | _ -> ()
         } |> Seq.countBy id |> Map.ofSeq
         
-    let rec generate streamCallHistory activeEvents streams =
+    let rec generate genState streamCallHistory activeEvents streams =
         if List.exists ((<>) []) streams then
             // sort streams by call history
             let streamsSorted = 
@@ -719,30 +717,22 @@ let generateCalls streams =
                 let activeEvents = activeEvents |> List.removeValueOnce evt
 
                 let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId, 0)
-                cmd :: generate streamCallHistory activeEvents remainingStreams
+                cmd :: generate genState streamCallHistory activeEvents remainingStreams
             | EmitEvent evtp ->
                 // add active event as many times as it will be waited upon
                 let evt = Option.get !evtp
                 let activeEvents = List.replicate correlationIdWaiters.[evt.CorrelationId] evt @ activeEvents
 
                 let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
-                cmd :: generate streamCallHistory activeEvents remainingStreams
-//            | ExecLeaf (trgt, op) ->
-//                // TODO
-//                generate streamCallHistory activeEvents remainingStreams
-            | ExecUnary (trgt, op, a) ->
-                match op with
-                | Negate ->
-                    
-                generate streamCallHistory activeEvents remainingStreams
-//            | ExecBinary (trgt, op, a, b) ->
-//                // TODO
-//                generate streamCallHistory activeEvents remainingStreams
-            | _ as eop -> 
+                cmd :: generate genState streamCallHistory activeEvents remainingStreams
+            | CudaOp op ->
                 let streamCallHistory = strmIdToProcess :: streamCallHistory
-                ExeOp(strmIdToProcess, eop) :: generate streamCallHistory activeEvents remainingStreams
+                let genState, calls = cudaCallsForOp genState strmIdToProcess op
+                calls @ generate genState streamCallHistory activeEvents remainingStreams
+            | ExecUnitStartInfo _ | ExecUnitEndInfo -> 
+                generate genState streamCallHistory activeEvents remainingStreams
         else
             // streams are all empty
             []
 
-    generate [] [] streams
+    generate initialCudaCallGeneratorState [] [] streams

@@ -90,6 +90,13 @@ let rec toUExpr expr =
     | Unary(op, a) -> UExpr(UnaryOp op, [toUExpr a])
     | Binary(op, a, b) -> UExpr(BinaryOp op, [toUExpr a; toUExpr b])
     
+let rec toExpr uexpr =
+    match uexpr with
+    | UExpr(LeafOp op, []) -> Leaf op
+    | UExpr(UnaryOp op, [a]) -> Unary(op, toExpr a)
+    | UExpr(BinaryOp op, [a; b]) -> Binary(op, toExpr a, toExpr b)
+    | _ -> failwithf "invalid unified expression %A" uexpr
+
 /// matches all exprs that work elementwise on their argument(s)
 let (|ElemwiseOp|_|) (op: obj) =
     match op with
@@ -137,7 +144,7 @@ let rec contains subExpr expr =
 let failshape op sa sb =
     failwithf "op %A was provided with arrays of incompatible shapes %A and %A" op sa sb
 
-/// Returns the shape of the given op.
+/// Returns the shape of the given expression.
 let rec shapeOf expr =
     // We assume that all operands have compatible size. 
     // For elementwise operations we assume that a and b are already broadcasted
@@ -175,6 +182,9 @@ let rec shapeOf expr =
     // misc
     | Unary(Annotated(_), a) -> shapeOf a
     | _ -> failwithf "unknown expr: %A" expr
+
+/// Return the shape of the given unified expression.
+let shapeOfUExpr uexpr = uexpr |> toExpr |> shapeOf
 
 /// Wraps the given op in a Reshape op if its shape does not match ss.
 let reshapeIfNecessary ss expr =
