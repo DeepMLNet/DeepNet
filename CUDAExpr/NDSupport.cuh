@@ -7,9 +7,8 @@
 class Shape0D {
 public:
   	_dev static size_t shape(const size_t dim) {
-      switch (dim) {
-        default: return 0;
-      }
+      return 0;
+   }
 };
 
 template <size_t offset_>
@@ -52,18 +51,16 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary0DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary0DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
-    const size_t pos[] {};
+    const size_t *pos = nullptr;
 
   trgt->element() = op(pos, 0);
 
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary0D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary0D(const TElemwiseOp &op, TTarget *trgt) {
 
 
   trgt->element() = op();
@@ -71,18 +68,16 @@ __global__ void elemwise0Ary0D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary0DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary0DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
-    const size_t pos[] {};
+    const size_t *pos = nullptr;
 
   trgt->element() = op(pos, 0, src0->element());
 
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary0D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary0D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
 
   trgt->element() = op(src0->element());
@@ -90,18 +85,16 @@ __global__ void elemwise1Ary0D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary0DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary0DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
-    const size_t pos[] {};
+    const size_t *pos = nullptr;
 
   trgt->element() = op(pos, 0, src0->element(), src1->element());
 
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary0D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary0D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
 
   trgt->element() = op(src0->element(), src1->element());
@@ -118,9 +111,10 @@ public:
         case 0: return shape0;
         default: return 0;
       }
+   }
 };
 
-template <size_t offset, size_t stride0>
+template <size_t offset_, size_t stride0>
 class Stride1D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -161,8 +155,7 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary1DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary1DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -177,8 +170,7 @@ __global__ void elemwise0Ary1DIndexed(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary1D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary1D(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -192,8 +184,7 @@ __global__ void elemwise0Ary1D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary1DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary1DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -208,8 +199,7 @@ __global__ void elemwise1Ary1DIndexed(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary1D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary1D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -223,8 +213,7 @@ __global__ void elemwise1Ary1D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary1DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary1DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -239,8 +228,7 @@ __global__ void elemwise2Ary1DIndexed(TTarget *trgt, const TSrc0 *src0, const TS
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary1D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary1D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -264,9 +252,10 @@ public:
         case 1: return shape1;
         default: return 0;
       }
+   }
 };
 
-template <size_t offset, size_t stride0, size_t stride1>
+template <size_t offset_, size_t stride0, size_t stride1>
 class Stride2D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -308,8 +297,7 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary2DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary2DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -328,8 +316,7 @@ __global__ void elemwise0Ary2DIndexed(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary2D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary2D(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -347,8 +334,7 @@ __global__ void elemwise0Ary2D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary2DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary2DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -367,8 +353,7 @@ __global__ void elemwise1Ary2DIndexed(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary2D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary2D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -386,8 +371,7 @@ __global__ void elemwise1Ary2D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary2DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary2DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -406,8 +390,7 @@ __global__ void elemwise2Ary2DIndexed(TTarget *trgt, const TSrc0 *src0, const TS
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary2D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary2D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
     const size_t iters0 = TTarget::shape(0) / (gridDim.x * blockDim.x) + 1;
@@ -436,9 +419,10 @@ public:
         case 2: return shape2;
         default: return 0;
       }
+   }
 };
 
-template <size_t offset, size_t stride0, size_t stride1, size_t stride2>
+template <size_t offset_, size_t stride0, size_t stride1, size_t stride2>
 class Stride3D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -481,8 +465,7 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary3DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary3DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -505,8 +488,7 @@ __global__ void elemwise0Ary3DIndexed(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary3D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary3D(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -528,8 +510,7 @@ __global__ void elemwise0Ary3D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary3DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary3DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -552,8 +533,7 @@ __global__ void elemwise1Ary3DIndexed(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary3D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary3D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -575,8 +555,7 @@ __global__ void elemwise1Ary3D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary3DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary3DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -599,8 +578,7 @@ __global__ void elemwise2Ary3DIndexed(TTarget *trgt, const TSrc0 *src0, const TS
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary3D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary3D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t iters2 = TTarget::shape(2) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -634,9 +612,10 @@ public:
         case 3: return shape3;
         default: return 0;
       }
+   }
 };
 
-template <size_t offset, size_t stride0, size_t stride1, size_t stride2, size_t stride3>
+template <size_t offset_, size_t stride0, size_t stride1, size_t stride2, size_t stride3>
 class Stride4D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -680,8 +659,7 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary4DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary4DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -710,8 +688,7 @@ __global__ void elemwise0Ary4DIndexed(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary4D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary4D(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -739,8 +716,7 @@ __global__ void elemwise0Ary4D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary4DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary4DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -769,8 +745,7 @@ __global__ void elemwise1Ary4DIndexed(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary4D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary4D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -798,8 +773,7 @@ __global__ void elemwise1Ary4D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary4DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary4DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -828,8 +802,7 @@ __global__ void elemwise2Ary4DIndexed(TTarget *trgt, const TSrc0 *src0, const TS
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary4D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary4D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -870,9 +843,10 @@ public:
         case 4: return shape4;
         default: return 0;
       }
+   }
 };
 
-template <size_t offset, size_t stride0, size_t stride1, size_t stride2, size_t stride3, size_t stride4>
+template <size_t offset_, size_t stride0, size_t stride1, size_t stride2, size_t stride3, size_t stride4>
 class Stride5D {
 public:
   	_dev static size_t stride(const size_t dim) {
@@ -917,8 +891,7 @@ public:
 };
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary5DIndexed(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary5DIndexed(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -950,8 +923,7 @@ __global__ void elemwise0Ary5DIndexed(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget>
-__global__ void elemwise0Ary5D(TTarget *trgt) {
-  TElemwiseOp op;
+_dev void elemwise0Ary5D(const TElemwiseOp &op, TTarget *trgt) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -982,8 +954,7 @@ __global__ void elemwise0Ary5D(TTarget *trgt) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary5DIndexed(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary5DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -1015,8 +986,7 @@ __global__ void elemwise1Ary5DIndexed(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-__global__ void elemwise1Ary5D(TTarget *trgt, const TSrc0 *src0) {
-  TElemwiseOp op;
+_dev void elemwise1Ary5D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -1047,8 +1017,7 @@ __global__ void elemwise1Ary5D(TTarget *trgt, const TSrc0 *src0) {
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary5DIndexed(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary5DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;
@@ -1080,8 +1049,7 @@ __global__ void elemwise2Ary5DIndexed(TTarget *trgt, const TSrc0 *src0, const TS
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-__global__ void elemwise2Ary5D(TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
-  TElemwiseOp op;
+_dev void elemwise2Ary5D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
     const size_t itersRest = (TTarget::shape(2) * TTarget::shape(3) * TTarget::shape(4)) / (gridDim.z * blockDim.z) + 1;
     const size_t iters1 = TTarget::shape(1) / (gridDim.y * blockDim.y) + 1;

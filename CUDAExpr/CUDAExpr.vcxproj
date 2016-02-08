@@ -72,6 +72,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -102,6 +103,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(ProjectDir)\x64\Debug\*.obj" "$(SolutionDir)\expr2\bin\Debug"
+copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\expr2\bin\Debug"
 </Command>
     </PostBuildEvent>
     <CudaCompile>
@@ -164,6 +166,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="NDSupport.cuh" />
     <ClInclude Include="Ops.cuh" />
     <ClInclude Include="Utils.cuh" />
+    <CudaCompile Include="..\expr2\bin\Debug\mod1.cu" />
     <CudaCompile Include="Test.cu" />
   </ItemGroup>
   <ItemGroup>

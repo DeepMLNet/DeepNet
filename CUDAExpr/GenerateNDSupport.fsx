@@ -40,18 +40,22 @@ for dims = 0 to maxDims do
     wrt "class Shape%dD {" dims
     wrt "public:"
     wrt "  	_dev static size_t shape(const size_t dim) {"
-    wrt "      switch (dim) {"
-    for d in ad do
-        wrt "        case %d: return shape%d;" d d
-    wrt "        default: return 0;"
-    wrt "      }"
+    if dims > 0 then
+        wrt "      switch (dim) {"
+        for d in ad do
+            wrt "        case %d: return shape%d;" d d
+        wrt "        default: return 0;"
+        wrt "      }"
+    else
+        wrt "      return 0;"
+    wrt "   }"
     wrt "};"
     wrt ""
 
     if dims = 0 then
         wrt "template <size_t offset_>"
     else
-        wrt "template <size_t offset, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
+        wrt "template <size_t offset_, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
 
     wrt "class Stride%dD {" dims
     wrt "public:"
@@ -144,7 +148,10 @@ for dims = 0 to maxDims do
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
-            wrt "    const size_t pos[] {%s};" (poses |> cw ", ")
+            if dims >= 1 then
+                wrt "    const size_t pos[] {%s};" (poses |> cw ", ")
+            else
+                wrt "    const size_t *pos = nullptr;"
 
         wrt ""
         fBody dims
@@ -169,11 +176,10 @@ for dims = 0 to maxDims do
 
         let srcArgDecls =
             {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d *src%d" i i) |> Seq.toList
-        let allArgDecls = "TTarget *trgt" :: srcArgDecls
+        let allArgDecls = "const TElemwiseOp &op" :: "TTarget *trgt" :: srcArgDecls
         let indexedName = if withIndexes then "Indexed" else ""
-        wrt "__global__ void elemwise%dAry%dD%s(%s) {" ary dims indexedName (allArgDecls |> cw ", ")
+        wrt "_dev void elemwise%dAry%dD%s(%s) {" ary dims indexedName (allArgDecls |> cw ", ")
 
-        wrt "  TElemwiseOp op;"
         elementwiseLoop withIndexes (fun dims ->      
             let poses = ad |>> prn "pos%d" |> cw ", "
             let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d->element(%s)" a poses) |> Seq.toList

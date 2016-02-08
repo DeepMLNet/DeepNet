@@ -3,6 +3,7 @@
 open Util
 open Op
 open ExecUnitsGen
+open System.Runtime.InteropServices
 
 /// template instantiation specification
 type TmplInstT = {FuncName: string; TmplArgs: string list; 
@@ -145,18 +146,27 @@ let srcViewReqsGivenTrgt trgtShape reqView op srcShapes =
     | BinaryOp Dot -> outplaceTrgt
     | BinaryOp TensorProduct -> outplaceTrgt     
 
+#nowarn "9"
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type ConstEOp =
+    val Value: float32
+    new(value: float32) = {Value = value;}
+    member this.CName () = "ConstEOp_t"
+    member this.IsIndexed () = false
+
 
 /// execution items for an elementwise operation
 let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
     let nSrc = List.length srcViews
-    let argTypes = cudaNDArrayCType trgtView :: (List.map cudaNDArrayCType srcViews)
-    let argTypesPointers = argTypes |> List.map (fun at -> at + " *")
+    let viewArgTypes = cudaNDArrayCType trgtView :: (List.map cudaNDArrayCType srcViews)
+    let viewArgTypesPntrs = viewArgTypes |> List.map (fun at -> at + " *")
     let indexedStr = if cOpIndexed then "Indexed" else ""
     let kernel = 
-        {FuncName=sprintf "elementwise%dAry%dD%s" nSrc (NDArrayView.nDim trgtView) indexedStr;
-         TmplArgs=cOp :: argTypes;
+        {FuncName=sprintf "elemwise%dAry%dD%s" nSrc (NDArrayView.nDim trgtView) indexedStr;
+         TmplArgs=cOp :: viewArgTypes;
          RetType="void";
-         ArgTypes=argTypesPointers}
+         ArgTypes=cOp :: viewArgTypesPntrs}
 
     let workDim = 
         match NDArrayView.nDim trgtView with
@@ -168,7 +178,9 @@ let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
             let rest = {2 .. d-1} |> Seq.map (fun i -> trgtView.Shape.[i]) |> Seq.fold (*) 1 
             (trgtView.Shape.[0], trgtView.Shape.[1], rest)
 
-    [LaunchKernel(kernel, workDim, (trgtView.Memory :> obj) :: (List.map (fun v -> v.Memory :> obj) srcViews))]
+    [LaunchKernel(kernel, 
+                  workDim, 
+                  (trgtView.Memory :> obj) :: (List.map (fun v -> v.Memory :> obj) srcViews))]
 
 
 /// returns the execution units for the specified op
@@ -177,8 +189,8 @@ let execItemsForOp trgtView op srcViews =
     // tensor creation
     | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView "DiagonalOneIEOp_t" true []
     | LeafOp (Zeros _) -> execItemsForElemwise trgtView "ZerosEOp_t" true []
-    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
-    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (sprintf "ConstEOp_t<%f>" f) true []
+    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView "ConstEOp_t" true []
+    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView "ConstEOp_t" true []
     // variable access
     | LeafOp (Var vs) -> []
         

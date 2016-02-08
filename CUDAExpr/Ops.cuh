@@ -24,13 +24,16 @@ struct DiagonalOneIEOP_t {
 };
 
 
-template <float TValue>
 struct ConstEOp_t
 {
+	ConstEOp_t(float value) : value(value) {}
+
 	_dev float operator() ()
 	{
-		return TValue;
+		return value;
 	}
+
+	float value;
 };
 
 

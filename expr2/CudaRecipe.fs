@@ -67,7 +67,7 @@ let instTmplKernel cache (ti: TmplInstT) =
             |> List.length
         let firstArgStr = 
             match ti.TmplArgs with
-            | fa::_ when not (fa.Contains("<") || fa.Contains(">")) -> fa
+            | fa::_ -> fa.Replace("<", "_").Replace(">", "_").Replace(".", "_")
             | _ -> ""
         let cName = sprintf "%s_%s_%d" ti.FuncName firstArgStr nPrv
         cache.Insts <- (ti, cName)::cache.Insts
@@ -80,11 +80,11 @@ let instTmplKernel cache (ti: TmplInstT) =
         let argCallStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "p%d" i) |> String.combineWith ", "
         let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
         let declStr =
-            sprintf "extern \"C\" %s %s (%s);" ti.RetType cName argDeclStr
-                + sprintf "%s %s (%s) {" ti.RetType cName argDeclStr
-                + sprintf "  %s %s (%s);" retCmd instStr argCallStr
-                + sprintf "}"
-                + sprintf ""
+            sprintf "extern \"C\" __global__ %s %s (%s) {\n" ti.RetType cName argDeclStr
+            + sprintf "  %s %s (%s);\n" retCmd ti.FuncName argCallStr
+            //+ sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
+            + sprintf "}\n"
+            + sprintf "\n"
         cache.Code <- cache.Code + declStr
 
         cName
@@ -199,12 +199,22 @@ let loadCudaCode modName modCode krnlNames =
     let includePath = assemblyDirectory
 
     use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-    cmplr.Compile([|sprintf "--gpu-architecture=%s" gpuArch; 
-                    sprintf "--include-path=\"%s\"" includePath |])
+    let cmplrArgs = [|sprintf "--gpu-architecture=%s" gpuArch; 
+                      sprintf "--include-path=\"%s\"" includePath|]
+
+    printfn "CUDA compilation of %s with arguments \"%s\":" modName (cmplrArgs |> String.combineWith " ")
+    try
+        cmplr.Compile(cmplrArgs)
+    with
+    | :? NVRTC.NVRTCException as cmplrError ->
+        printfn "Compile error:"
+        let log = cmplr.GetLogAsString()
+        printfn "%s" log
+
+        exit 1
     
     let log = cmplr.GetLogAsString()
-    printf "CUDA compilation of %s:" modName
-    printf "%s" log
+    printfn "%s" log
 
     let ptx = cmplr.GetPTX()
     use jitOpts = new CudaJitOptionCollection()
@@ -218,9 +228,9 @@ let loadCudaCode modName modCode krnlNames =
     let cuMod = cudaCntxt.LoadModulePTX(ptx, jitOpts)
 
     jitOpts.UpdateValues()
-    printf "CUDA jitting of %s:" modName
-    printf "%s" jitErrorBuffer.Value
-    printf "%s" jitInfoBuffer.Value   
+    printfn "CUDA jitting of %s:" modName
+    printfn "%s" jitErrorBuffer.Value
+    printfn "%s" jitInfoBuffer.Value   
     jitErrorBuffer.FreeHandle()
     jitInfoBuffer.FreeHandle()
 
@@ -235,7 +245,7 @@ let dumpCudaCode modName (modCode : string) =
     let filename = sprintf "%s.cu" modName
     use tw = new System.IO.StreamWriter(filename)
     tw.Write(modCode)
-    printf "Wrote CUDA module code to %s" filename
+    printfn "Wrote CUDA module code to %s" filename
 
 
 /// CUDA execution recipe
@@ -255,10 +265,18 @@ let generateCudaModuleName () =
     cudaModuleCounter <- cudaModuleCounter + 1
     sprintf "mod%d" cudaModuleCounter
 
+let cudaModuleHeader =
+    "#include \"NDSupport.cuh\"\n\
+     #include \"Ops.cuh\"\n"
+
+
 let buildCudaRecipe sizeSymbolEnv expr =
     let execUnits, exprRes, memAllocs = exprToCudaExecUnits sizeSymbolEnv expr
     let streams, eventObjCnt = execUnitsToStreamCommands execUnits
     let calls, krnlCache = generateCalls streams
     let modName = generateCudaModuleName ()
 
-    dumpCudaCode modName krnlCache.Code
+    let modCode = cudaModuleHeader + krnlCache.Code
+
+    dumpCudaCode modName modCode
+    loadCudaCode modName modCode []
