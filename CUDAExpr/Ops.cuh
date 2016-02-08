@@ -3,7 +3,7 @@
 #include "Utils.cuh"
 
 
-struct DiagonalOneIEOP_t {
+struct DiagonalOneIEOp_t {
 	_dev float operator() (const size_t *pos, const size_t dims) {
 		if (dims == 0) {
 			return 1.0;
@@ -22,6 +22,8 @@ struct DiagonalOneIEOP_t {
 		}
 	}
 };
+
+
 
 
 struct ConstEOp_t
@@ -101,6 +103,26 @@ struct DivideEOp_t
 	_dev float operator() (float a, float b)
 	{
 		return a / b;
+	}
+};
+
+struct PowerEOp_t
+{
+	_dev float operator() (float a, float b)
+	{
+		return powf(a, b);
+	}
+};
+
+
+
+
+// TODO: dummy
+struct Dot
+{
+	_dev float operator() (float a, float b)
+	{
+		return 111.1;
 	}
 };
 

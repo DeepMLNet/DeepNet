@@ -267,7 +267,7 @@ let generateCudaModuleName () =
 
 let cudaModuleHeader =
     "#include \"NDSupport.cuh\"\n\
-     #include \"Ops.cuh\"\n"
+     #include \"Ops.cuh\"\n\n"
 
 
 let buildCudaRecipe sizeSymbolEnv expr =

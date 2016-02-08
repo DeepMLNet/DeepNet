@@ -146,27 +146,52 @@ let srcViewReqsGivenTrgt trgtShape reqView op srcShapes =
     | BinaryOp Dot -> outplaceTrgt
     | BinaryOp TensorProduct -> outplaceTrgt     
 
+type ICudaOp =
+    abstract member CTypeName : unit -> string
+    abstract member IsIndexed : unit -> bool
+
 #nowarn "9"
 [<Struct>]
 [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
 type ConstEOp =
     val Value: float32
     new(value: float32) = {Value = value;}
-    member this.CName () = "ConstEOp_t"
-    member this.IsIndexed () = false
+    interface ICudaOp with
+        member this.CTypeName () = "ConstEOp_t"
+        member this.IsIndexed () = false
 
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type DiagonalOneIEOp =
+    interface ICudaOp with
+        member this.CTypeName () = "DiagonalOneIEOp_t"
+        member this.IsIndexed () = true
+
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type BasicEOp =
+    val CTypeNameM: string
+    new(name: string) = {CTypeNameM = name;}
+    interface ICudaOp with
+        member this.CTypeName () = this.CTypeNameM
+        member this.IsIndexed () = false
 
 /// execution items for an elementwise operation
-let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
+let execItemsForElemwise trgtView (cOp: ICudaOp) srcViews =
+    for srcView in srcViews do
+        if trgtView.Shape <> srcView.Shape then
+            failwithf "source has different shape %A than target %A for elemewise op %A"
+                trgtView.Shape srcView.Shape cOp
+
     let nSrc = List.length srcViews
     let viewArgTypes = cudaNDArrayCType trgtView :: (List.map cudaNDArrayCType srcViews)
     let viewArgTypesPntrs = viewArgTypes |> List.map (fun at -> at + " *")
-    let indexedStr = if cOpIndexed then "Indexed" else ""
+    let indexedStr = if cOp.IsIndexed() then "Indexed" else ""
     let kernel = 
         {FuncName=sprintf "elemwise%dAry%dD%s" nSrc (NDArrayView.nDim trgtView) indexedStr;
-         TmplArgs=cOp :: viewArgTypes;
+         TmplArgs=cOp.CTypeName() :: viewArgTypes;
          RetType="void";
-         ArgTypes=cOp :: viewArgTypesPntrs}
+         ArgTypes=cOp.CTypeName() :: viewArgTypesPntrs}
 
     let workDim = 
         match NDArrayView.nDim trgtView with
@@ -187,23 +212,23 @@ let execItemsForElemwise trgtView cOp cOpIndexed srcViews =
 let execItemsForOp trgtView op srcViews =
     match op with 
     // tensor creation
-    | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView "DiagonalOneIEOp_t" true []
-    | LeafOp (Zeros _) -> execItemsForElemwise trgtView "ZerosEOp_t" true []
-    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView "ConstEOp_t" true []
-    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView "ConstEOp_t" true []
+    | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView (DiagonalOneIEOp()) []
+    | LeafOp (Zeros _) -> execItemsForElemwise trgtView (BasicEOp("ZerosEOp_t")) []
+    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
+    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
     // variable access
     | LeafOp (Var vs) -> []
         
     // unary elementwise
-    | UnaryOp Negate -> execItemsForElemwise trgtView "NegateEOp_t" false srcViews
-    | UnaryOp Log -> execItemsForElemwise trgtView "LogEOp_t" false srcViews
-    | UnaryOp Exp -> execItemsForElemwise trgtView "ExpEOp_t" false srcViews
+    | UnaryOp Negate -> execItemsForElemwise trgtView (BasicEOp("NegateEOp_t")) srcViews
+    | UnaryOp Log -> execItemsForElemwise trgtView (BasicEOp("LogEOp_t")) srcViews
+    | UnaryOp Exp -> execItemsForElemwise trgtView (BasicEOp("ExpEOp_t")) srcViews
     // reductions
-    | UnaryOp Sum -> execItemsForElemwise trgtView "Sum" false srcViews // TODO
-    | UnaryOp (SumAxis _) -> execItemsForElemwise trgtView "SumAxis" false srcViews // TODO
+    | UnaryOp Sum -> execItemsForElemwise trgtView (BasicEOp("Sum")) srcViews // TODO
+    | UnaryOp (SumAxis _) -> execItemsForElemwise trgtView (BasicEOp("SumAxis")) srcViews // TODO
     // shape operations
     | UnaryOp (Reshape _) ->
-        if trgtView <> srcViews.[0] then execItemsForElemwise trgtView "IdEOp_t" false srcViews
+        if trgtView <> srcViews.[0] then execItemsForElemwise trgtView (BasicEOp("IdEOp_t")) srcViews
         else []
     | UnaryOp (Broadcast _) -> []
     | UnaryOp (SwapDim _) -> []
@@ -211,14 +236,14 @@ let execItemsForOp trgtView op srcViews =
     | UnaryOp (Annotated _) -> []
 
     // binary elementwise
-    | BinaryOp Add -> execItemsForElemwise trgtView "AddEOp_t" false srcViews
-    | BinaryOp Substract -> execItemsForElemwise trgtView "SubstractEOp_t" false srcViews
-    | BinaryOp Multiply -> execItemsForElemwise trgtView "MultiplyEOp_t" false srcViews
-    | BinaryOp Divide -> execItemsForElemwise trgtView "DivideEOp_t" false srcViews
-    | BinaryOp Power -> execItemsForElemwise trgtView "PowerEOp_t" false srcViews
+    | BinaryOp Add -> execItemsForElemwise trgtView (BasicEOp("AddEOp_t")) srcViews
+    | BinaryOp Substract -> execItemsForElemwise trgtView (BasicEOp("SubstractEOp_t")) srcViews
+    | BinaryOp Multiply -> execItemsForElemwise trgtView (BasicEOp("MultiplyEOp_t")) srcViews
+    | BinaryOp Divide -> execItemsForElemwise trgtView (BasicEOp("DivideEOp_t")) srcViews
+    | BinaryOp Power -> execItemsForElemwise trgtView (BasicEOp("PowerEOp_t")) srcViews
     // matrix/tensor operations
-    | BinaryOp Dot -> execItemsForElemwise trgtView "Dot" false srcViews // TODO
-    | BinaryOp TensorProduct -> execItemsForElemwise trgtView "TensorProduct" false srcViews // TODO
+    | BinaryOp Dot -> execItemsForElemwise trgtView (BasicEOp("Dot")) srcViews // TODO
+    | BinaryOp TensorProduct -> execItemsForElemwise trgtView (BasicEOp("TensorProduct")) srcViews // TODO
 
 
 /// generates CUDA execution units that will evaluate the given unified expression

@@ -103,7 +103,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(ProjectDir)\x64\Debug\*.obj" "$(SolutionDir)\expr2\bin\Debug"
-copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\expr2\bin\Debug"
+
 </Command>
     </PostBuildEvent>
     <CudaCompile>
@@ -113,6 +113,8 @@ copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\expr2\bin\Debug"
     <PreBuildEvent>
       <Command>cd "$(ProjectDir)"
 "$(ExtensionSDKDirectoryRoot)\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
+
+copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\expr2\bin\Debug"
 </Command>
     </PreBuildEvent>
     <PreBuildEvent>
