@@ -97,6 +97,7 @@
     <Compile Include="CudaExecUnits.fs" />
     <Compile Include="CudaBasics.fs" />
     <Compile Include="CudaRecipe.fs" />
+    <Compile Include="CudaExec.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />

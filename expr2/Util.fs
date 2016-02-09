@@ -6,6 +6,8 @@ type bytes
 [<Measure>]
 type elements
 
+type Dictionary<'a, 'b> = System.Collections.Generic.Dictionary<'a, 'b>
+
 module List =
     /// sets element with index elem to given value
     let rec set elem value lst =

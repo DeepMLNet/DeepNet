@@ -7,23 +7,27 @@ open StreamGen
 open CudaBasics
 open ManagedCuda
 
+/// Header of generated CUDA module
+let cudaModuleHeader =
+    "#include \"NDSupport.cuh\"\n\
+     #include \"Ops.cuh\"\n\n"
+
 /// CUDA event object
 type EventObjectT = int
 
-/// CUDA grid dimension
-type GridDimT = int * int * int
-/// CUDA block dimension
-type BlockDimT = int * int * int
-
-/// device memory allocation
-type DevMemAllocT = {Id: int; Size: int}
+/// device memory
+type DevMemT =
+    | DevMemAlloc of MemAllocT
+    | DevExternalMem of ExternalMemT
 /// device memory pointer
-type DevMemPtrT = DevMemAllocT * int
+type DevMemPtrT = {Base: DevMemT;
+                   Offset: int}
 
-/// host memory allocation
-type HostMemAllocT = {Id: int; Size: int}
+/// pre-allocated host memory 
+type HostExternalMemT = {Name: string}
 /// host memory pointer
-type HostMemPtrT = HostMemAllocT * int
+type HostMemPtrT = {Base: HostExternalMemT;
+                    Offset: int}
 
 /// CUDA call flags
 type CudaFlagsT = int
@@ -31,19 +35,19 @@ type CudaFlagsT = int
 /// CUDA api call
 type CudaCallT =
     // memory mangement
-    | MemAlloc of DevMemPtrT
-    | MemFree of DevMemPtrT
+    | MemAlloc of MemAllocT
+    | MemFree of MemAllocT
     // memory operations
     | MemcpyAsync of DevMemPtrT * DevMemPtrT * int * StreamT
     | MemcpyHtoDAsync of DevMemPtrT * HostMemPtrT * int * StreamT
     | MemcpyDtoHAsync of HostMemPtrT * DevMemPtrT * int * StreamT
-    | MemsetD32Async of DevMemPtrT * uint32 * int * StreamT
+    | MemsetD32Async of DevMemPtrT * single * int * StreamT
     // stream management
-    | StreamCreate of StreamT * CudaFlagsT
+    | StreamCreate of StreamT * BasicTypes.CUStreamFlags
     | StreamDestory of StreamT
-    | StreamWaitEvent of StreamT * EventObjectT * CudaFlagsT
+    | StreamWaitEvent of StreamT * EventObjectT 
     // event mangement
-    | EventCreate of EventObjectT * CudaFlagsT
+    | EventCreate of EventObjectT * BasicTypes.CUEventFlags
     | EventDestory of EventObjectT
     | EventRecord of EventObjectT * StreamT
     | EventSynchronize of EventObjectT
@@ -54,6 +58,21 @@ type CudaCallT =
 /// function instantiation state
 type KernelInstCacheT = {mutable Insts: (TmplInstT * string) list;
                          mutable Code: string} 
+
+/// CUDA execution recipe
+type CudaRecipeT = {KernelCode: string;
+                    InitCalls: CudaCallT list;
+                    DisposeCalls: CudaCallT list;
+                    ExecCalls: CudaCallT list;}
+
+module CudaRecipe =
+    /// gets all CUDA C kernel launches performed 
+    let getAllCKernelLaunches recipe =
+        let extract = List.filter (fun c -> 
+            match c with 
+            | LaunchCKernel _ -> true
+            | _ -> false)
+        (extract recipe.InitCalls) @ (extract recipe.DisposeCalls) @ (extract recipe.ExecCalls)
 
 /// instantiates a template CUDA C++ kernel with a C linkage function name and returns the C function name
 let instTmplKernel cache (ti: TmplInstT) =  
@@ -155,7 +174,7 @@ let generateCalls streams =
                 // remove active event
                 let activeEvents = activeEvents |> List.removeValueOnce evt
 
-                let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId, 0)
+                let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
                 cmd :: generate streamCallHistory activeEvents remainingStreams
             | EmitEvent evtp ->
                 // add active event as many times as it will be waited upon
@@ -168,19 +187,27 @@ let generateCalls streams =
                 // perform a non-synchronization operation
                 let streamCallHistory = strmIdToProcess :: streamCallHistory
 
+                let getDevMem t = 
+                    match t.Memory with
+                    | ExecUnitsGen.MemAlloc m -> {DevMemPtrT.Base = DevMemAlloc m; Offset = 0;}
+                    | ExecUnitsGen.ExternalMem m -> {DevMemPtrT.Base = DevExternalMem m; Offset = 0;}
+
+                let getHostMem t =
+                    {HostMemPtrT.Base = {HostExternalMemT.Name = t}; Offset=0;}
+
+                // generate CUDA call template
                 let calls = 
                     match cmd with
-                    | LaunchKernel(ti, workDim, args) ->
-                        // need to compute BlockDim and GridDim
-                        // i.e. let CUDA suggest
-                        // however for that the kernel must be compiled first
-                        // so let it compile the kernel
-                        // but then kernels are compiled one at a time
-                        // which might be slow
-                        // so kernels should be collected and compiled togehter
+                    | LaunchKernel(ti, workDim, args) -> 
                         [LaunchCKernel(instTmplKernel cache ti, workDim, 0, strmIdToProcess, args)]
-                    //| Memset(f, view) ->                        
-                    | _ -> failwithf "CUDA command %A not implemented" cmd
+                    | MemcpyDtoD(src, trgt) -> 
+                        [MemcpyAsync(getDevMem trgt, getDevMem src, NDArrayView.nElems trgt, strmIdToProcess)]
+                    | MemcpyHtoD(hostVarName, trgt) -> 
+                        [MemcpyHtoDAsync(getDevMem trgt, getHostMem hostVarName, NDArrayView.nElems trgt, strmIdToProcess)]
+                    | MemcpyDtoH(src, hostVarName) ->
+                        [MemcpyDtoHAsync(getHostMem hostVarName, getDevMem src, NDArrayView.nElems src, strmIdToProcess)]   
+                    | Memset(value, trgt) ->                        
+                        [MemsetD32Async(getDevMem trgt, single value, NDArrayView.nElems trgt, strmIdToProcess)]            
 
                 calls @ generate streamCallHistory activeEvents remainingStreams
             | ExecUnitStartInfo _ | ExecUnitEndInfo -> 
@@ -192,91 +219,45 @@ let generateCalls streams =
     generate [] [] streams, cache
 
 
-/// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
-/// ManagedCuda.CudaKernel objects for the specified kernel names.
-let loadCudaCode modName modCode krnlNames =
-    let gpuArch = "compute_30"
-    let includePath = assemblyDirectory
+let generateInitAndDispose memAllocs streamCnt eventObjCnt =
+    let memAllocCalls = 
+        memAllocs 
+        |> List.map CudaCallT.MemAlloc
+    let memDisposeCalls = 
+        memAllocs 
+        |> List.map CudaCallT.MemFree
 
-    use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-    let cmplrArgs = [|"--std=c++11";
-                      sprintf "--gpu-architecture=%s" gpuArch; 
-                      sprintf "--include-path=\"%s\"" includePath|]
+    let streamAllocCalls = 
+        {0 .. streamCnt - 1} 
+        |> Seq.map (fun strmId -> StreamCreate(strmId, BasicTypes.CUStreamFlags.NonBlocking))
+        |> Seq.toList
+    let streamDisposeCalls=
+        {0 .. streamCnt - 1} 
+        |> Seq.map (fun strmId -> StreamDestory(strmId))
+        |> Seq.toList
 
-    printfn "CUDA compilation of %s with arguments \"%s\":" modName (cmplrArgs |> String.combineWith " ")
-    try
-        cmplr.Compile(cmplrArgs)
-    with
-    | :? NVRTC.NVRTCException as cmplrError ->
-        printfn "Compile error:"
-        let log = cmplr.GetLogAsString()
-        printfn "%s" log
-        exit 1
-    let ptx = cmplr.GetPTX()
-    
-    let log = cmplr.GetLogAsString()
-    printfn "%s" log
+    let eventAllocCalls =
+        {0 .. eventObjCnt - 1}
+        |> Seq.map (fun evntId -> EventCreate(evntId, 
+                                              BasicTypes.CUEventFlags.DisableTiming ||| 
+                                              BasicTypes.CUEventFlags.BlockingSync))
+        |> Seq.toList
+    let eventDisposeCalls =
+        {0 .. eventObjCnt - 1}
+        |> Seq.map (fun evntId -> EventDestory(evntId))
+        |> Seq.toList        
 
-    printfn "CUDA jitting of %s:" modName
-    use jitOpts = new CudaJitOptionCollection()
-    use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
-    jitOpts.Add(jitInfoBuffer)
-    use jitErrorBuffer = new CudaJOErrorLogBuffer(10000)   
-    jitOpts.Add(jitErrorBuffer)
-    use jitLogVerbose = new CudaJOLogVerbose(true)
-    jitOpts.Add(jitLogVerbose)
+    memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
 
-    let cuMod = cudaCntxt.LoadModulePTX(ptx, jitOpts)
-
-    jitOpts.UpdateValues()
-    printfn "%s" jitErrorBuffer.Value
-    printfn "%s" jitInfoBuffer.Value   
-    jitErrorBuffer.FreeHandle()
-    jitInfoBuffer.FreeHandle()
-
-    let krnls =
-        krnlNames
-        |> Seq.fold (fun krnls name -> 
-            krnls |> Map.add name (CudaKernel(name, cuMod, cudaCntxt))) 
-            Map.empty
-    krnls
-
-let dumpCudaCode (modName: string) (modCode: string) =
-    let filename = modName
-    use tw = new System.IO.StreamWriter(filename)
-    tw.Write(modCode)
-    printfn "Wrote CUDA module code to %s" filename
-
-
-/// CUDA execution recipe
-type CudaRecipeT = {KernelInst: KernelInstCacheT;
-                    InitCalls: CudaCallT list;
-                    DisposeCalls: CudaCallT list;
-                    ExecCalls: CudaCallT list;}
-
-let emptyCudaRecipe = {KernelInst = {Insts=[]; Code=""};
-                       InitCalls = [];
-                       DisposeCalls = [];
-                       ExecCalls = []}
-
-
-let mutable cudaModuleCounter = 0
-let generateCudaModuleName () =
-    cudaModuleCounter <- cudaModuleCounter + 1
-    sprintf "mod%d.cu" cudaModuleCounter
-
-let cudaModuleHeader =
-    "#include \"NDSupport.cuh\"\n\
-     #include \"Ops.cuh\"\n\n"
-
-
-let buildCudaRecipe sizeSymbolEnv expr =
-    let execUnits, exprRes, memAllocs = exprToCudaExecUnits sizeSymbolEnv expr
+let buildCudaRecipe cudaEnv sizeSymbolEnv expr =
+    let execUnits, exprRes, memAllocs = exprToCudaExecUnits cudaEnv sizeSymbolEnv expr
     let streams, eventObjCnt = execUnitsToStreamCommands execUnits
-    let calls, krnlCache = generateCalls streams
-    let modName = generateCudaModuleName ()
+    let execCalls, krnlCache = generateCalls streams
+    let initCalls, disposeCalls = generateInitAndDispose memAllocs (List.length streams) eventObjCnt
 
-    let modCode = cudaModuleHeader + krnlCache.Code
+    {KernelCode = cudaModuleHeader + krnlCache.Code;
+     InitCalls = initCalls;
+     DisposeCalls = disposeCalls;
+     ExecCalls = execCalls;}
 
-    dumpCudaCode modName modCode
-    loadCudaCode modName modCode []
+

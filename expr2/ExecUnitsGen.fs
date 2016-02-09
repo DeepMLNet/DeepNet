@@ -4,11 +4,19 @@ open Util
 open Shape
 open Op
 
-/// a memory allocation
+/// a memory allocation execlusively for this expression (used for temporary results)
 type MemAllocT = {Id: int; Size: int}
 
+/// pointer to external, pre-allocated memory (used for variable access)
+type ExternalMemT = {Name: string}
+
+/// memory can either be internal to this expression or be external 
+type MemoryT =
+    | MemAlloc of MemAllocT
+    | ExternalMem of ExternalMemT
+
 /// an n-dimensional array view
-type NDArrayViewT = {Memory: MemAllocT; Shape: int list;
+type NDArrayViewT = {Memory: MemoryT; Shape: int list;
                      Offset: int; Stride: int list;}
 
 module NDArrayView =
@@ -64,9 +72,13 @@ type EvalReqT = {Id: int;
                  View: NDArrayViewT option; 
                  OnCompletion: EvalResultT -> unit}
 
+/// generator function record
+type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : NDArrayViewT -> AnyOpT -> NDArrayViewT list -> 'e list;
+                                TrgtViewGivenSrc: (int -> MemoryT) -> NShapeSpecT -> NDArrayViewT option -> AnyOpT -> NDArrayViewT list -> bool list -> NDArrayViewT * bool;
+                                SrcViewReqsGivenTrgt: NShapeSpecT -> NDArrayViewT option -> AnyOpT -> NShapeSpecT list -> NDArrayViewT option list;}
 
 /// generates execution units that will evaluate the given unified expression
-let exprToExecUnits execItemsForOp trgtViewGivenSrc srcViewReqsGivenTrgt (sizeSymbolEnv: SymbolEnvT) (expr: UExprT) =
+let exprToExecUnits gen (sizeSymbolEnv: SymbolEnvT) (expr: UExprT) =
     // number of occurrences of subexpressions
     let exprOccurrences = subExprOccurrences expr
 
@@ -88,7 +100,7 @@ let exprToExecUnits execItemsForOp trgtViewGivenSrc srcViewReqsGivenTrgt (sizeSy
     let newMemory size = 
         let mem = {Id = (List.length memAllocs); Size=size}
         memAllocs <- mem :: memAllocs
-        mem
+        MemAlloc mem
 
     // evaluation requestion
     let mutable evalRequests : EvalReqT list = []
@@ -157,10 +169,10 @@ let exprToExecUnits execItemsForOp trgtViewGivenSrc srcViewReqsGivenTrgt (sizeSy
                             |> List.map (fun s -> subres.[s].View, subres.[s].Shared, subres.[s].ExecUnitId) 
                             |> List.unzip3
                         let trgtView, trgtShared =
-                            trgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op srcViews srcShared
+                            gen.TrgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op srcViews srcShared
                        
                         // emit execution unit 
-                        let eu = {newExecUnit() with Items=execItemsForOp trgtView op srcViews;
+                        let eu = {newExecUnit() with Items=gen.ExecItemsForOp trgtView op srcViews;
                                                      DependsOn=srcExeUnitIds}                                    
                         submitExecUnit eu
 
@@ -169,7 +181,7 @@ let exprToExecUnits execItemsForOp trgtViewGivenSrc srcViewReqsGivenTrgt (sizeSy
                 if List.isEmpty srcs then onMaybeCompleted ()
                 else
                     let srcReqStorages = 
-                        srcViewReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs)                    
+                        gen.SrcViewReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs)                    
                     for src, srcReqStorage in List.zip srcs srcReqStorages do
                         submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
                             subreqResults <- subreqResults |> Map.add src (Some res)

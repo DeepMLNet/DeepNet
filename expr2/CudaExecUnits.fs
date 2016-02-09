@@ -5,6 +5,15 @@ open Op
 open ExecUnitsGen
 open System.Runtime.InteropServices
 
+
+/// variable storage location
+type VarStorageT =
+    | DevVar
+    | HostVar
+
+/// additional environment informations for CUDA
+type CudaEnvT = {VarStorage: Map<VarSpecT, VarStorageT>}
+
 /// template instantiation specification
 type TmplInstT = {FuncName: string; TmplArgs: string list; 
                   RetType: string; ArgTypes: string list;}
@@ -16,11 +25,42 @@ type WorkDimT = int * int * int
 type CudaOpT =
     // memory operations
     | MemcpyDtoD of NDArrayViewT * NDArrayViewT
-    | MemcpyHtoD of NDArrayViewT * NDArrayViewT
-    | MemcpyDtoH of NDArrayViewT * NDArrayViewT
+    | MemcpyHtoD of string * NDArrayViewT
+    | MemcpyDtoH of NDArrayViewT * string
     | Memset of float * NDArrayViewT
     // kernel execution
     | LaunchKernel of TmplInstT * WorkDimT * (obj list)
+
+/// CUDA C++ operation functor description
+type ICudaOp =
+    abstract member CTypeName : unit -> string
+    abstract member IsIndexed : unit -> bool
+
+#nowarn "9"
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type ConstEOp =
+    val Value: float32
+    new(value: float32) = {Value = value;}
+    interface ICudaOp with
+        member this.CTypeName () = "ConstEOp_t"
+        member this.IsIndexed () = false
+
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type DiagonalOneIEOp =
+    interface ICudaOp with
+        member this.CTypeName () = "DiagonalOneIEOp_t"
+        member this.IsIndexed () = true
+
+[<Struct>]
+[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+type BasicEOp =
+    val CTypeNameM: string
+    new(name: string) = {CTypeNameM = name;}
+    interface ICudaOp with
+        member this.CTypeName () = this.CTypeNameM
+        member this.IsIndexed () = false
 
 /// converts sequence of ints to sequence of strings
 let toStrSeq items =
@@ -33,9 +73,8 @@ let cudaNDArrayCType view =
     let strideStr = "<" + ((view.Offset :: view.Stride) |> toStrSeq |> String.combineWith ",") + ">"
     sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s > " dims dims shapeStr dims strideStr
 
-
 /// computes the definitive target view of an op given its source views
-let trgtViewGivenSrc memAllocator trgtShape reqView op srcViews srcShared  =
+let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShared  =
     // target that shares no elements with any srcView
     let outplaceTrgt =
         match reqView with
@@ -50,9 +89,19 @@ let trgtViewGivenSrc memAllocator trgtShape reqView op srcViews srcShared  =
 
     match op with
     // variable access
-    | LeafOp (Var vs) ->
-        // TODO: use variable memory
-        NDArrayView.newContinguous memAllocator trgtShape, false        
+    | LeafOp (Var vs) ->       
+        match cudaEnv.VarStorage |> Map.find vs with
+        | DevVar ->
+            // we assume that all device input vars are continguous
+            {Memory=ExternalMem({Name=VarSpec.name vs}) 
+             Shape=trgtShape; Offset=0; 
+             Stride=NDArray.contiguousStride trgtShape}, true
+        | HostVar ->
+            // will transfer variable from host to device during execution
+            // need continguous memory for that
+            match reqView with
+            | Some rv when NDArrayView.isContiguous rv -> rv, false
+            | _ -> NDArrayView.newContinguous memAllocator trgtShape, false        
     // tensor creation
     | LeafOp _ -> outplaceTrgt        
 
@@ -95,7 +144,7 @@ let trgtViewGivenSrc memAllocator trgtShape reqView op srcViews srcShared  =
       
 
 /// computes desired source views given desired target view
-let srcViewReqsGivenTrgt trgtShape reqView op srcShapes =
+let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
     let nSrcs = List.length srcShapes
 
     // requests all sources to use separate storage
@@ -146,35 +195,6 @@ let srcViewReqsGivenTrgt trgtShape reqView op srcShapes =
     | BinaryOp Dot -> outplaceTrgt
     | BinaryOp TensorProduct -> outplaceTrgt     
 
-type ICudaOp =
-    abstract member CTypeName : unit -> string
-    abstract member IsIndexed : unit -> bool
-
-#nowarn "9"
-[<Struct>]
-[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-type ConstEOp =
-    val Value: float32
-    new(value: float32) = {Value = value;}
-    interface ICudaOp with
-        member this.CTypeName () = "ConstEOp_t"
-        member this.IsIndexed () = false
-
-[<Struct>]
-[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-type DiagonalOneIEOp =
-    interface ICudaOp with
-        member this.CTypeName () = "DiagonalOneIEOp_t"
-        member this.IsIndexed () = true
-
-[<Struct>]
-[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-type BasicEOp =
-    val CTypeNameM: string
-    new(name: string) = {CTypeNameM = name;}
-    interface ICudaOp with
-        member this.CTypeName () = this.CTypeNameM
-        member this.IsIndexed () = false
 
 /// execution items for an elementwise operation
 let execItemsForElemwise trgtView (cOp: ICudaOp) srcViews =
@@ -210,7 +230,7 @@ let execItemsForElemwise trgtView (cOp: ICudaOp) srcViews =
 
 
 /// returns the execution units for the specified op
-let execItemsForOp trgtView op srcViews =
+let execItemsForOp cudaEnv trgtView op srcViews =
     match op with 
     // tensor creation
     | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView (DiagonalOneIEOp()) []
@@ -218,8 +238,10 @@ let execItemsForOp trgtView op srcViews =
     | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
     | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
     // variable access
-    | LeafOp (Var vs) -> []
-        
+    | LeafOp (Var vs) -> 
+        match cudaEnv.VarStorage |> Map.find vs with
+        | DevVar -> []
+        | HostVar -> [MemcpyHtoD(VarSpec.name vs, trgtView)]       
     // unary elementwise
     | UnaryOp Negate -> execItemsForElemwise trgtView (BasicEOp("NegateEOp_t")) srcViews
     | UnaryOp Log -> execItemsForElemwise trgtView (BasicEOp("LogEOp_t")) srcViews
@@ -248,7 +270,10 @@ let execItemsForOp trgtView op srcViews =
 
 
 /// generates CUDA execution units that will evaluate the given unified expression
-let exprToCudaExecUnits =
-    exprToExecUnits execItemsForOp trgtViewGivenSrc srcViewReqsGivenTrgt 
+let exprToCudaExecUnits cudaEnv =
+    exprToExecUnits {ExecItemsForOp=execItemsForOp cudaEnv; 
+                     TrgtViewGivenSrc=trgtViewGivenSrc cudaEnv;
+                     SrcViewReqsGivenTrgt=srcViewReqsGivenTrgt cudaEnv;}
+
 
 
