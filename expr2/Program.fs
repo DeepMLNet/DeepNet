@@ -9,6 +9,8 @@ open ExecUnitsGen
 open CudaExecUnits
 open StreamGen
 open CudaRecipe
+open CudaExec
+open NDArrayCuda
 
 
 let printExpr label expr =
@@ -26,7 +28,7 @@ let linearRegression () =
     let t = var "t" [symbol "M"]
 
     let pred = a.*x + b
-    let smplLoss = (pred - t)**2.0
+    let smplLoss = (pred - t)**2.0f
     let loss = sum smplLoss
 
     {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss}
@@ -58,6 +60,16 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
         |> VarEnv.add lr.x xVal
         |> VarEnv.add lr.t tVal
     EvalEnv.fromVarEnvAndExpr varEnv lr.Loss
+
+let linearRegressionCudaEnv (lr: LinearRegression) =
+    let varLocs =
+        [lr.a |> extractVar, HostVar;
+         lr.b |> extractVar, HostVar;
+         lr.x |> extractVar, HostVar;
+         lr.t |> extractVar, HostVar;]
+        |> Map.ofList
+    {CudaEnvT.VarStorLoc = varLocs}
+
 
 [<Fact>]
 let ``Build linear regression`` () =
@@ -145,8 +157,9 @@ let printStreams streams =
 let ``Build execution sequence of linear regression`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
+    let cenv = linearRegressionCudaEnv lr
     
-    let exeSeq, eRes, memAllocs = exprToCudaExecUnits env.SizeSymbolEnv (toUExpr lr.Loss)
+    let exeSeq, eRes, memAllocs = exprToCudaExecUnits cenv env.SizeSymbolEnv (toUExpr lr.Loss)
     printfn "linear regression exec sequence:\n%A" exeSeq
 
     let exeStreams, strmCnt = execUnitsToStreamCommands exeSeq
@@ -163,8 +176,9 @@ let ``Build execution sequence of linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
+    let cenv = linearRegressionCudaEnv lr
 
-    let exeSeq, eRes, memAllocs = exprToCudaExecUnits env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    let exeSeq, eRes, memAllocs = exprToCudaExecUnits cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
     //printfn "linear regression wrt A exec sequence:\n%A" exeSeq
 
     let exeStreams, strmCnt = execUnitsToStreamCommands exeSeq
@@ -181,10 +195,29 @@ let ``Build CUDA recipe for linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
+    let cenv = linearRegressionCudaEnv lr
 
-    let recipe = buildCudaRecipe env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    printfn "%A" recipe
 
     ()
+
+
+[<Fact>]
+let ``Evaluate linear regression gradient using CUDA`` () =
+    let lr = linearRegression ()
+    let lrg = linearRegressionReverseGradient lr
+    let env = linearRegressionEvalEnv lr
+    let cenv = linearRegressionCudaEnv lr
+
+    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    use cudaExpr = new CudaExprWorkspace(recipe)
+    use lockedVarEnv = new PageLockedVarEnv(env.VarEnv)
+
+    cudaExpr.Eval(Map.empty, lockedVarEnv.HostMem)
+
+    ()
+
 
 
 
@@ -201,5 +234,6 @@ let main argv =
     //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
-    ``Build CUDA recipe for linear regression gradient`` ()
+    //``Build CUDA recipe for linear regression gradient`` ()
+    ``Evaluate linear regression gradient using CUDA`` ()
     0

@@ -218,7 +218,7 @@ let generateCalls streams =
 
     generate [] [] streams, cache
 
-
+/// generates init and dispose calls for CUDA resources
 let generateInitAndDispose memAllocs streamCnt eventObjCnt =
     let memAllocCalls = 
         memAllocs 
@@ -249,6 +249,7 @@ let generateInitAndDispose memAllocs streamCnt eventObjCnt =
 
     memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
 
+/// builds a CUDA recipe for the given unified expression
 let buildCudaRecipe cudaEnv sizeSymbolEnv expr =
     let execUnits, exprRes, memAllocs = exprToCudaExecUnits cudaEnv sizeSymbolEnv expr
     let streams, eventObjCnt = execUnitsToStreamCommands execUnits

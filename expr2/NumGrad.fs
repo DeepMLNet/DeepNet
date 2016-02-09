@@ -20,7 +20,7 @@ let numGradEpsilon epsilon f x =
     j
 
 /// evaluates the Jacobian of f at x numerically
-let numGrad = numGradEpsilon 1e-5
+let numGrad = numGradEpsilon 1e-5f
 
 let exprGradDiff evalEnv wrt expr =
     let g = ExprForwardDiff.grad wrt expr
@@ -49,7 +49,7 @@ let reverseDiffDeviations evalEnv expr =
     devs
 
 let reverseDiffDeviationsOkay evalEnv expr =
-    let maxDeviation = 1e-4
+    let maxDeviation = 1e-4f
     reverseDiffDeviations evalEnv expr |> Map.iter
         (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %s = %f" name dev)
     reverseDiffDeviations evalEnv expr |> Map.forall (fun _ dev -> dev < maxDeviation) 

@@ -37,7 +37,7 @@ let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : VarDiffs =
     | Unary(op, a) ->
         match op with
         | Negate -> -eg |> reverseDiffStep a
-        | Log -> egExpanded * (padLeft a) ** -1. |> collapse |> reverseDiffStep a
+        | Log -> egExpanded * (padLeft a) ** -1.0f |> collapse |> reverseDiffStep a
         | Exp -> egExpanded * (padLeft expr) |> collapse |> reverseDiffStep a
         | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
         | Reshape ss -> eg |> reverseDiffStep a
@@ -73,8 +73,8 @@ let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : VarDiffs =
         | Substract -> eg .+ (-eg)
         | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
                       ((egExpanded * (padLeft a)) |> collapse)
-        | Divide -> eg |> reverseDiffStep (a * b ** -1.)
-        | Power -> (egExpanded * padLeft (b * a**(b-1.)) |> collapse) .+ 
+        | Divide -> eg |> reverseDiffStep (a * b ** -1.0f)
+        | Power -> (egExpanded * padLeft (b * a**(b-1.0f)) |> collapse) .+ 
                    (egExpanded * padLeft (a**b * log a) |> collapse)
         | Dot -> 
             /// Jacobian of y = m .* x wrt x

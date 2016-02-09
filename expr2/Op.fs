@@ -23,8 +23,8 @@ type LeafOpT =
     // tensor creation
     | DiagonalOne of ShapeSpecT                /// tensor with 1 on diagonal of given shape
     | Zeros of ShapeSpecT                   /// zero tensor of given shape
-    | ScalarConst of float                  /// scalar of given value
-    | TensorConst of float * ShapeSpecT     /// tensor of given shape filled with given value
+    | ScalarConst of single                  /// scalar of given value
+    | TensorConst of single * ShapeSpecT     /// tensor of given shape filled with given value
     // variable access
     | Var of VarSpecT                       /// variable read
 
@@ -273,17 +273,17 @@ type ExprT with
     static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b
 
     // elementwise binary with float
-    static member (+) (a: ExprT, b: float) = a + (scalar b)
-    static member (-) (a: ExprT, b: float) = a - (scalar b)
-    static member (*) (a: ExprT, b: float) = a * (scalar b)
-    static member (/) (a: ExprT, b: float) = a / (scalar b)
-    static member Pow (a: ExprT, b: float) = a ** (scalar b)
+    static member (+) (a: ExprT, b: single) = a + (scalar b)
+    static member (-) (a: ExprT, b: single) = a - (scalar b)
+    static member (*) (a: ExprT, b: single) = a * (scalar b)
+    static member (/) (a: ExprT, b: single) = a / (scalar b)
+    static member Pow (a: ExprT, b: single) = a ** (scalar b)
 
-    static member (+) (a: float, b: ExprT) = (scalar a) + b
-    static member (-) (a: float, b: ExprT) = (scalar a) - b
-    static member (*) (a: float, b: ExprT) = (scalar a) * b
-    static member (/) (a: float, b: ExprT) = (scalar a) / b
-    static member Pow (a: float, b: ExprT) = (scalar a) ** b
+    static member (+) (a: single, b: ExprT) = (scalar a) + b
+    static member (-) (a: single, b: ExprT) = (scalar a) - b
+    static member (*) (a: single, b: ExprT) = (scalar a) * b
+    static member (/) (a: single, b: ExprT) = (scalar a) / b
+    static member Pow (a: single, b: ExprT) = (scalar a) ** b
 
     // transposition
     static member Pow (a: ExprT, b: T) = transpose a 

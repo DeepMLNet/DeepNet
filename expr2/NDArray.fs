@@ -8,7 +8,7 @@ let CheckFinite = true
 /// if value is NaN or Inf throws an ArithmeticException
 let inline checkFiniteVal value =
     if CheckFinite then
-        if System.Double.IsInfinity(value) || System.Double.IsNaN(value) then
+        if System.Single.IsInfinity(value) || System.Single.IsNaN(value) then
             raise (System.ArithmeticException("non-finite value encountered"))
 
 /// an N-dimensional array with reshape and subview abilities
@@ -16,7 +16,7 @@ type NDArray =
     {Shape: int list;
      Stride: int list; 
      Offset: int;
-     Data: float[]}
+     Data: single[]}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +272,7 @@ let zerosLike a =
 let ones shape =
     let a = newContinguous shape
     for idx in allIdx shape do
-        set idx 1. a
+        set idx 1.0f a
     a
 
 /// NDArray of same shape as a filled with ones.
@@ -284,7 +284,7 @@ let identity shape =
     let a = zeros shape
     let ndim = List.length shape
     for i = 0 to (List.min shape) - 1 do
-        set (List.replicate ndim i) 1. a
+        set (List.replicate ndim i) 1.0f a
     a
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +292,7 @@ let identity shape =
 ////////////////////////////////////////////////////////////////////////////////////////////////   
       
 /// Applies the given function elementwise to the given NDArray.
-let elemwise (f: float -> float) a =
+let elemwise (f: single -> single) a =
     let c = zerosLike a
     for idx in allIdx (shape a) do
         let cv = f (get idx a)
@@ -301,7 +301,7 @@ let elemwise (f: float -> float) a =
     c
             
 /// Applies the given binary function elementwise to the two given NDArrays.
-let elemwise2 (f: float -> float -> float) a b =
+let elemwise2 (f: single -> single -> single) a b =
     let a, b = broadcastToSame a b
     let c = zerosLike a
     for idx in allIdx (shape a) do
@@ -377,7 +377,7 @@ let sumAxis = axisReduce sum
     
 /// elementwise product
 let product a =
-    allElems a |> Seq.fold (*) 1. |> scalar
+    allElems a |> Seq.fold (*) 1.0f |> scalar
 
 /// elementwise product over given axis
 let productAxis = axisReduce product 
@@ -507,17 +507,17 @@ type NDArray with
     static member Pow (a: NDArray, b: NDArray) = power a b
 
     // elementwise binary with float
-    static member (+) (a: NDArray, b: float) = a + (scalar b)
-    static member (-) (a: NDArray, b: float) = a - (scalar b)
-    static member (*) (a: NDArray, b: float) = a * (scalar b)
-    static member (/) (a: NDArray, b: float) = a / (scalar b)
-    static member Pow (a: NDArray, b: float) = a ** (scalar b)
+    static member (+) (a: NDArray, b: single) = a + (scalar b)
+    static member (-) (a: NDArray, b: single) = a - (scalar b)
+    static member (*) (a: NDArray, b: single) = a * (scalar b)
+    static member (/) (a: NDArray, b: single) = a / (scalar b)
+    static member Pow (a: NDArray, b: single) = a ** (scalar b)
 
-    static member (+) (a: float, b: NDArray) = (scalar a) + b
-    static member (-) (a: float, b: NDArray) = (scalar a) - b
-    static member (*) (a: float, b: NDArray) = (scalar a) * b
-    static member (/) (a: float, b: NDArray) = (scalar a) / b
-    static member Pow (a: float, b: NDArray) = (scalar a) ** b
+    static member (+) (a: single, b: NDArray) = (scalar a) + b
+    static member (-) (a: single, b: NDArray) = (scalar a) - b
+    static member (*) (a: single, b: NDArray) = (scalar a) * b
+    static member (/) (a: single, b: NDArray) = (scalar a) / b
+    static member Pow (a: single, b: NDArray) = (scalar a) ** b
 
     // transposition
     static member Pow (a: NDArray, b: T) = transpose a 

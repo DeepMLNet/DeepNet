@@ -57,7 +57,7 @@ let eval (evalEnv: EvalEnvT) expr =
         match expr with
             | Leaf(op) ->
                 match op with
-                | DiagonalOne ss ->  identity (shapeEval ss)
+                | DiagonalOne ss -> identity (shapeEval ss)
                 | Zeros ss -> zeros (shapeEval ss)
                 | ScalarConst f -> scalar f
                 | TensorConst(f, ss) -> scalar f |> broadcastToShape (shapeEval ss) 

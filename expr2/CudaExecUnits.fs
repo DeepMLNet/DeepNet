@@ -7,12 +7,12 @@ open System.Runtime.InteropServices
 
 
 /// variable storage location
-type VarStorageT =
+type VarStorLocT =
     | DevVar
     | HostVar
 
 /// additional environment informations for CUDA
-type CudaEnvT = {VarStorage: Map<VarSpecT, VarStorageT>}
+type CudaEnvT = {VarStorLoc: Map<VarSpecT, VarStorLocT>}
 
 /// template instantiation specification
 type TmplInstT = {FuncName: string; TmplArgs: string list; 
@@ -27,7 +27,7 @@ type CudaOpT =
     | MemcpyDtoD of NDArrayViewT * NDArrayViewT
     | MemcpyHtoD of string * NDArrayViewT
     | MemcpyDtoH of NDArrayViewT * string
-    | Memset of float * NDArrayViewT
+    | Memset of single * NDArrayViewT
     // kernel execution
     | LaunchKernel of TmplInstT * WorkDimT * (obj list)
 
@@ -40,8 +40,8 @@ type ICudaOp =
 [<Struct>]
 [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
 type ConstEOp =
-    val Value: float32
-    new(value: float32) = {Value = value;}
+    val Value: single
+    new(value: single) = {Value = value;}
     interface ICudaOp with
         member this.CTypeName () = "ConstEOp_t"
         member this.IsIndexed () = false
@@ -90,7 +90,7 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
     match op with
     // variable access
     | LeafOp (Var vs) ->       
-        match cudaEnv.VarStorage |> Map.find vs with
+        match cudaEnv.VarStorLoc |> Map.find vs with
         | DevVar ->
             // we assume that all device input vars are continguous
             {Memory=ExternalMem({Name=VarSpec.name vs}) 
@@ -235,11 +235,11 @@ let execItemsForOp cudaEnv trgtView op srcViews =
     // tensor creation
     | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView (DiagonalOneIEOp()) []
     | LeafOp (Zeros _) -> execItemsForElemwise trgtView (BasicEOp("ZerosEOp_t")) []
-    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
-    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (ConstEOp(float32 f)) []
+    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (ConstEOp(f)) []
+    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (ConstEOp(f)) []
     // variable access
     | LeafOp (Var vs) -> 
-        match cudaEnv.VarStorage |> Map.find vs with
+        match cudaEnv.VarStorLoc |> Map.find vs with
         | DevVar -> []
         | HostVar -> [MemcpyHtoD(VarSpec.name vs, trgtView)]       
     // unary elementwise

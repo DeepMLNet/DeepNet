@@ -54,7 +54,7 @@ let rec grad wrt expr =
 
         match op with
         | Negate -> -ga
-        | Log -> a ** -1. * ga
+        | Log -> a ** -1.0f * ga
         | Exp -> exp a * ga
         | SwapDim (ax1, ax2) -> gaExpanded |> swapDim ax1 ax2 |> collapse
         | Reshape ss -> ga 
@@ -79,8 +79,8 @@ let rec grad wrt expr =
         | Add -> ga .+ gb
         | Substract -> ga - gb
         | Multiply -> ga * (padRight b) .+ (padRight a) * gb 
-        | Divide -> subgrad (a * b ** -1.)
-        | Power -> padRight (a**(b-1.) * b) * ga .+ padRight (a**b * log a) * gb
+        | Divide -> subgrad (a * b ** -1.0f)
+        | Power -> padRight (a**(b-1.0f) * b) * ga .+ padRight (a**b * log a) * gb
         | Dot -> 
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                 | 1, 1 -> subgrad (sum(a * b))

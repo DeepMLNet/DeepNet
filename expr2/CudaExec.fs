@@ -46,8 +46,8 @@ let loadCudaCode modName modCode krnlNames =
     jitOpts.Add(jitInfoBuffer)
     use jitErrorBuffer = new CudaJOErrorLogBuffer(10000)   
     jitOpts.Add(jitErrorBuffer)
-    use jitLogVerbose = new CudaJOLogVerbose(true)
-    jitOpts.Add(jitLogVerbose)
+    //use jitLogVerbose = new CudaJOLogVerbose(true)
+    //jitOpts.Add(jitLogVerbose)
 
     let cuMod = cudaCntxt.LoadModulePTX(ptx, jitOpts)
 
@@ -102,16 +102,6 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     /// memory allocation to CUDA memory mapping
     let internalMem = new Dictionary<MemAllocT, CudaDeviceVariable<single>>()
 
-    /// get memory allocation for device memory
-    let getMem mem =
-        match mem with
-        | DevMemAlloc ma -> internalMem.[ma]
-        | DevExternalMem em -> externalMem.[em]
-
-    /// get memory allocation for host memory
-    let getHostMem mem =
-        hostMem.[mem]
-
     /// all kernel calls
     let kernelCalls = CudaRecipe.getAllCKernelLaunches recipe
 
@@ -154,6 +144,17 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     let execCalls (externalMem: Map<ExternalMemT, CudaDeviceVariable<single>>)
                   (hostMem:     Map<HostExternalMemT, CudaPageLockedHostMemory<single>>) 
                   calls =
+
+        /// get memory allocation for device memory
+        let getMem mem =
+            match mem with
+            | DevMemAlloc ma -> internalMem.[ma]
+            | DevExternalMem em -> externalMem.[em]
+
+        /// get memory allocation for host memory
+        let getHostMem mem =
+            hostMem.[mem]
+
         for call in calls do
             match call with 
             // memory management
@@ -220,6 +221,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
                 kernels.[krnl].BlockDimensions <- toDim3 blockDim
                 kernels.[krnl].GridDimensions <- toDim3 gridDim
                 kernels.[krnl].DynamicSharedMemory <- uint32 smemSize
+                // TODO: need to fill in memory references
                 kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
             | LaunchCPPKernel _ ->
                 failwith "cannot launch C++ kernel from CudaExec"
@@ -236,6 +238,8 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     member this.Eval(externalMem: Map<ExternalMemT, CudaDeviceVariable<single>>,
                      hostMem:     Map<HostExternalMemT, CudaPageLockedHostMemory<single>>) =
         execCalls externalMem hostMem recipe.ExecCalls
+        cudaCntxt.Synchronize () // TODO: remove and signal otherwise
+
 
 
 
