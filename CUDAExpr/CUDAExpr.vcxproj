@@ -168,7 +168,9 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="NDSupport.cuh" />
     <ClInclude Include="Ops.cuh" />
     <ClInclude Include="Utils.cuh" />
-    <CudaCompile Include="..\expr2\bin\Debug\mod1.cu" />
+    <CudaCompile Include="..\expr2\bin\Debug\mod1.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </CudaCompile>
     <CudaCompile Include="Test.cu" />
   </ItemGroup>
   <ItemGroup>

@@ -1,9 +1,11 @@
 #pragma once
 
+#ifndef __CUDACC_RTC__
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#endif
 
-#define _dev __host__ __device__ __forceinline__ inline
+#define _dev __host__ __device__ __forceinline__ 
 
 
 template <typename T>

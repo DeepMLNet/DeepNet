@@ -36,6 +36,10 @@ module NDArrayView =
     let nDim a =
         List.length a.Shape
 
+    /// number of elements
+    let nElems a =
+        List.fold (*) 1 a.Shape
+
     /// true if views a and b have at least one element in common
     let overlapping a b = false // TODO
     

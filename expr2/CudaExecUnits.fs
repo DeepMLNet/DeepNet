@@ -178,23 +178,24 @@ type BasicEOp =
 
 /// execution items for an elementwise operation
 let execItemsForElemwise trgtView (cOp: ICudaOp) srcViews =
-    for srcView in srcViews do
-        if trgtView.Shape <> srcView.Shape then
-            failwithf "source has different shape %A than target %A for elemewise op %A"
-                trgtView.Shape srcView.Shape cOp
+    if srcViews |> List.exists (fun sv -> NDArrayView.nElems trgtView <> NDArrayView.nElems sv) then
+        failwithf "sources have different number of elements than target"
+    let hetero = srcViews |> List.exists (fun sv -> trgtView.Shape <> sv.Shape)
 
     let nSrc = List.length srcViews
     let viewArgTypes = cudaNDArrayCType trgtView :: (List.map cudaNDArrayCType srcViews)
     let viewArgTypesPntrs = viewArgTypes |> List.map (fun at -> at + " *")
     let indexedStr = if cOp.IsIndexed() then "Indexed" else ""
+    let heteroStr = if hetero then "Heterogenous" else ""
     let kernel = 
-        {FuncName=sprintf "elemwise%dAry%dD%s" nSrc (NDArrayView.nDim trgtView) indexedStr;
+        {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (NDArrayView.nDim trgtView) indexedStr heteroStr;
          TmplArgs=cOp.CTypeName() :: viewArgTypes;
          RetType="void";
          ArgTypes=cOp.CTypeName() :: viewArgTypesPntrs}
 
     let workDim = 
         match NDArrayView.nDim trgtView with
+        | _ when hetero -> (NDArrayView.nElems trgtView, 1, 1)
         | 0 -> (1, 1, 1)
         | 1 -> (trgtView.Shape.[0], 1, 1)
         | 2 -> (trgtView.Shape.[0], trgtView.Shape.[1], 1)
@@ -242,8 +243,8 @@ let execItemsForOp trgtView op srcViews =
     | BinaryOp Divide -> execItemsForElemwise trgtView (BasicEOp("DivideEOp_t")) srcViews
     | BinaryOp Power -> execItemsForElemwise trgtView (BasicEOp("PowerEOp_t")) srcViews
     // matrix/tensor operations
-    | BinaryOp Dot -> execItemsForElemwise trgtView (BasicEOp("Dot")) srcViews // TODO
-    | BinaryOp TensorProduct -> execItemsForElemwise trgtView (BasicEOp("TensorProduct")) srcViews // TODO
+    | BinaryOp Dot -> [] // TODO
+    | BinaryOp TensorProduct -> [] // TODO
 
 
 /// generates CUDA execution units that will evaluate the given unified expression

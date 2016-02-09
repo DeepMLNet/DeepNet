@@ -4,6 +4,18 @@
 
 // ======================== dimensionality: 0 ==================================
 
+class Pos0D {
+public:
+    template<typename TNDArray>
+   _dev static Pos0D fromIdx(size_t idx) {
+     Pos0D p;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return 0;
+   }
+};
+
 class Shape0D {
 public:
   	_dev static size_t shape(const size_t dim) {
@@ -19,12 +31,16 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index() {
+      return offset_ + 0;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + 0;
+    }
+  	_dev static size_t index(const Pos0D &pos) {
       return offset_ + 0;
     }
 };
@@ -40,6 +56,7 @@ public:
   _dev static size_t size() {
     return 1;
   }
+  _dev static Pos0D idxToPos(size_t idx) { return Pos0D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element() {
@@ -47,6 +64,18 @@ public:
   }
   _dev const float &element() const {
     return data()[Stride::index()];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos0D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos0D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -67,6 +96,20 @@ _dev void elemwise0Ary0D(const TElemwiseOp &op, TTarget *trgt) {
 
 }
 
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary0DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary0DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
 
@@ -82,6 +125,20 @@ _dev void elemwise1Ary0D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
 
   trgt->element() = op(src0->element());
 
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary0DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
 }
 
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
@@ -101,7 +158,37 @@ _dev void elemwise2Ary0D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
 
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary0DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
+    }
+    }
+}
+
 // ======================== dimensionality: 1 ==================================
+
+class Pos1D {
+public:
+   size_t pos[1];
+    template<typename TNDArray>
+   _dev static Pos1D fromIdx(size_t idx) {
+     Pos1D p;
+     const size_t incr0 = 1;
+     p.pos[0] = idx / incr0;
+     idx -= p.pos[0] * incr0;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return pos[dim];
+   }
+};
 
 template <size_t shape0>
 class Shape1D {
@@ -123,13 +210,17 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index(const size_t pos0) {
       return offset_ + stride0 * pos0;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + stride0 * pos[0];
+    }
+  	_dev static size_t index(const Pos1D &pos) {
+      return offset_ + stride0 * pos[0];
     }
 };
 
@@ -144,6 +235,7 @@ public:
   _dev static size_t size() {
     return shape(0);
   }
+  _dev static Pos1D idxToPos(size_t idx) { return Pos1D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0) {
@@ -151,6 +243,18 @@ public:
   }
   _dev const float &element(size_t pos0) const {
     return data()[Stride::index(pos0)];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos1D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos1D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -178,6 +282,20 @@ _dev void elemwise0Ary1D(const TElemwiseOp &op, TTarget *trgt) {
     if ((pos0 < trgt->shape(0))) {
 
   trgt->element(pos0) = op();
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary1DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
 
     }
     }
@@ -212,6 +330,20 @@ _dev void elemwise1Ary1D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary1DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary1DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
@@ -241,7 +373,40 @@ _dev void elemwise2Ary1D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary1DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
+    }
+    }
+}
+
 // ======================== dimensionality: 2 ==================================
+
+class Pos2D {
+public:
+   size_t pos[2];
+    template<typename TNDArray>
+   _dev static Pos2D fromIdx(size_t idx) {
+     Pos2D p;
+     const size_t incr0 = 1;
+     const size_t incr1 = incr0 * TNDArray::shape(0);
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[0] = idx / incr0;
+     idx -= p.pos[0] * incr0;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return pos[dim];
+   }
+};
 
 template <size_t shape0, size_t shape1>
 class Shape2D {
@@ -265,13 +430,17 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index(const size_t pos0, const size_t pos1) {
       return offset_ + stride0 * pos0 + stride1 * pos1;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1];
+    }
+  	_dev static size_t index(const Pos2D &pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1];
     }
 };
 
@@ -286,6 +455,7 @@ public:
   _dev static size_t size() {
     return shape(0) * shape(1);
   }
+  _dev static Pos2D idxToPos(size_t idx) { return Pos2D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1) {
@@ -293,6 +463,18 @@ public:
   }
   _dev const float &element(size_t pos0, size_t pos1) const {
     return data()[Stride::index(pos0, pos1)];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos2D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos2D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -329,6 +511,20 @@ _dev void elemwise0Ary2D(const TElemwiseOp &op, TTarget *trgt) {
   trgt->element(pos0, pos1) = op();
 
     }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary2DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
+
     }
     }
 }
@@ -370,6 +566,20 @@ _dev void elemwise1Ary2D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary2DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary2DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
@@ -407,7 +617,43 @@ _dev void elemwise2Ary2D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary2DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
+    }
+    }
+}
+
 // ======================== dimensionality: 3 ==================================
+
+class Pos3D {
+public:
+   size_t pos[3];
+    template<typename TNDArray>
+   _dev static Pos3D fromIdx(size_t idx) {
+     Pos3D p;
+     const size_t incr0 = 1;
+     const size_t incr1 = incr0 * TNDArray::shape(0);
+     const size_t incr2 = incr1 * TNDArray::shape(1);
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[0] = idx / incr0;
+     idx -= p.pos[0] * incr0;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return pos[dim];
+   }
+};
 
 template <size_t shape0, size_t shape1, size_t shape2>
 class Shape3D {
@@ -433,13 +679,17 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2) {
       return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2];
+    }
+  	_dev static size_t index(const Pos3D &pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2];
     }
 };
 
@@ -454,6 +704,7 @@ public:
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2);
   }
+  _dev static Pos3D idxToPos(size_t idx) { return Pos3D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2) {
@@ -461,6 +712,18 @@ public:
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2) const {
     return data()[Stride::index(pos0, pos1, pos2)];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos3D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos3D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -505,6 +768,20 @@ _dev void elemwise0Ary3D(const TElemwiseOp &op, TTarget *trgt) {
 
     }
     }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary3DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
+
     }
     }
 }
@@ -554,6 +831,20 @@ _dev void elemwise1Ary3D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary3DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary3DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
@@ -599,7 +890,46 @@ _dev void elemwise2Ary3D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary3DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
+    }
+    }
+}
+
 // ======================== dimensionality: 4 ==================================
+
+class Pos4D {
+public:
+   size_t pos[4];
+    template<typename TNDArray>
+   _dev static Pos4D fromIdx(size_t idx) {
+     Pos4D p;
+     const size_t incr0 = 1;
+     const size_t incr1 = incr0 * TNDArray::shape(0);
+     const size_t incr2 = incr1 * TNDArray::shape(1);
+     const size_t incr3 = incr2 * TNDArray::shape(2);
+     p.pos[3] = idx / incr3;
+     idx -= p.pos[3] * incr3;
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[0] = idx / incr0;
+     idx -= p.pos[0] * incr0;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return pos[dim];
+   }
+};
 
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3>
 class Shape4D {
@@ -627,13 +957,17 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3) {
       return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2] + stride3 * pos[3];
+    }
+  	_dev static size_t index(const Pos4D &pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2] + stride3 * pos[3];
     }
 };
 
@@ -648,6 +982,7 @@ public:
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3);
   }
+  _dev static Pos4D idxToPos(size_t idx) { return Pos4D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
@@ -655,6 +990,18 @@ public:
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) const {
     return data()[Stride::index(pos0, pos1, pos2, pos3)];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos4D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos4D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -711,6 +1058,20 @@ _dev void elemwise0Ary4D(const TElemwiseOp &op, TTarget *trgt) {
 
     }
     }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary4DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
+
     }
     }
 }
@@ -772,6 +1133,20 @@ _dev void elemwise1Ary4D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary4DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary4DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
@@ -829,7 +1204,49 @@ _dev void elemwise2Ary4D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary4DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
+    }
+    }
+}
+
 // ======================== dimensionality: 5 ==================================
+
+class Pos5D {
+public:
+   size_t pos[5];
+    template<typename TNDArray>
+   _dev static Pos5D fromIdx(size_t idx) {
+     Pos5D p;
+     const size_t incr0 = 1;
+     const size_t incr1 = incr0 * TNDArray::shape(0);
+     const size_t incr2 = incr1 * TNDArray::shape(1);
+     const size_t incr3 = incr2 * TNDArray::shape(2);
+     const size_t incr4 = incr3 * TNDArray::shape(3);
+     p.pos[4] = idx / incr4;
+     idx -= p.pos[4] * incr4;
+     p.pos[3] = idx / incr3;
+     idx -= p.pos[3] * incr3;
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[0] = idx / incr0;
+     idx -= p.pos[0] * incr0;
+     return p;
+   }
+  	_dev size_t operator[] (const size_t dim) const {
+     return pos[dim];
+   }
+};
 
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3, size_t shape4>
 class Shape5D {
@@ -859,13 +1276,17 @@ public:
         default: return 0;
       }
     }
-
    _dev static size_t offset() {
       return offset_;
     }
-
   	_dev static size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3, const size_t pos4) {
       return offset_ + stride0 * pos0 + stride1 * pos1 + stride2 * pos2 + stride3 * pos3 + stride4 * pos4;
+    }
+  	_dev static size_t index(const size_t *pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2] + stride3 * pos[3] + stride4 * pos[4];
+    }
+  	_dev static size_t index(const Pos5D &pos) {
+      return offset_ + stride0 * pos[0] + stride1 * pos[1] + stride2 * pos[2] + stride3 * pos[3] + stride4 * pos[4];
     }
 };
 
@@ -880,6 +1301,7 @@ public:
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3) * shape(4);
   }
+  _dev static Pos5D idxToPos(size_t idx) { return Pos5D::fromIdx<Shape>(idx); }
   _dev float *data() { return reinterpret_cast<float *>(this); }
   _dev const float *data() const { return reinterpret_cast<const float *>(this); }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {
@@ -887,6 +1309,18 @@ public:
   }
   _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) const {
     return data()[Stride::index(pos0, pos1, pos2, pos3, pos4)];
+  }
+  _dev float &element(const size_t *pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const size_t *pos) const {
+    return data()[Stride::index(pos)];
+  }
+  _dev float &element(const Pos5D &pos) {
+    return data()[Stride::index(pos)];
+  }
+  _dev const float &element(const Pos5D &pos) const {
+    return data()[Stride::index(pos)];
   }
 };
 
@@ -949,6 +1383,20 @@ _dev void elemwise0Ary5D(const TElemwiseOp &op, TTarget *trgt) {
 
     }
     }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0Ary5DHeterogenous(const TElemwiseOp &op, TTarget *trgt) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op();
+
     }
     }
 }
@@ -1016,6 +1464,20 @@ _dev void elemwise1Ary5D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
     }
 }
 
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1Ary5DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)));
+
+    }
+    }
+}
+
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary5DIndexed(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
 
@@ -1075,6 +1537,20 @@ _dev void elemwise2Ary5D(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0
 
     }
     }
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2Ary5DHeterogenous(const TElemwiseOp &op, TTarget *trgt, const TSrc0 *src0, const TSrc1 *src1) {
+
+    const size_t iters = TTarget::size() / (gridDim.x * blockDim.x) + 1;
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < TTarget::size()) {
+
+  trgt->element(trgt->idxToPos(idx)) = op(src0->element(src0->idxToPos(idx)), src1->element(src1->idxToPos(idx)));
+
     }
     }
 }

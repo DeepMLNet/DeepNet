@@ -199,7 +199,8 @@ let loadCudaCode modName modCode krnlNames =
     let includePath = assemblyDirectory
 
     use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-    let cmplrArgs = [|sprintf "--gpu-architecture=%s" gpuArch; 
+    let cmplrArgs = [|"--std=c++11";
+                      sprintf "--gpu-architecture=%s" gpuArch; 
                       sprintf "--include-path=\"%s\"" includePath|]
 
     printfn "CUDA compilation of %s with arguments \"%s\":" modName (cmplrArgs |> String.combineWith " ")
@@ -210,13 +211,13 @@ let loadCudaCode modName modCode krnlNames =
         printfn "Compile error:"
         let log = cmplr.GetLogAsString()
         printfn "%s" log
-
         exit 1
+    let ptx = cmplr.GetPTX()
     
     let log = cmplr.GetLogAsString()
     printfn "%s" log
 
-    let ptx = cmplr.GetPTX()
+    printfn "CUDA jitting of %s:" modName
     use jitOpts = new CudaJitOptionCollection()
     use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
     jitOpts.Add(jitInfoBuffer)
@@ -228,7 +229,6 @@ let loadCudaCode modName modCode krnlNames =
     let cuMod = cudaCntxt.LoadModulePTX(ptx, jitOpts)
 
     jitOpts.UpdateValues()
-    printfn "CUDA jitting of %s:" modName
     printfn "%s" jitErrorBuffer.Value
     printfn "%s" jitInfoBuffer.Value   
     jitErrorBuffer.FreeHandle()
@@ -241,8 +241,8 @@ let loadCudaCode modName modCode krnlNames =
             Map.empty
     krnls
 
-let dumpCudaCode modName (modCode : string) =
-    let filename = sprintf "%s.cu" modName
+let dumpCudaCode (modName: string) (modCode: string) =
+    let filename = modName
     use tw = new System.IO.StreamWriter(filename)
     tw.Write(modCode)
     printfn "Wrote CUDA module code to %s" filename
@@ -263,7 +263,7 @@ let emptyCudaRecipe = {KernelInst = {Insts=[]; Code=""};
 let mutable cudaModuleCounter = 0
 let generateCudaModuleName () =
     cudaModuleCounter <- cudaModuleCounter + 1
-    sprintf "mod%d" cudaModuleCounter
+    sprintf "mod%d.cu" cudaModuleCounter
 
 let cudaModuleHeader =
     "#include \"NDSupport.cuh\"\n\

@@ -4,7 +4,7 @@
 
 
 struct DiagonalOneIEOp_t {
-	_dev float operator() (const size_t *pos, const size_t dims) {
+	_dev float operator() (const size_t *pos, const size_t dims) const {
 		if (dims == 0) {
 			return 1.0;
 		} else {
@@ -28,9 +28,9 @@ struct DiagonalOneIEOp_t {
 
 struct ConstEOp_t
 {
-	ConstEOp_t(float value) : value(value) {}
+	_dev ConstEOp_t(float value) : value(value) {}
 
-	_dev float operator() ()
+	_dev float operator() () const
 	{
 		return value;
 	}
@@ -41,7 +41,7 @@ struct ConstEOp_t
 
 struct NegateEOp_t
 {
-	_dev float operator() (float a)
+	_dev float operator() (float a) const
 	{
 		return -a;
 	}
@@ -50,7 +50,7 @@ struct NegateEOp_t
 
 struct LogEOp_t
 {
-	_dev float operator() (float a)
+	_dev float operator() (float a) const
 	{
 		return logf(a);
 	}
@@ -59,7 +59,7 @@ struct LogEOp_t
 
 struct ExpEOp_t
 {
-	_dev float operator() (float a)
+	_dev float operator() (float a) const
 	{
 		return expf(a);
 	}
@@ -67,7 +67,7 @@ struct ExpEOp_t
 
 struct IdEOp_t
 {
-	_dev float operator() (float a)
+	_dev float operator() (float a) const
 	{
 		return a;
 	}
@@ -76,7 +76,7 @@ struct IdEOp_t
 
 struct AddEOp_t
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
 		return a + b;
 	}
@@ -84,7 +84,7 @@ struct AddEOp_t
 
 struct SubstractEOp_t
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
 		return a - b;
 	}
@@ -92,7 +92,7 @@ struct SubstractEOp_t
 
 struct MultiplyEOp_t
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
 		return a * b;
 	}
@@ -100,7 +100,7 @@ struct MultiplyEOp_t
 
 struct DivideEOp_t
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
 		return a / b;
 	}
@@ -108,7 +108,7 @@ struct DivideEOp_t
 
 struct PowerEOp_t
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
 		return powf(a, b);
 	}
@@ -120,9 +120,9 @@ struct PowerEOp_t
 // TODO: dummy
 struct Dot
 {
-	_dev float operator() (float a, float b)
+	_dev float operator() (float a, float b) const
 	{
-		return 111.1;
+		return 111.1f;
 	}
 };
 
