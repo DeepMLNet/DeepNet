@@ -30,8 +30,11 @@ module DataLock =
     type DataLockT<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> 
         (data: obj, pinHnd: GCHandle, cudaMem: CudaRegisteredHostMemory<'a>) =
            
+        let mutable disposed = false
+
         interface IDisposable with
             member this.Dispose() =          
+                disposed <- true
                 if decrRefCount data then            
                     // unregister memory
                     cudaMem.Unregister() 
@@ -41,13 +44,25 @@ module DataLock =
                     pinHnd.Free()
 
         /// the data array
-        member this.Data = data
+        member this.Data = 
+            if disposed then failwith "DataLock is disposed"
+            data
+
+        member this.Data_ = data
 
         /// GC memory pin handle
-        member this.PinHnd = pinHnd
+        member this.PinHnd = 
+            if disposed then failwith "DataLock is disposed"
+            pinHnd
+
+        member this.PinHnd_ = pinHnd
 
         /// the CudaRegisteredHostMemory
-        member this.CudaRegisteredMemory = cudaMem
+        member this.CudaRegisteredMemory = 
+            if disposed then failwith "DataLock is disposed"
+            cudaMem
+
+        member this.CudaRegisteredMemory_ = cudaMem
 
     /// gets handle for already locked data           
     let get<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> (data: 'a array) =      
@@ -55,7 +70,7 @@ module DataLock =
             failwithf "%A is not registered data" data
         registeredCount.[data] <- registeredCount.[data] + 1
         let dr = dataRegistrations.[data] :?> DataLockT<'a>
-        new DataLockT<'a>(dr.Data, dr.PinHnd, dr.CudaRegisteredMemory)   
+        new DataLockT<'a>(dr.Data_, dr.PinHnd_, dr.CudaRegisteredMemory_)   
         
     /// gets the CudaRegisteredMemory for already locked data without increment the reference count
     let getCudaRegisteredMemory<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> (data: 'a array) =
@@ -75,7 +90,7 @@ module DataLock =
             let dataByteSize = dataElements * sizeof<'a>
 
             // construct cuda memory handle
-            let cudaMem = new CudaRegisteredHostMemory<'a>(dataAddr, BasicTypes.SizeT(dataElements))    
+            let cudaMem = new CudaRegisteredHostMemory<'a>(dataAddr, BasicTypes.SizeT(dataByteSize))    
             // register memory
             cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
 

@@ -113,7 +113,7 @@ type NDArrayPtrArgTmpl (view: NDArrayViewT) =
             let dims = NDArrayView.nDim view
             let shapeStr = if dims = 0 then "" else "<" + (view.Shape |> intToStrSeq |> String.combineWith ",") + ">"
             let strideStr = "<" + ((view.Offset :: view.Stride) |> intToStrSeq |> String.combineWith ",") + ">"
-            sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s> *" dims dims shapeStr dims strideStr            
+            sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s>" dims dims shapeStr dims strideStr            
 
         member this.CPPTypeName = (this :> ICudaArgTmpl).CPPTypeNameWithoutPtr + " *"
 
