@@ -64,3 +64,7 @@ let assemblyDirectory =
     let uri = new System.UriBuilder(codeBase)
     let path = System.Uri.UnescapeDataString(uri.Path)
     System.IO.Path.GetDirectoryName(path)
+
+/// converts sequence of ints to sequence of strings
+let intToStrSeq items =
+    Seq.map (sprintf "%d") items

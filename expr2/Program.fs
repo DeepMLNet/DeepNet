@@ -10,7 +10,7 @@ open CudaExecUnits
 open StreamGen
 open CudaRecipe
 open CudaExec
-open NDArrayCuda
+open CudaRegMem
 
 
 let printExpr label expr =
@@ -212,9 +212,9 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 
     let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
     use cudaExpr = new CudaExprWorkspace(recipe)
-    use lockedVarEnv = new PageLockedVarEnv(env.VarEnv)
+    use lockedVarEnv = new VarEnvLock(env.VarEnv)
 
-    cudaExpr.Eval(Map.empty, lockedVarEnv.HostMem)
+    cudaExpr.Eval(Map.empty, env.VarEnv)
 
     ()
 

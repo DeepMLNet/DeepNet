@@ -27,7 +27,7 @@ let exprGradDiff evalEnv wrt expr =
     let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
     let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
 
-    let value = evalEnv.VarEnv.[wrt |> Op.extractVar |> Op.VarSpec.name]
+    let value = evalEnv.VarEnv.[Op.extractVar wrt]
     let symGradVal = gradFun value
     let exprGradVal = numGrad exprFun value
     let gradDiff = abs (symGradVal - exprGradVal)
@@ -41,7 +41,7 @@ let reverseDiffDeviations evalEnv expr =
         let exprFun = (expr |> OpEval.toFun |> OpEval.addArg (Op.makeVar wrt)) |> OpEval.usingEvalEnv evalEnv
         let rDiffFun = (rDiff |> OpEval.toFun |> OpEval.addArg (Op.makeVar wrt)) |> OpEval.usingEvalEnv evalEnv
 
-        let value = evalEnv.VarEnv.[Op.VarSpec.name wrt]
+        let value = evalEnv.VarEnv.[wrt]
         let symGradVal = rDiffFun value
         let exprGradVal = numGrad exprFun value
         let gradDiff = abs (symGradVal - exprGradVal)

@@ -7,13 +7,10 @@ open Op
 /// a memory allocation execlusively for this expression (used for temporary results)
 type MemAllocT = {Id: int; Size: int}
 
-/// pointer to external, pre-allocated memory (used for variable access)
-type ExternalMemT = {Name: string}
-
-/// memory can either be internal to this expression or be external 
+/// memory can either be internal to this expression or external (passed in variable at runtime)
 type MemoryT =
     | MemAlloc of MemAllocT
-    | ExternalMem of ExternalMemT
+    | ExternalMem of VarSpecT
 
 /// an n-dimensional array view
 type NDArrayViewT = {Memory: MemoryT; Shape: int list;

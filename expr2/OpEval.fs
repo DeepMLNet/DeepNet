@@ -9,13 +9,13 @@ open NDArray
 let DebugEval = false
 
 /// variable environment
-type VarEnvT = Map<string, NDArray.NDArray>
+type VarEnvT = Map<VarSpecT, NDArray.NDArray>
 
 module VarEnv =
     /// add variable value to environment
     let add var value varEnv =
-        let varName, _ = extractVar var
-        Map.add varName value varEnv
+        let vs = extractVar var
+        Map.add vs value varEnv
 
     /// empty variable environment
     let (empty: VarEnvT) =
@@ -28,7 +28,11 @@ let DefaultEvalEnv = {VarEnv = Map.empty; SizeSymbolEnv = Map.empty}
 /// builds a size symbol environment from the variables occuring in the expression
 let buildSizeSymbolEnvFromVarEnv varEnv expr =
     let varSymShapes = extractVars expr |> Set.toSeq |> Map.ofSeq
-    let varValShapes = varEnv |> Map.map (fun _ ary -> NDArray.shape ary) 
+    let varValShapes = 
+        varEnv 
+        |> Map.toSeq 
+        |> Seq.map (fun (vs, ary) -> VarSpec.name vs, NDArray.shape ary) 
+        |> Map.ofSeq
     SymbolEnv.fromShapeValues varSymShapes varValShapes
 
 module EvalEnv =
@@ -61,7 +65,7 @@ let eval (evalEnv: EvalEnvT) expr =
                 | Zeros ss -> zeros (shapeEval ss)
                 | ScalarConst f -> scalar f
                 | TensorConst(f, ss) -> scalar f |> broadcastToShape (shapeEval ss) 
-                | Var(v) -> varEnv.[VarSpec.name v]
+                | Var(v) -> varEnv.[v]
             | Unary(op, a) ->
                 let av = subEval a
                 match op with

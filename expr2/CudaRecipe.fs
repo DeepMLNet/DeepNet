@@ -15,19 +15,6 @@ let cudaModuleHeader =
 /// CUDA event object
 type EventObjectT = int
 
-/// device memory
-type DevMemT =
-    | DevMemAlloc of MemAllocT
-    | DevExternalMem of ExternalMemT
-/// device memory pointer
-type DevMemPtrT = {Base: DevMemT;
-                   Offset: int}
-
-/// pre-allocated host memory 
-type HostExternalMemT = {Name: string}
-/// host memory pointer
-type HostMemPtrT = {Base: HostExternalMemT;
-                    Offset: int}
 
 /// CUDA call flags
 type CudaFlagsT = int
@@ -38,10 +25,10 @@ type CudaCallT =
     | MemAlloc of MemAllocT
     | MemFree of MemAllocT
     // memory operations
-    | MemcpyAsync of DevMemPtrT * DevMemPtrT * int * StreamT
-    | MemcpyHtoDAsync of DevMemPtrT * HostMemPtrT * int * StreamT
-    | MemcpyDtoHAsync of HostMemPtrT * DevMemPtrT * int * StreamT
-    | MemsetD32Async of DevMemPtrT * single * int * StreamT
+    | MemcpyAsync of IDevMemRngTmpl * IDevMemRngTmpl * StreamT
+    | MemcpyHtoDAsync of IDevMemRngTmpl * IHostMemRngTmpl * StreamT
+    | MemcpyDtoHAsync of IHostMemRngTmpl * IDevMemRngTmpl * StreamT
+    | MemsetD32Async of IDevMemRngTmpl * single * StreamT
     // stream management
     | StreamCreate of StreamT * BasicTypes.CUStreamFlags
     | StreamDestory of StreamT
@@ -52,8 +39,8 @@ type CudaCallT =
     | EventRecord of EventObjectT * StreamT
     | EventSynchronize of EventObjectT
     // execution control
-    | LaunchCPPKernel of TmplInstT * WorkDimT * int * StreamT * (obj list)
-    | LaunchCKernel of string * WorkDimT * int * StreamT * (obj list)
+    | LaunchCPPKernel of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+    | LaunchCKernel of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
 
 /// function instantiation state
 type KernelInstCacheT = {mutable Insts: (TmplInstT * string) list;
@@ -82,7 +69,7 @@ let instTmplKernel cache (ti: TmplInstT) =
         // generate C function name
         let nPrv = 
             cache.Insts 
-            |> List.filter (fun (oti, name) -> oti.FuncName = ti.FuncName) 
+            |> List.filter (fun (oti, _) -> oti.FuncName = ti.FuncName) 
             |> List.length
         let firstArgStr = 
             match ti.TmplArgs with
@@ -92,11 +79,11 @@ let instTmplKernel cache (ti: TmplInstT) =
         cache.Insts <- (ti, cName)::cache.Insts
 
         // generate template instantiation with C linkage
-        let instStr =
-            if List.isEmpty ti.TmplArgs then ti.FuncName
-            else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> String.combineWith ", ")
+        //let instStr =
+        //    if List.isEmpty ti.TmplArgs then ti.FuncName
+        //    else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> String.combineWith ", ")
         let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> String.combineWith ", "
-        let argCallStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "p%d" i) |> String.combineWith ", "
+        let argCallStr = ti.ArgTypes |> List.mapi (fun i _ -> sprintf "p%d" i) |> String.combineWith ", "
         let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
         let declStr =
             sprintf "extern \"C\" __global__ %s %s (%s) {\n" ti.RetType cName argDeclStr
@@ -144,7 +131,7 @@ let generateCalls streams =
             // find stream to process
             let strmIdToProcess, strmToProcess = 
                 streamsSorted 
-                |> List.find (fun (strmId, strm) ->
+                |> List.find (fun (_, strm) ->
                     match strm with
                     | WaitOnEvent evt ::_ when 
                         activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
@@ -187,13 +174,9 @@ let generateCalls streams =
                 // perform a non-synchronization operation
                 let streamCallHistory = strmIdToProcess :: streamCallHistory
 
-                let getDevMem t = 
-                    match t.Memory with
-                    | ExecUnitsGen.MemAlloc m -> {DevMemPtrT.Base = DevMemAlloc m; Offset = 0;}
-                    | ExecUnitsGen.ExternalMem m -> {DevMemPtrT.Base = DevExternalMem m; Offset = 0;}
-
-                let getHostMem t =
-                    {HostMemPtrT.Base = {HostExternalMemT.Name = t}; Offset=0;}
+//                let getDevMem t = {DevMemPtrT.Base = t.Memory; Offset = 0;}
+//                let getHostMem t =
+//                    {HostMemPtrT.Base = {HostExternalMemT.Name = t}; Offset=0;}
 
                 // generate CUDA call template
                 let calls = 
@@ -201,13 +184,13 @@ let generateCalls streams =
                     | LaunchKernel(ti, workDim, args) -> 
                         [LaunchCKernel(instTmplKernel cache ti, workDim, 0, strmIdToProcess, args)]
                     | MemcpyDtoD(src, trgt) -> 
-                        [MemcpyAsync(getDevMem trgt, getDevMem src, NDArrayView.nElems trgt, strmIdToProcess)]
-                    | MemcpyHtoD(hostVarName, trgt) -> 
-                        [MemcpyHtoDAsync(getDevMem trgt, getHostMem hostVarName, NDArrayView.nElems trgt, strmIdToProcess)]
-                    | MemcpyDtoH(src, hostVarName) ->
-                        [MemcpyDtoHAsync(getHostMem hostVarName, getDevMem src, NDArrayView.nElems src, strmIdToProcess)]   
+                        [MemcpyAsync(trgt, src, strmIdToProcess)]
+                    | MemcpyHtoD(hostSrc, trgt) -> 
+                        [MemcpyHtoDAsync(trgt, hostSrc, strmIdToProcess)]
+                    | MemcpyDtoH(src, hostTrgt) ->
+                        [MemcpyDtoHAsync(hostTrgt, src, strmIdToProcess)]   
                     | Memset(value, trgt) ->                        
-                        [MemsetD32Async(getDevMem trgt, single value, NDArrayView.nElems trgt, strmIdToProcess)]            
+                        [MemsetD32Async(trgt, single value, strmIdToProcess)]            
 
                 calls @ generate streamCallHistory activeEvents remainingStreams
             | ExecUnitStartInfo _ | ExecUnitEndInfo -> 

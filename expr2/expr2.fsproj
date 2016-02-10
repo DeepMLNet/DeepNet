@@ -94,11 +94,12 @@
     <Compile Include="DiffCheck.fs" />
     <Compile Include="ExecUnitsGen.fs" />
     <Compile Include="StreamGen.fs" />
-    <Compile Include="CudaExecUnits.fs" />
     <Compile Include="CudaBasics.fs" />
+    <Compile Include="CudaRegMem.fs" />
+    <Compile Include="NDArrayDev.fs" />
+    <Compile Include="CudaExecUnits.fs" />
     <Compile Include="CudaRecipe.fs" />
     <Compile Include="CudaExec.fs" />
-    <Compile Include="NDArrayCuda.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />

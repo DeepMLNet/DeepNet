@@ -4,6 +4,7 @@ open Util
 open ManagedCuda
 open CudaBasics
 open CudaRecipe
+open CudaExecUnits
 open ExecUnitsGen
 
 
@@ -100,7 +101,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     let events = new Dictionary<EventObjectT, CudaEvent>()
 
     /// memory allocation to CUDA memory mapping
-    let internalMem = new Dictionary<MemAllocT, CudaDeviceVariable<single>>()
+    let internalMem = new Dictionary<MemAllocT, CudaDeviceVariable<byte>>()
 
     /// all kernel calls
     let kernelCalls = CudaRecipe.getAllCKernelLaunches recipe
@@ -141,58 +142,48 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
         |> Map.ofSeq
     
     /// executes the specified calls
-    let execCalls (externalMem: Map<ExternalMemT, CudaDeviceVariable<single>>)
-                  (hostMem:     Map<HostExternalMemT, CudaPageLockedHostMemory<single>>) 
-                  calls =
-
-        /// get memory allocation for device memory
-        let getMem mem =
-            match mem with
-            | DevMemAlloc ma -> internalMem.[ma]
-            | DevExternalMem em -> externalMem.[em]
-
-        /// get memory allocation for host memory
-        let getHostMem mem =
-            hostMem.[mem]
+    let execCalls (execEnv: CudaExecEnvT) calls =
 
         for call in calls do
             match call with 
             // memory management
             | CudaRecipe.MemAlloc mem -> 
-                internalMem.Add(mem, new CudaDeviceVariable<single>(BasicTypes.SizeT(mem.Size)))
+                internalMem.Add(mem, new CudaDeviceVariable<byte>(BasicTypes.SizeT(mem.Size * 4)))
             | CudaRecipe.MemFree mem ->
                 internalMem.[mem].Dispose()
                 internalMem.Remove(mem) |> ignore
 
             // memory operations
-            | MemcpyAsync (dst, src, length, strm) ->
-                let {DevMemPtrT.Base = dstBase; Offset = dstOffset} = dst
-                let {DevMemPtrT.Base = srcBase; Offset = srcOffset} = src
-                (getMem dstBase).AsyncCopyToDevice(getMem srcBase, 
-                                                   BasicTypes.SizeT(srcOffset * sizeof<single>), 
-                                                   BasicTypes.SizeT(dstOffset * sizeof<single>), 
-                                                   BasicTypes.SizeT(length * sizeof<single>), 
-                                                   streams.[strm].Stream)
-            | MemcpyHtoDAsync (dst, src, length, strm) ->
-                let {DevMemPtrT.Base = dstBase; Offset = dstOffset} = dst
-                let {HostMemPtrT.Base = srcBase; Offset = srcOffset} = src
-                hostMem.[srcBase].AsyncCopyToDevice(getMem dstBase, 
-                                                    BasicTypes.SizeT(srcOffset * sizeof<single>), 
-                                                    BasicTypes.SizeT(dstOffset * sizeof<single>), 
-                                                    BasicTypes.SizeT(length * sizeof<single>), 
-                                                    streams.[strm].Stream)
-            | MemcpyDtoHAsync (dst, src, length, strm) ->
-                let {HostMemPtrT.Base = dstBase; Offset = dstOffset} = dst
-                let {DevMemPtrT.Base = srcBase; Offset = srcOffset} = src
-                hostMem.[dstBase].AsyncCopyFromDevice(getMem srcBase, 
-                                                      BasicTypes.SizeT(srcOffset * sizeof<single>), 
-                                                      BasicTypes.SizeT(dstOffset * sizeof<single>), 
-                                                      BasicTypes.SizeT(length * sizeof<single>), 
-                                                      streams.[strm].Stream)
-            | MemsetD32Async (dst, value, length, strm) ->
-                let {DevMemPtrT.Base = dstBase; Offset = dstOffset} = dst
+            | MemcpyAsync (dst, src, strm) ->
+                let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                let {DeviceVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                dstCudaVar.AsyncCopyToDevice(srcCudaVar, 
+                                             BasicTypes.SizeT(srcOffset), 
+                                             BasicTypes.SizeT(dstOffset), 
+                                             BasicTypes.SizeT(length), 
+                                             streams.[strm].Stream)
+            | MemcpyHtoDAsync (dst, src, strm) ->
+                let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                let {HostVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                use srcOffsetVar = new CudaRegisteredHostMemory<byte>(srcCudaVar.PinnedHostPointer + (nativeint srcOffset), 
+                                                                      BasicTypes.SizeT(length))
+                use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                BasicTypes.SizeT(length))
+                srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, streams.[strm].Stream)
+            | MemcpyDtoHAsync (dst, src, strm) ->
+                let {HostVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                let {DeviceVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                use srcOffsetVar = new CudaDeviceVariable<byte>(srcCudaVar.DevicePointer + (BasicTypes.SizeT srcOffset), 
+                                                                BasicTypes.SizeT(length))
+                use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
+                                                                      BasicTypes.SizeT(length))
+                dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, streams.[strm].Stream)
+            | MemsetD32Async (dst, value, strm) ->
+                let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                BasicTypes.SizeT(length))
                 let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
-                (getMem dstBase).MemsetAsync(intval, streams.[strm].Stream)
+                dstOffsetVar.MemsetAsync(intval, streams.[strm].Stream)
 
             // stream management
             | StreamCreate (strm, flags) ->
@@ -215,29 +206,34 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
                 events.[evnt].Synchronize()
 
             // execution control
-            | LaunchCKernel (krnl, workDim, smemSize, strm, args) ->
-                let {Block=blockDim; Grid=gridDim} = kernelLaunchDims.[(krnl, workDim)]
+            | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
+                // instantiate args
+                let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
                 let argArray = args |> List.toArray
+
+                // launch configuration
+                let {Block=blockDim; Grid=gridDim} = kernelLaunchDims.[(krnl, workDim)]
                 kernels.[krnl].BlockDimensions <- toDim3 blockDim
                 kernels.[krnl].GridDimensions <- toDim3 gridDim
                 kernels.[krnl].DynamicSharedMemory <- uint32 smemSize
-                // TODO: need to fill in memory references
+
                 kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
             | LaunchCPPKernel _ ->
                 failwith "cannot launch C++ kernel from CudaExec"
 
     // initialize
     do
-        execCalls Map.empty Map.empty recipe.InitCalls
+        execCalls {InternalMem=internalMem; ExternalVar=Map.empty; HostVar=Map.empty} recipe.InitCalls
 
     // finalizer
     interface System.IDisposable with
-        member this.Dispose() = execCalls Map.empty Map.empty recipe.DisposeCalls
+        member this.Dispose() = 
+            execCalls {InternalMem=internalMem; ExternalVar=Map.empty; HostVar=Map.empty} recipe.DisposeCalls
 
     /// Evaluate expression.
-    member this.Eval(externalMem: Map<ExternalMemT, CudaDeviceVariable<single>>,
-                     hostMem:     Map<HostExternalMemT, CudaPageLockedHostMemory<single>>) =
-        execCalls externalMem hostMem recipe.ExecCalls
+    member this.Eval(externalVar: Map<Op.VarSpecT, NDArrayDev.NDArrayDev>,
+                     hostVar:     Map<Op.VarSpecT, NDArray.NDArray>) =
+        execCalls {InternalMem=internalMem; ExternalVar=externalVar; HostVar=hostVar} recipe.ExecCalls
         cudaCntxt.Synchronize () // TODO: remove and signal otherwise
 
 
