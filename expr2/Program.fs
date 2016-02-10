@@ -224,7 +224,8 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 
 [<EntryPoint>]
 let main argv = 
-    //CudaCodeGen.testMe ()
+    CudaBasics.printCudaInfo ()
+
     ``Build linear regression`` ()
     //``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
@@ -236,4 +237,7 @@ let main argv =
     //``Build execution sequence of linear regression gradient`` ()
     //``Build CUDA recipe for linear regression gradient`` ()
     ``Evaluate linear regression gradient using CUDA`` ()
+    
+    
+    CudaBasics.shutdown ()
     0

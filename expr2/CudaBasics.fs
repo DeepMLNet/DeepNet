@@ -26,7 +26,19 @@ let cudaCntxt =
             printfn "Cannot create CUDA context: %s" e.Message
             exit 10
 
-    let di = cudaCntxt.GetDeviceInfo()
+    cudaCntxt
+
+let cudaDeviceInfo =
+    cudaCntxt.GetDeviceInfo()
+
+let cudaMaxBlockDim =
+    int cudaDeviceInfo.MaxBlockDim.x, int cudaDeviceInfo.MaxBlockDim.y, int cudaDeviceInfo.MaxBlockDim.z
+
+let cudaMaxGridDim =
+    int cudaDeviceInfo.MaxGridDim.x, int cudaDeviceInfo.MaxGridDim.y, int cudaDeviceInfo.MaxGridDim.z
+    
+let printCudaInfo () =
+    let di = cudaDeviceInfo
     printfn "CUDA device:                                         %s" di.DeviceName
     printfn "CUDA driver version:                                 %A" di.DriverVersion
     printfn "CUDA device global memory:                           %A bytes" di.TotalGlobalMemory
@@ -39,19 +51,13 @@ let cudaCntxt =
     printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
     printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
 
-    cudaCntxt
-
-let cudaDeviceInfo =
-    cudaCntxt.GetDeviceInfo()
-
-let cudaMaxBlockDim =
-    int cudaDeviceInfo.MaxBlockDim.x, int cudaDeviceInfo.MaxBlockDim.y, int cudaDeviceInfo.MaxBlockDim.z
-
-let cudaMaxGridDim =
-    int cudaDeviceInfo.MaxGridDim.x, int cudaDeviceInfo.MaxGridDim.y, int cudaDeviceInfo.MaxGridDim.z
     
-      
-    
+/// shutsdown CUDA (necessary for correct profiler results)  
+let shutdown () =
+    cudaCntxt.Synchronize ()
+    CudaContext.ProfilerStop ()
+    cudaCntxt.Dispose ()
+
 
 
 

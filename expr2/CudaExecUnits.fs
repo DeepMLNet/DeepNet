@@ -119,7 +119,7 @@ type NDArrayPtrArgTmpl (view: NDArrayViewT) =
 
         member this.GetArg env =
             // C++ structure is empty and we pass the pointer to data memory
-            CudaExecEnv.getDevVar env view :> obj
+            (CudaExecEnv.getDevVar env view).DevicePointer :> obj
 
 type NDArrayDevMemRngTmpl (view: NDArrayViewT) =
     interface IDevMemRngTmpl with

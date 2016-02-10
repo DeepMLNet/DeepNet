@@ -96,6 +96,7 @@ module DataLock =
 
             let dr = new DataLockT<'a>(data, pinHnd, cudaMem)     
             dataRegistrations.[data] <- dr
+            registeredCount.[data] <- 1
             dr
 
     /// unlocks data
