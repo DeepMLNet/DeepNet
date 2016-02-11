@@ -219,6 +219,18 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
         let str = aView.Stride
         {aView with Shape=trgtShape; 
                     Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}, aShared
+    // variable access
+    | UnaryOp (StoreToVar vs) ->
+        match cudaEnv.VarStorLoc |> Map.find vs with
+        | DevVar -> 
+            // we assume that all device input vars are continguous
+            {Memory=ExternalMem vs; 
+             Shape=trgtShape; Offset=0; 
+             Stride=NDArray.contiguousStride trgtShape}, true
+        | HostVar ->
+            // need continguous memory to transfer to host
+            if NDArrayView.isContiguous srcViews.[0] then srcViews.[0], srcShared.[0]
+            else outplaceTrgt 
     // misc
     | UnaryOp (Annotated _) -> srcViews.[0], srcShared.[0]
 
@@ -231,6 +243,9 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
     // matrix/tensor operations
     | BinaryOp Dot -> outplaceTrgt
     | BinaryOp TensorProduct -> outplaceTrgt
+
+    // nary
+    | NaryOp Discard -> outplaceTrgt
       
 
 /// computes desired source views given desired target view
@@ -272,6 +287,20 @@ let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
             [Some {rv with Shape=srcShapes.[0]; 
                            Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}]
         | _ -> outplaceTrgt
+    // variable access
+    | UnaryOp (StoreToVar vs) ->
+        match cudaEnv.VarStorLoc |> Map.find vs with
+        | DevVar -> 
+            // request to store directly into external var
+            // we assume that all device input vars are continguous
+            [Some {Memory=ExternalMem vs; 
+                   Shape=trgtShape; Offset=0; 
+                   Stride=NDArray.contiguousStride trgtShape}]
+        | HostVar ->
+            // need continguous storage to transfer to host
+            match reqView with
+            | Some rv when NDArrayView.isContiguous rv -> [reqView]
+            | _ -> outplaceTrgt
     // misc
     | UnaryOp (Annotated _) -> inplaceOverwriteTrgt
 
@@ -284,6 +313,9 @@ let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
     // matrix/tensor operations
     | BinaryOp Dot -> outplaceTrgt
     | BinaryOp TensorProduct -> outplaceTrgt     
+
+    // nary
+    | NaryOp Discard -> outplaceTrgt
 
 
 /// execution items for an elementwise operation
@@ -350,6 +382,24 @@ let execItemsForOp cudaEnv trgtView op srcViews =
         else []
     | UnaryOp (Broadcast _) -> []
     | UnaryOp (SwapDim _) -> []
+    // variable access
+    | UnaryOp (StoreToVar vs) ->
+        let copyItems = 
+            if trgtView <> srcViews.[0] then
+                execItemsForElemwise trgtView (NoArgEOpTmpl("IdEOp_t", false)) srcViews
+            else
+                []
+
+        match cudaEnv.VarStorLoc |> Map.find vs with
+        | DevVar -> 
+            // trgtView is the variable we need to store into
+            copyItems
+        | HostVar ->            
+            // we assume that host variable has continguous stride and zero offset
+            // trgtView has contingous stride
+            let hv = {Memory=ExternalMem vs; Shape=trgtView.Shape; 
+                      Offset=0; Stride=NDArray.contiguousStride trgtView.Shape}            
+            copyItems @ [MemcpyDtoH(NDArrayDevMemRngTmpl(trgtView), NDArrayHostMemRngTmpl(hv))]                 
     // misc
     | UnaryOp (Annotated _) -> []
 
@@ -362,6 +412,9 @@ let execItemsForOp cudaEnv trgtView op srcViews =
     // matrix/tensor operations
     | BinaryOp Dot -> [] // TODO
     | BinaryOp TensorProduct -> [] // TODO
+
+    // nary
+    | NaryOp Discard -> []
 
 
 /// generates CUDA execution units that will evaluate the given unified expression

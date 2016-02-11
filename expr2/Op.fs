@@ -41,6 +41,8 @@ and UnaryOpT =
     | Reshape of ShapeSpecT         /// reshape (assuming C-continguous order) tensor; element count does not change
     | Broadcast of ShapeSpecT       /// broadcast of SizeBroadcast dimensions
     | SwapDim of int * int          /// swaps two dimensions of a tensor
+    // variable storage
+    | StoreToVar of VarSpecT        /// variable write
     // misc
     | Annotated of Annotation       /// annotation (no influence on value)
 
@@ -61,12 +63,16 @@ and BinaryOpT =
     | Dot                           /// vector*vector, matrix*vector or matrix*matrix dot product
     | TensorProduct                 /// tensor product 
 
-  
+/// ops with an arbitrary exprs as arguments
+and NaryOpT =
+    | Discard                       /// evaluate all subexpressions but discard them
+
 /// an expression
 and ExprT =
     | Leaf of LeafOpT
     | Unary of UnaryOpT * ExprT
     | Binary of BinaryOpT * ExprT * ExprT
+    | Nary of NaryOpT * (ExprT list)
 
 
 
@@ -74,6 +80,7 @@ type AnyOpT =
     | LeafOp of LeafOpT
     | UnaryOp of UnaryOpT
     | BinaryOp of BinaryOpT
+    | NaryOp of NaryOpT
 
 /// unified expression
 type UExprT = UExpr of AnyOpT * (UExprT list)
@@ -83,18 +90,21 @@ let extractOp expr =
     | Leaf op -> LeafOp op
     | Unary(op, _) -> UnaryOp op
     | Binary(op, _, _) -> BinaryOp op
+    | Nary(op, _) -> NaryOp op
 
 let rec toUExpr expr =
     match expr with
     | Leaf op -> UExpr(LeafOp op, [])
     | Unary(op, a) -> UExpr(UnaryOp op, [toUExpr a])
     | Binary(op, a, b) -> UExpr(BinaryOp op, [toUExpr a; toUExpr b])
+    | Nary(op, se) -> UExpr(NaryOp op, se |> List.map toUExpr)
     
 let rec toExpr uexpr =
     match uexpr with
     | UExpr(LeafOp op, []) -> Leaf op
     | UExpr(UnaryOp op, [a]) -> Unary(op, toExpr a)
     | UExpr(BinaryOp op, [a; b]) -> Binary(op, toExpr a, toExpr b)
+    | UExpr(NaryOp op, se) -> Nary(op, se |> List.map toExpr)
     | _ -> failwithf "invalid unified expression %A" uexpr
 
 /// matches all exprs that work elementwise on their argument(s)
@@ -121,13 +131,16 @@ let (|ElemwiseOp|_|) (op: obj) =
 
 /// Traverses the op tree and for each op calls a function on its arguments and replaces 
 /// them by the function's return value(s).
-let rec mapOperands unaryMapping binaryMapping expr =
-    let subMap = mapOperands unaryMapping binaryMapping
+let rec mapOperands unaryMapping binaryMapping naryMapping expr =
+    let subMap = mapOperands unaryMapping binaryMapping naryMapping
     match expr with
     | Unary(op, a) -> Unary(op, unaryMapping op (subMap a))
     | Binary(op, a, b) -> 
         let ma, mb = binaryMapping op (subMap a) (subMap b)
         Binary(op, ma, mb)
+    | Nary(op, es) ->
+        let mes = naryMapping op (es |> List.map subMap)
+        Nary(op, mes)
     | _ -> expr
 
 /// returns true if subExpr is contained in expr
@@ -138,6 +151,7 @@ let rec contains subExpr expr =
         match expr with
         | Unary(_, a) -> contains subExpr a
         | Binary(_, a, b) -> contains subExpr a || contains subExpr b
+        | Nary(_, es) -> List.exists (contains subExpr) es
         | _ -> false
 
 /// Produces an error message about incompatible shapes.
@@ -179,7 +193,9 @@ let rec shapeOf expr =
     | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
     // variable access
     | Leaf(Var(_, ss)) -> ss
+    | Unary(StoreToVar _, a) -> shapeOf a
     // misc
+    | Nary(Discard, _) -> ShapeSpec.emptyVector 
     | Unary(Annotated(_), a) -> shapeOf a
     | _ -> failwithf "unknown expr: %A" expr
 
@@ -217,6 +233,8 @@ let check =
         | SwapDim(ax1, ax2) when 
                 not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
             failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+        | StoreToVar(vn, vs) when not (ShapeSpec.equalWithoutBroadcastability vs sa) -> 
+            failwithf "cannot store resulst of shape %A into variable %A of shape %A" sa vn vs
         | _ -> a
 
     let mapBinaryOp op a b =
@@ -233,7 +251,10 @@ let check =
             reshapeIfNecessary psa a, reshapeIfNecessary psb b
         | _ -> a, b
 
-    mapOperands mapUnaryOp mapBinaryOp
+    let mapNaryOp op es =
+        es
+
+    mapOperands mapUnaryOp mapBinaryOp mapNaryOp
 
 /// scalar of given value
 let scalar f = Leaf(ScalarConst(f)) |> check
@@ -333,7 +354,6 @@ let zeroMatrix rows cols = zeros (ShapeSpec.matrix rows cols)
 /// zero tensor with same shape as given tensor
 let zerosLike a = Leaf(Zeros(shapeOf a)) |> check
 
-
 /// variable of given name and shape
 let var name (ss: ShapeSpecT) = Leaf(Var(name, ss)) 
 
@@ -375,6 +395,7 @@ let rec extractVars expr =
     | Leaf _ -> Set.empty
     | Unary(_, a) -> extractVars a
     | Binary(_, a, b) -> Set.union (extractVars a) (extractVars b)
+    | Nary(_, es) -> Set.unionMany (es |> List.map extractVars)
 
 /// extract VarSpec from variable expression
 let extractVar expr = 
@@ -385,6 +406,15 @@ let extractVar expr =
 /// make variable expression from VarSpec
 let makeVar v =
     Leaf(Var(v))
+
+/// store to variable
+let storeToVar ve a =
+    let vs = extractVar ve
+    Unary(StoreToVar(vs), a) |> check
+
+/// computes specified expressions, but discards the result
+let discard es =
+    Nary(Discard, es) |> check
 
 /// counts how many times subExpr occurs in unified expression uexpr
 let subExprOccurrences uexpr =
@@ -404,3 +434,4 @@ let subExprOccurrences uexpr =
     fun subExpr ->
         if cnt.ContainsKey(subExpr) then cnt.[subExpr]
         else 0
+

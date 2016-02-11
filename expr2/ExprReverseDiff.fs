@@ -58,6 +58,7 @@ let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : VarDiffs =
             let ael = (shapeOf a).[ax]
             let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
             bc |> collapse |> reverseDiffStep a
+        | StoreToVar _ -> eg |> reverseDiffStep a
         | Annotated ano -> eg |> reverseDiffStep a
 
     | Binary(op, a, b) ->
@@ -97,6 +98,10 @@ let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : VarDiffs =
 
             da .+ db
         | TensorProduct -> failwith "not implemented"
+
+    | Nary(op, es) ->
+        match op with
+        | Discard -> failwith "cannot propagte gradient thorugh discard"
 
 
 /// reverse accumulation autodifferentiation of an expression

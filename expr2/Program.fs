@@ -2,7 +2,7 @@
 
 open Shape
 open Op
-open ExprForwardDiff
+//open ExprForwardDiff
 open ExprReverseDiff
 open OpEval
 open ExecUnitsGen
@@ -20,6 +20,7 @@ let printVal label value =
     printfn "%s =\n%A\nshape of %s: %A\n" label value label (NDArray.shape value)
 
 type LinearRegression = {a: ExprT; b: ExprT; x: ExprT; t: ExprT;
+                         lossWrtAOut: ExprT; lossWrtBOut: ExprT; lossWrtXOut: ExprT; lossWrtTOut: ExprT;
                          Pred: ExprT; Loss: ExprT}  
 let linearRegression () =
     let a = var "a" [symbol "M"; symbol "N"]
@@ -27,18 +28,24 @@ let linearRegression () =
     let x = var "x" [symbol "N"]
     let t = var "t" [symbol "M"]
 
+    let lossWrtAOut = var "lossWrtAOut" [fix 1; (symbol "M") * (symbol "N")]
+    let lossWrtBOut = var "lossWrtBOut" [fix 1; symbol "M"]
+    let lossWrtXOut = var "lossWrtXOut" [fix 1; symbol "N"]
+    let lossWrtTOut = var "lossWrtTOut" [fix 1; symbol "M"]
+
     let pred = a.*x + b
     let smplLoss = (pred - t)**2.0f
     let loss = sum smplLoss
 
-    {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss}
+    {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss;
+     lossWrtAOut=lossWrtAOut; lossWrtBOut=lossWrtBOut; lossWrtXOut=lossWrtXOut; lossWrtTOut=lossWrtTOut}
 
 type LinearRegressionGradient = {LossWrtA: ExprT; LossWrtB: ExprT; LossWrtX: ExprT; LossWrtT: ExprT}
-let linearRegressionForwardGradient (lr: LinearRegression) =
-    {LossWrtA = grad lr.a lr.Loss;
-     LossWrtB = grad lr.b lr.Loss;
-     LossWrtX = grad lr.x lr.Loss;
-     LossWrtT = grad lr.t lr.Loss;}
+//let linearRegressionForwardGradient (lr: LinearRegression) =
+//    {LossWrtA = grad lr.a lr.Loss;
+//     LossWrtB = grad lr.b lr.Loss;
+//     LossWrtX = grad lr.x lr.Loss;
+//     LossWrtT = grad lr.t lr.Loss;}
 
 let linearRegressionReverseGradient (lr: LinearRegression) =
     let d = reverseDiff lr.Loss
@@ -53,12 +60,20 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
     let bVal = NDArray.zeros [m]
     let xVal = NDArray.ones [n]
     let tVal = NDArray.ones [m]
+    let lossWrtAVal = NDArray.zeros [1; m*n]
+    let lossWrtBVal = NDArray.zeros [1; m]
+    let lossWrtXVal = NDArray.zeros [1; n]
+    let lossWrtTVal = NDArray.zeros [1; m]
     let varEnv = 
         VarEnv.empty
         |> VarEnv.add lr.a aVal
         |> VarEnv.add lr.b bVal
         |> VarEnv.add lr.x xVal
         |> VarEnv.add lr.t tVal
+        |> VarEnv.add lr.lossWrtAOut lossWrtAVal
+        |> VarEnv.add lr.lossWrtBOut lossWrtBVal
+        |> VarEnv.add lr.lossWrtXOut lossWrtXVal
+        |> VarEnv.add lr.lossWrtTOut lossWrtTVal
     EvalEnv.fromVarEnvAndExpr varEnv lr.Loss
 
 let linearRegressionCudaEnv (lr: LinearRegression) =
@@ -66,7 +81,11 @@ let linearRegressionCudaEnv (lr: LinearRegression) =
         [lr.a |> extractVar, HostVar;
          lr.b |> extractVar, HostVar;
          lr.x |> extractVar, HostVar;
-         lr.t |> extractVar, HostVar;]
+         lr.t |> extractVar, HostVar;
+         lr.lossWrtAOut |> extractVar, HostVar;
+         lr.lossWrtBOut |> extractVar, HostVar;
+         lr.lossWrtXOut |> extractVar, HostVar;
+         lr.lossWrtTOut |> extractVar, HostVar;]
         |> Map.ofList
     {CudaEnvT.VarStorLoc = varLocs}
 
@@ -84,15 +103,15 @@ let ``Eval linear regression`` () =
     printVal "pred" (eval env lr.Pred)
     printVal "loss" (eval env lr.Loss)
 
-[<Fact>]
-let ``Forward gradient of linear regression`` () =
-    let lr = linearRegression ()   
-    printfn "Forward:"
-    let fg = linearRegressionForwardGradient lr
-    printExpr "lossWrtA" fg.LossWrtA
-    printExpr "lossWrtB" fg.LossWrtB
-    printExpr "lossWrtX" fg.LossWrtX  
-    printExpr "lossWrtT" fg.LossWrtT
+//[<Fact>]
+//let ``Forward gradient of linear regression`` () =
+//    let lr = linearRegression ()   
+//    printfn "Forward:"
+//    let fg = linearRegressionForwardGradient lr
+//    printExpr "lossWrtA" fg.LossWrtA
+//    printExpr "lossWrtB" fg.LossWrtB
+//    printExpr "lossWrtX" fg.LossWrtX  
+//    printExpr "lossWrtT" fg.LossWrtT
 
 [<Fact>]
 let ``Reverse gradient of linear regression`` () =
@@ -104,16 +123,16 @@ let ``Reverse gradient of linear regression`` () =
     printExpr "lossWrtX" rg.LossWrtX  
     printExpr "lossWrtT" rg.LossWrtT
 
-[<Fact>]
-let ``Eval forward gradient of linear regression`` () =
-    let lr = linearRegression ()
-    let lrg = linearRegressionForwardGradient lr
-    let env = linearRegressionEvalEnv lr
-    printfn "Forward gradient:"
-    printVal "lossWrtA" (eval env lrg.LossWrtA)
-    printVal "lossWrtB" (eval env lrg.LossWrtB)
-    printVal "lossWrtX" (eval env lrg.LossWrtX) 
-    printVal "lossWrtT" (eval env lrg.LossWrtT)
+//[<Fact>]
+//let ``Eval forward gradient of linear regression`` () =
+//    let lr = linearRegression ()
+//    let lrg = linearRegressionForwardGradient lr
+//    let env = linearRegressionEvalEnv lr
+//    printfn "Forward gradient:"
+//    printVal "lossWrtA" (eval env lrg.LossWrtA)
+//    printVal "lossWrtB" (eval env lrg.LossWrtB)
+//    printVal "lossWrtX" (eval env lrg.LossWrtX) 
+//    printVal "lossWrtT" (eval env lrg.LossWrtT)
 
 [<Fact>]
 let ``Eval reverse gradient of linear regression`` () =
@@ -127,14 +146,14 @@ let ``Eval reverse gradient of linear regression`` () =
     printVal "lossWrtT" (eval env lrg.LossWrtT)
 
 
-[<Fact>]
-let ``Check forward gradient of linear regression`` () =
-    let lr = linearRegression ()
-    let env = linearRegressionEvalEnv lr
-    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff env lr.a lr.Loss)
-    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff env lr.b lr.Loss)
-    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff env lr.x lr.Loss)
-    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff env lr.t lr.Loss)
+//[<Fact>]
+//let ``Check forward gradient of linear regression`` () =
+//    let lr = linearRegression ()
+//    let env = linearRegressionEvalEnv lr
+//    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff env lr.a lr.Loss)
+//    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff env lr.b lr.Loss)
+//    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff env lr.x lr.Loss)
+//    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff env lr.t lr.Loss)
 
 [<Fact>]
 let ``Check reverse gradient of linear regression`` () =
@@ -210,14 +229,22 @@ let ``Evaluate linear regression gradient using CUDA`` () =
     let env = linearRegressionEvalEnv lr
     let cenv = linearRegressionCudaEnv lr
 
-    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    let allWrtsSaved =
+        discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
+                 lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
+                 lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
+                 lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
+
+    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)
     use lockedVarEnv = new VarEnvLock(env.VarEnv)
 
     cudaExpr.Eval(Map.empty, env.VarEnv)
 
-    ()
-
+    printVal "lossWrtA" (VarEnv.get lr.lossWrtAOut env.VarEnv)
+    printVal "lossWrtB" (VarEnv.get lr.lossWrtBOut env.VarEnv)
+    printVal "lossWrtX" (VarEnv.get lr.lossWrtXOut env.VarEnv)
+    printVal "lossWrtT" (VarEnv.get lr.lossWrtTOut env.VarEnv)
 
 
 

@@ -17,6 +17,11 @@ module VarEnv =
         let vs = extractVar var
         Map.add vs value varEnv
 
+    /// get variable value from environment
+    let get var (varEnv: VarEnvT) =
+        let vs = extractVar var
+        varEnv.[vs]
+
     /// empty variable environment
     let (empty: VarEnvT) =
         Map.empty
@@ -77,6 +82,7 @@ let eval (evalEnv: EvalEnvT) expr =
                 | Reshape ss -> reshape (shapeEval ss) av
                 | Broadcast ss -> broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> swapDim ax1 ax2 av
+                | StoreToVar v -> NDArray.copyTo av varEnv.[v]; av
                 | Annotated _-> av
             | Binary(op, a, b) ->
                 let av, bv = subEval a, subEval b  
@@ -88,6 +94,10 @@ let eval (evalEnv: EvalEnvT) expr =
                 | Power -> av ** bv
                 | Dot -> av .* bv
                 | TensorProduct -> av %* bv
+            | Nary(op, es) ->
+                let esv = List.map subEval es
+                match op with 
+                | Discard -> NDArray.zeros [0]
             
     doEval varEnv expr
 

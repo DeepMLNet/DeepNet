@@ -16,6 +16,8 @@ let checkReverseDiff evalEnv expr =
         | Binary(_, a, b) -> 
             checkSubExpr a
             checkSubExpr b
+        | Nary(_, es) ->
+            es |> List.iter checkSubExpr
 
         //printfn "checking %A" expr
         if not (reverseDiffDeviationsOkay evalEnv expr) then

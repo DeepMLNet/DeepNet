@@ -22,16 +22,16 @@ let numGradEpsilon epsilon f x =
 /// evaluates the Jacobian of f at x numerically
 let numGrad = numGradEpsilon 1e-5f
 
-let exprGradDiff evalEnv wrt expr =
-    let g = ExprForwardDiff.grad wrt expr
-    let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
-    let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
-
-    let value = evalEnv.VarEnv.[Op.extractVar wrt]
-    let symGradVal = gradFun value
-    let exprGradVal = numGrad exprFun value
-    let gradDiff = abs (symGradVal - exprGradVal)
-    sum gradDiff |> NDArray.value
+//let exprGradDiff evalEnv wrt expr =
+//    let g = ExprForwardDiff.grad wrt expr
+//    let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
+//    let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
+//
+//    let value = evalEnv.VarEnv.[Op.extractVar wrt]
+//    let symGradVal = gradFun value
+//    let exprGradVal = numGrad exprFun value
+//    let gradDiff = abs (symGradVal - exprGradVal)
+//    sum gradDiff |> NDArray.value
 
 
 let reverseDiffDeviations evalEnv expr =

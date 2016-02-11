@@ -150,6 +150,10 @@ module SizeSpec =
     let one =
         Base (Fixed 1)
 
+    /// fixed size
+    let fix s =
+        Base (Fixed s)
+
     /// symbolic size
     let symbol s =
         Base (Symbol s)
@@ -171,6 +175,7 @@ module SizeSpec =
 
 
 let symbol = SizeSpec.symbol
+let fix = SizeSpec.fix
 
 type SizeSpecT with
     static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = SizeSpec.equalWithBroadcastability ssa ssb
@@ -226,6 +231,8 @@ module ShapeSpec =
     let vector (ss: SizeSpecT) = [ss]
 
     let matrix (sr: SizeSpecT) (sc: SizeSpecT) = [sr; sc]
+
+    let emptyVector = [Base (Fixed 0)]
 
     let padLeft sa =
         (Broadcast)::sa
