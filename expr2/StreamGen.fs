@@ -71,6 +71,13 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
     let dependants (execUnitId: ExecUnitIdT) =
         execUnits |> List.filter (fun eu -> eu.DependsOn |> List.contains execUnitId)
 
+    /// gets all ExecUnits that are successors of the specified unit
+    let rec successors (execUnitId: ExecUnitIdT) = seq {
+        for d in dependants execUnitId do
+            yield d
+            yield! successors d.Id
+    }        
+
     /// gets the ExecUnits on which the specified unit depends
     let dependsOn (execUnitId: ExecUnitIdT) =
         (execUnitById execUnitId).DependsOn
@@ -81,20 +88,13 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
         |> List.forall (fun id -> 
             not (List.exists (fun (eutp: ExecUnitT<'e>) -> eutp.Id = id) execUnitsToProcess))
 
-    /// stream used by ExecUnit with Id euId
-    let tryGetStreamOfExecUnitId euId =
-        if streamOfUnit |> Map.containsKey euId then Some streamOfUnit.[euId]
-        else None
-
     /// all streams that are used by the successors of an ExecUnit
-    let rec usedStreamsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = 
-        eu.Id |> dependants |> List.fold (fun ustrs subEu -> 
-            match tryGetStreamOfExecUnitId subEu.Id with
-            | Some us -> us::ustrs
-            | None -> ustrs) 
-            (match tryGetStreamOfExecUnitId eu.Id with
-            | Some us -> [us]
-            | None -> [])
+    let rec usedStreamsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = seq {
+        for seu in Seq.append (Seq.singleton eu) (successors eu.Id) do
+            match streamOfUnit |> Map.tryFind seu.Id with
+            | Some s -> yield s
+            | None -> ()
+    }
 
     /// all streams that can currently be reused safely below an ExecUnit
     let rec availableStreamsBelowExecUnit (eu: ExecUnitT<'e>) =
@@ -106,14 +106,14 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
             eu.DependsOn 
             |> List.filter (fun pid -> 
                 pid |> dependants |> List.exists (fun dep -> 
-                    tryGetStreamOfExecUnitId dep.Id = Some streamOfUnit.[pid]) |> not)
+                    streamOfUnit |> Map.tryFind dep.Id = Some streamOfUnit.[pid]) |> not)
             |> List.map (fun pid -> streamOfUnit.[pid]) 
             |> Set.ofList
         // my stream
         let myStream = Set.singleton streamOfUnit.[eu.Id]
         // streams that are used by nodes that depend on us
         let usedBelow = 
-            eu.Id |> dependants |> List.map usedStreamsOfAndBelowExecUnit |> List.concat |> Set.ofList
+            eu.Id |> dependants |> List.map usedStreamsOfAndBelowExecUnit |> Seq.concat |> Set.ofSeq
             
         (availFromAbove + endingHere + myStream) - usedBelow |> Set.toList
 
@@ -122,16 +122,37 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
         if pId = sucId then true
         else pId |> dependants |> List.exists (fun d -> isSuccessorOf d.Id sucId) 
 
+    /// all streams that are used by the successors of an ExecUnit
+    let rec usedEventsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = seq {
+        for seu in Seq.append (Seq.singleton eu) (successors eu.Id) do
+            match eventOfUnit |> Map.tryFind seu.Id with
+            | Some evt -> yield evt
+            | None -> ()
+            for seud in seu.DependsOn do
+                match eventOfUnit |> Map.tryFind seud with
+                | Some evt -> yield evt
+                | None -> ()
+    }
+
     /// find reuseable event objects for the given ExecUnit
-    let tryFindAvailableEventObjectsFor (eu: ExecUnitIdT)  =
-        let rec findRec peu =
-            match eventOfUnit |> Map.tryFind peu with
-            | Some {EventObjectId=eObjId} when 
-                    peu |> dependants |> List.forall (fun d -> isSuccessorOf d.Id eu) 
+    let rec tryFindAvailableEventObjectFor (eu: ExecUnitT<'e>)  =
+        // Event is reuseable by eu if eu depends on all dependants of the event emitter
+        // and the event has not been reused by a successor of the event emitter.
+        let rec findRec peuId =
+            match eventOfUnit |> Map.tryFind peuId with
+            | Some {EventObjectId=eObjId} as sevt when 
+                    peuId 
+                    |> dependants 
+                    |> List.forall (fun d -> isSuccessorOf d.Id eu.Id) 
+                    &&
+                    not(peuId 
+                        |> dependants 
+                        |> List.exists (usedEventsOfAndBelowExecUnit >> Seq.contains sevt.Value))
                 -> Some eObjId
             | _ -> 
-                peu |> dependsOn |> List.tryPick findRec            
-        findRec eu
+                peuId |> dependsOn |> List.tryPick findRec            
+
+        findRec eu.Id
 
     // generate streams
     while not execUnitsToProcess.IsEmpty do
@@ -167,7 +188,7 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
             | None ->
                 // if possible, reuse an existing event object
                 let evtObjId =
-                    match tryFindAvailableEventObjectsFor endingUnitId with
+                    match tryFindAvailableEventObjectFor (execUnitById endingUnitId) with
                     | Some id -> id
                     | None -> newEventObjectId()
                 let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); SendingExecUnitId=endingUnitId}

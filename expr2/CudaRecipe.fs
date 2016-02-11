@@ -128,6 +128,9 @@ let generateCalls streams =
                         | _ -> 0
                     callsBetween + syncPenalty) 
         
+            printfn "Stream situation:\n%A" streamsSorted
+            printfn "Active events:\n%A" activeEvents
+
             // find stream to process
             let strmIdToProcess, strmToProcess = 
                 streamsSorted 

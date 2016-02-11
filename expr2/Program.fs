@@ -229,11 +229,19 @@ let ``Evaluate linear regression gradient using CUDA`` () =
     let env = linearRegressionEvalEnv lr
     let cenv = linearRegressionCudaEnv lr
 
-    let allWrtsSaved =
+//    let allWrtsSaved =
+//        discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
+//                 lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
+//                 lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
+//                 lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
+
+    let allWrtsSaved = 
         discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
                  lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
                  lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
                  lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
+
+    printfn "%A" allWrtsSaved
 
     let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)

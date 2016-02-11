@@ -148,7 +148,8 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
             match call with 
             // memory management
             | CudaRecipe.MemAlloc mem -> 
-                internalMem.Add(mem, new CudaDeviceVariable<byte>(BasicTypes.SizeT(mem.Size * 4)))
+                let sizeToAlloc = if mem.Size > 0 then mem.Size else 1
+                internalMem.Add(mem, new CudaDeviceVariable<byte>(BasicTypes.SizeT(sizeToAlloc * 4)))
             | CudaRecipe.MemFree mem ->
                 internalMem.[mem].Dispose()
                 internalMem.Remove(mem) |> ignore
