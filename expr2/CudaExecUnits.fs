@@ -393,7 +393,7 @@ let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
 
 
 /// execution items for an elementwise operation
-let execItemsForElemwise  trgtView cOp srcViews =
+let execItemsForElemwise trgtView cOp srcViews =
     if srcViews |> List.exists (fun sv -> NDArrayView.nElems trgtView <> NDArrayView.nElems sv) then
         failwithf "sources have different number of elements than target"
 
@@ -424,6 +424,8 @@ let execItemsForElemwise  trgtView cOp srcViews =
             (trgtView.Shape.[0], trgtView.Shape.[1], rest)
 
     [LaunchKernel(kernel, workDim, args)]
+
+
 
 
 /// generates ExecItems to copy srcView to trgtView 

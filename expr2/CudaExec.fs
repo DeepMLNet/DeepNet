@@ -77,9 +77,6 @@ let loadCudaCode modName modCode krnlNames =
 let unloadCudaCode cuMod =
     cudaCntxt.UnloadModule(cuMod)
 
-type ThrustDelegate = delegate of int -> int
-type Thrust2Delgate = delegate of single -> single
-
 /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
 /// functions objects for the specified C function names.
 let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
@@ -186,15 +183,14 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     /// all C function calls
     let cppCalls = CudaRecipe.getAllCFuncCalls recipe
 
-    /// Function names of all C calls
-    let cFuncNames =
+    /// Function names and delegate types of all C calls
+    let cFuncDelegates =
         cppCalls
         |> List.map (fun l ->
             match l with
-            | CallCFunc(name, _) -> name
+            | CallCFunc(name, dgte, _) -> name, dgte
             | _ -> failwith "unexpected C call")
-        |> Set.ofList
-        |> Set.toList
+        |> Map.ofList
 
     // compile and load CUDA kernel module
     let modName = generateCudaModName ()
@@ -217,7 +213,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     do
         dumpCudaCode cppModName recipe.CPPCode
     /// C++ functions
-    let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncNames
+    let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncDelegates
     
     /// executes the specified calls
     let execCalls (execEnv: CudaExecEnvT) calls =
@@ -299,12 +295,13 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
                 kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
             | LaunchCPPKernel _ ->
                 failwith "cannot launch C++ kernel from CudaExec"
-            | CallCFunc (func, argTmpls) ->
+            | CallCFunc (name, _, argTmpls) ->
                 // instantiate args
                 let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
                 let argArray = args |> List.toArray
-    
-                ()//TODO
+ 
+                let func = cFuncs.[name]   
+                func.DynamicInvoke(argArray) |> ignore
             // CUBLAS
             | CublasSetStram strm ->
                 cudaBlas.Stream <- streams.[strm].Stream

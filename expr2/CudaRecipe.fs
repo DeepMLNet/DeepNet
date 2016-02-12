@@ -41,7 +41,7 @@ type CudaCallT =
     // execution control
     | LaunchCPPKernel of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
     | LaunchCKernel of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-    | CallCFunc of string * (ICudaArgTmpl list)
+    | CallCFunc of string * System.Type * (ICudaArgTmpl list)
     // CUBLAS
     | CublasSetStram of StreamT
     | CublasSgemm of CudaBlas.Operation * CudaBlas.Operation *
@@ -264,6 +264,7 @@ let buildCudaRecipe cudaEnv sizeSymbolEnv expr =
     let initCalls, disposeCalls = generateInitAndDispose memAllocs (List.length streams) eventObjCnt
 
     {KernelCode = cudaModuleHeader + krnlCache.Code;
+     CPPCode = ""; //TODO
      InitCalls = initCalls;
      DisposeCalls = disposeCalls;
      ExecCalls = execCalls;}

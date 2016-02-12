@@ -4,6 +4,7 @@
 
 #include "Ops.cuh"
 #include "NDSupport.cuh"
+#include "ThrustInterface.cuh"
 
 using namespace std;
 

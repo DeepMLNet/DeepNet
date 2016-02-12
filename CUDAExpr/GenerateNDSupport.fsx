@@ -35,35 +35,47 @@ for dims = 0 to maxDims do
     wrt "// ======================== dimensionality: %d ==================================" dims
     wrt ""
 
-    wrt "class Pos%dD {" dims
-    wrt "public:"
-    if dims > 0 then
-        wrt "   size_t pos[%d];" dims
+    wrt "struct Pos%dD {" dims
+    wrt "   size_t pos[%d];" (max dims 1)
     wrt"    template<typename TNDArray>"
     wrt "   _dev static Pos%dD fromIdx(size_t idx) {" dims
     wrt "     Pos%dD p;" dims
-    if dims > 0 then
+    if dims >= 1 then
         wrt "     const size_t incr0 = 1;"
-        for d = 1 to dims - 1 do
-            wrt "     const size_t incr%d = incr%d * TNDArray::shape(%d);" d (d-1) (d-1)
-        for d = dims - 1 downto 0 do
-            wrt "     p.pos[%d] = idx / incr%d;" d d
-            wrt "     idx -= p.pos[%d] * incr%d;" d d
+    for d = 1 to dims - 1 do
+        wrt "     const size_t incr%d = incr%d * TNDArray::shape(%d);" d (d-1) (d-1)
+    for d = dims - 1 downto 0 do
+        wrt "     p.pos[%d] = idx / incr%d;" d d
+        wrt "     idx -= p.pos[%d] * incr%d;" d d
+    if dims = 0 then
+        // to silence compiler warning
+        wrt "     p.pos[0] = 0;"
     wrt "     return p;"
     wrt "   }"
-    wrt "  	_dev size_t operator[] (const size_t dim) const {"
-    if dims > 0 then
-        wrt "     return pos[dim];"
-    else
-        wrt "     return 0;"
+    wrt"    template<typename TNDArray>"
+    wrt "   _dev static Pos%dD fromIdxWithLastDimSetToZero(size_t idx) {" dims
+    wrt "     Pos%dD p = fromIdx<TNDArray>(idx);" dims 
+    if dims >= 1 then
+        wrt "     p[%d] = 0;" (dims - 1)
+    wrt "     return p;"
+    wrt "    }"
+    wrt "    template<typename TNDArray>"
+    wrt "   _dev size_t toIdx() const {"
+    if dims >= 1 then
+        wrt "     const size_t incr0 = 1;"
+    for d = 1 to dims - 1 do
+        wrt "     const size_t incr%d = incr%d * TNDArray::shape(%d);" d (d-1) (d-1)
+    wrt "     return %s;" (ad |>> (fun i -> prn "incr%d * pos[%d]" i i) |> cwe "0" " + ")
     wrt "   }"
+    wrt "  	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }"
+    wrt "  	_dev const size_t &operator[] (const size_t dim) const { return pos[dim]; }"
     wrt "};"
     wrt ""
     
     if dims > 0 then
         wrt "template <%s>" (ad |>> prn "size_t shape%d" |> cw ", ")
-    wrt "class Shape%dD {" dims
-    wrt "public:"
+    wrt "struct ShapeStatic%dD {" dims
+    //wrt "public:"
     wrt "  	_dev static size_t shape(const size_t dim) {"
     if dims > 0 then
         wrt "      switch (dim) {"
@@ -82,8 +94,8 @@ for dims = 0 to maxDims do
     else
         wrt "template <size_t offset_, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
 
-    wrt "class Stride%dD {" dims
-    wrt "public:"
+    wrt "struct StrideStatic%dD {" dims
+    //wrt "public:"
     wrt "  	_dev static size_t stride(const size_t dim) {"
     wrt "      switch (dim) {"
     for d in ad do
@@ -111,20 +123,24 @@ for dims = 0 to maxDims do
     wrt ""
 
     wrt "template <typename TShape, typename TStride>"
-    wrt "class NDArray%dD {" dims
-    wrt "public:"
+    wrt "struct NDArrayStatic%dD {" dims
     wrt "  typedef TShape Shape;"
     wrt "  typedef TStride Stride;"
+    wrt "  typedef Pos%dD Pos;" dims
+    wrt "  float *mData;"
+    wrt ""
     wrt "  _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }"
     wrt "  _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }"
+    wrt "  _dev static size_t nDim() { return %d; }" dims
     wrt "  _dev static size_t offset() { return Stride::offset(); }"
     wrt "  _dev static size_t size() {"
     wrt "    return %s;"
         (ad |>> prn "shape(%d)" |> cwe "1" " * ")
     wrt "  }"
     wrt "  _dev static Pos%dD idxToPos(size_t idx) { return Pos%dD::fromIdx<Shape>(idx); }" dims dims
-    wrt "  _dev float *data() { return reinterpret_cast<float *>(this); }"
-    wrt "  _dev const float *data() const { return reinterpret_cast<const float *>(this); }"
+    wrt "  _dev static Pos%dD idxToPosWithLastDimSetToZero(size_t idx) { return Pos%dD::fromIdxWithLastDimSetToZero<Shape>(idx); }" dims dims
+    wrt "  _dev float *data() { return mData; }"
+    wrt "  _dev const float *data() const { return mData; }"
     wrt "  _dev float &element(%s) {"
         (ad |>> prn "size_t pos%d" |> cw ", ")
     wrt "    return data()[Stride::index(%s)];"
