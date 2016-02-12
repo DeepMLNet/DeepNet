@@ -229,19 +229,13 @@ let ``Evaluate linear regression gradient using CUDA`` () =
     let env = linearRegressionEvalEnv lr
     let cenv = linearRegressionCudaEnv lr
 
-//    let allWrtsSaved =
-//        discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
-//                 lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
-//                 lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
-//                 lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
-
     let allWrtsSaved = 
         discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
                  lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
                  lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
                  lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
 
-    printfn "%A" allWrtsSaved
+    //printfn "%A" allWrtsSaved
 
     let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)
@@ -261,11 +255,11 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 let main argv = 
     CudaBasics.printCudaInfo ()
 
-    ``Build linear regression`` ()
+    //``Build linear regression`` ()
     //``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
     //``Eval forward gradient of linear regression`` ()
-    //``Eval reverse gradient of linear regression`` ()
+    ``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()

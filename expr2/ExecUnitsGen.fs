@@ -45,6 +45,22 @@ module NDArrayView =
     let nElems a =
         List.fold (*) 1 a.Shape
 
+    /// transposes the view of a matrix
+    let transpose a =
+        if nDim a <> 2 then failwith "need a matrix to transpose"
+        {a with Shape=List.rev a.Shape; Stride=List.rev a.Stride}
+
+    /// true if NDArrayView can be target of a BLAS operation
+    let isBlasTargetable a =
+        if nDim a = 2 then a.Stride = NDArray.columnMajorStride a.Shape
+        else false
+
+    /// creates a new memory allocation and a new NDArrayView with 
+    /// memory layout suitable for being a BLAS target
+    let newBlasTarget memAllocator shape =
+        {newContinguous memAllocator shape with
+            Stride=NDArray.columnMajorStride shape}
+
     /// true if views a and b have at least one element in common
     let overlapping a b = false // TODO
     
@@ -70,7 +86,7 @@ type EvalReqT = {Id: int;
                  OnCompletion: EvalResultT -> unit}
 
 /// generator function record
-type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : NDArrayViewT -> AnyOpT -> NDArrayViewT list -> 'e list;
+type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : (int -> MemoryT) -> NDArrayViewT -> AnyOpT -> NDArrayViewT list -> 'e list;
                                 TrgtViewGivenSrc: (int -> MemoryT) -> NShapeSpecT -> NDArrayViewT option -> AnyOpT -> NDArrayViewT list -> bool list -> NDArrayViewT * bool;
                                 SrcViewReqsGivenTrgt: NShapeSpecT -> NDArrayViewT option -> AnyOpT -> NShapeSpecT list -> NDArrayViewT option list;}
 
@@ -169,7 +185,7 @@ let exprToExecUnits gen (sizeSymbolEnv: SymbolEnvT) (expr: UExprT) =
                             gen.TrgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op srcViews srcShared
                        
                         // emit execution unit 
-                        let eu = {newExecUnit() with Items=gen.ExecItemsForOp trgtView op srcViews;
+                        let eu = {newExecUnit() with Items=gen.ExecItemsForOp newMemory trgtView op srcViews;
                                                      DependsOn=srcExeUnitIds}                                    
                         submitExecUnit eu
 

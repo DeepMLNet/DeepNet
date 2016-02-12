@@ -16,6 +16,14 @@ let generateCudaModName () =
     cudaModCntr <- cudaModCntr + 1
     sprintf "mod%d.cu" cudaModCntr
 
+
+/// dumps CUDA kernel code to a file
+let dumpCudaCode (modName: string) (modCode: string) =
+    let filename = modName
+    use tw = new System.IO.StreamWriter(filename)
+    tw.Write(modCode)
+    printfn "Wrote CUDA module code to %s" filename
+
 /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
 /// ManagedCuda.CudaKernel objects for the specified kernel names.
 let loadCudaCode modName modCode krnlNames =
@@ -27,7 +35,7 @@ let loadCudaCode modName modCode krnlNames =
                       sprintf "--gpu-architecture=%s" gpuArch; 
                       sprintf "--include-path=\"%s\"" includePath|]
 
-    printfn "CUDA compilation of %s with arguments \"%s\":" modName (cmplrArgs |> String.combineWith " ")
+    printfn "nvrtc %s %s" (cmplrArgs |> String.combineWith " ") modName 
     try
         cmplr.Compile(cmplrArgs)
     with
@@ -63,14 +71,64 @@ let loadCudaCode modName modCode krnlNames =
         |> Seq.fold (fun krnls name -> 
             krnls |> Map.add name (CudaKernel(name, cuMod, cudaCntxt))) 
             Map.empty
-    krnls
+    krnls, cuMod
 
-/// dumps CUDA kernel code to a file
-let dumpCudaCode (modName: string) (modCode: string) =
-    let filename = modName
-    use tw = new System.IO.StreamWriter(filename)
-    tw.Write(modCode)
-    printfn "Wrote CUDA module code to %s" filename
+/// unloads previously loaded CUDA kernel code
+let unloadCudaCode cuMod =
+    cudaCntxt.UnloadModule(cuMod)
+
+type ThrustDelegate = delegate of int -> int
+type Thrust2Delgate = delegate of single -> single
+
+/// Compiles the given CUDA C++ device/host code into a module, loads it and returns
+/// functions objects for the specified C function names.
+let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
+    let gpuArch = "compute_30"
+    let includePath = assemblyDirectory
+
+    let libName = (System.IO.Path.GetFileNameWithoutExtension modName) + ".dll"
+
+    use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
+    let cmplrArgs = ["--std=c++11";
+                     sprintf "--gpu-architecture=%s" gpuArch; 
+                     sprintf "--include-path=\"%s\"" includePath;
+                     sprintf "-o \"%s\"" libName;
+                     sprintf "\"%s\"" modName]
+    let cmplrArgStr = cmplrArgs |> String.combineWith " "
+
+    printfn "nvcc %s" cmplrArgStr
+
+    use prcs = new System.Diagnostics.Process()
+    prcs.StartInfo.FileName <- "nvcc.exe"
+    prcs.StartInfo.Arguments <- cmplrArgStr
+    prcs.Start() |> ignore
+    prcs.WaitForExit()
+
+    if prcs.ExitCode <> 0 then
+        printfn "Compile error"
+        exit 1
+
+    // load compiled library
+    let libHndl = LoadLibrary(libName)
+    if libHndl = System.IntPtr.Zero then
+        raise (System.ComponentModel.Win32Exception(sprintf "LoadLibrary of %s failed" libName))
+
+    // get function addresses and build delegates
+    let funcs =
+        funcDelegates
+        |> Map.map (fun name delegateType ->
+            let addr = GetProcAddress(libHndl, name)
+            if addr = System.IntPtr.Zero then
+                 raise (System.ComponentModel.Win32Exception(sprintf "GetProcAddress of %s in %s failed" name libName))
+            System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer (addr, delegateType))
+
+    funcs, libHndl
+
+/// unloads previously loaded CUDA C++ code
+let unloadCppCode libHndl =
+    let ret = FreeLibrary(libHndl)
+    if not ret then
+        raise (System.ComponentModel.Win32Exception("FreeLibrary failed"))        
 
 
 /// Computes CUDA launch dimensions from work dimensions and maximum block size.
@@ -125,12 +183,25 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
             | _ -> failwith "unexpected CUDA call")
         |> Set.ofList
 
-    // compile and load CUDA module
+    /// all C function calls
+    let cppCalls = CudaRecipe.getAllCFuncCalls recipe
+
+    /// Function names of all C calls
+    let cFuncNames =
+        cppCalls
+        |> List.map (fun l ->
+            match l with
+            | CallCFunc(name, _) -> name
+            | _ -> failwith "unexpected C call")
+        |> Set.ofList
+        |> Set.toList
+
+    // compile and load CUDA kernel module
     let modName = generateCudaModName ()
     do
         dumpCudaCode modName recipe.KernelCode
     /// CUDA kernels
-    let kernels = loadCudaCode modName recipe.KernelCode kernelCNames
+    let kernels, krnlModHndl = loadCudaCode modName recipe.KernelCode kernelCNames
 
     /// CUDA launch sizes for specified WorkDims
     let kernelLaunchDims =
@@ -140,6 +211,13 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
             let maxBlockSize = kernels.[name].GetOccupancyMaxPotentialBlockSize().blockSize
             (name, workDim), computeLaunchDim workDim maxBlockSize)
         |> Map.ofSeq
+
+    // compile and load CUDA C++ host/device module
+    let cppModName = generateCudaModName ()
+    do
+        dumpCudaCode cppModName recipe.CPPCode
+    /// C++ functions
+    let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncNames
     
     /// executes the specified calls
     let execCalls (execEnv: CudaExecEnvT) calls =
@@ -221,6 +299,26 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
                 kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
             | LaunchCPPKernel _ ->
                 failwith "cannot launch C++ kernel from CudaExec"
+            | CallCFunc (func, argTmpls) ->
+                // instantiate args
+                let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
+                let argArray = args |> List.toArray
+    
+                ()//TODO
+            // CUBLAS
+            | CublasSetStram strm ->
+                cudaBlas.Stream <- streams.[strm].Stream
+            | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt) ->   
+                let aVar = (a :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
+                let bVar = (b :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
+                let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
+                let m = a.GetRowsForOp execEnv aOp
+                let n = b.GetColumnsForOp execEnv bOp
+                let k = a.GetColumnsForOp execEnv aOp
+                let ldA = a.GetLeadingDimension execEnv
+                let ldB = b.GetLeadingDimension execEnv
+                let ldTrgt = trgt.GetLeadingDimension execEnv
+                cudaBlas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
     // initialize
     do
@@ -230,6 +328,8 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     interface System.IDisposable with
         member this.Dispose() = 
             execCalls {InternalMem=internalMem; ExternalVar=Map.empty; HostVar=Map.empty} recipe.DisposeCalls
+            unloadCppCode cLibHndl
+            unloadCudaCode krnlModHndl
 
     /// Evaluate expression.
     member this.Eval(externalVar: Map<Op.VarSpecT, NDArrayDev.NDArrayDev>,

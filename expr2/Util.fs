@@ -1,5 +1,8 @@
 ﻿module Util
 
+open System.Runtime.InteropServices
+open System
+
 [<Measure>]
 type bytes
 
@@ -68,3 +71,16 @@ let assemblyDirectory =
 /// converts sequence of ints to sequence of strings
 let intToStrSeq items =
     Seq.map (sprintf "%d") items
+
+
+
+[<DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Ansi)>]
+extern IntPtr LoadLibrary([<MarshalAs(UnmanagedType.LPStr)>] string dllToLoad)
+
+[<DllImport("kernel32.dll", CharSet=CharSet.Ansi, ExactSpelling=true, SetLastError=true)>]
+extern IntPtr GetProcAddress(IntPtr hModule, string procedureName)
+
+[<DllImport("kernel32.dll", SetLastError=true)>]
+extern [<return: MarshalAs(UnmanagedType.Bool)>] bool FreeLibrary(IntPtr hModule)
+
+

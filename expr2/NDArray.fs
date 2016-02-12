@@ -94,13 +94,31 @@ let rec contiguousStride (shape: int list) =
                 | sp::srest -> (lp*sp)::sp::srest
                 | [] -> failwith "unexpected"    
 
+/// computes the stride given the shape for the NDArray to be in Fortran order (column-major)
+let columnMajorStride (shape: int list) =
+    let rec buildStride elemsLeft shape =
+        match shape with
+        | [] -> []
+        | l :: ls ->
+            elemsLeft :: buildStride (l * elemsLeft) ls
+
+    buildStride 1 shape
+
 /// true if the NDArray is continguous
 let isContiguous (a: NDArray) =
     a.Stride = contiguousStride a.Shape    
 
+/// true if the NDArray is in Fortran order
+let isColumnMajor (a: NDArray) =
+    a.Stride = columnMajorStride a.Shape
+
 /// creates a new continguous NDArray of the given shape and fills it with zeros
 let newContinguous shp =
     {Shape=shp; Stride=contiguousStride shp; Offset=0; Data=Array.zeroCreate (nElems shp)}
+
+/// creates a new column-major NDArray of the given shape and fills it with zeros
+let newColumnMajor shp =
+    {newContinguous shp with Stride=columnMajorStride shp}
 
 /// checks that two NDArrays have the same shape
 let checkSameShape a b =

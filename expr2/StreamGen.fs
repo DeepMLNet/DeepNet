@@ -7,7 +7,7 @@ open ExecUnitsGen
 type StreamT = int
 
 /// an event that can be used for synchronization
-type EventT = {EventObjectId: int; CorrelationId: int; SendingExecUnitId: int}
+type EventT = {EventObjectId: int; CorrelationId: int; EmittingExecUnitId: int}
 
 /// a placeholder (reference to) an event
 type EventPlaceHolderT = EventT option ref
@@ -191,7 +191,7 @@ let execUnitsToStreamCommands (execUnits: ExecUnitT<'e> list) : (StreamSeqT<'e> 
                     match tryFindAvailableEventObjectFor (execUnitById endingUnitId) with
                     | Some id -> id
                     | None -> newEventObjectId()
-                let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); SendingExecUnitId=endingUnitId}
+                let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); EmittingExecUnitId=endingUnitId}
                 eventOfUnit <- eventOfUnit |> Map.add endingUnitId evt
                 
                 // fill in event placeholder and wait for event

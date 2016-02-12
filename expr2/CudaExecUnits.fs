@@ -92,6 +92,67 @@ type HostMemRngT =
 type IHostMemRngTmpl =
     abstract member GetRng : CudaExecEnvT -> HostMemRngT
     
+/// BLAS transpose operation
+type BlasOpT =
+    | BlasId
+    | BlasTranspose
+
+    member this.CudaBlasOperation =
+        match this with
+        | BlasId -> CudaBlas.Operation.NonTranspose
+        | BlasTranspose -> CudaBlas.Operation.Transpose
+
+// All CUBLAS calls use Fortran matrices. This means:
+// - one-based indexing
+// - column major
+// For NDArray this translates to:
+// CUBLAS #columns    = Shape.[0]
+// CUBLAS #rows       = Shape.[1]
+// CUBLAS leading dim = Stride.[0] >= 1 (no broadcasting)
+// Stride.[1] must be 1.
+
+/// BLAS view of NDArray. The NDArray is implicitly transposed and exposed as a "float *"
+type BlasTransposedMatrixTmpl (view: NDArrayViewT) =
+    do
+        match view.Stride with
+        | [0; _] -> failwithf "NDArray for use with BLAS cannot be broadcasted in first dimension"
+        | [_; n] when n <> 1 -> failwithf "NDArray for use with BLAS must be continguous in last dimension but has stride %d" n
+        | [_; _] -> ()
+        | _ -> failwith "NDArray for use with BLAS must be 2-dimensional"         
+
+    member this.GetLeadingDimension env =
+        view.Stride.[0] 
+
+    member this.GetColumns env =
+        view.Shape.[0]
+
+    member this.GetRows env =
+        view.Shape.[1]
+
+    member this.GetColumnsForOp env op =
+        match op with 
+        | CudaBlas.Operation.NonTranspose -> this.GetColumns env
+        | CudaBlas.Operation.Transpose 
+        | CudaBlas.Operation.ConjugateTranspose -> this.GetRows env
+        | _ -> failwithf "unknown CudaBlas.Operation %A" op
+
+    member this.GetRowsForOp env op =
+        match op with 
+        | CudaBlas.Operation.NonTranspose -> this.GetRows env
+        | CudaBlas.Operation.Transpose 
+        | CudaBlas.Operation.ConjugateTranspose -> this.GetColumns env
+        | _ -> failwithf "unknown CudaBlas.Operation %A" op
+
+    interface ICudaArgTmpl with
+        member this.CPPTypeName = "float *"
+        member this.CPPTypeNameWithoutPtr = "float"
+        member this.GetArg env = 
+            let devVar = CudaExecEnv.getDevVar env view
+            // need to adjust by offset
+            let offsetBytes = view.Offset * 4
+            new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetBytes), 
+                                           devVar.SizeInBytes - offsetBytes) :> obj
+
 /// a CUDA operation 
 type CudaOpT =
     // memory operations
@@ -101,6 +162,13 @@ type CudaOpT =
     | Memset of single * IDevMemRngTmpl
     // kernel execution
     | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
+    // CUBLAS calls 
+    | BlasGemm of BlasOpT * BlasOpT *  
+                  single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
+                  single * BlasTransposedMatrixTmpl
+    // Thrust calls
+    //| ThrustSum  
+
 
 /// CUDA C++ operation functor description
 type ICudaOp =
@@ -170,6 +238,12 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
         match reqView with
         | Some rv when not (List.exists (NDArrayView.overlapping rv) srcViews) -> rv, false
         | _ -> NDArrayView.newContinguous memAllocator trgtShape, false        
+
+    let outplaceBlasTrgt =
+        match reqView with
+        | Some rv when not (List.exists (NDArrayView.overlapping rv) srcViews) &&
+                       NDArrayView.isBlasTargetable rv -> rv, false
+        | _ -> NDArrayView.newBlasTarget memAllocator trgtShape, false
 
     // target that reuses a srcView, if it may be overwritten
     let inplaceOverwriteTrgt =
@@ -241,7 +315,7 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
     | BinaryOp Divide -> inplaceOverwriteTrgt
     | BinaryOp Power -> inplaceOverwriteTrgt
     // matrix/tensor operations
-    | BinaryOp Dot -> outplaceTrgt
+    | BinaryOp Dot -> outplaceBlasTrgt
     | BinaryOp TensorProduct -> outplaceTrgt
 
     // nary
@@ -319,7 +393,7 @@ let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
 
 
 /// execution items for an elementwise operation
-let execItemsForElemwise trgtView cOp srcViews =
+let execItemsForElemwise  trgtView cOp srcViews =
     if srcViews |> List.exists (fun sv -> NDArrayView.nElems trgtView <> NDArrayView.nElems sv) then
         failwithf "sources have different number of elements than target"
 
@@ -352,8 +426,33 @@ let execItemsForElemwise trgtView cOp srcViews =
     [LaunchKernel(kernel, workDim, args)]
 
 
+/// generates ExecItems to copy srcView to trgtView 
+let copyExecItems trgtView srcView =
+    if NDArrayView.nElems trgtView <> NDArrayView.nElems srcView then
+        failwithf "cannot copy array with %d elements to array with %d elements"
+            (NDArrayView.nElems trgtView) (NDArrayView.nElems srcView)
+    execItemsForElemwise trgtView (NoArgEOpTmpl("IdEOp_t", false)) [srcView]
+
+/// BLAS arg passing, so that orientation is preserved
+let blasArg memAllocator (view: NDArrayViewT) =
+    match view.Stride with
+    | [_; 1] -> view, BlasTranspose, []
+    | [1; _] -> NDArrayView.transpose view, BlasId, []
+    | [_; _] -> 
+        // need to copy
+        let tmpView = NDArrayView.newContinguous memAllocator view.Shape
+        let copyOps = copyExecItems tmpView view
+        tmpView, BlasTranspose, copyOps
+    | _ -> failwith "need 2-dimensional array for BLAS argument"
+
+/// BLAS result processing, so that orientation is preserved
+let blasTarget (view: NDArrayViewT) =
+    match view.Stride with
+    | [1; _] -> NDArrayView.transpose view
+    | _ -> failwith "cannot use specified view as BLAS target"
+
 /// returns the execution units for the specified op
-let execItemsForOp cudaEnv trgtView op srcViews =
+let execItemsForOp cudaEnv memAllocator trgtView op srcViews =
     match op with 
     // tensor creation
     | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView (NoArgEOpTmpl("DiagonalOneIEOp_t", true)) []
@@ -374,22 +473,19 @@ let execItemsForOp cudaEnv trgtView op srcViews =
     | UnaryOp Log -> execItemsForElemwise trgtView (NoArgEOpTmpl("LogEOp_t", false)) srcViews
     | UnaryOp Exp -> execItemsForElemwise trgtView (NoArgEOpTmpl("ExpEOp_t", false)) srcViews
     // reductions
-    | UnaryOp Sum -> execItemsForElemwise trgtView (NoArgEOpTmpl("Sum", false)) srcViews // TODO
-    | UnaryOp (SumAxis _) -> execItemsForElemwise trgtView (NoArgEOpTmpl("SumAxis", false)) srcViews // TODO
+    | UnaryOp Sum -> [] // TODO
+    | UnaryOp (SumAxis _) -> [] // TODO
     // shape operations
     | UnaryOp (Reshape _) ->
-        if trgtView <> srcViews.[0] then execItemsForElemwise trgtView (NoArgEOpTmpl("IdEOp_t", false)) srcViews
+        if trgtView <> srcViews.[0] then copyExecItems trgtView srcViews.[0]
         else []
     | UnaryOp (Broadcast _) -> []
     | UnaryOp (SwapDim _) -> []
     // variable access
     | UnaryOp (StoreToVar vs) ->
         let copyItems = 
-            if trgtView <> srcViews.[0] then
-                execItemsForElemwise trgtView (NoArgEOpTmpl("IdEOp_t", false)) srcViews
-            else
-                []
-
+            if trgtView <> srcViews.[0] then copyExecItems trgtView srcViews.[0]
+            else []
         match cudaEnv.VarStorLoc |> Map.find vs with
         | DevVar -> 
             // trgtView is the variable we need to store into
@@ -410,7 +506,15 @@ let execItemsForOp cudaEnv trgtView op srcViews =
     | BinaryOp Divide -> execItemsForElemwise trgtView (NoArgEOpTmpl("DivideEOp_t", false)) srcViews
     | BinaryOp Power -> execItemsForElemwise trgtView (NoArgEOpTmpl("PowerEOp_t", false)) srcViews
     // matrix/tensor operations
-    | BinaryOp Dot -> [] // TODO
+    | BinaryOp Dot -> 
+        let aView, aOp, aCopyItems = blasArg memAllocator srcViews.[0]
+        let bView, bOp, bCopyItems = blasArg memAllocator srcViews.[1]
+        let tView = blasTarget trgtView
+        let blasItems = [BlasGemm(aOp, bOp, 1.0f, 
+                                  BlasTransposedMatrixTmpl(aView), 
+                                  BlasTransposedMatrixTmpl(bView),
+                                  0.0f, BlasTransposedMatrixTmpl(tView))]
+        aCopyItems @ bCopyItems @ blasItems
     | BinaryOp TensorProduct -> [] // TODO
 
     // nary

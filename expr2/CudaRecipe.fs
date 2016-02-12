@@ -41,6 +41,13 @@ type CudaCallT =
     // execution control
     | LaunchCPPKernel of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
     | LaunchCKernel of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+    | CallCFunc of string * (ICudaArgTmpl list)
+    // CUBLAS
+    | CublasSetStram of StreamT
+    | CublasSgemm of CudaBlas.Operation * CudaBlas.Operation *
+                     single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
+                     single * BlasTransposedMatrixTmpl 
+
 
 /// function instantiation state
 type KernelInstCacheT = {mutable Insts: (TmplInstT * string) list;
@@ -48,18 +55,27 @@ type KernelInstCacheT = {mutable Insts: (TmplInstT * string) list;
 
 /// CUDA execution recipe
 type CudaRecipeT = {KernelCode: string;
+                    CPPCode: string;
                     InitCalls: CudaCallT list;
                     DisposeCalls: CudaCallT list;
                     ExecCalls: CudaCallT list;}
 
 module CudaRecipe =
     /// gets all CUDA C kernel launches performed 
-    let getAllCKernelLaunches recipe =
+    let getAllCKernelLaunches recipe = 
         let extract = List.filter (fun c -> 
             match c with 
             | LaunchCKernel _ -> true
             | _ -> false)
         (extract recipe.InitCalls) @ (extract recipe.DisposeCalls) @ (extract recipe.ExecCalls)
+
+    let getAllCFuncCalls recipe =
+        let extract = List.filter (fun c -> 
+            match c with 
+            | CallCFunc _ -> true
+            | _ -> false)
+        (extract recipe.InitCalls) @ (extract recipe.DisposeCalls) @ (extract recipe.ExecCalls)
+
 
 /// instantiates a template CUDA C++ kernel with a C linkage function name and returns the C function name
 let instTmplKernel cache (ti: TmplInstT) =  
@@ -126,30 +142,35 @@ let generateCalls streams =
                         | EmitEvent _::_ -> 1000
                         | WaitOnEvent _::_ -> -1000
                         | _ -> 0
-                    callsBetween + syncPenalty) 
-        
-            printfn "Stream situation:\n%A" streamsSorted
-            printfn "Active events:\n%A" activeEvents
+                    callsBetween + syncPenalty)         
 
             // find stream to process
             let strmIdToProcess, strmToProcess = 
-                streamsSorted 
-                |> List.find (fun (_, strm) ->
-                    match strm with
-                    | WaitOnEvent evt ::_ when 
-                        activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
-                        // WaitOnEvent can only be called when EmitEvent 
-                        // with same CorrelationId has been called before.
-                    | WaitOnEvent _ ::_ -> false
-                    | EmitEvent evtp ::_ ->
-                        match !evtp with
-                        | Some evt when
-                            activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
-                            // EmitEvent for a given event must be called
-                            // after all necessary calls to WaitOnEvent for a previous correlation.
-                        | _ -> true
-                    | [] -> false
-                    | _ -> true)
+                try
+                    streamsSorted 
+                    |> List.find (fun (_, strm) ->
+                        match strm with
+                        | WaitOnEvent evt ::_ when 
+                            activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
+                            // WaitOnEvent can only be called when EmitEvent 
+                            // with same CorrelationId has been called before.
+                        | WaitOnEvent _ ::_ -> false
+                        | EmitEvent evtp ::_ ->
+                            match !evtp with
+                            | Some evt when
+                                activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
+                                // EmitEvent for a given event must be called
+                                // after all necessary calls to WaitOnEvent for a previous correlation.
+                            | _ -> true
+                        | [] -> false
+                        | _ -> true)
+                with
+                :? System.Collections.Generic.KeyNotFoundException ->
+                    // cannot find a stream that matches above rules
+                    printfn "Error: deadlock during stream sequencing"
+                    printfn "Streams to process:\n%A" streamsSorted
+                    printfn "Active events:\n%A" activeEvents
+                    failwith "deadlock during stream sequencing"
 
             // book keeping
             let execOp = List.head strmToProcess       
@@ -177,10 +198,6 @@ let generateCalls streams =
                 // perform a non-synchronization operation
                 let streamCallHistory = strmIdToProcess :: streamCallHistory
 
-//                let getDevMem t = {DevMemPtrT.Base = t.Memory; Offset = 0;}
-//                let getHostMem t =
-//                    {HostMemPtrT.Base = {HostExternalMemT.Name = t}; Offset=0;}
-
                 // generate CUDA call template
                 let calls = 
                     match cmd with
@@ -193,7 +210,11 @@ let generateCalls streams =
                     | MemcpyDtoH(src, hostTrgt) ->
                         [MemcpyDtoHAsync(hostTrgt, src, strmIdToProcess)]   
                     | Memset(value, trgt) ->                        
-                        [MemsetD32Async(trgt, single value, strmIdToProcess)]            
+                        [MemsetD32Async(trgt, single value, strmIdToProcess)]      
+                    | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
+                        [CublasSetStram(strmIdToProcess);
+                         CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
+                                     aFac, a, b, trgtFac, trgt)]      
 
                 calls @ generate streamCallHistory activeEvents remainingStreams
             | ExecUnitStartInfo _ | ExecUnitEndInfo -> 

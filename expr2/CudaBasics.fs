@@ -51,12 +51,17 @@ let printCudaInfo () =
     printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
     printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
 
-    
+
+// CUDA BLAS handle
+let cudaBlas =
+    new CudaBlas.CudaBlas()
+
 /// shutsdown CUDA (necessary for correct profiler results)  
 let shutdown () =
     cudaCntxt.Synchronize ()
-    CudaContext.ProfilerStop ()
+    cudaBlas.Dispose ()
     cudaCntxt.Dispose ()
+    CudaContext.ProfilerStop ()
 
 
 
