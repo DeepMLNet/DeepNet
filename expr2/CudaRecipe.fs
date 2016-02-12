@@ -1,20 +1,26 @@
 ﻿module CudaRecipe
 
+open ManagedCuda
+
 open Util
 open ExecUnitsGen
 open CudaExecUnits
 open StreamGen
 open CudaBasics
-open ManagedCuda
 
-/// Header of generated CUDA module
-let cudaModuleHeader =
+/// Header of generated CUDA kernel module
+let kernelModuleHeader =
     "#include \"NDSupport.cuh\"\n\
      #include \"Ops.cuh\"\n\n"
 
+/// Header of generated C++ module
+let cppModuleHeader =
+    "#include \"ThrustInterface.cuh\"\n\
+     #include \"Reduce.cuh\"\n\n"
+
+
 /// CUDA event object
 type EventObjectT = int
-
 
 /// CUDA call flags
 type CudaFlagsT = int
@@ -50,8 +56,16 @@ type CudaCallT =
 
 
 /// function instantiation state
-type KernelInstCacheT = {mutable Insts: (TmplInstT * string) list;
-                         mutable Code: string} 
+type TmplInstCacheT = {mutable Insts: (TmplInstT * string) list;
+                         mutable Code: (TmplInstT * string) list;} 
+
+module TmplInstCache =
+    /// gets the generated code for the specified domain
+    let getCodeForDomain domain cache =
+        cache.Code
+        |> List.fold (fun code (ti, tiCode) ->
+            if ti.Domain = domain then code + "\n" + tiCode
+            else code) ""
 
 /// CUDA execution recipe
 type CudaRecipeT = {KernelCode: string;
@@ -77,8 +91,8 @@ module CudaRecipe =
         (extract recipe.InitCalls) @ (extract recipe.DisposeCalls) @ (extract recipe.ExecCalls)
 
 
-/// instantiates a template CUDA C++ kernel with a C linkage function name and returns the C function name
-let instTmplKernel cache (ti: TmplInstT) =  
+/// instantiates a template C++ function with a unique C linkage function name and returns the C function name
+let instCPPTmplFunc cache (ti: TmplInstT) =  
     match cache.Insts |> List.tryFind (fun (cti, _) -> cti = ti) with
     | Some (_, cName) -> cName
     | None ->
@@ -87,27 +101,26 @@ let instTmplKernel cache (ti: TmplInstT) =
             cache.Insts 
             |> List.filter (fun (oti, _) -> oti.FuncName = ti.FuncName) 
             |> List.length
-        let firstArgStr = 
-            match ti.TmplArgs with
-            | fa::_ -> fa.Replace("<", "_").Replace(">", "_").Replace(".", "_")
-            | _ -> ""
-        let cName = sprintf "%s_%s_%d" ti.FuncName firstArgStr nPrv
+        let cName = sprintf "%s_%d" ti.FuncName nPrv
         cache.Insts <- (ti, cName)::cache.Insts
 
         // generate template instantiation with C linkage
         //let instStr =
         //    if List.isEmpty ti.TmplArgs then ti.FuncName
         //    else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> String.combineWith ", ")
+        let krnlStr = match ti.Domain with
+                      | KernelFunc -> "__global__"
+                      | CPPFunc -> "__declspec(dllexport)"
         let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> String.combineWith ", "
         let argCallStr = ti.ArgTypes |> List.mapi (fun i _ -> sprintf "p%d" i) |> String.combineWith ", "
         let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
         let declStr =
-            sprintf "extern \"C\" __global__ %s %s (%s) {\n" ti.RetType cName argDeclStr
+            sprintf "extern \"C\" %s %s %s (%s) {\n" krnlStr ti.RetType cName argDeclStr
             + sprintf "  %s %s (%s);\n" retCmd ti.FuncName argCallStr
             //+ sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
             + sprintf "}\n"
             + sprintf "\n"
-        cache.Code <- cache.Code + declStr
+        cache.Code <- (ti, declStr)::cache.Code
 
         cName
 
@@ -124,7 +137,7 @@ let generateCalls streams =
         } |> Seq.countBy id |> Map.ofSeq
         
     /// mutable kernel instantiation cache
-    let cache = {Insts=[]; Code=""}
+    let cache = {Insts=[]; Code=[]}
 
     let rec generate streamCallHistory activeEvents streams =
         if List.exists ((<>) []) streams then
@@ -202,7 +215,9 @@ let generateCalls streams =
                 let calls = 
                     match cmd with
                     | LaunchKernel(ti, workDim, args) -> 
-                        [LaunchCKernel(instTmplKernel cache ti, workDim, 0, strmIdToProcess, args)]
+                        [LaunchCKernel(instCPPTmplFunc cache ti, workDim, 0, strmIdToProcess, args)]
+                    | CudaOpT.CallCFunc(ti, dlgte, args) ->
+                        [CallCFunc(instCPPTmplFunc cache ti, dlgte, args)]
                     | MemcpyDtoD(src, trgt) -> 
                         [MemcpyAsync(trgt, src, strmIdToProcess)]
                     | MemcpyHtoD(hostSrc, trgt) -> 
@@ -260,11 +275,11 @@ let generateInitAndDispose memAllocs streamCnt eventObjCnt =
 let buildCudaRecipe cudaEnv sizeSymbolEnv expr =
     let execUnits, exprRes, memAllocs = exprToCudaExecUnits cudaEnv sizeSymbolEnv expr
     let streams, eventObjCnt = execUnitsToStreamCommands execUnits
-    let execCalls, krnlCache = generateCalls streams
+    let execCalls, tmplInstCache = generateCalls streams
     let initCalls, disposeCalls = generateInitAndDispose memAllocs (List.length streams) eventObjCnt
 
-    {KernelCode = cudaModuleHeader + krnlCache.Code;
-     CPPCode = ""; //TODO
+    {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
+     CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;
      InitCalls = initCalls;
      DisposeCalls = disposeCalls;
      ExecCalls = execCalls;}

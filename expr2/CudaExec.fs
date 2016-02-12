@@ -8,6 +8,9 @@ open CudaExecUnits
 open ExecUnitsGen
 
 
+let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
+
+
 /// generated CUDA module counter
 let mutable cudaModCntr = 0
 
@@ -85,8 +88,8 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
 
     let libName = (System.IO.Path.GetFileNameWithoutExtension modName) + ".dll"
 
-    use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-    let cmplrArgs = ["--std=c++11";
+    let cmplrArgs = ["--shared";
+                     sprintf "--compiler-bindir \"%s\"" hostCompilerDir;
                      sprintf "--gpu-architecture=%s" gpuArch; 
                      sprintf "--include-path=\"%s\"" includePath;
                      sprintf "-o \"%s\"" libName;
@@ -98,6 +101,7 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
     use prcs = new System.Diagnostics.Process()
     prcs.StartInfo.FileName <- "nvcc.exe"
     prcs.StartInfo.Arguments <- cmplrArgStr
+    prcs.StartInfo.UseShellExecute <- false
     prcs.Start() |> ignore
     prcs.WaitForExit()
 
@@ -188,7 +192,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
         cppCalls
         |> List.map (fun l ->
             match l with
-            | CallCFunc(name, dgte, _) -> name, dgte
+            | CudaCallT.CallCFunc(name, dgte, _) -> name, dgte
             | _ -> failwith "unexpected C call")
         |> Map.ofList
 
@@ -295,7 +299,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
                 kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
             | LaunchCPPKernel _ ->
                 failwith "cannot launch C++ kernel from CudaExec"
-            | CallCFunc (name, _, argTmpls) ->
+            | CudaCallT.CallCFunc (name, _, argTmpls) ->
                 // instantiate args
                 let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
                 let argArray = args |> List.toArray

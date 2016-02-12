@@ -63,6 +63,11 @@ module NDArrayView =
 
     /// true if views a and b have at least one element in common
     let overlapping a b = false // TODO
+
+    /// reorders the axes of the NDArrayView as specified
+    let reorderAxes (newOrder: int list) a =
+        {a with Shape = List.permute (fun i -> newOrder.[i]) a.Shape;
+                Stride = List.permute (fun i -> newOrder.[i]) a.Stride;}
     
 
 /// Id of an ExecUnitT

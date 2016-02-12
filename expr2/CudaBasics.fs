@@ -60,8 +60,8 @@ let cudaBlas =
 let shutdown () =
     cudaCntxt.Synchronize ()
     cudaBlas.Dispose ()
-    cudaCntxt.Dispose ()
     CudaContext.ProfilerStop ()
+    cudaCntxt.Dispose ()
 
 
 

@@ -1,12 +1,14 @@
 ﻿module CudaExecUnits
 
+open System
 open System.Runtime.InteropServices
 open ManagedCuda
+
 open Util
 open Op
 open ExecUnitsGen
 open CudaRegMem
-open System
+open NDArrayDev
 
 /// device memory pointer
 type DevMemPtrT = {Base: MemoryT;
@@ -26,9 +28,13 @@ type VarStorLocT =
 /// additional environment informations for CUDA
 type CudaEnvT = {VarStorLoc: Map<VarSpecT, VarStorLocT>}
 
+type FuncDomainT =
+    | KernelFunc
+    | CPPFunc
+
 /// template instantiation specification
-type TmplInstT = {FuncName: string; TmplArgs: string list; 
-                  RetType: string; ArgTypes: string list;}
+type TmplInstT = {FuncName: string; Domain: FuncDomainT; 
+                  TmplArgs: string list; RetType: string; ArgTypes: string list;}
 
 /// dimensionality of parallel work to perform
 type WorkDimT = int * int * int
@@ -160,14 +166,13 @@ type CudaOpT =
     | MemcpyHtoD of IHostMemRngTmpl * IDevMemRngTmpl
     | MemcpyDtoH of IDevMemRngTmpl * IHostMemRngTmpl
     | Memset of single * IDevMemRngTmpl
-    // kernel execution
+    // execution control
     | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
+    | CallCFunc of TmplInstT * System.Type * (ICudaArgTmpl list)
     // CUBLAS calls 
     | BlasGemm of BlasOpT * BlasOpT *  
                   single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                   single * BlasTransposedMatrixTmpl
-    // Thrust calls
-    //| ThrustSum  
 
 
 /// CUDA C++ operation functor description
@@ -181,12 +186,12 @@ type NDArrayPtrArgTmpl (view: NDArrayViewT) =
             let dims = NDArrayView.nDim view
             let shapeStr = if dims = 0 then "" else "<" + (view.Shape |> intToStrSeq |> String.combineWith ",") + ">"
             let strideStr = "<" + ((view.Offset :: view.Stride) |> intToStrSeq |> String.combineWith ",") + ">"
-            sprintf "NDArray%dD<Shape%dD%s, Stride%dD%s>" dims dims shapeStr dims strideStr            
+            sprintf "NDArrayStatic%dD<ShapeStatic%dD%s, StrideStatic%dD%s>" dims dims shapeStr dims strideStr            
 
-        member this.CPPTypeName = (this :> ICudaArgTmpl).CPPTypeNameWithoutPtr + " *"
+        member this.CPPTypeName = (this :> ICudaArgTmpl).CPPTypeNameWithoutPtr
 
         member this.GetArg env =
-            // C++ structure is empty and we pass the pointer to data memory
+            // C++ struct just contains the pointer to data memory
             (CudaExecEnv.getDevVar env view).DevicePointer :> obj
 
 type NDArrayDevMemRngTmpl (view: NDArrayViewT) =
@@ -408,6 +413,7 @@ let execItemsForElemwise trgtView cOp srcViews =
     let heteroStr = if hetero then "Heterogenous" else ""
     let kernel = 
         {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (NDArrayView.nDim trgtView) indexedStr heteroStr;
+         Domain=KernelFunc;
          TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeNameWithoutPtr) args;
          RetType="void";
          ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;}
@@ -426,6 +432,33 @@ let execItemsForElemwise trgtView cOp srcViews =
     [LaunchKernel(kernel, workDim, args)]
 
 
+/// specifies the name of the C++ function
+type CPPFuncNameAttribute (cppFuncName: string) =
+    inherit System.Attribute()     
+    member this.CPPFuncName = cppFuncName
+
+[<CPPFuncName("sum")>]
+type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
+
+[<CPPFuncName("sumLastAxis")>]
+type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit
+
+/// generate ExecItems to call a C++ template function
+let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> argTmpls =
+    let cDelegateType = typeof<'FuncDelegate>
+    let cAttributes = cDelegateType.GetCustomAttributes(typeof<CPPFuncNameAttribute>, false)
+    if Array.isEmpty cAttributes then
+        failwithf "CPPFuncName attribute is missing on delegate %A" cDelegateType
+    let cppFuncNameAttribute = cAttributes.[0] :?> CPPFuncNameAttribute
+    let cppFuncName = cppFuncNameAttribute.CPPFuncName
+
+    let cFuncTmpl =
+        {FuncName=cppFuncName;
+         Domain=CPPFunc;
+         TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;
+         RetType="void";
+         ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
+    [CallCFunc(cFuncTmpl, cDelegateType, argTmpls)]
 
 
 /// generates ExecItems to copy srcView to trgtView 
@@ -475,8 +508,15 @@ let execItemsForOp cudaEnv memAllocator trgtView op srcViews =
     | UnaryOp Log -> execItemsForElemwise trgtView (NoArgEOpTmpl("LogEOp_t", false)) srcViews
     | UnaryOp Exp -> execItemsForElemwise trgtView (NoArgEOpTmpl("ExpEOp_t", false)) srcViews
     // reductions
-    | UnaryOp Sum -> [] // TODO
-    | UnaryOp (SumAxis _) -> [] // TODO
+    | UnaryOp Sum -> 
+        execItemsForCFunc<CPPSum> [NDArrayPtrArgTmpl trgtView; NDArrayPtrArgTmpl srcViews.[0]]
+    | UnaryOp (SumAxis ax) -> 
+        // we need to swap axes so that the axes the summation is performed over comes last
+        let src = srcViews.[0]
+        let nd = NDArrayView.nDim src
+        let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
+        let srcAdj = NDArrayView.reorderAxes axOrder src
+        execItemsForCFunc<CPPSumLastAxis> [NDArrayPtrArgTmpl trgtView; NDArrayPtrArgTmpl srcAdj]
     // shape operations
     | UnaryOp (Reshape _) ->
         if trgtView <> srcViews.[0] then copyExecItems trgtView srcViews.[0]

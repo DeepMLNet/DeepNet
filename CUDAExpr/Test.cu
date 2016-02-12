@@ -4,7 +4,7 @@
 
 #include "Ops.cuh"
 #include "NDSupport.cuh"
-#include "ThrustInterface.cuh"
+#include "Reduce.cuh"
 
 using namespace std;
 

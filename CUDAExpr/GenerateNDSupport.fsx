@@ -204,7 +204,7 @@ for dims = 0 to maxDims do
             wrt "    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);"
     
             wrt "    if (%s) {"
-                (ad |>> (fun i -> prn "(pos%d < trgt->shape(%d))" i i) |> cw " && ")
+                (ad |>> (fun i -> prn "(pos%d < trgt.shape(%d))" i i) |> cw " && ")
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
@@ -235,16 +235,16 @@ for dims = 0 to maxDims do
         wrt "template <typename TElemwiseOp, %s>" (allTmpl |> cw ", ")
 
         let srcArgDecls =
-            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d *src%d" i i) |> Seq.toList
-        let allArgDecls = "const TElemwiseOp &op" :: "TTarget *trgt" :: srcArgDecls
+            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
+        let allArgDecls = "const TElemwiseOp &op" :: "TTarget &trgt" :: srcArgDecls
         let indexedName = if withIndexes then "Indexed" else ""
         wrt "_dev void elemwise%dAry%dD%s(%s) {" ary dims indexedName (allArgDecls |> cw ", ")
 
         elementwiseLoop withIndexes (fun dims ->      
             let poses = ad |>> prn "pos%d" |> cw ", "
-            let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d->element(%s)" a poses) |> Seq.toList
+            let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d.element(%s)" a poses) |> Seq.toList
             let allArgs = if withIndexes then "pos" :: sprintf "%d" dims :: srcArgs else srcArgs
-            wrt "  trgt->element(%s) = op(%s);" poses (allArgs |> cw ", "))        
+            wrt "  trgt.element(%s) = op(%s);" poses (allArgs |> cw ", "))        
         wrt "}"
         wrt ""
 
@@ -269,16 +269,16 @@ for dims = 0 to maxDims do
         wrt "template <typename TElemwiseOp, %s>" (allTmpl |> cw ", ")
 
         let srcArgDecls =
-            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d *src%d" i i) |> Seq.toList
-        let allArgDecls = "const TElemwiseOp &op" :: "TTarget *trgt" :: srcArgDecls
+            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
+        let allArgDecls = "const TElemwiseOp &op" :: "TTarget &trgt" :: srcArgDecls
         wrt "_dev void elemwise%dAry%dDHeterogenous(%s) {" ary dims (allArgDecls |> cw ", ")        
         elementwiseHeterogenousLoop (fun dims ->      
             let srcArgs = 
                 {0 .. ary - 1} 
-                |> Seq.map (fun a -> sprintf "src%d->element(src%d->idxToPos(idx))" a a) 
+                |> Seq.map (fun a -> sprintf "src%d.element(src%d.idxToPos(idx))" a a) 
                 |> Seq.toList
             let allArgs = srcArgs
-            wrt "  trgt->element(trgt->idxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
+            wrt "  trgt.element(trgt.idxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
         wrt "}"
         wrt ""
 
