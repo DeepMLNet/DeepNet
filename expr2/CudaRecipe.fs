@@ -15,7 +15,8 @@ let kernelModuleHeader =
 
 /// Header of generated C++ module
 let cppModuleHeader =
-    "#include \"ThrustInterface.cuh\"\n\
+    "#include \"NDSupport.cuh\"\n\
+     #include \"ThrustInterface.cuh\"\n\
      #include \"Reduce.cuh\"\n\n"
 
 

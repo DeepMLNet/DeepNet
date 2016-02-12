@@ -20,6 +20,7 @@ let printVal label value =
     printfn "%s =\n%A\nshape of %s: %A\n" label value label (NDArray.shape value)
 
 type LinearRegression = {a: ExprT; b: ExprT; x: ExprT; t: ExprT;
+                         predOut: ExprT; lossOut: ExprT;
                          lossWrtAOut: ExprT; lossWrtBOut: ExprT; lossWrtXOut: ExprT; lossWrtTOut: ExprT;
                          Pred: ExprT; Loss: ExprT}  
 let linearRegression () =
@@ -28,6 +29,8 @@ let linearRegression () =
     let x = var "x" [symbol "N"]
     let t = var "t" [symbol "M"]
 
+    let predOut = var "predOut" [symbol "M"]
+    let lossOut = var "lossOut" []
     let lossWrtAOut = var "lossWrtAOut" [fix 1; (symbol "M") * (symbol "N")]
     let lossWrtBOut = var "lossWrtBOut" [fix 1; symbol "M"]
     let lossWrtXOut = var "lossWrtXOut" [fix 1; symbol "N"]
@@ -38,6 +41,7 @@ let linearRegression () =
     let loss = sum smplLoss
 
     {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss;
+     predOut=predOut; lossOut=lossOut;
      lossWrtAOut=lossWrtAOut; lossWrtBOut=lossWrtBOut; lossWrtXOut=lossWrtXOut; lossWrtTOut=lossWrtTOut}
 
 type LinearRegressionGradient = {LossWrtA: ExprT; LossWrtB: ExprT; LossWrtX: ExprT; LossWrtT: ExprT}
@@ -60,6 +64,8 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
     let bVal = NDArray.zeros [m]
     let xVal = NDArray.ones [n]
     let tVal = NDArray.ones [m]
+    let predOutVal = NDArray.zeros [m]
+    let lossOutVal = NDArray.zeros []
     let lossWrtAVal = NDArray.zeros [1; m*n]
     let lossWrtBVal = NDArray.zeros [1; m]
     let lossWrtXVal = NDArray.zeros [1; n]
@@ -70,6 +76,8 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
         |> VarEnv.add lr.b bVal
         |> VarEnv.add lr.x xVal
         |> VarEnv.add lr.t tVal
+        |> VarEnv.add lr.predOut predOutVal
+        |> VarEnv.add lr.lossOut lossOutVal
         |> VarEnv.add lr.lossWrtAOut lossWrtAVal
         |> VarEnv.add lr.lossWrtBOut lossWrtBVal
         |> VarEnv.add lr.lossWrtXOut lossWrtXVal
@@ -82,6 +90,8 @@ let linearRegressionCudaEnv (lr: LinearRegression) =
          lr.b |> extractVar, HostVar;
          lr.x |> extractVar, HostVar;
          lr.t |> extractVar, HostVar;
+         lr.predOut |> extractVar, HostVar;
+         lr.lossOut |> extractVar, HostVar;
          lr.lossWrtAOut |> extractVar, HostVar;
          lr.lossWrtBOut |> extractVar, HostVar;
          lr.lossWrtXOut |> extractVar, HostVar;
@@ -222,6 +232,27 @@ let ``Build CUDA recipe for linear regression gradient`` () =
     ()
 
 
+let ``Evaluate linear regression using CUDA`` () =
+    let lr = linearRegression ()
+    let env = linearRegressionEvalEnv lr
+    let cenv = linearRegressionCudaEnv lr
+
+    let allWrtsSaved = 
+        discard [lr.Pred |> storeToVar lr.predOut;
+                 lr.Loss |> storeToVar lr.lossOut;]
+
+    printfn "%A" allWrtsSaved
+
+    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
+    use cudaExpr = new CudaExprWorkspace(recipe)
+    use lockedVarEnv = new VarEnvLock(env.VarEnv)
+
+    cudaExpr.Eval(Map.empty, env.VarEnv)
+
+    printVal "pred" (VarEnv.get lr.predOut env.VarEnv)
+    printVal "loss" (VarEnv.get lr.lossOut env.VarEnv)
+
+
 [<Fact>]
 let ``Evaluate linear regression gradient using CUDA`` () =
     let lr = linearRegression ()
@@ -256,16 +287,17 @@ let main argv =
     CudaBasics.printCudaInfo ()
 
     //``Build linear regression`` ()
-    //``Eval linear regression`` ()
+    ``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
     //``Eval forward gradient of linear regression`` ()
-    ``Eval reverse gradient of linear regression`` ()
+    //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
     //``Build CUDA recipe for linear regression gradient`` ()
-    ``Evaluate linear regression gradient using CUDA`` ()
+    ``Evaluate linear regression using CUDA`` ()
+    //``Evaluate linear regression gradient using CUDA`` ()
     
     
     CudaBasics.shutdown ()
