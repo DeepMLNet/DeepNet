@@ -241,7 +241,7 @@ let ``Evaluate linear regression using CUDA`` () =
         discard [lr.Pred |> storeToVar lr.predOut;
                  lr.Loss |> storeToVar lr.lossOut;]
 
-    printfn "%A" allWrtsSaved
+    //printfn "%A" allWrtsSaved
 
     let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)

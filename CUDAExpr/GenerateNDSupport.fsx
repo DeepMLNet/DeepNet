@@ -16,7 +16,7 @@ let combineWithButIfEmpty empty sep items =
     if Seq.isEmpty items then empty
     else combineWith sep items
 
-let sw = new StreamWriter("NDSupport.cuh")
+let sw = new StringWriter()
 let prn = sprintf
 let cw = combineWith
 let cwe = combineWithButIfEmpty
@@ -293,6 +293,10 @@ for dims = 0 to maxDims do
     ()
 
 
-sw.Dispose()
+// save only if content changed to preserve modification time
+let contents = sw.ToString ()
+let outFilename = "NDSupport.cuh"
+if not (File.Exists outFilename && File.ReadAllText outFilename = contents) then
+    File.WriteAllText (outFilename, contents)
 
 

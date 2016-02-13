@@ -101,6 +101,8 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
                      sprintf "\"%s\"" modName]
     let cmplrArgStr = cmplrArgs |> String.combineWith " "
 
+    dumpCode modName modCode
+
     let headerModTimes =
         System.IO.Directory.EnumerateFiles(includePath, "*.cuh")
         |> Seq.map (fun headerFile ->
@@ -108,7 +110,6 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
         |> Map.ofSeq
 
     let cacheKey = modCode, headerModTimes
-
     match cppModCache.TryGet cacheKey with
     | Some libData ->
         System.IO.File.WriteAllBytes (libName, libData)
@@ -231,8 +232,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
 
     // compile and load CUDA C++ host/device module
     let cppModName = generateCudaModName ()
-    do
-        dumpCode cppModName recipe.CPPCode
+
     /// C++ functions
     let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncDelegates
     

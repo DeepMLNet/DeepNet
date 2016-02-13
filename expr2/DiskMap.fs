@@ -33,7 +33,7 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
                 let keyPath = Path.Combine (dir, keyFilename)
                 let valuePath = Path.Combine (dir, valueFilename)
                 if File.Exists keyPath && File.Exists valuePath then
-                    if key.SequenceEqual (File.ReadAllBytes valuePath) then
+                    if key.SequenceEqual (File.ReadAllBytes keyPath) then
                         Some (dir, File.ReadAllBytes valuePath)
                     else None
                 else None)

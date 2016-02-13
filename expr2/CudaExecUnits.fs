@@ -438,10 +438,12 @@ type CPPFuncNameAttribute (cppFuncName: string) =
     member this.CPPFuncName = cppFuncName
 
 [<CPPFuncName("sum")>]
-type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
+type CPPSum = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
+//type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
 
 [<CPPFuncName("sumLastAxis")>]
-type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit
+type CPPSumLastAxis = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
+//type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit
 
 /// generate ExecItems to call a C++ template function
 let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> argTmpls =
