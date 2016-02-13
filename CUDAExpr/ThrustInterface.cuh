@@ -1,25 +1,55 @@
 #pragma once
 
+#pragma warning (disable : 4503) 
+
 #pragma warning (push)
-#pragma warning (disable : 4267)
+#pragma warning (disable : 4267 4244 4503) 
 #include <thrust/device_vector.h>
 #pragma warning (pop)
+
 
 #include "Utils.cuh"
 
 
-// TODO: change to permutation iterator
+/// thrust range for iterating over a ArrayND with arbitrary strides and offset
+template <typename TArrayND>
+class ArrayNDRange
+{
+public:
+	typedef float TValue;
+	typedef typename thrust::device_ptr<TValue> BaseIterator;
+    typedef typename thrust::iterator_difference<BaseIterator>::type difference_type;
 
-/// converts a linear index into a pointer to a ArrayND element
-template <typename TArrayND, typename TValue>
-struct LinearIndexToElement : public thrust::unary_function<size_t, thrust::device_ptr<TValue>> {
-	TArrayND arrayND;
+    struct IndexFunctor : public thrust::unary_function<difference_type, difference_type>
+    {
+        IndexFunctor(TArrayND baseArray) : BaseArray(baseArray) {}
+        _dev difference_type operator()(const difference_type& linearIdx) const
+        { 
+			// return the element position index given a linear index
+			return BaseArray.index(BaseArray.linearIdxToPos(linearIdx));
+        }
 
-	LinearIndexToElement(TArrayND ary) : arrayND(ary)  { }
+        TArrayND BaseArray;
+    };
 
-	_dev thrust::device_ptr<TValue> operator() (size_t linearIdx) {
-		return thrust::device_pointer_cast(0);
-		//return thrust::device_pointer_cast(&arrayND.element(arrayND.idxToPos(linearIdx)));
-	}
+    typedef typename thrust::counting_iterator<difference_type>                   CountingIterator;
+    typedef typename thrust::transform_iterator<IndexFunctor, CountingIterator>   TransformIterator;
+    typedef typename thrust::permutation_iterator<BaseIterator,TransformIterator> PermutationIterator;
+    typedef PermutationIterator iterator;
+
+    ArrayNDRange(TArrayND baseArray) : BaseArray(baseArray) {}
+   
+    iterator begin(void) const
+    {
+        return PermutationIterator(thrust::device_pointer_cast((TValue *)BaseArray.data()), 
+								   TransformIterator(CountingIterator(0), IndexFunctor(BaseArray)));
+    }
+
+    iterator end(void) const
+    {
+        return begin() + BaseArray.size();
+    }
+    
+protected:
+	TArrayND BaseArray;
 };
-

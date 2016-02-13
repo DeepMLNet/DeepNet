@@ -6,6 +6,7 @@ open CudaBasics
 open CudaRecipe
 open CudaExecUnits
 open ExecUnitsGen
+open DiskMap
 
 
 let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
@@ -21,15 +22,13 @@ let generateCudaModName () =
 
 
 /// dumps CUDA kernel code to a file
-let dumpCudaCode (modName: string) (modCode: string) =
-    let filename = modName
-    use tw = new System.IO.StreamWriter(filename)
-    tw.Write(modCode)
-    printfn "Wrote CUDA module code to %s" filename
+let dumpCode (modName: string) (modCode: string) =
+    System.IO.File.WriteAllText(modName, modCode)
+    printfn "Wrote module code to %s" modName
 
 /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
 /// ManagedCuda.CudaKernel objects for the specified kernel names.
-let loadCudaCode modName modCode krnlNames =
+let loadKernelCode modName modCode krnlNames =
     let gpuArch = "compute_30"
     let includePath = assemblyDirectory
 
@@ -80,6 +79,12 @@ let loadCudaCode modName modCode krnlNames =
 let unloadCudaCode cuMod =
     cudaCntxt.UnloadModule(cuMod)
 
+type ModCacheKey = {Code: string; HeaderModTimes: Map<string, System.DateTime>}
+
+let localAppData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
+let cppModCacheDir = System.IO.Path.Combine(localAppData, "expr2", "CPPCache")
+let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
+
 /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
 /// functions objects for the specified C function names.
 let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
@@ -96,18 +101,30 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
                      sprintf "\"%s\"" modName]
     let cmplrArgStr = cmplrArgs |> String.combineWith " "
 
-    printfn "nvcc %s" cmplrArgStr
+    let headerModTimes =
+        System.IO.Directory.EnumerateFiles(includePath, "*.cuh")
+        |> Seq.map (fun headerFile ->
+            System.IO.Path.GetFileName headerFile, System.IO.File.GetLastWriteTimeUtc headerFile)
+        |> Map.ofSeq
 
-    use prcs = new System.Diagnostics.Process()
-    prcs.StartInfo.FileName <- "nvcc.exe"
-    prcs.StartInfo.Arguments <- cmplrArgStr
-    prcs.StartInfo.UseShellExecute <- false
-    prcs.Start() |> ignore
-    prcs.WaitForExit()
+    let cacheKey = modCode, headerModTimes
 
-    if prcs.ExitCode <> 0 then
-        printfn "Compile error"
-        exit 1
+    match cppModCache.TryGet cacheKey with
+    | Some libData ->
+        System.IO.File.WriteAllBytes (libName, libData)
+    | None ->
+        printfn "nvcc %s" cmplrArgStr
+        use prcs = new System.Diagnostics.Process()
+        prcs.StartInfo.FileName <- "nvcc.exe"
+        prcs.StartInfo.Arguments <- cmplrArgStr
+        prcs.StartInfo.UseShellExecute <- false
+        prcs.Start() |> ignore
+        prcs.WaitForExit()
+        if prcs.ExitCode <> 0 then
+            printfn "Compile error"
+            exit 1
+
+        cppModCache.Set cacheKey (System.IO.File.ReadAllBytes libName)
 
     // load compiled library
     let libHndl = LoadLibrary(libName)
@@ -199,9 +216,9 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     // compile and load CUDA kernel module
     let modName = generateCudaModName ()
     do
-        dumpCudaCode modName recipe.KernelCode
+        dumpCode modName recipe.KernelCode
     /// CUDA kernels
-    let kernels, krnlModHndl = loadCudaCode modName recipe.KernelCode kernelCNames
+    let kernels, krnlModHndl = loadKernelCode modName recipe.KernelCode kernelCNames
 
     /// CUDA launch sizes for specified WorkDims
     let kernelLaunchDims =
@@ -215,7 +232,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
     // compile and load CUDA C++ host/device module
     let cppModName = generateCudaModName ()
     do
-        dumpCudaCode cppModName recipe.CPPCode
+        dumpCode cppModName recipe.CPPCode
     /// C++ functions
     let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncDelegates
     

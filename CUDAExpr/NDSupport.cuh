@@ -7,18 +7,18 @@
 struct Pos0D {
    size_t pos[1];
     template<typename TNDArray>
-   _dev static Pos0D fromIdx(size_t idx) {
+   _dev static Pos0D fromLinearIdx(size_t idx) {
      Pos0D p;
      p.pos[0] = 0;
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos0D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos0D p = fromIdx<TNDArray>(idx);
+   _dev static Pos0D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos0D p = fromLinearIdx<TNDArray>(idx);
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      return 0;
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -62,12 +62,15 @@ struct NDArrayStatic0D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 0; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return 1;
   }
-  _dev static Pos0D idxToPos(size_t idx) { return Pos0D::fromIdx<Shape>(idx); }
-  _dev static Pos0D idxToPosWithLastDimSetToZero(size_t idx) { return Pos0D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos0D linearIdxToPos(size_t idx) { return Pos0D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos0D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos0D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos0D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element() {
@@ -115,7 +118,7 @@ _dev void elemwise0Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -146,7 +149,7 @@ _dev void elemwise1Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -177,7 +180,7 @@ _dev void elemwise2Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -188,7 +191,7 @@ _dev void elemwise2Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 struct Pos1D {
    size_t pos[1];
     template<typename TNDArray>
-   _dev static Pos1D fromIdx(size_t idx) {
+   _dev static Pos1D fromLinearIdx(size_t idx) {
      Pos1D p;
      const size_t incr0 = 1;
      p.pos[0] = idx / incr0;
@@ -196,13 +199,13 @@ struct Pos1D {
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos1D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos1D p = fromIdx<TNDArray>(idx);
+   _dev static Pos1D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos1D p = fromLinearIdx<TNDArray>(idx);
      p[0] = 0;
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      return incr0 * pos[0];
    }
@@ -252,12 +255,15 @@ struct NDArrayStatic1D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 1; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0);
   }
-  _dev static Pos1D idxToPos(size_t idx) { return Pos1D::fromIdx<Shape>(idx); }
-  _dev static Pos1D idxToPosWithLastDimSetToZero(size_t idx) { return Pos1D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos1D linearIdxToPos(size_t idx) { return Pos1D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos1D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos1D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos1D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element(size_t pos0) {
@@ -317,7 +323,7 @@ _dev void elemwise0Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -360,7 +366,7 @@ _dev void elemwise1Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -403,7 +409,7 @@ _dev void elemwise2Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -414,7 +420,7 @@ _dev void elemwise2Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 struct Pos2D {
    size_t pos[2];
     template<typename TNDArray>
-   _dev static Pos2D fromIdx(size_t idx) {
+   _dev static Pos2D fromLinearIdx(size_t idx) {
      Pos2D p;
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
@@ -425,13 +431,13 @@ struct Pos2D {
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos2D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos2D p = fromIdx<TNDArray>(idx);
+   _dev static Pos2D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos2D p = fromLinearIdx<TNDArray>(idx);
      p[1] = 0;
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
      return incr0 * pos[0] + incr1 * pos[1];
@@ -484,12 +490,15 @@ struct NDArrayStatic2D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 2; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1);
   }
-  _dev static Pos2D idxToPos(size_t idx) { return Pos2D::fromIdx<Shape>(idx); }
-  _dev static Pos2D idxToPosWithLastDimSetToZero(size_t idx) { return Pos2D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos2D linearIdxToPos(size_t idx) { return Pos2D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos2D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos2D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos2D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element(size_t pos0, size_t pos1) {
@@ -557,7 +566,7 @@ _dev void elemwise0Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -608,7 +617,7 @@ _dev void elemwise1Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -659,7 +668,7 @@ _dev void elemwise2Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -670,7 +679,7 @@ _dev void elemwise2Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 struct Pos3D {
    size_t pos[3];
     template<typename TNDArray>
-   _dev static Pos3D fromIdx(size_t idx) {
+   _dev static Pos3D fromLinearIdx(size_t idx) {
      Pos3D p;
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
@@ -684,13 +693,13 @@ struct Pos3D {
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos3D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos3D p = fromIdx<TNDArray>(idx);
+   _dev static Pos3D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos3D p = fromLinearIdx<TNDArray>(idx);
      p[2] = 0;
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
      const size_t incr2 = incr1 * TNDArray::shape(1);
@@ -746,12 +755,15 @@ struct NDArrayStatic3D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 3; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2);
   }
-  _dev static Pos3D idxToPos(size_t idx) { return Pos3D::fromIdx<Shape>(idx); }
-  _dev static Pos3D idxToPosWithLastDimSetToZero(size_t idx) { return Pos3D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos3D linearIdxToPos(size_t idx) { return Pos3D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos3D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos3D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos3D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2) {
@@ -827,7 +839,7 @@ _dev void elemwise0Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -886,7 +898,7 @@ _dev void elemwise1Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -945,7 +957,7 @@ _dev void elemwise2Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -956,7 +968,7 @@ _dev void elemwise2Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 struct Pos4D {
    size_t pos[4];
     template<typename TNDArray>
-   _dev static Pos4D fromIdx(size_t idx) {
+   _dev static Pos4D fromLinearIdx(size_t idx) {
      Pos4D p;
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
@@ -973,13 +985,13 @@ struct Pos4D {
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos4D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos4D p = fromIdx<TNDArray>(idx);
+   _dev static Pos4D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos4D p = fromLinearIdx<TNDArray>(idx);
      p[3] = 0;
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
      const size_t incr2 = incr1 * TNDArray::shape(1);
@@ -1038,12 +1050,15 @@ struct NDArrayStatic4D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 4; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3);
   }
-  _dev static Pos4D idxToPos(size_t idx) { return Pos4D::fromIdx<Shape>(idx); }
-  _dev static Pos4D idxToPosWithLastDimSetToZero(size_t idx) { return Pos4D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos4D linearIdxToPos(size_t idx) { return Pos4D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos4D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos4D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos4D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
@@ -1131,7 +1146,7 @@ _dev void elemwise0Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -1202,7 +1217,7 @@ _dev void elemwise1Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -1273,7 +1288,7 @@ _dev void elemwise2Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -1284,7 +1299,7 @@ _dev void elemwise2Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 struct Pos5D {
    size_t pos[5];
     template<typename TNDArray>
-   _dev static Pos5D fromIdx(size_t idx) {
+   _dev static Pos5D fromLinearIdx(size_t idx) {
      Pos5D p;
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
@@ -1304,13 +1319,13 @@ struct Pos5D {
      return p;
    }
     template<typename TNDArray>
-   _dev static Pos5D fromIdxWithLastDimSetToZero(size_t idx) {
-     Pos5D p = fromIdx<TNDArray>(idx);
+   _dev static Pos5D fromLinearIdxWithLastDimSetToZero(size_t idx) {
+     Pos5D p = fromLinearIdx<TNDArray>(idx);
      p[4] = 0;
      return p;
     }
     template<typename TNDArray>
-   _dev size_t toIdx() const {
+   _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      const size_t incr1 = incr0 * TNDArray::shape(0);
      const size_t incr2 = incr1 * TNDArray::shape(1);
@@ -1372,12 +1387,15 @@ struct NDArrayStatic5D {
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
   _dev static size_t nDim() { return 5; }
+  _dev static size_t nElems() { return Shape::nElems(); }
   _dev static size_t offset() { return Stride::offset(); }
   _dev static size_t size() {
     return shape(0) * shape(1) * shape(2) * shape(3) * shape(4);
   }
-  _dev static Pos5D idxToPos(size_t idx) { return Pos5D::fromIdx<Shape>(idx); }
-  _dev static Pos5D idxToPosWithLastDimSetToZero(size_t idx) { return Pos5D::fromIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static Pos5D linearIdxToPos(size_t idx) { return Pos5D::fromLinearIdx<Shape>(idx); }
+  _dev static Pos5D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos5D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
+  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
+  _dev static size_t index(const Pos5D &pos) { return Stride::index(pos); }
   _dev float *data() { return mData; }
   _dev const float *data() const { return mData; }
   _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {
@@ -1471,7 +1489,7 @@ _dev void elemwise0Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op();
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
 
     }
     }
@@ -1548,7 +1566,7 @@ _dev void elemwise1Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
 
     }
     }
@@ -1625,7 +1643,7 @@ _dev void elemwise2Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < TTarget::size()) {
 
-  trgt.element(trgt.idxToPos(idx)) = op(src0.element(src0.idxToPos(idx)), src1.element(src1.idxToPos(idx)));
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }

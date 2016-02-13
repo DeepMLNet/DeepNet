@@ -38,7 +38,7 @@ for dims = 0 to maxDims do
     wrt "struct Pos%dD {" dims
     wrt "   size_t pos[%d];" (max dims 1)
     wrt"    template<typename TNDArray>"
-    wrt "   _dev static Pos%dD fromIdx(size_t idx) {" dims
+    wrt "   _dev static Pos%dD fromLinearIdx(size_t idx) {" dims
     wrt "     Pos%dD p;" dims
     if dims >= 1 then
         wrt "     const size_t incr0 = 1;"
@@ -53,14 +53,14 @@ for dims = 0 to maxDims do
     wrt "     return p;"
     wrt "   }"
     wrt"    template<typename TNDArray>"
-    wrt "   _dev static Pos%dD fromIdxWithLastDimSetToZero(size_t idx) {" dims
-    wrt "     Pos%dD p = fromIdx<TNDArray>(idx);" dims 
+    wrt "   _dev static Pos%dD fromLinearIdxWithLastDimSetToZero(size_t idx) {" dims
+    wrt "     Pos%dD p = fromLinearIdx<TNDArray>(idx);" dims 
     if dims >= 1 then
         wrt "     p[%d] = 0;" (dims - 1)
     wrt "     return p;"
     wrt "    }"
     wrt "    template<typename TNDArray>"
-    wrt "   _dev size_t toIdx() const {"
+    wrt "   _dev size_t toLinearIdx() const {"
     if dims >= 1 then
         wrt "     const size_t incr0 = 1;"
     for d = 1 to dims - 1 do
@@ -75,7 +75,6 @@ for dims = 0 to maxDims do
     if dims > 0 then
         wrt "template <%s>" (ad |>> prn "size_t shape%d" |> cw ", ")
     wrt "struct ShapeStatic%dD {" dims
-    //wrt "public:"
     wrt "  	_dev static size_t shape(const size_t dim) {"
     if dims > 0 then
         wrt "      switch (dim) {"
@@ -132,13 +131,16 @@ for dims = 0 to maxDims do
     wrt "  _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }"
     wrt "  _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }"
     wrt "  _dev static size_t nDim() { return %d; }" dims
+    wrt "  _dev static size_t nElems() { return Shape::nElems(); }"
     wrt "  _dev static size_t offset() { return Stride::offset(); }"
     wrt "  _dev static size_t size() {"
     wrt "    return %s;"
         (ad |>> prn "shape(%d)" |> cwe "1" " * ")
     wrt "  }"
-    wrt "  _dev static Pos%dD idxToPos(size_t idx) { return Pos%dD::fromIdx<Shape>(idx); }" dims dims
-    wrt "  _dev static Pos%dD idxToPosWithLastDimSetToZero(size_t idx) { return Pos%dD::fromIdxWithLastDimSetToZero<Shape>(idx); }" dims dims
+    wrt "  _dev static Pos%dD linearIdxToPos(size_t idx) { return Pos%dD::fromLinearIdx<Shape>(idx); }" dims dims
+    wrt "  _dev static Pos%dD linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos%dD::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }" dims dims
+    wrt "  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }"
+    wrt "  _dev static size_t index(const Pos%dD &pos) { return Stride::index(pos); }" dims
     wrt "  _dev float *data() { return mData; }"
     wrt "  _dev const float *data() const { return mData; }"
     wrt "  _dev float &element(%s) {"
@@ -275,10 +277,10 @@ for dims = 0 to maxDims do
         elementwiseHeterogenousLoop (fun dims ->      
             let srcArgs = 
                 {0 .. ary - 1} 
-                |> Seq.map (fun a -> sprintf "src%d.element(src%d.idxToPos(idx))" a a) 
+                |> Seq.map (fun a -> sprintf "src%d.element(src%d.linearIdxToPos(idx))" a a) 
                 |> Seq.toList
             let allArgs = srcArgs
-            wrt "  trgt.element(trgt.idxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
+            wrt "  trgt.element(trgt.linearIdxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
         wrt "}"
         wrt ""
 
