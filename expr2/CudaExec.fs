@@ -11,7 +11,27 @@ open DiskMap
 
 let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
+type ModCacheKey = {Code: string; HeaderModTimes: Map<string, System.DateTime>}
 
+let gpuArch = "compute_30"
+let includePath = assemblyDirectory
+
+let localAppData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
+
+let krnlPtxCacheDir = System.IO.Path.Combine(localAppData, "expr2", "PTXCache")
+let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
+
+let cppModCacheDir = System.IO.Path.Combine(localAppData, "expr2", "CPPCache")
+let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
+
+
+let headerModTimes =
+    System.IO.Directory.EnumerateFiles(includePath, "*.cuh")
+    |> Seq.map (fun headerFile ->
+        System.IO.Path.GetFileName headerFile, System.IO.File.GetLastWriteTimeUtc headerFile)
+    |> Map.ofSeq
+
+   
 /// generated CUDA module counter
 let mutable cudaModCntr = 0
 
@@ -29,29 +49,35 @@ let dumpCode (modName: string) (modCode: string) =
 /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
 /// ManagedCuda.CudaKernel objects for the specified kernel names.
 let loadKernelCode modName modCode krnlNames =
-    let gpuArch = "compute_30"
-    let includePath = assemblyDirectory
-
     use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
     let cmplrArgs = [|"--std=c++11";
                       sprintf "--gpu-architecture=%s" gpuArch; 
                       sprintf "--include-path=\"%s\"" includePath|]
 
-    printfn "nvrtc %s %s" (cmplrArgs |> String.combineWith " ") modName 
-    try
-        cmplr.Compile(cmplrArgs)
-    with
-    | :? NVRTC.NVRTCException as cmplrError ->
-        printfn "Compile error:"
-        let log = cmplr.GetLogAsString()
-        printfn "%s" log
-        exit 1
-    let ptx = cmplr.GetPTX()
-    
-    let log = cmplr.GetLogAsString()
-    printfn "%s" log
+    dumpCode modName modCode
 
-    printfn "CUDA jitting of %s:" modName
+    let cacheKey = modCode, headerModTimes
+    let ptx =
+        match krnlPtxCache.TryGet cacheKey with
+        | Some ptx -> ptx
+        | None ->
+            printfn "nvrtc %s %s" (cmplrArgs |> String.combineWith " ") modName 
+            try
+                cmplr.Compile(cmplrArgs)
+            with
+            | :? NVRTC.NVRTCException as cmplrError ->
+                printfn "Compile error:"
+                let log = cmplr.GetLogAsString()
+                printfn "%s" log
+                exit 1
+            let log = cmplr.GetLogAsString()
+            printfn "%s" log
+
+            let ptx = cmplr.GetPTX()
+            krnlPtxCache.Set cacheKey ptx
+            ptx    
+
+    //printfn "CUDA jitting of %s:" modName
     use jitOpts = new CudaJitOptionCollection()
     use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
     jitOpts.Add(jitInfoBuffer)
@@ -79,17 +105,10 @@ let loadKernelCode modName modCode krnlNames =
 let unloadCudaCode cuMod =
     cudaCntxt.UnloadModule(cuMod)
 
-type ModCacheKey = {Code: string; HeaderModTimes: Map<string, System.DateTime>}
-
-let localAppData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
-let cppModCacheDir = System.IO.Path.Combine(localAppData, "expr2", "CPPCache")
-let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
 /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
 /// functions objects for the specified C function names.
 let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
-    let gpuArch = "compute_30"
-    let includePath = assemblyDirectory
 
     let libName = (System.IO.Path.GetFileNameWithoutExtension modName) + ".dll"
 
@@ -102,12 +121,6 @@ let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
     let cmplrArgStr = cmplrArgs |> String.combineWith " "
 
     dumpCode modName modCode
-
-    let headerModTimes =
-        System.IO.Directory.EnumerateFiles(includePath, "*.cuh")
-        |> Seq.map (fun headerFile ->
-            System.IO.Path.GetFileName headerFile, System.IO.File.GetLastWriteTimeUtc headerFile)
-        |> Map.ofSeq
 
     let cacheKey = modCode, headerModTimes
     match cppModCache.TryGet cacheKey with
@@ -216,8 +229,6 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
 
     // compile and load CUDA kernel module
     let modName = generateCudaModName ()
-    do
-        dumpCode modName recipe.KernelCode
     /// CUDA kernels
     let kernels, krnlModHndl = loadKernelCode modName recipe.KernelCode kernelCNames
 
