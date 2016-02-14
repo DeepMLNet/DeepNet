@@ -287,17 +287,19 @@ let main argv =
     CudaBasics.printCudaInfo ()
 
     //``Build linear regression`` ()
-    ``Eval linear regression`` ()
     //``Reverse gradient of linear regression`` ()
     //``Eval forward gradient of linear regression`` ()
-    //``Eval reverse gradient of linear regression`` ()
     //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
     //``Build CUDA recipe for linear regression gradient`` ()
+    
+    ``Eval linear regression`` ()
     ``Evaluate linear regression using CUDA`` ()
-    //``Evaluate linear regression gradient using CUDA`` ()
+
+    ``Eval reverse gradient of linear regression`` ()
+    ``Evaluate linear regression gradient using CUDA`` ()
     
     
     CudaBasics.shutdown ()

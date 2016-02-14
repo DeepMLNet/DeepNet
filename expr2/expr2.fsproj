@@ -101,6 +101,8 @@
     <Compile Include="CudaExecUnits.fs" />
     <Compile Include="CudaRecipe.fs" />
     <Compile Include="CudaExec.fs" />
+    <Compile Include="FuncBuilder.fs" />
+    <Compile Include="CudaCheck.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="test.fsx" />
