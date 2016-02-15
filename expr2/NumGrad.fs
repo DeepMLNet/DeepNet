@@ -45,7 +45,7 @@ let reverseDiffDeviations evalEnv expr =
         let symGradVal = rDiffFun value
         let exprGradVal = numGrad exprFun value
         let gradDiff = abs (symGradVal - exprGradVal)
-        devs <- devs |> Map.add (Op.VarSpec.name wrt) (sum gradDiff |> NDArray.value)
+        devs <- devs |> Map.add (Op.VarSpec.name wrt) (sum gradDiff |> ArrayND.value)
     devs
 
 let reverseDiffDeviationsOkay evalEnv expr =

@@ -9,7 +9,7 @@ open NDArray
 let DebugEval = false
 
 /// variable environment
-type VarEnvT = Map<VarSpecT, NDArray.NDArray>
+type VarEnvT = Map<VarSpecT, ArrayND.ArrayND>
 
 module VarEnv =
     /// add variable value to environment
@@ -36,7 +36,7 @@ let buildSizeSymbolEnvFromVarEnv varEnv expr =
     let varValShapes = 
         varEnv 
         |> Map.toSeq 
-        |> Seq.map (fun (vs, ary) -> VarSpec.name vs, NDArray.shape ary) 
+        |> Seq.map (fun (vs, ary) -> VarSpec.name vs, ArrayND.shape ary) 
         |> Map.ofSeq
     SymbolEnv.fromShapeValues varSymShapes varValShapes
 
@@ -82,7 +82,7 @@ let eval (evalEnv: EvalEnvT) expr =
                 | Reshape ss -> reshape (shapeEval ss) av
                 | Broadcast ss -> broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> swapDim ax1 ax2 av
-                | StoreToVar v -> NDArray.copyTo av varEnv.[v]; av
+                | StoreToVar v -> ArrayND.copyTo av varEnv.[v]; av
                 | Annotated _-> av
             | Binary(op, a, b) ->
                 let av, bv = subEval a, subEval b  
@@ -97,7 +97,7 @@ let eval (evalEnv: EvalEnvT) expr =
             | Nary(op, es) ->
                 let esv = List.map subEval es
                 match op with 
-                | Discard -> NDArray.zeros [0]
+                | Discard -> ArrayND.zeros [0]
             
     doEval varEnv expr
 

@@ -89,7 +89,8 @@
     <Compile Include="Shape.fs" />
     <Compile Include="Op.fs" />
     <Compile Include="ExprReverseDiff.fs" />
-    <Compile Include="NDArray.fs" />
+    <Compile Include="ArrayND.fs" />
+    <Compile Include="arrayndtst.fs" />
     <Compile Include="OpEval.fs" />
     <Compile Include="NumGrad.fs" />
     <Compile Include="DiffCheck.fs" />

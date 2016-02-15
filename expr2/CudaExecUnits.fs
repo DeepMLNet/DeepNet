@@ -43,7 +43,7 @@ type WorkDimT = int * int * int
 type CudaExecEnvT = 
     {InternalMem: Dictionary<MemAllocT, CudaDeviceVariable<byte>>;
      ExternalVar: Map<VarSpecT, NDArrayDev.NDArrayDev>;
-     HostVar:     Map<VarSpecT, NDArray.NDArray>}
+     HostVar:     Map<VarSpecT, ArrayND.ArrayND>}
 
 module CudaExecEnv = 
     /// gets device memory for an internal allocation or external reference
@@ -264,7 +264,7 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
             // we assume that all device input vars are continguous
             {Memory=ExternalMem vs; 
              Shape=trgtShape; Offset=0; 
-             Stride=NDArray.contiguousStride trgtShape}, true
+             Stride=ArrayND.contiguousStride trgtShape}, true
         | HostVar ->
             // will transfer variable from host to device during execution
             // need continguous memory for that
@@ -305,7 +305,7 @@ let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShare
             // we assume that all device input vars are continguous
             {Memory=ExternalMem vs; 
              Shape=trgtShape; Offset=0; 
-             Stride=NDArray.contiguousStride trgtShape}, true
+             Stride=ArrayND.contiguousStride trgtShape}, true
         | HostVar ->
             // need continguous memory to transfer to host
             if NDArrayView.isContiguous srcViews.[0] then srcViews.[0], srcShared.[0]
@@ -374,7 +374,7 @@ let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
             // we assume that all device input vars are continguous
             [Some {Memory=ExternalMem vs; 
                    Shape=trgtShape; Offset=0; 
-                   Stride=NDArray.contiguousStride trgtShape}]
+                   Stride=ArrayND.contiguousStride trgtShape}]
         | HostVar ->
             // need continguous storage to transfer to host
             match reqView with
@@ -503,7 +503,7 @@ let execItemsForOp cudaEnv memAllocator trgtView op srcViews =
         | HostVar -> 
             // we assume that host variable has continguous stride and zero offset
             let hv = {Memory=ExternalMem vs; Shape=trgtView.Shape; 
-                      Offset=0; Stride=NDArray.contiguousStride trgtView.Shape}            
+                      Offset=0; Stride=ArrayND.contiguousStride trgtView.Shape}            
             [MemcpyHtoD(NDArrayHostMemRngTmpl(hv), NDArrayDevMemRngTmpl(trgtView))]       
     // unary elementwise
     | UnaryOp Negate -> execItemsForElemwise trgtView (NoArgEOpTmpl("NegateEOp_t", false)) srcViews
@@ -538,7 +538,7 @@ let execItemsForOp cudaEnv memAllocator trgtView op srcViews =
             // we assume that host variable has continguous stride and zero offset
             // trgtView has contingous stride
             let hv = {Memory=ExternalMem vs; Shape=trgtView.Shape; 
-                      Offset=0; Stride=NDArray.contiguousStride trgtView.Shape}            
+                      Offset=0; Stride=ArrayND.contiguousStride trgtView.Shape}            
             copyItems @ [MemcpyDtoH(NDArrayDevMemRngTmpl(trgtView), NDArrayHostMemRngTmpl(hv))]                 
     // misc
     | UnaryOp (Annotated _) -> []

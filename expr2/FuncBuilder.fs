@@ -1,7 +1,7 @@
 ﻿module FuncBuilder
 
 
-type CudaEvalFunction (expr) =
+//type CudaEvalFunction (expr) =
 
     // function instance depends on sizes and locations of variables
     // necessary information is SizeSymbolEnv and CudaEnvT
@@ -18,10 +18,10 @@ type CudaEvalFunction (expr) =
 
 
 
-    let getInstanceForEvalEnv evalEnv =
+    //let getInstanceForEvalEnv evalEnv =
         
 
 
-let buildFun builder expr =
-    builder expr
+//let buildFun builder expr =
+  //  builder expr
 

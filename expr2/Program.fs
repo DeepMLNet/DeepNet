@@ -17,7 +17,7 @@ let printExpr label expr =
     printfn "%s :=\n%A\nshape of %s: %A\n" label expr label (shapeOf expr)
 
 let printVal label value =
-    printfn "%s =\n%A\nshape of %s: %A\n" label value label (NDArray.shape value)
+    printfn "%s =\n%A\nshape of %s: %A\n" label value label (ArrayND.shape value)
 
 type LinearRegression = {a: ExprT; b: ExprT; x: ExprT; t: ExprT;
                          predOut: ExprT; lossOut: ExprT;
@@ -60,16 +60,16 @@ let linearRegressionReverseGradient (lr: LinearRegression) =
 
 let linearRegressionEvalEnv (lr: LinearRegression) =
     let m, n = 3, 2
-    let aVal = NDArray.identity [m; n]
-    let bVal = NDArray.zeros [m]
-    let xVal = NDArray.ones [n]
-    let tVal = NDArray.ones [m]
-    let predOutVal = NDArray.zeros [m]
-    let lossOutVal = NDArray.zeros []
-    let lossWrtAVal = NDArray.zeros [1; m*n]
-    let lossWrtBVal = NDArray.zeros [1; m]
-    let lossWrtXVal = NDArray.zeros [1; n]
-    let lossWrtTVal = NDArray.zeros [1; m]
+    let aVal = ArrayND.identity [m; n]
+    let bVal = ArrayND.zeros [m]
+    let xVal = ArrayND.ones [n]
+    let tVal = ArrayND.ones [m]
+    let predOutVal = ArrayND.zeros [m]
+    let lossOutVal = ArrayND.zeros []
+    let lossWrtAVal = ArrayND.zeros [1; m*n]
+    let lossWrtBVal = ArrayND.zeros [1; m]
+    let lossWrtXVal = ArrayND.zeros [1; n]
+    let lossWrtTVal = ArrayND.zeros [1; m]
     let varEnv = 
         VarEnv.empty
         |> VarEnv.add lr.a aVal

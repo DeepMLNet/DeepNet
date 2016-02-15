@@ -362,7 +362,7 @@ type CudaExprWorkspace(recipe: CudaRecipeT) =
 
     /// Evaluate expression.
     member this.Eval(externalVar: Map<Op.VarSpecT, NDArrayDev.NDArrayDev>,
-                     hostVar:     Map<Op.VarSpecT, NDArray.NDArray>) =
+                     hostVar:     Map<Op.VarSpecT, ArrayND.ArrayND>) =
         execCalls {InternalMem=internalMem; ExternalVar=externalVar; HostVar=hostVar} recipe.ExecCalls
         cudaCntxt.Synchronize () // TODO: remove and signal otherwise
 

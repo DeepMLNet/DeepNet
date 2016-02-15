@@ -108,16 +108,16 @@ module DataLock =
 /// for fast data transfers with GPU device.
 module NDArrayLock =
     /// get DataLock for already locked NDArray
-    let get (ary: NDArray) =
+    let get (ary: ArrayND) =
         DataLock.get ary.Data
 
     /// Gets the CudaRegisteredMemory for an already locked NDArray.
     /// It becomes invalid if the NDArray is unlocked.
-    let getCudaRegisteredMemory (ary: NDArray) =
+    let getCudaRegisteredMemory (ary: ArrayND) =
         DataLock.getCudaRegisteredMemory ary.Data
 
     /// lock NDArray and get corresponding DataLock
-    let lock (ary: NDArray) =
+    let lock (ary: ArrayND) =
         DataLock.lock ary.Data
 
     /// unlock given DataLock

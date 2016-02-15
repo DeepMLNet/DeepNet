@@ -35,7 +35,7 @@ module NDArrayView =
     let newContinguous memAllocator shape = 
         {Memory=memAllocator (4 * List.fold (*) 1 shape); 
          Shape=shape; Offset=0; 
-         Stride=NDArray.contiguousStride shape}
+         Stride=ArrayND.contiguousStride shape}
 
     /// number of dimensions
     let nDim a =
@@ -52,14 +52,14 @@ module NDArrayView =
 
     /// true if NDArrayView can be target of a BLAS operation
     let isBlasTargetable a =
-        if nDim a = 2 then a.Stride = NDArray.columnMajorStride a.Shape
+        if nDim a = 2 then a.Stride = ArrayND.columnMajorStride a.Shape
         else false
 
     /// creates a new memory allocation and a new NDArrayView with 
     /// memory layout suitable for being a BLAS target
     let newBlasTarget memAllocator shape =
         {newContinguous memAllocator shape with
-            Stride=NDArray.columnMajorStride shape}
+            Stride=ArrayND.columnMajorStride shape}
 
     /// true if views a and b have at least one element in common
     let overlapping a b = false // TODO
