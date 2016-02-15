@@ -92,8 +92,8 @@
     <Compile Include="ArrayND\ArrayND.fs" />
     <Compile Include="ArrayND\ArrayNDHost.fs" />
     <Compile Include="ArrayND\ArrayNDCuda.fs" />
-    <Compile Include="Expr\Base\Shape.fs" />
-    <Compile Include="Expr\Base\Op.fs" />
+    <Compile Include="Expr\Base\SymShapes.fs" />
+    <Compile Include="Expr\Base\Expr.fs" />
     <Compile Include="Expr\Base\ExprReverseDiff.fs" />
     <Compile Include="Expr\Base\OpEval.fs" />
     <Compile Include="Expr\Compiler\ExecUnitsGen.fs" />

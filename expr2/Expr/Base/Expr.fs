@@ -1,18 +1,20 @@
-﻿module Op
+﻿module Expr
 
 open System.Collections.Generic
 
 open Util
-open Shape
+open SymShapes
 
 /// variable specification: has a name and shape specificaiton
 type VarSpecT = string * ShapeSpecT
 
 module VarSpec =
+    /// name of variable
     let name (vs: VarSpecT) = 
         let name, _ = vs
         name
 
+    /// shape of variable
     let shape (vs: VarSpecT) =
         let _, shape = vs
         shape
@@ -75,14 +77,14 @@ and ExprT =
     | Nary of NaryOpT * (ExprT list)
 
 
-
+/// an op of any arity
 type AnyOpT =
     | LeafOp of LeafOpT
     | UnaryOp of UnaryOpT
     | BinaryOp of BinaryOpT
     | NaryOp of NaryOpT
 
-/// unified expression
+/// unified expression (combines all arities into one type)
 type UExprT = UExpr of AnyOpT * (UExprT list)
 
 let extractOp expr =
@@ -226,7 +228,7 @@ let check =
                     sa ss
             for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                 match sa.[dim], ss.[dim] with
-                | Shape.Broadcast, _ -> ()
+                | SymShapes.Broadcast, _ -> ()
                 | ssa, ssb when ssa .= ssb -> ()
                 | _ -> failwithf "dimension %d of array with shape %A is not broadcastable to shape %A" dim sa ss
             a
@@ -268,9 +270,6 @@ let transpose a =
         failwithf "cannot transpose array of shape %A" (shapeOf a)
     swapDim 0 1 a
 
-/// transpose 
-type T = T
-
 /// emits an elementwise binary operation with broadcasting of the inputs if necessary
 let constructElementwise op a b =
     let sa, sb = shapeOf a, shapeOf b
@@ -307,7 +306,7 @@ type ExprT with
     static member Pow (a: single, b: ExprT) = (scalar a) ** b
 
     // transposition
-    static member Pow (a: ExprT, b: T) = transpose a 
+    member this.T = transpose this
 
 /// reshape (assuming C-continguous order) tensor; element count does not change
 let reshape ss a = Unary(Reshape(ss), a) |> check
