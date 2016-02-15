@@ -1,4 +1,4 @@
-namespace NSArray
+namespace ArrayNDNS
 
 open Util
 
@@ -238,16 +238,16 @@ module ArrayND =
 
         /// value zero (if defined for 'T)
         member inline this.Zero =
-            if typeof<'T>.Equals(typeof<float>) then (box 0.0) :?> 'T
-            elif typeof<'T>.Equals(typeof<float32>) then (box 0.0f) :?> 'T
+            if typeof<'T>.Equals(typeof<double>) then (box 0.0) :?> 'T
+            elif typeof<'T>.Equals(typeof<single>) then (box 0.0f) :?> 'T
             elif typeof<'T>.Equals(typeof<int>) then (box 0) :?> 'T
             elif typeof<'T>.Equals(typeof<byte>) then (box 0) :?> 'T
             else failwithf "zero is undefined for type %A" typeof<'T>
 
         /// value one (if defined for 'T)
         member inline this.One =
-            if typeof<'T>.Equals(typeof<float>) then (box 1.0) :?> 'T
-            elif typeof<'T>.Equals(typeof<float32>) then (box 1.0f) :?> 'T
+            if typeof<'T>.Equals(typeof<double>) then (box 1.0) :?> 'T
+            elif typeof<'T>.Equals(typeof<single>) then (box 1.0f) :?> 'T
             elif typeof<'T>.Equals(typeof<int>) then (box 1) :?> 'T
             elif typeof<'T>.Equals(typeof<byte>) then (box 1) :?> 'T
             else failwithf "one is undefined for type %A" typeof<'T>
@@ -256,13 +256,11 @@ module ArrayND =
         abstract Item : int list -> 'T with get, set
 
         /// a new ArrayND of same type and new storage allocation for given layout
-        abstract New : ArrayNDLayoutT -> ArrayNDT<'T>
+        abstract NewOfSameType : ArrayNDLayoutT -> ArrayNDT<'T>
 
         /// a new ArrayND of same type with same storage allocation but new layout
-        abstract WithNewLayout : ArrayNDLayoutT -> ArrayNDT<'T>
+        abstract NewView : ArrayNDLayoutT -> ArrayNDT<'T>
 
-
-//module ArrayND =
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -313,15 +311,15 @@ module ArrayND =
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
     let inline newContiguousOfType shp (a: ArrayNDT<'T>) =
-        a.New (ArrayNDLayout.newContiguous shp)
+        a.NewOfSameType (ArrayNDLayout.newContiguous shp)
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
     let inline newColumnMajorOfType shp (a: ArrayNDT<'T>) =
-        a.New (ArrayNDLayout.newColumnMajor shp)
+        a.NewOfSameType (ArrayNDLayout.newColumnMajor shp)
 
     /// creates a new ArrayND with existing data but new layout
     let inline relayout newLayout (a: ArrayNDT<'T>) =
-        a.WithNewLayout newLayout
+        a.NewView newLayout
 
     /// checks that two NDArrays have the same shape
     let inline checkSameShape a b =
@@ -401,17 +399,34 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // array creation functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// fills the specified ArrayND with zeros
+    let inline fillWithZeros a =
+        for idx in allIdx a do
+            set idx (a.Zero) a
    
+    /// NDArray of specified shape and same type as a filled with zeros.
+    let inline zerosOfType shp a =
+        newContiguousOfType shp a
+
     /// NDArray of same shape filled with zeros.
     let inline zerosLike a =
         newContiguousOfType (shape a) a
 
+    /// fills the specified ArrayND with ones
+    let inline fillWithOnes a =
+        for idx in allIdx a do
+            set idx (a.One) a
+
+    /// NDArray of specified shape and same type as a filled with ones.
+    let inline onesOfType shp a =
+        let n = newContiguousOfType shp a
+        fillWithOnes n
+        n        
+
     /// NDArray of same shape filled with ones.
     let inline onesLike (a: ArrayNDT<'T>) =
-        let n = newContiguousOfType (shape a) a
-        for idx in allIdx n do
-            set idx (n.One) n
-        n
+        onesOfType (shape a) a
 
     /// creates a scalar ArrayND of given value and type
     let inline scalarOfType value a =
@@ -458,80 +473,80 @@ module ArrayND =
     type ArrayNDT<'T> with
 
         // elementwise unary
-        static member (~-) (a: ArrayNDT<float>) = map (~-) a
-        static member (~-) (a: ArrayNDT<float32>) = map (~-) a
+        static member (~-) (a: ArrayNDT<double>) = map (~-) a
+        static member (~-) (a: ArrayNDT<single>) = map (~-) a
         static member (~-) (a: ArrayNDT<int>) = map (~-) a
 
         // elementwise binary
-        static member (+) (a: ArrayNDT<float>, b: ArrayNDT<float>) = map2 (+) a b
-        static member (+) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = map2 (+) a b
+        static member (+) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (+) a b
+        static member (+) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (+) a b
         static member (+) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (+) a b
         static member (+) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (+) a b
 
-        static member (-) (a: ArrayNDT<float>, b: ArrayNDT<float>) = map2 (-) a b
-        static member (-) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = map2 (-) a b
+        static member (-) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (-) a b
+        static member (-) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (-) a b
         static member (-) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (-) a b
         static member (-) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (-) a b
 
-        static member (*) (a: ArrayNDT<float>, b: ArrayNDT<float>) = map2 (*) a b
-        static member (*) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = map2 (*) a b
+        static member (*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (*) a b
+        static member (*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (*) a b
         static member (*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (*) a b
         static member (*) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (*) a b
 
-        static member (/) (a: ArrayNDT<float>, b: ArrayNDT<float>) = map2 (/) a b
-        static member (/) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = map2 (/) a b
+        static member (/) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (/) a b
+        static member (/) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (/) a b
         static member (/) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (/) a b
         static member (/) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (/) a b
 
-        static member Pow (a: ArrayNDT<float>, b: ArrayNDT<float>) = map2 ( ** ) a b
-        static member Pow (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = map2 ( ** ) a b
+        static member Pow (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 ( ** ) a b
+        static member Pow (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 ( ** ) a b
 
         // elementwise binary with scalars
-        static member (+) (a: ArrayNDT<float>, b: float) = a + (scalarOfType b a)
-        static member (+) (a: ArrayNDT<float32>, b: float32) = a + (scalarOfType b a)
+        static member (+) (a: ArrayNDT<double>, b: double) = a + (scalarOfType b a)
+        static member (+) (a: ArrayNDT<single>, b: single) = a + (scalarOfType b a)
         static member (+) (a: ArrayNDT<int>, b: int) = a + (scalarOfType b a)
         static member (+) (a: ArrayNDT<byte>, b: byte) = a + (scalarOfType b a)
 
-        static member (+) (a: float, b: ArrayNDT<float>) = (scalarOfType a b) + b
-        static member (+) (a: float32, b: ArrayNDT<float32>) = (scalarOfType a b) + b
+        static member (+) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) + b
+        static member (+) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) + b
         static member (+) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) + b
         static member (+) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) + b
 
-        static member (-) (a: ArrayNDT<float>, b: float) = a - (scalarOfType b a)
-        static member (-) (a: ArrayNDT<float32>, b: float32) = a - (scalarOfType b a)
+        static member (-) (a: ArrayNDT<double>, b: double) = a - (scalarOfType b a)
+        static member (-) (a: ArrayNDT<single>, b: single) = a - (scalarOfType b a)
         static member (-) (a: ArrayNDT<int>, b: int) = a - (scalarOfType b a)
         static member (-) (a: ArrayNDT<byte>, b: byte) = a - (scalarOfType b a)
 
-        static member (-) (a: float, b: ArrayNDT<float>) = (scalarOfType a b) - b
-        static member (-) (a: float32, b: ArrayNDT<float32>) = (scalarOfType a b) - b
+        static member (-) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) - b
+        static member (-) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) - b
         static member (-) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) - b
         static member (-) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) - b
 
-        static member (*) (a: ArrayNDT<float>, b: float) = a * (scalarOfType b a)
-        static member (*) (a: ArrayNDT<float32>, b: float32) = a * (scalarOfType b a)
+        static member (*) (a: ArrayNDT<double>, b: double) = a * (scalarOfType b a)
+        static member (*) (a: ArrayNDT<single>, b: single) = a * (scalarOfType b a)
         static member (*) (a: ArrayNDT<int>, b: int) = a * (scalarOfType b a)
         static member (*) (a: ArrayNDT<byte>, b: byte) = a * (scalarOfType b a)
 
-        static member (*) (a: float, b: ArrayNDT<float>) = (scalarOfType a b) * b
-        static member (*) (a: float32, b: ArrayNDT<float32>) = (scalarOfType a b) * b
+        static member (*) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) * b
+        static member (*) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) * b
         static member (*) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) * b
         static member (*) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) * b
 
-        static member (/) (a: ArrayNDT<float>, b: float) = a / (scalarOfType b a)
-        static member (/) (a: ArrayNDT<float32>, b: float32) = a / (scalarOfType b a)
+        static member (/) (a: ArrayNDT<double>, b: double) = a / (scalarOfType b a)
+        static member (/) (a: ArrayNDT<single>, b: single) = a / (scalarOfType b a)
         static member (/) (a: ArrayNDT<int>, b: int) = a / (scalarOfType b a)
         static member (/) (a: ArrayNDT<byte>, b: byte) = a / (scalarOfType b a)
 
-        static member (/) (a: float, b: ArrayNDT<float>) = (scalarOfType a b) / b
-        static member (/) (a: float32, b: ArrayNDT<float32>) = (scalarOfType a b) / b
+        static member (/) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) / b
+        static member (/) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) / b
         static member (/) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) / b
         static member (/) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) / b
 
-        static member Pow (a: ArrayNDT<float>, b: float) = a ** (scalarOfType b a)
-        static member Pow (a: ArrayNDT<float32>, b: float32) = a ** (scalarOfType b a)
+        static member Pow (a: ArrayNDT<double>, b: double) = a ** (scalarOfType b a)
+        static member Pow (a: ArrayNDT<single>, b: single) = a ** (scalarOfType b a)
 
-        static member Pow (a: float, b: ArrayNDT<float>) = (scalarOfType a b) ** b
-        static member Pow (a: float32, b: ArrayNDT<float32>) = (scalarOfType a b) ** b
+        static member Pow (a: double, b: ArrayNDT<double>) = (scalarOfType a b) ** b
+        static member Pow (a: single, b: ArrayNDT<single>) = (scalarOfType a b) ** b
 
         // transposition
         member this.T = transpose this
@@ -573,8 +588,8 @@ module ArrayND =
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
-    /// dot product between vec*vec, mat*vec, mat*mat
-    let inline dot (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    /// dot product implementation between vec*vec, mat*vec, mat*mat
+    let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         let inline matrixDot a b =
             let nI = (shape a).[0]
             let nJ = (shape a).[1]
@@ -601,10 +616,16 @@ module ArrayND =
                     (shape a) (shape b)
 
     type ArrayNDT<'T> with   
-        static member (.*) (a: ArrayNDT<float>, b: ArrayNDT<float>) = dot a b
-        static member (.*) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = dot a b
-        static member (.*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = dot a b
-        static member (.*) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = dot a b   
+        /// dot product
+        static member (.*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = dotImpl a b
+        /// dot product
+        static member (.*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = dotImpl a b
+        /// dot product
+        static member (.*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = dotImpl a b
+
+    /// dot product between vec*vec, mat*vec, mat*mat
+    let inline dot a b =
+        a .* b
 
     /// block array specification
     type BlockSpec<'T> =
@@ -685,88 +706,10 @@ module ArrayND =
         generate [] |> blockArray
    
     type ArrayNDT<'T> with                  
-        static member (%*) (a: ArrayNDT<float>, b: ArrayNDT<float>) = tensorProduct a b
-        static member (%*) (a: ArrayNDT<float32>, b: ArrayNDT<float32>) = tensorProduct a b
+        /// tensor product
+        static member (%*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = tensorProduct a b
+        /// tensor product
+        static member (%*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = tensorProduct a b
+        /// tensor product
         static member (%*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = tensorProduct a b
-        static member (%*) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = tensorProduct a b
-       
-
-module ArrayNDHost =
-    open ArrayND
-
-    // host storage for an NDArray
-    type IHostStorage<'T> = 
-        abstract Item: int -> 'T with get, set
-
-    // NDArray storage in a managed .NET array
-    type ManagedArrayStorageT<'T> (data: 'T[]) =
-        new (size: int) = ManagedArrayStorageT<'T>(Array.zeroCreate size)
-        interface IHostStorage<'T> with
-            member this.Item 
-                with get(index) = data.[index]
-                and set index value = data.[index] <- value
-
-    /// an N-dimensional array with reshape and subview abilities stored in host memory
-    type ArrayNDHostT<'T> (layout: ArrayNDLayoutT, storage: IHostStorage<'T>) = 
-        inherit ArrayNDT<'T>(layout)
         
-        /// a new ArrayND in host memory using a managed array as storage
-        new (layout: ArrayNDLayoutT) =
-            ArrayNDHostT<'T>(layout, ManagedArrayStorageT<'T>(ArrayNDLayout.nElems layout))
-
-        /// storage
-        member inline this.Storage = storage
-
-        /// if true, then setting NaN or Inf causes and exception to be thrown.
-        static member val CheckFinite = false with get, set 
-
-        override this.Item
-            with get pos = storage.[ArrayNDLayout.addr pos layout]
-            and set pos value = 
-                if ArrayNDHostT<'T>.CheckFinite then
-                    let isNonFinite =
-                        match box value with
-                        | :? float as dv -> System.Double.IsInfinity(dv) || System.Double.IsNaN(dv) 
-                        | :? float32 as sv -> System.Single.IsInfinity(sv) || System.Single.IsNaN(sv) 
-                        | _ -> false
-                    if isNonFinite then raise (System.ArithmeticException("non-finite value encountered"))
-                storage.[ArrayNDLayout.addr pos layout] <- value 
-
-        override this.New (layout: ArrayNDLayoutT) = 
-            ArrayNDHostT<'T>(layout) :> ArrayNDT<'T>
-
-        override this.WithNewLayout (layout: ArrayNDLayoutT) = 
-            ArrayNDHostT<'T>(layout, storage) :> ArrayNDT<'T>
-
-    /// creates a new contiguous (row-major) NDArray in host memory of the given shape 
-    let inline newContinguous<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp)
-
-    /// creates a new Fortran (column-major) NDArray in host memory of the given shape
-    let inline newColumnMajor<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp)
-
-    /// NDArray with zero dimensions (scalar) and given value
-    let inline scalar f =
-        let a = newContinguous [] 
-        set [] f a
-        a
-
-    /// NDArray of given shape filled with zeros.
-    let inline zeros shape =
-        newContinguous shape
-
-    /// NDArray of given shape filled with ones.
-    let inline ones shape =
-        let a = newContinguous shape
-        for idx in allIdx a do
-            set idx a.One a
-        a
-
-    /// NDArray with ones on the diagonal of given shape.
-    let inline identity shape =
-        let a = zeros shape
-        let ndim = List.length shape
-        for i = 0 to (List.min shape) - 1 do
-            set (List.replicate ndim i) a.One a
-        a

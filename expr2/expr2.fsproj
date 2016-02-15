@@ -83,32 +83,31 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Util.fs" />
-    <Compile Include="DiskMap.fs" />
-    <Compile Include="Shape.fs" />
-    <Compile Include="Op.fs" />
-    <Compile Include="ExprReverseDiff.fs" />
-    <Compile Include="ArrayND.fs" />
-    <Compile Include="arrayndtst.fs" />
-    <Compile Include="OpEval.fs" />
-    <Compile Include="NumGrad.fs" />
-    <Compile Include="DiffCheck.fs" />
-    <Compile Include="ExecUnitsGen.fs" />
-    <Compile Include="StreamGen.fs" />
-    <Compile Include="CudaBasics.fs" />
-    <Compile Include="CudaRegMem.fs" />
-    <Compile Include="NDArrayDev.fs" />
-    <Compile Include="CudaExecUnits.fs" />
-    <Compile Include="CudaRecipe.fs" />
-    <Compile Include="CudaExec.fs" />
-    <Compile Include="FuncBuilder.fs" />
-    <Compile Include="CudaCheck.fs" />
-    <Compile Include="Program.fs" />
     <None Include="App.config" />
-    <None Include="test.fsx" />
     <Content Include="packages.config" />
     <Content Include="debugcode.txt" />
+    <Compile Include="Tools\AssemblyInfo.fs" />
+    <Compile Include="Tools\Util.fs" />
+    <Compile Include="Tools\DiskMap.fs" />
+    <Compile Include="ArrayND\ArrayND.fs" />
+    <Compile Include="ArrayND\ArrayNDHost.fs" />
+    <Compile Include="ArrayND\NDArrayDev.fs" />
+    <Compile Include="Expr\Base\Shape.fs" />
+    <Compile Include="Expr\Base\Op.fs" />
+    <Compile Include="Expr\Base\ExprReverseDiff.fs" />
+    <Compile Include="Expr\Base\OpEval.fs" />
+    <Compile Include="Expr\Compiler\ExecUnitsGen.fs" />
+    <Compile Include="Expr\Compiler\StreamGen.fs" />
+    <Compile Include="Expr\Compiler\CudaBasics.fs" />
+    <Compile Include="Expr\Compiler\CudaRegMem.fs" />
+    <Compile Include="Expr\Compiler\CudaExecUnits.fs" />
+    <Compile Include="Expr\Compiler\CudaRecipe.fs" />
+    <Compile Include="Expr\Compiler\CudaExec.fs" />
+    <Compile Include="Expr\Func\FuncBuilder.fs" />
+    <Compile Include="Expr\Check\NumGrad.fs" />
+    <Compile Include="Expr\Check\DiffCheck.fs" />
+    <Compile Include="Expr\Check\CudaCheck.fs" />
+    <Compile Include="Main\Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
