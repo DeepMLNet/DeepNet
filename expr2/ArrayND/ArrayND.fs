@@ -5,7 +5,7 @@ open Util
 
 [<AutoOpen>]
 module ArrayNDLayoutTypes =
-    // layout (shape, offset, stride) of an NDArray
+    // layout (shape, offset, stride) of an ArrayND
     type ArrayNDLayoutT =
         {/// shape
          Shape: int list;
@@ -66,7 +66,7 @@ module ArrayNDLayout =
     let inline allIdxOfDim dim a =
         { 0 .. a.Shape.[dim] - 1}
 
-    /// computes the stride given the shape for the NDArray to be continguous (row-major)
+    /// computes the stride given the shape for the ArrayND to be continguous (row-major)
     let rec contiguousStride (shape: int list) =
         match shape with
         | [] -> []
@@ -76,7 +76,7 @@ module ArrayNDLayout =
             | sp::srest -> (lp*sp)::sp::srest
             | [] -> failwith "unexpected"    
 
-    /// computes the stride given the shape for the NDArray to be in Fortran order (column-major)
+    /// computes the stride given the shape for the ArrayND to be in Fortran order (column-major)
     let inline columnMajorStride (shape: int list) =
         let rec buildStride elemsLeft shape =
             match shape with
@@ -85,18 +85,18 @@ module ArrayNDLayout =
                 elemsLeft :: buildStride (l * elemsLeft) ls
         buildStride 1 shape
 
-    /// a contiguous (row-major) NDArray layout of the given shape 
+    /// a contiguous (row-major) ArrayND layout of the given shape 
     let inline newContiguous shp =
         {Shape=shp; Stride=contiguousStride shp; Offset=0;}
 
-    /// a Fortran (column-major) NDArray layout of the given shape 
+    /// a Fortran (column-major) ArrayND layout of the given shape 
     let inline newColumnMajor shp =
         {Shape=shp; Stride=columnMajorStride shp; Offset=0;}
 
-    /// true if the NDArray is continguous
+    /// true if the ArrayND is contiguous
     let inline isContiguous a = (stride a = contiguousStride (shape a))
 
-    /// true if the NDArray is in Fortran order
+    /// true if the ArrayND is in Fortran order
     let inline isColumnMajor a = (stride a = columnMajorStride (shape a))
 
     /// adds a new dimension of size one to the left
@@ -131,7 +131,7 @@ module ArrayNDLayout =
             | _ -> failwithf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
         a, b
 
-    /// broadcasts a NDArray to the given shape
+    /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape bs ain =
         let bsDim = List.length bs
         if bsDim <> nDims ain then
@@ -272,6 +272,19 @@ module ArrayND =
     /// set element value
     let inline set idx value (a: ArrayNDT<_>) = a.[idx] <- value
 
+    /// if true, then setting NaN or Inf causes and exception to be thrown.
+    let CheckFinite = false
+
+    /// checks if value is finite if CheckFinite is true and raises an exception if not
+    let inline doCheckFinite value =
+        if CheckFinite then
+            let isNonFinite =
+                match box value with
+                | :? double as dv -> System.Double.IsInfinity(dv) || System.Double.IsNaN(dv) 
+                | :? single as sv -> System.Single.IsInfinity(sv) || System.Single.IsNaN(sv) 
+                | _ -> false
+            if isNonFinite then raise (System.ArithmeticException("non-finite value encountered"))
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // shape functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,13 +313,13 @@ module ArrayND =
     /// all indices of the given dimension
     let inline allIdxOfDim dim a = layout a |> ArrayNDLayout.allIdxOfDim dim 
             
-    /// sequence of all elements of a NDArray
+    /// sequence of all elements of a ArrayND
     let inline allElems a = allIdx a |> Seq.map (fun i -> get i a)
 
-    /// true if the NDArray is continguous
+    /// true if the ArrayND is continguous
     let inline isContiguous a = layout a |> ArrayNDLayout.isContiguous
 
-    /// true if the NDArray is in Fortran order
+    /// true if the ArrayND is in Fortran order
     let inline isColumnMajor a = layout a |> ArrayNDLayout.isColumnMajor
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
@@ -321,26 +334,26 @@ module ArrayND =
     let inline relayout newLayout (a: ArrayNDT<'T>) =
         a.NewView newLayout
 
-    /// checks that two NDArrays have the same shape
+    /// checks that two ArrayNDs have the same shape
     let inline checkSameShape a b =
         if shape a <> shape b then
             failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" (shape a) (shape b)
 
     /// Copies all elements from source to destination.
-    /// Both NDArrays must have the same shape.
+    /// Both ArrayNDs must have the same shape.
     let inline copyTo (source: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
         checkSameShape source dest
         for idx in allIdx source do
             set idx (get idx source) dest
 
-    /// Returns a continguous copy of the given NDArray.
+    /// Returns a continguous copy of the given ArrayND.
     let inline copy source =
         let dest = newContiguousOfType (shape source) source
         copyTo source dest
         dest
 
-    /// If the NDArray is not continguous, returns a continguous copy; otherwise
-    /// the given NDArray is returned unchanged.
+    /// If the ArrayND is not continguous, returns a continguous copy; otherwise
+    /// the given ArrayND is returned unchanged.
     let inline makeContiguous a =
         if isContiguous a then a else copy a
 
@@ -364,7 +377,7 @@ module ArrayND =
         let la, lb = ArrayNDLayout.broadcastToSame (layout a) (layout b)
         relayout la a, relayout lb b
 
-    /// broadcasts a NDArray to the given shape
+    /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape shp a =
         relayout (ArrayNDLayout.broadcastToShape shp (layout a)) a
 
@@ -405,11 +418,11 @@ module ArrayND =
         for idx in allIdx a do
             set idx (a.Zero) a
    
-    /// NDArray of specified shape and same type as a filled with zeros.
+    /// ArrayND of specified shape and same type as a filled with zeros.
     let inline zerosOfType shp a =
         newContiguousOfType shp a
 
-    /// NDArray of same shape filled with zeros.
+    /// ArrayND of same shape filled with zeros.
     let inline zerosLike a =
         newContiguousOfType (shape a) a
 
@@ -418,13 +431,13 @@ module ArrayND =
         for idx in allIdx a do
             set idx (a.One) a
 
-    /// NDArray of specified shape and same type as a filled with ones.
+    /// ArrayND of specified shape and same type as a filled with ones.
     let inline onesOfType shp a =
         let n = newContiguousOfType shp a
         fillWithOnes n
         n        
 
-    /// NDArray of same shape filled with ones.
+    /// ArrayND of same shape filled with ones.
     let inline onesLike (a: ArrayNDT<'T>) =
         onesOfType (shape a) a
 
@@ -433,6 +446,14 @@ module ArrayND =
         let ary = newContiguousOfType [] a
         set [] value ary
         ary
+
+    /// fills the diagonal of a quadratic matrix with ones
+    let inline fillDiagonalWithOnes a =
+        match shape a with
+        | [n; m] when n = m ->
+            for i = 0 to n - 1 do
+                set [i; i] a.One a
+        | _ -> invalidArg "a" "need a quadratic matrix"
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // elementwise operations

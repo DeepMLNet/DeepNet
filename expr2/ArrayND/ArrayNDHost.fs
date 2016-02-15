@@ -1,16 +1,28 @@
 ﻿namespace ArrayNDNS
 
+open System
+open System.Runtime.InteropServices
+
 open Util
 open ArrayND
 
 module ArrayNDHost = 
 
-    /// if true, then setting NaN or Inf causes and exception to be thrown.
-    let CheckFinite = false
+    /// pinned memory (from .NET or other source)          
+    type IPinnedMemory =
+        inherit IDisposable
+        abstract Ptr: IntPtr with get
 
-    // host storage for an NDArray
+    /// host storage for an NDArray
     type IHostStorage<'T> = 
         abstract Item: int -> 'T with get, set
+        abstract Pin: unit -> IPinnedMemory
+
+    /// pinned .NET managed memory
+    type PinnedManagedMemoryT (gcHnd: GCHandle) =       
+        interface IPinnedMemory with
+            member this.Ptr = gcHnd.AddrOfPinnedObject()
+            member this.Dispose() = gcHnd.Free()
 
     // NDArray storage in a managed .NET array
     type ManagedArrayStorageT<'T> (data: 'T[]) =
@@ -19,6 +31,9 @@ module ArrayNDHost =
             member this.Item 
                 with get(index) = data.[index]
                 and set index value = data.[index] <- value
+            member this.Pin () =
+                let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
+                new PinnedManagedMemoryT (gcHnd) :> IPinnedMemory                
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
     type ArrayNDHostT<'T> (layout: ArrayNDLayoutT, storage: IHostStorage<'T>) = 
@@ -34,13 +49,7 @@ module ArrayNDHost =
         override this.Item
             with get pos = storage.[ArrayNDLayout.addr pos layout]
             and set pos value = 
-                if CheckFinite then
-                    let isNonFinite =
-                        match box value with
-                        | :? double as dv -> System.Double.IsInfinity(dv) || System.Double.IsNaN(dv) 
-                        | :? single as sv -> System.Single.IsInfinity(sv) || System.Single.IsNaN(sv) 
-                        | _ -> false
-                    if isNonFinite then raise (System.ArithmeticException("non-finite value encountered"))
+                ArrayND.doCheckFinite value
                 storage.[ArrayNDLayout.addr pos layout] <- value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
@@ -49,34 +58,34 @@ module ArrayNDHost =
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDHostT<'T>(layout, storage) :> ArrayNDT<'T>
 
-    /// creates a new contiguous (row-major) NDArray in host memory of the given shape 
-    let inline newContinguous<'T> shp =
+    /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
+    let inline newContiguous<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp)
 
-    /// creates a new Fortran (column-major) NDArray in host memory of the given shape
+    /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
     let inline newColumnMajor<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp)
 
-    /// NDArray with zero dimensions (scalar) and given value
+    /// ArrayNDHostT with zero dimensions (scalar) and given value
     let inline scalar value =
-        let a = newContinguous [] 
+        let a = newContiguous [] 
         ArrayND.set [] value a
         a
 
-    /// NDArray of given shape filled with zeros.
+    /// ArrayNDHostT of given shape filled with zeros.
     let inline zeros shape =
-        newContinguous shape
+        newContiguous shape
 
-    /// NDArray of given shape filled with ones.
+    /// ArrayNDHostT of given shape filled with ones.
     let inline ones shape =
-        let a = newContinguous shape
+        let a = newContiguous shape
         ArrayND.fillWithOnes a
         a
 
-    /// NDArray with ones on the diagonal of given shape.
-    let inline identity shape =
-        let a = zeros shape
-        let ndim = List.length shape
-        for i = 0 to (List.min shape) - 1 do
-            set (List.replicate ndim i) a.One a
+    /// ArrayNDHostT identity matrix
+    let inline identity size =
+        let a = zeros [size; size]
+        ArrayND.fillDiagonalWithOnes a
+        a
+
         
