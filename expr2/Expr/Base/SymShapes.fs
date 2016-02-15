@@ -1,76 +1,81 @@
-﻿module SymShapes
+﻿namespace ExprNS
 
 open Util
 
-type SymbolSpec = string
+module SymbolEnvTypes =
 
-/// symbol value environment
-type SymbolEnvT = Map<string, int>
+    type SymbolSpec = string
 
-/// elementary size specification, can be either a symbol or a fixed quantity
-type BaseSize =
-    | Symbol of SymbolSpec
-    | Fixed of int
-       
-/// product of elementary size specifications
-type SizeProductT(factor: int, inSymbols: Map<SymbolSpec, int>) =
-    let symbols =
-        Map.fold (fun c sBase sPower ->
-                    match sBase, sPower with
-                    | _, p when p = 0 -> c
-                    | _, p when p > 0 -> Map.add sBase sPower c
-                    | _ -> failwithf "SizeProduct cannot have negative exponents: %A" inSymbols) 
-            Map.empty inSymbols
-  
-    new() = SizeProductT(1, Map.empty)
-    new(f: int) = SizeProductT(f, Map.empty)
-    new(b: SymbolSpec) = SizeProductT(1, Map.empty |> Map.add b 1)
+    /// symbol value environment
+    type SymbolEnvT = Map<string, int>
 
-    member this.Symbols = symbols
-    member this.Factor = factor
+    /// elementary size specification, can be either a symbol or a fixed quantity
+    type BaseSize =
+        | Symbol of SymbolSpec
+        | Fixed of int
 
-    static member (*) (a: SizeProductT, b: SizeProductT) =
-        let pSymbols = 
-            Map.fold 
-                (fun p bBase bPower -> 
-                    match Map.tryFind bBase p with
-                    | Some pPower -> Map.add bBase (pPower + bPower) p
-                    | None -> Map.add bBase bPower p) 
-                a.Symbols b.Symbols
-        SizeProductT(a.Factor * b.Factor, pSymbols)
-         
-    static member (*) (a: SizeProductT, b: SymbolSpec) = a * SizeProductT(b)
-    static member (*) (a: SizeProductT, b: int) = a * SizeProductT(b)
-    static member (*) (a: SymbolSpec, b: SizeProductT) = SizeProductT(a) * b
-    static member (*) (a: int, b: SizeProductT) = SizeProductT(a) * b
-
-    override this.ToString() = 
-        let ft = if this.Factor = 1 then "" else sprintf "%d " this.Factor
-        let txt = Map.fold (fun txt tBase tPower -> 
-                                let t = if tPower = 1 then tBase else sprintf "%s**%d" tBase tPower
-                                txt + t + " ") 
-                            ft this.Symbols                
-        "'" + txt.Trim() + "'"
-                        
-    override this.Equals(otherObj) =
-        match otherObj with
-        | :? SizeProductT as other ->
-            this.Symbols = other.Symbols && this.Factor = other.Factor
-        | _ -> false
-
-    override this.GetHashCode() =
-        hash (this.Factor, this.Symbols)
-
-    interface System.IComparable with
-        member this.CompareTo otherObj =
-            match otherObj with
-            | :? SizeProductT as other ->
-                let ms = Map.add "__factor__" this.Factor this.Symbols
-                let os = Map.add "__factor__" other.Factor other.Symbols
-                compare ms os
-            | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 module SizeProduct =
+    open SymbolEnvTypes
+       
+    /// product of elementary size specifications
+    type SizeProductT(factor: int, inSymbols: Map<SymbolSpec, int>) =
+        let symbols =
+            Map.fold (fun c sBase sPower ->
+                        match sBase, sPower with
+                        | _, p when p = 0 -> c
+                        | _, p when p > 0 -> Map.add sBase sPower c
+                        | _ -> failwithf "SizeProduct cannot have negative exponents: %A" inSymbols) 
+                Map.empty inSymbols
+  
+        new() = SizeProductT(1, Map.empty)
+        new(f: int) = SizeProductT(f, Map.empty)
+        new(b: SymbolSpec) = SizeProductT(1, Map.empty |> Map.add b 1)
+
+        member this.Symbols = symbols
+        member this.Factor = factor
+
+        static member (*) (a: SizeProductT, b: SizeProductT) =
+            let pSymbols = 
+                Map.fold 
+                    (fun p bBase bPower -> 
+                        match Map.tryFind bBase p with
+                        | Some pPower -> Map.add bBase (pPower + bPower) p
+                        | None -> Map.add bBase bPower p) 
+                    a.Symbols b.Symbols
+            SizeProductT(a.Factor * b.Factor, pSymbols)
+         
+        static member (*) (a: SizeProductT, b: SymbolSpec) = a * SizeProductT(b)
+        static member (*) (a: SizeProductT, b: int) = a * SizeProductT(b)
+        static member (*) (a: SymbolSpec, b: SizeProductT) = SizeProductT(a) * b
+        static member (*) (a: int, b: SizeProductT) = SizeProductT(a) * b
+
+        override this.ToString() = 
+            let ft = if this.Factor = 1 then "" else sprintf "%d " this.Factor
+            let txt = Map.fold (fun txt tBase tPower -> 
+                                    let t = if tPower = 1 then tBase else sprintf "%s**%d" tBase tPower
+                                    txt + t + " ") 
+                                ft this.Symbols                
+            "'" + txt.Trim() + "'"
+                        
+        override this.Equals(otherObj) =
+            match otherObj with
+            | :? SizeProductT as other ->
+                this.Symbols = other.Symbols && this.Factor = other.Factor
+            | _ -> false
+
+        override this.GetHashCode() =
+            hash (this.Factor, this.Symbols)
+
+        interface System.IComparable with
+            member this.CompareTo otherObj =
+                match otherObj with
+                | :? SizeProductT as other ->
+                    let ms = Map.add "__factor__" this.Factor this.Symbols
+                    let os = Map.add "__factor__" other.Factor other.Symbols
+                    compare ms os
+                | _ -> invalidArg "otherObj" "cannot compare values of different types"
+
     let isEmpty (p: SizeProductT) =
         Map.isEmpty p.Symbols
 
@@ -109,23 +114,26 @@ module SizeProduct =
     let tryEval (env: SymbolEnvT) (p: SizeProductT) =
         if canEval env p then Some (eval env p) else None
 
-/// size specification of a dimension (axis)
-[<StructuralEquality; StructuralComparison>]
-type SizeSpecT =
-    | Base of BaseSize              // fixed size or symbol
-    | Broadcast                     // size 1 and broadcastable
-    | Product of SizeProductT       // product of fixed sizes and symbols
-
-     static member (*) (ssa: SizeSpecT, ssb: SizeSpecT) =
-        match ssa, ssb with
-        | Base (Fixed 0), _ | _, Base (Fixed 0) -> Base (Fixed 0)
-        | Broadcast, ss | ss, Broadcast -> ss
-        | Product spa, Product spb -> Product (spa * spb)
-        | Product sp, Base b | Base b, Product sp -> Product (sp * (SizeProduct.ofBaseSize b))
-        | Base ba, Base bb -> Product ((SizeProduct.ofBaseSize ba) * (SizeProduct.ofBaseSize bb))
 
 
 module SizeSpec =
+    open SymbolEnvTypes
+
+    /// size specification of a dimension (axis)
+    [<StructuralEquality; StructuralComparison>]
+    type SizeSpecT =
+        | Base of BaseSize              // fixed size or symbol
+        | Broadcast                     // size 1 and broadcastable
+        | Product of SizeProduct.SizeProductT       // product of fixed sizes and symbols
+
+         static member (*) (ssa: SizeSpecT, ssb: SizeSpecT) =
+            match ssa, ssb with
+            | Base (Fixed 0), _ | _, Base (Fixed 0) -> Base (Fixed 0)
+            | Broadcast, ss | ss, Broadcast -> ss
+            | Product spa, Product spb -> Product (spa * spb)
+            | Product sp, Base b | Base b, Product sp -> Product (sp * (SizeProduct.ofBaseSize b))
+            | Base ba, Base bb -> Product ((SizeProduct.ofBaseSize ba) * (SizeProduct.ofBaseSize bb))
+
 
     /// simplify size specification
     let simplify (ss: SizeSpecT) = 
@@ -173,22 +181,24 @@ module SizeSpec =
         | Broadcast -> 1
         | Product p -> SizeProduct.eval env p
 
+    type SizeSpecT with
+        /// equal size with broadcastability
+        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithBroadcastability ssa ssb
+        /// equal size ignoring broadcastability
+        static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithoutBroadcastability ssa ssb
 
-let symbol = SizeSpec.symbol
-let fix = SizeSpec.fix
-
-type SizeSpecT with
-    static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = SizeSpec.equalWithBroadcastability ssa ssb
-    static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = SizeSpec.equalWithoutBroadcastability ssa ssb
-
-/// shape specifcation of a tensor
-type ShapeSpecT = SizeSpecT list
-
-/// evaluated shape specification of a tensor
-type NShapeSpecT = int list
 
 /// shape specification of a tensor
 module ShapeSpec =
+    open SymbolEnvTypes
+    open SizeSpec
+
+    /// shape specifcation of a tensor
+    type ShapeSpecT = SizeSpecT list
+
+    /// evaluated shape specification of a tensor
+    type NShapeSpecT = int list
+
     let withoutAxis ax sa =
         sa |> List.without ax
 
@@ -287,9 +297,12 @@ module ShapeSpec =
 
 
 module SymbolEnv =
+    open SymbolEnvTypes
+    open SizeSpec
+    open ShapeSpec
 
     /// constructs a SymbolEnv from numeric shape values
-    let fromShapeValues (shpSymEnv: Map<string, ShapeSpecT>) (shpValEnv: Map<string, int list>) =
+    let fromShapeValues (shpSymEnv: Map<string, ShapeSpecT>) (shpValEnv: Map<string, NShapeSpecT>) =
         let inferAndCheckSizes (knownSizes: SymbolEnvT) = 
             seq {
                 for name, symShape in Map.toSeq shpSymEnv do
