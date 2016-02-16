@@ -230,6 +230,12 @@ module ArrayNDLayout =
 
 //[<AutoOpen>]
 module ArrayND =
+
+    /// object that can be queried for shape
+    type IHasLayout =
+        /// shape of object
+        abstract member Layout : ArrayNDLayoutT
+
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
@@ -261,6 +267,8 @@ module ArrayND =
         /// a new ArrayND of same type with same storage allocation but new layout
         abstract NewView : ArrayNDLayoutT -> ArrayNDT<'T>
 
+        interface IHasLayout with
+            member this.Layout = this.Layout
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -290,7 +298,7 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// layout
-    let inline layout (a: ArrayNDT<_>) = a.Layout
+    let inline layout (a: IHasLayout) = a.Layout
 
     /// number of dimensions
     let inline nDims a = layout a |> ArrayNDLayout.nDims
@@ -414,7 +422,7 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// fills the specified ArrayND with zeros
-    let inline fillWithZeros a =
+    let inline fillWithZeros (a: ArrayNDT<'T>) =
         for idx in allIdx a do
             set idx (a.Zero) a
    
@@ -427,7 +435,7 @@ module ArrayND =
         newContiguousOfType (shape a) a
 
     /// fills the specified ArrayND with ones
-    let inline fillWithOnes a =
+    let inline fillWithOnes (a: ArrayNDT<'T>) =
         for idx in allIdx a do
             set idx (a.One) a
 
@@ -448,7 +456,7 @@ module ArrayND =
         ary
 
     /// fills the diagonal of a quadratic matrix with ones
-    let inline fillDiagonalWithOnes a =
+    let inline fillDiagonalWithOnes (a: ArrayNDT<'T>) =
         match shape a with
         | [n; m] when n = m ->
             for i = 0 to n - 1 do

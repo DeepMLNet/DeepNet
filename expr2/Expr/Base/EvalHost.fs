@@ -1,58 +1,16 @@
 ﻿namespace ExprNS
 
+open System
+
 open Util
 open VarSpec
+open SizeSymbolTypes
+open ArrayNDNS
 open ArrayNDNS.ArrayND
-//open NDArray
+open EvalEnv
 
 
-module VarEnv = 
-
-    /// variable environment
-    type VarEnvT = Map<System.IComparable, System.IComparable>
-
-    /// add variable value to environment
-    let add var value varEnv =
-        let vs = extractVar var
-        Map.add vs value varEnv
-
-    /// get variable value from environment
-    let get var (varEnv: VarEnvT) =
-        let vs = extractVar var
-        varEnv.[vs]
-
-    /// empty variable environment
-    let (empty: VarEnvT) =
-        Map.empty
-
-
-module EvalEnv = 
-
-    /// evaluation environment
-    type EvalEnvT = {VarEnv: VarEnvT; SizeSymbolEnv: SymbolEnvT}
-    let DefaultEvalEnv = {VarEnv = Map.empty; SizeSymbolEnv = Map.empty}
-
-    /// builds a size symbol environment from the variables occuring in the expression
-    let buildSizeSymbolEnvFromVarEnv varEnv expr =
-        let varSymShapes = extractVars expr |> Set.toSeq |> Map.ofSeq
-        let varValShapes = 
-            varEnv 
-            |> Map.toSeq 
-            |> Seq.map (fun (vs, ary) -> VarSpec.name vs, ArrayND.shape ary) 
-            |> Map.ofSeq
-        SymbolEnv.fromShapeValues varSymShapes varValShapes
-
-    let fromVarEnvAndExpr varEnv expr = 
-        {DefaultEvalEnv with VarEnv = varEnv; SizeSymbolEnv = buildSizeSymbolEnvFromVarEnv varEnv expr;}
-
-    let fromVarEnv varEnv =
-        {DefaultEvalEnv with VarEnv = varEnv;}
-
-    let addSizeSymbolsFromExpr expr evalEnv =
-        fromVarEnvAndExpr evalEnv.VarEnv expr
-
-
-module Eval =
+module EvalHost =
 
     [<Literal>]
     let DebugEval = false
@@ -117,4 +75,5 @@ module Eval =
 
     let usingEvalEnv (evalEnv: EvalEnvT) f =
         fun value -> f evalEnv value
+
 

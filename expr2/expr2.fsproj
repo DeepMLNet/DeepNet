@@ -93,11 +93,12 @@
     <Compile Include="ArrayND\ArrayND.fs" />
     <Compile Include="ArrayND\ArrayNDHost.fs" />
     <Compile Include="ArrayND\ArrayNDCuda.fs" />
-    <Compile Include="Expr\Base\SymShapes.fs" />
+    <Compile Include="Expr\Base\SymShape.fs" />
     <Compile Include="Expr\Base\Vars.fs" />
     <Compile Include="Expr\Base\Expr.fs" />
     <Compile Include="Expr\Base\UExpr.fs" />
-    <Compile Include="Expr\Base\Eval.fs" />
+    <Compile Include="Expr\Base\EvalEnvs.fs" />
+    <Compile Include="Expr\Base\EvalHost.fs" />
     <Compile Include="Expr\Compiler\ExecUnitsGen.fs" />
     <Compile Include="Expr\Compiler\StreamGen.fs" />
     <Compile Include="Expr\Compiler\CudaRegMem.fs" />
@@ -109,7 +110,6 @@
     <Compile Include="Expr\Check\DiffCheck.fs" />
     <Compile Include="Expr\Check\CudaCheck.fs" />
     <Compile Include="Main\Program.fs" />
-    <Compile Include="Expr\Diff\ExprReverseDiff.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

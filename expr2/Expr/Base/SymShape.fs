@@ -2,24 +2,25 @@
 
 open Util
 
-module SymbolEnvTypes =
+module SizeSymbolTypes =
 
-    type SymbolSpec = string
-
-    /// symbol value environment
-    type SymbolEnvT = Map<string, int>
+    /// a symbolic size
+    type SizeSymbolT = string
 
     /// elementary size specification, can be either a symbol or a fixed quantity
-    type BaseSize =
-        | Symbol of SymbolSpec
+    type BaseSizeT =
+        | Sym of SizeSymbolT
         | Fixed of int
+
+    /// symbol value environment
+    type SizeSymbolEnvT = Map<SizeSymbolT, int>
 
 
 module SizeProduct =
-    open SymbolEnvTypes
+    open SizeSymbolTypes
        
     /// product of elementary size specifications
-    type SizeProductT(factor: int, inSymbols: Map<SymbolSpec, int>) =
+    type SizeProductT(factor: int, inSymbols: Map<SizeSymbolT, int>) =
         let symbols =
             Map.fold (fun c sBase sPower ->
                         match sBase, sPower with
@@ -30,7 +31,7 @@ module SizeProduct =
   
         new() = SizeProductT(1, Map.empty)
         new(f: int) = SizeProductT(f, Map.empty)
-        new(b: SymbolSpec) = SizeProductT(1, Map.empty |> Map.add b 1)
+        new(b: SizeSymbolT) = SizeProductT(1, Map.empty |> Map.add b 1)
 
         member this.Symbols = symbols
         member this.Factor = factor
@@ -45,9 +46,9 @@ module SizeProduct =
                     a.Symbols b.Symbols
             SizeProductT(a.Factor * b.Factor, pSymbols)
          
-        static member (*) (a: SizeProductT, b: SymbolSpec) = a * SizeProductT(b)
+        static member (*) (a: SizeProductT, b: SizeSymbolT) = a * SizeProductT(b)
         static member (*) (a: SizeProductT, b: int) = a * SizeProductT(b)
-        static member (*) (a: SymbolSpec, b: SizeProductT) = SizeProductT(a) * b
+        static member (*) (a: SizeSymbolT, b: SizeProductT) = SizeProductT(a) * b
         static member (*) (a: int, b: SizeProductT) = SizeProductT(a) * b
 
         override this.ToString() = 
@@ -79,9 +80,9 @@ module SizeProduct =
     let isEmpty (p: SizeProductT) =
         Map.isEmpty p.Symbols
 
-    let ofBaseSize (bs: BaseSize) =
+    let ofBaseSize (bs: BaseSizeT) =
         match bs with
-        | Symbol s -> SizeProductT(s)
+        | Sym s -> SizeProductT(s)
         | Fixed f -> SizeProductT(f)
 
     let empty =
@@ -101,28 +102,28 @@ module SizeProduct =
         else
             None
 
-    let eval (env: SymbolEnvT) (p: SizeProductT) =
+    /// evaluate to a numeric size
+    let eval (env: SizeSymbolEnvT) (p: SizeProductT) =
         p.Symbols 
             |> Map.toSeq
             |> Seq.map (fun (sym, power) -> pown env.[sym] power)
             |> Seq.fold (*) p.Factor
 
-    let canEval (env: SymbolEnvT) (p: SizeProductT) =
+    let canEval (env: SizeSymbolEnvT) (p: SizeProductT) =
         p.Symbols
             |> Map.forall (fun sym _ -> Map.containsKey sym env)
 
-    let tryEval (env: SymbolEnvT) (p: SizeProductT) =
+    let tryEval (env: SizeSymbolEnvT) (p: SizeProductT) =
         if canEval env p then Some (eval env p) else None
 
 
-
 module SizeSpec =
-    open SymbolEnvTypes
+    open SizeSymbolTypes
 
     /// size specification of a dimension (axis)
     [<StructuralEquality; StructuralComparison>]
     type SizeSpecT =
-        | Base of BaseSize              // fixed size or symbol
+        | Base of BaseSizeT              // fixed size or symbol
         | Broadcast                     // size 1 and broadcastable
         | Product of SizeProduct.SizeProductT       // product of fixed sizes and symbols
 
@@ -139,7 +140,7 @@ module SizeSpec =
     let simplify (ss: SizeSpecT) = 
         match ss with
         | Product (SizeProduct.SingleFactor f) -> Base (Fixed f)
-        | Product (SizeProduct.SingleSymbol s) -> Base (Symbol s)
+        | Product (SizeProduct.SingleSymbol s) -> Base (Sym s)
         | _ -> ss
 
     /// True if both sizes have the same number of elements and 
@@ -154,6 +155,12 @@ module SizeSpec =
         | Broadcast, Base (Fixed 1) | Base (Fixed 1), Broadcast -> true
         | a, b -> a = b
 
+    type SizeSpecT with
+        /// equal size with broadcastability
+        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithBroadcastability ssa ssb
+        /// equal size ignoring broadcastability
+        static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithoutBroadcastability ssa ssb
+
     /// not-broadcastable size one
     let one =
         Base (Fixed 1)
@@ -164,16 +171,16 @@ module SizeSpec =
 
     /// symbolic size
     let symbol s =
-        Base (Symbol s)
+        Base (Sym s)
 
     /// broadcastable size one
     let broadcastable =
         Broadcast
 
     /// evaluate symbolic size specification to a number
-    let eval (env: SymbolEnvT) ss =
+    let eval (env: SizeSymbolEnvT) ss =
         match ss with
-        | Base (Symbol sym) -> 
+        | Base (Sym sym) -> 
             match Map.tryFind sym env with
             | Some l -> l
             | None -> failwithf "no size known for symbol %s" sym
@@ -181,16 +188,10 @@ module SizeSpec =
         | Broadcast -> 1
         | Product p -> SizeProduct.eval env p
 
-    type SizeSpecT with
-        /// equal size with broadcastability
-        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithBroadcastability ssa ssb
-        /// equal size ignoring broadcastability
-        static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = equalWithoutBroadcastability ssa ssb
-
 
 /// shape specification of a tensor
 module ShapeSpec =
-    open SymbolEnvTypes
+    open SizeSymbolTypes
     open SizeSpec
 
     /// shape specifcation of a tensor
@@ -215,7 +216,7 @@ module ShapeSpec =
         List.fold 
             (fun p ss ->
                 match ss with
-                | Base (Symbol b) -> p * b
+                | Base (Sym b) -> p * b
                 | Base (Fixed f) -> p * f
                 | Broadcast -> p 
                 | Product pb -> p * pb)
@@ -288,22 +289,16 @@ module ShapeSpec =
     let disableAllBroadcasts sa =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
-    /// evaluates shape to numeric shape
-    let eval (env: SymbolEnvT) (sa: ShapeSpecT) : NShapeSpecT =
-        List.map (SizeSpec.eval env) sa
-
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
         List.forall2 (.=) sa sb
 
+    /// evaluates shape to numeric shape
+    let eval (env: SizeSymbolEnvT) (sa: ShapeSpecT) : NShapeSpecT =
+        List.map (SizeSpec.eval env) sa
 
-module SymbolEnv =
-    open SymbolEnvTypes
-    open SizeSpec
-    open ShapeSpec
-
-    /// constructs a SymbolEnv from numeric shape values
-    let fromShapeValues (shpSymEnv: Map<string, ShapeSpecT>) (shpValEnv: Map<string, NShapeSpecT>) =
-        let inferAndCheckSizes (knownSizes: SymbolEnvT) = 
+    /// constructs a SizeSymbolEnv from numeric shape values
+    let inferSizeSymbolEnv (shpValEnv: Map<string, NShapeSpecT>) (shpSymEnv: Map<string, ShapeSpecT>) =
+        let inferAndCheckSizes (knownSizes: SizeSymbolEnvT) = 
             seq {
                 for name, symShape in Map.toSeq shpSymEnv do
                     let valShape = 
@@ -311,7 +306,7 @@ module SymbolEnv =
                         | Some s -> s
                         | None -> failwithf "no value for variable %s was specified" name
 
-                    if ShapeSpec.nDim symShape <> List.length valShape then
+                    if nDim symShape <> List.length valShape then
                         failwithf "variable %s is expected to have shape of form %A but it has shape %A \
                                     with different rank" 
                             name symShape valShape
@@ -323,7 +318,7 @@ module SymbolEnv =
                                     name symShape valShape symSizeInferred valSize
 
                         match symSize with
-                        | Base (Symbol s) -> 
+                        | Base (Sym s) -> 
                             match Map.tryFind s knownSizes with
                             | Some knownSize ->
                                 if knownSize <> valSize then
