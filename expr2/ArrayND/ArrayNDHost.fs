@@ -60,11 +60,11 @@ module ArrayNDHost =
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let inline newContiguous<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp)
+        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp) :> ArrayNDT<'T>
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
     let inline newColumnMajor<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp)
+        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp) :> ArrayNDT<'T>
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let inline scalar value =

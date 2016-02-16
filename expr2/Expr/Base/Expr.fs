@@ -23,7 +23,7 @@ module Expr =
 
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | DiagonalOne of ShapeSpecT             
+        | Identity of SizeSpecT
         /// zero tensor of given shape       
         | Zeros of ShapeSpecT                   
         /// scalar of given value
@@ -185,7 +185,7 @@ module Expr =
         | Unary(Sum, _) -> ShapeSpec.scalar
         | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
         // tensor creation
-        | Leaf(DiagonalOne(ss)) -> ss
+        | Leaf(Identity(ss)) -> ShapeSpec.matrix ss ss
         | Leaf(Zeros(ss)) -> ss
         | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
         // shape operations
@@ -224,7 +224,7 @@ module Expr =
                         sa ss
                 for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                     match sa.[dim], ss.[dim] with
-                    | SizeSpec.Broadcast, _ -> ()
+                    | SizeSpecT.Broadcast, _ -> ()
                     | ssa, ssb when ssa .= ssb -> ()
                     | _ -> failwithf "dimension %d of array with shape %A is not broadcastable to shape %A" dim sa ss
                 a
@@ -334,11 +334,8 @@ module Expr =
     let sumKeepingAxis ax a =
         a |> sumAxis ax |> insertBroadcastAxis ax
 
-    /// tensor of given shape with 1s on the diagonal
-    let diagonalOne ss = Leaf(DiagonalOne(ss)) |> check
-
     /// identity matrix of given size
-    let identity size = diagonalOne (ShapeSpec.matrix size size)
+    let identity size = Leaf(Identity(size)) |> check
 
     /// zero tensor of given shape
     let zeros ss = Leaf(Zeros(ss)) |> check

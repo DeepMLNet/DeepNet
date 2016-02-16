@@ -499,18 +499,42 @@ module ArrayND =
             set idx cv a
 
 
+    //let inline cast<'T> v = unbox<'T> (box v)
+
+
     type ArrayNDT<'T> with
 
+        member this.Cast<'A> () =
+            unbox<ArrayNDT<'A>> (box this)
+
+        member this.CastBack (v: ArrayNDT<'A>) =
+            unbox<ArrayNDT<'T>> (box v)
+
+        static member UncheckedMap (f: 'A -> 'A) (a: ArrayNDT<'T>) =
+            a.Cast<'A> () |> map f |> a.CastBack
+
+        static member UncheckedMap2 (f: 'A -> 'A -> 'A) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+            let aCast = a.Cast<'A> ()
+            let bCast = b.Cast<'A> ()
+            let mCast = map2 f aCast bCast
+            let m = a.CastBack mCast
+            m
+
         // elementwise unary
-        static member (~-) (a: ArrayNDT<double>) = map (~-) a
-        static member (~-) (a: ArrayNDT<single>) = map (~-) a
-        static member (~-) (a: ArrayNDT<int>) = map (~-) a
+        static member (~-) (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap (~-) a
+        //static member (~-) (a: ArrayNDT<double>) = map (~-) a
+        //static member (~-) (a: ArrayNDT<single>) = map (~-) a
+        //static member (~-) (a: ArrayNDT<int>) = map (~-) a
+
+        static member Log (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap log a
+        static member Exp (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap exp a
 
         // elementwise binary
-        static member (+) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (+) a b
-        static member (+) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (+) a b
-        static member (+) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (+) a b
-        static member (+) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (+) a b
+        static member (+) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap2 (+) a b
+        //static member (+) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (+) a b
+        //static member (+) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (+) a b
+        //static member (+) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (+) a b
+        //static member (+) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (+) a b
 
         static member (-) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (-) a b
         static member (-) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (-) a b
