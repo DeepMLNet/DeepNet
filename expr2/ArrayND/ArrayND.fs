@@ -240,7 +240,7 @@ module ArrayND =
     [<AbstractClass>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
         /// layout
-        member inline this.Layout = layout
+        member this.Layout = layout
 
         /// value zero (if defined for 'T)
         member inline this.Zero =
@@ -269,6 +269,16 @@ module ArrayND =
 
         interface IHasLayout with
             member this.Layout = this.Layout
+
+        /// unchecked cast to NDArrayT<'A>
+        member this.Cast<'A> () =
+            let thisBoxed = box this
+            let thisCasted = unbox<ArrayNDT<'A>> thisBoxed
+            thisCasted
+
+        /// unchecked cast of v to NDArrayT<'T> (this type)
+        member this.CastToMe (v: ArrayNDT<'A>) = v.Cast<'T> ()
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -498,108 +508,92 @@ module ArrayND =
             let cv = f (get idx a) (get idx b)
             set idx cv a
 
+    /// unsupported operation for this type
+    let inline unsp (a: 'T) : 'R = 
+        failwithf "operation unsupported for type %A" typeof<'T>
 
-    //let inline cast<'T> v = unbox<'T> (box v)
+    let inline uncheckedApply (f: ArrayNDT<'A> -> ArrayNDT<'A>) (a: ArrayNDT<'T>) =
+        let aCast = a.Cast<'A> ()
+        let mCast = f aCast
+        let m = a.CastToMe mCast
+        m
+
+    let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        let aCast = a.Cast<'A> ()
+        let bCast = b.Cast<'A> ()
+        let mCast = f aCast bCast
+        let m = a.CastToMe mCast
+        m
+
+    let inline uncheckedMap (f: 'A -> 'A) (a: ArrayNDT<'T>) =
+        uncheckedApply (map f) a
+
+    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        uncheckedApply2 (map2 f) a b
+
+    let inline typedApply   (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
+                            (fSingle: ArrayNDT<single> -> ArrayNDT<single>)
+                            (fInt:    ArrayNDT<int>    -> ArrayNDT<int>)
+                            (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>)
+                            (a: ArrayNDT<'T>) =
+        if   typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
+        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
+        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
+        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
+        else failwith "unknown type"
+
+    let inline typedApply2  (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
+                            (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
+                            (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<int>)
+                            (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<byte>)
+                            (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        if   typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
+        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
+        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
+        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
+        else failwith "unknown type"
+
+    let inline typedMap (fDouble: double -> double) 
+                        (fSingle: single -> single)
+                        (fInt:    int    -> int)
+                        (fByte:   byte   -> byte)
+                        (a: ArrayNDT<'T>) =
+        typedApply (map fDouble) (map fSingle) (map fInt) (map fByte) a
+
+    let inline typedMap2 (fDouble: double -> double -> double) 
+                         (fSingle: single -> single -> single)
+                         (fInt:    int    -> int    -> int)
+                         (fByte:   byte   -> byte   -> byte)
+                         (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        typedApply2 (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
 
 
-    type ArrayNDT<'T> with
-
-        member this.Cast<'A> () =
-            unbox<ArrayNDT<'A>> (box this)
-
-        member this.CastBack (v: ArrayNDT<'A>) =
-            unbox<ArrayNDT<'T>> (box v)
-
-        static member UncheckedMap (f: 'A -> 'A) (a: ArrayNDT<'T>) =
-            a.Cast<'A> () |> map f |> a.CastBack
-
-        static member UncheckedMap2 (f: 'A -> 'A -> 'A) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
-            let aCast = a.Cast<'A> ()
-            let bCast = b.Cast<'A> ()
-            let mCast = map2 f aCast bCast
-            let m = a.CastBack mCast
-            m
+    type ArrayNDT<'T> with    
 
         // elementwise unary
-        static member (~-) (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap (~-) a
-        //static member (~-) (a: ArrayNDT<double>) = map (~-) a
-        //static member (~-) (a: ArrayNDT<single>) = map (~-) a
-        //static member (~-) (a: ArrayNDT<int>) = map (~-) a
-
-        static member Log (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap log a
-        static member Exp (a: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap exp a
+        static member (~-) (a: ArrayNDT<'T>) = typedMap (~-) (~-) (~-) (unsp) a
+        static member Log (a: ArrayNDT<'T>) = typedMap log log (unsp) (unsp) a
+        static member Exp (a: ArrayNDT<'T>) = typedMap exp exp (unsp) (unsp) a
 
         // elementwise binary
-        static member (+) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = ArrayNDT<'T>.UncheckedMap2 (+) a b
-        //static member (+) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (+) a b
-        //static member (+) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (+) a b
-        //static member (+) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (+) a b
-        //static member (+) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (+) a b
-
-        static member (-) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (-) a b
-        static member (-) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (-) a b
-        static member (-) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (-) a b
-        static member (-) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (-) a b
-
-        static member (*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (*) a b
-        static member (*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (*) a b
-        static member (*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (*) a b
-        static member (*) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (*) a b
-
-        static member (/) (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 (/) a b
-        static member (/) (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 (/) a b
-        static member (/) (a: ArrayNDT<int>, b: ArrayNDT<int>) = map2 (/) a b
-        static member (/) (a: ArrayNDT<byte>, b: ArrayNDT<byte>) = map2 (/) a b
-
-        static member Pow (a: ArrayNDT<double>, b: ArrayNDT<double>) = map2 ( ** ) a b
-        static member Pow (a: ArrayNDT<single>, b: ArrayNDT<single>) = map2 ( ** ) a b
+        static member (+) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
+        static member (-) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (-) (-) (-) (-) a b
+        static member (*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (*) (*) (*) (*) a b
+        static member (/) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (/) (/) (/) (/) a b
+        static member Pow (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
 
         // elementwise binary with scalars
-        static member (+) (a: ArrayNDT<double>, b: double) = a + (scalarOfType b a)
-        static member (+) (a: ArrayNDT<single>, b: single) = a + (scalarOfType b a)
-        static member (+) (a: ArrayNDT<int>, b: int) = a + (scalarOfType b a)
-        static member (+) (a: ArrayNDT<byte>, b: byte) = a + (scalarOfType b a)
+        static member (+) (a: ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
+        static member (-) (a: ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
+        static member (*) (a: ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
+        static member (/) (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
+        static member Pow (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
 
-        static member (+) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) + b
-        static member (+) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) + b
-        static member (+) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) + b
-        static member (+) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) + b
-
-        static member (-) (a: ArrayNDT<double>, b: double) = a - (scalarOfType b a)
-        static member (-) (a: ArrayNDT<single>, b: single) = a - (scalarOfType b a)
-        static member (-) (a: ArrayNDT<int>, b: int) = a - (scalarOfType b a)
-        static member (-) (a: ArrayNDT<byte>, b: byte) = a - (scalarOfType b a)
-
-        static member (-) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) - b
-        static member (-) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) - b
-        static member (-) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) - b
-        static member (-) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) - b
-
-        static member (*) (a: ArrayNDT<double>, b: double) = a * (scalarOfType b a)
-        static member (*) (a: ArrayNDT<single>, b: single) = a * (scalarOfType b a)
-        static member (*) (a: ArrayNDT<int>, b: int) = a * (scalarOfType b a)
-        static member (*) (a: ArrayNDT<byte>, b: byte) = a * (scalarOfType b a)
-
-        static member (*) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) * b
-        static member (*) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) * b
-        static member (*) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) * b
-        static member (*) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) * b
-
-        static member (/) (a: ArrayNDT<double>, b: double) = a / (scalarOfType b a)
-        static member (/) (a: ArrayNDT<single>, b: single) = a / (scalarOfType b a)
-        static member (/) (a: ArrayNDT<int>, b: int) = a / (scalarOfType b a)
-        static member (/) (a: ArrayNDT<byte>, b: byte) = a / (scalarOfType b a)
-
-        static member (/) (a: double, b: ArrayNDT<double>) = (scalarOfType a b) / b
-        static member (/) (a: single, b: ArrayNDT<single>) = (scalarOfType a b) / b
-        static member (/) (a: int, b: ArrayNDT<int>) = (scalarOfType a b) / b
-        static member (/) (a: byte, b: ArrayNDT<byte>) = (scalarOfType a b) / b
-
-        static member Pow (a: ArrayNDT<double>, b: double) = a ** (scalarOfType b a)
-        static member Pow (a: ArrayNDT<single>, b: single) = a ** (scalarOfType b a)
-
-        static member Pow (a: double, b: ArrayNDT<double>) = (scalarOfType a b) ** b
-        static member Pow (a: single, b: ArrayNDT<single>) = (scalarOfType a b) ** b
+        static member (+) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member (-) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member (*) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member (/) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member Pow (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
 
         // transposition
         member this.T = transpose this
@@ -670,11 +664,7 @@ module ArrayND =
 
     type ArrayNDT<'T> with   
         /// dot product
-        static member (.*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = dotImpl a b
-        /// dot product
-        static member (.*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = dotImpl a b
-        /// dot product
-        static member (.*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = dotImpl a b
+        static member (.*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 dotImpl dotImpl dotImpl dotImpl a b
 
     /// dot product between vec*vec, mat*vec, mat*mat
     let inline dot a b =
@@ -758,11 +748,7 @@ module ArrayND =
 
         generate [] |> blockArray
    
-    type ArrayNDT<'T> with                  
-        /// tensor product
-        static member (%*) (a: ArrayNDT<double>, b: ArrayNDT<double>) = tensorProduct a b
-        /// tensor product
-        static member (%*) (a: ArrayNDT<single>, b: ArrayNDT<single>) = tensorProduct a b
-        /// tensor product
-        static member (%*) (a: ArrayNDT<int>, b: ArrayNDT<int>) = tensorProduct a b
+    type ArrayNDT<'T> with
+        /// dot product
+        static member (%*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 tensorProduct tensorProduct tensorProduct tensorProduct a b
         

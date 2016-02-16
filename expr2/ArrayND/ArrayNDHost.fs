@@ -44,7 +44,7 @@ module ArrayNDHost =
             ArrayNDHostT<'T>(layout, ManagedArrayStorageT<'T>(ArrayNDLayout.nElems layout))
 
         /// storage
-        member inline this.Storage = storage
+        member this.Storage = storage
 
         override this.Item
             with get pos = storage.[ArrayNDLayout.addr pos layout]

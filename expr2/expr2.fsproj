@@ -99,17 +99,18 @@
     <Compile Include="Expr\Base\UExpr.fs" />
     <Compile Include="Expr\Base\EvalEnvs.fs" />
     <Compile Include="Expr\Base\EvalHost.fs" />
-    <Compile Include="Expr\Compiler\ExecUnitsGen.fs" />
-    <Compile Include="Expr\Compiler\StreamGen.fs" />
-    <Compile Include="Expr\Compiler\CudaRegMem.fs" />
-    <Compile Include="Expr\Compiler\CudaExecUnits.fs" />
-    <Compile Include="Expr\Compiler\CudaRecipe.fs" />
-    <Compile Include="Expr\Compiler\CudaExec.fs" />
-    <Compile Include="Expr\Func\FuncBuilder.fs" />
-    <Compile Include="Expr\Check\NumGrad.fs" />
-    <Compile Include="Expr\Check\DiffCheck.fs" />
-    <Compile Include="Expr\Check\CudaCheck.fs" />
-    <Compile Include="Main\Program.fs" />
+    <None Include="Expr\Compiler\ExecUnitsGen.fs" />
+    <None Include="Expr\Compiler\StreamGen.fs" />
+    <None Include="Expr\Compiler\CudaRegMem.fs" />
+    <None Include="Expr\Compiler\CudaExecUnits.fs" />
+    <None Include="Expr\Compiler\CudaRecipe.fs" />
+    <None Include="Expr\Compiler\CudaExec.fs" />
+    <None Include="Expr\Func\FuncBuilder.fs" />
+    <None Include="Expr\Check\NumGrad.fs" />
+    <None Include="Expr\Check\DiffCheck.fs" />
+    <None Include="Expr\Check\CudaCheck.fs" />
+    <None Include="Main\Program.fs" />
+    <Compile Include="Main\Program2.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
