@@ -136,7 +136,7 @@ module ArrayNDCuda =
 
     /// Copies a ArrayNDCudaT to the host
     let toHost (src: ArrayNDCudaT<'T>) =
-        let dst = ArrayNDHost.newContiguous<'T> (shape src)
+        let dst = ArrayNDHost.newContiguous<'T> (shape src) :?> ArrayNDHostT<'T>
         copyIntoHost dst src
         dst
 
