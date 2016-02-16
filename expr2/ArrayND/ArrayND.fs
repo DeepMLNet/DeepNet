@@ -587,13 +587,13 @@ module ArrayND =
         static member (-) (a: ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
         static member (*) (a: ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
         static member (/) (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
-        static member Pow (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
+        static member Pow (a: ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)
 
-        static member (+) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member (+) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) + b
         static member (-) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
-        static member (*) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
-        static member (/) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
-        static member Pow (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member (*) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) * b
+        static member (/) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) / b
+        static member Pow (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) ** b
 
         // transposition
         member this.T = transpose this
@@ -733,7 +733,7 @@ module ArrayND =
         joined
     
     /// tensor product
-    let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> =
+    let inline tensorProductImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> =
         let a, b = padToSame a b
         let aShp = shape a
 
@@ -750,5 +750,7 @@ module ArrayND =
    
     type ArrayNDT<'T> with
         /// dot product
-        static member (%*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 tensorProduct tensorProduct tensorProduct tensorProduct a b
+        static member (%*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
+    /// tensor product
+    let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b

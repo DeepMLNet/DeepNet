@@ -52,13 +52,12 @@ module EvalHost =
                 let av, bv = subEval a, subEval b  
                 match op with
                 | Add -> av + bv
-                //| Substract -> av - bv
-                //| Multiply -> av * bv
-                //| Divide -> av / bv
-                //| Power -> av ** bv
-                //| Dot -> av .* bv
-                //| TensorProduct -> failwith "not impl"
-                //| TensorProduct -> av %* bv
+                | Substract -> av - bv
+                | Multiply -> av * bv
+                | Divide -> av / bv
+                | Power -> av ** bv
+                | Dot -> av .* bv
+                | TensorProduct -> av %* bv
             | Nary(op, es) ->
                 let esv = List.map subEval es
                 match op with 
