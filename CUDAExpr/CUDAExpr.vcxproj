@@ -114,7 +114,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <Command>cd "$(ProjectDir)"
 "$(ExtensionSDKDirectoryRoot)\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
 
-copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\expr2\bin\Debug"
+copy "$(ProjectDir)\*.cuh" "$(SolutionDir)\SymTensorCuda\bin\Debug"
 </Command>
     </PreBuildEvent>
     <PreBuildEvent>

@@ -44,7 +44,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Util.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="Expr.fs" />
@@ -58,6 +57,11 @@
     <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
       <Name>ArrayND</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Basics\Basics.fsproj">
+      <Name>Basics</Name>
+      <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
