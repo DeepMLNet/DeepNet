@@ -1,0 +1,43 @@
+- Should probably switch to Thrust for all operations
+- can it be done?
+	- should definintely work for sum and sumaxis
+	- would also be nice for elementwise functions
+- drawback: 
+	- need full nvcc compiler
+
+- can also use arrayfire for dimensions <= 4
+
+- thrust should work with any dimension when iterators are defined appropirately
+- both require host calls
+- arrayfire is fixed to a particular stream for now
+
+
+TODO:
+	- implement CUBLAS DONE
+	- implement host call interface  DONE
+	- implement host call function generation / compilation DONE
+	- implement host call function calling DONE
+	- implement Thrust iterators DONE
+	- implement elementwise / reductions using Thrust DONE
+	- (later: implement calls to arrayfire)
+
+
+- okay, where is the problem?
+- solution 1:
+	- define delgates for all functions we call
+	- means: number of parameters and their types must be known during compile time
+		- not really: we still can just pass an IntPtr
+	- advantage: quite save and easy
+
+
+TODO:
+	- compare GPU and CPU result
+	- perhaps to it automatically?
+
+
+	- nice frontend
+	- cleanup cuda code
+	- directory structure
+	- tanh / sigmoid
+	- simple neural network
+	- ArrayFire HEAD?
