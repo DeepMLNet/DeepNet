@@ -170,6 +170,11 @@ module ArrayNDLayout =
         if nDims a <> 2 then failwithf "cannot transpose non-matrix of shape %A" (shape a)
         swapDim 0 1 a
 
+    /// reorders the axes as specified
+    let inline reorderAxes (newOrder: int list) a =
+        {a with Shape = List.permute (fun i -> newOrder.[i]) a.Shape;
+                Stride = List.permute (fun i -> newOrder.[i]) a.Stride;}
+
     /// creates a subview layout
     let rec view ranges a =
         let checkElementRange isEnd nElems i =

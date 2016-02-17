@@ -72,6 +72,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="ArrayNDManikin.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="ExecUnitsGen.fs" />
     <Compile Include="StreamGen.fs" />
@@ -83,6 +84,11 @@
     <Compile Include="CudaCheck.fs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
+      <Name>SymTensor</Name>
+      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <Reference Include="CudaBlas">
       <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\CudaBlas.dll</HintPath>
       <Private>True</Private>
@@ -135,11 +141,6 @@
     <ProjectReference Include="..\CUDAExpr\CUDAExpr.vcxproj">
       <Name>CUDAExpr</Name>
       <Project>{d746a1db-9c71-4b76-b184-a38031879282}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Expr\SymTensor.fsproj">
-      <Name>SymTensor</Name>
-      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

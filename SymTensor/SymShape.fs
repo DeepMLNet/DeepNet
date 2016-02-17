@@ -206,15 +206,19 @@ module SizeSpec =
         | Product p -> SizeProduct.eval env p
 
 
-/// shape specification of a tensor
-module ShapeSpec =
-    open SizeSymbolTypes
+[<AutoOpen>]
+module ShapeSpecTypes =
 
     /// shape specifcation of a tensor
     type ShapeSpecT = SizeSpecT list
 
     /// evaluated shape specification of a tensor
     type NShapeSpecT = int list
+
+
+/// shape specification of a tensor
+module ShapeSpec =
+    open SizeSymbolTypes
 
     let withoutAxis ax sa =
         sa |> List.without ax

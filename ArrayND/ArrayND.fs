@@ -3,13 +3,20 @@ namespace ArrayNDNS
 open Util
 
 
-//[<AutoOpen>]
-module ArrayND =
+[<AutoOpen>]
+module ArrayNDTypes =
 
     /// object that can be queried for shape
     type IHasLayout =
         /// shape of object
         abstract member Layout : ArrayNDLayoutT
+
+    /// ArrayND of any type
+    type IArrayNDT =
+        inherit IHasLayout
+
+
+module ArrayND =
 
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
@@ -44,6 +51,7 @@ module ArrayND =
 
         interface IHasLayout with
             member this.Layout = this.Layout
+        interface IArrayNDT 
 
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
@@ -114,6 +122,14 @@ module ArrayND =
 
     /// true if the ArrayND is in Fortran order
     let inline isColumnMajor a = layout a |> ArrayNDLayout.isColumnMajor
+
+    /// true if ArrayND can be target of a BLAS operation
+    let inline isBlasTargetable a =
+        (nDims a = 2) && (isColumnMajor a)
+
+    /// true if a and b have at least one element in common
+    let inline overlapping a b = 
+        false // TODO
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
     let inline newContiguousOfType shp (a: ArrayNDT<'T>) =
@@ -197,6 +213,10 @@ module ArrayND =
     /// transposes the given matrix
     let inline transpose a =
         relayout (ArrayNDLayout.transpose (layout a)) a
+
+    /// reorders the axes as specified
+    let inline reorderAxes (newOrder: int list) a =
+        relayout (ArrayNDLayout.reorderAxes newOrder (layout a)) a
 
     /// creates a subview of an ArrayND
     let inline view ranges a =

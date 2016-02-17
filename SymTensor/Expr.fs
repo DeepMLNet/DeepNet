@@ -34,8 +34,8 @@ module Expr =
 
         // ==== variable access ====
         /// variable read
-        | Var of VarSpecT<'T>                       
-
+        | Var of VarSpecT<'T>       
+        
 
     /// ops with one expr as argument
     and UnaryOpT<'T> =
