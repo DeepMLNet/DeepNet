@@ -73,15 +73,15 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ArrayNDManikin.fs" />
-    <Compile Include="Types.fs" />
     <Compile Include="ExecUnitsGen.fs" />
-    <Compile Include="StreamGen.fs" />
+    <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaExecUnits.fs" />
+    <Compile Include="StreamGen.fs" />
     <Compile Include="CudaRecipe.fs" />
-    <Compile Include="CudaRegMem.fs" />
     <Compile Include="CudaExec.fs" />
     <Content Include="packages.config" />
     <Compile Include="CudaCheck.fs" />
+    <Compile Include="VarEnvLock.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">

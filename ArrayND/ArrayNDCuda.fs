@@ -10,8 +10,12 @@ open ArrayNDHost
 
 module ArrayNDCuda =
 
-    type IDeviceStorage<'T> =
+    type IDeviceStorage =
+        abstract ByteData: CudaDeviceVariable<byte>
+
+    type IDeviceStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> =
         abstract Item: int -> 'T with get, set
+        abstract Data: CudaDeviceVariable<'T>
 
     /// Storage in a CudaDeviceVariable. 
     /// The underlying CudaDeviceVariable is disposed when this object is finalized.
@@ -19,6 +23,7 @@ module ArrayNDCuda =
                                                                                (data: CudaDeviceVariable<'T>) =
 
         new (size: int) = CudaDeviceVariableStorageT<'T> (new CudaDeviceVariable<'T> (SizeT(size)))
+
         interface IDeviceStorage<'T> with
             member this.Item 
                 with get(index) = 
@@ -28,11 +33,20 @@ module ArrayNDCuda =
                 and set index (value: 'T) = 
                     data.CopyToDevice(value, SizeT(index * sizeof<'T>))
 
+            member this.Data = data
+
+        interface IDeviceStorage with
+            member this.ByteData =
+                new CudaDeviceVariable<byte> (data.DevicePointer, data.SizeInBytes)
+
         override this.Finalize() =
             data.Dispose()
 
         member this.CudaDeviceVariabe = data
 
+
+    type IArrayNDCudaT =
+        inherit IArrayNDT
 
     /// an N-dimensional array with reshape and subview abilities stored in GPU device memory
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
@@ -57,6 +71,8 @@ module ArrayNDCuda =
 
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
+
+        interface IArrayNDCudaT
 
 
     /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 

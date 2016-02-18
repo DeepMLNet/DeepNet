@@ -1,163 +1,19 @@
-﻿module CudaExecUnits
+﻿namespace SymTensor.Compiler.Cuda
 
 open System
 open System.Runtime.InteropServices
 open ManagedCuda
 
 open Util
-open Op
-open ExecUnitsGen
-open CudaRegMem
-open NDArrayDev
-
-/// device memory pointer
-type DevMemPtrT = {Base: MemoryT;
-                   Offset: int}
-
-/// pre-allocated host memory 
-type HostExternalMemT = {Name: string}
-/// host memory pointer
-type HostMemPtrT = {Base: HostExternalMemT;
-                    Offset: int}
-
-/// variable storage location
-type VarStorLocT =
-    | DevVar
-    | HostVar
-
-/// additional environment informations for CUDA
-type CudaEnvT = {VarStorLoc: Map<VarSpecT, VarStorLocT>}
-
-type FuncDomainT =
-    | KernelFunc
-    | CPPFunc
-
-/// template instantiation specification
-type TmplInstT = {FuncName: string; Domain: FuncDomainT; 
-                  TmplArgs: string list; RetType: string; ArgTypes: string list;}
-
-/// dimensionality of parallel work to perform
-type WorkDimT = int * int * int
-
-/// Actual CUDA internal memory allocations and external device and host references
-type CudaExecEnvT = 
-    {InternalMem: Dictionary<MemAllocT, CudaDeviceVariable<byte>>;
-     ExternalVar: Map<VarSpecT, NDArrayDev.NDArrayDev>;
-     HostVar:     Map<VarSpecT, ArrayND.ArrayND>}
-
-module CudaExecEnv = 
-    /// gets device memory for an internal allocation or external reference
-    let getDevVar (env: CudaExecEnvT) view =
-        match view.Memory with
-        | MemAlloc im -> env.InternalMem.[im]
-        | ExternalMem vs ->
-            let ev = env.ExternalVar.[vs]
-            if ev.Shape = view.Shape && ev.Stride = view.Stride && ev.Offset = view.Offset then
-                // TODO: remove conversion from single to byte
-                new CudaDeviceVariable<byte>(ev.Data.DevicePointer, ev.Data.SizeInBytes)
-            else
-                failwithf "external variable is of form %A but form %A was expected" ev view
-
-    /// gets host memory for an external reference
-    let getHostVar (env: CudaExecEnvT) view =
-        match view.Memory with
-        | ExternalMem vs ->
-            let hv = env.HostVar.[vs]
-            if hv.Shape = view.Shape && hv.Stride = view.Stride && hv.Offset = view.Offset then
-                // TODO: remove conversion from single to byte
-                let cr = NDArrayLock.getCudaRegisteredMemory hv
-                new CudaRegisteredHostMemory<byte>(cr.PinnedHostPointer, cr.SizeInBytes)
-            else
-                failwithf "host variable is of form %A but form %A was expected" hv view
-        | _ -> failwithf "host variable must be of type ExternalMem"
+open ArrayNDNS
+open SymTensor
+open SymTensor.Compiler
 
 
-/// CUDA C++ argument template
-type ICudaArgTmpl =
-    abstract member CPPTypeName : string
-    abstract member CPPTypeNameWithoutPtr : string
-    abstract member GetArg : CudaExecEnvT -> obj 
 
-/// CUDA device memory range
-type DevMemRngT = 
-    {DeviceVar: CudaDeviceVariable<byte>;
-     OffsetInBytes: int;
-     LengthInBytes: int;}
-
-/// CUDA device memory range template
-type IDevMemRngTmpl =
-    abstract member GetRng : CudaExecEnvT -> DevMemRngT
-
-/// CUDA host memory range
-type HostMemRngT = 
-    {HostVar: CudaRegisteredHostMemory<byte>;
-     OffsetInBytes: int;
-     LengthInBytes: int;}
-
-/// CUDA host memory range template
-type IHostMemRngTmpl =
-    abstract member GetRng : CudaExecEnvT -> HostMemRngT
     
-/// BLAS transpose operation
-type BlasOpT =
-    | BlasId
-    | BlasTranspose
 
-    member this.CudaBlasOperation =
-        match this with
-        | BlasId -> CudaBlas.Operation.NonTranspose
-        | BlasTranspose -> CudaBlas.Operation.Transpose
 
-// All CUBLAS calls use Fortran matrices. This means:
-// - one-based indexing
-// - column major
-// For NDArray this translates to:
-// CUBLAS #columns    = Shape.[0]
-// CUBLAS #rows       = Shape.[1]
-// CUBLAS leading dim = Stride.[0] >= 1 (no broadcasting)
-// Stride.[1] must be 1.
-
-/// BLAS view of NDArray. The NDArray is implicitly transposed and exposed as a "float *"
-type BlasTransposedMatrixTmpl (view: NDArrayViewT) =
-    do
-        match view.Stride with
-        | [0; _] -> failwithf "NDArray for use with BLAS cannot be broadcasted in first dimension"
-        | [_; n] when n <> 1 -> failwithf "NDArray for use with BLAS must be continguous in last dimension but has stride %d" n
-        | [_; _] -> ()
-        | _ -> failwith "NDArray for use with BLAS must be 2-dimensional"         
-
-    member this.GetLeadingDimension env =
-        view.Stride.[0] 
-
-    member this.GetColumns env =
-        view.Shape.[0]
-
-    member this.GetRows env =
-        view.Shape.[1]
-
-    member this.GetColumnsForOp env op =
-        match op with 
-        | CudaBlas.Operation.NonTranspose -> this.GetColumns env
-        | CudaBlas.Operation.Transpose 
-        | CudaBlas.Operation.ConjugateTranspose -> this.GetRows env
-        | _ -> failwithf "unknown CudaBlas.Operation %A" op
-
-    member this.GetRowsForOp env op =
-        match op with 
-        | CudaBlas.Operation.NonTranspose -> this.GetRows env
-        | CudaBlas.Operation.Transpose 
-        | CudaBlas.Operation.ConjugateTranspose -> this.GetColumns env
-        | _ -> failwithf "unknown CudaBlas.Operation %A" op
-
-    interface ICudaArgTmpl with
-        member this.CPPTypeName = "float *"
-        member this.CPPTypeNameWithoutPtr = "float"
-        member this.GetArg env = 
-            let devVar = CudaExecEnv.getDevVar env view
-            // need to adjust by offset
-            let offsetBytes = view.Offset * 4
-            new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetBytes), 
-                                           devVar.SizeInBytes - offsetBytes) :> obj
 
 /// a CUDA operation 
 type CudaOpT =
@@ -180,19 +36,12 @@ type ICudaOp =
     abstract member IsIndexed : bool  
 
 /// NDArray pointer marshalling template
-type NDArrayPtrArgTmpl (view: NDArrayViewT) = 
+type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
     interface ICudaArgTmpl with
-        member this.CPPTypeNameWithoutPtr = 
-            let dims = NDArrayView.nDim view
-            let shapeStr = if dims = 0 then "" else "<" + (view.Shape |> intToStrSeq |> String.combineWith ",") + ">"
-            let strideStr = "<" + ((view.Offset :: view.Stride) |> intToStrSeq |> String.combineWith ",") + ">"
-            sprintf "NDArrayStatic%dD<ShapeStatic%dD%s, StrideStatic%dD%s>" dims dims shapeStr dims strideStr            
-
-        member this.CPPTypeName = (this :> ICudaArgTmpl).CPPTypeNameWithoutPtr
-
+        member this.CPPTypeName = manikin.CPPType
         member this.GetArg env =
             // C++ struct just contains the pointer to data memory
-            (CudaExecEnv.getDevVar env view).DevicePointer :> obj
+            (CudaExecEnv.getDevVar env manikin).DevicePointer :> obj
 
 type NDArrayDevMemRngTmpl (view: NDArrayViewT) =
     interface IDevMemRngTmpl with

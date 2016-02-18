@@ -6,13 +6,16 @@ open Expr
 [<AutoOpen>]
 module UExprTypes = 
 
+
+
     type IUExtensionOp =
+        inherit System.IComparable
         abstract Arity: ArityT with get        
 
     type ULeafOpT =
         | Identity of SizeSpecT
         | Zeros of ShapeSpecT                   
-        | ScalarConst of obj
+        | ScalarConst of System.IComparable
         | Var of IVarSpec
 
     type UUnaryOpT =
@@ -49,7 +52,8 @@ module UExprTypes =
         | UNaryOp of UNaryOpT
 
     /// unified expression (combines all arities and types)
-    type UExprT = UExpr of UOpT * System.Type * (UExprT list)
+    [<StructuralComparison>] [<StructuralEquality>]
+    type UExprT = UExpr of UOpT * TypeNameT *  ShapeSpecT * (UExprT list)
 
 
 module UExpr =
@@ -61,7 +65,7 @@ module UExpr =
             match op with
             | Expr.Identity ss -> Identity ss
             | Expr.Zeros ss -> Zeros ss
-            | Expr.ScalarConst v -> ScalarConst (box v)
+            | Expr.ScalarConst v -> ScalarConst (box v :?> System.IComparable)
             | Expr.Var vs -> Var (vs :> IVarSpec)
             |> ULeafOp
         | Unary(op, _) -> 
@@ -96,11 +100,13 @@ module UExpr =
     /// converts an expression to a unified expression
     let rec toUExpr (expr: ExprT<'T>) =
         let uop = extractOp expr
+        let tn = TypeName typeof<'T>.AssemblyQualifiedName
+        let shp = Expr.shapeOf expr
         match expr with
-        | Leaf op -> UExpr (uop, typeof<'T>, [])
-        | Unary(op, a) -> UExpr(uop, typeof<'T>, [toUExpr a])
-        | Binary(op, a, b) -> UExpr(uop, typeof<'T>, [toUExpr a; toUExpr b])
-        | Nary(op, se) -> UExpr(uop, typeof<'T>, se |> List.map toUExpr)
+        | Leaf op -> UExpr (uop, tn, shp, [])
+        | Unary(op, a) -> UExpr(uop, tn, shp, [toUExpr a])
+        | Binary(op, a, b) -> UExpr(uop, tn, shp, [toUExpr a; toUExpr b])
+        | Nary(op, se) -> UExpr(uop, tn, shp, se |> List.map toUExpr)
     
     /// converts a unified expression to an expression
 //    let rec toExpr uexpr =
@@ -111,8 +117,21 @@ module UExpr =
 //        | UExpr(NaryOp op, se) -> Nary(op, se |> List.map toExpr)
 //        | _ -> failwithf "invalid unified expression %A" uexpr
 
-    /// Return the shape of the given unified expression.
-    //let shapeOf uexpr = uexpr |> toExpr |> shapeOf
+    /// the op of the given unified expression
+    let inline opOf uexpr =
+        match uexpr with UExpr(op, typ, shp, se) -> op
+
+    /// the type of the given unified expression
+    let inline typeOf uexpr =
+        match uexpr with UExpr(op, TypeName tn, shp, se) -> System.Type.GetType(tn)
+
+    /// the type of the given unified expression
+    let inline typenameOf uexpr =
+        match uexpr with UExpr(op, typ, shp, se) -> typ
+
+    /// the shape of the given unified expression
+    let inline shapeOf uexpr = 
+        match uexpr with UExpr(op, typ, shp, se) -> shp
 
     /// counts how many times subExpr occurs in unified expression uexpr
     let subExprOccurrences uexpr =
@@ -124,7 +143,7 @@ module UExpr =
                 cnt.[expr] <- 1
 
             match expr with
-            | UExpr (_, _, srcs) ->
+            | UExpr (_, _, _, srcs) ->
                 for src in srcs do
                     build src
         build uexpr

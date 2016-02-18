@@ -28,8 +28,8 @@ module ExecUnitsTypes =
                      OnCompletion: EvalResultT -> unit}
 
     /// generator function record
-    type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : (int -> MemManikinT) -> IArrayNDT -> UOpT -> IArrayNDT list -> 'e list;
-                                    TrgtViewGivenSrc: (int -> MemManikinT) -> NShapeSpecT -> IArrayNDT option -> UOpT -> IArrayNDT list -> bool list -> IArrayNDT * bool;
+    type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : (TypeNameT -> int -> MemManikinT) -> IArrayNDT -> UOpT -> IArrayNDT list -> 'e list;
+                                    TrgtViewGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> IArrayNDT option -> UOpT -> IArrayNDT list -> bool list -> IArrayNDT * bool;
                                     SrcViewReqsGivenTrgt: NShapeSpecT -> IArrayNDT option -> UOpT -> NShapeSpecT list -> IArrayNDT option list;}
 
 module ExecUnit =
@@ -54,8 +54,8 @@ module ExecUnit =
         // storage space
         let mutable memAllocIdCnt = 0
         let mutable memAllocs = []
-        let newMemory size = 
-            let mem = {Id = (List.length memAllocs); Size=size}
+        let newMemory typ elements = 
+            let mem = {Id=(List.length memAllocs); TypeName=typ; Elements=elements}
             memAllocs <- mem :: memAllocs
             MemAlloc mem
 
@@ -112,7 +112,7 @@ module ExecUnit =
                 // emit exec unit to evaluate expression
                 let erqExpr = erqToProcess.Expr
                 match erqExpr with
-                | UExpr(op, srcs) ->
+                | UExpr(op, typ, shp, srcs) ->
                     let nSrc = List.length srcs
                     let mutable subreqResults : Map<UExprT, EvalResultT option> = Map.empty
 
@@ -126,8 +126,9 @@ module ExecUnit =
                                 |> List.map (fun s -> subres.[s].View, subres.[s].Shared, subres.[s].ExecUnitId) 
                                 |> List.unzip3
                             let trgtView, trgtShared =
-                                gen.TrgtViewGivenSrc newMemory (numShapeOf erqExpr) erqTarget op srcViews srcShared
-                       
+                                gen.TrgtViewGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
+                            let trgtShared = trgtShared || erqResultShared
+
                             // emit execution unit 
                             let eu = {newExecUnit() with Items=gen.ExecItemsForOp newMemory trgtView op srcViews;
                                                          DependsOn=srcExeUnitIds}                                    

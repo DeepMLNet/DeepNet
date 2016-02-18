@@ -8,15 +8,24 @@ open ArrayND
 
 module ArrayNDHost = 
 
-    /// pinned memory (from .NET or other source)          
+    /// Pinned (unmovable) memory (from .NET or other source).
+    /// Can be used to obtain a pointer.
     type IPinnedMemory =
         inherit IDisposable
-        abstract Ptr: IntPtr with get
+        /// pointer to storage buffer (implementation specific)
+        abstract Ptr: IntPtr
 
-    /// host storage for an NDArray
+    /// type-neutral host storage for an ArrayND
+    type IHostStorage =
+        abstract Pin: unit -> IPinnedMemory
+        abstract SizeInBytes: int
+
+    /// host storage for an ArrayND
     type IHostStorage<'T> = 
+        inherit IHostStorage
         abstract Item: int -> 'T with get, set
         abstract Pin: unit -> IPinnedMemory
+        abstract Size: int
 
     /// pinned .NET managed memory
     type PinnedManagedMemoryT (gcHnd: GCHandle) =       
@@ -24,16 +33,31 @@ module ArrayNDHost =
             member this.Ptr = gcHnd.AddrOfPinnedObject()
             member this.Dispose() = gcHnd.Free()
 
-    // NDArray storage in a managed .NET array
+    // ArrayND storage in a managed .NET array
     type ManagedArrayStorageT<'T> (data: 'T[]) =
         new (size: int) = ManagedArrayStorageT<'T>(Array.zeroCreate size)
+
+        member this.Pin () =
+            let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
+            new PinnedManagedMemoryT (gcHnd) :> IPinnedMemory    
+
+        member this.Size = data.Length
+        member this.SizeInBytes = data.Length * sizeof<'T>
+
+        interface IHostStorage with
+            member this.Pin () = this.Pin ()
+            member this.SizeInBytes = this.SizeInBytes
+
         interface IHostStorage<'T> with
             member this.Item 
                 with get(index) = data.[index]
                 and set index value = data.[index] <- value
-            member this.Pin () =
-                let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-                new PinnedManagedMemoryT (gcHnd) :> IPinnedMemory                
+            member this.Pin () = this.Pin ()        
+            member this.Size = this.Size
+
+    type IArrayNDHostT =
+        inherit IArrayNDT
+        abstract Storage: IHostStorage
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
     type ArrayNDHostT<'T> (layout: ArrayNDLayoutT, storage: IHostStorage<'T>) = 
@@ -57,6 +81,9 @@ module ArrayNDHost =
 
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDHostT<'T>(layout, storage) :> ArrayNDT<'T>
+
+        interface IArrayNDHostT with
+            member this.Storage = this.Storage :> IHostStorage
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let inline newContiguous<'T> shp =

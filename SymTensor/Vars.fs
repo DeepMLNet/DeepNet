@@ -6,11 +6,16 @@ open ShapeSpec
 [<AutoOpen>]
 module VarSpecTypes =
 
+    /// assembly qualified name of a .NET type
+    type TypeNameT = TypeName of string
+
     /// non-generic variable specification interface
     type IVarSpec =
         inherit System.IComparable
         abstract member Name : string 
         abstract member Shape: ShapeSpecT
+        abstract member Type: System.Type
+        abstract member TypeName: TypeNameT
 
     /// variable specification: has a name, type and shape specificaiton
     type VarSpecT<'T> = 
@@ -19,6 +24,8 @@ module VarSpecTypes =
         interface IVarSpec with
             member this.Name = this.Name
             member this.Shape = this.Shape
+            member this.Type = typeof<'T>
+            member this.TypeName = TypeName (typeof<'T>.AssemblyQualifiedName)
 
 
 module VarSpec =

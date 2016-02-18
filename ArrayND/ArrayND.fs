@@ -9,11 +9,12 @@ module ArrayNDTypes =
     /// object that can be queried for shape
     type IHasLayout =
         /// shape of object
-        abstract member Layout : ArrayNDLayoutT
+        abstract Layout : ArrayNDLayoutT
 
     /// ArrayND of any type
     type IArrayNDT =
         inherit IHasLayout
+        abstract CPPType: string
 
 
 module ArrayND =
@@ -49,9 +50,30 @@ module ArrayND =
         /// a new ArrayND of same type with same storage allocation but new layout
         abstract NewView : ArrayNDLayoutT -> ArrayNDT<'T>
 
+        /// C++ type name
+        member this.CPPType = 
+            let dims = ArrayNDLayout.nDims layout
+            let shp = ArrayNDLayout.shape layout
+            let str = ArrayNDLayout.stride layout
+            let ofst = ArrayNDLayout.offset layout
+            let cppDataType = 
+                if typeof<'T>.Equals(typeof<double>) then "double"
+                elif typeof<'T>.Equals(typeof<single>) then "single"
+                elif typeof<'T>.Equals(typeof<int>) then "int"
+                elif typeof<'T>.Equals(typeof<byte>) then "char"
+                else failwithf "no C++ datatype for %A" typeof<'T>
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> intToStrSeq |> String.combineWith ",") + ">"
+            let strideStr = 
+                "<" + ((ofst :: str) |> intToStrSeq |> String.combineWith ",") + ">"
+            sprintf "ArrayNDStatic%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+                dims cppDataType dims shapeStr dims strideStr            
+
         interface IHasLayout with
             member this.Layout = this.Layout
-        interface IArrayNDT 
+        interface IArrayNDT with
+            member this.CPPType = this.CPPType               
 
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
@@ -61,7 +83,7 @@ module ArrayND =
 
         /// unchecked cast of v to NDArrayT<'T> (this type)
         member this.CastToMe (v: ArrayNDT<'A>) = v.Cast<'T> ()
-
+                
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access

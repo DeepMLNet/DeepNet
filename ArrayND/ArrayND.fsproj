@@ -75,6 +75,7 @@
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="ArrayND.fs" />
     <Compile Include="ArrayNDHost.fs" />
+    <Compile Include="ArrayNDHostReg.fs" />
     <Compile Include="ArrayNDCuda.fs" />
     <Content Include="packages.config" />
   </ItemGroup>

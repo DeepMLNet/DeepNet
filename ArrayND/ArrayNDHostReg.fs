@@ -1,15 +1,14 @@
-﻿module CudaRegMem
+﻿namespace ArrayNDNS
 
 open System
 open System.Runtime.InteropServices
 open ManagedCuda
+open ManagedCuda.BasicTypes
 open Util
-open NDArray
+open ArrayNDHost
 
 
-/// CUDA registered memory for data arrays
-module DataLock =
-
+module CudaRegMemSupport =
     // TODO: make thread safe
 
     /// registration count
@@ -19,82 +18,88 @@ module DataLock =
     let dataRegistrations = new Dictionary<obj, obj>()
 
     /// decreases reference count for page locked data
-    let decrRefCount<'a> (data: 'a) =
+    let decrRefCount (data: IHostStorage) =
         registeredCount.[data] <- registeredCount.[data] - 1
         if registeredCount.[data] = 0 then
             dataRegistrations.Remove[data] |> ignore
             true
         else false
 
-    /// a data lock handle
-    type DataLockT<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> 
-        (data: obj, pinHnd: GCHandle, cudaMem: CudaRegisteredHostMemory<'a>) =
+
+[<AutoOpen>]
+module CudaRegMemTypes =
+
+    /// CUDA registered memory for data arrays handle
+    type CudaRegMemHnd (data: IHostStorage, pinHnd: IPinnedMemory, cudaMem: CudaRegisteredHostMemory<byte>) =
            
         let mutable disposed = false
 
         interface IDisposable with
             member this.Dispose() =          
                 disposed <- true
-                if decrRefCount data then            
+                if CudaRegMemSupport.decrRefCount data then            
                     // unregister memory
                     cudaMem.Unregister() 
                     // release cuda memory handle 
                     cudaMem.Dispose()
                     // unpin managed memory
-                    pinHnd.Free()
+                    pinHnd.Dispose()
 
         /// the data array
         member this.Data = 
             if disposed then failwith "DataLock is disposed"
             data
-
-        member this.Data_ = data
+        member this.DataPriv = data
 
         /// GC memory pin handle
         member this.PinHnd = 
             if disposed then failwith "DataLock is disposed"
             pinHnd
-
-        member this.PinHnd_ = pinHnd
+        member this.PinHndPriv = pinHnd
 
         /// the CudaRegisteredHostMemory
         member this.CudaRegisteredMemory = 
             if disposed then failwith "DataLock is disposed"
             cudaMem
+        member this.CudaRegisteredMemoryPriv = cudaMem
 
-        member this.CudaRegisteredMemory_ = cudaMem
+
+
+/// CUDA registered memory for data arrays
+module CudaRegMem =
+    open CudaRegMemSupport
 
     /// gets handle for already locked data           
-    let get<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> (data: 'a array) =      
+    let get (data: IHostStorage) =      
         if not (dataRegistrations.ContainsKey(data)) then
             failwithf "%A is not registered data" data
         registeredCount.[data] <- registeredCount.[data] + 1
-        let dr = dataRegistrations.[data] :?> DataLockT<'a>
-        new DataLockT<'a>(dr.Data_, dr.PinHnd_, dr.CudaRegisteredMemory_)   
+        let dr = dataRegistrations.[data] :?> CudaRegMemHnd
+        new CudaRegMemHnd(dr.DataPriv, dr.PinHndPriv, dr.CudaRegisteredMemoryPriv)   
         
     /// gets the CudaRegisteredMemory for already locked data without increment the reference count
-    let getCudaRegisteredMemory<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> (data: 'a array) =
+    let getCudaRegisteredMemory (data: IHostStorage) =
         if not (dataRegistrations.ContainsKey(data)) then
             failwithf "%A is not registered data" data
-        let dr = dataRegistrations.[data] :?> DataLockT<'a>
+        let dr = dataRegistrations.[data] :?> CudaRegMemHnd
         dr.CudaRegisteredMemory
             
     /// locks data (multiple registrations are okay) and returns the handle
-    let lock<'a when 'a: (new: unit -> 'a) and 'a: struct and 'a:> ValueType> (data: 'a array) = 
+    let lock (data: IHostStorage) = 
         if dataRegistrations.ContainsKey(data) then get data      
         else
             // pin managed memory so that address cannot change
-            let pinHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
-            let dataAddr = pinHnd.AddrOfPinnedObject ()
-            let dataElements = Array.length data
-            let dataByteSize = dataElements * sizeof<'a>
+            let pinHnd = data.Pin ()
+            let dataAddr = pinHnd.Ptr
+            let dataByteSize = data.SizeInBytes
 
             // construct cuda memory handle
-            let cudaMem = new CudaRegisteredHostMemory<'a>(dataAddr, BasicTypes.SizeT(dataByteSize))    
+            let cudaMem = new CudaRegisteredHostMemory<byte>(dataAddr, SizeT(dataByteSize))    
             // register memory
             cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
 
-            let dr = new DataLockT<'a>(data, pinHnd, cudaMem)     
+            // create handle object
+            let dr = new CudaRegMemHnd(data, pinHnd, cudaMem)     
             dataRegistrations.[data] <- dr
             registeredCount.[data] <- 1
             dr
@@ -106,36 +111,24 @@ module DataLock =
 
 /// Methods for locking an NDArray into memory and registering the memory with CUDA
 /// for fast data transfers with GPU device.
-module NDArrayLock =
+module ArrayNDHostReg =
     /// get DataLock for already locked NDArray
-    let get (ary: ArrayND) =
-        DataLock.get ary.Data
+    let get (ary: IArrayNDHostT) =
+        CudaRegMem.get ary.Storage
 
     /// Gets the CudaRegisteredMemory for an already locked NDArray.
     /// It becomes invalid if the NDArray is unlocked.
-    let getCudaRegisteredMemory (ary: ArrayND) =
-        DataLock.getCudaRegisteredMemory ary.Data
+    let getCudaRegisteredMemory (ary: IArrayNDHostT) =
+        CudaRegMem.getCudaRegisteredMemory ary.Storage
 
     /// lock NDArray and get corresponding DataLock
-    let lock (ary: ArrayND) =
-        DataLock.lock ary.Data
+    let lock (ary: IArrayNDHostT) =
+        CudaRegMem.lock ary.Storage
 
     /// unlock given DataLock
     let unlock aryLock =
-        DataLock.unlock aryLock
+        CudaRegMem.unlock aryLock
 
 
-
-/// Locks all variables in a VarEnv.
-type VarEnvLock (varEnv: OpEval.VarEnvT) =   
-    let varLocks =
-        varEnv
-        |> Map.toList
-        |> List.map (fun (name, ary) -> NDArrayLock.lock ary)
-
-    interface IDisposable with
-        member this.Dispose () =
-            for lck in varLocks do
-                (lck :> IDisposable).Dispose()
 
                 
