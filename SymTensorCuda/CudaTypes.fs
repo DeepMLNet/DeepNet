@@ -16,9 +16,6 @@ open SymTensor.Compiler
 [<AutoOpen>]
 module Types =
 
-    /// dimensionality of parallel work to perform
-    type WorkDimT = int * int * int
-
     /// device memory pointer
     type DevMemPtrT = {
         /// base memory
@@ -87,6 +84,12 @@ module Types =
         inherit System.Attribute()     
         member this.CPPFuncName = cppFuncName
 
+    /// a CUDA compute stream
+    type StreamT = int
+
+    /// a CUDA event that can be used for synchronization
+    type EventT = {EventObjectId: int; CorrelationId: int; EmittingExecUnitId: int}
+
 
 
 module CudaExecEnv = 
@@ -116,7 +119,6 @@ module CudaExecEnv =
             else
                 failwithf "host variable is of form %A but form %A was expected" hv manikin
         | _ -> failwithf "host variable must be of type ExternalMem"
-
 
 
 [<AutoOpen>]

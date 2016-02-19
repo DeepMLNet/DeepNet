@@ -68,6 +68,11 @@ let assemblyDirectory =
     let path = System.Uri.UnescapeDataString(uri.Path)
     System.IO.Path.GetDirectoryName(path)
 
+/// path to AppData\Local
+let localAppData = 
+    let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
+    System.IO.Path.Combine (lad, "expr2")
+    
 /// converts sequence of ints to sequence of strings
 let intToStrSeq items =
     Seq.map (sprintf "%d") items

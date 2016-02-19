@@ -76,12 +76,12 @@
     <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaExecUnits.fs" />
-    <Compile Include="StreamGen.fs" />
+    <Compile Include="CudaStream.fs" />
     <Compile Include="CudaRecipe.fs" />
     <Compile Include="CudaExec.fs" />
-    <Content Include="packages.config" />
     <Compile Include="CudaCheck.fs" />
     <Compile Include="VarEnvLock.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">

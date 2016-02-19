@@ -1,10 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
-open System
-open System.Runtime.InteropServices
-open ManagedCuda
-
 open Util
+open Basics.Cuda
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
@@ -13,7 +10,7 @@ open SymTensor.Compiler
 [<AutoOpen>]
 module CudaExecUnitTypes =
 
-    /// a CUDA operation 
+    /// a CUDA operation that will be assigned to and executed in a CUDA stream
     type CudaExecItemT =
         // memory operations
         | MemcpyDtoD of IDevMemRngTmpl * IDevMemRngTmpl

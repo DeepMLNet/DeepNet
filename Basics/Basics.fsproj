@@ -74,7 +74,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="DiskMap.fs" />
-    <Compile Include="CudaBasics.fs" />
+    <Compile Include="CudaSup.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
