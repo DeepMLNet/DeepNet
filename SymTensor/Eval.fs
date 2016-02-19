@@ -128,7 +128,7 @@ module Eval =
                 | Sum -> ArrayND.sum av
                 | SumAxis ax -> ArrayND.sumAxis ax av
                 | Reshape ss -> ArrayND.reshape (shapeEval ss) av
-                | Broadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
+                | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
                 | StoreToVar vs -> ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv); av
                 | Annotated _-> av                

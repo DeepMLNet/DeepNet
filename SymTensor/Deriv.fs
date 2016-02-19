@@ -46,7 +46,7 @@ module Deriv =
             | Exp -> egExpanded * (padLeft expr) |> collapse |> reverseDiffStep a
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Reshape ss -> eg |> reverseDiffStep a
-            | Broadcast ss -> 
+            | DoBroadcast ss -> 
                 let mutable egUnbroadcasted = egExpanded
                 for ax, (eSize, aSize) in List.indexed (List.zip ss (shapeOf a)) do
                     match eSize, aSize with

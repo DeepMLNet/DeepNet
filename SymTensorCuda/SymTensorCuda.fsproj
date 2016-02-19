@@ -73,7 +73,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ArrayNDManikin.fs" />
-    <Compile Include="ExecUnitsGen.fs" />
+    <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaExecUnits.fs" />
     <Compile Include="StreamGen.fs" />

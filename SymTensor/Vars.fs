@@ -28,6 +28,14 @@ module VarSpecTypes =
             member this.TypeName = TypeName (typeof<'T>.AssemblyQualifiedName)
 
 
+module TypeName =
+
+    /// gets the System.Type associated by this TypeName
+    let getType (TypeName tn) =
+        System.Type.GetType(tn)
+
+
+
 module VarSpec =
 
     /// create variable specifation by name and shape

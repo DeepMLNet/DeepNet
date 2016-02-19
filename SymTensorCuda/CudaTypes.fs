@@ -10,9 +10,11 @@ open SymTensor
 open SymTensor.Compiler
 
 
+#nowarn "9"
+
 
 [<AutoOpen>]
-module CudaTypes =
+module Types =
 
     /// dimensionality of parallel work to perform
     type WorkDimT = int * int * int
@@ -33,11 +35,13 @@ module CudaTypes =
 
     /// variable storage location
     type VarStorLocT =
+        /// variable stored on device
         | LocDev
+        /// variable stored on host
         | LocHost
 
     /// additional environment informations for CUDA
-    type CudaEnvT = {VarStorLoc: Map<IVarSpec, VarStorLocT>}
+    type CudaCompileEnvT = {VarStorLoc: Map<IVarSpec, VarStorLocT>}
 
     /// function domain (kernel only or host code that may call kernels)
     type FuncDomainT =
@@ -54,36 +58,22 @@ module CudaTypes =
         {InternalMem: Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>;
          ExternalVar: Map<IVarSpec, ArrayNDCuda.IArrayNDCudaT>;
          HostVar:     Map<IVarSpec, ArrayNDHost.IArrayNDHostT>}
-
-
-    /// CUDA C++ argument template
-    type ICudaArgTmpl =
-        abstract member CPPTypeName : string
-        abstract member GetArg : CudaExecEnvT -> obj 
-
+    
     /// CUDA device memory range
     type DevMemRngT = 
-        {DeviceVar: CudaDeviceVariable<byte>;
+        {DeviceMem: CudaDeviceVariable<byte>;
          OffsetInBytes: int;
          LengthInBytes: int;}
-
-    /// CUDA device memory range template
-    type IDevMemRngTmpl =
-        abstract member GetRng : CudaExecEnvT -> DevMemRngT
 
     /// CUDA host memory range
     type HostMemRngT = 
-        {HostVar: CudaRegisteredHostMemory<byte>;
+        {HostMem: CudaRegisteredHostMemory<byte>;
          OffsetInBytes: int;
          LengthInBytes: int;}
 
-    /// CUDA host memory range template
-    type IHostMemRngTmpl =
-        abstract member GetRng : CudaExecEnvT -> HostMemRngT
-
 
     /// BLAS transpose operation
-    type BlasOpT =
+    type BlasTransposeOpT =
         | BlasId
         | BlasTranspose
 
@@ -92,12 +82,17 @@ module CudaTypes =
             | BlasId -> CudaBlas.Operation.NonTranspose
             | BlasTranspose -> CudaBlas.Operation.Transpose
 
+    /// specifies the name of the C++ function
+    type CPPFuncNameAttribute (cppFuncName: string) =
+        inherit System.Attribute()     
+        member this.CPPFuncName = cppFuncName
+
 
 
 module CudaExecEnv = 
 
     /// gets device memory for an internal allocation or external reference
-    let getDevVar (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+    let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemAlloc im -> env.InternalMem.[im]
         | MemExternal vs ->
@@ -110,7 +105,7 @@ module CudaExecEnv =
                 failwithf "external variable is of form %A but form %A was expected" ev manikin
 
     /// gets host memory for an external reference
-    let getHostVar (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+    let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]
@@ -123,36 +118,79 @@ module CudaExecEnv =
         | _ -> failwithf "host variable must be of type ExternalMem"
 
 
+
 [<AutoOpen>]
-module CudaArgTemplates =
+module ArgTemplates =
 
+    /// CUDA C++ argument template
+    type ICudaArgTmpl =
+        abstract member CPPTypeName : string
+        abstract member GetArg : CudaExecEnvT -> obj 
 
-    // All CUBLAS calls use Fortran matrices. This means:
-    // - one-based indexing
-    // - column major
-    // For NDArray this translates to:
-    // CUBLAS #columns    = Shape.[0]
-    // CUBLAS #rows       = Shape.[1]
-    // CUBLAS leading dim = Stride.[0] >= 1 (no broadcasting)
-    // Stride.[1] must be 1.
+    /// CUDA C++ operation functor description
+    type ICudaOp =
+        abstract member IsIndexed : bool  
 
-    /// BLAS view of NDArray. The NDArray is implicitly transposed and exposed as a "float *"
-    type BlasTransposedMatrixTmpl (view: ArrayNDManikinT) =
+    /// CUDA device memory range template
+    type IDevMemRngTmpl =
+        abstract member GetRng : CudaExecEnvT -> DevMemRngT
+
+    /// CUDA host memory range template
+    type IHostMemRngTmpl =
+        abstract member GetRng : CudaExecEnvT -> HostMemRngT
+
+    /// ArrayND argument template
+    type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = manikin.CPPType
+            member this.GetArg env =
+                // C++ struct just contains the pointer to data memory
+                (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer :> obj
+
+    /// device memory range over the elements of a contiguous ArrayND
+    type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
+        interface IDevMemRngTmpl with
+            member this.GetRng env =
+                {DeviceMem = CudaExecEnv.getDevMemForManikin env manikin;
+                 OffsetInBytes = ArrayNDManikin.offsetInBytes manikin;
+                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}
+    
+    /// registered host memory range over the elements of a contiguous ArrayND    
+    type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
+        interface IHostMemRngTmpl with
+            member this.GetRng env =
+                {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;
+                 OffsetInBytes = ArrayNDManikin.offsetInBytes manikin;
+                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}      
+
+    /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "float *"
+    type BlasTransposedMatrixTmpl (manikin: ArrayNDManikinT) =
+        // All CUBLAS calls use Fortran matrices. This means:
+        // - one-based indexing
+        // - column major
+        // For ArrayND this translates to:
+        // CUBLAS #columns    = Shape.[0]
+        // CUBLAS #rows       = Shape.[1]
+        // CUBLAS leading dim = Stride.[0] >= 1 (no broadcasting)
+        // Stride.[1] must be 1.
+
         do
-            match ArrayND.stride view with
+            if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
+                failwith "CUBLAS currently requires single values"
+            match ArrayND.stride manikin with
             | [0; _] -> failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
             | [_; n] when n <> 1 -> failwithf "ArrayND for use with BLAS must be continguous in last dimension but has stride %d" n
             | [_; _] -> ()
             | _ -> failwith "ArrayND for use with BLAS must be 2-dimensional"         
 
         member this.GetLeadingDimension env =
-            (ArrayND.stride view).[0] 
+            (ArrayND.stride manikin).[0] 
 
         member this.GetColumns env =
-            (ArrayND.shape view).[0]
+            (ArrayND.shape manikin).[0]
 
         member this.GetRows env =
-            (ArrayND.shape view).[1]
+            (ArrayND.shape manikin).[1]
 
         member this.GetColumnsForOp env op =
             match op with 
@@ -171,9 +209,52 @@ module CudaArgTemplates =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float"
             member this.GetArg env = 
-                let devVar = CudaExecEnv.getDevVar env view
+                let devVar = CudaExecEnv.getDevMemForManikin env manikin
                 // need to adjust by offset
-                let offsetBytes = view.Offset * 4
+                let offsetBytes = ArrayNDManikin.offsetInBytes manikin
                 new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetBytes), 
                                                devVar.SizeInBytes - offsetBytes) :> obj
 
+
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    /// const value elementwise operation C++ structure
+    type ConstEOpArg<'T when 'T: struct> =
+        val Value: 'T
+        new (value: 'T) = {Value = value}
+
+    type ConstEOpArgTmpl<'T> (value: 'T) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "ConstEOp_t"
+            member this.GetArg env = 
+                match box value with
+                | :? single as n -> ConstEOpArg(n) :> obj
+                | :? double as n -> ConstEOpArg(n) :> obj
+                | :? int as n -> ConstEOpArg(n) :> obj
+                | :? byte as n -> ConstEOpArg(n) :> obj
+                | _ -> failwithf "unsupported type %A" (value.GetType())
+        interface ICudaOp with
+            member this.IsIndexed = false
+
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type NoArgEOpArg = struct end
+    
+    type NoArgEOpArgTmpl (cppTypeName: string, indexed: bool) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = cppTypeName
+            member this.GetArg env = NoArgEOpArg() :> obj
+        interface ICudaOp with
+            member this.IsIndexed = indexed
+
+
+[<AutoOpen>]
+module NativeFunctionDelegates =
+
+    [<CPPFuncName("sum")>]
+    type CPPSum = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
+    //type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
+
+    [<CPPFuncName("sumLastAxis")>]
+    type CPPSumLastAxis = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
+    //type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit

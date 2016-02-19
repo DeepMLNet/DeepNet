@@ -10,415 +10,339 @@ open SymTensor
 open SymTensor.Compiler
 
 
+[<AutoOpen>]
+module CudaExecUnitTypes =
 
-    
-
-
-
-/// a CUDA operation 
-type CudaOpT =
-    // memory operations
-    | MemcpyDtoD of IDevMemRngTmpl * IDevMemRngTmpl
-    | MemcpyHtoD of IHostMemRngTmpl * IDevMemRngTmpl
-    | MemcpyDtoH of IDevMemRngTmpl * IHostMemRngTmpl
-    | Memset of single * IDevMemRngTmpl
-    // execution control
-    | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
-    | CallCFunc of TmplInstT * System.Type * (ICudaArgTmpl list)
-    // CUBLAS calls 
-    | BlasGemm of BlasOpT * BlasOpT *  
-                  single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
-                  single * BlasTransposedMatrixTmpl
+    /// a CUDA operation 
+    type CudaExecItemT =
+        // memory operations
+        | MemcpyDtoD of IDevMemRngTmpl * IDevMemRngTmpl
+        | MemcpyHtoD of IHostMemRngTmpl * IDevMemRngTmpl
+        | MemcpyDtoH of IDevMemRngTmpl * IHostMemRngTmpl
+        | Memset of single * IDevMemRngTmpl
+        // execution control
+        | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
+        | CallCFunc of TmplInstT * System.Type * (ICudaArgTmpl list)
+        // CUBLAS calls 
+        | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  
+                      single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
+                      single * BlasTransposedMatrixTmpl
 
 
-/// CUDA C++ operation functor description
-type ICudaOp =
-    abstract member IsIndexed : bool  
+module CudaExecUnit =
 
-/// NDArray pointer marshalling template
-type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
-    interface ICudaArgTmpl with
-        member this.CPPTypeName = manikin.CPPType
-        member this.GetArg env =
-            // C++ struct just contains the pointer to data memory
-            (CudaExecEnv.getDevVar env manikin).DevicePointer :> obj
+    /// Computes desired source views given desired target view.
+    /// There is no guarantee that the desired source views will be used.
+    let srcReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
+        let nSrcs = List.length srcShapes
 
-type NDArrayDevMemRngTmpl (view: NDArrayViewT) =
-    interface IDevMemRngTmpl with
-        member this.GetRng env =
-            {DeviceVar = CudaExecEnv.getDevVar env view;
-             OffsetInBytes = view.Offset * sizeof<single>;
-             LengthInBytes = (NDArrayView.nElems view) * sizeof<single>;}
-        
-type NDArrayHostMemRngTmpl (view: NDArrayViewT) =
-    interface IHostMemRngTmpl with
-        member this.GetRng env =
-            {HostVar = CudaExecEnv.getHostVar env view;
-             OffsetInBytes = view.Offset * sizeof<single>;
-             LengthInBytes = (NDArrayView.nElems view) * sizeof<single>;}        
+        // requests all sources to use separate storage
+        let outplaceTrgt =
+            List.replicate nSrcs None
 
+        // requests one source to be evaluated into our target view
+        let inplaceOverwriteTrgt =
+            match nSrcs with
+            | 0 -> []
+            | 1 -> [reqView]
+            | _ -> reqView :: List.replicate (nSrcs-1) None
 
-#nowarn "9"
-[<Struct>]
-[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-type ConstEOp =
-    val Value: single
-    new (value: single) = {Value = value}
+        match op with
+        | ULeafOp _ -> []
 
-type ConstEOpTmpl (value: single) =
-    interface ICudaArgTmpl with
-        member this.CPPTypeName = "ConstEOp_t"
-        member this.CPPTypeNameWithoutPtr = (this :> ICudaArgTmpl).CPPTypeName
-        member this.GetArg env = ConstEOp(value) :> obj
-    interface ICudaOp with
-        member this.IsIndexed = false
-
-[<Struct>]
-[<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-type NoArgEOp = struct end
-    
-type NoArgEOpTmpl (cppTypeName: string, indexed: bool) =
-    interface ICudaArgTmpl with
-        member this.CPPTypeName = cppTypeName
-        member this.CPPTypeNameWithoutPtr = (this :> ICudaArgTmpl).CPPTypeName
-        member this.GetArg env = NoArgEOp() :> obj
-    interface ICudaOp with
-        member this.IsIndexed = indexed
-
-/// computes the definitive target view of an op given its source views
-let trgtViewGivenSrc cudaEnv memAllocator trgtShape reqView op srcViews srcShared  =
-    // target that shares no elements with any srcView
-    let outplaceTrgt =
-        match reqView with
-        | Some rv when not (List.exists (NDArrayView.overlapping rv) srcViews) -> rv, false
-        | _ -> NDArrayView.newContinguous memAllocator trgtShape, false        
-
-    let outplaceBlasTrgt =
-        match reqView with
-        | Some rv when not (List.exists (NDArrayView.overlapping rv) srcViews) &&
-                       NDArrayView.isBlasTargetable rv -> rv, false
-        | _ -> NDArrayView.newBlasTarget memAllocator trgtShape, false
-
-    // target that reuses a srcView, if it may be overwritten
-    let inplaceOverwriteTrgt =
-        match List.tryFindIndex not srcShared with
-        | Some i -> srcViews.[i], false
-        | None -> outplaceTrgt    
-
-    match op with
-    // variable access
-    | LeafOp (Var vs) ->       
-        match cudaEnv.VarStorLoc |> Map.find vs with
-        | DevVar ->
-            // we assume that all device input vars are continguous
-            {Memory=ExternalMem vs; 
-             Shape=trgtShape; Offset=0; 
-             Stride=ArrayND.contiguousStride trgtShape}, true
-        | HostVar ->
-            // will transfer variable from host to device during execution
-            // need continguous memory for that
+        // unary elementwise
+        | UUnaryOp Negate -> inplaceOverwriteTrgt
+        | UUnaryOp Log -> inplaceOverwriteTrgt
+        | UUnaryOp Exp -> inplaceOverwriteTrgt
+        // reductions
+        | UUnaryOp Sum -> outplaceTrgt
+        | UUnaryOp (SumAxis _) -> outplaceTrgt
+        // shape operations
+        | UUnaryOp (Reshape _) ->        
             match reqView with
-            | Some rv when NDArrayView.isContiguous rv -> rv, false
-            | _ -> NDArrayView.newContinguous memAllocator trgtShape, false        
-    // tensor creation
-    | LeafOp _ -> outplaceTrgt        
+            | Some rv when ArrayND.isContiguous rv ->
+                [Some (ArrayND.reshapeView srcShapes.[0] rv)]
+            | _ -> outplaceTrgt
+        | UUnaryOp (DoBroadcast _) -> outplaceTrgt
+        | UUnaryOp (SwapDim (ax1, ax2)) ->
+            match reqView with
+            | Some rv -> [Some (ArrayND.swapDim ax1 ax2 rv)]
+            | _ -> outplaceTrgt
+        // variable access
+        | UUnaryOp (StoreToVar vs) ->
+            match cudaEnv.VarStorLoc |> Map.find vs with
+            | LocDev -> 
+                // request to store directly into external var
+                // we assume that all device input vars are continguous
+                [Some (ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape)]
+            | LocHost ->
+                // need continguous storage to transfer to host
+                match reqView with
+                | Some rv when ArrayND.isContiguous rv -> [reqView]
+                | _ -> outplaceTrgt
+        // misc
+        | UUnaryOp (Annotated _) -> inplaceOverwriteTrgt
 
-    // unary elementwise
-    | UnaryOp Negate -> inplaceOverwriteTrgt
-    | UnaryOp Log -> inplaceOverwriteTrgt
-    | UnaryOp Exp -> inplaceOverwriteTrgt
-    // reductions
-    | UnaryOp Sum -> outplaceTrgt
-    | UnaryOp (SumAxis _) -> outplaceTrgt
-    // shape operations
-    | UnaryOp (Reshape _) ->        
-        // TODO: optimize: check if copy is really necessary
-        if NDArrayView.isContiguous srcViews.[0] then
-            {srcViews.[0] with Shape=trgtShape; Stride=NDArrayView.contiguousStride trgtShape}, srcShared.[0]
-        else outplaceTrgt  // will copy
-    | UnaryOp (Broadcast _) ->
-        let aView, aShared = srcViews.[0], srcShared.[0]
-        {aView with Shape=trgtShape; 
-                    Stride=List.map3 
-                        (fun aStr aShp tShp -> if aShp = tShp then aStr else 0) 
-                        aView.Stride aView.Shape trgtShape}, aShared
-    | UnaryOp (SwapDim (ax1, ax2)) ->
-        let aView, aShared = srcViews.[0], srcShared.[0]
-        let str = aView.Stride
-        {aView with Shape=trgtShape; 
-                    Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}, aShared
-    // variable access
-    | UnaryOp (StoreToVar vs) ->
-        match cudaEnv.VarStorLoc |> Map.find vs with
-        | DevVar -> 
-            // we assume that all device input vars are continguous
-            {Memory=ExternalMem vs; 
-             Shape=trgtShape; Offset=0; 
-             Stride=ArrayND.contiguousStride trgtShape}, true
-        | HostVar ->
-            // need continguous memory to transfer to host
-            if NDArrayView.isContiguous srcViews.[0] then srcViews.[0], srcShared.[0]
-            else outplaceTrgt 
-    // misc
-    | UnaryOp (Annotated _) -> srcViews.[0], srcShared.[0]
+        // binary elementwise
+        | UBinaryOp Add -> inplaceOverwriteTrgt
+        | UBinaryOp Substract -> inplaceOverwriteTrgt
+        | UBinaryOp Multiply -> inplaceOverwriteTrgt
+        | UBinaryOp Divide -> inplaceOverwriteTrgt
+        | UBinaryOp Power -> inplaceOverwriteTrgt
+        // matrix/tensor operations
+        | UBinaryOp Dot -> outplaceTrgt
+        | UBinaryOp TensorProduct -> outplaceTrgt     
 
-    // binary elementwise
-    | BinaryOp Add -> inplaceOverwriteTrgt
-    | BinaryOp Substract -> inplaceOverwriteTrgt
-    | BinaryOp Multiply -> inplaceOverwriteTrgt
-    | BinaryOp Divide -> inplaceOverwriteTrgt
-    | BinaryOp Power -> inplaceOverwriteTrgt
-    // matrix/tensor operations
-    | BinaryOp Dot -> outplaceBlasTrgt
-    | BinaryOp TensorProduct -> outplaceTrgt
+        // nary
+        | UNaryOp Discard -> outplaceTrgt
+        | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
-    // nary
-    | NaryOp Discard -> outplaceTrgt
+
+    /// computes the definitive target view of an op given its source views
+    let trgtGivenSrc compileEnv memAllocator (typ: TypeNameT) (trgtShape: NShapeSpecT) (req: ArrayNDManikinT option) 
+                     (op: UOpT) (srcs: ArrayNDManikinT list) (srcShared: bool list)  =
+        // target that shares no elements with any srcView
+        let outplaceTrgt =
+            match req with
+            | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
+            | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+
+        let outplaceBlasTrgt =
+            match req with
+            | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) &&
+                           ArrayND.isBlasTargetable rv -> rv, false
+            | _ -> ArrayNDManikin.newColumnMajor memAllocator typ trgtShape, false
+
+        // target that reuses a srcView, if it may be overwritten
+        let inplaceOverwriteTrgt =
+            match List.tryFindIndex not srcShared with
+            | Some i -> srcs.[i], false
+            | None -> outplaceTrgt    
+
+        match op with
+        // variable access
+        | ULeafOp (Var vs) ->       
+            match compileEnv.VarStorLoc |> Map.find vs with
+            | LocDev ->
+                // we assume that all device input vars are continguous
+                ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape, true
+            | LocHost ->
+                // will transfer variable from host to device during execution
+                // need continguous memory for that
+                match req with
+                | Some rv when ArrayND.isContiguous rv -> rv, false
+                | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+        // tensor creation
+        | ULeafOp _ -> outplaceTrgt        
+
+        // unary elementwise
+        | UUnaryOp Negate -> inplaceOverwriteTrgt
+        | UUnaryOp Log -> inplaceOverwriteTrgt
+        | UUnaryOp Exp -> inplaceOverwriteTrgt
+        // reductions
+        | UUnaryOp Sum -> outplaceTrgt
+        | UUnaryOp (SumAxis _) -> outplaceTrgt
+        // shape operations
+        | UUnaryOp (Reshape _) ->        
+            // TODO: optimize: check if copy is really necessary
+            if ArrayND.isContiguous srcs.[0] then
+                ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0]
+            else outplaceTrgt  // will copy
+        | UUnaryOp (DoBroadcast _) ->
+            ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
+        | UUnaryOp (SwapDim (ax1, ax2)) ->
+            ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
+        // variable access
+        | UUnaryOp (StoreToVar vs) ->
+            match compileEnv.VarStorLoc |> Map.find vs with
+            | LocDev -> 
+                // we assume that all device input vars are continguous
+                ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape, true
+            | LocHost ->
+                // need continguous memory to transfer to host
+                if ArrayND.isContiguous srcs.[0] then srcs.[0], srcShared.[0]
+                else outplaceTrgt 
+        // misc
+        | UUnaryOp (Annotated _) -> srcs.[0], srcShared.[0]
+
+        // binary elementwise
+        | UBinaryOp Add -> inplaceOverwriteTrgt
+        | UBinaryOp Substract -> inplaceOverwriteTrgt
+        | UBinaryOp Multiply -> inplaceOverwriteTrgt
+        | UBinaryOp Divide -> inplaceOverwriteTrgt
+        | UBinaryOp Power -> inplaceOverwriteTrgt
+        // matrix/tensor operations
+        | UBinaryOp Dot -> outplaceBlasTrgt
+        | UBinaryOp TensorProduct -> outplaceTrgt
+
+        // nary
+        | UNaryOp Discard -> outplaceTrgt
+        | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
+
       
 
-/// computes desired source views given desired target view
-let srcViewReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
-    let nSrcs = List.length srcShapes
+    /// execution items for an elementwise operation
+    let execItemsForElemwise trgt cOp srcViews =
+        if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
+            failwithf "sources have different number of elements than target"
 
-    // requests all sources to use separate storage
-    let outplaceTrgt =
-        List.replicate nSrcs None
+        let args = 
+            (cOp :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            (List.map (fun v -> (ArrayNDArgTmpl v) :> ICudaArgTmpl) srcViews)
 
-    // requests one source to be evaluated into our target view
-    let inplaceOverwriteTrgt =
-        match nSrcs with
-        | 0 -> []
-        | 1 -> [reqView]
-        | _ -> reqView :: List.replicate (nSrcs-1) None
+        let nSrc = List.length srcViews
+        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
+        let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
+        let heteroStr = if hetero then "Heterogenous" else ""
+        let kernel = 
+            {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr;
+             Domain=KernelFunc;
+             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;
+             RetType="void";
+             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;}
 
-    match op with
-    | LeafOp _ -> []
+        let workDim = 
+            match ArrayND.nDims trgt with
+            | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
+            | 0 -> (1, 1, 1)
+            | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
+            | 2 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], 1)
+            | 3 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[2])
+            | d ->
+                let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
+                ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
 
-    // unary elementwise
-    | UnaryOp Negate -> inplaceOverwriteTrgt
-    | UnaryOp Log -> inplaceOverwriteTrgt
-    | UnaryOp Exp -> inplaceOverwriteTrgt
-    // reductions
-    | UnaryOp Sum -> outplaceTrgt
-    | UnaryOp (SumAxis _) -> outplaceTrgt
-    // shape operations
-    | UnaryOp (Reshape _) ->        
-        match reqView with
-        | Some rv when NDArrayView.isContiguous rv ->
-            [Some {rv with Shape=srcShapes.[0]; Stride=NDArrayView.contiguousStride srcShapes.[0]}]
-        | _ -> outplaceTrgt
-    | UnaryOp (Broadcast _) -> outplaceTrgt
-    | UnaryOp (SwapDim (ax1, ax2)) ->
-        match reqView with
-        | Some rv ->
-            let str = rv.Stride
-            [Some {rv with Shape=srcShapes.[0]; 
-                           Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1]}]
-        | _ -> outplaceTrgt
-    // variable access
-    | UnaryOp (StoreToVar vs) ->
-        match cudaEnv.VarStorLoc |> Map.find vs with
-        | DevVar -> 
-            // request to store directly into external var
-            // we assume that all device input vars are continguous
-            [Some {Memory=ExternalMem vs; 
-                   Shape=trgtShape; Offset=0; 
-                   Stride=ArrayND.contiguousStride trgtShape}]
-        | HostVar ->
-            // need continguous storage to transfer to host
-            match reqView with
-            | Some rv when NDArrayView.isContiguous rv -> [reqView]
-            | _ -> outplaceTrgt
-    // misc
-    | UnaryOp (Annotated _) -> inplaceOverwriteTrgt
-
-    // binary elementwise
-    | BinaryOp Add -> inplaceOverwriteTrgt
-    | BinaryOp Substract -> inplaceOverwriteTrgt
-    | BinaryOp Multiply -> inplaceOverwriteTrgt
-    | BinaryOp Divide -> inplaceOverwriteTrgt
-    | BinaryOp Power -> inplaceOverwriteTrgt
-    // matrix/tensor operations
-    | BinaryOp Dot -> outplaceTrgt
-    | BinaryOp TensorProduct -> outplaceTrgt     
-
-    // nary
-    | NaryOp Discard -> outplaceTrgt
+        [LaunchKernel(kernel, workDim, args)]
 
 
-/// execution items for an elementwise operation
-let execItemsForElemwise trgtView cOp srcViews =
-    if srcViews |> List.exists (fun sv -> NDArrayView.nElems trgtView <> NDArrayView.nElems sv) then
-        failwithf "sources have different number of elements than target"
 
-    let args = 
-        (cOp :> ICudaArgTmpl) ::
-        ((NDArrayPtrArgTmpl trgtView) :> ICudaArgTmpl) ::
-        (List.map (fun v -> (NDArrayPtrArgTmpl v) :> ICudaArgTmpl) srcViews)
+    /// generate ExecItems to call a C++ template function
+    let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> argTmpls =
+        let cDelegateType = typeof<'FuncDelegate>
+        let cAttributes = cDelegateType.GetCustomAttributes(typeof<CPPFuncNameAttribute>, false)
+        if Array.isEmpty cAttributes then
+            failwithf "CPPFuncName attribute is missing on delegate %A" cDelegateType
+        let cppFuncNameAttribute = cAttributes.[0] :?> CPPFuncNameAttribute
+        let cppFuncName = cppFuncNameAttribute.CPPFuncName
 
-    let nSrc = List.length srcViews
-    let hetero = srcViews |> List.exists (fun sv -> trgtView.Shape <> sv.Shape)
-    let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
-    let heteroStr = if hetero then "Heterogenous" else ""
-    let kernel = 
-        {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (NDArrayView.nDim trgtView) indexedStr heteroStr;
-         Domain=KernelFunc;
-         TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeNameWithoutPtr) args;
-         RetType="void";
-         ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;}
-
-    let workDim = 
-        match NDArrayView.nDim trgtView with
-        | _ when hetero -> (NDArrayView.nElems trgtView, 1, 1)
-        | 0 -> (1, 1, 1)
-        | 1 -> (trgtView.Shape.[0], 1, 1)
-        | 2 -> (trgtView.Shape.[0], trgtView.Shape.[1], 1)
-        | 3 -> (trgtView.Shape.[0], trgtView.Shape.[1], trgtView.Shape.[2])
-        | d ->
-            let rest = {2 .. d-1} |> Seq.map (fun i -> trgtView.Shape.[i]) |> Seq.fold (*) 1 
-            (trgtView.Shape.[0], trgtView.Shape.[1], rest)
-
-    [LaunchKernel(kernel, workDim, args)]
+        let cFuncTmpl =
+            {FuncName=cppFuncName;
+             Domain=CPPFunc;
+             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;
+             RetType="void";
+             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
+        [CallCFunc(cFuncTmpl, cDelegateType, argTmpls)]
 
 
-/// specifies the name of the C++ function
-type CPPFuncNameAttribute (cppFuncName: string) =
-    inherit System.Attribute()     
-    member this.CPPFuncName = cppFuncName
+    /// generates ExecItems to copy srcView to trgtView 
+    let copyExecItems trgt src =
+        if ArrayND.nElems trgt <> ArrayND.nElems src then
+            failwithf "cannot copy array with %d elements to array with %d elements"
+                (ArrayND.nElems trgt) (ArrayND.nElems src)
+        execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
-[<CPPFuncName("sum")>]
-type CPPSum = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
-//type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
+    /// BLAS input argument passing, so that orientation is preserved
+    let blasArg memAllocator (manikin: ArrayNDManikinT) =
+        match (ArrayND.stride manikin) with
+        | [_; 1] -> manikin, BlasTranspose, []
+        | [1; _] -> ArrayND.transpose manikin, BlasId, []
+        | [_; _] -> 
+            // need to copy
+            let tmpView = ArrayNDManikin.newContiguous memAllocator 
+                                                       (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
+            let copyOps = copyExecItems tmpView manikin
+            tmpView, BlasTranspose, copyOps
+        | _ -> failwith "need 2-dimensional array for BLAS argument"
 
-[<CPPFuncName("sumLastAxis")>]
-type CPPSumLastAxis = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
-//type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit
+    /// BLAS target argument passing, so that orientation is preserved
+    let blasTarget (manikin: ArrayNDManikinT) =
+        match (ArrayND.stride manikin) with
+        | [1; _] -> ArrayND.transpose manikin
+        | _ -> failwith "cannot use specified view as BLAS target"
 
-/// generate ExecItems to call a C++ template function
-let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> argTmpls =
-    let cDelegateType = typeof<'FuncDelegate>
-    let cAttributes = cDelegateType.GetCustomAttributes(typeof<CPPFuncNameAttribute>, false)
-    if Array.isEmpty cAttributes then
-        failwithf "CPPFuncName attribute is missing on delegate %A" cDelegateType
-    let cppFuncNameAttribute = cAttributes.[0] :?> CPPFuncNameAttribute
-    let cppFuncName = cppFuncNameAttribute.CPPFuncName
-
-    let cFuncTmpl =
-        {FuncName=cppFuncName;
-         Domain=CPPFunc;
-         TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;
-         RetType="void";
-         ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
-    [CallCFunc(cFuncTmpl, cDelegateType, argTmpls)]
-
-
-/// generates ExecItems to copy srcView to trgtView 
-let copyExecItems trgtView srcView =
-    if NDArrayView.nElems trgtView <> NDArrayView.nElems srcView then
-        failwithf "cannot copy array with %d elements to array with %d elements"
-            (NDArrayView.nElems trgtView) (NDArrayView.nElems srcView)
-    execItemsForElemwise trgtView (NoArgEOpTmpl("IdEOp_t", false)) [srcView]
-
-/// BLAS arg passing, so that orientation is preserved
-let blasArg memAllocator (view: NDArrayViewT) =
-    match view.Stride with
-    | [_; 1] -> view, BlasTranspose, []
-    | [1; _] -> NDArrayView.transpose view, BlasId, []
-    | [_; _] -> 
-        // need to copy
-        let tmpView = NDArrayView.newContinguous memAllocator view.Shape
-        let copyOps = copyExecItems tmpView view
-        tmpView, BlasTranspose, copyOps
-    | _ -> failwith "need 2-dimensional array for BLAS argument"
-
-/// BLAS result processing, so that orientation is preserved
-let blasTarget (view: NDArrayViewT) =
-    match view.Stride with
-    | [1; _] -> NDArrayView.transpose view
-    | _ -> failwith "cannot use specified view as BLAS target"
-
-/// returns the execution units for the specified op
-let execItemsForOp cudaEnv memAllocator trgtView op srcViews =
-    match op with 
-    // tensor creation
-    | LeafOp (DiagonalOne _) -> execItemsForElemwise trgtView (NoArgEOpTmpl("DiagonalOneIEOp_t", true)) []
-    | LeafOp (Zeros _) -> execItemsForElemwise trgtView (NoArgEOpTmpl("ZerosEOp_t", false)) []
-    | LeafOp (ScalarConst f) -> execItemsForElemwise trgtView (ConstEOpTmpl(f)) []
-    | LeafOp (TensorConst(f, _)) -> execItemsForElemwise trgtView (ConstEOpTmpl(f)) []
-    // variable access
-    | LeafOp (Var vs) -> 
-        match cudaEnv.VarStorLoc |> Map.find vs with
-        | DevVar -> []
-        | HostVar -> 
-            // we assume that host variable has continguous stride and zero offset
-            let hv = {Memory=ExternalMem vs; Shape=trgtView.Shape; 
-                      Offset=0; Stride=ArrayND.contiguousStride trgtView.Shape}            
-            [MemcpyHtoD(NDArrayHostMemRngTmpl(hv), NDArrayDevMemRngTmpl(trgtView))]       
-    // unary elementwise
-    | UnaryOp Negate -> execItemsForElemwise trgtView (NoArgEOpTmpl("NegateEOp_t", false)) srcViews
-    | UnaryOp Log -> execItemsForElemwise trgtView (NoArgEOpTmpl("LogEOp_t", false)) srcViews
-    | UnaryOp Exp -> execItemsForElemwise trgtView (NoArgEOpTmpl("ExpEOp_t", false)) srcViews
-    // reductions
-    | UnaryOp Sum -> 
-        execItemsForCFunc<CPPSum> [NDArrayPtrArgTmpl trgtView; NDArrayPtrArgTmpl srcViews.[0]]
-    | UnaryOp (SumAxis ax) -> 
-        // we need to swap axes so that the axes the summation is performed over comes last
-        let src = srcViews.[0]
-        let nd = NDArrayView.nDim src
-        let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
-        let srcAdj = NDArrayView.reorderAxes axOrder src
-        execItemsForCFunc<CPPSumLastAxis> [NDArrayPtrArgTmpl trgtView; NDArrayPtrArgTmpl srcAdj]
-    // shape operations
-    | UnaryOp (Reshape _) ->
-        if trgtView <> srcViews.[0] then copyExecItems trgtView srcViews.[0]
-        else []
-    | UnaryOp (Broadcast _) -> []
-    | UnaryOp (SwapDim _) -> []
-    // variable access
-    | UnaryOp (StoreToVar vs) ->
-        let copyItems = 
-            if trgtView <> srcViews.[0] then copyExecItems trgtView srcViews.[0]
+    /// returns the execution units for the specified op
+    let execItemsForOp cudaEnv memAllocator trgt op srcs =
+        match op with 
+        // tensor creation
+        | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
+        | ULeafOp (Zeros _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
+        | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) []
+        // variable access
+        | ULeafOp (Var vs) -> 
+            match cudaEnv.VarStorLoc |> Map.find vs with
+            | LocDev -> []
+            | LocHost -> 
+                // we assume that host variable has continguous stride and zero offset
+                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) (ArrayND.shape trgt)
+                [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
+        // unary elementwise
+        | UUnaryOp Negate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcs
+        | UUnaryOp Log -> execItemsForElemwise trgt (NoArgEOpArgTmpl("LogEOp_t", false)) srcs
+        | UUnaryOp Exp -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ExpEOp_t", false)) srcs
+        // reductions
+        | UUnaryOp Sum -> 
+            execItemsForCFunc<CPPSum> [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0]]
+        | UUnaryOp (SumAxis ax) -> 
+            // we need to swap axes so that the axes the summation is performed over comes last
+            let src = srcs.[0]
+            let nd = ArrayND.nDims src
+            let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
+            let srcAdj = ArrayND.reorderAxes axOrder src
+            execItemsForCFunc<CPPSumLastAxis> [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj]
+        // shape operations
+        | UUnaryOp (Reshape _) ->
+            if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
             else []
-        match cudaEnv.VarStorLoc |> Map.find vs with
-        | DevVar -> 
-            // trgtView is the variable we need to store into
-            copyItems
-        | HostVar ->            
-            // we assume that host variable has continguous stride and zero offset
-            // trgtView has contingous stride
-            let hv = {Memory=ExternalMem vs; Shape=trgtView.Shape; 
-                      Offset=0; Stride=ArrayND.contiguousStride trgtView.Shape}            
-            copyItems @ [MemcpyDtoH(NDArrayDevMemRngTmpl(trgtView), NDArrayHostMemRngTmpl(hv))]                 
-    // misc
-    | UnaryOp (Annotated _) -> []
+        | UUnaryOp (DoBroadcast _) -> []
+        | UUnaryOp (SwapDim _) -> []
+        // variable access
+        | UUnaryOp (StoreToVar vs) ->
+            let copyItems = 
+                if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
+                else []
+            match cudaEnv.VarStorLoc |> Map.find vs with
+            | LocDev -> 
+                // trgtView is the variable we need to store into
+                copyItems
+            | LocHost ->            
+                // we assume that host variable has continguous stride and zero offset
+                // trgtView has contingous stride
+                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) (ArrayND.shape trgt)
+                copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(trgt), ArrayNDHostRegMemRngTmpl(hv))]                 
+        // misc
+        | UUnaryOp (Annotated _) -> []
 
-    // binary elementwise
-    | BinaryOp Add -> execItemsForElemwise trgtView (NoArgEOpTmpl("AddEOp_t", false)) srcViews
-    | BinaryOp Substract -> execItemsForElemwise trgtView (NoArgEOpTmpl("SubstractEOp_t", false)) srcViews
-    | BinaryOp Multiply -> execItemsForElemwise trgtView (NoArgEOpTmpl("MultiplyEOp_t", false)) srcViews
-    | BinaryOp Divide -> execItemsForElemwise trgtView (NoArgEOpTmpl("DivideEOp_t", false)) srcViews
-    | BinaryOp Power -> execItemsForElemwise trgtView (NoArgEOpTmpl("PowerEOp_t", false)) srcViews
-    // matrix/tensor operations
-    | BinaryOp Dot -> 
-        let aView, aOp, aCopyItems = blasArg memAllocator srcViews.[0]
-        let bView, bOp, bCopyItems = blasArg memAllocator srcViews.[1]
-        let tView = blasTarget trgtView
-        let blasItems = [BlasGemm(aOp, bOp, 1.0f, 
-                                  BlasTransposedMatrixTmpl(aView), 
-                                  BlasTransposedMatrixTmpl(bView),
-                                  0.0f, BlasTransposedMatrixTmpl(tView))]
-        aCopyItems @ bCopyItems @ blasItems
-    | BinaryOp TensorProduct -> [] // TODO
+        // binary elementwise
+        | UBinaryOp Add -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AddEOp_t", false)) srcs
+        | UBinaryOp Substract -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcs
+        | UBinaryOp Multiply -> execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t", false)) srcs
+        | UBinaryOp Divide -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DivideEOp_t", false)) srcs
+        | UBinaryOp Power -> execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t", false)) srcs
+        // matrix/tensor operations
+        | UBinaryOp Dot -> 
+            let aView, aOp, aCopyItems = blasArg memAllocator srcs.[0]
+            let bView, bOp, bCopyItems = blasArg memAllocator srcs.[1]
+            let tView = blasTarget trgt
+            let blasItems = [BlasGemm(aOp, bOp, 1.0f, 
+                                      BlasTransposedMatrixTmpl(aView), 
+                                      BlasTransposedMatrixTmpl(bView),
+                                      0.0f, BlasTransposedMatrixTmpl(tView))]
+            aCopyItems @ bCopyItems @ blasItems
+        | UBinaryOp TensorProduct -> [] // TODO
 
-    // nary
-    | NaryOp Discard -> []
+        // nary
+        | UNaryOp Discard -> []
+        | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
 
-/// generates CUDA execution units that will evaluate the given unified expression
-let exprToCudaExecUnits cudaEnv =
-    exprToExecUnits {ExecItemsForOp=execItemsForOp cudaEnv; 
-                     TrgtViewGivenSrc=trgtViewGivenSrc cudaEnv;
-                     SrcViewReqsGivenTrgt=srcViewReqsGivenTrgt cudaEnv;}
+
+    /// generates CUDA execution units that will evaluate the given unified expression
+    let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
+        ExecUnit.exprToExecUnits {ExecItemsForOp=execItemsForOp compileEnv; 
+                                  TrgtGivenSrc=trgtGivenSrc compileEnv;
+                                  SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv;}
+
 
 
 

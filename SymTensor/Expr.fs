@@ -58,7 +58,7 @@ module Expr =
         /// reshape tensor; element count does not change
         | Reshape of ShapeSpecT         
         /// broadcast tensor; element count may change
-        | Broadcast of ShapeSpecT       
+        | DoBroadcast of ShapeSpecT       
         /// swaps two dimensions of a tensor
         | SwapDim of int * int          
 
@@ -193,7 +193,7 @@ module Expr =
         | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
         // shape operations
         | Unary(Reshape(ss), _) -> ss
-        | Unary(Broadcast(ss), _) -> ss
+        | Unary(DoBroadcast(ss), _) -> ss
         | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
         // variable access
         | Leaf(Var vs) -> VarSpec.shape vs
@@ -209,7 +209,7 @@ module Expr =
 
     /// Wraps the given op in a Broadcast op if its shape does not match ss.
     let broadcastIfNecessary ss expr =
-        if ss = shapeOf expr then expr else Unary(Broadcast(ss), expr)
+        if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT<'T>) : ExprT<'T> =
@@ -221,7 +221,7 @@ module Expr =
             | Reshape(ss) when not ((ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss)) ->
                 failwithf "cannot reshape array of shape %A with %A elements into shape %A with %A elements"
                     sa (ShapeSpec.nElem sa) ss (ShapeSpec.nElem ss)
-            | Broadcast(ss) -> 
+            | DoBroadcast(ss) -> 
                 if ShapeSpec.nDim ss <> ShapeSpec.nDim sa then
                     failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
                         sa ss
@@ -319,7 +319,7 @@ module Expr =
     let reshape ss a = Unary(Reshape(ss), a) |> check
 
     /// broadcast of SizeBroadcast dimensions
-    let broadcast ss a = Unary(Broadcast(ss), a) |> check
+    let broadcast ss a = Unary(DoBroadcast(ss), a) |> check
 
     /// enables broadcasting in the given dimension, it must be of size one
     let enableBroadcast dim a = 

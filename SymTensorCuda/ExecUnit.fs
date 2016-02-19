@@ -17,20 +17,24 @@ module ExecUnitsTypes =
 
     /// result of an evaluation request
     type EvalResultT = {ExecUnitId: ExecUnitIdT; 
-                        View: IArrayNDT; 
+                        View: ArrayNDManikinT; 
                         Shared: bool}
 
     /// an evaluation request
     type EvalReqT = {Id: int; 
                      Expr: UExprT; 
                      Multiplicity: int; 
-                     View: IArrayNDT option; 
+                     View: ArrayNDManikinT option; 
                      OnCompletion: EvalResultT -> unit}
 
     /// generator function record
-    type ExecUnitsGeneratorT<'e> = {ExecItemsForOp : (TypeNameT -> int -> MemManikinT) -> IArrayNDT -> UOpT -> IArrayNDT list -> 'e list;
-                                    TrgtViewGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> IArrayNDT option -> UOpT -> IArrayNDT list -> bool list -> IArrayNDT * bool;
-                                    SrcViewReqsGivenTrgt: NShapeSpecT -> IArrayNDT option -> UOpT -> NShapeSpecT list -> IArrayNDT option list;}
+    type ExecUnitsGeneratorT<'e> = {ExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
+                                                    ArrayNDManikinT list -> 'e list;
+                                    TrgtGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> 
+                                                  ArrayNDManikinT option -> UOpT -> ArrayNDManikinT list -> bool list -> 
+                                                  ArrayNDManikinT * bool;
+                                    SrcReqsGivenTrgt: NShapeSpecT -> ArrayNDManikinT option -> UOpT -> NShapeSpecT list -> 
+                                                      ArrayNDManikinT option list;}
 
 module ExecUnit =
     
@@ -126,7 +130,7 @@ module ExecUnit =
                                 |> List.map (fun s -> subres.[s].View, subres.[s].Shared, subres.[s].ExecUnitId) 
                                 |> List.unzip3
                             let trgtView, trgtShared =
-                                gen.TrgtViewGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
+                                gen.TrgtGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
                             let trgtShared = trgtShared || erqResultShared
 
                             // emit execution unit 
@@ -139,7 +143,7 @@ module ExecUnit =
                     if List.isEmpty srcs then onMaybeCompleted ()
                     else
                         let srcReqStorages = 
-                            gen.SrcViewReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs)                    
+                            gen.SrcReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs)                    
                         for src, srcReqStorage in List.zip srcs srcReqStorages do
                             submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
                                 subreqResults <- subreqResults |> Map.add src (Some res)

@@ -25,7 +25,7 @@ module UExprTypes =
         | Sum                           
         | SumAxis of int                
         | Reshape of ShapeSpecT         
-        | Broadcast of ShapeSpecT       
+        | DoBroadcast of ShapeSpecT       
         | SwapDim of int * int          
         | StoreToVar of IVarSpec
         | Annotated of Annotation       
@@ -76,7 +76,7 @@ module UExpr =
             | Expr.Sum -> Sum                           
             | Expr.SumAxis a -> SumAxis a            
             | Expr.Reshape ss -> Reshape ss
-            | Expr.Broadcast ss -> Broadcast ss
+            | Expr.DoBroadcast ss -> DoBroadcast ss
             | Expr.SwapDim (ax1, ax2) -> SwapDim (ax1, ax2)
             | Expr.StoreToVar vs -> StoreToVar (vs :> IVarSpec)
             | Expr.Annotated ano -> Annotated ano

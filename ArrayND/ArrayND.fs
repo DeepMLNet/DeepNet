@@ -9,13 +9,14 @@ module ArrayNDTypes =
     /// object that can be queried for shape
     type IHasLayout =
         /// shape of object
-        abstract Layout : ArrayNDLayoutT
+        abstract Layout: ArrayNDLayoutT
 
     /// ArrayND of any type
     type IArrayNDT =
         inherit IHasLayout
         abstract CPPType: string
-
+        abstract NewView: ArrayNDLayoutT -> IArrayNDT
+        abstract NewOfSameType: ArrayNDLayoutT -> IArrayNDT
 
 module ArrayND =
 
@@ -73,7 +74,9 @@ module ArrayND =
         interface IHasLayout with
             member this.Layout = this.Layout
         interface IArrayNDT with
-            member this.CPPType = this.CPPType               
+            member this.CPPType = this.CPPType         
+            member this.NewView layout = this.NewView layout :> IArrayNDT    
+            member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
 
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
@@ -83,7 +86,7 @@ module ArrayND =
 
         /// unchecked cast of v to NDArrayT<'T> (this type)
         member this.CastToMe (v: ArrayNDT<'A>) = v.Cast<'T> ()
-                
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -162,8 +165,11 @@ module ArrayND =
         a.NewOfSameType (ArrayNDLayout.newColumnMajor shp)
 
     /// creates a new ArrayND with existing data but new layout
-    let inline relayout newLayout (a: ArrayNDT<'T>) =
-        a.NewView newLayout
+    let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
+        a.NewView newLayout :?> 'A
+
+        //(^A : (static member MakeNewView : ^A -> ArrayNDLayoutT -> ^A) (a, newLayout))
+        //ArrayNDOverloads.MakeNewView (a, newLayout)
 
     /// checks that two ArrayNDs have the same shape
     let inline checkSameShape a b =
@@ -188,9 +194,11 @@ module ArrayND =
     let inline makeContiguous a =
         if isContiguous a then a else copy a
 
+    /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
         relayout (ArrayNDLayout.padLeft (layout a)) a
 
+    /// appends a broadcastable dimension of size one as last dimension
     let inline padRight a =
         relayout (ArrayNDLayout.padRight (layout a)) a
 
