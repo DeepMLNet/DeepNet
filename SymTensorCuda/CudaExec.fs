@@ -4,7 +4,7 @@ open System.Runtime.InteropServices
 open System.IO
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Util
+open Basics
 open ArrayNDNS
 open Basics.Cuda
 open SymTensor
@@ -21,12 +21,12 @@ module Compile =
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
     let gpuArch = "compute_30"
-    let includePath = assemblyDirectory
+    let includePath = Util.assemblyDirectory
 
-    let krnlPtxCacheDir = Path.Combine(localAppData, "PTXCache")
+    let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
     let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
 
-    let cppModCacheDir = Path.Combine(localAppData, "CPPCache")
+    let cppModCacheDir = Path.Combine(Util.localAppData, "CPPCache")
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
 
@@ -69,7 +69,7 @@ module Compile =
             match krnlPtxCache.TryGet cacheKey with
             | Some ptx -> ptx
             | None ->
-                printfn "nvrtc %s %s" (cmplrArgs |> String.combineWith " ") modName 
+                printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modName 
                 try
                     cmplr.Compile(cmplrArgs)
                 with
@@ -126,7 +126,7 @@ module Compile =
                          sprintf "--include-path=\"%s\"" includePath;
                          sprintf "-o \"%s\"" libName;
                          sprintf "\"%s\"" modName]
-        let cmplrArgStr = cmplrArgs |> String.combineWith " "
+        let cmplrArgStr = cmplrArgs |> String.concat " "
 
         dumpCode modName modCode
 
@@ -149,7 +149,7 @@ module Compile =
             cppModCache.Set cacheKey (System.IO.File.ReadAllBytes libName)
 
         // load compiled library
-        let libHndl = LoadLibrary(libName)
+        let libHndl = Native.LoadLibrary(libName)
         if libHndl = System.IntPtr.Zero then
             raise (System.ComponentModel.Win32Exception(sprintf "LoadLibrary of %s failed" libName))
 
@@ -157,7 +157,7 @@ module Compile =
         let funcs =
             funcDelegates
             |> Map.map (fun name delegateType ->
-                let addr = GetProcAddress(libHndl, name)
+                let addr = Native.GetProcAddress(libHndl, name)
                 if addr = System.IntPtr.Zero then
                      raise (System.ComponentModel.Win32Exception(sprintf "GetProcAddress of %s in %s failed" name libName))
                 System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer (addr, delegateType))
@@ -166,7 +166,7 @@ module Compile =
 
     /// unloads previously loaded CUDA C++ code
     let unloadCppCode libHndl =
-        let ret = FreeLibrary(libHndl)
+        let ret = Native.FreeLibrary(libHndl)
         if not ret then
             raise (System.ComponentModel.Win32Exception("FreeLibrary failed"))        
 

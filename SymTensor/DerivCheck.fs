@@ -51,6 +51,10 @@ module DerivCheck =
             let symGradVal = rDiffFun value
             let exprGradVal = numGrad exprFun value
             let gradDiff = abs (symGradVal - exprGradVal)
+
+            printfn "symbolic grad of %A wrt %A is %A with value %A" expr wrt rDiff symGradVal
+            printfn "and numeric grad has value %A" exprGradVal
+
             devs <- devs |> Map.add (VarSpec.name wrt) (ArrayND.sum gradDiff |> ArrayND.value)
         devs
 
@@ -58,7 +62,8 @@ module DerivCheck =
         let maxDeviation = Convert.ChangeType(1e-4, typeof<'T>) :?> 'T
         let devs = reverseDiffDeviations evalEnv expr
         devs |> Map.iter
-            (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %A = %A" name dev)
+            (fun name dev -> printfn "deviation wrt %A = %A" name dev)
+            //(fun name dev -> if dev > maxDeviation then printfn "deviation wrt %A = %A" name dev)
         devs |> Map.forall (fun _ dev -> dev < maxDeviation) 
 
 

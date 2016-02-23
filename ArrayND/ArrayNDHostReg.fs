@@ -4,7 +4,7 @@ open System
 open System.Runtime.InteropServices
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Util
+open Basics
 open ArrayNDHost
 
 

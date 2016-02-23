@@ -1,15 +1,8 @@
-﻿module Util
+﻿namespace Basics
 
-open System.Runtime.InteropServices
+
 open System
 
-[<Measure>]
-type bytes
-
-[<Measure>]
-type elements
-
-type Dictionary<'a, 'b> = System.Collections.Generic.Dictionary<'a, 'b>
 
 module List =
     /// sets element with index elem to given value
@@ -44,48 +37,50 @@ module Map =
         Map(Seq.concat [ (Map.toSeq p) ; (Map.toSeq q) ])    
 
 module String =
-    /// concatenates the given items with sep inbetween
-    let combineWith sep items =    
-        let rec combine items = 
-            match items with
-            | [item] -> item
-            | item::rest -> item + sep + combine rest
-            | [] -> ""
-        items |> Seq.toList |> combine
 
-/// iterates function f n times
-let rec iterate f n x =
-    match n with
-    | 0 -> x
-    | n when n > 0 -> iterate f (n-1) (f x)
-    | _ -> failwithf "cannot execute negative iterations %d" n
+    /// combines sequence of string with given seperator but returns empty if sequence is empty
+    let concatButIfEmpty empty sep items =
+        if Seq.isEmpty items then empty
+        else String.concat sep items
 
-/// directory of our assembly
-let assemblyDirectory = 
-    // http://stackoverflow.com/questions/52797/how-do-i-get-the-path-of-the-assembly-the-code-is-in
-    let codeBase = System.Reflection.Assembly.GetExecutingAssembly().CodeBase
-    let uri = new System.UriBuilder(codeBase)
-    let path = System.Uri.UnescapeDataString(uri.Path)
-    System.IO.Path.GetDirectoryName(path)
 
-/// path to AppData\Local
-let localAppData = 
-    let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
-    System.IO.Path.Combine (lad, "expr2")
+
+[<AutoOpen>]
+module UtilTypes =
+
+    [<Measure>]
+    type bytes
+
+    [<Measure>]
+    type elements
+
+    type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+
+
+module Util =
+
+    /// iterates function f n times
+    let rec iterate f n x =
+        match n with
+        | 0 -> x
+        | n when n > 0 -> iterate f (n-1) (f x)
+        | _ -> failwithf "cannot execute negative iterations %d" n
+
+    /// directory of our assembly
+    let assemblyDirectory = 
+        // http://stackoverflow.com/questions/52797/how-do-i-get-the-path-of-the-assembly-the-code-is-in
+        let codeBase = System.Reflection.Assembly.GetExecutingAssembly().CodeBase
+        let uri = new System.UriBuilder(codeBase)
+        let path = System.Uri.UnescapeDataString(uri.Path)
+        System.IO.Path.GetDirectoryName(path)
+
+    /// path to application directory under AppData\Local
+    let localAppData = 
+        let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
+        System.IO.Path.Combine (lad, "expr2")
     
-/// converts sequence of ints to sequence of strings
-let intToStrSeq items =
-    Seq.map (sprintf "%d") items
-
-
-
-[<DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Ansi)>]
-extern IntPtr LoadLibrary([<MarshalAs(UnmanagedType.LPStr)>] string dllToLoad)
-
-[<DllImport("kernel32.dll", CharSet=CharSet.Ansi, ExactSpelling=true, SetLastError=true)>]
-extern IntPtr GetProcAddress(IntPtr hModule, string procedureName)
-
-[<DllImport("kernel32.dll", SetLastError=true)>]
-extern [<return: MarshalAs(UnmanagedType.Bool)>] bool FreeLibrary(IntPtr hModule)
+    /// converts sequence of ints to sequence of strings
+    let intToStrSeq items =
+        Seq.map (sprintf "%d") items
 
 

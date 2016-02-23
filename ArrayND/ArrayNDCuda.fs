@@ -3,7 +3,7 @@
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
-open Util
+open Basics
 open ArrayND
 open ArrayNDHost
 

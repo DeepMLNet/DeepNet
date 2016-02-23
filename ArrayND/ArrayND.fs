@@ -1,6 +1,6 @@
 namespace ArrayNDNS
 
-open Util
+open Basics
 
 
 [<AutoOpen>]
@@ -22,6 +22,7 @@ module ArrayND =
 
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
+    [<StructuredFormatDisplay("{PrettyString}")>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
         /// layout
         member this.Layout = layout
@@ -65,9 +66,9 @@ module ArrayND =
                 else failwithf "no C++ datatype for %A" typeof<'T>
             let shapeStr = 
                 if dims = 0 then "" 
-                else "<" + (shp |> intToStrSeq |> String.combineWith ",") + ">"
+                else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
             let strideStr = 
-                "<" + ((ofst :: str) |> intToStrSeq |> String.combineWith ",") + ">"
+                "<" + ((ofst :: str) |> Util.intToStrSeq |> String.concat ",") + ">"
             sprintf "ArrayNDStatic%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
                 dims cppDataType dims shapeStr dims strideStr            
 
@@ -575,11 +576,43 @@ module ArrayND =
         generate [] |> blockArray
    
     type ArrayNDT<'T> with
-        /// dot product
+        /// tensor product
         static member (%*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
+
+
+    let prettyString a =
+        let rec prettyDim lineSpace a =
+            let ls = (shape a).[0]
+            let maxElems = 12
+
+            let subPrint idxes = 
+                idxes
+                |> Seq.map (fun i -> 
+                    prettyDim (lineSpace + " ") (view [Elem i; AllFill] a)) 
+                |> Seq.toList
+                    
+            let subStrs () = 
+                if ls < maxElems then
+                    subPrint (seq {0 .. ls - 1})
+                else
+                    let leftIdx = seq {0 .. (maxElems / 2)}
+                    let rightIdx = seq {(maxElems / 2) + 2 .. (ls - 1)}
+                    (subPrint leftIdx) @ ["..."] @ (subPrint rightIdx)
+
+            match nDims a with
+            | 0 -> sprintf "%A" (value a)
+            | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
+            | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
+
+        prettyDim "" a                       
+
+
+    type ArrayNDT<'T> with
+        /// pretty contents string
+        member this.PrettyString = prettyString this
 
 
 [<AutoOpen>]

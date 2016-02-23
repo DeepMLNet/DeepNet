@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Util
+open Basics
 open ArrayNDNS
 open ShapeSpec
 open VarSpec

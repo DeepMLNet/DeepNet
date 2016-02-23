@@ -1,8 +1,8 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
 open ManagedCuda
+open Basics
 open Basics.Cuda
-open Util
 open SymTensor.Compiler
 
 
@@ -87,8 +87,8 @@ module TmplInstCache =
             let krnlStr = match ti.Domain with
                           | KernelFunc -> "__global__"
                           | CPPFunc -> "__declspec(dllexport)"
-            let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> String.combineWith ", "
-            let argCallStr = ti.ArgTypes |> List.mapi (fun i _ -> sprintf "p%d" i) |> String.combineWith ", "
+            let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> String.concat ", "
+            let argCallStr = ti.ArgTypes |> List.mapi (fun i _ -> sprintf "p%d" i) |> String.concat ", "
             let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
             let declStr =
                 sprintf "extern \"C\" %s %s %s (%s) {\n" krnlStr ti.RetType cName argDeclStr

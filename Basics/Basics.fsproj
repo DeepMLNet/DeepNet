@@ -72,6 +72,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Native.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaSup.fs" />

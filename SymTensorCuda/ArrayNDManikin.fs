@@ -2,7 +2,7 @@
 
 open System.Runtime.InteropServices
 open ManagedCuda
-open Util
+open Basics
 open ArrayNDNS
 open SymTensor
 

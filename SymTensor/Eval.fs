@@ -2,7 +2,7 @@
 
 open System
 
-open Util
+open Basics
 open VarSpec
 open SizeSymbolTypes
 open ArrayNDNS

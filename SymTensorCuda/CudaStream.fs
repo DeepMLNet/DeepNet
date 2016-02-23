@@ -1,6 +1,6 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
-open Util
+open Basics
 open SymTensor.Compiler
 
 

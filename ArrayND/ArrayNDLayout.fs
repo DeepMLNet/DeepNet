@@ -1,18 +1,19 @@
 ﻿namespace ArrayNDNS
 
-open Util
+open Basics
 
 
 [<AutoOpen>]
 module ArrayNDLayoutTypes =
     // layout (shape, offset, stride) of an ArrayND
-    type ArrayNDLayoutT =
-        {/// shape
-         Shape: int list;
-         /// offset in elements
-         Offset: int;
-         /// stride in elements
-         Stride: int list;}
+    type ArrayNDLayoutT = {
+        /// shape
+        Shape: int list;
+        /// offset in elements
+        Offset: int;
+        /// stride in elements
+        Stride: int list;
+    }
 
     /// range specification
     type RangeT = 
@@ -20,6 +21,7 @@ module ArrayNDLayoutTypes =
         | Rng of int * int
         | NewAxis
         | All
+        | AllFill
 
 
 module ArrayNDLayout =
@@ -186,8 +188,15 @@ module ArrayNDLayout =
 
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
-            | (All | Elem _ | Rng _ as idx)::rSlices, shp::rShps, str::rStrs ->
-                let ra = recView rSlices {a with Shape=rShps; Stride=rStrs} 
+            | AllFill::rRanges, shp::rShps, _ ->
+                if List.length rShps > List.length rRanges then
+                    recView (All :: AllFill :: rRanges) a
+                elif List.length rShps = List.length rRanges then
+                    recView (All :: rRanges) a
+                else
+                    recView rRanges a
+            | (All | Elem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
+                let ra = recView rRanges {a with Shape=rShps; Stride=rStrs} 
                 match idx with 
                 | All ->
                     {ra with Shape = shp::ra.Shape;
@@ -203,9 +212,9 @@ module ArrayNDLayout =
                     {ra with Offset = ra.Offset + start*str;
                              Shape = (stop - start)::ra.Shape;
                              Stride = str::ra.Stride} 
-                | NewAxis -> failwith "impossible"
-            | NewAxis::rSlices, _, _ ->
-                let ra = recView rSlices a
+                | AllFill | NewAxis -> failwith "impossible"
+            | NewAxis::rRanges, _, _ ->
+                let ra = recView rRanges a
                 {ra with Shape = 1::ra.Shape; 
                          Stride = 0::ra.Stride}
             | [], [], _ -> a 

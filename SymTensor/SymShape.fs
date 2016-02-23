@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Util
+open Basics
 
 [<AutoOpen>]
 module SizeSymbolTypes =

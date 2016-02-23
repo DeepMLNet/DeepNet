@@ -1,6 +1,6 @@
 ﻿namespace SymTensor.Compiler
 
-open Util
+open Basics
 open ArrayNDNS
 open SymTensor
 
