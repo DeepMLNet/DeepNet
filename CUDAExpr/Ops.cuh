@@ -115,14 +115,3 @@ struct PowerEOp_t
 };
 
 
-
-
-// TODO: dummy
-struct Dot
-{
-	_dev float operator() (float a, float b) const
-	{
-		return 111.1f;
-	}
-};
-

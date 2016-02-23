@@ -188,13 +188,12 @@ module ArrayNDLayout =
 
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
-            | AllFill::rRanges, shp::rShps, _ ->
-                if List.length rShps > List.length rRanges then
-                    recView (All :: AllFill :: rRanges) a
-                elif List.length rShps = List.length rRanges then
-                    recView (All :: rRanges) a
-                else
-                    recView rRanges a
+            | AllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
+                recView (All :: AllFill :: rRanges) a
+            | AllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
+                recView (All :: rRanges) a
+            | AllFill::rRanges, _, _ ->
+                recView rRanges a
             | (All | Elem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
                 let ra = recView rRanges {a with Shape=rShps; Stride=rStrs} 
                 match idx with 

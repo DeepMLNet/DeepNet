@@ -583,31 +583,36 @@ module ArrayND =
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
 
 
-    let prettyString a =
-        let rec prettyDim lineSpace a =
-            let ls = (shape a).[0]
-            let maxElems = 12
+    let prettyString (a: ArrayNDT<'T>) =
+        let maxElems = 12
 
+        let rec prettyDim lineSpace a =
+            let ls () = (shape a).[0]
             let subPrint idxes = 
                 idxes
                 |> Seq.map (fun i -> 
                     prettyDim (lineSpace + " ") (view [Elem i; AllFill] a)) 
-                |> Seq.toList
-                    
+                |> Seq.toList                   
             let subStrs () = 
-                if ls < maxElems then
-                    subPrint (seq {0 .. ls - 1})
+                if ls() < maxElems then
+                    subPrint (seq {0 .. ls() - 1})
                 else
                     let leftIdx = seq {0 .. (maxElems / 2)}
-                    let rightIdx = seq {(maxElems / 2) + 2 .. (ls - 1)}
+                    let rightIdx = seq {(maxElems / 2) + 2 .. (ls() - 1)}
                     (subPrint leftIdx) @ ["..."] @ (subPrint rightIdx)
 
             match nDims a with
-            | 0 -> sprintf "%A" (value a)
+            | 0 -> 
+                let v = value a
+                if   typeof<'T>.Equals(typeof<single>) then sprintf "%.4f" (v |> box :?> single)
+                elif typeof<'T>.Equals(typeof<double>) then sprintf "%.4f" (v |> box :?> double)
+                elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
+                elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
+                else sprintf "%A;" v
             | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
             | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
 
-        prettyDim "" a                       
+        prettyDim " " a                       
 
 
     type ArrayNDT<'T> with

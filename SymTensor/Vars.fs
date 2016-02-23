@@ -18,6 +18,7 @@ module VarSpecTypes =
         abstract member TypeName: TypeNameT
 
     /// variable specification: has a name, type and shape specificaiton
+    [<StructuredFormatDisplay("Var \"{Name}\"")>]
     type VarSpecT<'T> = 
         {Name: string; Shape: ShapeSpecT;}
         

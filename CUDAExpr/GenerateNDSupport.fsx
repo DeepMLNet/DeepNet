@@ -37,13 +37,13 @@ for dims = 0 to maxDims do
 
     wrt "struct Pos%dD {" dims
     wrt "   size_t pos[%d];" (max dims 1)
-    wrt"    template<typename TNDArray>"
+    wrt"    template<typename TArrayND>"
     wrt "   _dev static Pos%dD fromLinearIdx(size_t idx) {" dims
     wrt "     Pos%dD p;" dims
     if dims >= 1 then
         wrt "     const size_t incr0 = 1;"
     for d = 1 to dims - 1 do
-        wrt "     const size_t incr%d = incr%d * TNDArray::shape(%d);" d (d-1) (d-1)
+        wrt "     const size_t incr%d = incr%d * TArrayND::shape(%d);" d (d-1) (d-1)
     for d = dims - 1 downto 0 do
         wrt "     p.pos[%d] = idx / incr%d;" d d
         wrt "     idx -= p.pos[%d] * incr%d;" d d
@@ -52,19 +52,19 @@ for dims = 0 to maxDims do
         wrt "     p.pos[0] = 0;"
     wrt "     return p;"
     wrt "   }"
-    wrt"    template<typename TNDArray>"
+    wrt"    template<typename TArrayND>"
     wrt "   _dev static Pos%dD fromLinearIdxWithLastDimSetToZero(size_t idx) {" dims
-    wrt "     Pos%dD p = fromLinearIdx<TNDArray>(idx);" dims 
+    wrt "     Pos%dD p = fromLinearIdx<TArrayND>(idx);" dims 
     if dims >= 1 then
         wrt "     p[%d] = 0;" (dims - 1)
     wrt "     return p;"
     wrt "    }"
-    wrt "    template<typename TNDArray>"
+    wrt "    template<typename TArrayND>"
     wrt "   _dev size_t toLinearIdx() const {"
     if dims >= 1 then
         wrt "     const size_t incr0 = 1;"
     for d = 1 to dims - 1 do
-        wrt "     const size_t incr%d = incr%d * TNDArray::shape(%d);" d (d-1) (d-1)
+        wrt "     const size_t incr%d = incr%d * TArrayND::shape(%d);" d (d-1) (d-1)
     wrt "     return %s;" (ad |>> (fun i -> prn "incr%d * pos[%d]" i i) |> cwe "0" " + ")
     wrt "   }"
     wrt "  	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }"
@@ -121,12 +121,12 @@ for dims = 0 to maxDims do
     wrt "};"
     wrt ""
 
-    wrt "template <typename TShape, typename TStride>"
-    wrt "struct NDArrayStatic%dD {" dims
+    wrt "template <typename TData, typename TShape, typename TStride>"
+    wrt "struct ArrayNDStatic%dD {" dims
     wrt "  typedef TShape Shape;"
     wrt "  typedef TStride Stride;"
     wrt "  typedef Pos%dD Pos;" dims
-    wrt "  float *mData;"
+    wrt "  TData *mData;"
     wrt ""
     wrt "  _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }"
     wrt "  _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }"
@@ -141,28 +141,28 @@ for dims = 0 to maxDims do
     wrt "  _dev static Pos%dD linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos%dD::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }" dims dims
     wrt "  _dev static size_t index(const size_t *pos) { return Stride::index(pos); }"
     wrt "  _dev static size_t index(const Pos%dD &pos) { return Stride::index(pos); }" dims
-    wrt "  _dev float *data() { return mData; }"
-    wrt "  _dev const float *data() const { return mData; }"
-    wrt "  _dev float &element(%s) {"
+    wrt "  _dev TData *data() { return mData; }"
+    wrt "  _dev const TData *data() const { return mData; }"
+    wrt "  _dev TData &element(%s) {"
         (ad |>> prn "size_t pos%d" |> cw ", ")
     wrt "    return data()[Stride::index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
-    wrt "  _dev const float &element(%s) const {"
+    wrt "  _dev const TData &element(%s) const {"
         (ad |>> prn "size_t pos%d" |> cw ", ")
     wrt "    return data()[Stride::index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
-    wrt "  _dev float &element(const size_t *pos) {"
+    wrt "  _dev TData &element(const size_t *pos) {"
     wrt "    return data()[Stride::index(pos)];"
     wrt "  }"
-    wrt "  _dev const float &element(const size_t *pos) const {"
+    wrt "  _dev const TData &element(const size_t *pos) const {"
     wrt "    return data()[Stride::index(pos)];"
     wrt "  }"
-    wrt "  _dev float &element(const Pos%dD &pos) {" dims
+    wrt "  _dev TData &element(const Pos%dD &pos) {" dims
     wrt "    return data()[Stride::index(pos)];"
     wrt "  }"
-    wrt "  _dev const float &element(const Pos%dD &pos) const {" dims
+    wrt "  _dev const TData &element(const Pos%dD &pos) const {" dims
     wrt "    return data()[Stride::index(pos)];"
     wrt "  }"
     wrt "};"

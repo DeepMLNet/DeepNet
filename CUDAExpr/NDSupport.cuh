@@ -6,18 +6,18 @@
 
 struct Pos0D {
    size_t pos[1];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos0D fromLinearIdx(size_t idx) {
      Pos0D p;
      p.pos[0] = 0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos0D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos0D p = fromLinearIdx<TNDArray>(idx);
+     Pos0D p = fromLinearIdx<TArrayND>(idx);
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      return 0;
    }
@@ -52,12 +52,12 @@ struct StrideStatic0D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic0D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic0D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos0D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -71,24 +71,24 @@ struct NDArrayStatic0D {
   _dev static Pos0D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos0D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos0D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element() {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element() {
     return data()[Stride::index()];
   }
-  _dev const float &element() const {
+  _dev const TData &element() const {
     return data()[Stride::index()];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos0D &pos) {
+  _dev TData &element(const Pos0D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos0D &pos) const {
+  _dev const TData &element(const Pos0D &pos) const {
     return data()[Stride::index(pos)];
   }
 };
@@ -190,7 +190,7 @@ _dev void elemwise2Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 
 struct Pos1D {
    size_t pos[1];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos1D fromLinearIdx(size_t idx) {
      Pos1D p;
      const size_t incr0 = 1;
@@ -198,13 +198,13 @@ struct Pos1D {
      idx -= p.pos[0] * incr0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos1D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos1D p = fromLinearIdx<TNDArray>(idx);
+     Pos1D p = fromLinearIdx<TArrayND>(idx);
      p[0] = 0;
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
      return incr0 * pos[0];
@@ -245,12 +245,12 @@ struct StrideStatic1D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic1D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic1D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos1D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -264,24 +264,24 @@ struct NDArrayStatic1D {
   _dev static Pos1D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos1D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos1D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element(size_t pos0) {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element(size_t pos0) {
     return data()[Stride::index(pos0)];
   }
-  _dev const float &element(size_t pos0) const {
+  _dev const TData &element(size_t pos0) const {
     return data()[Stride::index(pos0)];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos1D &pos) {
+  _dev TData &element(const Pos1D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos1D &pos) const {
+  _dev const TData &element(const Pos1D &pos) const {
     return data()[Stride::index(pos)];
   }
 };
@@ -419,27 +419,27 @@ _dev void elemwise2Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 
 struct Pos2D {
    size_t pos[2];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos2D fromLinearIdx(size_t idx) {
      Pos2D p;
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
      p.pos[1] = idx / incr1;
      idx -= p.pos[1] * incr1;
      p.pos[0] = idx / incr0;
      idx -= p.pos[0] * incr0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos2D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos2D p = fromLinearIdx<TNDArray>(idx);
+     Pos2D p = fromLinearIdx<TArrayND>(idx);
      p[1] = 0;
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
      return incr0 * pos[0] + incr1 * pos[1];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -480,12 +480,12 @@ struct StrideStatic2D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic2D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic2D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos2D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -499,24 +499,24 @@ struct NDArrayStatic2D {
   _dev static Pos2D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos2D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos2D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element(size_t pos0, size_t pos1) {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element(size_t pos0, size_t pos1) {
     return data()[Stride::index(pos0, pos1)];
   }
-  _dev const float &element(size_t pos0, size_t pos1) const {
+  _dev const TData &element(size_t pos0, size_t pos1) const {
     return data()[Stride::index(pos0, pos1)];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos2D &pos) {
+  _dev TData &element(const Pos2D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos2D &pos) const {
+  _dev const TData &element(const Pos2D &pos) const {
     return data()[Stride::index(pos)];
   }
 };
@@ -678,12 +678,12 @@ _dev void elemwise2Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 
 struct Pos3D {
    size_t pos[3];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos3D fromLinearIdx(size_t idx) {
      Pos3D p;
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
      p.pos[2] = idx / incr2;
      idx -= p.pos[2] * incr2;
      p.pos[1] = idx / incr1;
@@ -692,17 +692,17 @@ struct Pos3D {
      idx -= p.pos[0] * incr0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos3D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos3D p = fromLinearIdx<TNDArray>(idx);
+     Pos3D p = fromLinearIdx<TArrayND>(idx);
      p[2] = 0;
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -745,12 +745,12 @@ struct StrideStatic3D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic3D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic3D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos3D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -764,24 +764,24 @@ struct NDArrayStatic3D {
   _dev static Pos3D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos3D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos3D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element(size_t pos0, size_t pos1, size_t pos2) {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element(size_t pos0, size_t pos1, size_t pos2) {
     return data()[Stride::index(pos0, pos1, pos2)];
   }
-  _dev const float &element(size_t pos0, size_t pos1, size_t pos2) const {
+  _dev const TData &element(size_t pos0, size_t pos1, size_t pos2) const {
     return data()[Stride::index(pos0, pos1, pos2)];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos3D &pos) {
+  _dev TData &element(const Pos3D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos3D &pos) const {
+  _dev const TData &element(const Pos3D &pos) const {
     return data()[Stride::index(pos)];
   }
 };
@@ -967,13 +967,13 @@ _dev void elemwise2Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 
 struct Pos4D {
    size_t pos[4];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos4D fromLinearIdx(size_t idx) {
      Pos4D p;
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
-     const size_t incr3 = incr2 * TNDArray::shape(2);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
+     const size_t incr3 = incr2 * TArrayND::shape(2);
      p.pos[3] = idx / incr3;
      idx -= p.pos[3] * incr3;
      p.pos[2] = idx / incr2;
@@ -984,18 +984,18 @@ struct Pos4D {
      idx -= p.pos[0] * incr0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos4D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos4D p = fromLinearIdx<TNDArray>(idx);
+     Pos4D p = fromLinearIdx<TArrayND>(idx);
      p[3] = 0;
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
-     const size_t incr3 = incr2 * TNDArray::shape(2);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
+     const size_t incr3 = incr2 * TArrayND::shape(2);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2] + incr3 * pos[3];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -1040,12 +1040,12 @@ struct StrideStatic4D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic4D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic4D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos4D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -1059,24 +1059,24 @@ struct NDArrayStatic4D {
   _dev static Pos4D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos4D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos4D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
     return data()[Stride::index(pos0, pos1, pos2, pos3)];
   }
-  _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) const {
+  _dev const TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) const {
     return data()[Stride::index(pos0, pos1, pos2, pos3)];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos4D &pos) {
+  _dev TData &element(const Pos4D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos4D &pos) const {
+  _dev const TData &element(const Pos4D &pos) const {
     return data()[Stride::index(pos)];
   }
 };
@@ -1298,14 +1298,14 @@ _dev void elemwise2Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const
 
 struct Pos5D {
    size_t pos[5];
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos5D fromLinearIdx(size_t idx) {
      Pos5D p;
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
-     const size_t incr3 = incr2 * TNDArray::shape(2);
-     const size_t incr4 = incr3 * TNDArray::shape(3);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
+     const size_t incr3 = incr2 * TArrayND::shape(2);
+     const size_t incr4 = incr3 * TArrayND::shape(3);
      p.pos[4] = idx / incr4;
      idx -= p.pos[4] * incr4;
      p.pos[3] = idx / incr3;
@@ -1318,19 +1318,19 @@ struct Pos5D {
      idx -= p.pos[0] * incr0;
      return p;
    }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev static Pos5D fromLinearIdxWithLastDimSetToZero(size_t idx) {
-     Pos5D p = fromLinearIdx<TNDArray>(idx);
+     Pos5D p = fromLinearIdx<TArrayND>(idx);
      p[4] = 0;
      return p;
     }
-    template<typename TNDArray>
+    template<typename TArrayND>
    _dev size_t toLinearIdx() const {
      const size_t incr0 = 1;
-     const size_t incr1 = incr0 * TNDArray::shape(0);
-     const size_t incr2 = incr1 * TNDArray::shape(1);
-     const size_t incr3 = incr2 * TNDArray::shape(2);
-     const size_t incr4 = incr3 * TNDArray::shape(3);
+     const size_t incr1 = incr0 * TArrayND::shape(0);
+     const size_t incr2 = incr1 * TArrayND::shape(1);
+     const size_t incr3 = incr2 * TArrayND::shape(2);
+     const size_t incr4 = incr3 * TArrayND::shape(3);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2] + incr3 * pos[3] + incr4 * pos[4];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -1377,12 +1377,12 @@ struct StrideStatic5D {
     }
 };
 
-template <typename TShape, typename TStride>
-struct NDArrayStatic5D {
+template <typename TData, typename TShape, typename TStride>
+struct ArrayNDStatic5D {
   typedef TShape Shape;
   typedef TStride Stride;
   typedef Pos5D Pos;
-  float *mData;
+  TData *mData;
 
   _dev static size_t shape(const size_t dim) { return Shape::shape(dim); }
   _dev static size_t stride(const size_t dim) { return Stride::stride(dim); }
@@ -1396,24 +1396,24 @@ struct NDArrayStatic5D {
   _dev static Pos5D linearIdxToPosWithLastDimSetToZero(size_t idx) { return Pos5D::fromLinearIdxWithLastDimSetToZero<Shape>(idx); }
   _dev static size_t index(const size_t *pos) { return Stride::index(pos); }
   _dev static size_t index(const Pos5D &pos) { return Stride::index(pos); }
-  _dev float *data() { return mData; }
-  _dev const float *data() const { return mData; }
-  _dev float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {
+  _dev TData *data() { return mData; }
+  _dev const TData *data() const { return mData; }
+  _dev TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {
     return data()[Stride::index(pos0, pos1, pos2, pos3, pos4)];
   }
-  _dev const float &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) const {
+  _dev const TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) const {
     return data()[Stride::index(pos0, pos1, pos2, pos3, pos4)];
   }
-  _dev float &element(const size_t *pos) {
+  _dev TData &element(const size_t *pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const size_t *pos) const {
+  _dev const TData &element(const size_t *pos) const {
     return data()[Stride::index(pos)];
   }
-  _dev float &element(const Pos5D &pos) {
+  _dev TData &element(const Pos5D &pos) {
     return data()[Stride::index(pos)];
   }
-  _dev const float &element(const Pos5D &pos) const {
+  _dev const TData &element(const Pos5D &pos) const {
     return data()[Stride::index(pos)];
   }
 };

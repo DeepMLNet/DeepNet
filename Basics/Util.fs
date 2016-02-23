@@ -56,6 +56,10 @@ module UtilTypes =
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 
+    let conv<'T> value : 'T =
+        //let vbox = box value
+        Convert.ChangeType(box value, typeof<'T>) :?> 'T
+
 
 module Util =
 
