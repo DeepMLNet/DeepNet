@@ -41,12 +41,26 @@ module Expr =
     and UnaryOpT<'T> =
 
         // ==== unary elementwise ==== 
-        /// elementwise negation
         | Negate                        
-        /// elementwise logarithm
-        | Log                           
-        /// elementwise exponential funcion
+        | Abs
+        | SignT
+        | Log
+        | Log10                           
         | Exp                           
+        | Sin
+        | Cos
+        | Tan
+        | Asin
+        | Acos
+        | Atan
+        | Sinh
+        | Cosh
+        | Tanh
+        | Sqrt
+        | Ceil
+        | Floor
+        | Round
+        | Truncate
 
         // ==== reductions ====
         /// summation of all elements
@@ -74,15 +88,11 @@ module Expr =
     /// ops with two exprs as arguments
     and BinaryOpT<'T> =
         // ==== binary elementwise ====
-        /// elementwise addition
         | Add                           
-        /// elementwise substraction
         | Substract                     
-        /// elementwise multiplication
         | Multiply                      
-        /// elementwise division
         | Divide                        
-        /// elementwise power
+        | Modulo
         | Power                         
     
         // ==== matrix/tensor operations ====
@@ -261,11 +271,18 @@ module Expr =
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
 
+    /// scalar of given value and type
+    let inline scalart<'T> f =
+        scalar (conv<'T> f)
+
     /// scalar 0 of appropriate type
     let inline zero<'T> () = scalar (ArrayNDT<'T>.Zero)
 
     /// scalar 1 of appropriate type
     let inline one<'T> () = scalar (ArrayNDT<'T>.One)
+
+    /// scalar 2 of appropriate type
+    let inline two<'T> () = scalart<'T> 2
 
     /// swaps two dimensions of a tensor
     let swapDim ax1 ax2 a = Unary(SwapDim(ax1, ax2), a) |> check
@@ -288,15 +305,34 @@ module Expr =
     type ExprT<'T> with
 
         // elementwise unary
+        static member (~+) (a: ExprT<'T>) = a |> check
         static member (~-) (a: ExprT<'T>) = Unary(Negate, a) |> check 
-        static member Exp (a: ExprT<'T>) = Unary(Exp, a) |> check
+        static member Abs (a: ExprT<'T>) = Unary(Abs, a) |> check
+        static member SignT (a: ExprT<'T>) = Unary(SignT, a) |> check
         static member Log (a: ExprT<'T>) = Unary(Log, a) |> check
+        static member Log10 (a: ExprT<'T>) = Unary(Log10, a) |> check
+        static member Exp (a: ExprT<'T>) = Unary(Exp, a) |> check
+        static member Sin (a: ExprT<'T>) = Unary(Sin, a) |> check
+        static member Cos (a: ExprT<'T>) = Unary(Cos, a) |> check
+        static member Tan (a: ExprT<'T>) = Unary(Tan, a) |> check
+        static member Asin (a: ExprT<'T>) = Unary(Asin, a) |> check
+        static member Acos (a: ExprT<'T>) = Unary(Acos, a) |> check
+        static member Atan (a: ExprT<'T>) = Unary(Atan, a) |> check
+        static member Sinh (a: ExprT<'T>) = Unary(Sinh, a) |> check
+        static member Cosh (a: ExprT<'T>) = Unary(Cosh, a) |> check
+        static member Tanh (a: ExprT<'T>) = Unary(Tanh, a) |> check
+        static member Sqrt (a: ExprT<'T>) = Unary(Sqrt, a) |> check
+        static member Ceiling (a: ExprT<'T>) = Unary(Ceil, a) |> check
+        static member Floor (a: ExprT<'T>) = Unary(Floor, a) |> check
+        static member Round (a: ExprT<'T>) = Unary(Round, a) |> check
+        static member Truncate (a: ExprT<'T>) = Unary(Truncate, a) |> check
 
         // elementwise binary
         static member (+) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Add a b
         static member (-) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Substract a b
         static member (*) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Multiply a b
         static member (/) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Divide a b
+        static member (%) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Modulo a b
         static member Pow (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Power a b
 
         // elementwise binary with basetype
@@ -304,16 +340,25 @@ module Expr =
         static member (-) (a: ExprT<'T>, b: 'T) = a - (scalar b)
         static member (*) (a: ExprT<'T>, b: 'T) = a * (scalar b)
         static member (/) (a: ExprT<'T>, b: 'T) = a / (scalar b)
+        static member (%) (a: ExprT<'T>, b: 'T) = a % (scalar b)
         static member Pow (a: ExprT<'T>, b: 'T) = a ** (scalar b)
 
         static member (+) (a: 'T, b: ExprT<'T>) = (scalar a) + b
         static member (-) (a: 'T, b: ExprT<'T>) = (scalar a) - b
         static member (*) (a: 'T, b: ExprT<'T>) = (scalar a) * b
         static member (/) (a: 'T, b: ExprT<'T>) = (scalar a) / b
+        static member (%) (a: 'T, b: ExprT<'T>) = (scalar a) % b
         static member Pow (a: 'T, b: ExprT<'T>) = (scalar a) ** b
 
         // transposition
         member this.T = transpose this
+
+    /// sign keeping type
+    let signt (a: ExprT<'T>) =
+        ExprT<'T>.SignT a 
+
+    let sqrtt (a: ExprT<'T>) =
+        ExprT<'T>.Sqrt a
 
     /// reshape (assuming C-continguous order) tensor; element count does not change
     let reshape ss a = Unary(Reshape(ss), a) |> check

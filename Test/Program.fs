@@ -277,6 +277,8 @@ let main argv =
     //``Build linear regression`` ()
     //``Eval linear regression`` ()
 
+    //tanh
+
     //``Reverse gradient of linear regression`` ()
     ``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()

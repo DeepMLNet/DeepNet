@@ -48,6 +48,22 @@ struct NegateEOp_t
 };
 
 
+struct AbsEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return fabsf(a);
+	}
+};
+
+struct SignTEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return a > 0.0f ? 1.0f : 0.0f;
+	}
+};
+
 struct LogEOp_t
 {
 	_dev float operator() (float a) const
@@ -56,6 +72,13 @@ struct LogEOp_t
 	}
 };
 
+struct Log10EOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return log10f(a);
+	}
+};
 
 struct ExpEOp_t
 {
@@ -64,6 +87,119 @@ struct ExpEOp_t
 		return expf(a);
 	}
 };
+
+struct SinEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return sinf(a);
+	}
+};
+
+struct CosEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return cosf(a);
+	}
+};
+
+struct TanEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return tanf(a);
+	}
+};
+
+struct AsinEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return asinf(a);
+	}
+};
+
+struct AcosEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return acosf(a);
+	}
+};
+
+struct AtanEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return atanf(a);
+	}
+};
+
+struct SinhEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return sinhf(a);
+	}
+};
+
+struct CoshEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return coshf(a);
+	}
+};
+
+struct TanhEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return tanhf(a);
+	}
+};
+
+struct SqrtEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return sqrtf(a);
+	}
+};
+
+struct CeilEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return ceilf(a);
+	}
+};
+
+struct FloorEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return floorf(a);
+	}
+};
+
+struct RoundEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return roundf(a);
+	}
+};
+
+struct TruncateEOp_t
+{
+	_dev float operator() (float a) const
+	{
+		return truncf(a);
+	}
+};
+
 
 struct IdEOp_t
 {

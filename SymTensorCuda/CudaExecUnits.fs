@@ -48,9 +48,26 @@ module CudaExecUnit =
         | ULeafOp _ -> []
 
         // unary elementwise
-        | UUnaryOp Negate -> inplaceOverwriteTrgt
+        | UUnaryOp Negate -> inplaceOverwriteTrgt                        
+        | UUnaryOp Abs -> inplaceOverwriteTrgt
+        | UUnaryOp SignT -> inplaceOverwriteTrgt
         | UUnaryOp Log -> inplaceOverwriteTrgt
-        | UUnaryOp Exp -> inplaceOverwriteTrgt
+        | UUnaryOp Log10 -> inplaceOverwriteTrgt                           
+        | UUnaryOp Exp -> inplaceOverwriteTrgt                           
+        | UUnaryOp Sin -> inplaceOverwriteTrgt
+        | UUnaryOp Cos -> inplaceOverwriteTrgt
+        | UUnaryOp Tan -> inplaceOverwriteTrgt
+        | UUnaryOp Asin -> inplaceOverwriteTrgt
+        | UUnaryOp Acos -> inplaceOverwriteTrgt
+        | UUnaryOp Atan -> inplaceOverwriteTrgt
+        | UUnaryOp Sinh -> inplaceOverwriteTrgt
+        | UUnaryOp Cosh -> inplaceOverwriteTrgt
+        | UUnaryOp Tanh -> inplaceOverwriteTrgt
+        | UUnaryOp Sqrt -> inplaceOverwriteTrgt
+        | UUnaryOp Ceil -> inplaceOverwriteTrgt
+        | UUnaryOp Floor -> inplaceOverwriteTrgt
+        | UUnaryOp Round -> inplaceOverwriteTrgt
+        | UUnaryOp Truncate -> inplaceOverwriteTrgt        
         // reductions
         | UUnaryOp Sum -> outplaceTrgt
         | UUnaryOp (SumAxis _) -> outplaceTrgt
@@ -85,6 +102,7 @@ module CudaExecUnit =
         | UBinaryOp Substract -> inplaceOverwriteTrgt
         | UBinaryOp Multiply -> inplaceOverwriteTrgt
         | UBinaryOp Divide -> inplaceOverwriteTrgt
+        | UBinaryOp Modulo -> inplaceOverwriteTrgt
         | UBinaryOp Power -> inplaceOverwriteTrgt
         // matrix/tensor operations
         | UBinaryOp Dot -> outplaceTrgt
@@ -133,9 +151,26 @@ module CudaExecUnit =
         | ULeafOp _ -> outplaceTrgt        
 
         // unary elementwise
-        | UUnaryOp Negate -> inplaceOverwriteTrgt
+        | UUnaryOp Negate -> inplaceOverwriteTrgt                        
+        | UUnaryOp Abs -> inplaceOverwriteTrgt
+        | UUnaryOp SignT -> inplaceOverwriteTrgt
         | UUnaryOp Log -> inplaceOverwriteTrgt
-        | UUnaryOp Exp -> inplaceOverwriteTrgt
+        | UUnaryOp Log10 -> inplaceOverwriteTrgt                           
+        | UUnaryOp Exp -> inplaceOverwriteTrgt                           
+        | UUnaryOp Sin -> inplaceOverwriteTrgt
+        | UUnaryOp Cos -> inplaceOverwriteTrgt
+        | UUnaryOp Tan -> inplaceOverwriteTrgt
+        | UUnaryOp Asin -> inplaceOverwriteTrgt
+        | UUnaryOp Acos -> inplaceOverwriteTrgt
+        | UUnaryOp Atan -> inplaceOverwriteTrgt
+        | UUnaryOp Sinh -> inplaceOverwriteTrgt
+        | UUnaryOp Cosh -> inplaceOverwriteTrgt
+        | UUnaryOp Tanh -> inplaceOverwriteTrgt
+        | UUnaryOp Sqrt -> inplaceOverwriteTrgt
+        | UUnaryOp Ceil -> inplaceOverwriteTrgt
+        | UUnaryOp Floor -> inplaceOverwriteTrgt
+        | UUnaryOp Round -> inplaceOverwriteTrgt
+        | UUnaryOp Truncate -> inplaceOverwriteTrgt    
         // reductions
         | UUnaryOp Sum -> outplaceTrgt
         | UUnaryOp (SumAxis _) -> outplaceTrgt
@@ -167,6 +202,7 @@ module CudaExecUnit =
         | UBinaryOp Substract -> inplaceOverwriteTrgt
         | UBinaryOp Multiply -> inplaceOverwriteTrgt
         | UBinaryOp Divide -> inplaceOverwriteTrgt
+        | UBinaryOp Modulo -> inplaceOverwriteTrgt
         | UBinaryOp Power -> inplaceOverwriteTrgt
         // matrix/tensor operations
         | UBinaryOp Dot -> outplaceBlasTrgt
@@ -275,8 +311,25 @@ module CudaExecUnit =
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
         // unary elementwise
         | UUnaryOp Negate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcs
+        | UUnaryOp Abs -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcs
+        | UUnaryOp SignT -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SignTEOp_t", false)) srcs
         | UUnaryOp Log -> execItemsForElemwise trgt (NoArgEOpArgTmpl("LogEOp_t", false)) srcs
+        | UUnaryOp Log10 -> execItemsForElemwise trgt (NoArgEOpArgTmpl("Log10EOp_t", false)) srcs
         | UUnaryOp Exp -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ExpEOp_t", false)) srcs
+        | UUnaryOp Sin -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SinEOp_t", false)) srcs
+        | UUnaryOp Cos -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CosEOp_t", false)) srcs
+        | UUnaryOp Tan -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TanEOp_t", false)) srcs
+        | UUnaryOp Asin -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AsinEOp_t", false)) srcs
+        | UUnaryOp Acos -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AcosEOp_t", false)) srcs
+        | UUnaryOp Atan -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AtanEOp_t", false)) srcs
+        | UUnaryOp Sinh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SinhEOp_t", false)) srcs
+        | UUnaryOp Cosh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CoshEOp_t", false)) srcs
+        | UUnaryOp Tanh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TanhEOp_t", false)) srcs
+        | UUnaryOp Sqrt -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SqrtEOp_t", false)) srcs
+        | UUnaryOp Ceil -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CeilEOp_t", false)) srcs
+        | UUnaryOp Floor -> execItemsForElemwise trgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcs
+        | UUnaryOp Round -> execItemsForElemwise trgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcs
+        | UUnaryOp Truncate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcs
         // reductions
         | UUnaryOp Sum -> 
             execItemsForCFunc<CPPSum> [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0]]
@@ -315,6 +368,7 @@ module CudaExecUnit =
         | UBinaryOp Substract -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcs
         | UBinaryOp Multiply -> execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t", false)) srcs
         | UBinaryOp Divide -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DivideEOp_t", false)) srcs
+        | UBinaryOp Modulo -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ModuloEOp_t", false)) srcs
         | UBinaryOp Power -> execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t", false)) srcs
         // matrix/tensor operations
         | UBinaryOp Dot -> 

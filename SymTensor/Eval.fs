@@ -126,8 +126,25 @@ module Eval =
                 let av = subEval a
                 match op with
                 | Negate -> -av
+                | Abs -> abs av
+                | SignT -> ArrayND.signt av
                 | Log -> log av
+                | Log10 -> log10 av
                 | Exp -> exp av
+                | Sin -> sin av
+                | Cos -> cos av
+                | Tan -> tan av
+                | Asin -> asin av
+                | Acos -> acos av
+                | Atan -> atan av
+                | Sinh -> sinh av
+                | Cosh -> cosh av
+                | Tanh -> tanh av
+                | Sqrt -> sqrt av
+                | Ceil -> ceil av
+                | Floor -> floor av
+                | Round -> round av
+                | Truncate -> truncate av
                 | Sum -> ArrayND.sum av
                 | SumAxis ax -> ArrayND.sumAxis ax av
                 | Reshape ss -> ArrayND.reshape (shapeEval ss) av
@@ -142,6 +159,7 @@ module Eval =
                 | Substract -> av - bv
                 | Multiply -> av * bv
                 | Divide -> av / bv
+                | Modulo -> av % bv
                 | Power -> av ** bv
                 | Dot -> av .* bv
                 | TensorProduct -> av %* bv

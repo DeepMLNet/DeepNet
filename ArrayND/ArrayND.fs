@@ -399,20 +399,40 @@ module ArrayND =
                          (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         typedApply2 (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
 
+    let inline signImpl (x: 'T) =
+        conv<'T> (sign x)
 
     type ArrayNDT<'T> with    
 
         // elementwise unary
+        static member (~+) (a: ArrayNDT<'T>) = typedMap (~+) (~+) (~+) (unsp) a
         static member (~-) (a: ArrayNDT<'T>) = typedMap (~-) (~-) (~-) (unsp) a
         static member Abs (a: ArrayNDT<'T>) = typedMap abs abs abs (unsp) a
+        static member SignT (a: ArrayNDT<'T>) = typedMap signImpl signImpl sign (unsp) a
         static member Log (a: ArrayNDT<'T>) = typedMap log log (unsp) (unsp) a
+        static member Log10 (a: ArrayNDT<'T>) = typedMap log10 log10 (unsp) (unsp) a
         static member Exp (a: ArrayNDT<'T>) = typedMap exp exp (unsp) (unsp) a
+        static member Sin (a: ArrayNDT<'T>) = typedMap sin sin (unsp) (unsp) a
+        static member Cos (a: ArrayNDT<'T>) = typedMap cos cos (unsp) (unsp) a
+        static member Tan (a: ArrayNDT<'T>) = typedMap tan tan (unsp) (unsp) a
+        static member Asin (a: ArrayNDT<'T>) = typedMap asin asin (unsp) (unsp) a
+        static member Acos (a: ArrayNDT<'T>) = typedMap acos acos (unsp) (unsp) a
+        static member Atan (a: ArrayNDT<'T>) = typedMap atan atan (unsp) (unsp) a
+        static member Sinh (a: ArrayNDT<'T>) = typedMap sinh sinh (unsp) (unsp) a
+        static member Cosh (a: ArrayNDT<'T>) = typedMap cosh cosh (unsp) (unsp) a
+        static member Tanh (a: ArrayNDT<'T>) = typedMap tanh tanh (unsp) (unsp) a
+        static member Sqrt (a: ArrayNDT<'T>) = typedMap sqrt sqrt (unsp) (unsp) a
+        static member Ceiling (a: ArrayNDT<'T>) = typedMap ceil ceil (unsp) (unsp) a
+        static member Floor (a: ArrayNDT<'T>) = typedMap floor floor (unsp) (unsp) a
+        static member Round (a: ArrayNDT<'T>) = typedMap round round (unsp) (unsp) a
+        static member Truncate (a: ArrayNDT<'T>) = typedMap truncate truncate (unsp) (unsp) a
 
         // elementwise binary
         static member (+) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
         static member (-) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (-) (-) (-) (-) a b
         static member (*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (*) (*) (*) (*) a b
         static member (/) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (/) (/) (/) (/) a b
+        static member (%) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (%) (%) (%) (%) a b
         static member Pow (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
 
         // elementwise binary with scalars
@@ -420,16 +440,22 @@ module ArrayND =
         static member (-) (a: ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
         static member (*) (a: ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
         static member (/) (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
+        static member (%) (a: ArrayNDT<'T>, b: 'T) = a % (scalarOfType b a)
         static member Pow (a: ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)
 
         static member (+) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) + b
         static member (-) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
         static member (*) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) * b
         static member (/) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) / b
+        static member (%) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) % b
         static member Pow (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) ** b
 
         // transposition
         member this.T = transpose this
+
+    /// sign keeping type
+    let inline signt (a: ArrayNDT<'T>) =
+        ArrayNDT<'T>.SignT a 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations

@@ -1,5 +1,6 @@
 ﻿namespace SymTensor
 
+open Basics
 
 [<AutoOpen>]
 module DerivTypes =
@@ -42,8 +43,25 @@ module Deriv =
         | Unary(op, a) ->
             match op with
             | Negate -> -eg |> reverseDiffStep a
+            | Abs -> eg * signt a |> reverseDiffStep a
+            | SignT -> Map.empty
             | Log -> egExpanded * (padLeft a) ** (-one()) |> collapse |> reverseDiffStep a
+            | Log10 -> eg |> reverseDiffStep (log a / log (scalart<'T> 10))
             | Exp -> egExpanded * (padLeft expr) |> collapse |> reverseDiffStep a
+            | Sin -> eg * cos a |> reverseDiffStep a
+            | Cos -> -eg * sin a |> reverseDiffStep a
+            | Tan -> one() + (tan a)**(two()) |> reverseDiffStep a
+            | Asin -> one() / sqrtt (one() - a**(two())) |> reverseDiffStep a
+            | Acos -> -one() / sqrtt (one() - a**(two())) |> reverseDiffStep a
+            | Atan -> one() / (one<'T>() + a**(two())) |> reverseDiffStep a
+            | Sinh -> cosh a |> reverseDiffStep a
+            | Cosh -> sinh a |> reverseDiffStep a
+            | Tanh -> one() - (tanh a)**(two()) |> reverseDiffStep a
+            | Sqrt -> one() / (two<'T>() * sqrtt a) |> reverseDiffStep a
+            | Ceil -> Map.empty
+            | Floor -> Map.empty
+            | Round -> Map.empty
+            | Truncate -> Map.empty
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Reshape ss -> eg |> reverseDiffStep a
             | DoBroadcast ss -> 
@@ -80,6 +98,7 @@ module Deriv =
             | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
                           ((egExpanded * (padLeft a)) |> collapse)
             | Divide -> eg |> reverseDiffStep (a * b ** (-one()))
+            | Modulo -> eg .+ (-truncate (a / b))
             | Power -> (egExpanded * padLeft (b * a**(b - one())) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
             | Dot -> 

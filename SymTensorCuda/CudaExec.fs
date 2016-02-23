@@ -70,10 +70,8 @@ module Compile =
             | Some ptx -> ptx
             | None ->
                 printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modName 
-                try
-                    cmplr.Compile(cmplrArgs)
-                with
-                | :? NVRTC.NVRTCException as cmplrError ->
+                try cmplr.Compile(cmplrArgs)
+                with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
                     printfn "%s" log

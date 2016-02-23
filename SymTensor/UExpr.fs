@@ -20,8 +20,25 @@ module UExprTypes =
 
     type UUnaryOpT =
         | Negate                        
-        | Log                           
+        | Abs
+        | SignT
+        | Log
+        | Log10                           
         | Exp                           
+        | Sin
+        | Cos
+        | Tan
+        | Asin
+        | Acos
+        | Atan
+        | Sinh
+        | Cosh
+        | Tanh
+        | Sqrt
+        | Ceil
+        | Floor
+        | Round
+        | Truncate                   
         | Sum                           
         | SumAxis of int                
         | Reshape of ShapeSpecT         
@@ -34,7 +51,8 @@ module UExprTypes =
         | Add                           
         | Substract                     
         | Multiply                      
-        | Divide                        
+        | Divide       
+        | Modulo                 
         | Power                         
         | Dot                           
         | TensorProduct                 
@@ -71,8 +89,25 @@ module UExpr =
         | Unary(op, _) -> 
             match op with
             | Expr.Negate -> Negate
+            | Expr.Abs -> Abs
+            | Expr.SignT -> SignT
             | Expr.Log -> Log
+            | Expr.Log10 -> Log10
             | Expr.Exp -> Exp                          
+            | Expr.Sin -> Sin
+            | Expr.Cos -> Cos
+            | Expr.Tan -> Tan
+            | Expr.Asin -> Asin
+            | Expr.Acos -> Acos
+            | Expr.Atan -> Atan
+            | Expr.Sinh -> Sinh
+            | Expr.Cosh -> Cosh
+            | Expr.Tanh -> Tanh
+            | Expr.Sqrt -> Sqrt
+            | Expr.Ceil -> Ceil
+            | Expr.Floor -> Floor
+            | Expr.Round -> Round
+            | Expr.Truncate -> Truncate
             | Expr.Sum -> Sum                           
             | Expr.SumAxis a -> SumAxis a            
             | Expr.Reshape ss -> Reshape ss
@@ -86,7 +121,8 @@ module UExpr =
             | Expr.Add -> Add                         
             | Expr.Substract -> Substract                    
             | Expr.Multiply -> Multiply                     
-            | Expr.Divide -> Divide                       
+            | Expr.Divide -> Divide             
+            | Expr.Modulo -> Modulo          
             | Expr.Power -> Power               
             | Expr.Dot -> Dot                   
             | Expr.TensorProduct -> TensorProduct     
