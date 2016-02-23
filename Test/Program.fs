@@ -126,8 +126,8 @@ let ``Build linear regression`` () =
 let ``Eval linear regression`` () =
     let lr = linearRegression<single> ()
     let env = linearRegressionEvalEnv lr
-    printVal "pred" (Eval.evalWithEvalEnv env lr.Pred)
-    printVal "loss" (Eval.evalWithEvalEnv env lr.Loss)
+    printfn "CPU: pred=\n%A" (Eval.evalWithEvalEnv env lr.Pred)
+    printfn "CPU: loss=\n%A" (Eval.evalWithEvalEnv env lr.Loss)
 
 
 [<Fact>]
@@ -146,10 +146,10 @@ let ``Eval reverse gradient of linear regression`` () =
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
     printfn "Reverse gradient:"
-    printVal "lossWrtA" (Eval.evalWithEvalEnv env lrg.LossWrtA)
-    printVal "lossWrtB" (Eval.evalWithEvalEnv env lrg.LossWrtB)
-    printVal "lossWrtX" (Eval.evalWithEvalEnv env lrg.LossWrtX) 
-    printVal "lossWrtT" (Eval.evalWithEvalEnv env lrg.LossWrtT)
+    printfn "CPU: lossWrtA=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtA)
+    printfn "CPU: lossWrtB=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtB)
+    printfn "CPU: lossWrtX=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtX) 
+    printfn "CPU: lossWrtT=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtT)
 
 [<Fact>]
 let ``Check reverse gradient of linear regression`` () =
@@ -235,8 +235,8 @@ let ``Evaluate linear regression using CUDA`` () =
 
     cudaExpr.Eval(Map.empty, env.VarEnv)
 
-    printVal "pred" (VarEnv.get lr.predOut env.VarEnv)
-    printVal "loss" (VarEnv.get lr.lossOut env.VarEnv)
+    printfn "GPU: pred=\n%A" (VarEnv.get lr.predOut env.VarEnv)
+    printfn "GPU: loss=\n%A" (VarEnv.get lr.lossOut env.VarEnv)
 
 
 [<Fact>]
@@ -260,10 +260,10 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 
     cudaExpr.Eval(Map.empty, env.VarEnv)
 
-    printVal "lossWrtA" (VarEnv.get lr.lossWrtAOut env.VarEnv)
-    printVal "lossWrtB" (VarEnv.get lr.lossWrtBOut env.VarEnv)
-    printVal "lossWrtX" (VarEnv.get lr.lossWrtXOut env.VarEnv)
-    printVal "lossWrtT" (VarEnv.get lr.lossWrtTOut env.VarEnv)
+    printfn "GPU: lossWrtA =\n%A" (VarEnv.get lr.lossWrtAOut env.VarEnv)
+    printfn "GPU: lossWrtB =\n%A" (VarEnv.get lr.lossWrtBOut env.VarEnv)
+    printfn "GPU: lossWrtX =\n%A" (VarEnv.get lr.lossWrtXOut env.VarEnv)
+    printfn "GPU: lossWrtT =\n%A" (VarEnv.get lr.lossWrtTOut env.VarEnv)
 
 
 

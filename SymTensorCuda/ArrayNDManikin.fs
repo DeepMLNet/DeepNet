@@ -58,6 +58,9 @@ module ArrayNDManikinTypes =
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDManikinT(layout, storage) :> ArrayNDT<int>
 
+        override this.DataType =
+            TypeName.getType this.TypeName
+
 
 
 

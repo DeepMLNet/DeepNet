@@ -49,8 +49,8 @@ module Compile =
 
     /// dumps CUDA kernel code to a file
     let dumpCode (modName: string) (modCode: string) =
-        System.IO.File.WriteAllText(modName, modCode)
-        printfn "Wrote module code to %s" modName
+        File.WriteAllText(modName, modCode)
+        //printfn "Wrote module code to %s" modName
 
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
@@ -97,8 +97,8 @@ module Compile =
         let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
-        printfn "%s" jitErrorBuffer.Value
-        printfn "%s" jitInfoBuffer.Value   
+        //printfn "%s" jitErrorBuffer.Value
+        //printfn "%s" jitInfoBuffer.Value   
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
 

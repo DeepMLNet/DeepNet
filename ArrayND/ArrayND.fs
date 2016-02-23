@@ -17,6 +17,7 @@ module ArrayNDTypes =
         abstract CPPType: string
         abstract NewView: ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType: ArrayNDLayoutT -> IArrayNDT
+        abstract DataType: System.Type
 
 module ArrayND =
 
@@ -59,11 +60,11 @@ module ArrayND =
             let str = ArrayNDLayout.stride layout
             let ofst = ArrayNDLayout.offset layout
             let cppDataType = 
-                if typeof<'T>.Equals(typeof<double>) then "double"
-                elif typeof<'T>.Equals(typeof<single>) then "single"
-                elif typeof<'T>.Equals(typeof<int>) then "int"
-                elif typeof<'T>.Equals(typeof<byte>) then "char"
-                else failwithf "no C++ datatype for %A" typeof<'T>
+                if this.DataType.Equals(typeof<double>) then "double"
+                elif this.DataType.Equals(typeof<single>) then "float"
+                elif this.DataType.Equals(typeof<int>) then "int"
+                elif this.DataType.Equals(typeof<byte>) then "char"
+                else failwithf "no C++ datatype for %A" this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
@@ -72,12 +73,17 @@ module ArrayND =
             sprintf "ArrayNDStatic%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
                 dims cppDataType dims shapeStr dims strideStr            
 
+        /// type of data in this ArrayND
+        abstract DataType: System.Type
+        default this.DataType = typeof<'T>
+
         interface IHasLayout with
             member this.Layout = this.Layout
         interface IArrayNDT with
             member this.CPPType = this.CPPType         
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
+            member this.DataType = this.DataType
 
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
