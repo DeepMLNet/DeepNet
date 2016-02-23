@@ -247,9 +247,9 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 let main argv = 
     CudaSup.printInfo ()
 
-    //``Build linear regression`` ()
-    //``Reverse gradient of linear regression`` ()
-    //``Check reverse gradient of linear regression`` ()
+    ``Build linear regression`` ()
+    ``Reverse gradient of linear regression`` ()
+    ``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
     //``Build CUDA recipe for linear regression gradient`` ()

@@ -1,10 +1,10 @@
 ﻿namespace SymTensor
 
+open ArrayNDNS
+open System
 
 
 module DerivCheck =
-
-    open ArrayNDNS
 
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
@@ -25,7 +25,7 @@ module DerivCheck =
 
     /// evaluates the Jacobian of f at x numerically
     let inline numGrad (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) = 
-        let epsilon = (box 1e-5) :?> 'T
+        let epsilon = Convert.ChangeType(1e-5, typeof<'T>) :?> 'T
         numGradEpsilon epsilon f x
 
     //let exprGradDiff evalEnv wrt expr =
@@ -55,7 +55,7 @@ module DerivCheck =
         devs
 
     let inline reverseDiffDeviationsOkay evalEnv (expr: ExprT<'T>) =
-        let maxDeviation = (box 1e-4f) :?> 'T
+        let maxDeviation = Convert.ChangeType(1e-4, typeof<'T>) :?> 'T
         let devs = reverseDiffDeviations evalEnv expr
         devs |> Map.iter
             (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %A = %A" name dev)
