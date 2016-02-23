@@ -21,14 +21,16 @@ module Types =
         /// base memory
         Base: MemManikinT;
         /// offset in elements
-        Offset: int}
+        Offset: int
+    }
 
     /// pre-allocated host memory 
     type HostExternalMemT = {Name: string}
     /// host memory pointer
-    type HostMemPtrT = {Base: HostExternalMemT;
-                        Offset: int}
-
+    type HostMemPtrT = {
+        Base: HostExternalMemT;
+        Offset: int
+    }
 
     /// variable storage location
     type VarStorLocT =
@@ -46,27 +48,49 @@ module Types =
         | CPPFunc
 
     /// template instantiation specification
-    type TmplInstT = {FuncName: string; Domain: FuncDomainT; 
-                      TmplArgs: string list; RetType: string; ArgTypes: string list;}
+    type TmplInstT = {
+        FuncName:       string; 
+        Domain:         FuncDomainT; 
+        TmplArgs:       string list; 
+        RetType:        string; 
+        ArgTypes:       string list;
+    }
 
+    /// a CUDA compute stream
+    type StreamT = int
+
+    /// CUDA event object
+    type EventObjectT = int
+
+    /// a CUDA event that can be used for synchronization
+    type EventT = {
+        EventObjectId: int; 
+        CorrelationId: int;     
+        EmittingExecUnitId: int;
+    }
 
     /// Actual CUDA internal memory allocations and external device and host references
-    type CudaExecEnvT = 
-        {InternalMem: Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>;
-         ExternalVar: Map<IVarSpec, ArrayNDCuda.IArrayNDCudaT>;
-         HostVar:     Map<IVarSpec, ArrayNDHost.IArrayNDHostT>}
+    type CudaExecEnvT = {
+        Stream:                 Dictionary<StreamT, CudaStream>;
+        Event:                  Dictionary<EventObjectT, CudaEvent>;
+        InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>;
+        mutable ExternalVar:    Map<IVarSpec, IArrayNDCudaT>;
+        mutable HostVar:        Map<IVarSpec, IArrayNDHostT>;
+    }
     
     /// CUDA device memory range
-    type DevMemRngT = 
-        {DeviceMem: CudaDeviceVariable<byte>;
-         OffsetInBytes: int;
-         LengthInBytes: int;}
+    type DevMemRngT = {
+        DeviceMem:              CudaDeviceVariable<byte>;
+        OffsetInBytes:          int;
+        LengthInBytes:          int;
+    }
 
     /// CUDA host memory range
-    type HostMemRngT = 
-        {HostMem: CudaRegisteredHostMemory<byte>;
-         OffsetInBytes: int;
-         LengthInBytes: int;}
+    type HostMemRngT = {
+        HostMem:                CudaRegisteredHostMemory<byte>;
+        OffsetInBytes:          int;
+        LengthInBytes:          int;
+    }
 
 
     /// BLAS transpose operation
@@ -84,11 +108,6 @@ module Types =
         inherit System.Attribute()     
         member this.CPPFuncName = cppFuncName
 
-    /// a CUDA compute stream
-    type StreamT = int
-
-    /// a CUDA event that can be used for synchronization
-    type EventT = {EventObjectId: int; CorrelationId: int; EmittingExecUnitId: int}
 
 
 
@@ -103,7 +122,7 @@ module CudaExecEnv =
             if (ArrayND.shape ev) = (ArrayND.shape manikin) && 
                     (ArrayND.stride ev) = (ArrayND.stride manikin) && 
                     (ArrayND.offset ev) = (ArrayND.offset manikin) then
-                (ev :?> ArrayNDCuda.IDeviceStorage).ByteData
+                (ev :?> IDeviceStorage).ByteData
             else
                 failwithf "external variable is of form %A but form %A was expected" ev manikin
 

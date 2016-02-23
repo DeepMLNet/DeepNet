@@ -1,8 +1,12 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Runtime.InteropServices
 open System.IO
 open ManagedCuda
+open ManagedCuda.BasicTypes
 open Util
+open ArrayNDNS
+open Basics.Cuda
 open SymTensor
 open SymTensor.Compiler
 open Basics.Cuda
@@ -26,6 +30,7 @@ module Compile =
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
 
+    /// modification time of C++ header files
     let headerModTimes =
         Directory.EnumerateFiles(includePath, "*.cuh")
         |> Seq.map (fun headerFile ->
@@ -49,7 +54,9 @@ module Compile =
 
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
-    let loadKernelCode modName modCode krnlNames =
+    let loadKernelCode modCode krnlNames =
+        let modName = generateCudaModName ()
+
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
         let cmplrArgs = [|"--std=c++11";
                           sprintf "--gpu-architecture=%s" gpuArch; 
@@ -109,9 +116,9 @@ module Compile =
 
     /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
     /// functions objects for the specified C function names.
-    let loadCppCode modName modCode (funcDelegates: Map<string, System.Type>)  =
-
-        let libName = (System.IO.Path.GetFileNameWithoutExtension modName) + ".dll"
+    let loadCppCode modCode (funcDelegates: Map<string, System.Type>)  =
+        let modName = generateCudaModName ()
+        let libName = (Path.GetFileNameWithoutExtension modName) + ".dll"
 
         let cmplrArgs = ["--shared";
                          sprintf "--compiler-bindir \"%s\"" hostCompilerDir;
@@ -165,19 +172,19 @@ module Compile =
 
 
 [<AutoOpen>]
-module CudaExprWorkspaceTypes =
-    
+module CudaExprWorkspaceTypes =    
 
     /// Workspace for evaluation of an expression compiled to a CudaRecipeT.
     type CudaExprWorkspace(recipe: CudaRecipeT) =
-        /// stream id to CUDA stream mapping
-        let streams = new Dictionary<StreamT, CudaStream>()
 
-        /// event id to CUDA event mapping
-        let events = new Dictionary<EventObjectT, CudaEvent>()
-
-        /// memory allocation to CUDA memory mapping
-        let internalMem = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>()
+        /// execution environment
+        let execEnv = {
+            Stream = new Dictionary<StreamT, CudaStream>();
+            Event = new Dictionary<EventObjectT, CudaEvent>();
+            InternalMem = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>();
+            ExternalVar = Map.empty;
+            HostVar = Map.empty;
+        }
 
         /// all kernel calls
         let kernelCalls = CudaRecipe.getAllCKernelLaunches recipe
@@ -214,9 +221,8 @@ module CudaExprWorkspaceTypes =
             |> Map.ofList
 
         // compile and load CUDA kernel module
-        let modName = generateCudaModName ()
         /// CUDA kernels
-        let kernels, krnlModHndl = loadKernelCode modName recipe.KernelCode kernelCNames
+        let kernels, krnlModHndl = Compile.loadKernelCode recipe.KernelCode kernelCNames
 
         /// CUDA launch sizes for specified WorkDims
         let kernelLaunchDims =
@@ -224,79 +230,78 @@ module CudaExprWorkspaceTypes =
             |> Set.toSeq
             |> Seq.map (fun (name, workDim) ->
                 let maxBlockSize = kernels.[name].GetOccupancyMaxPotentialBlockSize().blockSize
-                (name, workDim), computeLaunchDim workDim maxBlockSize)
+                (name, workDim), CudaSup.computeLaunchDim workDim maxBlockSize)
             |> Map.ofSeq
 
         // compile and load CUDA C++ host/device module
-        let cppModName = generateCudaModName ()
-
         /// C++ functions
-        let cFuncs, cLibHndl = loadCppCode cppModName recipe.CPPCode cFuncDelegates
+        let cFuncs, cLibHndl = Compile.loadCppCode recipe.CPPCode cFuncDelegates
     
         /// executes the specified calls
-        let execCalls (execEnv: CudaExecEnvT) calls =
+        let execCalls calls =
 
             for call in calls do
                 match call with 
                 // memory management
-                | CudaRecipe.MemAlloc mem -> 
-                    let sizeToAlloc = if mem.Size > 0 then mem.Size else 1
-                    internalMem.Add(mem, new CudaDeviceVariable<byte>(BasicTypes.SizeT(sizeToAlloc * 4)))
-                | CudaRecipe.MemFree mem ->
-                    internalMem.[mem].Dispose()
-                    internalMem.Remove(mem) |> ignore
+                | CudaCallT.MemAlloc mem -> 
+                    let typeSize = Marshal.SizeOf (TypeName.getType mem.TypeName)
+                    let elements = if mem.Elements > 0 then mem.Elements else 1
+                    execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT(elements * typeSize)))
+                | CudaCallT.MemFree mem ->
+                    execEnv.InternalMem.[mem].Dispose()
+                    execEnv.InternalMem.Remove(mem) |> ignore
 
                 // memory operations
                 | MemcpyAsync (dst, src, strm) ->
-                    let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {DeviceVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
                     dstCudaVar.AsyncCopyToDevice(srcCudaVar, 
-                                                 BasicTypes.SizeT(srcOffset), 
-                                                 BasicTypes.SizeT(dstOffset), 
-                                                 BasicTypes.SizeT(length), 
-                                                 streams.[strm].Stream)
+                                                 SizeT(srcOffset), 
+                                                 SizeT(dstOffset), 
+                                                 SizeT(length), 
+                                                 execEnv.Stream.[strm].Stream)
                 | MemcpyHtoDAsync (dst, src, strm) ->
-                    let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {HostVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {HostMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
                     use srcOffsetVar = new CudaRegisteredHostMemory<byte>(srcCudaVar.PinnedHostPointer + (nativeint srcOffset), 
                                                                           BasicTypes.SizeT(length))
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
-                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, streams.[strm].Stream)
+                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, execEnv.Stream.[strm].Stream)
                 | MemcpyDtoHAsync (dst, src, strm) ->
-                    let {HostVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {DeviceVar=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
                     use srcOffsetVar = new CudaDeviceVariable<byte>(srcCudaVar.DevicePointer + (BasicTypes.SizeT srcOffset), 
                                                                     BasicTypes.SizeT(length))
                     use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
                                                                           BasicTypes.SizeT(length))
-                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, streams.[strm].Stream)
+                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, execEnv.Stream.[strm].Stream)
                 | MemsetD32Async (dst, value, strm) ->
-                    let {DeviceVar=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
-                    dstOffsetVar.MemsetAsync(intval, streams.[strm].Stream)
+                    dstOffsetVar.MemsetAsync(intval, execEnv.Stream.[strm].Stream)
 
                 // stream management
                 | StreamCreate (strm, flags) ->
-                    streams.Add(strm, new CudaStream(flags))
+                    execEnv.Stream.Add(strm, new CudaStream(flags))
                 | StreamDestory strm ->
-                    streams.[strm].Dispose()
-                    streams.Remove(strm) |> ignore
+                    execEnv.Stream.[strm].Dispose()
+                    execEnv.Stream.Remove(strm) |> ignore
                 | StreamWaitEvent (strm, evnt) ->
-                    streams.[strm].WaitEvent(events.[evnt].Event)
+                    execEnv.Stream.[strm].WaitEvent(execEnv.Event.[evnt].Event)
 
                 // event management
                 | EventCreate (evnt, flags) ->
-                    events.Add(evnt, new CudaEvent(flags))
+                    execEnv.Event.Add(evnt, new CudaEvent(flags))
                 | EventDestory evnt ->
-                    events.[evnt].Dispose()
-                    events.Remove(evnt) |> ignore
+                    execEnv.Event.[evnt].Dispose()
+                    execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
-                    events.[evnt].Record(streams.[strm].Stream)
+                    execEnv.Event.[evnt].Record(execEnv.Stream.[strm].Stream)
                 | EventSynchronize evnt ->
-                    events.[evnt].Synchronize()
+                    execEnv.Event.[evnt].Synchronize()
 
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
@@ -306,11 +311,11 @@ module CudaExprWorkspaceTypes =
 
                     // launch configuration
                     let {Block=blockDim; Grid=gridDim} = kernelLaunchDims.[(krnl, workDim)]
-                    kernels.[krnl].BlockDimensions <- toDim3 blockDim
-                    kernels.[krnl].GridDimensions <- toDim3 gridDim
+                    kernels.[krnl].BlockDimensions <- CudaSup.toDim3 blockDim
+                    kernels.[krnl].GridDimensions <- CudaSup.toDim3 gridDim
                     kernels.[krnl].DynamicSharedMemory <- uint32 smemSize
 
-                    kernels.[krnl].RunAsync(streams.[strm].Stream, argArray)
+                    kernels.[krnl].RunAsync(execEnv.Stream.[strm].Stream, argArray)
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
                 | CudaCallT.CallCFunc (name, _, argTmpls) ->
@@ -322,7 +327,7 @@ module CudaExprWorkspaceTypes =
                     func.DynamicInvoke(argArray) |> ignore
                 // CUBLAS
                 | CublasSetStram strm ->
-                    cudaBlas.Stream <- streams.[strm].Stream
+                    CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt) ->   
                     let aVar = (a :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
                     let bVar = (b :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
@@ -333,24 +338,29 @@ module CudaExprWorkspaceTypes =
                     let ldA = a.GetLeadingDimension execEnv
                     let ldB = b.GetLeadingDimension execEnv
                     let ldTrgt = trgt.GetLeadingDimension execEnv
-                    cudaBlas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
+                    CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
         // initialize
         do
-            execCalls {InternalMem=internalMem; ExternalVar=Map.empty; HostVar=Map.empty} recipe.InitCalls
+            execCalls recipe.InitCalls
 
         // finalizer
         interface System.IDisposable with
             member this.Dispose() = 
-                execCalls {InternalMem=internalMem; ExternalVar=Map.empty; HostVar=Map.empty} recipe.DisposeCalls
+                execCalls recipe.DisposeCalls
                 Compile.unloadCppCode cLibHndl
                 Compile.unloadCudaCode krnlModHndl
 
         /// Evaluate expression.
-        member this.Eval(externalVar: Map<IVarSpecT, NDArrayDev.NDArrayDev>,
-                         hostVar:     Map<IVarSpecT, ArrayND.ArrayND>) =
-            execCalls {InternalMem=internalMem; ExternalVar=externalVar; HostVar=hostVar} recipe.ExecCalls
-            cudaCntxt.Synchronize () // TODO: remove and signal otherwise
+        member this.Eval(externalVar: Map<IVarSpec, IArrayNDT>,
+                         hostVar:     Map<IVarSpec, IArrayNDT>) =
+
+            execEnv.ExternalVar <- Map.map (fun _ (v: IArrayNDT) -> v :?> IArrayNDCudaT) externalVar
+            execEnv.HostVar <- Map.map (fun _ (v: IArrayNDT) -> v :?> IArrayNDHostT) hostVar
+
+            execCalls recipe.ExecCalls
+
+            CudaSup.context.Synchronize () // TODO: remove and signal otherwise
 
 
 

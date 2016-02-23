@@ -80,7 +80,7 @@
     <Compile Include="CudaRecipe.fs" />
     <Compile Include="CudaExec.fs" />
     <Compile Include="CudaCheck.fs" />
-    <Compile Include="VarEnvLock.fs" />
+    <Compile Include="VarEnvReg.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

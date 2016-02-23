@@ -417,3 +417,16 @@ module Expr =
         Nary(Discard, es) |> check
 
 
+[<AutoOpen>]
+module ExprTypes2 =
+    type ArityT = Expr.ArityT
+    type Annotation = Expr.Annotation
+    type LeafOpT<'T> = Expr.LeafOpT<'T>
+    type UnaryOpT<'T> = Expr.UnaryOpT<'T>
+    type BinaryOpT<'T> = Expr.BinaryOpT<'T>
+    type NaryOpT<'T> = Expr.NaryOpT<'T>
+    type IExtensionOp<'T> = Expr.IExtensionOp<'T>
+    type ExprT<'T> = Expr.ExprT<'T>
+
+
+

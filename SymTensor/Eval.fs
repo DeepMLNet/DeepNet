@@ -12,13 +12,13 @@ open ArrayNDNS.ArrayND
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable environment
-    type VarEnvT = Map<IVarSpec, IHasLayout>
+    type VarEnvT = Map<IVarSpec, IArrayNDT>
 
 module VarEnv = 
     /// add variable value to environment
     let add (var: Expr.ExprT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) =
         let vs = Expr.extractVar var
-        Map.add (vs :> IVarSpec) (value :> IHasLayout) varEnv
+        Map.add (vs :> IVarSpec) (value :> IArrayNDT) varEnv
 
     /// get variable value from environment
     let getVarSpecT (vs: VarSpecT<'T>) (varEnv: VarEnvT) : ArrayNDT<'T> =
@@ -62,7 +62,10 @@ module VarEnv =
 module EvalEnvTypes =
     /// Information neccessary to evaluate an expression.
     /// Contains numeric values for variables and size symbols.
-    type EvalEnvT = {VarEnv: VarEnvT; SizeSymbolEnv: SizeSymbolEnvT}
+    type EvalEnvT = {
+        VarEnv:             VarEnvT; 
+        SizeSymbolEnv:      SizeSymbolEnvT
+    }
 
 
 module EvalEnv = 

@@ -8,7 +8,7 @@ module DerivCheck =
 
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let numGradEpsilon epsilon f x =
+    let inline numGradEpsilon (epsilon: ^T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
         let y = f x
         let xShp, yShp = ArrayND.shape x, ArrayND.shape y
         let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
@@ -24,7 +24,9 @@ module DerivCheck =
         j
 
     /// evaluates the Jacobian of f at x numerically
-    let numGrad f x = numGradEpsilon 1e-5 f x
+    let inline numGrad (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) = 
+        let epsilon = (box 1e-5) :?> 'T
+        numGradEpsilon epsilon f x
 
     //let exprGradDiff evalEnv wrt expr =
     //    let g = ExprForwardDiff.grad wrt expr
@@ -38,7 +40,7 @@ module DerivCheck =
     //    sum gradDiff |> NDArray.value
 
 
-    let reverseDiffDeviations evalEnv expr =
+    let inline reverseDiffDeviations evalEnv expr =
         let mutable devs = Map.empty
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs |> Map.toSeq do
@@ -52,16 +54,15 @@ module DerivCheck =
             devs <- devs |> Map.add (VarSpec.name wrt) (ArrayND.sum gradDiff |> ArrayND.value)
         devs
 
-    let reverseDiffDeviationsOkay evalEnv expr =
-        let maxDeviation = 1e-4
-        reverseDiffDeviations evalEnv expr |> Map.iter
-            (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %s = %f" name dev)
-        reverseDiffDeviations evalEnv expr |> Map.forall (fun _ dev -> dev < maxDeviation) 
+    let inline reverseDiffDeviationsOkay evalEnv (expr: ExprT<'T>) =
+        let maxDeviation = (box 1e-4f) :?> 'T
+        let devs = reverseDiffDeviations evalEnv expr
+        devs |> Map.iter
+            (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %A = %A" name dev)
+        devs |> Map.forall (fun _ dev -> dev < maxDeviation) 
 
 
-
-
-    let checkReverseDiff (evalEnv: EvalEnvT) expr = 
+    let inline checkReverseDiff (evalEnv: EvalEnvT) (expr: ExprT<'T>) = 
         let evalEnv = evalEnv |> EvalEnv.enhance VarEnv.empty (Seq.singleton expr)
 
         let rec checkSubExpr expr = 

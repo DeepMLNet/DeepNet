@@ -6,7 +6,9 @@ open System.Runtime.InteropServices
 open Util
 open ArrayND
 
-module ArrayNDHost = 
+
+[<AutoOpen>]
+module ArrayNDHostTypes = 
 
     /// Pinned (unmovable) memory (from .NET or other source).
     /// Can be used to obtain a pointer.
@@ -84,6 +86,9 @@ module ArrayNDHost =
 
         interface IArrayNDHostT with
             member this.Storage = this.Storage :> IHostStorage
+
+
+module ArrayNDHost = 
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let inline newContiguous<'T> shp =

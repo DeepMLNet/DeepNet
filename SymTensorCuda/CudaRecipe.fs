@@ -9,53 +9,54 @@ open SymTensor.Compiler
 [<AutoOpen>]
 module CudaRecipeTypes =
 
-    /// CUDA event object
-    type EventObjectT = int
-
     /// CUDA call flags
     type CudaFlagsT = int
 
     /// CUDA api call
     type CudaCallT =
         // memory mangement
-        | MemAlloc of MemAllocManikinT
-        | MemFree of MemAllocManikinT
+        | MemAlloc          of MemAllocManikinT
+        | MemFree           of MemAllocManikinT
         // memory operations
-        | MemcpyAsync of IDevMemRngTmpl * IDevMemRngTmpl * StreamT
-        | MemcpyHtoDAsync of IDevMemRngTmpl * IHostMemRngTmpl * StreamT
-        | MemcpyDtoHAsync of IHostMemRngTmpl * IDevMemRngTmpl * StreamT
-        | MemsetD32Async of IDevMemRngTmpl * single * StreamT
+        | MemcpyAsync       of IDevMemRngTmpl * IDevMemRngTmpl * StreamT
+        | MemcpyHtoDAsync   of IDevMemRngTmpl * IHostMemRngTmpl * StreamT
+        | MemcpyDtoHAsync   of IHostMemRngTmpl * IDevMemRngTmpl * StreamT
+        | MemsetD32Async    of IDevMemRngTmpl * single * StreamT
         // stream management
-        | StreamCreate of StreamT * BasicTypes.CUStreamFlags
-        | StreamDestory of StreamT
-        | StreamWaitEvent of StreamT * EventObjectT 
+        | StreamCreate      of StreamT * BasicTypes.CUStreamFlags
+        | StreamDestory     of StreamT
+        | StreamWaitEvent   of StreamT * EventObjectT 
         // event mangement
-        | EventCreate of EventObjectT * BasicTypes.CUEventFlags
-        | EventDestory of EventObjectT
-        | EventRecord of EventObjectT * StreamT
-        | EventSynchronize of EventObjectT
+        | EventCreate       of EventObjectT * BasicTypes.CUEventFlags
+        | EventDestory      of EventObjectT
+        | EventRecord       of EventObjectT * StreamT
+        | EventSynchronize  of EventObjectT
         // execution control
-        | LaunchCPPKernel of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-        | LaunchCKernel of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-        | CallCFunc of string * System.Type * (ICudaArgTmpl list)
+        | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+        | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+        | CallCFunc         of string * System.Type * (ICudaArgTmpl list)
         // CUBLAS
-        | CublasSetStram of StreamT
-        | CublasSgemm of CudaBlas.Operation * CudaBlas.Operation *
-                         single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
-                         single * BlasTransposedMatrixTmpl 
+        | CublasSetStram    of StreamT
+        | CublasSgemm       of CudaBlas.Operation * CudaBlas.Operation *
+                               single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
+                               single * BlasTransposedMatrixTmpl 
 
 
     /// function instantiation state
-    type TmplInstCacheT = {mutable Insts: (TmplInstT * string) list;
-                           mutable Code:  (TmplInstT * string) list;} 
+    type TmplInstCacheT = {
+        mutable Insts: (TmplInstT * string) list;
+        mutable Code:  (TmplInstT * string) list;
+    } 
 
 
     /// CUDA execution recipe
-    type CudaRecipeT = {KernelCode: string;
-                        CPPCode: string;
-                        InitCalls: CudaCallT list;
-                        DisposeCalls: CudaCallT list;
-                        ExecCalls: CudaCallT list;}
+    type CudaRecipeT = {
+        KernelCode: string;
+        CPPCode: string;
+        InitCalls: CudaCallT list;
+        DisposeCalls: CudaCallT list;
+        ExecCalls: CudaCallT list;
+    }
 
 
 module TmplInstCache =

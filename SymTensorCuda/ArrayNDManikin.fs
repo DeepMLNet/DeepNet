@@ -12,7 +12,11 @@ module ArrayNDManikinTypes =
     open ArrayND
 
     /// represents a memory allocation execlusively for this expression (used for temporary results)
-    type MemAllocManikinT = {Id: int; TypeName: TypeNameT; Elements: int;}
+    type MemAllocManikinT = {
+        Id:             int; 
+        TypeName:       TypeNameT; 
+        Elements:       int;
+    }
 
     /// Represents memory. 
     /// Memory can either be internal to this expression or external (passed in variable at runtime).

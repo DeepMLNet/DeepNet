@@ -8,7 +8,8 @@ open ArrayND
 open ArrayNDHost
 
 
-module ArrayNDCuda =
+[<AutoOpen>]
+module ArrayNDCudaTypes =
 
     type IDeviceStorage =
         abstract ByteData: CudaDeviceVariable<byte>
@@ -74,6 +75,8 @@ module ArrayNDCuda =
 
         interface IArrayNDCudaT
 
+
+module ArrayNDCuda = 
 
     /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
     let inline newContiguous<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> shp =

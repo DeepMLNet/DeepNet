@@ -1,75 +1,67 @@
 ﻿open Xunit
 
-open Shape
-open Op
-//open ExprForwardDiff
-open ExprReverseDiff
-open OpEval
-open ExecUnitsGen
-open CudaExecUnits
-open StreamGen
-open CudaRecipe
-open CudaExec
-open CudaRegMem
+open Basics.Cuda
+open ArrayNDNS
+open SymTensor
+open SymTensor.Compiler
+open SymTensor.Compiler.Cuda
+
 
 
 let printExpr label expr =
-    printfn "%s :=\n%A\nshape of %s: %A\n" label expr label (shapeOf expr)
+    printfn "%s :=\n%A\nshape of %s: %A\n" label expr label (Expr.shapeOf expr)
 
 let printVal label value =
     printfn "%s =\n%A\nshape of %s: %A\n" label value label (ArrayND.shape value)
 
-type LinearRegression = {a: ExprT; b: ExprT; x: ExprT; t: ExprT;
-                         predOut: ExprT; lossOut: ExprT;
-                         lossWrtAOut: ExprT; lossWrtBOut: ExprT; lossWrtXOut: ExprT; lossWrtTOut: ExprT;
-                         Pred: ExprT; Loss: ExprT}  
-let linearRegression () =
-    let a = var "a" [symbol "M"; symbol "N"]
-    let b = var "b" [symbol "M"]
-    let x = var "x" [symbol "N"]
-    let t = var "t" [symbol "M"]
+type ExprTs = ExprT<single>
 
-    let predOut = var "predOut" [symbol "M"]
-    let lossOut = var "lossOut" []
-    let lossWrtAOut = var "lossWrtAOut" [fix 1; (symbol "M") * (symbol "N")]
-    let lossWrtBOut = var "lossWrtBOut" [fix 1; symbol "M"]
-    let lossWrtXOut = var "lossWrtXOut" [fix 1; symbol "N"]
-    let lossWrtTOut = var "lossWrtTOut" [fix 1; symbol "M"]
+type LinearRegression = {a: ExprTs; b: ExprTs; x: ExprTs; t: ExprTs;
+                         predOut: ExprTs; lossOut: ExprTs;
+                         lossWrtAOut: ExprTs; lossWrtBOut: ExprTs; lossWrtXOut: ExprTs; lossWrtTOut: ExprTs;
+                         Pred: ExprTs; Loss: ExprTs}  
+let linearRegression () =
+    let a : ExprTs = Expr.var "a" [SizeSpec.symbol "M"; SizeSpec.symbol "N"]
+    let b : ExprTs = Expr.var "b" [SizeSpec.symbol "M"]
+    let x : ExprTs = Expr.var "x" [SizeSpec.symbol "N"]
+    let t : ExprTs = Expr.var "t" [SizeSpec.symbol "M"]
+
+    let predOut = Expr.var "predOut" [SizeSpec.symbol "M"]
+    let lossOut = Expr.var "lossOut" []
+    let lossWrtAOut = Expr.var "lossWrtAOut" [SizeSpec.fix 1; (SizeSpec.symbol "M") * (SizeSpec.symbol "N")]
+    let lossWrtBOut = Expr.var "lossWrtBOut" [SizeSpec.fix 1; SizeSpec.symbol "M"]
+    let lossWrtXOut = Expr.var "lossWrtXOut" [SizeSpec.fix 1; SizeSpec.symbol "N"]
+    let lossWrtTOut = Expr.var "lossWrtTOut" [SizeSpec.fix 1; SizeSpec.symbol "M"]
 
     let pred = a.*x + b
     let smplLoss = (pred - t)**2.0f
-    let loss = sum smplLoss
+    let loss = Expr.sum smplLoss
 
     {a=a; b=b; x=x; t=t; Pred=pred; Loss=loss;
      predOut=predOut; lossOut=lossOut;
      lossWrtAOut=lossWrtAOut; lossWrtBOut=lossWrtBOut; lossWrtXOut=lossWrtXOut; lossWrtTOut=lossWrtTOut}
 
-type LinearRegressionGradient = {LossWrtA: ExprT; LossWrtB: ExprT; LossWrtX: ExprT; LossWrtT: ExprT}
-//let linearRegressionForwardGradient (lr: LinearRegression) =
-//    {LossWrtA = grad lr.a lr.Loss;
-//     LossWrtB = grad lr.b lr.Loss;
-//     LossWrtX = grad lr.x lr.Loss;
-//     LossWrtT = grad lr.t lr.Loss;}
+type LinearRegressionGradient = {LossWrtA: ExprTs; LossWrtB: ExprTs; LossWrtX: ExprTs; LossWrtT: ExprTs}
 
 let linearRegressionReverseGradient (lr: LinearRegression) =
-    let d = reverseDiff lr.Loss
-    {LossWrtA = diffOf lr.a d;
-     LossWrtB = diffOf lr.b d;
-     LossWrtX = diffOf lr.x d;
-     LossWrtT = diffOf lr.t d;}
+    let d = Deriv.compute lr.Loss
+    {LossWrtA = Deriv.ofVar lr.a d;
+     LossWrtB = Deriv.ofVar lr.b d;
+     LossWrtX = Deriv.ofVar lr.x d;
+     LossWrtT = Deriv.ofVar lr.t d;}
 
 let linearRegressionEvalEnv (lr: LinearRegression) =
     let m, n = 3, 2
-    let aVal = ArrayND.identity [m; n]
-    let bVal = ArrayND.zeros [m]
-    let xVal = ArrayND.ones [n]
-    let tVal = ArrayND.ones [m]
-    let predOutVal = ArrayND.zeros [m]
-    let lossOutVal = ArrayND.zeros []
-    let lossWrtAVal = ArrayND.zeros [1; m*n]
-    let lossWrtBVal = ArrayND.zeros [1; m]
-    let lossWrtXVal = ArrayND.zeros [1; n]
-    let lossWrtTVal = ArrayND.zeros [1; m]
+    let aVal = ArrayNDHost.ones [m; n]
+    let bVal = ArrayNDHost.zeros [m]
+    let xVal = ArrayNDHost.ones [n]
+    let tVal = ArrayNDHost.ones [m]
+    let predOutVal = ArrayNDHost.zeros [m]
+    let lossOutVal = ArrayNDHost.zeros []
+    let lossWrtAVal = ArrayNDHost.zeros [1; m*n]
+    let lossWrtBVal = ArrayNDHost.zeros [1; m]
+    let lossWrtXVal = ArrayNDHost.zeros [1; n]
+    let lossWrtTVal = ArrayNDHost.zeros [1; m]
     let varEnv = 
         VarEnv.empty
         |> VarEnv.add lr.a aVal
@@ -82,22 +74,22 @@ let linearRegressionEvalEnv (lr: LinearRegression) =
         |> VarEnv.add lr.lossWrtBOut lossWrtBVal
         |> VarEnv.add lr.lossWrtXOut lossWrtXVal
         |> VarEnv.add lr.lossWrtTOut lossWrtTVal
-    EvalEnv.fromVarEnvAndExpr varEnv lr.Loss
+    EvalEnv.create varEnv (Seq.singleton lr.Loss)
 
-let linearRegressionCudaEnv (lr: LinearRegression) =
+let linearRegressionCompileEnv (lr: LinearRegression) =
     let varLocs =
-        [lr.a |> extractVar, HostVar;
-         lr.b |> extractVar, HostVar;
-         lr.x |> extractVar, HostVar;
-         lr.t |> extractVar, HostVar;
-         lr.predOut |> extractVar, HostVar;
-         lr.lossOut |> extractVar, HostVar;
-         lr.lossWrtAOut |> extractVar, HostVar;
-         lr.lossWrtBOut |> extractVar, HostVar;
-         lr.lossWrtXOut |> extractVar, HostVar;
-         lr.lossWrtTOut |> extractVar, HostVar;]
+        [lr.a |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.b |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.x |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.t |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.predOut |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.lossOut |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.lossWrtAOut |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.lossWrtBOut |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.lossWrtXOut |> Expr.extractVar :> IVarSpec, LocHost;
+         lr.lossWrtTOut |> Expr.extractVar :> IVarSpec, LocHost;]
         |> Map.ofList
-    {CudaEnvT.VarStorLoc = varLocs}
+    {CudaCompileEnvT.VarStorLoc = varLocs}
 
 
 [<Fact>]
@@ -110,18 +102,8 @@ let ``Build linear regression`` () =
 let ``Eval linear regression`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
-    printVal "pred" (eval env lr.Pred)
-    printVal "loss" (eval env lr.Loss)
-
-//[<Fact>]
-//let ``Forward gradient of linear regression`` () =
-//    let lr = linearRegression ()   
-//    printfn "Forward:"
-//    let fg = linearRegressionForwardGradient lr
-//    printExpr "lossWrtA" fg.LossWrtA
-//    printExpr "lossWrtB" fg.LossWrtB
-//    printExpr "lossWrtX" fg.LossWrtX  
-//    printExpr "lossWrtT" fg.LossWrtT
+    printVal "pred" (Eval.evalWithEvalEnv env lr.Pred)
+    printVal "loss" (Eval.evalWithEvalEnv env lr.Loss)
 
 [<Fact>]
 let ``Reverse gradient of linear regression`` () =
@@ -133,43 +115,22 @@ let ``Reverse gradient of linear regression`` () =
     printExpr "lossWrtX" rg.LossWrtX  
     printExpr "lossWrtT" rg.LossWrtT
 
-//[<Fact>]
-//let ``Eval forward gradient of linear regression`` () =
-//    let lr = linearRegression ()
-//    let lrg = linearRegressionForwardGradient lr
-//    let env = linearRegressionEvalEnv lr
-//    printfn "Forward gradient:"
-//    printVal "lossWrtA" (eval env lrg.LossWrtA)
-//    printVal "lossWrtB" (eval env lrg.LossWrtB)
-//    printVal "lossWrtX" (eval env lrg.LossWrtX) 
-//    printVal "lossWrtT" (eval env lrg.LossWrtT)
-
 [<Fact>]
 let ``Eval reverse gradient of linear regression`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
     printfn "Reverse gradient:"
-    printVal "lossWrtA" (eval env lrg.LossWrtA)
-    printVal "lossWrtB" (eval env lrg.LossWrtB)
-    printVal "lossWrtX" (eval env lrg.LossWrtX) 
-    printVal "lossWrtT" (eval env lrg.LossWrtT)
-
-
-//[<Fact>]
-//let ``Check forward gradient of linear regression`` () =
-//    let lr = linearRegression ()
-//    let env = linearRegressionEvalEnv lr
-//    printfn "delta lossWrtA = %f" (NumGrad.exprGradDiff env lr.a lr.Loss)
-//    printfn "delta lossWrtB = %f" (NumGrad.exprGradDiff env lr.b lr.Loss)
-//    printfn "delta lossWrtX = %f" (NumGrad.exprGradDiff env lr.x lr.Loss)
-//    printfn "delta lossWrtT = %f" (NumGrad.exprGradDiff env lr.t lr.Loss)
+    printVal "lossWrtA" (Eval.evalWithEvalEnv env lrg.LossWrtA)
+    printVal "lossWrtB" (Eval.evalWithEvalEnv env lrg.LossWrtB)
+    printVal "lossWrtX" (Eval.evalWithEvalEnv env lrg.LossWrtX) 
+    printVal "lossWrtT" (Eval.evalWithEvalEnv env lrg.LossWrtT)
 
 [<Fact>]
 let ``Check reverse gradient of linear regression`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
-    DiffCheck.checkReverseDiff env lr.Loss
+    DerivCheck.checkReverseDiff env lr.Loss
     printfn "linear regression gradient checked"
 
 let printList execSeq =
@@ -186,16 +147,16 @@ let printStreams streams =
 let ``Build execution sequence of linear regression`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
-    let cenv = linearRegressionCudaEnv lr
+    let cenv = linearRegressionCompileEnv lr
     
-    let exeSeq, eRes, memAllocs = exprToCudaExecUnits cenv env.SizeSymbolEnv (toUExpr lr.Loss)
+    let exeSeq, eRes, memAllocs = CudaExecUnit.exprToCudaExecUnits cenv env.SizeSymbolEnv (UExpr.toUExpr lr.Loss)
     printfn "linear regression exec sequence:\n%A" exeSeq
 
-    let exeStreams, strmCnt = execUnitsToStreamCommands exeSeq
+    let exeStreams, strmCnt = CudaStreamSeq.execUnitsToStreams exeSeq
     printfn "linear regression exec streams:"
     printStreams exeStreams
 
-    let cudaCalls, krnlCache = generateCalls exeStreams
+    let cudaCalls, krnlCache = CudaRecipe.generateCalls exeStreams
     printfn "linear regression CUDA calls:"
     printList cudaCalls
 
@@ -205,16 +166,16 @@ let ``Build execution sequence of linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
-    let cenv = linearRegressionCudaEnv lr
+    let cenv = linearRegressionCompileEnv lr
 
-    let exeSeq, eRes, memAllocs = exprToCudaExecUnits cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    let exeSeq, eRes, memAllocs = CudaExecUnit.exprToCudaExecUnits cenv env.SizeSymbolEnv (UExpr.toUExpr lrg.LossWrtA)
     //printfn "linear regression wrt A exec sequence:\n%A" exeSeq
 
-    let exeStreams, strmCnt = execUnitsToStreamCommands exeSeq
+    let exeStreams, strmCnt = CudaStreamSeq.execUnitsToStreams exeSeq
     printfn "linear regression wrt A exec streams:"
     printStreams exeStreams
 
-    let cudaCalls, krnlCache = generateCalls exeStreams
+    let cudaCalls, krnlCache = CudaRecipe.generateCalls exeStreams
     printfn "linear regression wrt A CUDA calls:"
     printList cudaCalls
 
@@ -224,9 +185,9 @@ let ``Build CUDA recipe for linear regression gradient`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
-    let cenv = linearRegressionCudaEnv lr
+    let cenv = linearRegressionCompileEnv lr
 
-    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr lrg.LossWrtA)
+    let recipe = CudaRecipe.build cenv env.SizeSymbolEnv (UExpr.toUExpr lrg.LossWrtA)
     printfn "%A" recipe
 
     ()
@@ -235,17 +196,17 @@ let ``Build CUDA recipe for linear regression gradient`` () =
 let ``Evaluate linear regression using CUDA`` () =
     let lr = linearRegression ()
     let env = linearRegressionEvalEnv lr
-    let cenv = linearRegressionCudaEnv lr
+    let cenv = linearRegressionCompileEnv lr
 
     let allWrtsSaved = 
-        discard [lr.Pred |> storeToVar lr.predOut;
-                 lr.Loss |> storeToVar lr.lossOut;]
+        Expr.discard [lr.Pred |> Expr.storeToVar lr.predOut;
+                      lr.Loss |> Expr.storeToVar lr.lossOut;]
 
     //printfn "%A" allWrtsSaved
 
-    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
+    let recipe = CudaRecipe.build cenv env.SizeSymbolEnv (UExpr.toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)
-    use lockedVarEnv = new VarEnvLock(env.VarEnv)
+    use lockedVarEnv = new VarEnvReg(env.VarEnv)
 
     cudaExpr.Eval(Map.empty, env.VarEnv)
 
@@ -258,19 +219,19 @@ let ``Evaluate linear regression gradient using CUDA`` () =
     let lr = linearRegression ()
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
-    let cenv = linearRegressionCudaEnv lr
+    let cenv = linearRegressionCompileEnv lr
 
     let allWrtsSaved = 
-        discard [lrg.LossWrtA |> storeToVar lr.lossWrtAOut;
-                 lrg.LossWrtB |> storeToVar lr.lossWrtBOut;
-                 lrg.LossWrtX |> storeToVar lr.lossWrtXOut;
-                 lrg.LossWrtT |> storeToVar lr.lossWrtTOut]
+        Expr.discard [lrg.LossWrtA |> Expr.storeToVar lr.lossWrtAOut;
+                      lrg.LossWrtB |> Expr.storeToVar lr.lossWrtBOut;
+                      lrg.LossWrtX |> Expr.storeToVar lr.lossWrtXOut;
+                      lrg.LossWrtT |> Expr.storeToVar lr.lossWrtTOut]
 
     //printfn "%A" allWrtsSaved
 
-    let recipe = buildCudaRecipe cenv env.SizeSymbolEnv (toUExpr allWrtsSaved)
+    let recipe = CudaRecipe.build cenv env.SizeSymbolEnv (UExpr.toUExpr allWrtsSaved)
     use cudaExpr = new CudaExprWorkspace(recipe)
-    use lockedVarEnv = new VarEnvLock(env.VarEnv)
+    use lockedVarEnv = new VarEnvReg(env.VarEnv)
 
     cudaExpr.Eval(Map.empty, env.VarEnv)
 
@@ -284,12 +245,10 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 
 [<EntryPoint>]
 let main argv = 
-    CudaBasics.printCudaInfo ()
+    CudaSup.printInfo ()
 
     //``Build linear regression`` ()
     //``Reverse gradient of linear regression`` ()
-    //``Eval forward gradient of linear regression`` ()
-    //``Check gradient of linear regression`` ()
     //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
@@ -302,5 +261,5 @@ let main argv =
     ``Evaluate linear regression gradient using CUDA`` ()
     
     
-    CudaBasics.shutdown ()
+    CudaSup.shutdown ()
     0

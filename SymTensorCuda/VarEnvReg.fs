@@ -1,17 +1,17 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
 
+open System
 open ArrayNDNS
 open SymTensor
 
 
-
-/// Locks all variables in a VarEnv.
-type VarEnvLock (varEnv: VarEnvT) =   
+/// Locks and registers all variables in a VarEnv for use with CUDA.
+type VarEnvReg (varEnv: VarEnvT) =   
     let varLocks =
         varEnv
         |> Map.toList
-        |> List.map (fun (name, ary) -> NDArrayLock.lock ary)
+        |> List.map (fun (name, ary) -> ArrayNDHostReg.lock (ary :?> IArrayNDHostT))
 
     interface IDisposable with
         member this.Dispose () =

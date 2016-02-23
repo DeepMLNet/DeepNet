@@ -580,3 +580,10 @@ module ArrayND =
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
+
+
+[<AutoOpen>]
+module ArrayNDTypes2 =
+    type ArrayNDT<'T> = ArrayND.ArrayNDT<'T>
+
+
