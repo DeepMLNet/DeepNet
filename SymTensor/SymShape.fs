@@ -6,7 +6,10 @@ open Basics
 module SizeSymbolTypes =
 
     /// a symbolic size
-    type SizeSymbolT = string
+    type SizeSymbolT = {
+        Name:       string;
+        Flexible:   bool;
+    }
 
     /// elementary size specification, can be either a symbol or a fixed quantity
     type BaseSizeT =
@@ -16,6 +19,13 @@ module SizeSymbolTypes =
     /// symbol value environment
     type SizeSymbolEnvT = Map<SizeSymbolT, int>
 
+
+module SizeSymbol =
+    let name sym =
+        sym.Name
+
+    let flexible sym =
+        sym.Flexible
 
 module SizeSymbolEnv =
     open SizeSymbolTypes
