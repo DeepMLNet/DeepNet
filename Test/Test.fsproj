@@ -78,7 +78,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <None Include="MLP.fs" />
+    <Compile Include="MLP.fs" />
     <Compile Include="Program.fs" />
     <None Include="Program2.fs" />
     <None Include="App.config" />

@@ -8,7 +8,7 @@
     <ProjectGuid>2e96a03e-7031-43c3-aeee-b9c9dc543448</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Expr</RootNamespace>
-    <AssemblyName>Expr</AssemblyName>
+    <AssemblyName>SymTensor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -81,6 +81,7 @@
     <Compile Include="Deriv.fs" />
     <Compile Include="DerivCheck.fs" />
     <Compile Include="Function.fs" />
+    <Compile Include="ModelContext.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

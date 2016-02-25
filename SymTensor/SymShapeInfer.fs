@@ -15,11 +15,8 @@ module SymSizeEnvTypes =
 
 module SymSizeEnv =
     
-    let contradictionFail msg =
-        failwithf "size inference contradiction: %s" msg
-
     let contradiction fmt = 
-        Printf.ksprintf contradictionFail fmt
+        Printf.ksprintf (fun msg -> failwithf "size inference contradiction: %s" msg) fmt
 
     let empty =
         {Inferred = Map.empty; Equalities = [];}
