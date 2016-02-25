@@ -68,10 +68,15 @@ module SizeProductTypes =
         static member (*) (a: SizeProductT, b: int) = a * SizeProductT(b)
         static member (*) (a: SizeSymbolT, b: SizeProductT) = SizeProductT(a) * b
         static member (*) (a: int, b: SizeProductT) = SizeProductT(a) * b
+        static member (*) (a: SizeProductT, b: BaseSizeT) =
+            match b with
+            | Sym s -> a * s
+            | Fixed f -> a * f
+        static member (*) (a: BaseSizeT, b: SizeProductT) = b * a
 
         override this.ToString() = 
             let ft = if this.Factor = 1 then "" else sprintf "%d " this.Factor
-            let txt = Map.fold (fun txt tBase tPower -> 
+            let txt = Map.fold (fun txt {Name=tBase} tPower -> 
                                     let t = if tPower = 1 then tBase else sprintf "%s**%d" tBase tPower
                                     txt + t + " ") 
                                 ft this.Symbols                
@@ -90,8 +95,8 @@ module SizeProductTypes =
             member this.CompareTo otherObj =
                 match otherObj with
                 | :? SizeProductT as other ->
-                    let ms = Map.add "__factor__" this.Factor this.Symbols
-                    let os = Map.add "__factor__" other.Factor other.Symbols
+                    let ms = Map.add {Name="__factor__"; Flexible=false} this.Factor this.Symbols
+                    let os = Map.add {Name="__factor__"; Flexible=false} other.Factor other.Symbols
                     compare ms os
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
@@ -123,6 +128,9 @@ module SizeProduct =
             Some sp.Factor
         else
             None
+
+    let mult (sBase: BaseSizeT) (sPower: int) (p: SizeProductT) =
+        Seq.fold (*) p (Seq.replicate sPower sBase) 
 
     /// evaluate to a numeric size
     let eval (env: SizeSymbolEnvT) (p: SizeProductT) =
@@ -198,7 +206,11 @@ module SizeSpec =
 
     /// symbolic size
     let symbol s =
-        Base (Sym s)
+        Base (Sym {Name=s; Flexible=false})
+
+    /// flexible symbolic size
+    let flexSymbol s =
+        Base (Sym {Name=s; Flexible=true})
 
     /// broadcastable size one
     let broadcastable =
@@ -210,7 +222,7 @@ module SizeSpec =
         | Base (Sym sym) -> 
             match Map.tryFind sym env with
             | Some l -> l
-            | None -> failwithf "no size known for symbol %s" sym
+            | None -> failwithf "no size known for symbol %s" (SizeSymbol.name sym)
         | Base (Fixed f) -> f
         | Broadcast -> 1
         | Product p -> SizeProduct.eval env p
@@ -357,7 +369,7 @@ module ShapeSpec =
                             | Some knownSize ->
                                 if knownSize <> valSize then
                                     failwithf "variable %s with shape of form %A and actual shape %A \
-                                               requires %s to be %d, but it was inferred to be %d previously"
+                                               requires %A to be %d, but it was inferred to be %d previously"
                                         name symShape valShape s valSize knownSize
                             | None -> ()
                             yield s, valSize

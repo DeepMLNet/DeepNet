@@ -20,7 +20,10 @@ module VarSpecTypes =
     /// variable specification: has a name, type and shape specificaiton
     [<StructuredFormatDisplay("Var \"{Name}\"")>]
     type VarSpecT<'T> = 
-        {Name: string; Shape: ShapeSpecT;}
+        {
+            Name:      string; 
+            Shape:     ShapeSpecT;
+        }
         
         interface IVarSpec with
             member this.Name = this.Name

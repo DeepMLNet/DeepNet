@@ -221,52 +221,68 @@ module Expr =
     let broadcastIfNecessary ss expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
-    /// Traverses the expression and checks ops' arguments for compatible shapes.
-    let check (expr: ExprT<'T>) : ExprT<'T> =
-        let mapUnaryOp op a =
+    /// Infers symbol sizes from the given expression and checks ops' arguments for compatible shapes.
+    let rec inferSymSizes (expr: ExprT<'T>) =
+        match expr with
+        | Leaf op ->
+            SymSizeEnv.empty
+
+        | Unary (op, a) ->
+            let env = inferSymSizes a
             let sa = shapeOf a
+
             match op with
             | SumAxis(ax) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
                 failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
-            | Reshape(ss) when not ((ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss)) ->
-                failwithf "cannot reshape array of shape %A with %A elements into shape %A with %A elements"
-                    sa (ShapeSpec.nElem sa) ss (ShapeSpec.nElem ss)
+            | Reshape(ss) ->
+                SymSizeEnv.needEqual (ShapeSpec.nElem sa) (ShapeSpec.nElem ss) env
             | DoBroadcast(ss) -> 
                 if ShapeSpec.nDim ss <> ShapeSpec.nDim sa then
                     failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
                         sa ss
+
+                let mutable env = env
                 for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                     match sa.[dim], ss.[dim] with
                     | SizeSpecT.Broadcast, _ -> ()
-                    | ssa, ssb when ssa .= ssb -> ()
-                    | _ -> failwithf "dimension %d of array with shape %A is not broadcastable to shape %A" dim sa ss
-                a
+                    | ssa, ssb -> env <- SymSizeEnv.needEqual ssa ssb env
+                env
+
             | SwapDim(ax1, ax2) when 
                     not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
                 failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
-            | StoreToVar vs when not (ShapeSpec.equalWithoutBroadcastability (VarSpec.shape vs) sa) -> 
-                failwithf "cannot store resulst of shape %A into variable %A" sa vs
-            | _ -> a
+            | StoreToVar vs ->
+                SymSizeEnv.needEqualShape sa (VarSpec.shape vs) env
+            | _ -> env
 
-        let mapBinaryOp op a b =
+        | Binary (op, a, b) ->
+            let env = SymSizeEnv.merge (inferSymSizes a) (inferSymSizes b)
             let sa, sb = shapeOf a, shapeOf b
+
             match op with
-            | BinaryElemwiseOp when not (ShapeSpec.equalWithoutBroadcastability sa sb) -> 
-                failwithf "cannot perform elementwise operation %A on arrays of shapes %A and %A" op sa sb
+            | BinaryElemwiseOp ->
+                SymSizeEnv.needEqualShape sa sb env
             | Dot -> 
                 match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                | 2, 2 when sa.[1] .= sb.[0] -> a, b
+                | 2, 2 -> SymSizeEnv.needEqual sa.[1] sb.[0] env
                 | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-            | TensorProduct ->
-                let psa, psb = ShapeSpec.padToSame sa sb
-                reshapeIfNecessary psa a, reshapeIfNecessary psb b
-            | _ -> a, b
+            | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
+                failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
+            | _ -> env
 
-        let mapNaryOp op es =
+        | Nary (op, es) ->
+            let env = 
+                es |> List.fold (fun env a -> SymSizeEnv.merge env (inferSymSizes a)) SymSizeEnv.empty 
+            let ss =
+                es |> List.map shapeOf
+
             match op with
-            | _ -> es
+            | _ -> env
 
-        mapOperands mapUnaryOp mapBinaryOp mapNaryOp expr
+    /// Traverses the expression and checks ops' arguments for compatible shapes.
+    let check (expr: ExprT<'T>) : ExprT<'T> =
+        inferSymSizes expr |> ignore
+        expr
 
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
@@ -428,10 +444,17 @@ module Expr =
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
         |> check
 
+    /// tensor product
+    let tensorProduct (a: ExprT<'T>) (b: ExprT<'T>) =
+        let sa, sb = shapeOf a, shapeOf b
+        let psa, psb = ShapeSpec.padToSame sa sb
+        let a, b = reshapeIfNecessary psa a, reshapeIfNecessary psb b
+        Binary(TensorProduct, a, b) |> check
+
     type ExprT with
         // tensor binary
         static member (.*) (a: ExprT<'T>, b: ExprT<'T>) = dot a b
-        static member (%*) (a: ExprT<'T>, b: ExprT<'T>) = Binary(TensorProduct, a, b) |> check
+        static member (%*) (a: ExprT<'T>, b: ExprT<'T>) = tensorProduct a b
 
     /// extract all variables from an expression
     let rec extractVars expr =

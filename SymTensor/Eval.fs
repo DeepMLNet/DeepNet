@@ -35,7 +35,16 @@ module VarEnv =
     /// joins two variable environments
     let join (a: VarEnvT) (b: VarEnvT) =
         Map.join a b
-   
+
+    /// infers symbol sizes from the variable environment
+    let inferSymSizes (varEnv: VarEnvT) =
+        Map.fold 
+            (fun env vSym vVal ->
+                let symShape = VarSpec.shape vSym
+                let valShape = ArrayND.shape vVal |> List.map (Fixed >> Base)
+                SymSizeEnv.needEqualShape symShape valShape env)
+            SymSizeEnv.empty varEnv
+
     /// enhances an existing size symbol environment from the variables occuring in the expression  
     let enhanceSizeSymbolEnvUsingExprs sizeSymbolEnv exprs (varEnv: VarEnvT) =
         let varSymShapes = 

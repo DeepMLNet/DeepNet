@@ -30,6 +30,10 @@
           <Enabled>False</Enabled>
           <Lines>100</Lines>
         </MaxLinesInFunction>
+        <MaxLinesInLambdaFunction>
+          <Enabled>True</Enabled>
+          <Lines>16</Lines>
+        </MaxLinesInLambdaFunction>
       </Rules>
     </SourceLength>
   </Analysers>

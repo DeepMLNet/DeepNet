@@ -123,6 +123,22 @@ let ``Build linear regression`` () =
     printExpr "loss" lr.Loss
 
 [<Fact>]
+let ``Linear regression symbol size inference`` () =
+    let lr = linearRegression<single> ()
+    let env = linearRegressionEvalEnv lr
+
+    printfn "Inferred symbol sizes without variable values:"
+    let senv = Expr.inferSymSizes lr.Loss
+    SymSizeEnv.dump senv
+
+    printfn "Inferred symbol sizes with variable values:"
+    let vsenv = VarEnv.inferSymSizes env.VarEnv
+    let esenv = Expr.inferSymSizes lr.Loss
+    let senv = SymSizeEnv.merge vsenv esenv
+    SymSizeEnv.dump senv
+
+
+[<Fact>]
 let ``Eval linear regression`` () =
     let lr = linearRegression<single> ()
     let env = linearRegressionEvalEnv lr
@@ -274,21 +290,21 @@ let main argv =
 
     //``Pretty print ArrayND`` ()
 
-    //``Build linear regression`` ()
-    //``Eval linear regression`` ()
+    ``Build linear regression`` ()
+    ``Eval linear regression`` ()
 
-    //tanh
-
+    ``Linear regression symbol size inference`` ()
+    
     //``Reverse gradient of linear regression`` ()
-    ``Check reverse gradient of linear regression`` ()
+    //``Check reverse gradient of linear regression`` ()
     //``Build execution sequence of linear regression`` ()
     //``Build execution sequence of linear regression gradient`` ()
     //``Build CUDA recipe for linear regression gradient`` ()
     
-    ``Eval linear regression`` ()
+    //``Eval linear regression`` ()
     ``Evaluate linear regression using CUDA`` ()
 
-    ``Eval reverse gradient of linear regression`` ()
+    //``Eval reverse gradient of linear regression`` ()
     ``Evaluate linear regression gradient using CUDA`` ()
     
     
