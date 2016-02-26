@@ -27,7 +27,7 @@ let ``Test Autoencoder`` () =
     
     let input : ExprT<single> =     mc.Var "Input"  ["nInput"; "BatchSize"]
 
-    let pars = Autoencoder.pars (mc.Module "Autoencoder1") 50 false
+    let pars = Autoencoder.pars (mc.Module "Autoencoder1") {NLatent=50; Tied=false}
     let loss = Autoencoder.loss pars input 
 
     printfn "Autoencoder:\n%A" loss

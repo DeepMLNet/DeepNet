@@ -55,11 +55,16 @@ module Autoencoder =
         OutLayer:   NeuralLayer.Pars<'T>;
     }
 
-    let pars (mc: MC) nLatent tiedWeights =
+    type HyperPars = {
+        NLatent:    int;
+        Tied:       bool;
+    }
+
+    let pars (mc: MC) hyperPars =
         let p =
-            {InLayer   = NeuralLayer.pars (mc.Module "InLayer") nLatent;
+            {InLayer   = NeuralLayer.pars (mc.Module "InLayer") hyperPars.NLatent;
              OutLayer  = NeuralLayer.parsFlexible (mc.Module "OutLayer");}
-        if tiedWeights then
+        if hyperPars.Tied then
             {p with OutLayer = {p.OutLayer with Weights = p.InLayer.Weights.T}}
         else p
 
