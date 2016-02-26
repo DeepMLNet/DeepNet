@@ -6,15 +6,22 @@ open Basics
 module SizeSymbolTypes =
 
     /// a symbolic size
+    [<StructuredFormatDisplay ("\"{Name}\"")>]
     type SizeSymbolT = {
         Name:       string;
         Flexible:   bool;
     }
 
     /// elementary size specification, can be either a symbol or a fixed quantity
+    [<StructuredFormatDisplay ("{PrettyString}")>]
     type BaseSizeT =
         | Sym of SizeSymbolT
         | Fixed of int
+
+        member this.PrettyString =
+            match this with
+            | Sym s -> sprintf "%A" s
+            | Fixed f -> sprintf "%d" f
 
     /// symbol value environment
     type SizeSymbolEnvT = Map<SizeSymbolT, int>
@@ -75,12 +82,16 @@ module SizeProductTypes =
         static member (*) (a: BaseSizeT, b: SizeProductT) = b * a
 
         override this.ToString() = 
-            let ft = if this.Factor = 1 then "" else sprintf "%d " this.Factor
-            let txt = Map.fold (fun txt {Name=tBase} tPower -> 
-                                    let t = if tPower = 1 then tBase else sprintf "%s**%d" tBase tPower
-                                    txt + t + " ") 
-                                ft this.Symbols                
-            "'" + txt.Trim() + "'"
+            let ft = if this.Factor = 1 then [] else [sprintf "%d " this.Factor]
+            let st = 
+                this.Symbols
+                |> Map.toSeq
+                |> Seq.map 
+                    (fun (tBase, tPower) ->
+                        if tPower = 1 then sprintf "%A" tBase 
+                        else sprintf "%A**%d" tBase tPower)
+                |> Seq.toList
+            String.concat " * " (ft @ st)
                         
         override this.Equals(otherObj) =
             match otherObj with
@@ -150,6 +161,7 @@ module SizeProduct =
 [<AutoOpen>]
 module SizeSpecTypes =
     /// size specification of a dimension (axis)
+    [<StructuredFormatDisplay ("{PrettyString}")>]
     [<StructuralEquality; StructuralComparison>]
     type SizeSpecT =
         | Base of BaseSizeT              // fixed size or symbol
@@ -180,6 +192,11 @@ module SizeSpecTypes =
             | Broadcast, Base (Fixed 1) | Base (Fixed 1), Broadcast -> true
             | a, b -> a = b
 
+        member this.PrettyString =
+            match this with
+            | Base b -> sprintf "%A" b
+            | Broadcast -> "1*"
+            | Product p -> sprintf "%A" p
 
 
 module SizeSpec =
@@ -294,27 +311,24 @@ module ShapeSpec =
         sa @ [Broadcast]
 
     let rec padToSame sa sb =
-        if nDim sa < nDim sb then
-            padToSame (padLeft sa) sb
-        elif nDim sb < nDim sa then
-            padToSame sa (padLeft sb)
-        else
-            sa, sb
+        if nDim sa < nDim sb then padToSame (padRight sa) sb
+        elif nDim sb < nDim sa then padToSame sa (padRight sb)
+        else sa, sb
 
     let broadcast (sa: ShapeSpecT) dim size =
         match sa.[dim] with
             | Broadcast -> List.set dim size sa
             | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
-    let broadcastToSame saIn sbIn =
+    let broadcastToSame mustEqual saIn sbIn =
         let mutable sa, sb = saIn, sbIn
         if nDim sa <> nDim sb then 
             failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
         for d = 0 to (nDim sa) - 1 do
             match sa.[d], sb.[d] with
-                | al, bl when al = bl -> ()
                 | al, bl when al = Broadcast -> sa <- broadcast sa d bl
                 | al, bl when bl = Broadcast -> sb <- broadcast sb d al
+                | al, bl when (if mustEqual then al = bl else true) -> ()        
                 | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
 

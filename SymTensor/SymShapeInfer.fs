@@ -23,20 +23,20 @@ module SymSizeEnv =
 
     let dump env =
         for KeyValue(sym, value) in env.Inferred do
-            printfn "%15s = %A" (SizeSymbol.name sym) value
+            printfn "%-30s = %A" (SizeSymbol.name sym) value
 
     /// substitutes all inferred symbols into size and simplifies it
-    let rec subst inferred size = 
+    let rec substInf inferred size = 
         match size with
         | Base (Sym sym) ->
             match Map.tryFind sym inferred with
-            | Some s -> subst inferred s
+            | Some s -> substInf inferred s
             | None -> size
         | Base (Fixed _) -> size
         | Broadcast -> size
         | Product p ->
             let substProduct p sBase sPower = 
-                match subst inferred (Base (Sym sBase)) with
+                match substInf inferred (Base (Sym sBase)) with
                 | Base b -> SizeProduct.mult b sPower p
                 | Broadcast -> p
                 | Product op ->
@@ -48,6 +48,13 @@ module SymSizeEnv =
                 |> Map.fold substProduct (SizeProductT p.Factor) 
                 |> Product
         |> SizeSpec.simplify
+
+    let subst env size =
+        substInf env.Inferred size
+
+    let substShape env (shape: ShapeSpecT)  : ShapeSpecT =
+        List.map (subst env) shape
+
 //
 //    let rec simplifyInferred inferred =
 //        let subst =
@@ -63,6 +70,9 @@ module SymSizeEnv =
 //        else inferred
 
     let addInferred sym value inferred =
+        if substInf inferred value = Base (Sym sym) then
+            failwithf "inferrering %A = %A would introduce a loop" sym value
+
         match Map.tryFind sym inferred with
         | Some other ->
             if other = value then inferred
@@ -78,7 +88,7 @@ module SymSizeEnv =
 
     let rec infer env =      
         let rec inferOne inferred (a, b) =
-            match subst inferred a, subst inferred b with
+            match substInf inferred a, substInf inferred b with
             | Base (Fixed av), Base (Fixed bv) ->
                 if av = bv then inferred
                 else contradiction "fixed %d <> fixed %d" av bv
@@ -94,6 +104,7 @@ module SymSizeEnv =
 
             | Base (Sym asym), Base (Sym bsym) ->
                 match SizeSymbol.flexible asym, SizeSymbol.flexible bsym with
+                | true, true when asym = bsym -> inferred
                 | true, true -> inferred |> addInferred asym b
                 | true, false -> inferred |> addInferred asym b 
                 | false, true -> inferred |> addInferred bsym a

@@ -127,9 +127,26 @@ module Expr =
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
         match uop with
-        | Negate
+        | Negate                        
+        | Abs
+        | SignT
         | Log
-        | Exp
+        | Log10                           
+        | Exp                           
+        | Sin
+        | Cos
+        | Tan
+        | Asin
+        | Acos
+        | Atan
+        | Sinh
+        | Cosh
+        | Tanh
+        | Sqrt
+        | Ceil
+        | Floor
+        | Round
+        | Truncate
             -> Some ()
         | _ -> None
 
@@ -140,6 +157,7 @@ module Expr =
         | Substract
         | Multiply
         | Divide
+        | Modulo
         | Power
             -> Some ()
         | _ -> None
@@ -178,40 +196,78 @@ module Expr =
         // We assume that all operands have compatible size. 
         // For elementwise operations we assume that a and b are already broadcasted
         // to have the *same* size.
+
         match expr with
-        // binary elementwise
-        | Unary (UnaryElemwiseOp, a) 
-        | Binary (BinaryElemwiseOp, a, _) 
+
+        // tensor creation
+        | Leaf(Identity(ss)) -> ShapeSpec.matrix ss ss
+        | Leaf(Zeros(ss)) -> ss
+        | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
+
+        // variable access
+        | Leaf(Var vs) -> VarSpec.shape vs
+
+        // unary elementwise
+        | Unary (Negate, a)                       
+        | Unary (Abs, a)
+        | Unary (SignT, a)
+        | Unary (Log, a)
+        | Unary (Log10, a)                           
+        | Unary (Exp, a)                           
+        | Unary (Sin, a)
+        | Unary (Cos, a)
+        | Unary (Tan, a)
+        | Unary (Asin, a)
+        | Unary (Acos, a)
+        | Unary (Atan, a)
+        | Unary (Sinh, a)
+        | Unary (Cosh, a)
+        | Unary (Tanh, a)
+        | Unary (Sqrt, a)
+        | Unary (Ceil, a)
+        | Unary (Floor, a)
+        | Unary (Round, a)
+        | Unary (Truncate, a)
             -> shapeOf a
+
+        // reductions
+        | Unary(Sum, _) -> ShapeSpec.scalar
+        | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+
+        // shape operations
+        | Unary(Reshape(ss), _) -> ss
+        | Unary(DoBroadcast(ss), _) -> ss
+        | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
+
+        // misc
+        | Unary(StoreToVar _, a) -> shapeOf a
+        | Unary(Annotated(_), a) -> shapeOf a
+
+        // binary elementwise
+        | Binary (Add, a, _)                         
+        | Binary (Substract, a, _)                     
+        | Binary (Multiply, a, _)                      
+        | Binary (Divide, a, _)                        
+        | Binary (Modulo, a, _)
+        | Binary (Power, a, _)                         
+            -> shapeOf a
+            
         // matrix/tensor operations
         | Binary (Dot, a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                 | 1, 1 -> ShapeSpec.scalar
                 | 2, 1 -> ShapeSpec.vector sa.[0]
-                | 2, 2 when sa.[1] .= sb.[0] -> ShapeSpec.matrix sa.[0] sb.[1]
-                | _ -> failshape expr sa sb
+                | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+                | _ -> failwith "invalid graph"
         | Binary (TensorProduct, a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
             List.map2 (*) sa sb
-        // reductions
-        | Unary(Sum, _) -> ShapeSpec.scalar
-        | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
-        // tensor creation
-        | Leaf(Identity(ss)) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros(ss)) -> ss
-        | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
-        // shape operations
-        | Unary(Reshape(ss), _) -> ss
-        | Unary(DoBroadcast(ss), _) -> ss
-        | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
-        // variable access
-        | Leaf(Var vs) -> VarSpec.shape vs
-        | Unary(StoreToVar _, a) -> shapeOf a
+
         // misc
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
-        | Unary(Annotated(_), a) -> shapeOf a
-        | _ -> failwithf "unknown expr: %A" expr
+        | Nary(ExtensionOp _, _) -> failwith "not implemented"
+
 
     /// Wraps the given op in a Reshape op if its shape does not match ss.
     let reshapeIfNecessary ss expr =
@@ -279,10 +335,36 @@ module Expr =
             match op with
             | _ -> env
 
+    /// substitues the given symbol sizes into the expression
+    let rec substSymSizes symSizes (expr: ExprT<'T>) =
+        let sSub = substSymSizes symSizes
+        let sSize = SymSizeEnv.subst symSizes
+        let sShp = SymSizeEnv.substShape symSizes
+
+        match expr with
+        | Leaf (Identity ss) -> Leaf (Identity (sSize ss))
+        | Leaf (Zeros ss) -> Leaf (Zeros (sShp ss))
+        | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
+        | Leaf _ -> expr
+
+        | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
+        | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
+        | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape},  sSub a)
+        | Unary (op, a) -> Unary (op, sSub a)
+
+        | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
+
+        | Nary (op, es) -> Nary (op, List.map sSub es)
+
+    /// Infers symbol sizes from the given expression and substitues them into the expression.
+    let inferAndSubstSymSizes (expr: ExprT<'T>) =
+        substSymSizes (inferSymSizes expr) expr
+
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT<'T>) : ExprT<'T> =
-        inferSymSizes expr |> ignore
-        expr
+        inferAndSubstSymSizes expr
+        //inferSymSizes expr |> ignore
+        //expr
 
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
@@ -312,7 +394,7 @@ module Expr =
     let constructElementwise op a b =
         let sa, sb = shapeOf a, shapeOf b
         let psa, psb = ShapeSpec.padToSame sa sb
-        let bsa, bsb = ShapeSpec.broadcastToSame psa psb
+        let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
         let ba = a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
         Binary(op, ba, bb) |> check
@@ -436,11 +518,11 @@ module Expr =
     let dot (a: ExprT<'T>) (b: ExprT<'T>) =
         let sa, sb = shapeOf a, shapeOf b
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 1, 1 when sa.[0] .= sb.[0] -> sum (a * b)
-            | 2, 1 when sa.[1] .= sb.[0] -> 
+            | 1, 1 -> sum (a * b)
+            | 2, 1 -> 
                 let bm = b |> reshape (ShapeSpec.padRight sb)
                 Binary(Dot, a, bm) |> reshape [sa.[0]]
-            | 2, 2 when sa.[1] .= sb.[0] -> Binary(Dot, a, b)
+            | 2, 2 -> Binary(Dot, a, b)
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
         |> check
 

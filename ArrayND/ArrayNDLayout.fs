@@ -116,10 +116,10 @@ module ArrayNDLayout =
         | 1 -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0 a.Stride}
         | _ -> failwithf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
 
-    /// pads shapes from the left until they have same rank
+    /// pads shapes from the right until they have same rank
     let rec padToSame a b =
-        if nDims a < nDims b then padToSame (padLeft a) b
-        elif nDims b < nDims a then padToSame a (padLeft b)
+        if nDims a < nDims b then padToSame (padRight a) b
+        elif nDims b < nDims a then padToSame a (padRight b)
         else a, b
 
     /// broadcasts to have the same size
