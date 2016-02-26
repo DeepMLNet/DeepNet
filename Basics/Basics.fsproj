@@ -76,6 +76,7 @@
     <Compile Include="Util.fs" />
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaSup.fs" />
+    <Compile Include="HDF5.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -101,6 +102,10 @@
     </Reference>
     <Reference Include="FsPickler">
       <HintPath>..\packages\FsPickler.1.8.0\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="HDF.PInvoke">
+      <HintPath>..\packages\HDF.PInvoke.1.8.16.10\lib\Net45\HDF.PInvoke.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="ManagedCuda">

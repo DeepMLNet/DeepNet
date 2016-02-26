@@ -45,6 +45,7 @@ module ArrayNDHostTypes =
 
         member this.Size = data.Length
         member this.SizeInBytes = data.Length * sizeof<'T>
+        member this.Data = data
 
         interface IHostStorage with
             member this.Pin () = this.Pin ()
