@@ -101,6 +101,11 @@ module ArrayNDLayout =
     /// true if the ArrayND is in Fortran order
     let inline isColumnMajor a = (stride a = columnMajorStride (shape a))
 
+    /// true if the memory of the ArrayND is a contiguous block
+    let inline hasContiguousMemory a =
+        isContiguous a || isColumnMajor a
+        // TODO: extend to any memory ordering
+
     /// adds a new dimension of size one to the left
     let inline padLeft a =
         {a with Shape=1::a.Shape; Stride=0::a.Stride}

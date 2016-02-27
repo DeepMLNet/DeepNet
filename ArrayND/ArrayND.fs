@@ -100,6 +100,20 @@ module ArrayND =
         /// unchecked cast of v to NDArrayT<'T> (this type)
         member this.CastToMe (v: ArrayNDT<'A>) = v.Cast<'T> ()
 
+        /// checks that two ArrayNDs have the same shape
+        static member inline CheckSameShape (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+            if (ArrayNDLayout.shape a.Layout) <> (ArrayNDLayout.shape b.Layout) then
+                failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
+                    (ArrayNDLayout.shape a.Layout) (ArrayNDLayout.shape b.Layout)
+
+        /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
+        /// Both ArrayNDTs must be of same shape.
+        abstract CopyTo : ArrayNDT<'T> -> unit
+        default this.CopyTo (dest: ArrayNDT<'T>) =
+            // slow elementwise fallback copy
+            ArrayNDT<'T>.CheckSameShape this dest
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                dest.[idx] <- this.[idx]
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -161,6 +175,9 @@ module ArrayND =
     /// true if the ArrayND is in Fortran order
     let inline isColumnMajor a = layout a |> ArrayNDLayout.isColumnMajor
 
+    /// true if the memory of the ArrayND is a contiguous block
+    let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
+
     /// true if ArrayND can be target of a BLAS operation
     let inline isBlasTargetable a =
         (nDims a = 2) && (isColumnMajor a)
@@ -182,16 +199,13 @@ module ArrayND =
         a.NewView newLayout :?> 'A
 
     /// checks that two ArrayNDs have the same shape
-    let inline checkSameShape a b =
-        if shape a <> shape b then
-            failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" (shape a) (shape b)
+    let inline checkSameShape (a: ArrayNDT<'T>) b =
+        ArrayNDT<'T>.CheckSameShape a b
 
     /// Copies all elements from source to destination.
     /// Both ArrayNDs must have the same shape.
     let inline copyTo (source: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
-        checkSameShape source dest
-        for idx in allIdx source do
-            set idx (get idx source) dest
+        source.CopyTo dest
 
     /// Returns a continguous copy of the given ArrayND.
     let inline copy source =
@@ -655,6 +669,7 @@ module ArrayND =
     type ArrayNDT<'T> with
         /// pretty contents string
         member this.PrettyString = prettyString this
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // pretty slicing and item access

@@ -88,6 +88,21 @@ module ArrayNDHostTypes =
         interface IArrayNDHostT with
             member this.Storage = this.Storage :> IHostStorage
 
+        override this.CopyTo (dest: ArrayNDT<'T>) =
+            ArrayNDT<'T>.CheckSameShape this dest
+            match dest with
+            | :? ArrayNDHostT<'T> as dest ->
+                match this.Storage, dest.Storage with
+                | (:? ManagedArrayStorageT<'T> as ts), (:? ManagedArrayStorageT<'T> as ds) ->
+                    if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
+                            ArrayND.stride this = ArrayND.stride dest then
+                        let nElems = ArrayNDLayout.nElems this.Layout
+                        Array.Copy (ts.Data, this.Layout.Offset, ds.Data, dest.Layout.Offset, nElems)
+                    else base.CopyTo dest
+                | _ -> base.CopyTo dest
+            | _ -> base.CopyTo dest
+                              
+
 
 module ArrayNDHost = 
 

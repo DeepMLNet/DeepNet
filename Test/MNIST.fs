@@ -25,11 +25,9 @@ module Mnist =
         let nSamples = List.length data
 
         let dataShape = ArrayND.shape data.[0]
-        let ds = ArrayNDHost.zeros (dataShape @ [nSamples])
+        let ds = ArrayNDHost.zeros ([nSamples] @ dataShape)
 
-        data |> List.iteri (fun smpl d -> 
-            if smpl % 1000 = 0 then printfn "%d" smpl
-            ds.[Fill, smpl] <- d)
+        data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)
         ds
 
     let private swapEndians (value: int32) =
@@ -53,8 +51,6 @@ module Mnist =
 
         let nRows = imageReader.ReadInt32() |> swapEndians
         let nCols = imageReader.ReadInt32() |> swapEndians
-
-        //let nSamples = min nSamples 500
 
         for smpl in 0 .. nSamples - 1 do
             let label = labelReader.ReadByte() |> int
@@ -82,3 +78,4 @@ module Mnist =
     
         {TrnImgs = trnImgs; TrnLbls = trnLbls;
          TstImgs = tstImgs; TstLbls = tstLbls;}
+
