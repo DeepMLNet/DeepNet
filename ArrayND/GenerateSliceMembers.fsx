@@ -18,6 +18,8 @@ type ModeT =
     | Special
     | Range
 
+prn "// ========================= SLICE MEMBERS BEGIN ============================="
+
 for dim in 1 .. maxDim do
     let ad = {0 .. dim-1}
 
@@ -27,20 +29,23 @@ for dim in 1 .. maxDim do
             generate (Special :: modes)
             generate (Range :: modes)
         else
-            let decls, calls = 
+            let decls, calls, itemCalls = 
                 modes 
                 |> List.mapi (fun dim mode ->
                     match mode with
                     | IntValue -> 
                         sprintf "d%d: int" dim, 
-                        sprintf "SliceElem d%d" dim
+                        sprintf "SliceElem d%d" dim,
+                        sprintf "d%d" dim
                     | Special -> 
                         sprintf "d%d: SpecialAxisT" dim, 
-                        sprintf "SliceSpecial d%d" dim
+                        sprintf "SliceSpecial d%d" dim,
+                        ""
                     | Range -> 
                         sprintf "d%ds: int option, d%df: int option" dim dim,
-                        sprintf "SliceRng (d%ds, d%df)" dim dim)
-                |> List.unzip
+                        sprintf "SliceRng (d%ds, d%df)" dim dim,
+                        "")
+                |> List.unzip3
 
             if List.contains Range modes then
                 prn "member this.GetSlice (%s) = " (String.concat ", " decls)
@@ -51,19 +56,21 @@ for dim in 1 .. maxDim do
                 prn "member this.Item"
                 prn "    with get (%s) = " (String.concat ", " decls)
                 prn "        getSliceView [%s] this" (String.concat "; " calls)
-                prn "    with set (%s) value = " (String.concat ", " decls)
+                prn "    and set (%s) value = " (String.concat ", " decls)
                 prn "        setSliceView [%s] this value" (String.concat "; " calls)
             else
                 prn "member this.Item"
                 prn "    with get (%s) = " (String.concat ", " decls)
-                prn "        this.[[%s]]" (String.concat "; " calls)
-                prn "    with set (%s) value = " (String.concat ", " decls)
-                prn "        this.[[%s]] <- value" (String.concat "; " calls)
+                prn "        this.[[%s]]" (String.concat "; " itemCalls)
+                prn "    and set (%s) value = " (String.concat ", " decls)
+                prn "        this.[[%s]] <- value" (String.concat "; " itemCalls)
 
     prn ""
     prn "// %d dimensions" dim
     generate []
 
+
+prn "// ========================= SLICE MEMBERS END ==============================="
 
 f.Dispose ()
 

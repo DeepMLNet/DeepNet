@@ -72,6 +72,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <None Include="GenerateSliceMembers.fsx" />
+    <Content Include="ArrayNDSliceMembers.txt" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="ArrayND.fs" />
@@ -80,7 +81,6 @@
     <Compile Include="ArrayNDCuda.fs" />
     <Compile Include="ArrayNDHDF.fs" />
     <Content Include="packages.config" />
-    <Content Include="ArrayNDSliceMembers.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

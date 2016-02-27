@@ -59,7 +59,7 @@ let ``Test slice`` () =
     let slc4 = ary2.[Fill, 1..3, 2..4]
     printfn "slc4=\n%A" slc4
 
-    ary2.[1..1, 1..3, 2..4] <- slc3
+    ary2.[NewAxis, 1..3, 2..4] <- slc3
 
 
 [<EntryPoint>]
