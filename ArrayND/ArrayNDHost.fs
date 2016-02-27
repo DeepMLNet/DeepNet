@@ -121,4 +121,12 @@ module ArrayNDHost =
         ArrayND.fillDiagonalWithOnes a
         a
 
+    /// Creates an ArrayNDT using the specified data and shape with contiguous (row major) layout.
+    /// The data is referenced, not copied.
+    let ofArray (data: 'T array) shp =
+        let layout = ArrayNDLayout.newContiguous shp
+        if ArrayNDLayout.nElems layout <> Array.length data then
+            failwithf "specified shape %A has %d elements, but passed data array has %d elements"
+                shp (ArrayNDLayout.nElems layout) (Array.length data)
+        ArrayNDHostT<'T> (layout, ManagedArrayStorageT<'T> (data)) :> ArrayNDT<'T>
         

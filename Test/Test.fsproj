@@ -78,6 +78,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="MNIST.fs" />
     <Compile Include="Models.fs" />
     <Compile Include="ModelTest.fs" />
     <None Include="Program.fs" />

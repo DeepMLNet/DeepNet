@@ -19,6 +19,12 @@ module ArrayNDTypes =
         abstract NewOfSameType: ArrayNDLayoutT -> IArrayNDT
         abstract DataType: System.Type
 
+    type SpecialAxisT =
+        | SpecialNewAxis
+        | SpecialFill
+
+
+
 module ArrayND =
 
     /// an N-dimensional array with reshape and subview abilities
@@ -647,9 +653,63 @@ module ArrayND =
         prettyDim " " a                       
 
 
+    type SliceRngT = 
+        | SE of int
+        | SR of (int option) * (int option)
+        | SS of SpecialAxisT
+
+    let sliceView slice ary = 
+        let rng =
+            slice 
+            |> List.mapi 
+                (fun dim slc ->
+                    match slc with
+                    | SE i -> Elem i
+                    | SR (s, f) ->
+                        match s, f with
+                        | Some s, Some f -> Rng (s, f)
+                        | Some s, None -> Rng (s, (shape ary).[dim] - 1)
+                        | None, Some f -> Rng (0, f)
+                        | None, None -> All
+                    | SS SpecialNewAxis -> NewAxis
+                    | SS SpecialFill -> AllFill)
+        printfn "Range: %A" rng
+        view rng ary
+                        
+
     type ArrayNDT<'T> with
         /// pretty contents string
         member this.PrettyString = prettyString this
+
+
+        //abstract Item : RangeT list -> ArrayNDT<'T> with get, set
+
+        member this.GetSlice (d0: int) =
+            sliceView [SE d0] this
+
+        member this.GetSlice (d0s: int option, d0f: int option) =
+            sliceView [SR (d0s, d0f)] this
+
+        member this.GetSlice (d0s: int option, d0f: int option, 
+                              d1s: int option, d1f: int option) =
+            sliceView [SR (d0s, d0f); SR (d1s, d1f)] this
+
+        member this.GetSlice (d0: SpecialAxisT,
+                              d1s: int option, d1f: int option,
+                              d2s: int option, d2f: int option) =
+            sliceView [SS d0; SR (d1s, d1f); SR (d2s, d2f)] this
+
+        member this.GetSlice (d0: int,
+                              d1s: int option, d1f: int option,
+                              d2s: int option, d2f: int option) =
+            sliceView [SE d0; SR (d1s, d1f); SR (d2s, d2f)] this
+
+        member this.GetSlice (d0s: int option, d0f: int option, 
+                              d1s: int option, d1f: int option,
+                              d2s: int option, d2f: int option) =
+            sliceView [SR (d0s, d0f); SR (d1s, d1f); SR (d2s, d2f)] this
+
+
 
 
 [<AutoOpen>]

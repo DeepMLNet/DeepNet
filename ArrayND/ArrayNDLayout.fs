@@ -209,7 +209,7 @@ module ArrayNDLayout =
                     checkElementRange false shp start
                     checkElementRange true shp stop
                     {ra with Offset = ra.Offset + start*str;
-                             Shape = (stop - start)::ra.Shape;
+                             Shape = (stop + 1 - start)::ra.Shape;
                              Stride = str::ra.Stride} 
                 | AllFill | NewAxis -> failwith "impossible"
             | NewAxis::rRanges, _, _ ->
