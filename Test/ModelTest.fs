@@ -53,11 +53,13 @@ let ``Test slice`` () =
     let ary2 : ArrayNDT<single> = ArrayNDHost.ones [5; 4]
     //printfn "ary2=\n%A" ary2
 
-    let slc3 = ary2.[SpecialNewAxis, 1..3, 2..4]
+    let slc3 = ary2.[NewAxis, 1..3, 2..4]
     printfn "slc3=\n%A" slc3
 
-    let slc4 = ary2.[SpecialFill, 1..3, 2..4]
+    let slc4 = ary2.[Fill, 1..3, 2..4]
     printfn "slc4=\n%A" slc4
+
+    ary2.[1..1, 1..3, 2..4] <- slc3
 
 
 [<EntryPoint>]

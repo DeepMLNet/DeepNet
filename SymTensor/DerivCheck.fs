@@ -20,7 +20,7 @@ module DerivCheck =
             xdf |> ArrayND.set [xi] ((xf |> ArrayND.get [xi]) + epsilon)
             let ydf = xdf |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
             let d = (ydf - yf) / epsilon       
-            j |> ArrayND.view [All; Elem xi] |> ArrayND.copyTo d
+            j |> ArrayND.view [RngAll; RngElem xi] |> ArrayND.copyTo d
         j
 
     /// evaluates the Jacobian of f at x numerically

@@ -17,11 +17,11 @@ module ArrayNDLayoutTypes =
 
     /// range specification
     type RangeT = 
-        | Elem of int
+        | RngElem of int
         | Rng of int * int
-        | NewAxis
-        | All
-        | AllFill
+        | RngNewAxis
+        | RngAll
+        | RngAllFill
 
 
 module ArrayNDLayout =
@@ -188,19 +188,19 @@ module ArrayNDLayout =
 
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
-            | AllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
-                recView (All :: AllFill :: rRanges) a
-            | AllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
-                recView (All :: rRanges) a
-            | AllFill::rRanges, _, _ ->
+            | RngAllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
+                recView (RngAll :: RngAllFill :: rRanges) a
+            | RngAllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
+                recView (RngAll :: rRanges) a
+            | RngAllFill::rRanges, _, _ ->
                 recView rRanges a
-            | (All | Elem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
+            | (RngAll | RngElem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
                 let ra = recView rRanges {a with Shape=rShps; Stride=rStrs} 
                 match idx with 
-                | All ->
+                | RngAll ->
                     {ra with Shape = shp::ra.Shape;
                              Stride = str::ra.Stride}
-                | Elem i -> 
+                | RngElem i -> 
                     checkElementRange false shp i
                     {ra with Offset = ra.Offset + i*str;
                              Stride = ra.Stride;
@@ -211,8 +211,8 @@ module ArrayNDLayout =
                     {ra with Offset = ra.Offset + start*str;
                              Shape = (stop + 1 - start)::ra.Shape;
                              Stride = str::ra.Stride} 
-                | AllFill | NewAxis -> failwith "impossible"
-            | NewAxis::rRanges, _, _ ->
+                | RngAllFill | RngNewAxis -> failwith "impossible"
+            | RngNewAxis::rRanges, _, _ ->
                 let ra = recView rRanges a
                 {ra with Shape = 1::ra.Shape; 
                          Stride = 0::ra.Stride}
@@ -231,11 +231,11 @@ module ArrayNDLayout =
                 let rest = generate ls (dim-1)
                 if dim = 0 then
                     for is, ws in rest do
-                        yield All::is, ws
+                        yield RngAll::is, ws
                 else
                     for i=0 to l - 1 do
                         for is, ws in rest do
-                            yield Elem i::is, i::ws
+                            yield RngElem i::is, i::ws
             | [] -> yield [], []
         } 
         generate (shape a) dim  

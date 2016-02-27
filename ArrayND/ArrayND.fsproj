@@ -71,6 +71,7 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
+    <None Include="GenerateSliceMembers.fsx" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="ArrayND.fs" />
@@ -79,6 +80,7 @@
     <Compile Include="ArrayNDCuda.fs" />
     <Compile Include="ArrayNDHDF.fs" />
     <Content Include="packages.config" />
+    <Content Include="ArrayNDSliceMembers.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
@@ -124,14 +126,17 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Basics\Basics.fsproj">
       <Name>Basics</Name>
       <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>cd "$(ProjectDir)"
+"C:\Program Files (x86)\Microsoft SDKs\F#\4.0\Framework\v4.0\fsi.exe" GenerateSliceMembers.fsx
+</PreBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

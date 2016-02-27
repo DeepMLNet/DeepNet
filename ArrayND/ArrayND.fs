@@ -20,8 +20,8 @@ module ArrayNDTypes =
         abstract DataType: System.Type
 
     type SpecialAxisT =
-        | SpecialNewAxis
-        | SpecialFill
+        | NewAxis
+        | Fill
 
 
 
@@ -106,10 +106,10 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////   
     
     /// get element value
-    let inline get idx (a: ArrayNDT<_>) = a.[idx]
+    let inline get (idx: int list) (a: ArrayNDT<_>) = a.[idx]
     
     /// set element value
-    let inline set idx value (a: ArrayNDT<_>) = a.[idx] <- value
+    let inline set (idx: int list) value (a: ArrayNDT<_>) = a.[idx] <- value
 
     /// if true, then setting NaN or Inf causes and exception to be thrown.
     let CheckFinite = false
@@ -520,7 +520,7 @@ module ArrayND =
             | 1, 1 when shape a = shape b -> 
                 map2 (*) a b |> sum
             | 2, 1 when (shape a).[1] = (shape b).[0] -> 
-                matrixDot a (padRight b) |> view [All; Elem 0] 
+                matrixDot a (padRight b) |> view [RngAll; RngElem 0] 
             | 2, 2 when (shape a).[1] = (shape b).[0] ->
                 matrixDot a b
             | _ -> 
@@ -629,7 +629,7 @@ module ArrayND =
             let subPrint idxes = 
                 idxes
                 |> Seq.map (fun i -> 
-                    prettyDim (lineSpace + " ") (view [Elem i; AllFill] a)) 
+                    prettyDim (lineSpace + " ") (view [RngElem i; RngAllFill] a)) 
                 |> Seq.toList                   
             let subStrs () = 
                 if ls() < maxElems then
@@ -653,62 +653,72 @@ module ArrayND =
         prettyDim " " a                       
 
 
-    type SliceRngT = 
-        | SE of int
-        | SR of (int option) * (int option)
-        | SS of SpecialAxisT
 
-    let sliceView slice ary = 
+    type ArrayNDT<'T> with
+        /// pretty contents string
+        member this.PrettyString = prettyString this
+  
+    type SliceRngT = 
+        | SliceElem of int
+        | SliceRng of (int option) * (int option)
+        | SliceSpecial of SpecialAxisT
+
+    let getSliceView slice ary = 
         let rng =
             slice 
             |> List.mapi 
                 (fun dim slc ->
                     match slc with
-                    | SE i -> Elem i
-                    | SR (s, f) ->
+                    | SliceElem i -> RngElem i
+                    | SliceRng (s, f) ->
                         match s, f with
                         | Some s, Some f -> Rng (s, f)
                         | Some s, None -> Rng (s, (shape ary).[dim] - 1)
                         | None, Some f -> Rng (0, f)
-                        | None, None -> All
-                    | SS SpecialNewAxis -> NewAxis
-                    | SS SpecialFill -> AllFill)
+                        | None, None -> RngAll
+                    | SliceSpecial NewAxis -> RngNewAxis
+                    | SliceSpecial Fill -> RngAllFill)
         printfn "Range: %A" rng
         view rng ary
                         
+    let setSliceView slice ary value =
+        let trgt = getSliceView slice ary
+        copyTo value trgt
+
 
     type ArrayNDT<'T> with
-        /// pretty contents string
-        member this.PrettyString = prettyString this
 
-
-        //abstract Item : RangeT list -> ArrayNDT<'T> with get, set
-
-        member this.GetSlice (d0: int) =
-            sliceView [SE d0] this
+        member this.Item
+            with get (d0: int) = this.[[d0]]
+            and set (d0: int) value = this.[[d0]] <- value
 
         member this.GetSlice (d0s: int option, d0f: int option) =
-            sliceView [SR (d0s, d0f)] this
+            getSliceView [SliceRng (d0s, d0f)] this
 
         member this.GetSlice (d0s: int option, d0f: int option, 
                               d1s: int option, d1f: int option) =
-            sliceView [SR (d0s, d0f); SR (d1s, d1f)] this
+            getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f)] this
 
         member this.GetSlice (d0: SpecialAxisT,
                               d1s: int option, d1f: int option,
                               d2s: int option, d2f: int option) =
-            sliceView [SS d0; SR (d1s, d1f); SR (d2s, d2f)] this
+            getSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
 
         member this.GetSlice (d0: int,
                               d1s: int option, d1f: int option,
                               d2s: int option, d2f: int option) =
-            sliceView [SE d0; SR (d1s, d1f); SR (d2s, d2f)] this
+            getSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
 
         member this.GetSlice (d0s: int option, d0f: int option, 
                               d1s: int option, d1f: int option,
                               d2s: int option, d2f: int option) =
-            sliceView [SR (d0s, d0f); SR (d1s, d1f); SR (d2s, d2f)] this
+            getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
 
+        member this.SetSlice (d0s: int option, d0f: int option, 
+                              d1s: int option, d1f: int option,
+                              d2s: int option, d2f: int option,
+                              value: ArrayNDT<'T>) =
+            setSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this value
 
 
 
