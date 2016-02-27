@@ -58,7 +58,7 @@ module HDF5Types =
             let nElems = List.fold (*) 1 shape
             if Array.length data <> nElems then
                 failwithf "shape %A does not match number of elements in data array" shape
-            if List.exists ((<) 0) shape then
+            if List.exists ((>) 0) shape then
                 failwithf "shape %A has negative elements" shape
 
                        

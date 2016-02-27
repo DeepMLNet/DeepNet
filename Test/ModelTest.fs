@@ -5,6 +5,7 @@ open ArrayNDNS
 
 open SymTensor
 open Models
+open Datasets
 
 
 let ``Test neural net`` () =
@@ -62,10 +63,22 @@ let ``Test slice`` () =
     ary2.[NewAxis, 1..3, 2..4] <- slc3
 
 
+let ``Test MNIST`` () =
+    let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\test\Data\MNIST"
+    use hdf = new HDF5 (@"C:\Local\surban\dev\fexpr\test\Data\MNIST\MNIST.h5", HDF5Overwrite)
+
+    ArrayNDHDF.write hdf "TrnImgs" mnist.TrnImgs
+    ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
+    ArrayNDHDF.write hdf "TstImgs" mnist.TstImgs
+    ArrayNDHDF.write hdf "TstLbls" mnist.TstLbls
+
+
 [<EntryPoint>]
 let main argv = 
     
     ``Test slice`` ()
+
+    ``Test MNIST`` ()
 
     //``Test neural net`` ()
 

@@ -181,9 +181,6 @@ module ArrayND =
     let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
         a.NewView newLayout :?> 'A
 
-        //(^A : (static member MakeNewView : ^A -> ArrayNDLayoutT -> ^A) (a, newLayout))
-        //ArrayNDOverloads.MakeNewView (a, newLayout)
-
     /// checks that two ArrayNDs have the same shape
     let inline checkSameShape a b =
         if shape a <> shape b then
@@ -668,7 +665,7 @@ module ArrayND =
         | SliceRng of (int option) * (int option)
         | SliceSpecial of SpecialAxisT
 
-    let getSliceView slice ary = 
+    let inline getSliceView slice ary = 
         let rng =
             slice 
             |> List.mapi 
@@ -683,10 +680,10 @@ module ArrayND =
                         | None, None -> RngAll
                     | SliceSpecial NewAxis -> RngNewAxis
                     | SliceSpecial Fill -> RngAllFill)
-        printfn "Range: %A" rng
+        //printfn "Range: %A" rng
         view rng ary
                         
-    let setSliceView slice ary value =
+    let inline setSliceView slice ary value =
         let trgt = getSliceView slice ary
         copyTo value trgt
 
@@ -695,179 +692,179 @@ module ArrayND =
         // ========================= SLICE MEMBERS BEGIN =============================
         
         // 1 dimensions
-        member this.Item
+        member inline this.Item
             with get (d0: int) = 
                 this.[[d0]]
             and set (d0: int) value = 
                 this.[[d0]] <- value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT) = 
                 getSliceView [SliceSpecial d0] this
             and set (d0: SpecialAxisT) value = 
                 setSliceView [SliceSpecial d0] this value
-        member this.GetSlice (d0s: int option, d0f: int option) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option) = 
              getSliceView [SliceRng (d0s, d0f)] this
-        member this.SetSlice (d0s: int option, d0f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f)] this value
         
         // 2 dimensions
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: int) = 
                 this.[[d0; d1]]
             and set (d0: int, d1: int) value = 
                 this.[[d0; d1]] <- value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: int) = 
                 getSliceView [SliceSpecial d0; SliceElem d1] this
             and set (d0: SpecialAxisT, d1: int) value = 
                 setSliceView [SliceSpecial d0; SliceElem d1] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: int) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: int) = 
              getSliceView [SliceRng (d0s, d0f); SliceElem d1] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceElem d1] this value
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: SpecialAxisT) = 
                 getSliceView [SliceElem d0; SliceSpecial d1] this
             and set (d0: int, d1: SpecialAxisT) value = 
                 setSliceView [SliceElem d0; SliceSpecial d1] this value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: SpecialAxisT) = 
                 getSliceView [SliceSpecial d0; SliceSpecial d1] this
             and set (d0: SpecialAxisT, d1: SpecialAxisT) value = 
                 setSliceView [SliceSpecial d0; SliceSpecial d1] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT) = 
              getSliceView [SliceRng (d0s, d0f); SliceSpecial d1] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceSpecial d1] this value
-        member this.GetSlice (d0: int, d1s: int option, d1f: int option) = 
+        member inline this.GetSlice (d0: int, d1s: int option, d1f: int option) = 
              getSliceView [SliceElem d0; SliceRng (d1s, d1f)] this
-        member this.SetSlice (d0: int, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceRng (d1s, d1f)] this value
-        member this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option) = 
              getSliceView [SliceSpecial d0; SliceRng (d1s, d1f)] this
-        member this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceRng (d1s, d1f)] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option) = 
              getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f)] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f)] this value
         
         // 3 dimensions
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: int, d2: int) = 
                 this.[[d0; d1; d2]]
             and set (d0: int, d1: int, d2: int) value = 
                 this.[[d0; d1; d2]] <- value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: int, d2: int) = 
                 getSliceView [SliceSpecial d0; SliceElem d1; SliceElem d2] this
             and set (d0: SpecialAxisT, d1: int, d2: int) value = 
                 setSliceView [SliceSpecial d0; SliceElem d1; SliceElem d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: int, d2: int) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: int, d2: int) = 
              getSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceElem d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: int, d2: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: int, d2: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceElem d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: SpecialAxisT, d2: int) = 
                 getSliceView [SliceElem d0; SliceSpecial d1; SliceElem d2] this
             and set (d0: int, d1: SpecialAxisT, d2: int) value = 
                 setSliceView [SliceElem d0; SliceSpecial d1; SliceElem d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: int) = 
                 getSliceView [SliceSpecial d0; SliceSpecial d1; SliceElem d2] this
             and set (d0: SpecialAxisT, d1: SpecialAxisT, d2: int) value = 
                 setSliceView [SliceSpecial d0; SliceSpecial d1; SliceElem d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: int) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: int) = 
              getSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceElem d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceElem d2] this value
-        member this.GetSlice (d0: int, d1s: int option, d1f: int option, d2: int) = 
+        member inline this.GetSlice (d0: int, d1s: int option, d1f: int option, d2: int) = 
              getSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceElem d2] this
-        member this.SetSlice (d0: int, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceElem d2] this value
-        member this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: int) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: int) = 
              getSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceElem d2] this
-        member this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceElem d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: int) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: int) = 
              getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceElem d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: int, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceElem d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: int, d2: SpecialAxisT) = 
                 getSliceView [SliceElem d0; SliceElem d1; SliceSpecial d2] this
             and set (d0: int, d1: int, d2: SpecialAxisT) value = 
                 setSliceView [SliceElem d0; SliceElem d1; SliceSpecial d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: int, d2: SpecialAxisT) = 
                 getSliceView [SliceSpecial d0; SliceElem d1; SliceSpecial d2] this
             and set (d0: SpecialAxisT, d1: int, d2: SpecialAxisT) value = 
                 setSliceView [SliceSpecial d0; SliceElem d1; SliceSpecial d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: int, d2: SpecialAxisT) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: int, d2: SpecialAxisT) = 
              getSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceSpecial d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: int, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: int, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceSpecial d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: int, d1: SpecialAxisT, d2: SpecialAxisT) = 
                 getSliceView [SliceElem d0; SliceSpecial d1; SliceSpecial d2] this
             and set (d0: int, d1: SpecialAxisT, d2: SpecialAxisT) value = 
                 setSliceView [SliceElem d0; SliceSpecial d1; SliceSpecial d2] this value
-        member this.Item
+        member inline this.Item
             with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: SpecialAxisT) = 
                 getSliceView [SliceSpecial d0; SliceSpecial d1; SliceSpecial d2] this
             and set (d0: SpecialAxisT, d1: SpecialAxisT, d2: SpecialAxisT) value = 
                 setSliceView [SliceSpecial d0; SliceSpecial d1; SliceSpecial d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: SpecialAxisT) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: SpecialAxisT) = 
              getSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceSpecial d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceSpecial d2] this value
-        member this.GetSlice (d0: int, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
+        member inline this.GetSlice (d0: int, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
              getSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceSpecial d2] this
-        member this.SetSlice (d0: int, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceSpecial d2] this value
-        member this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
              getSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceSpecial d2] this
-        member this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceSpecial d2] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: SpecialAxisT) = 
              getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceSpecial d2] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2: SpecialAxisT, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceSpecial d2] this value
-        member this.GetSlice (d0: int, d1: int, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: int, d1: int, d2s: int option, d2f: int option) = 
              getSliceView [SliceElem d0; SliceElem d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: int, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceElem d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0: SpecialAxisT, d1: int, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1: int, d2s: int option, d2f: int option) = 
              getSliceView [SliceSpecial d0; SliceElem d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: SpecialAxisT, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceElem d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: int, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: int, d2s: int option, d2f: int option) = 
              getSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: int, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceElem d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0: int, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: int, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
              getSliceView [SliceElem d0; SliceSpecial d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: int, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceSpecial d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0: SpecialAxisT, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
              getSliceView [SliceSpecial d0; SliceSpecial d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: SpecialAxisT, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceSpecial d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2s: int option, d2f: int option) = 
              getSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1: SpecialAxisT, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceSpecial d1; SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0: int, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: int, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
              getSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: int, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: int, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceElem d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
              getSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0: SpecialAxisT, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceSpecial d0; SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this value
-        member this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
+        member inline this.GetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2s: int option, d2f: int option) = 
              getSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this
-        member this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
+        member inline this.SetSlice (d0s: int option, d0f: int option, d1s: int option, d1f: int option, d2s: int option, d2f: int option, value: ArrayNDT<'T>) = 
              setSliceView [SliceRng (d0s, d0f); SliceRng (d1s, d1f); SliceRng (d2s, d2f)] this value
         // ========================= SLICE MEMBERS END ===============================
 

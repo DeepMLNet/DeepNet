@@ -48,18 +48,18 @@ for dim in 1 .. maxDim do
                 |> List.unzip3
 
             if List.contains Range modes then
-                prn "member this.GetSlice (%s) = " (String.concat ", " decls)
+                prn "member inline this.GetSlice (%s) = " (String.concat ", " decls)
                 prn "     getSliceView [%s] this" (String.concat "; " calls)
-                prn "member this.SetSlice (%s, value: ArrayNDT<'T>) = " (String.concat ", " decls)
+                prn "member inline this.SetSlice (%s, value: ArrayNDT<'T>) = " (String.concat ", " decls)
                 prn "     setSliceView [%s] this value" (String.concat "; " calls)
             elif List.contains Special modes then
-                prn "member this.Item"
+                prn "member inline this.Item"
                 prn "    with get (%s) = " (String.concat ", " decls)
                 prn "        getSliceView [%s] this" (String.concat "; " calls)
                 prn "    and set (%s) value = " (String.concat ", " decls)
                 prn "        setSliceView [%s] this value" (String.concat "; " calls)
             else
-                prn "member this.Item"
+                prn "member inline this.Item"
                 prn "    with get (%s) = " (String.concat ", " decls)
                 prn "        this.[[%s]]" (String.concat "; " itemCalls)
                 prn "    and set (%s) value = " (String.concat ", " decls)
