@@ -64,8 +64,8 @@ let ``Test slice`` () =
 
 
 let ``Test MNIST`` () =
-    let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\test\Data\MNIST"
-    use hdf = new HDF5 (@"C:\Local\surban\dev\fexpr\test\Data\MNIST\MNIST.h5", HDF5Overwrite)
+    let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\Data\MNIST"
+    use hdf = new HDF5 (@"C:\Local\surban\dev\fexpr\Data\MNIST\MNIST.h5", HDF5Overwrite)
 
     ArrayNDHDF.write hdf "TrnImgs" mnist.TrnImgs
     ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
