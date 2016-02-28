@@ -157,6 +157,20 @@ module ArrayNDLayout =
     let inline reshape shp a =
         if not (isContiguous a) then
             invalidArg "a" "layout must be contiguous for reshape"
+
+        let shp =
+            match List.filter ((=) -1) shp |> List.length with
+            | 0 -> shp
+            | 1 ->
+                let elemsSoFar = List.fold (*) -1 shp
+                let elemsNeeded = nElems a
+                if elemsNeeded % elemsSoFar = 0 then
+                    List.map (fun s -> if s = -1 then elemsNeeded / elemsSoFar else s) shp
+                else
+                    failwithf "cannot reshape from %A to %A because %d / %d is not an integer" 
+                        (shape a) shp elemsNeeded elemsSoFar
+            | _ -> failwithf "only the size of one dimension can be determined automatically, but shape was %A" shp
+          
         let shpElems = List.fold (*) 1 shp
         if shpElems <> nElems a then
             failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
@@ -179,6 +193,8 @@ module ArrayNDLayout =
 
     /// reorders the axes as specified
     let inline reorderAxes (newOrder: int list) a =
+        if nDims a <> List.length newOrder then
+            failwithf "permutation %A should have same rank as shape %A" newOrder (shape a)
         {a with Shape = List.permute (fun i -> newOrder.[i]) a.Shape;
                 Stride = List.permute (fun i -> newOrder.[i]) a.Stride;}
 

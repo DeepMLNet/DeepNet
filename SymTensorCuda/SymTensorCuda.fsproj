@@ -79,6 +79,7 @@
     <Compile Include="CudaStream.fs" />
     <Compile Include="CudaRecipe.fs" />
     <Compile Include="CudaExec.fs" />
+    <Compile Include="CudaEval.fs" />
     <Compile Include="CudaCheck.fs" />
     <Compile Include="VarEnvReg.fs" />
     <Content Include="packages.config" />

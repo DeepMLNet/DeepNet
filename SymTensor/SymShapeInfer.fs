@@ -139,6 +139,8 @@ module SymSizeEnv =
 
     /// requires shape a to be equal to shape b
     let needEqualShape (a: ShapeSpecT) (b: ShapeSpecT) env =
+        if List.length a <> List.length b then
+            contradiction "shape %A must be of same dimensionality as shape %A" a b
         List.fold2 (fun env sa sb -> needEqual sa sb env) env a b 
 
     /// merges two environments

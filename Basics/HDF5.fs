@@ -97,10 +97,10 @@ module HDF5Types =
 
             if H5S.is_simple (shapeHnd) = 0 then
                 failwithf "HDF5 dataset %s is not simple" name
-            let nDims = H5S.get_simple_extent_ndims (dataHnd) |> check
+            let nDims = H5S.get_simple_extent_ndims (shapeHnd) |> check
             let shape : uint64 array = Array.zeroCreate nDims
             let maxShape : uint64 array = Array.zeroCreate nDims
-            H5S.get_simple_extent_dims(dataHnd, shape, maxShape) |> check |> ignore
+            H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
             let nElems = Array.fold (*) (uint64 1) shape |> int
 
             let data : 'T array = Array.zeroCreate nElems

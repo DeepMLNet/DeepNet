@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.IO.Compression
 
+open Basics
 open ArrayNDNS
 
 
@@ -19,6 +20,9 @@ module MnistTypes =
 
 
 module Mnist = 
+
+    [<Literal>]
+    let TestDataset = true
 
     let private assemble dataSeq =
         let data = List.ofSeq dataSeq
@@ -52,6 +56,10 @@ module Mnist =
         let nRows = imageReader.ReadInt32() |> swapEndians
         let nCols = imageReader.ReadInt32() |> swapEndians
 
+        let nSamples = 
+            if TestDataset then min 500 nSamples
+            else nSamples
+
         for smpl in 0 .. nSamples - 1 do
             let label = labelReader.ReadByte() |> int
             let labelHot : ArrayNDT<single> = ArrayNDHost.zeros [10];
@@ -68,7 +76,7 @@ module Mnist =
         let labelSeq, imageSeq = sampleSeq labelPath imagePath |> Seq.toList |> List.unzip
         assemble labelSeq, assemble imageSeq    
 
-    let load directory =
+    let private loadRaw directory =
         let trnLbls, trnImgs = 
             dataset (Path.Combine (directory, "train-labels-idx1-ubyte.gz")) 
                     (Path.Combine (directory, "train-images-idx3-ubyte.gz"))
@@ -78,4 +86,21 @@ module Mnist =
     
         {TrnImgs = trnImgs; TrnLbls = trnLbls;
          TstImgs = tstImgs; TstLbls = tstLbls;}
+
+    let load directory =
+        let hdfPath = Path.Combine (directory, "MNIST.h5")
+        if File.Exists hdfPath then
+            use hdf = new HDF5 (hdfPath, HDF5Read)
+            {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
+             TstImgs = ArrayNDHDF.read hdf "TstImgs"; TstLbls = ArrayNDHDF.read hdf "TstLbls";}
+        else
+            printf "Converting MNIST to HDF5..."
+            let mnist = loadRaw directory
+            use hdf = new HDF5 (hdfPath, HDF5Overwrite)
+            ArrayNDHDF.write hdf "TrnImgs" mnist.TrnImgs
+            ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
+            ArrayNDHDF.write hdf "TstImgs" mnist.TstImgs
+            ArrayNDHDF.write hdf "TstLbls" mnist.TstLbls
+            printf "Done."
+            mnist
 

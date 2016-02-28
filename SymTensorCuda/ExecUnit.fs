@@ -39,12 +39,12 @@ module ExecUnitsTypes =
 module ExecUnit =
     
     /// generates execution units that will evaluate the given unified expression
-    let exprToExecUnits gen (sizeSymbolEnv: SizeSymbolEnvT) (expr: UExprT) =
+    let exprToExecUnits gen (expr: UExprT) =
         // number of occurrences of subexpressions
         let exprOccurrences = UExpr.subExprOccurrences expr
 
         // calculates the numeric shape
-        let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval sizeSymbolEnv
+        let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval 
 
         // execution units
         let mutable execUnits = []

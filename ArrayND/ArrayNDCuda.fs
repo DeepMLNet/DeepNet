@@ -1,5 +1,6 @@
 ﻿namespace ArrayNDNS
 
+open System
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
@@ -158,4 +159,10 @@ module ArrayNDCuda =
         let dst = ArrayNDHost.newContiguous<'T> (shape src) :?> ArrayNDHostT<'T>
         copyIntoHost dst src
         dst
+
+    /// Creates a ArrayNDT of given type and layout in device memory.
+    let newOfType typ (layout: ArrayNDLayoutT) = 
+        let gt = typedefof<ArrayNDCudaT<_>>
+        let t = gt.MakeGenericType [|typ|]
+        Activator.CreateInstance (t, [|layout|]) :?> IArrayNDT
 

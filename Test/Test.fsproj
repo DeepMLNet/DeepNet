@@ -83,6 +83,7 @@
     <Compile Include="ModelTest.fs" />
     <None Include="Program.fs" />
     <None Include="Program2.fs" />
+    <None Include="Program3.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
   </ItemGroup>

@@ -22,6 +22,7 @@ module Expr =
 
      
     /// ops with no exprs as arguments
+    [<StructuralComparison; StructuralEquality>]
     type LeafOpT<'T> =
 
         // ==== tensor creation ====
@@ -38,7 +39,8 @@ module Expr =
         
 
     /// ops with one expr as argument
-    and UnaryOpT<'T> =
+    and [<StructuralComparison; StructuralEquality>] 
+        UnaryOpT<'T> =
 
         // ==== unary elementwise ==== 
         | Negate                        
@@ -86,7 +88,9 @@ module Expr =
 
 
     /// ops with two exprs as arguments
-    and BinaryOpT<'T> =
+    and [<StructuralComparison; StructuralEquality>] 
+        BinaryOpT<'T> =
+
         // ==== binary elementwise ====
         | Add                           
         | Substract                     
@@ -103,25 +107,42 @@ module Expr =
 
 
     /// ops with an arbitrary exprs as arguments
-    and NaryOpT<'T> =
+    and [<StructuralComparison; StructuralEquality>] 
+        NaryOpT<'T> =
+
         /// evaluate all subexpressions but discard them
         | Discard        
+        /// return all subexpressions
+        | Return
         /// extension op
         | ExtensionOp of IExtensionOp<'T>
    
      
     /// an extension op
     and IExtensionOp<'T> =
+        inherit System.IComparable
+        inherit System.IComparable<'T>
+        inherit System.IEquatable<'T>
+
         /// the arity 
         abstract Arity: ArityT with get                   
 
+    /// a type conversion op
+    and [<StructuralComparison; StructuralEquality>] 
+        ConvertOpT<'T> =
+
+        | FromInt of ExprT<int>
+        | FromSingle of ExprT<single>
+        | FromDouble of ExprT<double>
 
     /// an expression
-    and ExprT<'T> =
+    and [<StructuralComparison; StructuralEquality>] 
+        ExprT<'T> =
         | Leaf of LeafOpT<'T>
         | Unary of UnaryOpT<'T> * ExprT<'T>
         | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
+        | Convert of ConvertOpT<'T>
 
 
     /// matches all unary ops that work elementwise
@@ -349,7 +370,7 @@ module Expr =
 
         | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
         | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
-        | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape},  sSub a)
+        | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
@@ -360,11 +381,26 @@ module Expr =
     let inferAndSubstSymSizes (expr: ExprT<'T>) =
         substSymSizes (inferSymSizes expr) expr
 
+    /// true if all shapes in the expression can be evaluated to numeric shapes
+    let rec canEvalAllSymSizes (expr: ExprT<'T>) =
+        match expr with
+        | Leaf (Identity ss) -> SizeSpec.canEval ss
+        | Leaf (Zeros ss) -> ShapeSpec.canEval ss
+        | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
+        | Leaf _ -> true
+
+        | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
+        | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
+        | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && canEvalAllSymSizes a
+        | Unary (op, a) -> canEvalAllSymSizes a
+
+        | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
+
+        | Nary (op, es) -> List.forall canEvalAllSymSizes es
+
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT<'T>) : ExprT<'T> =
         inferAndSubstSymSizes expr
-        //inferSymSizes expr |> ignore
-        //expr
 
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
@@ -541,8 +577,9 @@ module Expr =
     /// extract all variables from an expression
     let rec extractVars expr =
         match expr with
-        | Leaf(Var(v)) -> Set.singleton v
+        | Leaf(Var vs) -> Set.singleton vs
         | Leaf _ -> Set.empty
+        | Unary(StoreToVar vs, a) -> extractVars a |> Set.add vs
         | Unary(_, a) -> extractVars a
         | Binary(_, a, b) -> Set.union (extractVars a) (extractVars b)
         | Nary(_, es) -> Set.unionMany (es |> List.map extractVars)

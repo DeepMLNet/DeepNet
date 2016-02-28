@@ -68,7 +68,7 @@ module DerivCheck =
 
 
     let inline checkReverseDiff (evalEnv: EvalEnvT) (expr: ExprT<'T>) = 
-        let evalEnv = evalEnv |> EvalEnv.enhance VarEnv.empty (Seq.singleton expr)
+        let evalEnv = evalEnv |> EvalEnv.enhance VarEnv.empty 
 
         let rec checkSubExpr expr = 
             match expr with

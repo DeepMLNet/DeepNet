@@ -8,6 +8,9 @@ open Models
 open Datasets
 
 
+let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\Data\MNIST"
+
+
 let ``Test neural net`` () =
     let mc = MC "NeuralNet"
     
@@ -18,6 +21,32 @@ let ``Test neural net`` () =
     let loss = NeuralLayer.loss pars input target
 
     printfn "NeuralNet:\n%A" loss
+
+    // compute loss of neural net on MNIST
+    //let bla : ExprT<double> = Expr.identity (SizeSpec.fix 1)
+    let lossFun = Func.make onHost loss |> arg2 input target
+
+    printfn "mnist.TstImgs: %A" (ArrayND.shape mnist.TstImgs)
+
+    let tstImgs =  
+        mnist.TstImgs
+        |> ArrayND.reorderAxes [2; 0; 1] 
+
+    printfn "tstImgs: %A" (ArrayND.shape tstImgs)
+
+    
+
+    let tstImgs =  
+        mnist.TstImgs
+        |> ArrayND.reorderAxes [2; 0; 1] 
+        |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
+    let tstLbls =  
+        mnist.TstLbls
+        |> ArrayND.reorderAxes [1; 0] 
+
+    let tstLoss = lossFun tstImgs tstLbls
+    printfn "Test loss on MNIST=%A" tstLoss
+
     let dloss = Deriv.compute loss
     ()
     //printfn "%A" dloss
@@ -38,49 +67,10 @@ let ``Test Autoencoder`` () =
 
 
 
-let ``Test slice`` () =
-    let ary : ArrayNDT<single> = ArrayNDHost.ones [5; 7; 4]
-    //printfn "ary=\n%A" ary
-
-    let slc1 = ary.[0..1, 1..3, 2..4]
-    printfn "slc1=\n%A" slc1
-
-    let slc1b = ary.[0..1, 1..3, *]
-    printfn "slc1b=\n%A" slc1b
-
-    let slc2 = ary.[1, 1..3, 2..4]
-    printfn "slc2=\n%A" slc2
-
-    let ary2 : ArrayNDT<single> = ArrayNDHost.ones [5; 4]
-    //printfn "ary2=\n%A" ary2
-
-    let slc3 = ary2.[NewAxis, 1..3, 2..4]
-    printfn "slc3=\n%A" slc3
-
-    let slc4 = ary2.[Fill, 1..3, 2..4]
-    printfn "slc4=\n%A" slc4
-
-    ary2.[NewAxis, 1..3, 2..4] <- slc3
-
-
-let ``Test MNIST`` () =
-    let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\Data\MNIST"
-    use hdf = new HDF5 (@"C:\Local\surban\dev\fexpr\Data\MNIST\MNIST.h5", HDF5Overwrite)
-
-    ArrayNDHDF.write hdf "TrnImgs" mnist.TrnImgs
-    ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
-    ArrayNDHDF.write hdf "TstImgs" mnist.TstImgs
-    ArrayNDHDF.write hdf "TstLbls" mnist.TstLbls
-
-
 [<EntryPoint>]
 let main argv = 
     
-    ``Test slice`` ()
-
-    ``Test MNIST`` ()
-
-    //``Test neural net`` ()
+    ``Test neural net`` ()
 
     //``Test Autoencoder`` ()
 

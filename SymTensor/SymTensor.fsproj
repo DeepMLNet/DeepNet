@@ -77,10 +77,10 @@
     <Compile Include="Vars.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="UExpr.fs" />
-    <Compile Include="Eval.fs" />
-    <Compile Include="Deriv.fs" />
-    <Compile Include="DerivCheck.fs" />
     <Compile Include="Function.fs" />
+    <Compile Include="HostEval.fs" />
+    <Compile Include="Deriv.fs" />
+    <None Include="DerivCheck.fs" />
     <Compile Include="ModelContext.fs" />
     <Content Include="packages.config" />
   </ItemGroup>

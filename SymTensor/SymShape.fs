@@ -23,9 +23,6 @@ module SizeSymbolTypes =
             | Sym s -> sprintf "%A" s
             | Fixed f -> sprintf "%d" f
 
-    /// symbol value environment
-    type SizeSymbolEnvT = Map<SizeSymbolT, int>
-
 
 module SizeSymbol =
     let name sym =
@@ -33,12 +30,6 @@ module SizeSymbol =
 
     let flexible sym =
         sym.Flexible
-
-module SizeSymbolEnv =
-    open SizeSymbolTypes
-
-    /// empty symbol value environment
-    let empty : SizeSymbolEnvT = Map.empty
 
 
 [<AutoOpen>]
@@ -143,19 +134,24 @@ module SizeProduct =
     let mult (sBase: BaseSizeT) (sPower: int) (p: SizeProductT) =
         Seq.fold (*) p (Seq.replicate sPower sBase) 
 
+    /// tries to evaluate to a numeric size
+    let tryEval (p: SizeProductT) =
+        match p with
+        | SingleFactor f -> Some f
+        | _ -> None
+
     /// evaluate to a numeric size
-    let eval (env: SizeSymbolEnvT) (p: SizeProductT) =
-        p.Symbols 
-            |> Map.toSeq
-            |> Seq.map (fun (sym, power) -> pown env.[sym] power)
-            |> Seq.fold (*) p.Factor
+    let eval (p: SizeProductT) =
+        match tryEval p with
+        | Some f -> f
+        | _ -> failwithf "cannot evaluate %A to a numeric size, since it contains symbols" p
 
-    let canEval (env: SizeSymbolEnvT) (p: SizeProductT) =
-        p.Symbols
-            |> Map.forall (fun sym _ -> Map.containsKey sym env)
+//    /// true if it can be evaluated to a numeric size
+//    let canEval (p: SizeProductT) =
+//        match p with
+//        | SingleFactor f -> true
+//        | _ -> false
 
-    let tryEval (env: SizeSymbolEnvT) (p: SizeProductT) =
-        if canEval env p then Some (eval env p) else None
 
 
 [<AutoOpen>]
@@ -234,15 +230,24 @@ module SizeSpec =
         Broadcast
 
     /// evaluate symbolic size specification to a number
-    let eval (env: SizeSymbolEnvT) ss =
+    let tryEval ss =
         match ss with
-        | Base (Sym sym) -> 
-            match Map.tryFind sym env with
-            | Some l -> l
-            | None -> failwithf "no size known for symbol %s" (SizeSymbol.name sym)
-        | Base (Fixed f) -> f
-        | Broadcast -> 1
-        | Product p -> SizeProduct.eval env p
+        | Base (Sym sym) ->  None
+        | Base (Fixed f) -> Some f
+        | Broadcast -> Some 1
+        | Product p -> SizeProduct.tryEval p        
+
+    /// true, if evaluation to numeric shape is possible
+    let canEval ss =
+        match tryEval ss with
+        | Some _ -> true
+        | None -> false
+
+    /// evaluate symbolic size specification to a number
+    let eval ss =
+        match tryEval ss with
+        | Some s -> s
+        | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
 
 
 [<AutoOpen>]
@@ -348,60 +353,19 @@ module ShapeSpec =
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
         List.forall2 (.=) sa sb
 
+    /// evaluates shape to numeric shape, if possible
+    let tryEval (sa: ShapeSpecT) : NShapeSpecT option =
+        let c = List.map (SizeSpec.tryEval) sa
+        if List.exists (Option.isNone) c then None
+        else Some (List.map Option.get c)          
+
+    /// true if evaluation to numeric shape is possible
+    let canEval sa =
+        match tryEval sa with
+        | Some _ -> true
+        | None -> false
+
     /// evaluates shape to numeric shape
-    let eval (env: SizeSymbolEnvT) (sa: ShapeSpecT) : NShapeSpecT =
-        List.map (SizeSpec.eval env) sa
-
-    /// Infers numeric values for size symbols by matching symbolic and numeric shapes and adds
-    /// them to the specified SizeSymbolEnvT.
-    let enhanceSizeSymbolEnv (sizeSymbolEnv: SizeSymbolEnvT) 
-                             (shpValEnv: Map<string, NShapeSpecT>) 
-                             (shpSymEnv: Map<string, ShapeSpecT>) =
-
-        let inferAndCheckSizes (knownSizes: SizeSymbolEnvT) = 
-            seq {
-                for name, symShape in Map.toSeq shpSymEnv do
-                    let valShape = 
-                        match Map.tryFind name shpValEnv with
-                        | Some s -> s
-                        | None -> failwithf "no value for variable %s was specified" name
-
-                    if nDim symShape <> List.length valShape then
-                        failwithf "variable %s is expected to have shape of form %A but it has shape %A \
-                                    with different rank" 
-                            name symShape valShape
-
-                    for symSize, valSize in List.zip symShape valShape do
-                        let checkInferred symSizeInferred =
-                            if symSizeInferred <> valSize then
-                                failwithf "variable %s with shape of form %A is incompatible with actual shape %A (%d <> %d)"
-                                    name symShape valShape symSizeInferred valSize
-
-                        match symSize with
-                        | Base (Sym s) -> 
-                            match Map.tryFind s knownSizes with
-                            | Some knownSize ->
-                                if knownSize <> valSize then
-                                    failwithf "variable %s with shape of form %A and actual shape %A \
-                                               requires %A to be %d, but it was inferred to be %d previously"
-                                        name symShape valShape s valSize knownSize
-                            | None -> ()
-                            yield s, valSize
-                        | Base (Fixed f) -> checkInferred f
-                        | Broadcast -> checkInferred 1
-                        | Product sp ->
-                            match SizeProduct.tryEval knownSizes sp with
-                            | Some f -> checkInferred f
-                            | None -> ()
-            } |> Map.ofSeq
-
-        let rec inferUntilStable knownSizes =
-            let newKnownSizes = inferAndCheckSizes knownSizes
-            if knownSizes = newKnownSizes then knownSizes else inferUntilStable newKnownSizes
-
-        inferUntilStable sizeSymbolEnv
-        
-    /// Infers numeric values for size symbols by matching symbolic and numeric shapes.
-    let inferSizeSymbolEnv =
-        enhanceSizeSymbolEnv SizeSymbolEnv.empty
+    let eval (sa: ShapeSpecT) : NShapeSpecT =
+        List.map (SizeSpec.eval) sa
 

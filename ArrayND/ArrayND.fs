@@ -492,17 +492,25 @@ module ArrayND =
         c
 
     /// elementwise sum
-    let inline sum (a: ArrayNDT<'T>) =
+    let inline sumImpl (a: ArrayNDT<'T>) =
         let value = allElems a |> Seq.fold (+) ArrayNDT<'T>.Zero         
         scalarOfType value a
+
+    /// elementwise sum
+    let inline sum (a: ArrayNDT<'T>) =
+        typedApply sumImpl sumImpl sumImpl sumImpl a 
 
     /// elementwise sum over given axis
     let inline sumAxis dim a = axisReduce sum dim a
     
     /// elementwise product
-    let inline product (a: ArrayNDT<'T>) =
+    let inline productImpl (a: ArrayNDT<'T>) =
         let value = allElems a |> Seq.fold (*) ArrayNDT<'T>.One
         scalarOfType value a
+
+    /// elementwise product
+    let inline product (a: ArrayNDT<'T>) =
+        typedApply productImpl productImpl productImpl productImpl a 
 
     /// elementwise product over given axis
     let inline productAxis dim a = axisReduce product dim a
@@ -636,7 +644,7 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////         
     
     let prettyString (a: ArrayNDT<'T>) =
-        let maxElems = 12
+        let maxElems = 10
 
         let rec prettyDim lineSpace a =
             let ls () = (shape a).[0]
@@ -650,7 +658,7 @@ module ArrayND =
                     subPrint (seq {0 .. ls() - 1})
                 else
                     let leftIdx = seq {0 .. (maxElems / 2)}
-                    let rightIdx = seq {(maxElems / 2) + 2 .. (ls() - 1)}
+                    let rightIdx = seq {ls() - 1 - (maxElems / 2) + 2 .. (ls() - 1)}
                     (subPrint leftIdx) @ ["..."] @ (subPrint rightIdx)
 
             match nDims a with

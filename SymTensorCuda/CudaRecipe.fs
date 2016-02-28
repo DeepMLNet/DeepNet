@@ -278,11 +278,12 @@ module CudaRecipe =
         memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
 
     /// builds a CUDA recipe for the given unified expression
-    let build compileEnv sizeSymbolEnv expr =
-        let execUnits, exprRes, memAllocs = CudaExecUnit.exprToCudaExecUnits compileEnv sizeSymbolEnv expr
+    let build compileEnv expr =
+        let execUnits, exprRes, memAllocs = CudaExecUnit.exprToCudaExecUnits compileEnv expr
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
         let execCalls, tmplInstCache = generateCalls streams
-        let initCalls, disposeCalls = generateInitAndDispose memAllocs (List.length streams) eventObjCnt
+        let initCalls, disposeCalls = 
+            generateInitAndDispose memAllocs (List.length streams) eventObjCnt
 
         {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
          CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;

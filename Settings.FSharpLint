@@ -31,9 +31,13 @@
           <Lines>100</Lines>
         </MaxLinesInFunction>
         <MaxLinesInLambdaFunction>
-          <Enabled>True</Enabled>
-          <Lines>16</Lines>
+          <Enabled>False</Enabled>
+          <Lines>50</Lines>
         </MaxLinesInLambdaFunction>
+        <MaxLinesInMatchLambdaFunction>
+          <Enabled>False</Enabled>
+          <Lines>100</Lines>
+        </MaxLinesInMatchLambdaFunction>
       </Rules>
     </SourceLength>
   </Analysers>

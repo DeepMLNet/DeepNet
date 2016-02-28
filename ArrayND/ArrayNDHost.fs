@@ -145,3 +145,9 @@ module ArrayNDHost =
                 shp (ArrayNDLayout.nElems layout) (Array.length data)
         ArrayNDHostT<'T> (layout, ManagedArrayStorageT<'T> (data)) :> ArrayNDT<'T>
         
+
+    /// Creates a ArrayNDT of given type and layout in host memory.
+    let newOfType typ (layout: ArrayNDLayoutT) = 
+        let gt = typedefof<ArrayNDHostT<_>>
+        let t = gt.MakeGenericType [|typ|]
+        Activator.CreateInstance (t, [|layout|]) :?> IArrayNDT
