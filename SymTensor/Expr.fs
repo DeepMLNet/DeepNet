@@ -87,9 +87,8 @@ module Expr =
         | DoBroadcast of ShapeSpecT       
         /// swaps two dimensions of a tensor
         | SwapDim of int * int          
-
-        // ==== subtensor ====
-        | Subtensor of (SubtensorRngT list)
+        // subtensor 
+        | Subtensor of ExprRngsSpecT
 
         // ==== variable storage ====
         /// variable write
@@ -99,6 +98,8 @@ module Expr =
         /// annotation (no influence on value)
         | Annotated of Annotation       
 
+    and ExprRngSpecT = RangeSpecT<ExprT<int>>
+    and ExprRngsSpecT = RangesSpecT<ExprT<int>>
 
     /// ops with two exprs as arguments
     and [<StructuralComparison; StructuralEquality>] 
@@ -125,8 +126,6 @@ module Expr =
 
         /// evaluate all subexpressions but discard them
         | Discard        
-        /// return all subexpressions
-        | Return
         /// extension op
         | ExtensionOp of IExtensionOp<'T>
    
@@ -147,20 +146,6 @@ module Expr =
         | FromInt of ExprT<int>
         | FromSingle of ExprT<single>
         | FromDouble of ExprT<double>
-
-    /// subtensor range specification
-    and SubtensorRngT = 
-        | RngSymElem            of SizeSpecT                           // size: symbolic
-        | RngDynElem            of ExprT<int>                          // size: symbolic
-        | RngSymStartSymEnd     of SizeSpecT * SizeSpecT               // size: symbolic
-        //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
-        //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
-        //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
-        | RngDynStartSymSize    of ExprT<int> * SizeSpecT              // size: symbolic
-        //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
-        | RngNewAxis                                                   // size: symbolic
-        | RngAll                                                       // size: symbolic
-        | RngAllFill                                                   // size: symbolic
 
     /// internal item/slicing range specification value for range building
     and private RangeSpecValueT =
@@ -197,28 +182,28 @@ module Expr =
         | Unary of UnaryOpT<'T> * ExprT<'T>
         | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
-        | Convert of ConvertOpT<'T>
+        //| Convert of ConvertOpT<'T>
 
         member private this.BuildSlice (rangeSpecs: RangeSpecT list) =
             rangeSpecs
             |> List.map (fun rs ->
                 match rs with
                 // item
-                | Item (RSVSizeSpec s) -> RngSymElem s
-                | Item (RSVInt e) -> RngSymElem (SizeSpec.fix e)
+                | Item (RSVSizeSpec s) -> RSSymElem s
+                | Item (RSVInt e) -> RSSymElem (SizeSpec.fix e)
                 | Item (RSVSpecial s) ->
                     match s with
-                    | NewAxis -> RngNewAxis
-                    | Fill -> RngAllFill
-                | Item (RSVExpr s) -> RngDynElem s
+                    | NewAxis -> RSNewAxis
+                    | Fill -> RSAllFill
+                | Item (RSVExpr s) -> RSDynElem s
 
                 // slice
-                | Slice (Some (RSVSizeSpec s), Some (RSVSizeSpec f)) -> RngSymStartSymEnd (s, f)
-                | Slice (Some (RSVSizeSpec s), Some (RSVInt f)) -> RngSymStartSymEnd (s, SizeSpec.fix f)
-                | Slice (Some (RSVInt s), Some (RSVSizeSpec f)) -> RngSymStartSymEnd (SizeSpec.fix s, f)
-                | Slice (Some (RSVInt s), Some (RSVInt f)) -> RngSymStartSymEnd (SizeSpec.fix s, SizeSpec.fix f)
-                | Slice (Some (RSVExpr s), Some (RSVPlusElems e)) -> RngDynStartSymSize (s, e.Elems)
-                | Slice (None, None) -> RngAll
+                | Slice (Some (RSVSizeSpec s), Some (RSVSizeSpec f)) -> RSSymStartSymEnd (s, f)
+                | Slice (Some (RSVSizeSpec s), Some (RSVInt f)) -> RSSymStartSymEnd (s, SizeSpec.fix f)
+                | Slice (Some (RSVInt s), Some (RSVSizeSpec f)) -> RSSymStartSymEnd (SizeSpec.fix s, f)
+                | Slice (Some (RSVInt s), Some (RSVInt f)) -> RSSymStartSymEnd (SizeSpec.fix s, SizeSpec.fix f)
+                | Slice (Some (RSVExpr s), Some (RSVPlusElems e)) -> RSDynStartSymSize (s, e.Elems)
+                | Slice (None, None) -> RSAll
 
                 | _ -> failwithf "unsupported item/slice specification: %A" rs
                 )
@@ -521,7 +506,23 @@ module Expr =
         | Unary(Reshape(ss), _) -> ss
         | Unary(DoBroadcast(ss), _) -> ss
         | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
-
+        | Unary(Subtensor(sr), a) ->
+            let rec subtensorShape rng baseShp =
+                let ss = subtensorShape 
+                match rng, baseShp with
+                | RSSymElem _                  ::rngs, _::shps -> ss rngs shps
+                | RSDynElem _                  ::rngs, _::shps -> ss rngs shps
+                | RSSymStartSymEnd (s, f)      ::rngs, _::shps -> (f + (SizeSpec.fix 1) - s) :: ss rngs shps
+                | RSDynStartSymSize (_, size)  ::rngs, _::shps -> size :: ss rngs shps
+                | RSNewAxis                    ::rngs, _::shps -> SizeSpec.broadcastable :: ss rngs shps
+                | RSAll                        ::rngs, _::shps -> (List.head baseShp) :: ss rngs shps
+                | RSAllFill                    ::_   , _ when List.length rng <= List.length baseShp 
+                                                               -> ss (RSAll :: rng) baseShp 
+                | RSAllFill                    ::rngs, _       -> ss rngs baseShp 
+                | []                                  , []     -> []
+                | [], _  | _, []                               -> failwith "incompatible subtensor range specification"                    
+            subtensorShape sr (shapeOf a)
+                    
         // misc
         | Unary(StoreToVar _, a) -> shapeOf a
         | Unary(Annotated(_), a) -> shapeOf a

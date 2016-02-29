@@ -370,9 +370,22 @@ module ShapeSpec =
         List.map (SizeSpec.eval) sa
 
 
-//[<AutoOpen>]
-//module SymRngTypes =
+[<AutoOpen>]
+module RangeSpecTypes =
 
+    /// symbolic/dynamic range specification for one dimension
+    type RangeSpecT<'Dyn> = 
+        | RSSymElem            of SizeSpecT                           // size: symbolic
+        | RSDynElem            of 'Dyn                                // size: symbolic
+        | RSSymStartSymEnd     of SizeSpecT * SizeSpecT               // size: symbolic
+        | RSDynStartSymSize    of 'Dyn * SizeSpecT                    // size: symbolic
+        | RSNewAxis                                                   // size: symbolic
+        | RSAll                                                       // size: symbolic
+        | RSAllFill                                                   // size: symbolic
+        //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
+        //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
+        //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
+        //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
 
-
-        
+    // symbolic/dynamic subtensor specification
+    type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list

@@ -2,7 +2,7 @@
 open System
 open System.IO
 
-let maxDim = 3
+let maxDim = 4
 
 let f = new StreamWriter ("ExprSliceMembers.txt")
 let ws = "        "
