@@ -20,22 +20,14 @@ let ``Test neural net`` () =
     let pars = NeuralLayer.parsFlexible (mc.Module "Layer1")
     let loss = NeuralLayer.loss pars input target
 
-    printfn "NeuralNet:\n%A" loss
+    //printfn "NeuralNet:\n%A" loss
+
+    printfn "Parameters: %A" mc
 
     // compute loss of neural net on MNIST
-    //let bla : ExprT<double> = Expr.identity (SizeSpec.fix 1)
     let lossFun = Func.make onHost loss |> arg2 input target
 
-    printfn "mnist.TstImgs: %A" (ArrayND.shape mnist.TstImgs)
-
-    let tstImgs =  
-        mnist.TstImgs
-        |> ArrayND.reorderAxes [2; 0; 1] 
-
-    printfn "tstImgs: %A" (ArrayND.shape tstImgs)
-
-    
-
+    // reorder MNIST
     let tstImgs =  
         mnist.TstImgs
         |> ArrayND.reorderAxes [2; 0; 1] 
@@ -44,8 +36,8 @@ let ``Test neural net`` () =
         mnist.TstLbls
         |> ArrayND.reorderAxes [1; 0] 
 
-    let tstLoss = lossFun tstImgs tstLbls
-    printfn "Test loss on MNIST=%A" tstLoss
+    //let tstLoss = lossFun tstImgs tstLbls
+    //printfn "Test loss on MNIST=%A" tstLoss
 
     let dloss = Deriv.compute loss
     ()

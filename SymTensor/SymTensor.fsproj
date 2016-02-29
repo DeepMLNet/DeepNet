@@ -71,6 +71,8 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
+    <None Include="GenerateExprSliceMembers.fsx" />
+    <Content Include="ExprSliceMembers.txt" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymShapeInfer.fs" />
@@ -135,6 +137,11 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>cd "$(ProjectDir)"
+"C:\Program Files (x86)\Microsoft SDKs\F#\4.0\Framework\v4.0\fsi.exe" GenerateExprSliceMembers.fsx
+</PreBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

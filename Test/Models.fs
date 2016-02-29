@@ -11,7 +11,7 @@ module LinearRegression =
     }
 
     let pars (nOut: int) (mc: MC) =
-        {Weights = mc.Var "weights"     [nOut; ">nIn"]} 
+        {Weights = mc.Param "weights"     [nOut; ">nIn"]} 
         
     let pred (pars: Pars<'T>) (input: ExprT<'T>) =
         pars.Weights .* input
@@ -31,12 +31,12 @@ module NeuralLayer =
     }
 
     let pars (mc: MC) (nOut: int) =
-        {Weights = mc.Var "weights"     [nOut; ">nIn"];
-         Bias    = mc.Var "bias"        [nOut];}
+        {Weights = mc.Param "weights"     [nOut; ">nIn"];
+         Bias    = mc.Param "bias"        [nOut];}
 
     let parsFlexible (mc: MC) =
-        {Weights = mc.Var "weights"     [">nOut"; ">nIn"];
-         Bias    = mc.Var "bias"        [">nOut"];}
+        {Weights = mc.Param "weights"     [">nOut"; ">nIn"];
+         Bias    = mc.Param "bias"        [">nOut"];}
 
     let pred pars input =
         tanh (pars.Weights .* input + pars.Bias)

@@ -10,6 +10,16 @@ module Expr =
 
     open ArrayND
 
+    let inline boxOption (oo: #obj option) = 
+        match oo with
+        | Some o -> Some (o :> obj)
+        | None -> None
+
+    /// start plus the specified number of (symbolic elements)
+    type PlusElems (elems: SizeSpecT) =
+        new (intElems: int) = PlusElems (SizeSpec.fix intElems)
+        member this.Elems = elems
+
     /// arity of an op
     type ArityT =
         | FixedArity of int
@@ -78,6 +88,9 @@ module Expr =
         /// swaps two dimensions of a tensor
         | SwapDim of int * int          
 
+        // ==== subtensor ====
+        | Subtensor of (SubtensorRngT list)
+
         // ==== variable storage ====
         /// variable write
         | StoreToVar of VarSpecT<'T>
@@ -135,6 +148,48 @@ module Expr =
         | FromSingle of ExprT<single>
         | FromDouble of ExprT<double>
 
+    /// subtensor range specification
+    and SubtensorRngT = 
+        | RngSymElem            of SizeSpecT                           // size: symbolic
+        | RngDynElem            of ExprT<int>                          // size: symbolic
+        | RngSymStartSymEnd     of SizeSpecT * SizeSpecT               // size: symbolic
+        //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
+        //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
+        //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
+        | RngDynStartSymSize    of ExprT<int> * SizeSpecT              // size: symbolic
+        //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
+        | RngNewAxis                                                   // size: symbolic
+        | RngAll                                                       // size: symbolic
+        | RngAllFill                                                   // size: symbolic
+
+    /// internal item/slicing range specification value for range building
+    and private RangeSpecValueT =
+        | RSVInt of int
+        | RSVSpecial of SpecialAxisT
+        | RSVSizeSpec of SizeSpecT
+        | RSVExpr of ExprT<int>
+        | RSVPlusElems of PlusElems
+
+    /// internal item/slicing range specification for range building
+    and private RangeSpecT =
+        | Item of RangeSpecValueT
+        | Slice of (RangeSpecValueT option) * (RangeSpecValueT option)
+
+        static member ObjSlice (s: #obj option) (f: #obj option) = 
+            let toRangeSpec vo =
+                match vo with
+                | Some v ->
+                    match box v with
+                    | :? int as i -> RSVInt i
+                    | :? SpecialAxisT as s -> RSVSpecial s
+                    | :? SizeSpecT as s -> RSVSizeSpec s
+                    | :? ExprT<int> as e -> RSVExpr e
+                    | :? PlusElems as p -> RSVPlusElems p
+                    | _ -> failwithf "unknown type %A in expression slice" ((box v).GetType())
+                    |> Some
+                | None -> None
+            Slice (toRangeSpec s, toRangeSpec f)
+
     /// an expression
     and [<StructuralComparison; StructuralEquality>] 
         ExprT<'T> =
@@ -143,6 +198,87 @@ module Expr =
         | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
         | Convert of ConvertOpT<'T>
+
+        member private this.BuildSlice (rangeSpecs: RangeSpecT list) =
+            rangeSpecs
+            |> List.map (fun rs ->
+                match rs with
+                // item
+                | Item (RSVSizeSpec s) -> RngSymElem s
+                | Item (RSVInt e) -> RngSymElem (SizeSpec.fix e)
+                | Item (RSVSpecial s) ->
+                    match s with
+                    | NewAxis -> RngNewAxis
+                    | Fill -> RngAllFill
+                | Item (RSVExpr s) -> RngDynElem s
+
+                // slice
+                | Slice (Some (RSVSizeSpec s), Some (RSVSizeSpec f)) -> RngSymStartSymEnd (s, f)
+                | Slice (Some (RSVSizeSpec s), Some (RSVInt f)) -> RngSymStartSymEnd (s, SizeSpec.fix f)
+                | Slice (Some (RSVInt s), Some (RSVSizeSpec f)) -> RngSymStartSymEnd (SizeSpec.fix s, f)
+                | Slice (Some (RSVInt s), Some (RSVInt f)) -> RngSymStartSymEnd (SizeSpec.fix s, SizeSpec.fix f)
+                | Slice (Some (RSVExpr s), Some (RSVPlusElems e)) -> RngDynStartSymSize (s, e.Elems)
+                | Slice (None, None) -> RngAll
+
+                | _ -> failwithf "unsupported item/slice specification: %A" rs
+                )
+            |> fun ss -> Unary (Subtensor ss, this)            
+            
+
+        // ========================= ITEM / SLICE MEMBERS BEGIN =============================
+        
+        // 1 dimensions
+        member this.Item with get (d0: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0)]
+        member this.Item with get (d0: int) = this.BuildSlice [Item (RSVInt d0)]
+        member this.Item with get (d0: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0)]
+        member this.Item with get (d0: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0)]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f]
+        
+        // 2 dimensions
+        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1)]
+        member this.Item with get (d0: int, d1: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1)]
+        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1)]
+        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1)]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1)]
+        member this.Item with get (d0: SizeSpecT, d1: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1)]
+        member this.Item with get (d0: int, d1: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1)]
+        member this.Item with get (d0: SpecialAxisT, d1: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1)]
+        member this.Item with get (d0: ExprT<int>, d1: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1)]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1)]
+        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1)]
+        member this.Item with get (d0: int, d1: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1)]
+        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1)]
+        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1)]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1)]
+        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1)]
+        member this.Item with get (d0: int, d1: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1)]
+        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1)]
+        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1)]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1)]
+        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f]
+        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f]
+        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f]
+        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f]
+        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f]
+        
+        // ========================= ITEM / SLICE MEMBERS END ===============================
+
+
+    let testme () =
+        let a : ExprT<float> = Leaf (Identity (SizeSpec.one))
+        let b : ExprT<int> = Leaf (Identity (SizeSpec.one))
+        let c : ExprT<int> = Leaf (Identity (SizeSpec.one))
+        let aitm1 = a.[SizeSpec.one]
+
+        let asl1 = a.[SizeSpec.fix 5 .. SizeSpec.fix 10]
+        //let asl2 = a.[b .. c]
+        let asl2b = a.[b ..]
+        let asl3c = a.[*]
+
+        //let d = b + (SizeSpec.one)
+        let asl3 = a.[b .. PlusElems SizeSpec.one]
+        //let asl3 = a.[b .. b]
+        ()
 
 
     /// matches all unary ops that work elementwise
@@ -434,6 +570,7 @@ module Expr =
         let ba = a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
         Binary(op, ba, bb) |> check
+
 
     // elementwise operators
     type ExprT<'T> with

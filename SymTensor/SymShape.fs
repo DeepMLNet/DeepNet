@@ -369,3 +369,10 @@ module ShapeSpec =
     let eval (sa: ShapeSpecT) : NShapeSpecT =
         List.map (SizeSpec.eval) sa
 
+
+//[<AutoOpen>]
+//module SymRngTypes =
+
+
+
+        
