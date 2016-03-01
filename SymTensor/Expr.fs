@@ -184,195 +184,51 @@ module Expr =
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
         //| Convert of ConvertOpT<'T>
 
-        member private this.BuildSlice (rangeSpecs: RangeSpecT list) =
-            rangeSpecs
-            |> List.map (fun rs ->
-                match rs with
-                // item
-                | Item (RSVSizeSpec s) -> RSSymElem s
-                | Item (RSVInt e) -> RSSymElem (SizeSpec.fix e)
-                | Item (RSVSpecial s) ->
-                    match s with
-                    | NewAxis -> RSNewAxis
-                    | Fill -> RSAllFill
-                | Item (RSVExpr s) -> RSDynElem s
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            /// converts argument list to range specification
+            let rec toRSV (args: obj list) =
+                match args with
+                // slices
+                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSSymStartSymEnd (so.Value, fo.Value) :: toRSV rest
+                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
+                    RSSymStartToEnd so.Value :: toRSV rest
+                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSStartToSymEnd fo.Value :: toRSV rest
+                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
+                    RSDynStartSymSize (so.Value, fo.Value.Elems) :: toRSV rest
 
-                // slice
-                | Slice (Some (RSVSizeSpec s), Some (RSVSizeSpec f)) -> RSSymStartSymEnd (s, f)
-                | Slice (Some (RSVSizeSpec s), Some (RSVInt f)) -> RSSymStartSymEnd (s, SizeSpec.fix f)
-                | Slice (Some (RSVInt s), Some (RSVSizeSpec f)) -> RSSymStartSymEnd (SizeSpec.fix s, f)
-                | Slice (Some (RSVInt s), Some (RSVInt f)) -> RSSymStartSymEnd (SizeSpec.fix s, SizeSpec.fix f)
-                | Slice (Some (RSVExpr s), Some (RSVPlusElems e)) -> RSDynStartSymSize (s, e.Elems)
-                | Slice (None, None) -> RSAll
+                // items
+                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: toRSV rest
+                | (:? SpecialAxisT as s)  :: rest -> match s with
+                                                     | NewAxis -> RSNewAxis :: toRSV rest
+                                                     | Fill    -> RSAllFill :: toRSV rest
+                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: toRSV rest
 
-                | _ -> failwithf "unsupported item/slice specification: %A" rs
-                )
-            |> fun ss -> Unary (Subtensor ss, this)            
-            
+                | []                              -> []
+                | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
-        // ========================= ITEM / SLICE MEMBERS BEGIN =============================
+            /// converts ints to SizeSpecTs
+            let intToSizeSpec (arg: obj) =
+                match arg with
+                | :? int as f -> SizeSpec.fix f :> obj
+                | :? (int option) as fo -> 
+                    match fo with
+                    | Some f -> Some (SizeSpec.fix f) :> obj
+                    | None -> None :> obj
+                | _ -> arg
+
+            allArgs
+            |> Array.toList
+            |> List.map intToSizeSpec
+            |> toRSV
+            |> fun ss -> Unary (Subtensor ss, this)  
+
+        member this.Item 
+            with get ([<System.ParamArray>] args: obj []) = 
+                this.GetSlice (args)
+
         
-        // 1 dimensions
-        member this.Item with get (d0: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0)]
-        member this.Item with get (d0: int) = this.BuildSlice [Item (RSVInt d0)]
-        member this.Item with get (d0: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0)]
-        member this.Item with get (d0: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f]
-        
-        // 2 dimensions
-        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1)]
-        member this.Item with get (d0: int, d1: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1)]
-        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1)]
-        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1)]
-        member this.Item with get (d0: SizeSpecT, d1: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1)]
-        member this.Item with get (d0: int, d1: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1)]
-        member this.Item with get (d0: SpecialAxisT, d1: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1)]
-        member this.Item with get (d0: ExprT<int>, d1: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1)]
-        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1)]
-        member this.Item with get (d0: int, d1: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1)]
-        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1)]
-        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1)]
-        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1)]
-        member this.Item with get (d0: int, d1: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1)]
-        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1)]
-        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1)]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f]
-        
-        // 3 dimensions
-        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT, d2: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: int, d1: SizeSpecT, d2: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT, d2: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT, d2: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1); Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT, d2: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SizeSpecT, d1: int, d2: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: int, d1: int, d2: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: int, d2: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: ExprT<int>, d1: int, d2: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1); Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int, d2: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT, d2: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: int, d1: SpecialAxisT, d2: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT, d2: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1); Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT, d2: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>, d2: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: int, d1: ExprT<int>, d2: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>, d2: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1); Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>, d2: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1); Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>, d2: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1); Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option, d2: SizeSpecT) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option, d2: SizeSpecT) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option, d2: SizeSpecT) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option, d2: SizeSpecT) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSizeSpec d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option, d2: SizeSpecT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f; Item (RSVSizeSpec d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT, d2: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1); Item (RSVInt d2)]
-        member this.Item with get (d0: int, d1: SizeSpecT, d2: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT, d2: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1); Item (RSVInt d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT, d2: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1); Item (RSVInt d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT, d2: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SizeSpecT, d1: int, d2: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1); Item (RSVInt d2)]
-        member this.Item with get (d0: int, d1: int, d2: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: int, d2: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1); Item (RSVInt d2)]
-        member this.Item with get (d0: ExprT<int>, d1: int, d2: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1); Item (RSVInt d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int, d2: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT, d2: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1); Item (RSVInt d2)]
-        member this.Item with get (d0: int, d1: SpecialAxisT, d2: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1); Item (RSVInt d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT, d2: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1); Item (RSVInt d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT, d2: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>, d2: int) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1); Item (RSVInt d2)]
-        member this.Item with get (d0: int, d1: ExprT<int>, d2: int) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1); Item (RSVInt d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>, d2: int) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1); Item (RSVInt d2)]
-        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>, d2: int) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1); Item (RSVInt d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>, d2: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1); Item (RSVInt d2)]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option, d2: int) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVInt d2)]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option, d2: int) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVInt d2)]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option, d2: int) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVInt d2)]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option, d2: int) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVInt d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option, d2: int) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f; Item (RSVInt d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: int, d1: SizeSpecT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1); Item (RSVSpecial d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT, d2: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SizeSpecT, d1: int, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: int, d1: int, d2: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: int, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: ExprT<int>, d1: int, d2: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1); Item (RSVSpecial d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int, d2: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: int, d1: SpecialAxisT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT, d2: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1); Item (RSVSpecial d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT, d2: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: int, d1: ExprT<int>, d2: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1); Item (RSVSpecial d2)]
-        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>, d2: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1); Item (RSVSpecial d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>, d2: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1); Item (RSVSpecial d2)]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSpecial d2)]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option, d2: SpecialAxisT) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSpecial d2)]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option, d2: SpecialAxisT) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSpecial d2)]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option, d2: SpecialAxisT) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVSpecial d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option, d2: SpecialAxisT) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f; Item (RSVSpecial d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SizeSpecT, d2: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: int, d1: SizeSpecT, d2: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SizeSpecT, d2: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SizeSpecT, d2: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1); Item (RSVExpr d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT, d2: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SizeSpecT, d1: int, d2: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: int, d1: int, d2: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: int, d2: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: ExprT<int>, d1: int, d2: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1); Item (RSVExpr d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int, d2: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SizeSpecT, d1: SpecialAxisT, d2: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: int, d1: SpecialAxisT, d2: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: SpecialAxisT, d2: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: ExprT<int>, d1: SpecialAxisT, d2: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1); Item (RSVExpr d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT, d2: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SizeSpecT, d1: ExprT<int>, d2: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: int, d1: ExprT<int>, d2: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: SpecialAxisT, d1: ExprT<int>, d2: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1); Item (RSVExpr d2)]
-        member this.Item with get (d0: ExprT<int>, d1: ExprT<int>, d2: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1); Item (RSVExpr d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>, d2: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1); Item (RSVExpr d2)]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option, d2: ExprT<int>) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVExpr d2)]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option, d2: ExprT<int>) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVExpr d2)]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option, d2: ExprT<int>) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVExpr d2)]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option, d2: ExprT<int>) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f; Item (RSVExpr d2)]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option, d2: ExprT<int>) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f; Item (RSVExpr d2)]
-        member this.GetSlice (d0: SizeSpecT, d1: SizeSpecT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSizeSpec d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: int, d1: SizeSpecT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVInt d0); Item (RSVSizeSpec d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SpecialAxisT, d1: SizeSpecT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSizeSpec d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: ExprT<int>, d1: SizeSpecT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSizeSpec d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SizeSpecT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSizeSpec d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SizeSpecT, d1: int, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVInt d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: int, d1: int, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVInt d0); Item (RSVInt d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SpecialAxisT, d1: int, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVInt d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: ExprT<int>, d1: int, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVExpr d0); Item (RSVInt d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: int, d2s: #obj option, d2f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVInt d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SizeSpecT, d1: SpecialAxisT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVSpecial d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: int, d1: SpecialAxisT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVInt d0); Item (RSVSpecial d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SpecialAxisT, d1: SpecialAxisT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVSpecial d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: ExprT<int>, d1: SpecialAxisT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVExpr d0); Item (RSVSpecial d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: SpecialAxisT, d2s: #obj option, d2f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVSpecial d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SizeSpecT, d1: ExprT<int>, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); Item (RSVExpr d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: int, d1: ExprT<int>, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVInt d0); Item (RSVExpr d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SpecialAxisT, d1: ExprT<int>, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); Item (RSVExpr d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: ExprT<int>, d1: ExprT<int>, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVExpr d0); Item (RSVExpr d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1: ExprT<int>, d2s: #obj option, d2f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; Item (RSVExpr d1); RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SizeSpecT, d1s: #obj option, d1f: #obj option, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSizeSpec d0); RangeSpecT.ObjSlice d1s d1f; RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: int, d1s: #obj option, d1f: #obj option, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVInt d0); RangeSpecT.ObjSlice d1s d1f; RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: SpecialAxisT, d1s: #obj option, d1f: #obj option, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVSpecial d0); RangeSpecT.ObjSlice d1s d1f; RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0: ExprT<int>, d1s: #obj option, d1f: #obj option, d2s: #obj option, d2f: #obj option) = this.BuildSlice [Item (RSVExpr d0); RangeSpecT.ObjSlice d1s d1f; RangeSpecT.ObjSlice d2s d2f]
-        member this.GetSlice (d0s: #obj option, d0f: #obj option, d1s: #obj option, d1f: #obj option, d2s: #obj option, d2f: #obj option) = this.BuildSlice [RangeSpecT.ObjSlice d0s d0f; RangeSpecT.ObjSlice d1s d1f; RangeSpecT.ObjSlice d2s d2f]
-        // ========================= ITEM / SLICE MEMBERS END ===============================
 
 
     let testme () =
@@ -380,6 +236,7 @@ module Expr =
         let b : ExprT<int> = Leaf (Identity (SizeSpec.one))
         let c : ExprT<int> = Leaf (Identity (SizeSpec.one))
         let aitm1 = a.[SizeSpec.one]
+        let aitm1b = a.[SizeSpec.one, 12, 3 .. 6]
 
         let asl1 = a.[SizeSpec.fix 5 .. SizeSpec.fix 10]
         //let asl2 = a.[b .. c]
@@ -387,7 +244,7 @@ module Expr =
         let asl3c = a.[*]
 
         //let d = b + (SizeSpec.one)
-        let asl3 = a.[b .. PlusElems 3]
+        let asl3 = a.[b .. PlusElems 3, b .. b, 33]
         //let asl3 = a.[b .. b]
         ()
 
@@ -878,6 +735,7 @@ module ExprTypes2 =
     type NaryOpT<'T> = Expr.NaryOpT<'T>
     type IExtensionOp<'T> = Expr.IExtensionOp<'T>
     type ExprT<'T> = Expr.ExprT<'T>
+
 
 
 

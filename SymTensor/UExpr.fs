@@ -73,7 +73,7 @@ module UExprTypes =
         | UBinaryOp of UBinaryOpT
         | UNaryOp of UNaryOpT
 
-    /// unified expression (combines all arities and types)
+    /// unified expression (combines all arities and types and ops cannot have expressions as parameters)
     [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{PrettyString}")>]
     type UExprT = 
         | UExpr of UOpT * TypeNameT * ShapeSpecT * (UExprT list)
@@ -142,8 +142,6 @@ module UExpr =
                     | RSNewAxis                     -> RSNewAxis,                   dynExprs
                     | RSAll                         -> RSAll,                       dynExprs
                     | RSAllFill                     -> RSAllFill,                   dynExprs)           
-            // workaround for: this code causes the code to be less generic...
-            //let dynUExprs = dynExprs |> List.map (fun (e: ExprT<int>) -> toUExpr e)
             let dynUExprs = dynExprs |> List.map toUExprForInt               
             UExpr(UNaryOp (Subtensor usr), tn, shp, toUExpr a :: dynUExprs)
 

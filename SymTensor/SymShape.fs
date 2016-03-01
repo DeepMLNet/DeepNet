@@ -476,6 +476,8 @@ module RangeSpecTypes =
         | RSSymElem            of SizeSpecT                           // size: symbolic
         | RSDynElem            of 'Dyn                                // size: symbolic
         | RSSymStartSymEnd     of SizeSpecT * SizeSpecT               // size: symbolic
+        | RSSymStartToEnd      of SizeSpecT                           // size: symbolic
+        | RSStartToSymEnd      of SizeSpecT                           // size: symbolic
         | RSDynStartSymSize    of 'Dyn * SizeSpecT                    // size: symbolic
         | RSNewAxis                                                   // size: symbolic
         | RSAll                                                       // size: symbolic
