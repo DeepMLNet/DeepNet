@@ -18,7 +18,7 @@ module Deriv =
         let exprShp = shapeOf expr
         let funElems = (shapeOf eg).[0]  
 
-        if (shapeOf eg).[1] <> ShapeSpec.nElem (shapeOf expr) then
+        if (shapeOf eg).[1] .<> ShapeSpec.nElem (shapeOf expr) then
             printfn "expr=\n%A" expr
             printfn "eg=\n%A" eg
 

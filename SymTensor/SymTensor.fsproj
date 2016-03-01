@@ -75,7 +75,7 @@
     <Content Include="ExprSliceMembers.txt" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="SymShape.fs" />
-    <Compile Include="SymShapeInfer.fs" />
+    <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="UExpr.fs" />

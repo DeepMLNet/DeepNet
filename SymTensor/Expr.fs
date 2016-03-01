@@ -512,14 +512,14 @@ module Expr =
                 match rng, baseShp with
                 | RSSymElem _                  ::rngs, _::shps -> ss rngs shps
                 | RSDynElem _                  ::rngs, _::shps -> ss rngs shps
-                | RSSymStartSymEnd (s, f)      ::rngs, _::shps -> (f + (SizeSpec.fix 1) - s) :: ss rngs shps
+                | RSSymStartSymEnd (s, f)      ::rngs, _::shps -> (f + 1 - s) :: ss rngs shps
                 | RSDynStartSymSize (_, size)  ::rngs, _::shps -> size :: ss rngs shps
                 | RSNewAxis                    ::rngs, _::shps -> SizeSpec.broadcastable :: ss rngs shps
                 | RSAll                        ::rngs, _::shps -> (List.head baseShp) :: ss rngs shps
                 | RSAllFill                    ::_   , _ when List.length rng <= List.length baseShp 
                                                                -> ss (RSAll :: rng) baseShp 
                 | RSAllFill                    ::rngs, _       -> ss rngs baseShp 
-                | []                                  , []     -> []
+                | []                                 , []      -> []
                 | [], _  | _, []                               -> failwith "incompatible subtensor range specification"                    
             subtensorShape sr (shapeOf a)
                     

@@ -7,6 +7,9 @@ open Expr
 [<AutoOpen>]
 module UExprTypes = 
 
+    // int holds the position of the subuexpr that has the dynamic value
+    type UExprRngSpec = RangeSpecT<int>
+    type UExprRngsSpec = RangesSpecT<int>
 
     type IUExtensionOp =
         inherit System.IComparable
@@ -43,7 +46,7 @@ module UExprTypes =
         | SumAxis of int                
         | Reshape of ShapeSpecT         
         | DoBroadcast of ShapeSpecT       
-        | SwapDim of int * int          
+        | SwapDim of int * int       
         | StoreToVar of IVarSpec
         | Annotated of Annotation       
 
@@ -59,6 +62,7 @@ module UExprTypes =
 
     type UNaryOpT =
         | Discard        
+        | Subtensor of UExprRngsSpec  
         | ExtensionOp of IUExtensionOp
              
 
@@ -84,133 +88,155 @@ module UExprTypes =
 
 module UExpr =
 
-    /// extracts the top-level op from an expression
-    let inline extractOp (expr: ExprT<'T>) =
-        match expr with
-        | Leaf op -> 
-            match op with
-            | Expr.Identity ss -> Identity ss
-            | Expr.Zeros ss -> Zeros ss
-            | Expr.ScalarConst v -> ScalarConst (box v :?> System.IComparable)
-            | Expr.Var vs -> Var (vs :> IVarSpec)
-            |> ULeafOp
-        | Unary(op, _) -> 
-            match op with
-            | Expr.Negate -> Negate
-            | Expr.Abs -> Abs
-            | Expr.SignT -> SignT
-            | Expr.Log -> Log
-            | Expr.Log10 -> Log10
-            | Expr.Exp -> Exp                          
-            | Expr.Sin -> Sin
-            | Expr.Cos -> Cos
-            | Expr.Tan -> Tan
-            | Expr.Asin -> Asin
-            | Expr.Acos -> Acos
-            | Expr.Atan -> Atan
-            | Expr.Sinh -> Sinh
-            | Expr.Cosh -> Cosh
-            | Expr.Tanh -> Tanh
-            | Expr.Sqrt -> Sqrt
-            | Expr.Ceil -> Ceil
-            | Expr.Floor -> Floor
-            | Expr.Round -> Round
-            | Expr.Truncate -> Truncate
-            | Expr.Sum -> Sum                           
-            | Expr.SumAxis a -> SumAxis a            
-            | Expr.Reshape ss -> Reshape ss
-            | Expr.DoBroadcast ss -> DoBroadcast ss
-            | Expr.SwapDim (ax1, ax2) -> SwapDim (ax1, ax2)
-            | Expr.StoreToVar vs -> StoreToVar (vs :> IVarSpec)
-            | Expr.Annotated ano -> Annotated ano
-            |> UUnaryOp
-        | Binary(op, _, _) -> 
-            match op with
-            | Expr.Add -> Add                         
-            | Expr.Substract -> Substract                    
-            | Expr.Multiply -> Multiply                     
-            | Expr.Divide -> Divide             
-            | Expr.Modulo -> Modulo          
-            | Expr.Power -> Power               
-            | Expr.Dot -> Dot                   
-            | Expr.TensorProduct -> TensorProduct     
-            |> UBinaryOp
-        | Nary(op, _) -> 
-            match op with
-            | Expr.Discard -> Discard
-            | Expr.ExtensionOp eop -> ExtensionOp (eop :?> IUExtensionOp)
-            |> UNaryOp
-
     /// converts an expression to a unified expression
     let rec toUExpr (expr: ExprT<'T>) =
-        let uop = extractOp expr
         let tn = TypeName typeof<'T>.AssemblyQualifiedName
         let shp = Expr.shapeOf expr
+
+        let leaf uop        = UExpr (ULeafOp uop, tn, shp, [])
+        let unary uop a     = UExpr (UUnaryOp uop, tn, shp, [toUExpr a])
+        let binary uop a b  = UExpr (UBinaryOp uop, tn, shp, [toUExpr a; toUExpr b])
+        let nary uop se     = UExpr (UNaryOp uop, tn, shp, se |> List.map toUExpr)
+
         match expr with
-        | Leaf op -> UExpr (uop, tn, shp, [])
-        | Unary(op, a) -> UExpr(uop, tn, shp, [toUExpr a])
-        | Binary(op, a, b) -> UExpr(uop, tn, shp, [toUExpr a; toUExpr b])
-        | Nary(op, se) -> UExpr(uop, tn, shp, se |> List.map toUExpr)
-    
+        | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
+        | Leaf (Expr.Zeros ss)          -> leaf (Zeros ss)
+        | Leaf (Expr.ScalarConst v)     -> leaf (ScalarConst (box v :?> System.IComparable))
+        | Leaf (Expr.Var vs)            -> leaf (Var (vs :> IVarSpec))
+
+        | Unary (Expr.Negate, a)        -> unary Negate a
+        | Unary (Expr.Abs, a)           -> unary Abs a
+        | Unary (Expr.SignT, a)         -> unary SignT a
+        | Unary (Expr.Log, a)           -> unary Log a
+        | Unary (Expr.Log10, a)         -> unary Log10 a
+        | Unary (Expr.Exp, a)           -> unary Exp a
+        | Unary (Expr.Sin, a)           -> unary Sin a
+        | Unary (Expr.Cos, a)           -> unary Cos a
+        | Unary (Expr.Tan, a)           -> unary Tan a
+        | Unary (Expr.Asin, a)          -> unary Asin a
+        | Unary (Expr.Acos, a)          -> unary Acos a
+        | Unary (Expr.Atan, a)          -> unary Atan a
+        | Unary (Expr.Sinh, a)          -> unary Sinh a
+        | Unary (Expr.Cosh, a)          -> unary Cosh a
+        | Unary (Expr.Tanh, a)          -> unary Tanh a
+        | Unary (Expr.Sqrt, a)          -> unary Sqrt a
+        | Unary (Expr.Ceil, a)          -> unary Ceil a
+        | Unary (Expr.Floor, a)         -> unary Floor a
+        | Unary (Expr.Round, a)         -> unary Round a
+        | Unary (Expr.Truncate, a)      -> unary Truncate a
+        | Unary (Expr.Sum, a)           -> unary Sum a
+        | Unary (Expr.SumAxis ax, a)    -> unary (SumAxis ax) a
+        | Unary (Expr.Reshape ss, a)    -> unary (Reshape ss) a
+        | Unary (Expr.DoBroadcast ss, a)-> unary (DoBroadcast ss) a
+        | Unary (Expr.SwapDim (ax1, ax2), a) -> unary (SwapDim (ax1, ax2)) a
+        | Unary (Expr.Subtensor sr, a)  ->
+            let usr, dynExprs = 
+                ([], sr)
+                ||> List.mapFold (fun dynExprs rng ->
+                    let idx = List.length dynExprs + 1
+                    match rng with
+                    | RSSymElem e                   -> RSSymElem e,                 dynExprs
+                    | RSDynElem e                   -> RSDynElem idx,               dynExprs @ [e]
+                    | RSSymStartSymEnd (s, f)       -> RSSymStartSymEnd (s, f),     dynExprs
+                    | RSDynStartSymSize (s, f)      -> RSDynStartSymSize (idx, f),  dynExprs @ [s]
+                    | RSNewAxis                     -> RSNewAxis,                   dynExprs
+                    | RSAll                         -> RSAll,                       dynExprs
+                    | RSAllFill                     -> RSAllFill,                   dynExprs)           
+            // workaround for: this code causes the code to be less generic...
+            //let dynUExprs = dynExprs |> List.map (fun (e: ExprT<int>) -> toUExpr e)
+            let dynUExprs = dynExprs |> List.map toUExprForInt               
+            UExpr(UNaryOp (Subtensor usr), tn, shp, toUExpr a :: dynUExprs)
+
+        | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (vs :> IVarSpec)) a
+        | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
+
+        | Binary (Expr.Add, a, b)       -> binary Add a b
+        | Binary (Expr.Substract, a, b) -> binary Substract a b
+        | Binary (Expr.Multiply, a, b)  -> binary Multiply a b                     
+        | Binary (Expr.Divide, a, b)    -> binary Divide a b             
+        | Binary (Expr.Modulo, a, b)    -> binary Modulo a b          
+        | Binary (Expr.Power, a, b)     -> binary Power a b               
+        | Binary (Expr.Dot, a, b)       -> binary Dot a b                   
+        | Binary (Expr.TensorProduct, a, b) -> binary TensorProduct a b             
+
+        | Nary (Expr.Discard, se)       -> nary Discard se
+        | Nary (Expr.ExtensionOp eop, se) -> nary (ExtensionOp (eop :?> IUExtensionOp)) se
+
+    and private toUExprForInt (expr: ExprT<int>) =
+        toUExpr expr
+
     /// converts a unified expression to an expression of (known) type
     let rec toExprOfType (UExpr (uop, tn, ss, subUExprs) as uexpr) : ExprT<'T> =
         if TypeName.ofType<'T> <> tn then
             failwith "UExpr type does not match does function"
 
+        let leaf op    = Expr.Leaf op
+        let unary op   = Expr.Unary (op, toExprOfType subUExprs.[0])
+        let binary op  = Expr.Binary (op, toExprOfType subUExprs.[0], toExprOfType subUExprs.[1])
+        let nary op    = Expr.Nary (op, List.map toExprOfType subUExprs)
+
         match uop with
-        | ULeafOp uop ->
-            match uop with
-            | Identity ss -> Expr.Identity ss
-            | Zeros ss -> Expr.Zeros ss
-            | ScalarConst v -> Expr.ScalarConst (box v :?> 'T)
-            | Var vs -> Expr.Var (box vs :?> VarSpecT<'T>)
-            |> Expr.Leaf
-        | UUnaryOp uop ->
-            match uop with
-            | Negate -> Expr.Negate
-            | Abs -> Expr.Abs
-            | SignT -> Expr.SignT
-            | Log -> Expr.Log
-            | Log10 -> Expr.Log10
-            | Exp -> Expr.Exp                          
-            | Sin -> Expr.Sin
-            | Cos -> Expr.Cos
-            | Tan -> Expr.Tan
-            | Asin -> Expr.Asin
-            | Acos -> Expr.Acos
-            | Atan -> Expr.Atan
-            | Sinh -> Expr.Sinh
-            | Cosh -> Expr.Cosh
-            | Tanh -> Expr.Tanh
-            | Sqrt -> Expr.Sqrt
-            | Ceil -> Expr.Ceil
-            | Floor -> Expr.Floor
-            | Round -> Expr.Round
-            | Truncate -> Expr.Truncate
-            | Sum -> Expr.Sum                           
-            | SumAxis a -> Expr.SumAxis a            
-            | Reshape ss -> Expr.Reshape ss
-            | DoBroadcast ss -> Expr.DoBroadcast ss
-            | SwapDim (ax1, ax2) -> Expr.SwapDim (ax1, ax2)
-            | StoreToVar vs -> Expr.StoreToVar (box vs :?> VarSpecT<'T>)
-            | Annotated ano -> Expr.Annotated ano
-            |> fun op -> Expr.Unary (op, toExprOfType subUExprs.[0])
-        | UBinaryOp uop ->
-            match uop with
-            | Add -> Expr.Add                         
-            | Substract -> Expr.Substract                    
-            | Multiply -> Expr.Multiply                     
-            | Divide -> Expr.Divide             
-            | Modulo -> Expr.Modulo          
-            | Power -> Expr.Power               
-            | Dot -> Expr.Dot                   
-            | TensorProduct -> Expr.TensorProduct     
-            |> fun op -> Expr.Binary (op, toExprOfType subUExprs.[0], toExprOfType subUExprs.[1])
-        | UNaryOp uop ->
-            match uop with
-            | Discard -> Expr.Discard
-            | ExtensionOp eop -> Expr.ExtensionOp (eop :?> IExtensionOp<'T>)
-            |> fun op -> Expr.Nary (op, List.map toExprOfType subUExprs)
+        | ULeafOp (Identity ss)             -> leaf (Expr.Identity ss)
+        | ULeafOp (Zeros ss)                -> leaf (Expr.Zeros ss)
+        | ULeafOp (ScalarConst v)           -> leaf (Expr.ScalarConst (box v :?> 'T))
+        | ULeafOp (Var vs)                  -> leaf (Expr.Var (box vs :?> VarSpecT<'T>))
+
+        | UUnaryOp Negate                   -> unary Expr.Negate
+        | UUnaryOp Abs                      -> unary Expr.Abs
+        | UUnaryOp SignT                    -> unary Expr.SignT
+        | UUnaryOp Log                      -> unary Expr.Log
+        | UUnaryOp Log10                    -> unary Expr.Log10
+        | UUnaryOp Exp                      -> unary Expr.Exp                         
+        | UUnaryOp Sin                      -> unary Expr.Sin
+        | UUnaryOp Cos                      -> unary Expr.Cos
+        | UUnaryOp Tan                      -> unary Expr.Tan
+        | UUnaryOp Asin                     -> unary Expr.Asin
+        | UUnaryOp Acos                     -> unary Expr.Acos
+        | UUnaryOp Atan                     -> unary Expr.Atan
+        | UUnaryOp Sinh                     -> unary Expr.Sinh
+        | UUnaryOp Cosh                     -> unary Expr.Cosh
+        | UUnaryOp Tanh                     -> unary Expr.Tanh
+        | UUnaryOp Sqrt                     -> unary Expr.Sqrt
+        | UUnaryOp Ceil                     -> unary Expr.Ceil
+        | UUnaryOp Floor                    -> unary Expr.Floor
+        | UUnaryOp Round                    -> unary Expr.Round
+        | UUnaryOp Truncate                 -> unary Expr.Truncate
+        | UUnaryOp Sum                      -> unary Expr.Sum                           
+        | UUnaryOp (SumAxis a)              -> unary (Expr.SumAxis a)            
+        | UUnaryOp (Reshape ss)             -> unary (Expr.Reshape ss)
+        | UUnaryOp (DoBroadcast ss)         -> unary (Expr.DoBroadcast ss)
+        | UUnaryOp (SwapDim (ax1, ax2))     -> unary (Expr.SwapDim (ax1, ax2))
+        | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (box vs :?> VarSpecT<'T>))
+        | UUnaryOp (Annotated ano)          -> unary (Expr.Annotated ano)
+
+        | UBinaryOp Add                     -> binary Expr.Add                         
+        | UBinaryOp Substract               -> binary Expr.Substract                    
+        | UBinaryOp Multiply                -> binary Expr.Multiply                     
+        | UBinaryOp Divide                  -> binary Expr.Divide             
+        | UBinaryOp Modulo                  -> binary Expr.Modulo          
+        | UBinaryOp Power                   -> binary Expr.Power               
+        | UBinaryOp Dot                     -> binary Expr.Dot                   
+        | UBinaryOp TensorProduct           -> binary Expr.TensorProduct     
+            
+        | UNaryOp Discard                   -> nary Expr.Discard
+        | UNaryOp (Subtensor sr)            ->
+            let drs = subUExprs |> List.tail |> List.map toExprOfTypeInt
+            let rec buildExprRngsSpec (srs: UExprRngsSpec) (drs: ExprT<int> list) =
+                match srs, drs with
+                | RSSymElem e              :: srs, _         -> RSSymElem e                :: buildExprRngsSpec srs drs
+                | RSDynElem _              :: srs, dr :: drs -> RSDynElem dr               :: buildExprRngsSpec srs drs
+                | RSSymStartSymEnd (s, f)  :: srs, _         -> RSSymStartSymEnd (s, f)    :: buildExprRngsSpec srs drs
+                | RSDynStartSymSize (_, f) :: srs, dr :: drs -> RSDynStartSymSize (dr, f)  :: buildExprRngsSpec srs drs
+                | RSNewAxis                :: srs, _         -> RSNewAxis                  :: buildExprRngsSpec srs drs
+                | RSAll                    :: srs, _         -> RSAll                      :: buildExprRngsSpec srs drs
+                | RSAllFill                :: srs, _         -> RSAllFill                  :: buildExprRngsSpec srs drs
+                | _                              , _         -> failwith "invalid unified subtensor spec"
+            unary (Expr.Subtensor (buildExprRngsSpec sr drs))
+
+        | UNaryOp (ExtensionOp eop)         -> nary (Expr.ExtensionOp (eop :?> IExtensionOp<'T>))
+
+    and private toExprOfTypeInt uexpr : ExprT<int> =
+        toExprOfType uexpr
 
     type private ToExprOfTypeT =
         static member ToExprOfType<'T> uexpr : ExprT<'T> =

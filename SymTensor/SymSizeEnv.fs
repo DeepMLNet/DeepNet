@@ -26,49 +26,18 @@ module SymSizeEnv =
             printfn "%-30s = %A" (SizeSymbol.name sym) value
 
     /// substitutes all inferred symbols into size and simplifies it
-    let rec substInf inferred size = 
-        match size with
-        | Base (Sym sym) ->
-            match Map.tryFind sym inferred with
-            | Some s -> substInf inferred s
-            | None -> size
-        | Base (Fixed _) -> size
-        | Broadcast -> size
-        | Product p ->
-            let substProduct p sBase sPower = 
-                match substInf inferred (Base (Sym sBase)) with
-                | Base b -> SizeProduct.mult b sPower p
-                | Broadcast -> p
-                | Product op ->
-                    // product substitution is currently unsupported
-                    printfn "Warning: product into product substituion is unsupported"
-                    SizeProduct.mult (Sym sBase) sPower p
+    let private substInf inferred size = 
+        SizeSpec.substSymbols inferred size
 
-            p.Symbols
-                |> Map.fold substProduct (SizeProductT p.Factor) 
-                |> Product
-        |> SizeSpec.simplify
-
+    /// substitutes all symbols into the size and simplifies it
     let subst env size =
         substInf env.Inferred size
 
-    let substShape env (shape: ShapeSpecT)  : ShapeSpecT =
+    /// substitutes all symbols into the shape and simplifies it
+    let substShape env (shape: ShapeSpecT) : ShapeSpecT =
         List.map (subst env) shape
 
-//
-//    let rec simplifyInferred inferred =
-//        let subst =
-//            inferred
-//            |> Map.map (fun sym value ->
-//                match value with
-//                | Base (Sym otherSym) ->
-//                    match Map.tryFind otherSym inferred with
-//                    | Some otherVal -> otherVal
-//                    | None -> value
-//                | _ -> value)
-//        if subst <> inferred then simplifyInferred subst
-//        else inferred
-
+    /// adds inferred symbol value
     let addInferred sym value inferred =
         if substInf inferred value = Base (Sym sym) then
             failwithf "inferrering %A = %A would introduce a loop" sym value
@@ -79,7 +48,6 @@ module SymSizeEnv =
             else contradiction "%A must be %A, but was inferred to be %A previously" sym value other
         | None -> 
             inferred |> Map.add sym value 
-            //inferred |> Map.add sym value |> simplifyInferred
             
 
     let tryGetInferred sym env = 
@@ -88,7 +56,8 @@ module SymSizeEnv =
 
     let rec infer env =      
         let rec inferOne inferred (a, b) =
-            match substInf inferred a, substInf inferred b with
+            match SizeSpec.substSymbols inferred a, 
+                  SizeSpec.substSymbols inferred b with
             | Base (Fixed av), Base (Fixed bv) ->
                 if av = bv then inferred
                 else contradiction "fixed %d <> fixed %d" av bv
@@ -97,8 +66,8 @@ module SymSizeEnv =
             | Base (Fixed av), Broadcast ->
                 if av = 1 then inferred
                 else contradiction "fixed %d <> broadcast 1" av
-            | Base (Fixed av), Product bp ->
-                contradiction "fixed %d <> product %A" av bp
+            | Base (Fixed av), Multinom bm ->
+                contradiction "fixed %d <> multinom %A" av bm
             | _, Base (Fixed _) ->
                 inferOne inferred (b, a)
 
@@ -112,21 +81,21 @@ module SymSizeEnv =
                 | _ -> contradiction "symbol %A <> symbol %A" asym bsym
             | Base (Sym asym), Broadcast ->
                 inferred |> addInferred asym b
-            | Base (Sym asym), Product bp ->
+            | Base (Sym asym), Multinom bm ->
                 if SizeSymbol.flexible asym then inferred |> addInferred asym b
-                else contradiction "symbol %A <> product %A" a b 
+                else contradiction "symbol %A <> multinom %A" a bm
             | _, Base (Sym _) ->
                 inferOne inferred (b, a)
 
             | Broadcast, Broadcast -> inferred
-            | Broadcast, Product bp ->
-                contradiction "broadcast 1 <> product %A" b
+            | Broadcast, Multinom bm ->
+                contradiction "broadcast 1 <> multinom %A" bm
             | _, Broadcast ->
                 inferOne inferred (b, a)
 
-            | Product ap, Product bp ->
-                if ap = bp then inferred                                
-                else contradiction "product %A <> product %A" a b
+            | Multinom am, Multinom bm ->
+                if am = bm then inferred                                
+                else contradiction "multinom %A <> multinom %A" am bm
 
         let newEnv = {env with Inferred = List.fold inferOne env.Inferred env.Equalities}
         if newEnv <> env then infer newEnv

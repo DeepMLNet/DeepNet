@@ -32,25 +32,23 @@ module SizeSymbol =
         sym.Flexible
 
 
-[<AutoOpen>]
+//[<AutoOpen>]
 module SizeProductTypes = 
       
     /// product of elementary size specifications
-    type SizeProductT(factor: int, inSymbols: Map<SizeSymbolT, int>) =
+    [<StructuredFormatDisplay("{PrettyString}")>]
+    type SizeProductT(symbols: Map<SizeSymbolT, int>) =
         let symbols =
-            Map.fold (fun c sBase sPower ->
-                        match sBase, sPower with
-                        | _, p when p = 0 -> c
-                        | _, p when p > 0 -> Map.add sBase sPower c
-                        | _ -> failwithf "SizeProduct cannot have negative exponents: %A" inSymbols) 
-                Map.empty inSymbols
+            symbols 
+            |> Map.filter (fun _ sPower ->
+                if sPower < 0 then failwithf "SizeProduct cannot have negative exponents: %A" symbols
+                else sPower > 0)
   
-        new() = SizeProductT(1, Map.empty)
-        new(f: int) = SizeProductT(f, Map.empty)
-        new(b: SizeSymbolT) = SizeProductT(1, Map.empty |> Map.add b 1)
+        new() = SizeProductT(Map.empty)
+        new(b: SizeSymbolT) = SizeProductT(b, 1)
+        new(b: SizeSymbolT, pow: int) = SizeProductT(Map.empty |> Map.add b pow)
 
         member this.Symbols = symbols
-        member this.Factor = factor
 
         static member (*) (a: SizeProductT, b: SizeProductT) =
             let pSymbols = 
@@ -60,127 +58,202 @@ module SizeProductTypes =
                         | Some pPower -> Map.add bBase (pPower + bPower) p
                         | None -> Map.add bBase bPower p) 
                     a.Symbols b.Symbols
-            SizeProductT(a.Factor * b.Factor, pSymbols)
+            SizeProductT(pSymbols)
          
         static member (*) (a: SizeProductT, b: SizeSymbolT) = a * SizeProductT(b)
-        static member (*) (a: SizeProductT, b: int) = a * SizeProductT(b)
         static member (*) (a: SizeSymbolT, b: SizeProductT) = SizeProductT(a) * b
-        static member (*) (a: int, b: SizeProductT) = SizeProductT(a) * b
-        static member (*) (a: SizeProductT, b: BaseSizeT) =
-            match b with
-            | Sym s -> a * s
-            | Fixed f -> a * f
-        static member (*) (a: BaseSizeT, b: SizeProductT) = b * a
 
-        override this.ToString() = 
-            let ft = if this.Factor = 1 then [] else [sprintf "%d " this.Factor]
-            let st = 
-                this.Symbols
-                |> Map.toSeq
-                |> Seq.map 
-                    (fun (tBase, tPower) ->
-                        if tPower = 1 then sprintf "%A" tBase 
-                        else sprintf "%A**%d" tBase tPower)
-                |> Seq.toList
-            String.concat " * " (ft @ st)
+        member this.PrettyString = 
+            this.Symbols
+            |> Map.toSeq
+            |> Seq.map 
+                (fun (tBase, tPower) ->
+                    if tPower = 1 then sprintf "%A" tBase 
+                    else sprintf "%A**%d" tBase tPower)
+            |> Seq.toList
+            |> String.concat " * "
                         
         override this.Equals(otherObj) =
             match otherObj with
-            | :? SizeProductT as other ->
-                this.Symbols = other.Symbols && this.Factor = other.Factor
+            | :? SizeProductT as other -> this.Symbols = other.Symbols 
             | _ -> false
 
         override this.GetHashCode() =
-            hash (this.Factor, this.Symbols)
+            hash this.Symbols
 
         interface System.IComparable with
             member this.CompareTo otherObj =
                 match otherObj with
-                | :? SizeProductT as other ->
-                    let ms = Map.add {Name="__factor__"; Flexible=false} this.Factor this.Symbols
-                    let os = Map.add {Name="__factor__"; Flexible=false} other.Factor other.Symbols
-                    compare ms os
+                | :? SizeProductT as other -> compare this.Symbols other.Symbols
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 
 module SizeProduct =
-    open SizeSymbolTypes
+    open SizeProductTypes
 
+    /// true if product is empty (equal to 1)
     let isEmpty (p: SizeProductT) =
         Map.isEmpty p.Symbols
 
-    let ofBaseSize (bs: BaseSizeT) =
-        match bs with
-        | Sym s -> SizeProductT(s)
-        | Fixed f -> SizeProductT(f)
-
+    /// empty product (equal to 1)
     let empty =
         SizeProductT()
 
+    /// matches if product consists of a single symbol with power 1
     let (|SingleSymbol|_|) (sp: SizeProductT) =
         let mc = Map.toList sp.Symbols
-        match sp.Factor, List.length mc with
-        | 1, 1 -> 
+        match List.length mc with
+        | 1 -> 
             let bs, power = mc.[0]
             if power = 1 then Some bs else None
         | _ -> None
 
-    let (|SingleFactor|_|) (sp: SizeProductT) =
-        if Map.isEmpty sp.Symbols then
-            Some sp.Factor
-        else
-            None
+    /// matches if product is empty (equal to 1)
+    let (|Empty|_|) (sp: SizeProductT) =
+        if isEmpty sp then Some () else None
 
-    let mult (sBase: BaseSizeT) (sPower: int) (p: SizeProductT) =
-        Seq.fold (*) p (Seq.replicate sPower sBase) 
 
-    /// tries to evaluate to a numeric size
-    let tryEval (p: SizeProductT) =
-        match p with
-        | SingleFactor f -> Some f
-        | _ -> None
+//[<AutoOpen>]
+module SizeMultinomTypes =
+    open SizeProductTypes
 
-    /// evaluate to a numeric size
-    let eval (p: SizeProductT) =
-        match tryEval p with
-        | Some f -> f
-        | _ -> failwithf "cannot evaluate %A to a numeric size, since it contains symbols" p
+    // symbolic multinomial
+    [<StructuredFormatDisplay("{PrettyString}")>]
+    type SizeMultinomT (products: Map<SizeProductT, int>) =
+        let products = products |> Map.filter (fun _ fac -> fac <> 0)
 
-//    /// true if it can be evaluated to a numeric size
-//    let canEval (p: SizeProductT) =
-//        match p with
-//        | SingleFactor f -> true
-//        | _ -> false
+        new (bs: BaseSizeT) = SizeMultinomT (1, bs, 1)
+        new (bs: BaseSizeT, pow: int) = SizeMultinomT (1, bs, pow)
+        new (fac: int, bs: BaseSizeT, pow: int) =
+            let m =
+                match bs with
+                | Sym s -> Map.empty |> Map.add (SizeProductT (s, pow)) fac
+                | Fixed f -> Map.empty |> Map.add (SizeProductT ()) (fac * (pown f pow))
+            SizeMultinomT (m)
 
+        member this.Products = products
+
+        static member (~-) (a: SizeMultinomT) =
+            a.Products 
+            |> Map.map (fun _ fac -> -fac)
+            |> SizeMultinomT 
+
+        static member (+) (a: SizeMultinomT, b: SizeMultinomT) =
+            (a.Products, b.Products)
+            ||> Map.fold (fun res prod fac -> 
+                match Map.tryFind prod res with
+                | Some rFac -> res |> Map.add prod (fac + rFac)
+                | None      -> res |> Map.add prod fac)
+            |> SizeMultinomT
+                
+        static member (-) (a: SizeMultinomT, b: SizeMultinomT) = a + (-b)
+        
+        static member (*) (a: SizeMultinomT, b: SizeMultinomT) =
+            seq { for KeyValue(ap, af) in a.Products do
+                    for KeyValue(bp, bf) in b.Products do
+                        yield ap*bp, af*bf }
+            |> Map.ofSeq
+            |> SizeMultinomT
+
+        member this.PrettyString =
+            products
+            |> Map.toSeq
+            |> Seq.map (fun (p, f) -> sprintf "%d * %A" f p)
+            |> String.concat " + "
+        
+        override this.Equals(otherObj) =
+            match otherObj with
+            | :? SizeMultinomT as other -> this.Products = other.Products 
+            | _ -> false
+
+        override this.GetHashCode() =
+            hash this.Products
+
+        interface System.IComparable with
+            member this.CompareTo otherObj =
+                match otherObj with
+                | :? SizeMultinomT as other -> compare this.Products other.Products
+                | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 
 [<AutoOpen>]
 module SizeSpecTypes =
-    /// size specification of a dimension (axis)
+    open SizeMultinomTypes
+
+    /// symbolic size specification of a dimension (axis)
     [<StructuredFormatDisplay ("{PrettyString}")>]
     [<StructuralEquality; StructuralComparison>]
     type SizeSpecT =
-        | Base of BaseSizeT              // fixed size or symbol
-        | Broadcast                     // size 1 and broadcastable
-        | Product of SizeProductT       // product of fixed sizes and symbols
-        
-        static member (*) (ssa: SizeSpecT, ssb: SizeSpecT) =
-            match ssa, ssb with
-            | Base (Fixed 0), _ | _, Base (Fixed 0) -> Base (Fixed 0)
-            | Broadcast, ss | ss, Broadcast -> ss
-            | Product spa, Product spb -> Product (spa * spb)
-            | Product sp, Base b | Base b, Product sp -> Product (sp * (SizeProduct.ofBaseSize b))
-            | Base ba, Base bb -> Product ((SizeProduct.ofBaseSize ba) * (SizeProduct.ofBaseSize bb))
+        | Base of BaseSizeT               // fixed size or symbol
+        | Broadcast                       // size 1 and broadcastable
+        | Multinom of SizeMultinomT       // product of fixed sizes and symbols
 
         /// simplify size specification
         static member Simplify (ss: SizeSpecT) =
             match ss with
-            | Product (SizeProduct.SingleFactor f) -> Base (Fixed f)
-            | Product (SizeProduct.SingleSymbol s) -> Base (Sym s)
+            | Multinom m -> 
+                match m.Products |> Map.toList with
+                | [SizeProduct.SingleSymbol s, f] when f = 1 -> Base (Sym s)
+                | [SizeProduct.Empty, f] -> Base (Fixed f)
+                | _ -> ss
             | _ -> ss
 
+        static member (~-) (ssa: SizeSpecT) =
+            match ssa with
+            | Base (Fixed 0) -> ssa
+            | Base b -> Multinom (-SizeMultinomT(b))
+            | Broadcast -> Multinom (-SizeMultinomT(Fixed 1))
+            | Multinom m -> Multinom (-m)
+            |> SizeSpecT.Simplify
+
+        static member (+) (ssa: SizeSpecT, ssb: SizeSpecT) =
+            match ssa, ssb with
+            | Base (Fixed 0), ss | ss, Base (Fixed 0) -> ss
+            | Broadcast, ss | ss, Broadcast -> ss + (Base (Fixed 1))
+            | Multinom ma, Multinom mb -> Multinom (ma + mb)
+            | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinomT(b))
+            | Base ba, Base bb -> Multinom (SizeMultinomT(ba) + SizeMultinomT(bb))
+            |> SizeSpecT.Simplify
+
+        static member (-) (ssa: SizeSpecT, ssb: SizeSpecT) =
+            ssa + (-ssb)
+
+        static member (*) (ssa: SizeSpecT, ssb: SizeSpecT) =
+            match ssa, ssb with
+            | Base (Fixed 0), _ | _, Base (Fixed 0) -> Base (Fixed 0)
+            | Broadcast, ss | ss, Broadcast -> ss
+            | Multinom ma, Multinom mb -> Multinom (ma * mb)
+            | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinomT(b))
+            | Base ba, Base bb -> Multinom (SizeMultinomT(ba) * SizeMultinomT(bb))
+            |> SizeSpecT.Simplify
+
+        static member Pow (ssa: SizeSpecT, pow: int) =
+            match pow with
+            | 0 -> Base (Fixed 1)
+            | 1 -> ssa
+            | _ ->
+                match ssa with
+                | Base (Fixed f) -> Base (Fixed (pown f pow))
+                | Base (Sym s) -> Multinom (SizeMultinomT (Sym s, pow))
+                | Broadcast -> Broadcast
+                | Multinom m ->
+                    m
+                    |> Seq.replicate pow
+                    |> Seq.reduce (*)
+                    |> Multinom
+            |> SizeSpecT.Simplify
+
+        // operations with int
+        static member (+) (ssa: SizeSpecT, ssb: int) = ssa + (Base (Fixed ssb))
+        static member (+) (ssa: int, ssb: SizeSpecT) = (Base (Fixed ssa)) + ssb
+        static member (-) (ssa: SizeSpecT, ssb: int) = ssa - (Base (Fixed ssb))
+        static member (-) (ssa: int, ssb: SizeSpecT) = (Base (Fixed ssa)) - ssb
+        static member (*) (ssa: SizeSpecT, ssb: int) = ssa * (Base (Fixed ssb))
+        static member (*) (ssa: int, ssb: SizeSpecT) = (Base (Fixed ssa)) * ssb
+
         /// equal size with broadcastability
-        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = SizeSpecT.Simplify ssa = SizeSpecT.Simplify ssb 
+        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = 
+            SizeSpecT.Simplify ssa = SizeSpecT.Simplify ssb 
 
         /// equal size ignoring broadcastability
         static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = 
@@ -188,11 +261,14 @@ module SizeSpecTypes =
             | Broadcast, Base (Fixed 1) | Base (Fixed 1), Broadcast -> true
             | a, b -> a = b
 
+        /// unequal size ignoring broadcastability
+        static member (.<>) (ssa: SizeSpecT, ssb: SizeSpecT) = not (ssa .= ssb)
+
         member this.PrettyString =
             match this with
             | Base b -> sprintf "%A" b
             | Broadcast -> "1*"
-            | Product p -> sprintf "%A" p
+            | Multinom m -> sprintf "%A" m
 
 
 module SizeSpec =
@@ -208,6 +284,10 @@ module SizeSpec =
     /// True if both sizes have the same number of elements.
     /// Broadcastable and non-broadcastable are treated as equal.
     let equalWithoutBroadcastability (ssa: SizeSpecT) (ssb: SizeSpecT) = ssa .= ssb
+
+    /// size zero
+    let zero =
+        Base (Fixed 0)
 
     /// not-broadcastable size one
     let one =
@@ -229,13 +309,38 @@ module SizeSpec =
     let broadcastable =
         Broadcast
 
+    /// substitute the symbols into the SizeSpec and simplifies it
+    let rec substSymbols symVals ss =
+        match ss with
+        | Base (Sym sym) ->
+            match Map.tryFind sym symVals with
+            | Some sv -> substSymbols symVals sv
+            | None -> ss
+        | Base (Fixed _) -> ss
+        | Broadcast -> ss
+        | Multinom m -> ss
+            // TODO: fix
+            // rebuild multinom with substituted values
+//            (zero, m.Products)
+//            ||> Map.fold 
+//                (fun substSum prod fac ->               
+//                    let substProd = 
+//                        (one, prod.Symbols)
+//                        ||> Map.fold 
+//                            (fun substProd sBase sPow ->
+//                                let sBaseSubst = substSymbols symVals ss
+//                                substProd * (sBaseSubst ** sPow))
+//                    substSum + fac * substProd)
+
+            ///
+        |> simplify
+            
     /// evaluate symbolic size specification to a number
     let tryEval ss =
-        match ss with
-        | Base (Sym sym) ->  None
+        match simplify ss with
         | Base (Fixed f) -> Some f
         | Broadcast -> Some 1
-        | Product p -> SizeProduct.tryEval p        
+        | _ -> None
 
     /// true, if evaluation to numeric shape is possible
     let canEval ss =
@@ -264,37 +369,30 @@ module ShapeSpecTypes =
 module ShapeSpec =
     open SizeSymbolTypes
 
-    let withoutAxis ax sa =
+    let withoutAxis ax (sa: ShapeSpecT) =
         sa |> List.without ax
 
-    let insertBroadcastAxis ax sa =
+    let insertBroadcastAxis ax (sa: ShapeSpecT) =
         sa |> List.insert ax Broadcast
 
-    let set ax size sa =
+    let set ax size (sa: ShapeSpecT) =
         sa |> List.set ax size
 
-    let nDim sa =
+    let nDim (sa: ShapeSpecT) =
         List.length sa
 
-    let nElem sa =
-        List.fold 
-            (fun p ss ->
-                match ss with
-                | Base (Sym b) -> p * b
-                | Base (Fixed f) -> p * f
-                | Broadcast -> p 
-                | Product pb -> p * pb)
-            SizeProduct.empty sa 
-            |> Product   
-            |> SizeSpec.simplify       
+    let nElem (sa: ShapeSpecT) =
+        if List.isEmpty sa then SizeSpec.one
+        else List.reduce (*) sa
 
-    let flatten sa =
+    let flatten (sa: ShapeSpecT) =
         [nElem sa]
 
-    let concat sa sb =
+    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) =
         sa @ sb
 
-    let transpose sa =
+    let transpose (sa: ShapeSpecT) =
+        if nDim sa <> 2 then failwithf "need matrix to transpose but have shape %A" sa
         List.rev sa
 
     let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) =
@@ -309,10 +407,10 @@ module ShapeSpec =
 
     let emptyVector = [Base (Fixed 0)]
 
-    let padLeft sa =
+    let padLeft (sa: ShapeSpecT) =
         (Broadcast)::sa
 
-    let padRight sa =
+    let padRight (sa: ShapeSpecT) =
         sa @ [Broadcast]
 
     let rec padToSame sa sb =
