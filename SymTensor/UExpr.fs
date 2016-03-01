@@ -138,6 +138,8 @@ module UExpr =
                     | RSSymElem e                   -> RSSymElem e,                 dynExprs
                     | RSDynElem e                   -> RSDynElem idx,               dynExprs @ [e]
                     | RSSymStartSymEnd (s, f)       -> RSSymStartSymEnd (s, f),     dynExprs
+                    | RSSymStartToEnd s             -> RSSymStartToEnd s,           dynExprs
+                    | RSStartToSymEnd f             -> RSStartToSymEnd f,           dynExprs
                     | RSDynStartSymSize (s, f)      -> RSDynStartSymSize (idx, f),  dynExprs @ [s]
                     | RSNewAxis                     -> RSNewAxis,                   dynExprs
                     | RSAll                         -> RSAll,                       dynExprs
@@ -224,6 +226,8 @@ module UExpr =
                 | RSSymElem e              :: srs, _         -> RSSymElem e                :: buildExprRngsSpec srs drs
                 | RSDynElem _              :: srs, dr :: drs -> RSDynElem dr               :: buildExprRngsSpec srs drs
                 | RSSymStartSymEnd (s, f)  :: srs, _         -> RSSymStartSymEnd (s, f)    :: buildExprRngsSpec srs drs
+                | RSSymStartToEnd s        :: srs, _         -> RSSymStartToEnd s          :: buildExprRngsSpec srs drs
+                | RSStartToSymEnd s        :: srs, _         -> RSStartToSymEnd s          :: buildExprRngsSpec srs drs
                 | RSDynStartSymSize (_, f) :: srs, dr :: drs -> RSDynStartSymSize (dr, f)  :: buildExprRngsSpec srs drs
                 | RSNewAxis                :: srs, _         -> RSNewAxis                  :: buildExprRngsSpec srs drs
                 | RSAll                    :: srs, _         -> RSAll                      :: buildExprRngsSpec srs drs

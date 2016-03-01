@@ -27,7 +27,7 @@ module Deriv =
 
         /// expands the second dimension of the the Jacobian into the shape of this expression
         let egExpanded =
-            eg |> reshape ((shapeOf eg).[0] :: (shapeOf expr))
+            eg |> reshape (funElems :: (shapeOf expr))
 
         /// flattens all but the first dimension into one dimension
         let collapse g =
@@ -65,6 +65,11 @@ module Deriv =
             | Round -> Map.empty
             | Truncate -> Map.empty
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
+            | Subtensor sr ->
+                let agExpanded : ExprT<'T> = Expr.zeros (funElems :: (shapeOf a))
+                setSubtensor agExpanded.[RSAll :: sr] egExpanded
+                |> collapse 
+                |> reverseDiffStep a
             | Reshape ss -> eg |> reverseDiffStep a
             | DoBroadcast ss -> 
                 let mutable egUnbroadcasted = egExpanded
@@ -124,6 +129,10 @@ module Deriv =
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"
+            | SetSubtensor sr ->
+                let bgExpanded = egExpanded.[RSAll::sr]
+                let agExpanded = setSubtensor egExpanded.[RSAll::sr] (zerosLike bgExpanded)
+                (agExpanded |> collapse) .+ (bgExpanded |> collapse)
 
         | Nary(op, es) ->
             match op with

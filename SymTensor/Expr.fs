@@ -117,7 +117,11 @@ module Expr =
         /// matrix*matrix => matrix dot product
         | Dot                           
         /// tensor product 
-        | TensorProduct                 
+        | TensorProduct        
+        
+        // ==== shape operations ====
+        /// replace subtensor
+        | SetSubtensor of ExprRngsSpecT                 
 
 
     /// ops with an arbitrary exprs as arguments
@@ -147,34 +151,6 @@ module Expr =
         | FromSingle of ExprT<single>
         | FromDouble of ExprT<double>
 
-    /// internal item/slicing range specification value for range building
-    and private RangeSpecValueT =
-        | RSVInt of int
-        | RSVSpecial of SpecialAxisT
-        | RSVSizeSpec of SizeSpecT
-        | RSVExpr of ExprT<int>
-        | RSVPlusElems of PlusElems
-
-    /// internal item/slicing range specification for range building
-    and private RangeSpecT =
-        | Item of RangeSpecValueT
-        | Slice of (RangeSpecValueT option) * (RangeSpecValueT option)
-
-        static member ObjSlice (s: #obj option) (f: #obj option) = 
-            let toRangeSpec vo =
-                match vo with
-                | Some v ->
-                    match box v with
-                    | :? int as i -> RSVInt i
-                    | :? SpecialAxisT as s -> RSVSpecial s
-                    | :? SizeSpecT as s -> RSVSizeSpec s
-                    | :? ExprT<int> as e -> RSVExpr e
-                    | :? PlusElems as p -> RSVPlusElems p
-                    | _ -> failwithf "unknown type %A in expression slice" ((box v).GetType())
-                    |> Some
-                | None -> None
-            Slice (toRangeSpec s, toRangeSpec f)
-
     /// an expression
     and [<StructuralComparison; StructuralEquality>] 
         ExprT<'T> =
@@ -183,71 +159,6 @@ module Expr =
         | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
         //| Convert of ConvertOpT<'T>
-
-        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            /// converts argument list to range specification
-            let rec toRSV (args: obj list) =
-                match args with
-                // slices
-                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSSymStartSymEnd (so.Value, fo.Value) :: toRSV rest
-                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
-                    RSSymStartToEnd so.Value :: toRSV rest
-                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSStartToSymEnd fo.Value :: toRSV rest
-                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
-                    RSDynStartSymSize (so.Value, fo.Value.Elems) :: toRSV rest
-
-                // items
-                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: toRSV rest
-                | (:? SpecialAxisT as s)  :: rest -> match s with
-                                                     | NewAxis -> RSNewAxis :: toRSV rest
-                                                     | Fill    -> RSAllFill :: toRSV rest
-                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: toRSV rest
-
-                | []                              -> []
-                | _                               -> failwithf "invalid item/slice specification: %A" allArgs
-
-            /// converts ints to SizeSpecTs
-            let intToSizeSpec (arg: obj) =
-                match arg with
-                | :? int as f -> SizeSpec.fix f :> obj
-                | :? (int option) as fo -> 
-                    match fo with
-                    | Some f -> Some (SizeSpec.fix f) :> obj
-                    | None -> None :> obj
-                | _ -> arg
-
-            allArgs
-            |> Array.toList
-            |> List.map intToSizeSpec
-            |> toRSV
-            |> fun ss -> Unary (Subtensor ss, this)  
-
-        member this.Item 
-            with get ([<System.ParamArray>] args: obj []) = 
-                this.GetSlice (args)
-
-        
-
-
-    let testme () =
-        let a : ExprT<float> = Leaf (Identity (SizeSpec.one))
-        let b : ExprT<int> = Leaf (Identity (SizeSpec.one))
-        let c : ExprT<int> = Leaf (Identity (SizeSpec.one))
-        let aitm1 = a.[SizeSpec.one]
-        let aitm1b = a.[SizeSpec.one, 12, 3 .. 6]
-
-        let asl1 = a.[SizeSpec.fix 5 .. SizeSpec.fix 10]
-        //let asl2 = a.[b .. c]
-        let asl2b = a.[b ..]
-        let asl3c = a.[*]
-
-        //let d = b + (SizeSpec.one)
-        let asl3 = a.[b .. PlusElems 3, b .. b, 33]
-        //let asl3 = a.[b .. b]
-        ()
-
 
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
@@ -367,17 +278,19 @@ module Expr =
             let rec subtensorShape rng baseShp =
                 let ss = subtensorShape 
                 match rng, baseShp with
-                | RSSymElem _                  ::rngs, _::shps -> ss rngs shps
-                | RSDynElem _                  ::rngs, _::shps -> ss rngs shps
-                | RSSymStartSymEnd (s, f)      ::rngs, _::shps -> (f + 1 - s) :: ss rngs shps
-                | RSDynStartSymSize (_, size)  ::rngs, _::shps -> size :: ss rngs shps
-                | RSNewAxis                    ::rngs, _::shps -> SizeSpec.broadcastable :: ss rngs shps
-                | RSAll                        ::rngs, _::shps -> (List.head baseShp) :: ss rngs shps
+                | RSSymElem _                  ::rngs, _::shps   -> ss rngs shps
+                | RSDynElem _                  ::rngs, _::shps   -> ss rngs shps
+                | RSSymStartSymEnd (s, f)      ::rngs, _::shps   -> (f + 1 - s) :: ss rngs shps
+                | RSSymStartToEnd s            ::rngs, shp::shps -> (shp - s) :: ss rngs shps 
+                | RSStartToSymEnd f            ::rngs, _::shps   -> (f + 1) :: ss rngs shps
+                | RSDynStartSymSize (_, size)  ::rngs, _::shps   -> size :: ss rngs shps
+                | RSNewAxis                    ::rngs, _::shps   -> SizeSpec.broadcastable :: ss rngs shps
+                | RSAll                        ::rngs, _::shps   -> (List.head baseShp) :: ss rngs shps
                 | RSAllFill                    ::_   , _ when List.length rng <= List.length baseShp 
-                                                               -> ss (RSAll :: rng) baseShp 
-                | RSAllFill                    ::rngs, _       -> ss rngs baseShp 
-                | []                                 , []      -> []
-                | [], _  | _, []                               -> failwith "incompatible subtensor range specification"                    
+                                                                 -> ss (RSAll :: rng) baseShp 
+                | RSAllFill                    ::rngs, _         -> ss rngs baseShp 
+                | []                                 , []        -> []
+                | [], _  | _, []                                 -> failwith "incompatible subtensor range specification"                    
             subtensorShape sr (shapeOf a)
                     
         // misc
@@ -400,10 +313,14 @@ module Expr =
                 | 1, 1 -> ShapeSpec.scalar
                 | 2, 1 -> ShapeSpec.vector sa.[0]
                 | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
-                | _ -> failwith "invalid graph"
+                | _ -> failwith "invalid expression"
         | Binary (TensorProduct, a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
             List.map2 (*) sa sb
+
+        // shape operations
+        | Binary (SetSubtensor ss, a, b) ->
+            shapeOf a
 
         // misc
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
@@ -723,6 +640,85 @@ module Expr =
     /// computes specified expressions, but discards the result
     let discard es =
         Nary(Discard, es) |> check
+
+    /// expression a with the specified subtensor replaced with b
+    let setSubtensor a b =
+        match a with
+        | Unary (Subtensor sr, t) ->
+            Binary (SetSubtensor sr, t, b) |> check
+        | _ ->
+            failwith "the first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]"
+
+    type ExprT with
+        // item / slicing
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            /// converts argument list to range specification
+            let rec toRSV (args: obj list) =
+                match args with
+                // direct range specification
+                | [:? ExprRngsSpecT as rngs] -> rngs
+
+                // slices
+                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSSymStartSymEnd (so.Value, fo.Value) :: toRSV rest
+                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
+                    RSSymStartToEnd so.Value :: toRSV rest
+                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSStartToSymEnd fo.Value :: toRSV rest
+                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
+                    RSDynStartSymSize (so.Value, fo.Value.Elems) :: toRSV rest
+                | null                           :: null                             :: rest ->
+                    RSAll :: toRSV rest
+
+                // items
+                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: toRSV rest
+                | (:? SpecialAxisT as s)  :: rest -> match s with
+                                                     | NewAxis -> RSNewAxis :: toRSV rest
+                                                     | Fill    -> RSAllFill :: toRSV rest
+                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: toRSV rest
+
+                | []                              -> []
+                | _                               -> failwithf "invalid item/slice specification: %A" allArgs
+
+            /// converts ints to SizeSpecTs
+            let intToSizeSpec (arg: obj) =
+                match arg with
+                | :? int as f -> SizeSpec.fix f :> obj
+                | :? (int option) as fo -> 
+                    match fo with
+                    | Some f -> Some (SizeSpec.fix f) :> obj
+                    | None -> None :> obj
+                | _ -> arg
+
+            allArgs
+            |> Array.toList
+            |> List.map intToSizeSpec
+            |> toRSV
+            |> fun ss -> Unary (Subtensor ss, this)  
+            |> check
+
+        member this.Item 
+            with get ([<System.ParamArray>] allArgs: obj []) = 
+                this.GetSlice (allArgs)
+                      
+
+
+    let testme () =
+        let a : ExprT<float> = Leaf (Identity (SizeSpec.one))
+        let b : ExprT<int> = Leaf (Identity (SizeSpec.one))
+        let c : ExprT<int> = Leaf (Identity (SizeSpec.one))
+        let aitm1 = a.[SizeSpec.one]
+        let aitm1b = a.[SizeSpec.one, 12, 3 .. 6]
+
+        let asl1 = a.[SizeSpec.fix 5 .. SizeSpec.fix 10]
+        //let asl2 = a.[b .. c]
+        let asl2b = a.[b ..]
+        let asl3c = a.[*]
+
+        //let d = b + (SizeSpec.one)
+        let asl3 = a.[b .. PlusElems 3, b .. b, 33]
+        //let asl3 = a.[b .. b]
+        ()
 
 
 [<AutoOpen>]

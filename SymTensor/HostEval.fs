@@ -63,6 +63,8 @@ module HostEval =
                 | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                 | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
+                //| Subtensor sr ->
+                    // TODO
                 | StoreToVar vs -> ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv); av
                 | Annotated _-> av                
             | Binary(op, a, b) ->

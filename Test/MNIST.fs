@@ -101,6 +101,6 @@ module Mnist =
             ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
             ArrayNDHDF.write hdf "TstImgs" mnist.TstImgs
             ArrayNDHDF.write hdf "TstLbls" mnist.TstLbls
-            printf "Done."
+            printfn "Done."
             mnist
 

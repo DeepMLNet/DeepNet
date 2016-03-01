@@ -17,11 +17,17 @@ module ArrayNDLayoutTypes =
 
     /// range specification
     type RangeT = 
+        /// single element
         | RngElem of int
-        | Rng of int * int
+        /// range from / to (including)
+        | Rng of (int option) * (int option)
+        /// insert broadcastable axis of size 1
         | RngNewAxis
-        | RngAll
+        /// fill (...)
         | RngAllFill
+
+    /// all elements
+    let RngAll = Rng (None, None)
 
 
 module ArrayNDLayout =
@@ -215,18 +221,21 @@ module ArrayNDLayout =
                 recView (RngAll :: rRanges) a
             | RngAllFill::rRanges, _, _ ->
                 recView rRanges a
-            | (RngAll | RngElem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
+            | (RngElem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
                 let ra = recView rRanges {a with Shape=rShps; Stride=rStrs} 
                 match idx with 
-                | RngAll ->
-                    {ra with Shape = shp::ra.Shape;
-                             Stride = str::ra.Stride}
                 | RngElem i -> 
                     checkElementRange false shp i
                     {ra with Offset = ra.Offset + i*str;
                              Stride = ra.Stride;
                              Shape = ra.Shape} 
-                | Rng(start, stop) ->
+                | Rng(startOpt, stopOpt) ->
+                    let start = match startOpt with
+                                | Some start -> start
+                                | None -> 0
+                    let stop = match stopOpt with
+                                | Some stop -> stop
+                                | None -> shp - 1
                     checkElementRange false shp start
                     checkElementRange true shp stop
                     {ra with Offset = ra.Offset + start*str;
