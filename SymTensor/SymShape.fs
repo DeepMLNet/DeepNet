@@ -473,19 +473,55 @@ module RangeSpecTypes =
 
     /// symbolic/dynamic range specification for one dimension
     type RangeSpecT<'Dyn> = 
-        | RSSymElem            of SizeSpecT                           // size: symbolic
-        | RSDynElem            of 'Dyn                                // size: symbolic
-        | RSSymStartSymEnd     of SizeSpecT * SizeSpecT               // size: symbolic
-        | RSSymStartToEnd      of SizeSpecT                           // size: symbolic
-        | RSStartToSymEnd      of SizeSpecT                           // size: symbolic
-        | RSDynStartSymSize    of 'Dyn * SizeSpecT                    // size: symbolic
-        | RSNewAxis                                                   // size: symbolic
-        | RSAll                                                       // size: symbolic
-        | RSAllFill                                                   // size: symbolic
+        // ranges with symbolic size (length)
+        | RSSymElem            of SizeSpecT                           
+        | RSDynElem            of 'Dyn                                
+        | RSSymStartSymEnd     of (SizeSpecT option) * (SizeSpecT option)
+        | RSDynStartSymSize    of 'Dyn * SizeSpecT                    
+        | RSNewAxis                                                   
+        | RSAllFill                                                   
         //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
         //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
         //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
         //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
 
+    /// all elements
+    let RSAll = RSSymStartSymEnd (None, None)
+
     // symbolic/dynamic subtensor specification
     type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list
+
+
+module RangeSpec =
+    open ArrayNDNS
+
+    /// evaluate a RangeSpecT to a RangeT
+    let eval dynEvaluator rs =
+        match rs with
+        | RSSymElem e -> RngElem (SizeSpec.eval e)
+        | RSDynElem e -> RngElem (dynEvaluator e)
+        | RSSymStartSymEnd (s, f) -> 
+            Rng (Option.map SizeSpec.eval s, Option.map SizeSpec.eval f)
+        | RSDynStartSymSize (s, elems) -> 
+            let sv = dynEvaluator s
+            Rng (Some sv, Some (sv + SizeSpec.eval elems))
+        | RSNewAxis -> RngNewAxis
+        | RSAllFill -> RngAllFill
+
+    let isDynamic rs =
+        match rs with
+        | RSDynElem _ 
+        | RSDynStartSymSize _ 
+            -> true
+        | _ -> false
+
+module RangesSpec =
+
+    /// evaluate a RangesSpecT to a RangeT list
+    let eval dynEvaluator rs =
+        rs
+        |> List.map (RangeSpec.eval dynEvaluator)
+
+    let isDynamic rs =
+        rs
+        |> List.exists RangeSpec.isDynamic

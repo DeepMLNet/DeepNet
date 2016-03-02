@@ -59,6 +59,8 @@ module UtilTypes =
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
+    /// Default value for options. Returns b if a is None, else the value of a.
+    let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
 
 module Util =
 

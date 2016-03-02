@@ -8,8 +8,8 @@ open Expr
 module UExprTypes = 
 
     // int holds the position of the subuexpr that has the dynamic value
-    type UExprRngSpec = RangeSpecT<int>
-    type UExprRngsSpec = RangesSpecT<int>
+    type UExprRngSpecT = RangeSpecT<int>
+    type UExprRngsSpecT = RangesSpecT<int>
 
     type IUExtensionOp =
         inherit System.IComparable
@@ -62,7 +62,8 @@ module UExprTypes =
 
     type UNaryOpT =
         | Discard        
-        | Subtensor of UExprRngsSpec  
+        | Subtensor of UExprRngsSpecT 
+        | SetSubtensor of UExprRngsSpecT
         | ExtensionOp of IUExtensionOp
              
 
@@ -84,6 +85,33 @@ module UExprTypes =
             | UExpr (UUnaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs.[0]
             | UExpr (UBinaryOp uop, tn, ss, subs) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
             | UExpr (UNaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs
+
+
+module UExprRngsSpec =
+
+    /// converts a ExprRngsSpecT to a UExprRngSpecT
+    let ofExprRngsSpec (sr: ExprRngsSpecT) =
+        ([], sr)
+        ||> List.mapFold (fun dynExprs rng ->
+            let idx = List.length dynExprs 
+            match rng with
+            | RSSymElem e                   -> RSSymElem e,                 dynExprs
+            | RSDynElem e                   -> RSDynElem idx,               dynExprs @ [e]
+            | RSSymStartSymEnd (s, f)       -> RSSymStartSymEnd (s, f),     dynExprs
+            | RSDynStartSymSize (s, f)      -> RSDynStartSymSize (idx, f),  dynExprs @ [s]
+            | RSNewAxis                     -> RSNewAxis,                   dynExprs
+            | RSAllFill                     -> RSAllFill,                   dynExprs)    
+
+    /// converts a UExprRngSpecT to a ExprRngsSpecT
+    let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT<int> list) =
+        match srs, drs with
+        | RSSymElem e              :: srs, _         -> RSSymElem e                :: toExprRngsSpec srs drs
+        | RSDynElem _              :: srs, dr :: drs -> RSDynElem dr               :: toExprRngsSpec srs drs
+        | RSSymStartSymEnd (s, f)  :: srs, _         -> RSSymStartSymEnd (s, f)    :: toExprRngsSpec srs drs
+        | RSDynStartSymSize (_, f) :: srs, dr :: drs -> RSDynStartSymSize (dr, f)  :: toExprRngsSpec srs drs
+        | RSNewAxis                :: srs, _         -> RSNewAxis                  :: toExprRngsSpec srs drs
+        | RSAllFill                :: srs, _         -> RSAllFill                  :: toExprRngsSpec srs drs
+        | _                              , _         -> failwith "invalid unified subtensor spec"
 
 
 module UExpr =
@@ -130,23 +158,9 @@ module UExpr =
         | Unary (Expr.DoBroadcast ss, a)-> unary (DoBroadcast ss) a
         | Unary (Expr.SwapDim (ax1, ax2), a) -> unary (SwapDim (ax1, ax2)) a
         | Unary (Expr.Subtensor sr, a)  ->
-            let usr, dynExprs = 
-                ([], sr)
-                ||> List.mapFold (fun dynExprs rng ->
-                    let idx = List.length dynExprs + 1
-                    match rng with
-                    | RSSymElem e                   -> RSSymElem e,                 dynExprs
-                    | RSDynElem e                   -> RSDynElem idx,               dynExprs @ [e]
-                    | RSSymStartSymEnd (s, f)       -> RSSymStartSymEnd (s, f),     dynExprs
-                    | RSSymStartToEnd s             -> RSSymStartToEnd s,           dynExprs
-                    | RSStartToSymEnd f             -> RSStartToSymEnd f,           dynExprs
-                    | RSDynStartSymSize (s, f)      -> RSDynStartSymSize (idx, f),  dynExprs @ [s]
-                    | RSNewAxis                     -> RSNewAxis,                   dynExprs
-                    | RSAll                         -> RSAll,                       dynExprs
-                    | RSAllFill                     -> RSAllFill,                   dynExprs)           
+            let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
             UExpr(UNaryOp (Subtensor usr), tn, shp, toUExpr a :: dynUExprs)
-
         | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (vs :> IVarSpec)) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
@@ -157,7 +171,11 @@ module UExpr =
         | Binary (Expr.Modulo, a, b)    -> binary Modulo a b          
         | Binary (Expr.Power, a, b)     -> binary Power a b               
         | Binary (Expr.Dot, a, b)       -> binary Dot a b                   
-        | Binary (Expr.TensorProduct, a, b) -> binary TensorProduct a b             
+        | Binary (Expr.TensorProduct, a, b) -> binary TensorProduct a b         
+        | Binary (Expr.SetSubtensor sr, a, b) ->
+            let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
+            let dynUExprs = dynExprs |> List.map toUExprForInt 
+            UExpr(UNaryOp (SetSubtensor usr), tn, shp, toUExpr a :: toUExpr b :: dynUExprs)
 
         | Nary (Expr.Discard, se)       -> nary Discard se
         | Nary (Expr.ExtensionOp eop, se) -> nary (ExtensionOp (eop :?> IUExtensionOp)) se
@@ -168,7 +186,7 @@ module UExpr =
     /// converts a unified expression to an expression of (known) type
     let rec toExprOfType (UExpr (uop, tn, ss, subUExprs) as uexpr) : ExprT<'T> =
         if TypeName.ofType<'T> <> tn then
-            failwith "UExpr type does not match does function"
+            failwith "UExpr type does not match"
 
         let leaf op    = Expr.Leaf op
         let unary op   = Expr.Unary (op, toExprOfType subUExprs.[0])
@@ -219,22 +237,12 @@ module UExpr =
         | UBinaryOp TensorProduct           -> binary Expr.TensorProduct     
             
         | UNaryOp Discard                   -> nary Expr.Discard
-        | UNaryOp (Subtensor sr)            ->
+        | UNaryOp (Subtensor usr)           ->
             let drs = subUExprs |> List.tail |> List.map toExprOfTypeInt
-            let rec buildExprRngsSpec (srs: UExprRngsSpec) (drs: ExprT<int> list) =
-                match srs, drs with
-                | RSSymElem e              :: srs, _         -> RSSymElem e                :: buildExprRngsSpec srs drs
-                | RSDynElem _              :: srs, dr :: drs -> RSDynElem dr               :: buildExprRngsSpec srs drs
-                | RSSymStartSymEnd (s, f)  :: srs, _         -> RSSymStartSymEnd (s, f)    :: buildExprRngsSpec srs drs
-                | RSSymStartToEnd s        :: srs, _         -> RSSymStartToEnd s          :: buildExprRngsSpec srs drs
-                | RSStartToSymEnd s        :: srs, _         -> RSStartToSymEnd s          :: buildExprRngsSpec srs drs
-                | RSDynStartSymSize (_, f) :: srs, dr :: drs -> RSDynStartSymSize (dr, f)  :: buildExprRngsSpec srs drs
-                | RSNewAxis                :: srs, _         -> RSNewAxis                  :: buildExprRngsSpec srs drs
-                | RSAll                    :: srs, _         -> RSAll                      :: buildExprRngsSpec srs drs
-                | RSAllFill                :: srs, _         -> RSAllFill                  :: buildExprRngsSpec srs drs
-                | _                              , _         -> failwith "invalid unified subtensor spec"
-            unary (Expr.Subtensor (buildExprRngsSpec sr drs))
-
+            unary (Expr.Subtensor (UExprRngsSpec.toExprRngsSpec usr drs))
+        | UNaryOp (SetSubtensor usr)        ->
+            let drs = subUExprs |> List.skip 2 |>  List.map toExprOfTypeInt
+            binary (Expr.SetSubtensor (UExprRngsSpec.toExprRngsSpec usr drs))
         | UNaryOp (ExtensionOp eop)         -> nary (Expr.ExtensionOp (eop :?> IExtensionOp<'T>))
 
     and private toExprOfTypeInt uexpr : ExprT<int> =

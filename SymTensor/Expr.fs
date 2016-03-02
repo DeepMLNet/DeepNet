@@ -280,14 +280,12 @@ module Expr =
                 match rng, baseShp with
                 | RSSymElem _                  ::rngs, _::shps   -> ss rngs shps
                 | RSDynElem _                  ::rngs, _::shps   -> ss rngs shps
-                | RSSymStartSymEnd (s, f)      ::rngs, _::shps   -> (f + 1 - s) :: ss rngs shps
-                | RSSymStartToEnd s            ::rngs, shp::shps -> (shp - s) :: ss rngs shps 
-                | RSStartToSymEnd f            ::rngs, _::shps   -> (f + 1) :: ss rngs shps
+                | RSSymStartSymEnd (s, f)      ::rngs, shp::shps -> 
+                    ((f |? (shp - SizeSpec.one)) + 1 - (s |? SizeSpec.zero)) :: ss rngs shps
                 | RSDynStartSymSize (_, size)  ::rngs, _::shps   -> size :: ss rngs shps
                 | RSNewAxis                    ::rngs, _::shps   -> SizeSpec.broadcastable :: ss rngs shps
-                | RSAll                        ::rngs, _::shps   -> (List.head baseShp) :: ss rngs shps
                 | RSAllFill                    ::_   , _ when List.length rng <= List.length baseShp 
-                                                                 -> ss (RSAll :: rng) baseShp 
+                                                                 -> ss (RSSymStartSymEnd (None, None) :: rng) baseShp 
                 | RSAllFill                    ::rngs, _         -> ss rngs baseShp 
                 | []                                 , []        -> []
                 | [], _  | _, []                                 -> failwith "incompatible subtensor range specification"                    
@@ -660,15 +658,15 @@ module Expr =
 
                 // slices
                 | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSSymStartSymEnd (so.Value, fo.Value) :: toRSV rest
+                    RSSymStartSymEnd (so, fo) :: toRSV rest
                 | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
-                    RSSymStartToEnd so.Value :: toRSV rest
+                    RSSymStartSymEnd (so, None) :: toRSV rest
                 | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSStartToSymEnd fo.Value :: toRSV rest
+                    RSSymStartSymEnd (None, fo) :: toRSV rest
                 | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
                     RSDynStartSymSize (so.Value, fo.Value.Elems) :: toRSV rest
                 | null                           :: null                             :: rest ->
-                    RSAll :: toRSV rest
+                    RSSymStartSymEnd (None, None) :: toRSV rest
 
                 // items
                 | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: toRSV rest

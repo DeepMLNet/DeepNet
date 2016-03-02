@@ -110,6 +110,8 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> outplaceTrgt
+        | UNaryOp (Subtensor _) -> outplaceTrgt
+        //| UNaryOp (SetSubtensor sr) -> 
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
 
@@ -210,6 +212,11 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> outplaceTrgt
+        | UNaryOp (Subtensor sr) -> 
+            if RangesSpec.isDynamic sr then outplaceTrgt
+            else 
+                let rng = RangesSpec.eval (failwith "static") sr
+                srcs.[0].[rng] :?> ArrayNDManikinT, srcShared.[0]
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
       
@@ -384,6 +391,10 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> []
+        | UNaryOp (Subtensor sr) ->
+            if RangesSpec.isDynamic sr then 
+                []// TODO
+            else []
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
 

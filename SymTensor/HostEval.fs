@@ -17,10 +17,11 @@ module HostEval =
     let mutable debug = false
 
     /// evaluate expression to numeric array 
-    let eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
+    let rec eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
         let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv
         let shapeEval symShape = ShapeSpec.eval symShape
         let sizeEval symSize = SizeSpec.eval symSize
+        let rngEval = RangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
 
         let rec doEval (expr: ExprT<'T>) =
             let subEval subExpr = 
@@ -63,8 +64,7 @@ module HostEval =
                 | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                 | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
-                //| Subtensor sr ->
-                    // TODO
+                | Subtensor sr -> av.[rngEval sr]
                 | StoreToVar vs -> ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv); av
                 | Annotated _-> av                
             | Binary(op, a, b) ->
@@ -78,6 +78,11 @@ module HostEval =
                 | Power -> av ** bv
                 | Dot -> av .* bv
                 | TensorProduct -> av %* bv
+                | SetSubtensor sr -> 
+                    let v = ArrayND.copy av
+                    v.[sr] <- bv
+                    v
+
             | Nary(op, es) ->
                 let esv = List.map subEval es
                 match op with 
@@ -86,6 +91,10 @@ module HostEval =
             
         doEval expr
 
+    and private evalInt (evalEnv: EvalEnvT) (expr: ExprT<int>) =
+        eval evalEnv expr
+
+    /// helper type for dynamic method invocation
     type private EvalT =
         static member Eval<'T> (evalEnv: EvalEnvT, expr: ExprT<'T>) : IArrayNDT =
             eval evalEnv expr :> IArrayNDT
