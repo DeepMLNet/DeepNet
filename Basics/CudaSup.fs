@@ -1,6 +1,7 @@
 ﻿namespace Basics.Cuda
 
 open ManagedCuda
+open ManagedCuda.BasicTypes
 
 
 [<AutoOpen>]
@@ -92,6 +93,12 @@ module CudaSup =
 
         {Block = bx, by, bz; Grid = gx, gy, gz;}
 
+    /// call implicit type conversation
+    let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
+
+    /// gets device pointer as IntPtr
+    let getIntPtr (cuPtr: CUdeviceptr) : System.IntPtr =
+        !> cuPtr.Pointer
 
 
 

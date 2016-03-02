@@ -53,10 +53,6 @@ module ArrayND =
         /// item access
         abstract Item : int list -> 'T with get, set
 
-//        member this.Item
-//            with get ([<System.ParamArray>] allArgs: obj []) = new 'T()
-//            and set ([<System.ParamArray>] allArgs: obj []) (value: 'T) = ()
-
         /// a new ArrayND of same type and new storage allocation for given layout
         abstract NewOfSameType : ArrayNDLayoutT -> ArrayNDT<'T>
 
@@ -69,18 +65,13 @@ module ArrayND =
             let shp = ArrayNDLayout.shape layout
             let str = ArrayNDLayout.stride layout
             let ofst = ArrayNDLayout.offset layout
-            let cppDataType = 
-                if this.DataType.Equals(typeof<double>) then "double"
-                elif this.DataType.Equals(typeof<single>) then "float"
-                elif this.DataType.Equals(typeof<int>) then "int"
-                elif this.DataType.Equals(typeof<byte>) then "char"
-                else failwithf "no C++ datatype for %A" this.DataType
+            let cppDataType = Util.cppType this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
             let strideStr = 
                 "<" + ((ofst :: str) |> Util.intToStrSeq |> String.concat ",") + ">"
-            sprintf "ArrayNDStatic%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
                 dims cppDataType dims shapeStr dims strideStr            
 
         /// type of data in this ArrayND

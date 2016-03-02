@@ -61,6 +61,17 @@ module ArrayNDManikinTypes =
         override this.DataType =
             TypeName.getType this.TypeName
 
+        /// C++ type name for ArrayND with static shape and dynamic offset/strides
+        member this.DynamicCPPType =
+            let dims = ArrayNDLayout.nDims layout
+            let shp = ArrayNDLayout.shape layout
+            let cppDataType = Util.cppType this.DataType
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
+                dims cppDataType dims shapeStr dims        
+
 
 
 

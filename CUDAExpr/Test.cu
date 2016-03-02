@@ -5,6 +5,7 @@
 #include "Ops.cuh"
 #include "NDSupport.cuh"
 //#include "Reduce.cuh"
+#include "Subtensor.cuh"
 
 using namespace std;
 

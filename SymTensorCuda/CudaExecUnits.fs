@@ -1,5 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System
+
 open Basics
 open Basics.Cuda
 open ArrayNDNS
@@ -220,6 +222,16 @@ module CudaExecUnit =
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
       
+    let workDimForElemwise trgt hetero =
+        match ArrayND.nDims trgt with
+        | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
+        | 0 -> (1, 1, 1)
+        | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
+        | 2 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], 1)
+        | 3 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[2])
+        | d ->
+            let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
+            ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
 
     /// execution items for an elementwise operation
     let execItemsForElemwise trgt cOp srcViews =
@@ -235,6 +247,7 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
         let heteroStr = if hetero then "Heterogenous" else ""
+        let workDim = workDimForElemwise trgt hetero
         let kernel = 
             {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr;
              Domain=KernelFunc;
@@ -242,18 +255,79 @@ module CudaExecUnit =
              RetType="void";
              ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;}
 
-        let workDim = 
-            match ArrayND.nDims trgt with
-            | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
-            | 0 -> (1, 1, 1)
-            | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
-            | 2 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], 1)
-            | 3 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[2])
-            | d ->
-                let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
-                ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
-
         [LaunchKernel(kernel, workDim, args)]
+
+
+    let execItemsForKernel cppFuncName tmplTmpls argTmpls workDim = 
+        let cFuncTmpl =
+            {FuncName=cppFuncName;
+             Domain=KernelFunc;
+             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) tmplTmpls;
+             RetType="void";
+             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
+        [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
+
+    let execItemsForCopyFromDynamicSubtensor trgt (src: ArrayNDManikinT) rngs rngExprs =
+
+        // does not kill any axes anymore
+        let rngs2 =
+            rngs 
+            |> List.map (fun r -> match r with
+                                  | RSDynElem e -> RSDynStartSymSize (e, SizeSpec.one)
+                                  | _ -> r)
+
+        // src with symbolic ranges applied, and dynamic axes unharmed
+        // (0 was added to offset and there size has been changed appropriately)
+        let src2 = src.[RangesSpec.eval (fun _ -> 0) rngs]
+
+
+        // now need to calculate new range specification for src2
+        // having RSAllFill and RngNewAxis in the expression makes it complicated
+        // perhaps we should introduce a simple range type
+        // RSAllFill can definitely be killed
+        // RSNewAxis is actually the operation followed by a reshape
+        // SymElem and DynElem are actually also SymStartSymEnd and DynStartSymEnd follow by a reshape
+        // what about Range options? - First element never needs an option
+        //                           - finish element could need it, once we introduce dynamic shape tensors
+        // everything would be simpler if that could be put in the graph build logic
+        // so introduce a slicing range spec
+        // then this thing here could simpliy 
+
+
+        //if ArrayND.nDims trgt <> ArrayND.nDims src then
+            //failwith "dynamic subtensor CUDA caller must have same number of dimensions in trgt and src"
+
+
+        let trgtTmpl = ArrayNDArgTmpl(trgt)
+        let srcTmpl = ArrayNDArgTmpl(src)
+        let dynSrcTmpl = ArrayNDSDArgTmpl(src)
+        let nDims = ArrayND.nDims trgt
+        let nDimsStr = sprintf "%d" nDims
+        let elemwiseFunc = sprintf "elemwise1Ary%dD" nDims
+
+        let rec rngToIdx rngs rngExprs =
+            match rngs, rngExprs with
+            | RSDynStartSymSize _ :: rrngs, rngExpr :: rrngExprs ->
+                (SizeTPtrFromArrayNDIdxTmpl (Some rngExpr) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                    rngToIdx rrngs rrngExprs 
+            | rng :: rrngs, _ when rng = RSAll ->
+                (SizeTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                    rngToIdx rrngs rngExprs 
+            | [], [] -> []
+            | _ -> failwith "invalid dynamic range specification"
+
+        let srcIdx = rngToIdx rngs rngExprs
+
+        // C++ signature is:
+        //template <typename TTarget, typename TBaseSrc, typename TDynSrc, size_t nDims,
+        //          TElemwise1Ary<IdEOp_t, TTarget, TDynSrc>::type copyFun>
+        //_dev void copyFromDynamicSubtensor(TTarget &trgt, const TBaseSrc &baseSrc, 
+        //                                   const Array<size_t, nDims> &srcIdx)
+        execItemsForKernel 
+            "copyFromDynamicSubtensor" 
+            [trgtTmpl; srcTmpl; dynSrcTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseFunc]
+            [trgtTmpl; srcTmpl; CPPArrayTmpl(srcIdx)]
+            (workDimForElemwise trgt false)
 
 
 
@@ -371,12 +445,12 @@ module CudaExecUnit =
         | UUnaryOp (Annotated _) -> []
 
         // binary elementwise
-        | UBinaryOp Add -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AddEOp_t", false)) srcs
+        | UBinaryOp Add ->       execItemsForElemwise trgt (NoArgEOpArgTmpl("AddEOp_t",       false)) srcs
         | UBinaryOp Substract -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcs
-        | UBinaryOp Multiply -> execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t", false)) srcs
-        | UBinaryOp Divide -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DivideEOp_t", false)) srcs
-        | UBinaryOp Modulo -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ModuloEOp_t", false)) srcs
-        | UBinaryOp Power -> execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t", false)) srcs
+        | UBinaryOp Multiply ->  execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) srcs
+        | UBinaryOp Divide ->    execItemsForElemwise trgt (NoArgEOpArgTmpl("DivideEOp_t",    false)) srcs
+        | UBinaryOp Modulo ->    execItemsForElemwise trgt (NoArgEOpArgTmpl("ModuloEOp_t",    false)) srcs
+        | UBinaryOp Power ->     execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t",     false)) srcs
         // matrix/tensor operations
         | UBinaryOp Dot -> 
             let aView, aOp, aCopyItems = blasArg memAllocator srcs.[0]
@@ -393,7 +467,7 @@ module CudaExecUnit =
         | UNaryOp Discard -> []
         | UNaryOp (Subtensor sr) ->
             if RangesSpec.isDynamic sr then 
-                []// TODO
+                execItemsForCopyFromDynamicSubtensor trgt srcs.[0] sr (List.tail srcs)
             else []
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 

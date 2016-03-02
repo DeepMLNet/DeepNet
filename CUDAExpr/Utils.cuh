@@ -20,3 +20,13 @@ _dev T max(const T a, const T b)
 	return a > b ? a : b;
 }
 
+
+// An array of fixed size that can be passed by value in function calls.
+template <typename T, size_t Tsize>
+struct Array {
+	T mElements[Tsize];
+
+	T& operator[] (const int idx) { return mElements[idx]; };
+	const T& operator[] (const int idx) const { return mElements[idx]; };
+	size_t size() const { return Tsize; }
+};

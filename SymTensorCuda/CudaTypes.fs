@@ -5,6 +5,7 @@ open System.Runtime.InteropServices
 open ManagedCuda
 
 open Basics
+open Basics.Cuda
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
@@ -148,6 +149,11 @@ module ArgTemplates =
         abstract member CPPTypeName : string
         abstract member GetArg : CudaExecEnvT -> obj 
 
+    /// CUDA C++ argument template for values that are passed by value in an array
+    type ICudaArrayMemberArgTmpl<'T when 'T :> ValueType> =
+        abstract member CPPTypeName : string
+        abstract member GetArg : CudaExecEnvT -> 'T
+
     /// CUDA C++ operation functor description
     type ICudaOp =
         abstract member IsIndexed : bool  
@@ -160,13 +166,78 @@ module ArgTemplates =
     type IHostMemRngTmpl =
         abstract member GetRng : CudaExecEnvT -> HostMemRngT
 
+//    [<Struct>]
+//    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+//    /// C++ ArrayND with static shape and static offset/stride
+//    type ArrayNDSSArg =
+//        val mData : IntPtr
+//        new (data: IntPtr) = {mData = data}
+
+    /// Literal C++ typename 
+    type CPPTemplateValue (cppTypeName) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = cppTypeName
+            member this.GetArg env = failwith "TemplateValue has no argument value"
+
     /// ArrayND argument template
     type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
+        // TShape is ShapeStaicXD and TStride is StrideStaticXD.
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env =
                 // C++ struct just contains the pointer to data memory
-                (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer :> obj
+                (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr :> obj
+
+    type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
+        // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = manikin.DynamicCPPType
+            member this.GetArg env =
+                // currently this cannot be passed as an argument
+                failwith "passing ArrayNDSDArg is not implemented"
+
+    type SizeTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
+        do 
+            match manikinOpt with
+            | Some manikin ->
+                if manikin.DataType <> typeof<int> then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type int"
+                if ArrayND.nDims manikin <> 0 then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
+                if ArrayND.offset manikin <> 0 then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must have zero offset"
+            | None -> ()
+
+        interface ICudaArrayMemberArgTmpl<IntPtr> with
+            member this.CPPTypeName = "size_t *"
+            member this.GetArg env =
+                match manikinOpt with
+                | Some manikin ->
+                    // pass pointer to (only) element
+                    (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
+                | None -> IntPtr.Zero
+
+    type CPPArrayTmpl<'T when 'T :> ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = 
+                sprintf "Array<%s, %d>" (valueTmpls.Head.CPPTypeName) (List.length valueTmpls)
+            member this.GetArg env =
+                let argVals =
+                    valueTmpls
+                    |> List.map (fun vt -> vt.GetArg env)
+                    |> List.toArray
+                PassArrayByVal.passArrayByValue argVals
+
+
+    type NullPtrArgTmpl () =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "void *"
+            member this.GetArg env = (System.IntPtr 0) :> obj
+
+    type SizeTArgTmpl (value: int) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "size_t"
+            member this.GetArg env = (nativeint value) :> obj
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =

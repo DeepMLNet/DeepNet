@@ -88,4 +88,13 @@ module Util =
     let intToStrSeq items =
         Seq.map (sprintf "%d") items
 
+    /// C++ data type for given type
+    let cppType (typ: System.Type) = 
+        match typ with
+        | _ when typ = typeof<double>   -> "double"
+        | _ when typ = typeof<single>   -> "float"
+        | _ when typ = typeof<int>      -> "int"
+        | _ when typ = typeof<byte>     -> "char"
+        | _ -> failwithf "no C++ datatype for %A" typ
+
 

@@ -89,6 +89,13 @@ module UExprTypes =
 
 module UExprRngsSpec =
 
+    // split into two ops:
+    // one that does nothing, just changes the static layout
+    // and another that does the copying if necessary
+    // op1 : StaticSubtensor
+    // op2 : DynamicSubtensor
+    // but how does this work with SetSubtensor?
+
     /// converts a ExprRngsSpecT to a UExprRngSpecT
     let ofExprRngsSpec (sr: ExprRngsSpecT) =
         ([], sr)

@@ -78,6 +78,7 @@
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaSup.fs" />
     <Compile Include="HDF5.fs" />
+    <Compile Include="ArrayByVal.fs" />
     <Content Include="packages.config" />
     <Content Include="HDF5DLLs\hdf5.dll">
       <Link>hdf5.dll</Link>

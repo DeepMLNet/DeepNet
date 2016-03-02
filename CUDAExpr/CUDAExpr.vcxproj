@@ -179,6 +179,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="Reduce.cuh">
       <DeploymentContent>false</DeploymentContent>
     </ClInclude>
+    <ClInclude Include="Subtensor.cuh" />
     <ClInclude Include="ThrustInterface.cuh">
       <DeploymentContent>false</DeploymentContent>
     </ClInclude>
