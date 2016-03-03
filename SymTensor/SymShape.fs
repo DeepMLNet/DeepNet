@@ -491,37 +491,39 @@ module RangeSpecTypes =
     // symbolic/dynamic subtensor specification
     type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list
 
+    /// simple range specification
+    type SimpleRangeSpecT<'Dyn> =
+        | SRSSymStartSymEnd     of SizeSpecT * (SizeSpecT option)
+        | SRSDynStartSymSize    of 'Dyn * SizeSpecT                    
 
-module RangeSpec =
+    let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
+        
+    type SimpleRangesSpecT<'Dyn> = SimpleRangeSpecT<'Dyn> list
+
+module SimpleRangeSpec =
     open ArrayNDNS
 
-    /// evaluate a RangeSpecT to a RangeT
+    /// evaluate a SimpleRangeSpecT to a RangeT
     let eval dynEvaluator rs =
         match rs with
-        | RSSymElem e -> RngElem (SizeSpec.eval e)
-        | RSDynElem e -> RngElem (dynEvaluator e)
-        | RSSymStartSymEnd (s, f) -> 
-            Rng (Option.map SizeSpec.eval s, Option.map SizeSpec.eval f)
-        | RSDynStartSymSize (s, elems) -> 
+        | SRSSymStartSymEnd (s, fo) -> 
+            Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+        | SRSDynStartSymSize (s, elems) -> 
             let sv = dynEvaluator s
             Rng (Some sv, Some (sv + SizeSpec.eval elems))
-        | RSNewAxis -> RngNewAxis
-        | RSAllFill -> RngAllFill
 
     let isDynamic rs =
         match rs with
-        | RSDynElem _ 
-        | RSDynStartSymSize _ 
-            -> true
+        | SRSDynStartSymSize _ -> true
         | _ -> false
 
-module RangesSpec =
+module SimpleRangesSpec =
 
     /// evaluate a RangesSpecT to a RangeT list
     let eval dynEvaluator rs =
         rs
-        |> List.map (RangeSpec.eval dynEvaluator)
+        |> List.map (SimpleRangeSpec.eval dynEvaluator)
 
     let isDynamic rs =
         rs
-        |> List.exists RangeSpec.isDynamic
+        |> List.exists SimpleRangeSpec.isDynamic

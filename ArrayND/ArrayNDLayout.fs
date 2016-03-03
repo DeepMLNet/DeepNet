@@ -101,6 +101,10 @@ module ArrayNDLayout =
     let inline newColumnMajor shp =
         {Shape=shp; Stride=columnMajorStride shp; Offset=0;}
 
+    /// an ArrayND layout for an empty (zero elements) vector (1D)
+    let emptyVector =
+        {Shape=[0]; Stride=[1]; Offset=0;}
+
     /// true if the ArrayND is contiguous
     let inline isContiguous a = (stride a = contiguousStride (shape a))
 

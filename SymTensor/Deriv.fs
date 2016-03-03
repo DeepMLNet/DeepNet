@@ -65,9 +65,9 @@ module Deriv =
             | Round -> Map.empty
             | Truncate -> Map.empty
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
-            | Subtensor sr ->
+            | Subtensor srs ->
                 let agExpanded : ExprT<'T> = Expr.zeros (funElems :: (shapeOf a))
-                setSubtensor agExpanded.[RSAll :: sr] egExpanded
+                setSubtensor agExpanded.[SRSAll :: srs] egExpanded
                 |> collapse 
                 |> reverseDiffStep a
             | Reshape ss -> eg |> reverseDiffStep a
@@ -130,8 +130,8 @@ module Deriv =
                 da .+ db
             | TensorProduct -> failwith "not implemented"
             | SetSubtensor sr ->
-                let bgExpanded = egExpanded.[RSAll::sr]
-                let agExpanded = setSubtensor egExpanded.[RSAll::sr] (zerosLike bgExpanded)
+                let bgExpanded = egExpanded.[SRSAll::sr]
+                let agExpanded = setSubtensor egExpanded.[SRSAll::sr] (zerosLike bgExpanded)
                 (agExpanded |> collapse) .+ (bgExpanded |> collapse)
 
         | Nary(op, es) ->

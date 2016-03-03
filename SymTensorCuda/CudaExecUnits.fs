@@ -36,11 +36,11 @@ module CudaExecUnit =
         let nSrcs = List.length srcShapes
 
         // requests all sources to use separate storage
-        let outplaceTrgt =
+        let noSrcReqs =
             List.replicate nSrcs None
 
-        // requests one source to be evaluated into our target view
-        let inplaceOverwriteTrgt =
+        // requests the first source to be evaluated into our target view
+        let inplaceFirstSrcReq =
             match nSrcs with
             | 0 -> []
             | 1 -> [reqView]
@@ -50,40 +50,40 @@ module CudaExecUnit =
         | ULeafOp _ -> []
 
         // unary elementwise
-        | UUnaryOp Negate -> inplaceOverwriteTrgt                        
-        | UUnaryOp Abs -> inplaceOverwriteTrgt
-        | UUnaryOp SignT -> inplaceOverwriteTrgt
-        | UUnaryOp Log -> inplaceOverwriteTrgt
-        | UUnaryOp Log10 -> inplaceOverwriteTrgt                           
-        | UUnaryOp Exp -> inplaceOverwriteTrgt                           
-        | UUnaryOp Sin -> inplaceOverwriteTrgt
-        | UUnaryOp Cos -> inplaceOverwriteTrgt
-        | UUnaryOp Tan -> inplaceOverwriteTrgt
-        | UUnaryOp Asin -> inplaceOverwriteTrgt
-        | UUnaryOp Acos -> inplaceOverwriteTrgt
-        | UUnaryOp Atan -> inplaceOverwriteTrgt
-        | UUnaryOp Sinh -> inplaceOverwriteTrgt
-        | UUnaryOp Cosh -> inplaceOverwriteTrgt
-        | UUnaryOp Tanh -> inplaceOverwriteTrgt
-        | UUnaryOp Sqrt -> inplaceOverwriteTrgt
-        | UUnaryOp Ceil -> inplaceOverwriteTrgt
-        | UUnaryOp Floor -> inplaceOverwriteTrgt
-        | UUnaryOp Round -> inplaceOverwriteTrgt
-        | UUnaryOp Truncate -> inplaceOverwriteTrgt        
+        | UUnaryOp Negate -> inplaceFirstSrcReq                        
+        | UUnaryOp Abs -> inplaceFirstSrcReq
+        | UUnaryOp SignT -> inplaceFirstSrcReq
+        | UUnaryOp Log -> inplaceFirstSrcReq
+        | UUnaryOp Log10 -> inplaceFirstSrcReq                           
+        | UUnaryOp Exp -> inplaceFirstSrcReq                           
+        | UUnaryOp Sin -> inplaceFirstSrcReq
+        | UUnaryOp Cos -> inplaceFirstSrcReq
+        | UUnaryOp Tan -> inplaceFirstSrcReq
+        | UUnaryOp Asin -> inplaceFirstSrcReq
+        | UUnaryOp Acos -> inplaceFirstSrcReq
+        | UUnaryOp Atan -> inplaceFirstSrcReq
+        | UUnaryOp Sinh -> inplaceFirstSrcReq
+        | UUnaryOp Cosh -> inplaceFirstSrcReq
+        | UUnaryOp Tanh -> inplaceFirstSrcReq
+        | UUnaryOp Sqrt -> inplaceFirstSrcReq
+        | UUnaryOp Ceil -> inplaceFirstSrcReq
+        | UUnaryOp Floor -> inplaceFirstSrcReq
+        | UUnaryOp Round -> inplaceFirstSrcReq
+        | UUnaryOp Truncate -> inplaceFirstSrcReq        
         // reductions
-        | UUnaryOp Sum -> outplaceTrgt
-        | UUnaryOp (SumAxis _) -> outplaceTrgt
+        | UUnaryOp Sum -> noSrcReqs
+        | UUnaryOp (SumAxis _) -> noSrcReqs
         // shape operations
         | UUnaryOp (Reshape _) ->        
             match reqView with
             | Some rv when ArrayND.isContiguous rv ->
                 [Some (ArrayND.reshapeView srcShapes.[0] rv)]
-            | _ -> outplaceTrgt
-        | UUnaryOp (DoBroadcast _) -> outplaceTrgt
+            | _ -> noSrcReqs
+        | UUnaryOp (DoBroadcast _) -> noSrcReqs
         | UUnaryOp (SwapDim (ax1, ax2)) ->
             match reqView with
             | Some rv -> [Some (ArrayND.swapDim ax1 ax2 rv)]
-            | _ -> outplaceTrgt
+            | _ -> noSrcReqs
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match cudaEnv.VarStorLoc |> Map.find vs with
@@ -91,40 +91,44 @@ module CudaExecUnit =
                 // request to store directly into external var
                 // we assume that all device input vars are continguous
                 [Some (ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape)]
-            | LocHost ->
-                // need continguous storage to transfer to host
-                match reqView with
-                | Some rv when ArrayND.isContiguous rv -> [reqView]
-                | _ -> outplaceTrgt
+            | LocHost -> noSrcReqs
         // misc
-        | UUnaryOp (Annotated _) -> inplaceOverwriteTrgt
+        | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
         // binary elementwise
-        | UBinaryOp Add -> inplaceOverwriteTrgt
-        | UBinaryOp Substract -> inplaceOverwriteTrgt
-        | UBinaryOp Multiply -> inplaceOverwriteTrgt
-        | UBinaryOp Divide -> inplaceOverwriteTrgt
-        | UBinaryOp Modulo -> inplaceOverwriteTrgt
-        | UBinaryOp Power -> inplaceOverwriteTrgt
+        | UBinaryOp Add -> inplaceFirstSrcReq
+        | UBinaryOp Substract -> inplaceFirstSrcReq
+        | UBinaryOp Multiply -> inplaceFirstSrcReq
+        | UBinaryOp Divide -> inplaceFirstSrcReq
+        | UBinaryOp Modulo -> inplaceFirstSrcReq
+        | UBinaryOp Power -> inplaceFirstSrcReq
         // matrix/tensor operations
-        | UBinaryOp Dot -> outplaceTrgt
-        | UBinaryOp TensorProduct -> outplaceTrgt     
+        | UBinaryOp Dot -> noSrcReqs
+        | UBinaryOp TensorProduct -> noSrcReqs     
 
         // nary
-        | UNaryOp Discard -> outplaceTrgt
-        | UNaryOp (Subtensor _) -> outplaceTrgt
-        //| UNaryOp (SetSubtensor sr) -> 
+        | UNaryOp Discard -> noSrcReqs
+        | UNaryOp (Subtensor _) -> noSrcReqs
+        | UNaryOp (SetSubtensor _) -> 
+            // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
+            // in a temporary manikin and copied over to avoid race conditions.
+            inplaceFirstSrcReq
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
 
     /// computes the definitive target view of an op given its source views
     let trgtGivenSrc compileEnv memAllocator (typ: TypeNameT) (trgtShape: NShapeSpecT) (req: ArrayNDManikinT option) 
                      (op: UOpT) (srcs: ArrayNDManikinT list) (srcShared: bool list)  =
+
+        // new allocated target
+        let newTrgt =
+            ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+
         // target that shares no elements with any srcView
         let outplaceTrgt =
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+            | _ -> newTrgt 
 
         let outplaceBlasTrgt =
             match req with
@@ -133,7 +137,7 @@ module CudaExecUnit =
             | _ -> ArrayNDManikin.newColumnMajor memAllocator typ trgtShape, false
 
         // target that reuses a srcView, if it may be overwritten
-        let inplaceOverwriteTrgt =
+        let inplaceOvrwrtTrgt =
             match List.tryFindIndex not srcShared with
             | Some i -> srcs.[i], false
             | None -> outplaceTrgt    
@@ -155,26 +159,26 @@ module CudaExecUnit =
         | ULeafOp _ -> outplaceTrgt        
 
         // unary elementwise
-        | UUnaryOp Negate -> inplaceOverwriteTrgt                        
-        | UUnaryOp Abs -> inplaceOverwriteTrgt
-        | UUnaryOp SignT -> inplaceOverwriteTrgt
-        | UUnaryOp Log -> inplaceOverwriteTrgt
-        | UUnaryOp Log10 -> inplaceOverwriteTrgt                           
-        | UUnaryOp Exp -> inplaceOverwriteTrgt                           
-        | UUnaryOp Sin -> inplaceOverwriteTrgt
-        | UUnaryOp Cos -> inplaceOverwriteTrgt
-        | UUnaryOp Tan -> inplaceOverwriteTrgt
-        | UUnaryOp Asin -> inplaceOverwriteTrgt
-        | UUnaryOp Acos -> inplaceOverwriteTrgt
-        | UUnaryOp Atan -> inplaceOverwriteTrgt
-        | UUnaryOp Sinh -> inplaceOverwriteTrgt
-        | UUnaryOp Cosh -> inplaceOverwriteTrgt
-        | UUnaryOp Tanh -> inplaceOverwriteTrgt
-        | UUnaryOp Sqrt -> inplaceOverwriteTrgt
-        | UUnaryOp Ceil -> inplaceOverwriteTrgt
-        | UUnaryOp Floor -> inplaceOverwriteTrgt
-        | UUnaryOp Round -> inplaceOverwriteTrgt
-        | UUnaryOp Truncate -> inplaceOverwriteTrgt    
+        | UUnaryOp Negate -> inplaceOvrwrtTrgt                        
+        | UUnaryOp Abs -> inplaceOvrwrtTrgt
+        | UUnaryOp SignT -> inplaceOvrwrtTrgt
+        | UUnaryOp Log -> inplaceOvrwrtTrgt
+        | UUnaryOp Log10 -> inplaceOvrwrtTrgt                           
+        | UUnaryOp Exp -> inplaceOvrwrtTrgt                           
+        | UUnaryOp Sin -> inplaceOvrwrtTrgt
+        | UUnaryOp Cos -> inplaceOvrwrtTrgt
+        | UUnaryOp Tan -> inplaceOvrwrtTrgt
+        | UUnaryOp Asin -> inplaceOvrwrtTrgt
+        | UUnaryOp Acos -> inplaceOvrwrtTrgt
+        | UUnaryOp Atan -> inplaceOvrwrtTrgt
+        | UUnaryOp Sinh -> inplaceOvrwrtTrgt
+        | UUnaryOp Cosh -> inplaceOvrwrtTrgt
+        | UUnaryOp Tanh -> inplaceOvrwrtTrgt
+        | UUnaryOp Sqrt -> inplaceOvrwrtTrgt
+        | UUnaryOp Ceil -> inplaceOvrwrtTrgt
+        | UUnaryOp Floor -> inplaceOvrwrtTrgt
+        | UUnaryOp Round -> inplaceOvrwrtTrgt
+        | UUnaryOp Truncate -> inplaceOvrwrtTrgt    
         // reductions
         | UUnaryOp Sum -> outplaceTrgt
         | UUnaryOp (SumAxis _) -> outplaceTrgt
@@ -189,39 +193,47 @@ module CudaExecUnit =
         | UUnaryOp (SwapDim (ax1, ax2)) ->
             ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
         // variable access
-        | UUnaryOp (StoreToVar vs) ->
-            match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev -> 
-                // we assume that all device input vars are continguous
-                ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape, true
-            | LocHost ->
-                // need continguous memory to transfer to host
-                if ArrayND.isContiguous srcs.[0] then srcs.[0], srcShared.[0]
-                else outplaceTrgt 
+        | UUnaryOp (StoreToVar _) -> newTrgt
         // misc
         | UUnaryOp (Annotated _) -> srcs.[0], srcShared.[0]
 
         // binary elementwise
-        | UBinaryOp Add -> inplaceOverwriteTrgt
-        | UBinaryOp Substract -> inplaceOverwriteTrgt
-        | UBinaryOp Multiply -> inplaceOverwriteTrgt
-        | UBinaryOp Divide -> inplaceOverwriteTrgt
-        | UBinaryOp Modulo -> inplaceOverwriteTrgt
-        | UBinaryOp Power -> inplaceOverwriteTrgt
+        | UBinaryOp Add -> inplaceOvrwrtTrgt
+        | UBinaryOp Substract -> inplaceOvrwrtTrgt
+        | UBinaryOp Multiply -> inplaceOvrwrtTrgt
+        | UBinaryOp Divide -> inplaceOvrwrtTrgt
+        | UBinaryOp Modulo -> inplaceOvrwrtTrgt
+        | UBinaryOp Power -> inplaceOvrwrtTrgt
         // matrix/tensor operations
         | UBinaryOp Dot -> outplaceBlasTrgt
         | UBinaryOp TensorProduct -> outplaceTrgt
 
         // nary
         | UNaryOp Discard -> outplaceTrgt
-        | UNaryOp (Subtensor sr) -> 
-            if RangesSpec.isDynamic sr then outplaceTrgt
-            else 
-                let rng = RangesSpec.eval (failwith "static") sr
+        | UNaryOp (Subtensor srs) -> 
+            if SimpleRangesSpec.isDynamic srs then 
+                // dynamic subtensors will be copied out of the src
+                outplaceTrgt
+            else
+                // symbolic subtensors use a view of the src 
+                let rng = SimpleRangesSpec.eval (failwith "is static") srs
                 srcs.[0].[rng] :?> ArrayNDManikinT, srcShared.[0]
+        | UNaryOp (SetSubtensor _) ->
+            if not (srcShared.[0]) then srcs.[0], false
+            else outplaceTrgt
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
+   
+    /// execution item to lunch the given kernel template function
+    let execItemsForKernel cppFuncName tmplTmpls argTmpls workDim = 
+        let cFuncTmpl =
+            {FuncName=cppFuncName;
+             Domain=KernelFunc;
+             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) tmplTmpls;
+             RetType="void";
+             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
+        [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
 
-      
+    /// returns the CUDA work dimensions for an elementwise operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
         | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
@@ -247,88 +259,68 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
         let heteroStr = if hetero then "Heterogenous" else ""
-        let workDim = workDimForElemwise trgt hetero
-        let kernel = 
-            {FuncName=sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr;
-             Domain=KernelFunc;
-             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;
-             RetType="void";
-             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) args;}
+        let funcName = sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr
 
-        [LaunchKernel(kernel, workDim, args)]
+        execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
 
-    let execItemsForKernel cppFuncName tmplTmpls argTmpls workDim = 
-        let cFuncTmpl =
-            {FuncName=cppFuncName;
-             Domain=KernelFunc;
-             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) tmplTmpls;
-             RetType="void";
-             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
-        [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
+    let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =
+        // Apply symbolic ranges to src, and leave dynamic axes unharmed.
+        // (0 is added to offset and their size is changed appropriately)
+        let basStatic = bas.[SimpleRangesSpec.eval (fun _ -> 0) rngs] :?> ArrayNDManikinT
 
-    let execItemsForCopyFromDynamicSubtensor trgt (src: ArrayNDManikinT) rngs rngExprs =
-
-        // does not kill any axes anymore
-        let rngs2 =
-            rngs 
-            |> List.map (fun r -> match r with
-                                  | RSDynElem e -> RSDynStartSymSize (e, SizeSpec.one)
-                                  | _ -> r)
-
-        // src with symbolic ranges applied, and dynamic axes unharmed
-        // (0 was added to offset and there size has been changed appropriately)
-        let src2 = src.[RangesSpec.eval (fun _ -> 0) rngs]
-
-
-        // now need to calculate new range specification for src2
-        // having RSAllFill and RngNewAxis in the expression makes it complicated
-        // perhaps we should introduce a simple range type
-        // RSAllFill can definitely be killed
-        // RSNewAxis is actually the operation followed by a reshape
-        // SymElem and DynElem are actually also SymStartSymEnd and DynStartSymEnd follow by a reshape
-        // what about Range options? - First element never needs an option
-        //                           - finish element could need it, once we introduce dynamic shape tensors
-        // everything would be simpler if that could be put in the graph build logic
-        // so introduce a slicing range spec
-        // then this thing here could simpliy 
-
-
-        //if ArrayND.nDims trgt <> ArrayND.nDims src then
-            //failwith "dynamic subtensor CUDA caller must have same number of dimensions in trgt and src"
-
-
-        let trgtTmpl = ArrayNDArgTmpl(trgt)
-        let srcTmpl = ArrayNDArgTmpl(src)
-        let dynSrcTmpl = ArrayNDSDArgTmpl(src)
-        let nDims = ArrayND.nDims trgt
-        let nDimsStr = sprintf "%d" nDims
-        let elemwiseFunc = sprintf "elemwise1Ary%dD" nDims
-
-        let rec rngToIdx rngs rngExprs =
-            match rngs, rngExprs with
-            | RSDynStartSymSize _ :: rrngs, rngExpr :: rrngExprs ->
-                (SizeTPtrFromArrayNDIdxTmpl (Some rngExpr) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
-                    rngToIdx rrngs rrngExprs 
-            | rng :: rrngs, _ when rng = RSAll ->
+        // convert simplified range specification to array of pointers to expressions calculating
+        // the indices
+        let rec rngToIdxPntrs rngs rngManikins =
+            match rngs, rngManikins with
+            | SRSDynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
+                // for dynamic range pass pointer to result of expression calculating the index
+                (SizeTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                    rngToIdxPntrs rrngs rrngManikins 
+            | SRSSymStartSymEnd _ :: rrngs, _ ->
+                // symbolic range has already been applied, pass null (meaning no offset to add)
                 (SizeTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
-                    rngToIdx rrngs rngExprs 
+                    rngToIdxPntrs rrngs rngManikins 
             | [], [] -> []
             | _ -> failwith "invalid dynamic range specification"
+        let basIdxPntrs = rngToIdxPntrs rngs rngManikins
 
-        let srcIdx = rngToIdx rngs rngExprs
+        // C++ parameters
+        ArrayNDArgTmpl basStatic, ArrayNDSDArgTmpl basStatic, CPPArrayTmpl basIdxPntrs
 
+    let execItemsForCopyFromDynamicSubtensor trgt src rngs rngManikins =
         // C++ signature is:
         //template <typename TTarget, typename TBaseSrc, typename TDynSrc, size_t nDims,
         //          TElemwise1Ary<IdEOp_t, TTarget, TDynSrc>::type copyFun>
-        //_dev void copyFromDynamicSubtensor(TTarget &trgt, const TBaseSrc &baseSrc, 
-        //                                   const Array<size_t, nDims> &srcIdx)
+        //_dev void copyFromDynamicSubtensor(TTarget &trgt,  
+        //                                   const TBaseSrc &baseSrc, const Array<size_t, nDims> &srcIdx)
+
+        let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
+        let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
+        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
+
         execItemsForKernel 
             "copyFromDynamicSubtensor" 
-            [trgtTmpl; srcTmpl; dynSrcTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseFunc]
-            [trgtTmpl; srcTmpl; CPPArrayTmpl(srcIdx)]
+            [ArrayNDArgTmpl trgt; srcTmpl; srcDynTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseFunc]
+            [ArrayNDArgTmpl trgt; srcTmpl; srcIdxPntrsTmpl]
             (workDimForElemwise trgt false)
 
+    let execItemsForCopyToDynamicSubtensor trgt rngs rngManikins src =
+        // C++ signature is:
+        //template <typename TBaseTrgt, typename TDynTrgt, size_t nDims, typename TSrc,
+        //          TElemwise1Ary<IdEOp_t, TDynTrgt, TSrc>::type copyFun>
+        //_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t, nDims> &trgtIdx,
+        //                                 const TSrc &src)
+
+        let trgtTmpl, trgtDynTmpl, trgtIdxPntrsTmpl = dynamicSubtensorTmplAndIdx trgt rngs rngManikins
+        let nDimsStr = sprintf "%d" (ArrayND.nDims src)
+        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims src)
+
+        execItemsForKernel 
+            "copyToDynamicSubtensor" 
+            [trgtTmpl; trgtDynTmpl; CPPTemplateValue nDimsStr; ArrayNDArgTmpl src; CPPTemplateValue elemwiseFunc]
+            [trgtTmpl; trgtIdxPntrsTmpl; ArrayNDArgTmpl src]
+            (workDimForElemwise src false)
 
 
     /// generate ExecItems to call a C++ template function
@@ -376,7 +368,7 @@ module CudaExecUnit =
         | _ -> failwith "cannot use specified view as BLAS target"
 
     /// returns the execution units for the specified op
-    let execItemsForOp cudaEnv memAllocator trgt op srcs =
+    let execItemsForOp compileEnv memAllocator trgt op srcs =
         match op with 
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
@@ -384,7 +376,7 @@ module CudaExecUnit =
         | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) []
         // variable access
         | ULeafOp (Var vs) -> 
-            match cudaEnv.VarStorLoc |> Map.find vs with
+            match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev -> []
             | LocHost -> 
                 // we assume that host variable has continguous stride and zero offset
@@ -429,18 +421,33 @@ module CudaExecUnit =
         | UUnaryOp (SwapDim _) -> []
         // variable access
         | UUnaryOp (StoreToVar vs) ->
-            let copyItems = 
-                if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
-                else []
-            match cudaEnv.VarStorLoc |> Map.find vs with
-            | LocDev -> 
-                // trgtView is the variable we need to store into
-                copyItems
+            let varShp, varType = ArrayND.shape srcs.[0], srcs.[0].TypeName
+
+            match compileEnv.VarStorLoc |> Map.find vs with
+            | LocDev when trgt.Storage <> (MemExternal vs) -> 
+                // Our source has not been evaluated directly into the variable storage.
+                // Therefore we need to copy into the variable.
+                // We assume that all device vars are continguous.
+                let dv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
+                copyExecItems dv srcs.[0]
+            | LocDev ->
+                // Source was evaluated directly into the variable storage.
+                // No copy necessary.
+                []
             | LocHost ->            
-                // we assume that host variable has continguous stride and zero offset
+                let copyItems, memcpySrc = 
+                    if ArrayND.isContiguous srcs.[0] then 
+                        // Source is contiguous. Can directly copy to host.
+                        [], srcs.[0]
+                    else
+                        // Need to copy to temporary contiguous storage first.
+                        let tmp = ArrayNDManikin.newContiguous memAllocator varType varShp
+                        copyExecItems tmp srcs.[0], tmp
+
+                // We assume that all host vars are continguous.
                 // trgtView has contingous stride
-                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) (ArrayND.shape trgt)
-                copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(trgt), ArrayNDHostRegMemRngTmpl(hv))]                 
+                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
+                copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]                 
         // misc
         | UUnaryOp (Annotated _) -> []
 
@@ -465,10 +472,19 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> []
-        | UNaryOp (Subtensor sr) ->
-            if RangesSpec.isDynamic sr then 
-                execItemsForCopyFromDynamicSubtensor trgt srcs.[0] sr (List.tail srcs)
-            else []
+        | UNaryOp (Subtensor srs) ->
+            if SimpleRangesSpec.isDynamic srs then 
+                // copy dynamic subtensor out of the src
+                execItemsForCopyFromDynamicSubtensor trgt srcs.[0] srs (List.tail srcs)
+            else [] // symbolic subtensor uses a slice of the src view
+        | UNaryOp (SetSubtensor srs) ->
+            // copy "a" if necessary
+            let copyItems = 
+                if trgt <> srcs.[0] then copyExecItems trgt srcs.[0] else []
+            // copy "b" into a
+            let setItems =
+                execItemsForCopyToDynamicSubtensor trgt srs (List.skip 2 srcs) srcs.[1]
+            copyItems @ setItems
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
 

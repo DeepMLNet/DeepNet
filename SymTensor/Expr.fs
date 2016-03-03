@@ -29,8 +29,7 @@ module Expr =
     type Annotation =
         /// text label
         | Text of string      
-
-     
+    
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT<'T> =
@@ -98,8 +97,8 @@ module Expr =
         /// annotation (no influence on value)
         | Annotated of Annotation       
 
-    and ExprRngSpecT = RangeSpecT<ExprT<int>>
-    and ExprRngsSpecT = RangesSpecT<ExprT<int>>
+    and ExprRngSpecT = SimpleRangeSpecT<ExprT<int>>
+    and ExprRngsSpecT = SimpleRangesSpecT<ExprT<int>>
 
     /// ops with two exprs as arguments
     and [<StructuralComparison; StructuralEquality>] 
@@ -159,6 +158,9 @@ module Expr =
         | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
         | Nary of NaryOpT<'T> * (ExprT<'T> list)
         //| Convert of ConvertOpT<'T>
+
+    type FullExprRngSpecT = RangeSpecT<ExprT<int>>
+    type FullExprRngsSpecT = RangesSpecT<ExprT<int>>
 
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
@@ -274,25 +276,15 @@ module Expr =
         | Unary(Reshape(ss), _) -> ss
         | Unary(DoBroadcast(ss), _) -> ss
         | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
-        | Unary(Subtensor(sr), a) ->
-            let rec subtensorShape rng baseShp =
-                let ss = subtensorShape 
-                match rng, baseShp with
-                | RSSymElem _                  ::rngs, _::shps   -> ss rngs shps
-                | RSDynElem _                  ::rngs, _::shps   -> ss rngs shps
-                | RSSymStartSymEnd (s, f)      ::rngs, shp::shps -> 
-                    ((f |? (shp - SizeSpec.one)) + 1 - (s |? SizeSpec.zero)) :: ss rngs shps
-                | RSDynStartSymSize (_, size)  ::rngs, _::shps   -> size :: ss rngs shps
-                | RSNewAxis                    ::rngs, _::shps   -> SizeSpec.broadcastable :: ss rngs shps
-                | RSAllFill                    ::_   , _ when List.length rng <= List.length baseShp 
-                                                                 -> ss (RSSymStartSymEnd (None, None) :: rng) baseShp 
-                | RSAllFill                    ::rngs, _         -> ss rngs baseShp 
-                | []                                 , []        -> []
-                | [], _  | _, []                                 -> failwith "incompatible subtensor range specification"                    
-            subtensorShape sr (shapeOf a)
+        | Unary(Subtensor(srs), a) ->
+            (srs, shapeOf a)
+            ||> List.map2 (fun sr shp ->
+                 match sr with
+                 | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
+                 | SRSDynStartSymSize (_, size) -> size)
                     
         // misc
-        | Unary(StoreToVar _, a) -> shapeOf a
+        | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
         | Unary(Annotated(_), a) -> shapeOf a
 
         // binary elementwise
@@ -642,41 +634,15 @@ module Expr =
     /// expression a with the specified subtensor replaced with b
     let setSubtensor a b =
         match a with
-        | Unary (Subtensor sr, t) ->
-            Binary (SetSubtensor sr, t, b) |> check
+        | Unary (Reshape _, (Unary (Subtensor srs, t) as st)) ->
+            let stShp = shapeOf st
+            Binary (SetSubtensor srs, t, Unary (Reshape stShp, b)) |> check
         | _ ->
             failwith "the first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]"
 
     type ExprT with
         // item / slicing
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            /// converts argument list to range specification
-            let rec toRSV (args: obj list) =
-                match args with
-                // direct range specification
-                | [:? ExprRngsSpecT as rngs] -> rngs
-
-                // slices
-                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSSymStartSymEnd (so, fo) :: toRSV rest
-                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
-                    RSSymStartSymEnd (so, None) :: toRSV rest
-                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
-                    RSSymStartSymEnd (None, fo) :: toRSV rest
-                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
-                    RSDynStartSymSize (so.Value, fo.Value.Elems) :: toRSV rest
-                | null                           :: null                             :: rest ->
-                    RSSymStartSymEnd (None, None) :: toRSV rest
-
-                // items
-                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: toRSV rest
-                | (:? SpecialAxisT as s)  :: rest -> match s with
-                                                     | NewAxis -> RSNewAxis :: toRSV rest
-                                                     | Fill    -> RSAllFill :: toRSV rest
-                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: toRSV rest
-
-                | []                              -> []
-                | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
             /// converts ints to SizeSpecTs
             let intToSizeSpec (arg: obj) =
@@ -688,18 +654,74 @@ module Expr =
                     | None -> None :> obj
                 | _ -> arg
 
-            allArgs
-            |> Array.toList
-            |> List.map intToSizeSpec
-            |> toRSV
-            |> fun ss -> Unary (Subtensor ss, this)  
+            /// converts argument list to range specification
+            let rec parseArgs (args: obj list) : FullExprRngsSpecT =
+                match args with
+                // direct range specification
+                | [:? FullExprRngsSpecT as rngs] -> rngs
+
+                // slices
+                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSSymStartSymEnd (so, fo) :: parseArgs rest
+                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
+                    RSSymStartSymEnd (so, None) :: parseArgs rest
+                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
+                    RSSymStartSymEnd (None, fo) :: parseArgs rest
+                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
+                    RSDynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
+                | null                           :: null                             :: rest ->
+                    RSSymStartSymEnd (None, None) :: parseArgs rest
+
+                // items
+                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: parseArgs rest
+                | (:? SpecialAxisT as s)  :: rest -> match s with
+                                                     | NewAxis -> RSNewAxis :: parseArgs rest
+                                                     | Fill    -> RSAllFill :: parseArgs rest
+                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: parseArgs rest
+
+                | []                              -> []
+                | _                               -> failwithf "invalid item/slice specification: %A" allArgs
+
+            let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpecT) (simpleRs: ExprRngsSpecT) (newShape: ShapeSpecT) =
+                match rngs, shps with
+                | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape
+                | RSDynElem e :: rngs, _::shps -> splitFRS rngs shps (SRSDynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
+                | RSSymStartSymEnd (so, fo) :: rngs, shp::shps -> 
+                    let size = (fo |? shp) - (so |? SizeSpec.zero) + 1
+                    splitFRS rngs shps (SRSSymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
+                | RSDynStartSymSize (s, size) :: rngs, _::shps ->
+                    splitFRS rngs shps (SRSDynStartSymSize (s, size)::simpleRs) (size::newShape)
+                | RSNewAxis :: rngs, _ ->
+                    splitFRS rngs shps simpleRs (SizeSpec.broadcastable::newShape)
+                | RSAllFill :: rrngs, _ ->
+                    if List.length rngs <= List.length shps then splitFRS (RSAll::rngs) shps simpleRs newShape
+                    else splitFRS rrngs shps simpleRs newShape
+                | [], [] -> List.rev simpleRs, List.rev newShape
+                | _ -> failwith "item/slice processing error"
+
+            // build full range specificaton
+            let argList = allArgs |> Array.toList  |> List.map intToSizeSpec
+
+            let srs, reshp = 
+                match argList with
+                | [:? ExprRngsSpecT as srs] -> 
+                    // simplified range specification was specified, use directly
+                    srs, shapeOf (Unary (Subtensor srs, this))
+                | [:? FullExprRngsSpecT as frs] ->
+                    // split into simplified range specification and reshape operation
+                    splitFRS frs (shapeOf this) [] []
+                | _ ->
+                    // parse, then split into simplified range specification and reshape operation
+                    splitFRS (argList |> parseArgs) (shapeOf this) [] []
+
+            // emit expression
+            Unary (Reshape reshp, Unary (Subtensor srs, this))  
             |> check
 
         member this.Item 
             with get ([<System.ParamArray>] allArgs: obj []) = 
                 this.GetSlice (allArgs)
                       
-
 
     let testme () =
         let a : ExprT<float> = Leaf (Identity (SizeSpec.one))

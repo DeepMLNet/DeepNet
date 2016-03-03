@@ -8,8 +8,8 @@ open Expr
 module UExprTypes = 
 
     // int holds the position of the subuexpr that has the dynamic value
-    type UExprRngSpecT = RangeSpecT<int>
-    type UExprRngsSpecT = RangesSpecT<int>
+    type UExprRngSpecT = SimpleRangeSpecT<int>
+    type UExprRngsSpecT = SimpleRangesSpecT<int>
 
     type IUExtensionOp =
         inherit System.IComparable
@@ -102,23 +102,15 @@ module UExprRngsSpec =
         ||> List.mapFold (fun dynExprs rng ->
             let idx = List.length dynExprs 
             match rng with
-            | RSSymElem e                   -> RSSymElem e,                 dynExprs
-            | RSDynElem e                   -> RSDynElem idx,               dynExprs @ [e]
-            | RSSymStartSymEnd (s, f)       -> RSSymStartSymEnd (s, f),     dynExprs
-            | RSDynStartSymSize (s, f)      -> RSDynStartSymSize (idx, f),  dynExprs @ [s]
-            | RSNewAxis                     -> RSNewAxis,                   dynExprs
-            | RSAllFill                     -> RSAllFill,                   dynExprs)    
+            | SRSSymStartSymEnd  (s, fo)     -> SRSSymStartSymEnd (s, fo),       dynExprs
+            | SRSDynStartSymSize (s, size)   -> SRSDynStartSymSize (idx, size),  dynExprs @ [s])
 
     /// converts a UExprRngSpecT to a ExprRngsSpecT
-    let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT<int> list) =
+    let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT<int> list)  =
         match srs, drs with
-        | RSSymElem e              :: srs, _         -> RSSymElem e                :: toExprRngsSpec srs drs
-        | RSDynElem _              :: srs, dr :: drs -> RSDynElem dr               :: toExprRngsSpec srs drs
-        | RSSymStartSymEnd (s, f)  :: srs, _         -> RSSymStartSymEnd (s, f)    :: toExprRngsSpec srs drs
-        | RSDynStartSymSize (_, f) :: srs, dr :: drs -> RSDynStartSymSize (dr, f)  :: toExprRngsSpec srs drs
-        | RSNewAxis                :: srs, _         -> RSNewAxis                  :: toExprRngsSpec srs drs
-        | RSAllFill                :: srs, _         -> RSAllFill                  :: toExprRngsSpec srs drs
-        | _                              , _         -> failwith "invalid unified subtensor spec"
+        | SRSSymStartSymEnd (s, fo) :: srs, _         -> SRSSymStartSymEnd (s, fo)   :: toExprRngsSpec srs drs
+        | SRSDynStartSymSize (_, f) :: srs, dr :: drs -> SRSDynStartSymSize (dr, f)  :: toExprRngsSpec srs drs
+        | _                               , _         -> failwith "invalid unified subtensor spec"
 
 
 module UExpr =

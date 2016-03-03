@@ -21,7 +21,7 @@ module HostEval =
         let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv
         let shapeEval symShape = ShapeSpec.eval symShape
         let sizeEval symSize = SizeSpec.eval symSize
-        let rngEval = RangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
+        let rngEval = SimpleRangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
 
         let rec doEval (expr: ExprT<'T>) =
             let subEval subExpr = 
@@ -65,7 +65,10 @@ module HostEval =
                 | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                 | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
                 | Subtensor sr -> av.[rngEval sr]
-                | StoreToVar vs -> ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv); av
+                | StoreToVar vs -> 
+                    // TODO: stage variable write to avoid overwrite of used variables
+                    ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv)
+                    ArrayND.relayout ArrayNDLayout.emptyVector av
                 | Annotated _-> av                
             | Binary(op, a, b) ->
                 let av, bv = subEval a, subEval b  
