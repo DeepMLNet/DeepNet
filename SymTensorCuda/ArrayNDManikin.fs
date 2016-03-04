@@ -97,6 +97,10 @@ module ArrayNDManikin =
         let layout = ArrayNDLayout.newContiguous shape
         ArrayNDManikinT (layout, storage) 
 
+    /// storage
+    let inline storage (ary: ArrayNDManikinT) =
+        ary.Storage
+
     /// used data type name
     let inline typeName (ary: ArrayNDManikinT) =
         ary.TypeName

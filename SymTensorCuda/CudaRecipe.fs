@@ -206,11 +206,18 @@ module CudaRecipe =
 
                     let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
+                | WaitOnRerunEvent evtp ->
+                    let evt = Option.get !evtp
+                    let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
+                    cmd :: generate streamCallHistory activeEvents remainingStreams
                 | EmitEvent evtp ->
                     // add active event as many times as it will be waited upon
                     let evt = Option.get !evtp
                     let activeEvents = List.replicate correlationIdWaiters.[evt.CorrelationId] evt @ activeEvents
 
+                    let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
+                    cmd :: generate streamCallHistory activeEvents remainingStreams
+                | EmitRerunEvent evt ->
                     let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
                 | Perform cmd ->
@@ -238,7 +245,8 @@ module CudaRecipe =
                                          aFac, a, b, trgtFac, trgt)]      
 
                     calls @ generate streamCallHistory activeEvents remainingStreams
-                | ExecUnitStartInfo _ | ExecUnitEndInfo -> 
+                | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 
+                    // ignore informational markers
                     generate streamCallHistory activeEvents remainingStreams
             else
                 // streams are all empty

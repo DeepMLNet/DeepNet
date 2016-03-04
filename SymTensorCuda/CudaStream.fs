@@ -12,11 +12,14 @@ module CudaCmdTypes =
 
     /// a command executed on a stream
     type CudaCmdT<'e> =
-        | Perform of 'e
-        | WaitOnEvent of EventT
-        | EmitEvent of EventPlaceHolderT
-        | ExecUnitStartInfo of string
-        | ExecUnitEndInfo
+        | Perform                   of 'e
+        | WaitOnEvent               of EventT
+        | EmitEvent                 of EventPlaceHolderT
+        | WaitOnRerunEvent          of EventPlaceHolderT
+        | EmitRerunEvent            of EventT
+        | RerunSatisfied            of ExecUnitIdT
+        | ExecUnitStart             of ExecUnitIdT
+        | ExecUnitEnd               of ExecUnitIdT
 
     /// a sequence of commands executed on a stream
     type StreamCmdsT<'e> = List<CudaCmdT<'e>>
@@ -38,6 +41,8 @@ module CudaStreamSeq =
         let mutable eventOfUnit : Map<ExecUnitIdT, EventT> = Map.empty
         /// placeholder for an event
         let mutable eventPlaceHolders : Map<ExecUnitIdT, EventPlaceHolderT> = Map.empty
+        /// event placeholders that are waiting for the RerunAfter event of the ExecUnit
+        let mutable rerunEventWaiters : Map<ExecUnitIdT, ResizeArray<EventPlaceHolderT>> = Map.empty
         /// ExecUnits that still need to be processed
         let mutable execUnitsToProcess = execUnits
 
@@ -63,6 +68,18 @@ module CudaStreamSeq =
         /// emits an ExeOp to the given streams
         let emitToStream s (exeOp: CudaCmdT<'e>) =
             streams.[s] <- streams.[s] @ [exeOp]
+
+        let rerunsSatisfiedOnStream s untilExecUnitId =           
+            let rec build strm = seq {               
+                match strm, untilExecUnitId with
+                | RerunSatisfied id :: rstrm, _ -> 
+                    yield id
+                    yield! build rstrm 
+                | ExecUnitEnd id :: _, Some stopId when stopId = id -> ()
+                | _ :: rstrm, _ -> yield! build rstrm
+                | [], _ -> ()
+            }
+            build streams.[s]
 
         /// get the ExecUnit with the given id
         let execUnitById (execUnitId: ExecUnitIdT) =
@@ -169,7 +186,7 @@ module CudaStreamSeq =
             /// all streams of the units we depend on, that have not been reused by our siblings or their successors
             let streamsNotYetTakenOver = Set.intersect availStreams streamTakeOverCands
 
-            // If we can take over a stream, then take over the one with least commands in it
+            // If we can take over a stream, then take over the one with least commands in it.
             // Otherwise, use the first available reusable stream or create a new one.
             let euStream = match streamsNotYetTakenOver |> Set.toList with
                            | _::_ as cs -> cs |> List.minBy streamLength
@@ -179,9 +196,13 @@ module CudaStreamSeq =
 
             // store stream
             streamOfUnit <- streamOfUnit |> Map.add eu.Id euStream
+
+            // emit ExecUnit start marker
+            ExecUnitStart eu.Id |> emitToStream euStream
                
             // our stream needs to wait on the results of the streams we depend on
-            for endingUnitId in eu.DependsOn |> List.filter (fun pId -> streamOfUnit.[pId] <> euStream) do            
+            let endingUnits = eu.DependsOn |> List.filter (fun pId -> streamOfUnit.[pId] <> euStream)
+            for endingUnitId in endingUnits do            
                 match eventOfUnit |> Map.tryFind endingUnitId with
                 | Some evt ->
                     // wait on already emitted event, if possible
@@ -199,6 +220,36 @@ module CudaStreamSeq =
                     eventPlaceHolders.[endingUnitId] := Some evt
                     WaitOnEvent evt |> emitToStream euStream
 
+            // find out which RerunAfter constraints are not yet satisfied on this stream
+            let rerunsSatisfiedByDeps =
+                endingUnits
+                |> List.map (fun pId ->
+                    rerunsSatisfiedOnStream streamOfUnit.[pId] (Some pId))
+                |> Seq.concat
+                |> Set.ofSeq
+            let rerunsSatisfiedOnStream = rerunsSatisfiedOnStream euStream None |> Set.ofSeq
+            let rerunsRequired = eu.RerunAfter |> Set.ofList
+            let rerunsMissing = rerunsRequired - rerunsSatisfiedByDeps - rerunsSatisfiedOnStream |> Set.toList
+
+            // wait until missing RerunAfter constraints are satisfied
+            if not (List.isEmpty rerunsMissing) then
+                // emit an placeholder WaitOnRerunEvent 
+                let evtPh = ref None
+                WaitOnRerunEvent evtPh |> emitToStream euStream
+                // add ourselves to the list of event waiters of the ExecUnitTs we are allowed to rerun after
+                for rraId in eu.RerunAfter do
+                    match rerunEventWaiters |> Map.tryFind rraId with
+                    | Some waiters -> waiters.Add evtPh
+                    | None ->
+                        let waiters = ResizeArray<EventPlaceHolderT>()
+                        waiters.Add evtPh
+                        rerunEventWaiters <- rerunEventWaiters |> Map.add rraId waiters
+
+            // emit that the missing RerunAfter constraints are now satisfied in this stream
+            let rerunsUnmarkedOnStream = (rerunsSatisfiedByDeps + rerunsRequired) - rerunsSatisfiedOnStream
+            for rrm in rerunsUnmarkedOnStream do
+                RerunSatisfied rrm |> emitToStream euStream
+
             // emit our instructions
             for cmd in eu.Items do
                 Perform cmd |> emitToStream euStream
@@ -206,7 +257,24 @@ module CudaStreamSeq =
             // emit an event placeholder to allow for synchronization
             let evtPh = ref None
             eventPlaceHolders <- eventPlaceHolders |> Map.add eu.Id evtPh
-            EmitEvent evtPh |> emitToStream streamOfUnit.[eu.Id]
+            EmitEvent evtPh |> emitToStream euStream
+
+            // check if we need to emit a rerun event
+            match rerunEventWaiters |> Map.tryFind eu.Id with
+            | Some waiters ->
+                // create new event and emit it
+                let evt = {EventObjectId=newEventObjectId(); 
+                           CorrelationId=newCorrelationId(); 
+                           EmittingExecUnitId=eu.Id}
+                EmitRerunEvent evt |> emitToStream euStream
+
+                // fill event into all waiters
+                for evtPh in waiters do
+                    evtPh := Some evt
+            | None -> ()
+
+            // emit ExecUnit end marker
+            ExecUnitEnd eu.Id |> emitToStream euStream
 
             // remove from queue
             execUnitsToProcess <- execUnitsToProcess |> List.withoutValue eu
