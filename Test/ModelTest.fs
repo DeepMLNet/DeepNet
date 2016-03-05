@@ -25,6 +25,14 @@ let ``Test neural net`` () =
     printfn "Parameters: %A" mc
 
     // compute loss of neural net on MNIST
+    //let lossFun = Func.make onHost loss |> arg2 input target
+    // Parameeter set must be passed
+    // and individual parameters must be replaced with slices to the parameterset.
+    // IMO it is best to keep individual parameter names as long as possible and substitute last.
+    // optimizer also needs that thing
+    // so separate substitute step?
+
+
     let lossFun = Func.make onHost loss |> arg2 input target
 
     // reorder MNIST
