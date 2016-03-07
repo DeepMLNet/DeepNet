@@ -92,6 +92,7 @@ module CudaExecUnit =
                 // we assume that all device input vars are continguous
                 [Some (ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape)]
             | LocHost -> noSrcReqs
+            | loc -> unsupLoc loc
         // misc
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
@@ -154,7 +155,8 @@ module CudaExecUnit =
                 // need continguous memory for that
                 match req with
                 | Some rv when ArrayND.isContiguous rv -> rv, false
-                | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+                | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false    
+            | loc -> unsupLoc loc                    
         // tensor creation
         | ULeafOp _ -> outplaceTrgt        
 
@@ -216,7 +218,7 @@ module CudaExecUnit =
                 outplaceTrgt
             else
                 // symbolic subtensors use a view of the src 
-                let rng = SimpleRangesSpec.eval (failwith "is static") srs
+                let rng = SimpleRangesSpec.eval (fun _ -> failwith "is static") srs
                 srcs.[0].[rng] :?> ArrayNDManikinT, srcShared.[0]
         | UNaryOp (SetSubtensor _) ->
             if not (srcShared.[0]) then srcs.[0], false
@@ -382,6 +384,7 @@ module CudaExecUnit =
                 // we assume that host variable has continguous stride and zero offset
                 let hv = ArrayNDManikin.externalContiguous (MemExternal vs) (ArrayND.shape trgt)
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
+            | loc -> unsupLoc loc
         // unary elementwise
         | UUnaryOp Negate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcs
         | UUnaryOp Abs -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcs
@@ -447,7 +450,8 @@ module CudaExecUnit =
                 // We assume that all host vars are continguous.
                 // trgtView has contingous stride
                 let hv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
-                copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]                 
+                copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
+            | loc -> unsupLoc loc                              
         // misc
         | UUnaryOp (Annotated _) -> []
 

@@ -6,6 +6,19 @@ open Basics
 [<AutoOpen>]
 module ArrayNDTypes =
 
+    /// Array storage location
+    type ArrayLocT = ArrayLoc of string
+
+    /// variable stored on host
+    let LocHost = ArrayLoc "Host"
+
+    let (|LocHost|_|) arg =
+        if arg = ArrayLoc "Host" then Some () else None
+
+    /// raises an error about an unsupported location
+    let unsupLoc loc =
+        failwithf "location %A is unsupported for this operation" loc
+
     /// object that can be queried for shape
     type IHasLayout =
         /// shape of object
@@ -14,15 +27,15 @@ module ArrayNDTypes =
     /// ArrayND of any type
     type IArrayNDT =
         inherit IHasLayout
-        abstract CPPType: string
-        abstract NewView: ArrayNDLayoutT -> IArrayNDT
-        abstract NewOfSameType: ArrayNDLayoutT -> IArrayNDT
-        abstract DataType: System.Type
+        abstract CPPType:           string
+        abstract NewView:           ArrayNDLayoutT -> IArrayNDT
+        abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
+        abstract DataType:          System.Type
+        abstract Location:          ArrayLocT
 
     type SpecialAxisT =
         | NewAxis
         | Fill
-
 
 
 module ArrayND =
@@ -78,6 +91,9 @@ module ArrayND =
         abstract DataType: System.Type
         default this.DataType = typeof<'T>
 
+        /// storage location of the ArrayND
+        abstract Location: ArrayLocT
+
         interface IHasLayout with
             member this.Layout = this.Layout
         interface IArrayNDT with
@@ -85,6 +101,7 @@ module ArrayND =
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
             member this.DataType = this.DataType
+            member this.Location = this.Location
 
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
@@ -136,6 +153,9 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // shape functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// location
+    let inline location (a: #IArrayNDT) = a.Location
 
     /// layout
     let inline layout (a: IHasLayout) = a.Layout
@@ -252,6 +272,8 @@ module ArrayND =
     /// on the reshape operation.
     /// If the array is not contiguous, a reshaped copy is returned.
     /// The number of elements must not change.
+    /// One element can be -1, in which case the size of that element is
+    /// inferred automatically.
     let inline reshape shp a =
         reshapeView shp (makeContiguous a)
 

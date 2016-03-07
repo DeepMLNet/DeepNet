@@ -65,7 +65,7 @@ module ExecUnit =
                     eu.DependsOn |> List.forall (fun depId ->
                         sorted |> Seq.exists (fun seu -> seu.Id = depId)))
             
-            for eu in toAdd do
+            for eu in toAdd |> Seq.toList do
                 sorted.Add eu |> ignore
                 unsorted.Remove eu |> ignore
 

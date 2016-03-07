@@ -73,6 +73,8 @@ module ArrayNDHostTypes =
         /// storage
         member this.Storage = storage
 
+        override this.Location = LocHost
+
         override this.Item
             with get pos = storage.[ArrayNDLayout.addr pos layout]
             and set pos value = 

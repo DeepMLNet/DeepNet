@@ -388,6 +388,7 @@ module Expr =
         let sSub = substSymSizes symSizes
         let sSize = SymSizeEnv.subst symSizes
         let sShp = SymSizeEnv.substShape symSizes
+        let sSrs = SymSizeEnv.substRange symSizes
 
         match expr with
         | Leaf (Identity ss) -> Leaf (Identity (sSize ss))
@@ -398,8 +399,10 @@ module Expr =
         | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
         | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
         | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
+        | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
+        | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
         | Nary (op, es) -> Nary (op, List.map sSub es)
@@ -419,15 +422,35 @@ module Expr =
         | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
         | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
         | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && canEvalAllSymSizes a
+        | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a
         | Unary (op, a) -> canEvalAllSymSizes a
 
+        | Binary (SetSubtensor srs, a, b) -> 
+            SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a && canEvalAllSymSizes b
         | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
 
         | Nary (op, es) -> List.forall canEvalAllSymSizes es
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT<'T>) : ExprT<'T> =
-        inferAndSubstSymSizes expr
+        inferSymSizes expr |> ignore
+        expr
+
+    /// Replaces all occurences of "part" in "expr" with "replacement".
+    let subst part replacement expr =
+        // TODO: currently does not substitues into Subtensor and SetSubtensor dyanmic range expression.
+        let rec doSubst part replacement expr =       
+            let subSubst = doSubst part replacement
+            match expr with
+            | _ when expr = part -> replacement
+            | Leaf _ -> expr
+            | Unary (op, a) -> Unary (op, subSubst a)
+            | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
+            | Nary (op, es) -> Nary (op, es |> List.map subSubst)
+
+        //let symSizes = inferSymSizes expr
+        doSubst part replacement expr |> check
+
 
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
@@ -682,6 +705,7 @@ module Expr =
                 | []                              -> []
                 | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
+            /// converts a full range specification into a simple range specification
             let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpecT) (simpleRs: ExprRngsSpecT) (newShape: ShapeSpecT) =
                 match rngs, shps with
                 | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape

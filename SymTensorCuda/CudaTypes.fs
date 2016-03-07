@@ -33,15 +33,8 @@ module Types =
         Offset: int
     }
 
-    /// variable storage location
-    type VarStorLocT =
-        /// variable stored on device
-        | LocDev
-        /// variable stored on host
-        | LocHost
-
     /// additional environment informations for CUDA
-    type CudaCompileEnvT = {VarStorLoc: Map<IVarSpec, VarStorLocT>}
+    type CudaCompileEnvT = {VarStorLoc: Map<UVarSpecT, ArrayLocT>}
 
     /// function domain (kernel only or host code that may call kernels)
     type FuncDomainT =

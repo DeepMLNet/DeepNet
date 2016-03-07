@@ -10,9 +10,12 @@ module LinearRegression =
         Weights:    ExprT<'T>;
     }
 
-    let pars (nOut: int) (mc: MC) =
-        {Weights = mc.Param "weights"     [nOut; ">nIn"]} 
+    let pars (mc: ModelBuilder<_>) nIn nOut =
+        {Weights = mc.Param "Weights"     [nOut; nIn]} 
         
+    let parsFromInput (mc: ModelBuilder<_>) input nOut =
+        pars mc (Expr.shapeOf input).[0] nOut
+
     let pred (pars: Pars<'T>) (input: ExprT<'T>) =
         pars.Weights .* input
 
@@ -30,13 +33,12 @@ module NeuralLayer =
         Bias:       ExprT<'T>;
     }
 
-    let pars (mc: MC) (nOut: int) =
-        {Weights = mc.Param "weights"     [nOut; ">nIn"];
-         Bias    = mc.Param "bias"        [nOut];}
+    let pars (mc: ModelBuilder<_>) nIn nOut =
+        {Weights = mc.Param "Weights"     [nOut; nIn];
+         Bias    = mc.Param "Bias"        [nOut];}
 
-    let parsFlexible (mc: MC) =
-        {Weights = mc.Param "weights"     [">nOut"; ">nIn"];
-         Bias    = mc.Param "bias"        [">nOut"];}
+    let parsFromInput (mc: ModelBuilder<_>) input nOut =
+        pars mc (Expr.shapeOf input).[0] nOut
 
     let pred pars input =
         tanh (pars.Weights .* input + pars.Bias)
@@ -56,15 +58,16 @@ module Autoencoder =
     }
 
     type HyperPars = {
-        NLatent:    int;
+        NVisible:   SizeSpecT;
+        NLatent:    SizeSpecT;
         Tied:       bool;
     }
 
-    let pars (mc: MC) hyperPars =
+    let pars (mc: ModelBuilder<_>) hp =
         let p =
-            {InLayer   = NeuralLayer.pars (mc.Module "InLayer") hyperPars.NLatent;
-             OutLayer  = NeuralLayer.parsFlexible (mc.Module "OutLayer");}
-        if hyperPars.Tied then
+            {InLayer   = NeuralLayer.pars (mc.Module "InLayer") hp.NVisible hp.NLatent;
+             OutLayer  = NeuralLayer.pars (mc.Module "OutLayer") hp.NLatent hp.NVisible;}
+        if hp.Tied then
             {p with OutLayer = {p.OutLayer with Weights = p.InLayer.Weights.T}}
         else p
 

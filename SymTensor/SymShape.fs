@@ -25,11 +25,14 @@ module SizeSymbolTypes =
 
 
 module SizeSymbol =
+    [<Literal>]
+    let AllowFlexible = false
+
     let name sym =
         sym.Name
 
-    let flexible sym =
-        sym.Flexible
+    let isFlexible sym =
+        AllowFlexible && sym.Flexible
 
 
 //[<AutoOpen>]
@@ -158,7 +161,10 @@ module SizeMultinomTypes =
         member this.PrettyString =
             products
             |> Map.toSeq
-            |> Seq.map (fun (p, f) -> sprintf "%d * %A" f p)
+            |> Seq.map (fun (p, f) -> 
+                if SizeProduct.isEmpty p then sprintf "%d" f
+                elif f = 1 then sprintf "%A" p
+                else sprintf "%d * %A" f p)
             |> String.concat " + "
         
         override this.Equals(otherObj) =
@@ -303,11 +309,25 @@ module SizeSpec =
 
     /// flexible symbolic size
     let flexSymbol s =
+        if not SizeSymbol.AllowFlexible then
+            failwith "flexible symbol support is disabled"
         Base (Sym {Name=s; Flexible=true})
 
     /// broadcastable size one
     let broadcastable =
         Broadcast
+
+    /// true if SizeSpec contains at least one flexible symbol
+    let isFlexible ss =
+        match ss with
+        | Base (Sym sym) -> SizeSymbol.isFlexible sym
+        | Base (Fixed _) -> false
+        | Broadcast -> false
+        | Multinom m ->            
+            m.Products
+            |> Map.exists (fun prod _ -> 
+                prod.Symbols
+                |> Map.exists (fun sym _ -> SizeSymbol.isFlexible sym))
 
     /// substitute the symbols into the SizeSpec and simplifies it
     let rec substSymbols symVals ss =
@@ -318,21 +338,19 @@ module SizeSpec =
             | None -> ss
         | Base (Fixed _) -> ss
         | Broadcast -> ss
-        | Multinom m -> ss
-            // TODO: fix
+        | Multinom m -> 
             // rebuild multinom with substituted values
-//            (zero, m.Products)
-//            ||> Map.fold 
-//                (fun substSum prod fac ->               
-//                    let substProd = 
-//                        (one, prod.Symbols)
-//                        ||> Map.fold 
-//                            (fun substProd sBase sPow ->
-//                                let sBaseSubst = substSymbols symVals ss
-//                                substProd * (sBaseSubst ** sPow))
-//                    substSum + fac * substProd)
+            (zero, m.Products)
+            ||> Map.fold 
+                (fun substSum prod fac ->               
+                    let substProd = 
+                        (one, prod.Symbols)
+                        ||> Map.fold 
+                            (fun substProd sBaseSym sPow ->
+                                let sBaseSubst = substSymbols symVals (Base (Sym sBaseSym))
+                                substProd * (sBaseSubst ** sPow))
+                    substSum + fac * substProd)
 
-            ///
         |> simplify
             
     /// evaluate symbolic size specification to a number
@@ -512,6 +530,13 @@ module SimpleRangeSpec =
             let sv = dynEvaluator s
             Rng (Some sv, Some (sv + SizeSpec.eval elems))
 
+    let canEvalSymbols rs =
+        match rs with
+        | SRSSymStartSymEnd (s, fo) ->
+            SizeSpec.canEval s && Option.forall SizeSpec.canEval fo
+        | SRSDynStartSymSize (_, elems) ->
+            SizeSpec.canEval elems
+
     let isDynamic rs =
         match rs with
         | SRSDynStartSymSize _ -> true
@@ -527,3 +552,8 @@ module SimpleRangesSpec =
     let isDynamic rs =
         rs
         |> List.exists SimpleRangeSpec.isDynamic
+
+    let canEvalSymbols rs =
+        rs
+        |> List.forall SimpleRangeSpec.canEvalSymbols
+

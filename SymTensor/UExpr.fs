@@ -19,7 +19,7 @@ module UExprTypes =
         | Identity of SizeSpecT
         | Zeros of ShapeSpecT                   
         | ScalarConst of System.IComparable
-        | Var of IVarSpec
+        | Var of UVarSpecT
 
     type UUnaryOpT =
         | Negate                        
@@ -47,7 +47,7 @@ module UExprTypes =
         | Reshape of ShapeSpecT         
         | DoBroadcast of ShapeSpecT       
         | SwapDim of int * int       
-        | StoreToVar of IVarSpec
+        | StoreToVar of UVarSpecT
         | Annotated of Annotation       
 
     type UBinaryOpT =
@@ -129,7 +129,7 @@ module UExpr =
         | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
         | Leaf (Expr.Zeros ss)          -> leaf (Zeros ss)
         | Leaf (Expr.ScalarConst v)     -> leaf (ScalarConst (box v :?> System.IComparable))
-        | Leaf (Expr.Var vs)            -> leaf (Var (vs :> IVarSpec))
+        | Leaf (Expr.Var vs)            -> leaf (Var (UVarSpec.ofVarSpec vs))
 
         | Unary (Expr.Negate, a)        -> unary Negate a
         | Unary (Expr.Abs, a)           -> unary Abs a
@@ -160,7 +160,7 @@ module UExpr =
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
             UExpr(UNaryOp (Subtensor usr), tn, shp, toUExpr a :: dynUExprs)
-        | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (vs :> IVarSpec)) a
+        | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (UVarSpec.ofVarSpec vs)) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
         | Binary (Expr.Add, a, b)       -> binary Add a b
@@ -196,7 +196,7 @@ module UExpr =
         | ULeafOp (Identity ss)             -> leaf (Expr.Identity ss)
         | ULeafOp (Zeros ss)                -> leaf (Expr.Zeros ss)
         | ULeafOp (ScalarConst v)           -> leaf (Expr.ScalarConst (box v :?> 'T))
-        | ULeafOp (Var vs)                  -> leaf (Expr.Var (box vs :?> VarSpecT<'T>))
+        | ULeafOp (Var vs)                  -> leaf (Expr.Var (UVarSpec.toVarSpec vs))
 
         | UUnaryOp Negate                   -> unary Expr.Negate
         | UUnaryOp Abs                      -> unary Expr.Abs
@@ -223,7 +223,7 @@ module UExpr =
         | UUnaryOp (Reshape ss)             -> unary (Expr.Reshape ss)
         | UUnaryOp (DoBroadcast ss)         -> unary (Expr.DoBroadcast ss)
         | UUnaryOp (SwapDim (ax1, ax2))     -> unary (Expr.SwapDim (ax1, ax2))
-        | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (box vs :?> VarSpecT<'T>))
+        | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (UVarSpec.toVarSpec vs))
         | UUnaryOp (Annotated ano)          -> unary (Expr.Annotated ano)
 
         | UBinaryOp Add                     -> binary Expr.Add                         

@@ -6,10 +6,13 @@ open Basics
 [<AutoOpen>]
 module SymSizeEnvTypes =
 
-    type SymSizeEnvT = {
-        Inferred:       Map<SizeSymbolT, SizeSpecT>;
-        Equalities:     (SizeSpecT * SizeSpecT) list;
-    }
+    [<StructuredFormatDisplay("{Pretty}")>]
+    type SymSizeEnvT = 
+        {Inferred:       Map<SizeSymbolT, SizeSpecT>;
+         Equalities:     (SizeSpecT * SizeSpecT) list;}
+
+        member this.Pretty =
+            sprintf "%A" (this.Inferred |> Map.toList)
 
 
 
@@ -37,6 +40,15 @@ module SymSizeEnv =
     let substShape env (shape: ShapeSpecT) : ShapeSpecT =
         List.map (subst env) shape
 
+    /// substitutes all symbols into the simplified range specification
+    let substRange env (srs: SimpleRangesSpecT<_>) = 
+        srs
+        |> List.map (function
+                     | SRSSymStartSymEnd (s, fo) -> 
+                         SRSSymStartSymEnd (subst env s, Option.map (subst env) fo)
+                     | SRSDynStartSymSize (s, elems) ->
+                         SRSDynStartSymSize (s, subst env elems))
+
     /// adds inferred symbol value
     let addInferred sym value inferred =
         if substInf inferred value = Base (Sym sym) then
@@ -56,8 +68,11 @@ module SymSizeEnv =
 
     let rec infer env =      
         let rec inferOne inferred (a, b) =
-            match SizeSpec.substSymbols inferred a, 
-                  SizeSpec.substSymbols inferred b with
+            let a = SizeSpec.substSymbols inferred a
+            let b = SizeSpec.substSymbols inferred b
+            let flexible = SizeSpec.isFlexible a || SizeSpec.isFlexible b
+
+            match a, b with
             | Base (Fixed av), Base (Fixed bv) ->
                 if av = bv then inferred
                 else contradiction "fixed %d <> fixed %d" av bv
@@ -67,34 +82,35 @@ module SymSizeEnv =
                 if av = 1 then inferred
                 else contradiction "fixed %d <> broadcast 1" av
             | Base (Fixed av), Multinom bm ->
-                contradiction "fixed %d <> multinom %A" av bm
+                if flexible then inferred
+                else contradiction "fixed %d <> multinom %A" av bm
             | _, Base (Fixed _) ->
                 inferOne inferred (b, a)
 
             | Base (Sym asym), Base (Sym bsym) ->
-                match SizeSymbol.flexible asym, SizeSymbol.flexible bsym with
-                | true, true when asym = bsym -> inferred
+                match SizeSymbol.isFlexible asym, SizeSymbol.isFlexible bsym with
+                | _ when asym = bsym -> inferred
                 | true, true -> inferred |> addInferred asym b
                 | true, false -> inferred |> addInferred asym b 
                 | false, true -> inferred |> addInferred bsym a
-                | false, false when asym = bsym -> inferred
                 | _ -> contradiction "symbol %A <> symbol %A" asym bsym
             | Base (Sym asym), Broadcast ->
                 inferred |> addInferred asym b
             | Base (Sym asym), Multinom bm ->
-                if SizeSymbol.flexible asym then inferred |> addInferred asym b
+                if SizeSymbol.isFlexible asym then inferred |> addInferred asym b
                 else contradiction "symbol %A <> multinom %A" a bm
             | _, Base (Sym _) ->
                 inferOne inferred (b, a)
 
             | Broadcast, Broadcast -> inferred
             | Broadcast, Multinom bm ->
-                contradiction "broadcast 1 <> multinom %A" bm
+                if flexible then inferred
+                else contradiction "broadcast 1 <> multinom %A" bm
             | _, Broadcast ->
                 inferOne inferred (b, a)
 
             | Multinom am, Multinom bm ->
-                if am = bm then inferred                                
+                if am = bm || flexible then inferred                                
                 else contradiction "multinom %A <> multinom %A" am bm
 
         let newEnv = {env with Inferred = List.fold inferOne env.Inferred env.Equalities}

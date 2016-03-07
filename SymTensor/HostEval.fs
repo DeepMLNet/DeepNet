@@ -121,7 +121,13 @@ module HostEval =
 [<AutoOpen>]
 module HostEvalTypes =
     /// evaluates expression on host using interpreter
-    let onHost (uexprs: UExprT list) = 
+    let onHost (compileEnv: CompileEnvT) (uexprs: UExprT list) = 
+        if compileEnv.ResultLoc <> LocHost then
+            failwith "host evaluator needs host result location"
+        for KeyValue(vs, loc) in compileEnv.VarLocs do
+            if loc <> LocHost then
+                failwithf "host evaluator cannot evaluate expression with variable %A located in %A" vs loc
+
         fun evalEnv -> HostEval.evalUExprs evalEnv uexprs
 
 

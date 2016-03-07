@@ -3,6 +3,7 @@
 open System
 open ManagedCuda
 open ManagedCuda.BasicTypes
+open Basics.Cuda
 
 open Basics
 open ArrayND
@@ -11,6 +12,12 @@ open ArrayNDHost
 
 [<AutoOpen>]
 module ArrayNDCudaTypes =
+
+    /// variable stored on CUDA device
+    let LocDev = ArrayLoc "CUDA"
+
+    let (|LocDev|_|) arg =
+        if arg = ArrayLoc "CUDA" then Some () else None
 
     type IDeviceStorage =
         abstract ByteData: CudaDeviceVariable<byte>
@@ -24,7 +31,9 @@ module ArrayNDCudaTypes =
     type CudaDeviceVariableStorageT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                                                                (data: CudaDeviceVariable<'T>) =
 
-        new (size: int) = CudaDeviceVariableStorageT<'T> (new CudaDeviceVariable<'T> (SizeT(size)))
+        new (size: int) = 
+            CudaSup.init()
+            CudaDeviceVariableStorageT<'T> (new CudaDeviceVariable<'T> (SizeT(size)))
 
         interface IDeviceStorage<'T> with
             member this.Item 
@@ -61,6 +70,8 @@ module ArrayNDCudaTypes =
 
         /// storage
         member this.Storage = storage
+
+        override this.Location = LocDev
 
         override this.Item
             with get pos = storage.[ArrayNDLayout.addr pos layout]

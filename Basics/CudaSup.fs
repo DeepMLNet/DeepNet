@@ -67,6 +67,10 @@ module CudaSup =
     let blas =
         new CudaBlas.CudaBlas()
 
+    /// Ensures that CUDA is initialized. Multiple calls are allowed and have no effect.
+    let init () =
+        context |> ignore
+
     /// shutsdown CUDA (necessary for correct profiler results)  
     let shutdown () =
         context.Synchronize ()

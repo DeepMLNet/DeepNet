@@ -26,7 +26,7 @@ template <typename T, size_t Tsize>
 struct Array {
 	T mElements[Tsize];
 
-	T& operator[] (const int idx) { return mElements[idx]; };
-	const T& operator[] (const int idx) const { return mElements[idx]; };
-	size_t size() const { return Tsize; }
+	_dev T& operator[] (const int idx) { return mElements[idx]; };
+	const _dev T& operator[] (const int idx) const { return mElements[idx]; };
+	size_t _dev size() const { return Tsize; }
 };

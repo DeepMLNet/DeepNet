@@ -61,6 +61,8 @@ module ArrayNDManikinTypes =
         override this.DataType =
             TypeName.getType this.TypeName
 
+        override this.Location = ArrayLoc "Manikin"
+
         /// C++ type name for ArrayND with static shape and dynamic offset/strides
         member this.DynamicCPPType =
             let dims = ArrayNDLayout.nDims layout

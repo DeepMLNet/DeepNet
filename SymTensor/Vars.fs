@@ -57,7 +57,19 @@ module VarSpecTypes =
             member this.SubstSymSizes symSizes = 
                 {this with Shape=SymSizeEnv.substShape symSizes this.Shape} :> IVarSpec
 
+//        interface System.IComparable with
+//            member this.CompareTo otherObj =
+//                let this = this :> IVarSpec
+//                match otherObj with
+//                | :? IVarSpec as othr -> 
+//                    compare 
+//                        (this.Name, this.Shape, this.TypeName) 
+//                        (othr.Name, othr.Shape, othr.TypeName)
+//                | _ -> invalidArg "otherObj" "cannot compare values of different types"
+//
+
     /// unified variable specification
+    //[<CustomComparison>]
     type UVarSpecT = 
         {
             Name:      string; 
@@ -73,6 +85,16 @@ module VarSpecTypes =
             member this.SubstSymSizes symSizes = 
                 {this with Shape=SymSizeEnv.substShape symSizes this.Shape} :> IVarSpec
 
+//        interface System.IComparable with
+//            member this.CompareTo otherObj =
+//                let this = this :> IVarSpec
+//                match otherObj with
+//                | :? IVarSpec as othr -> 
+//                    compare 
+//                        (this.Name, this.Shape, this.TypeName) 
+//                        (othr.Name, othr.Shape, othr.TypeName)
+//                | _ -> invalidArg "otherObj" "cannot compare values of different types"
+//
 
 module VarSpec =
 
@@ -90,4 +112,14 @@ module VarSpec =
     /// shape of variable
     let shape (vs: IVarSpec) = vs.Shape
 
+    /// substitutes the size symbol environment into the variable
+    let substSymSizes symSizeEnv (vs: IVarSpec) = 
+        vs.SubstSymSizes symSizeEnv
 
+module UVarSpec =
+
+    let ofVarSpec (vs: IVarSpec) =
+        {Name=vs.Name; Shape=vs.Shape; TypeName=vs.TypeName}
+
+    let toVarSpec (vs: IVarSpec) : VarSpecT<'T> =
+        {Name=vs.Name; Shape=vs.Shape;}
