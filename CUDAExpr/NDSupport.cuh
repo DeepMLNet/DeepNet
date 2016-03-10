@@ -52,25 +52,25 @@ struct StrideDynamic0D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND0D : public TShape, public TStride {
+struct ArrayND0D : TShape, TStride {
   typedef Pos0D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 0; }
   _dev size_t index() const {
-      return offset() + 0;
+      return this->offset() + 0;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + 0;
+      return this->offset() + 0;
   }
   _dev size_t index(const Pos0D &pos) const {
-      return offset() + 0;
+      return this->offset() + 0;
   }
   _dev size_t size() const {
     return 1;
   }
-  _dev Pos0D linearIdxToPos(size_t idx) const { return Pos0D::fromLinearIdx(this, idx); }
-  _dev Pos0D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos0D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos0D linearIdxToPos(size_t idx) const { return Pos0D::fromLinearIdx(*this, idx); }
+  _dev Pos0D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos0D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element() {
@@ -239,25 +239,25 @@ struct StrideDynamic1D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND1D : public TShape, public TStride {
+struct ArrayND1D : TShape, TStride {
   typedef Pos1D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 1; }
   _dev size_t index(const size_t pos0) const {
-      return offset() + stride(0) * pos0;
+      return this->offset() + this->stride(0) * pos0;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + stride(0) * pos[0];
+      return this->offset() + this->stride(0) * pos[0];
   }
   _dev size_t index(const Pos1D &pos) const {
-      return offset() + stride(0) * pos[0];
+      return this->offset() + this->stride(0) * pos[0];
   }
   _dev size_t size() const {
-    return shape(0);
+    return this->shape(0);
   }
-  _dev Pos1D linearIdxToPos(size_t idx) const { return Pos1D::fromLinearIdx(this, idx); }
-  _dev Pos1D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos1D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos1D linearIdxToPos(size_t idx) const { return Pos1D::fromLinearIdx(*this, idx); }
+  _dev Pos1D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos1D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element(size_t pos0) {
@@ -468,25 +468,25 @@ struct StrideDynamic2D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND2D : public TShape, public TStride {
+struct ArrayND2D : TShape, TStride {
   typedef Pos2D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 2; }
   _dev size_t index(const size_t pos0, const size_t pos1) const {
-      return offset() + stride(0) * pos0 + stride(1) * pos1;
+      return this->offset() + this->stride(0) * pos0 + this->stride(1) * pos1;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1];
   }
   _dev size_t index(const Pos2D &pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1];
   }
   _dev size_t size() const {
-    return shape(0) * shape(1);
+    return this->shape(0) * this->shape(1);
   }
-  _dev Pos2D linearIdxToPos(size_t idx) const { return Pos2D::fromLinearIdx(this, idx); }
-  _dev Pos2D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos2D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos2D linearIdxToPos(size_t idx) const { return Pos2D::fromLinearIdx(*this, idx); }
+  _dev Pos2D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos2D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element(size_t pos0, size_t pos1) {
@@ -727,25 +727,25 @@ struct StrideDynamic3D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND3D : public TShape, public TStride {
+struct ArrayND3D : TShape, TStride {
   typedef Pos3D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 3; }
   _dev size_t index(const size_t pos0, const size_t pos1, const size_t pos2) const {
-      return offset() + stride(0) * pos0 + stride(1) * pos1 + stride(2) * pos2;
+      return this->offset() + this->stride(0) * pos0 + this->stride(1) * pos1 + this->stride(2) * pos2;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2];
   }
   _dev size_t index(const Pos3D &pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2];
   }
   _dev size_t size() const {
-    return shape(0) * shape(1) * shape(2);
+    return this->shape(0) * this->shape(1) * this->shape(2);
   }
-  _dev Pos3D linearIdxToPos(size_t idx) const { return Pos3D::fromLinearIdx(this, idx); }
-  _dev Pos3D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos3D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos3D linearIdxToPos(size_t idx) const { return Pos3D::fromLinearIdx(*this, idx); }
+  _dev Pos3D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos3D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element(size_t pos0, size_t pos1, size_t pos2) {
@@ -1016,25 +1016,25 @@ struct StrideDynamic4D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND4D : public TShape, public TStride {
+struct ArrayND4D : TShape, TStride {
   typedef Pos4D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 4; }
   _dev size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3) const {
-      return offset() + stride(0) * pos0 + stride(1) * pos1 + stride(2) * pos2 + stride(3) * pos3;
+      return this->offset() + this->stride(0) * pos0 + this->stride(1) * pos1 + this->stride(2) * pos2 + this->stride(3) * pos3;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2] + stride(3) * pos[3];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2] + this->stride(3) * pos[3];
   }
   _dev size_t index(const Pos4D &pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2] + stride(3) * pos[3];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2] + this->stride(3) * pos[3];
   }
   _dev size_t size() const {
-    return shape(0) * shape(1) * shape(2) * shape(3);
+    return this->shape(0) * this->shape(1) * this->shape(2) * this->shape(3);
   }
-  _dev Pos4D linearIdxToPos(size_t idx) const { return Pos4D::fromLinearIdx(this, idx); }
-  _dev Pos4D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos4D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos4D linearIdxToPos(size_t idx) const { return Pos4D::fromLinearIdx(*this, idx); }
+  _dev Pos4D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos4D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3) {
@@ -1347,25 +1347,25 @@ struct StrideDynamic5D {
 };
 
 template <typename TData, typename TShape, typename TStride>
-struct ArrayND5D : public TShape, public TStride {
+struct ArrayND5D : TShape, TStride {
   typedef Pos5D Pos;
   TData *mData;
 
   _dev size_t nDim() const { return 5; }
   _dev size_t index(const size_t pos0, const size_t pos1, const size_t pos2, const size_t pos3, const size_t pos4) const {
-      return offset() + stride(0) * pos0 + stride(1) * pos1 + stride(2) * pos2 + stride(3) * pos3 + stride(4) * pos4;
+      return this->offset() + this->stride(0) * pos0 + this->stride(1) * pos1 + this->stride(2) * pos2 + this->stride(3) * pos3 + this->stride(4) * pos4;
   }
   _dev size_t index(const size_t *pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2] + stride(3) * pos[3] + stride(4) * pos[4];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2] + this->stride(3) * pos[3] + this->stride(4) * pos[4];
   }
   _dev size_t index(const Pos5D &pos) const {
-      return offset() + stride(0) * pos[0] + stride(1) * pos[1] + stride(2) * pos[2] + stride(3) * pos[3] + stride(4) * pos[4];
+      return this->offset() + this->stride(0) * pos[0] + this->stride(1) * pos[1] + this->stride(2) * pos[2] + this->stride(3) * pos[3] + this->stride(4) * pos[4];
   }
   _dev size_t size() const {
-    return shape(0) * shape(1) * shape(2) * shape(3) * shape(4);
+    return this->shape(0) * this->shape(1) * this->shape(2) * this->shape(3) * this->shape(4);
   }
-  _dev Pos5D linearIdxToPos(size_t idx) const { return Pos5D::fromLinearIdx(this, idx); }
-  _dev Pos5D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos5D::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }
+  _dev Pos5D linearIdxToPos(size_t idx) const { return Pos5D::fromLinearIdx(*this, idx); }
+  _dev Pos5D linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos5D::fromLinearIdxWithLastDimSetToZero(*this, idx); }
   _dev TData *data() { return mData; }
   _dev const TData *data() const { return mData; }
   _dev TData &element(size_t pos0, size_t pos1, size_t pos2, size_t pos3, size_t pos4) {

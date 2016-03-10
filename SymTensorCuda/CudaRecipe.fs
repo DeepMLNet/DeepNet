@@ -51,11 +51,11 @@ module CudaRecipeTypes =
 
     /// CUDA execution recipe
     type CudaRecipeT = {
-        KernelCode: string;
-        CPPCode: string;
-        InitCalls: CudaCallT list;
-        DisposeCalls: CudaCallT list;
-        ExecCalls: CudaCallT list;
+        KernelCode:         string;
+        CPPCode:            string;
+        InitCalls:          CudaCallT list;
+        DisposeCalls:       CudaCallT list;
+        ExecCalls:          CudaCallT list;
     }
 
 
@@ -81,9 +81,9 @@ module TmplInstCache =
             cache.Insts <- (ti, cName)::cache.Insts
 
             // generate template instantiation with C linkage
-            //let instStr =
-            //    if List.isEmpty ti.TmplArgs then ti.FuncName
-            //    else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> String.combineWith ", ")
+            let instStr =
+                if List.isEmpty ti.TmplArgs then ti.FuncName
+                else sprintf "%s<%s>" ti.FuncName (ti.TmplArgs |> String.concat ", ")
             let krnlStr = match ti.Domain with
                           | KernelFunc -> "__global__"
                           | CPPFunc -> "__declspec(dllexport)"
@@ -92,8 +92,8 @@ module TmplInstCache =
             let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
             let declStr =
                 sprintf "extern \"C\" %s %s %s (%s) {\n" krnlStr ti.RetType cName argDeclStr
-                + sprintf "  %s %s (%s);\n" retCmd ti.FuncName argCallStr
-                //+ sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
+                //+ sprintf "  %s %s (%s);\n" retCmd ti.FuncName argCallStr
+                + sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
                 + sprintf "}\n"
                 + sprintf "\n"
             cache.Code <- (ti, declStr)::cache.Code
@@ -103,16 +103,22 @@ module TmplInstCache =
 
 module CudaRecipe =
 
+    let commonIncludes = ["NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
+    let kernelModuleIncludes = commonIncludes
+    let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"]
+
+    let generateIncludes incls =
+        incls
+        |> List.map (sprintf "#include \"%s\"\n")
+        |> String.concat "\n"
+
     /// Header of generated CUDA kernel module
-    let kernelModuleHeader =
-        "#include \"NDSupport.cuh\"\n\
-         #include \"Ops.cuh\"\n\n"
+    let kernelModuleHeader = 
+        kernelModuleIncludes |> generateIncludes
 
     /// Header of generated C++ module
     let cppModuleHeader =
-        "#include \"NDSupport.cuh\"\n\
-         #include \"ThrustInterface.cuh\"\n\
-         #include \"Reduce.cuh\"\n\n"
+        cppModuleIncludes |> generateIncludes
 
     /// gets all CUDA C kernel launches performed 
     let getAllCKernelLaunches recipe = 

@@ -103,6 +103,10 @@
       <Link>Utils.cuh</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\CUDAExpr\Subtensor.cuh">
+      <Link>Subtensor.cuh</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">

@@ -125,13 +125,13 @@ module CudaExecUnit =
         let newTrgt =
             ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
 
-        // target that shares no elements with any srcView
+        // target that shares no elements with any srcView 
         let outplaceTrgt =
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> newTrgt 
-
-        let outplaceBlasTrgt =
+            | _ -> newTrgt  
+             
+        let outplaceBlasTrgt = 
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) &&
                            ArrayND.isBlasTargetable rv -> rv, false
@@ -141,7 +141,7 @@ module CudaExecUnit =
         let inplaceOvrwrtTrgt =
             match List.tryFindIndex not srcShared with
             | Some i -> srcs.[i], false
-            | None -> outplaceTrgt    
+            | None -> outplaceTrgt     
 
         match op with
         // variable access
@@ -188,7 +188,7 @@ module CudaExecUnit =
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
             if ArrayND.isContiguous srcs.[0] then
-                ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0]
+                ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0] 
             else outplaceTrgt  // will copy
         | UUnaryOp (DoBroadcast _) ->
             ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
@@ -247,11 +247,14 @@ module CudaExecUnit =
             let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
             ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
 
-    /// execution items for an elementwise operation
-    let execItemsForElemwise trgt cOp srcViews =
-        if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
-            failwithf "sources have different number of elements than target"
 
+    /// returns the C++ template instantiation code for the given template and argument list
+    let cppTemplateInstantiation tmpl args =
+        if List.isEmpty args then tmpl
+        else sprintf "%s<%s>" tmpl (args |> String.concat ", ")
+
+    /// function name of elementwise wrapper and its arguments for the given target, operation and sources
+    let elemwiseFuncnameAndArgs trgt cOp srcViews =
         let args = 
             (cOp :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
@@ -262,7 +265,15 @@ module CudaExecUnit =
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
         let heteroStr = if hetero then "Heterogenous" else ""
         let funcName = sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr
+        funcName, args
 
+    /// execution items for an elementwise operation
+    let execItemsForElemwise trgt cOp srcViews =
+        if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
+            failwithf "sources have different number of elements than target"
+
+        let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
+        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
 
@@ -299,11 +310,19 @@ module CudaExecUnit =
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
         let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
-        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
+        //let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
+
+        let elemwiseFuncname, _ = elemwiseFuncnameAndArgs trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src] 
+        let elemwiseArgs = [          
+            (NoArgEOpArgTmpl("IdEOp_t", false) :> ICudaArgTmpl).CPPTypeName;
+            (ArrayNDArgTmpl trgt :> ICudaArgTmpl).CPPTypeName;
+            (srcDynTmpl :> ICudaArgTmpl).CPPTypeName
+        ]
+        let elemwiseTmplInst = cppTemplateInstantiation elemwiseFuncname elemwiseArgs
 
         execItemsForKernel 
             "copyFromDynamicSubtensor" 
-            [ArrayNDArgTmpl trgt; srcTmpl; srcDynTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseFunc]
+            [ArrayNDArgTmpl trgt; srcTmpl; srcDynTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseTmplInst]
             [ArrayNDArgTmpl trgt; srcTmpl; srcIdxPntrsTmpl]
             (workDimForElemwise trgt false)
 
@@ -316,11 +335,21 @@ module CudaExecUnit =
 
         let trgtTmpl, trgtDynTmpl, trgtIdxPntrsTmpl = dynamicSubtensorTmplAndIdx trgt rngs rngManikins
         let nDimsStr = sprintf "%d" (ArrayND.nDims src)
-        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims src)
+//        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims src)
+
+        //let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
+
+        let elemwiseFuncname, _ = elemwiseFuncnameAndArgs trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src] 
+        let elemwiseArgs = [          
+            (NoArgEOpArgTmpl("IdEOp_t", false) :> ICudaArgTmpl).CPPTypeName;           
+            (trgtDynTmpl :> ICudaArgTmpl).CPPTypeName;
+            (ArrayNDArgTmpl src :> ICudaArgTmpl).CPPTypeName;
+        ]
+        let elemwiseTmplInst = cppTemplateInstantiation elemwiseFuncname elemwiseArgs
 
         execItemsForKernel 
             "copyToDynamicSubtensor" 
-            [trgtTmpl; trgtDynTmpl; CPPTemplateValue nDimsStr; ArrayNDArgTmpl src; CPPTemplateValue elemwiseFunc]
+            [trgtTmpl; trgtDynTmpl; CPPTemplateValue nDimsStr; ArrayNDArgTmpl src; CPPTemplateValue elemwiseTmplInst]
             [trgtTmpl; trgtIdxPntrsTmpl; ArrayNDArgTmpl src]
             (workDimForElemwise src false)
 
@@ -375,7 +404,7 @@ module CudaExecUnit =
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
         | ULeafOp (Zeros _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
-        | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) []
+        | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) [] 
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with

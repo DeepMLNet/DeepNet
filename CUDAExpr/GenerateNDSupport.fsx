@@ -125,30 +125,30 @@ for dims = 0 to maxDims do
     wrt ""
 
     wrt "template <typename TData, typename TShape, typename TStride>"
-    wrt "struct ArrayND%dD : public TShape, public TStride {" dims
+    wrt "struct ArrayND%dD : TShape, TStride {" dims
     wrt "  typedef Pos%dD Pos;" dims
     wrt "  TData *mData;"
     wrt ""
     wrt "  _dev size_t nDim() const { return %d; }" dims
     wrt "  _dev size_t index(%s) const {"
         (ad |>> prn "const size_t pos%d" |> cw ", ")
-    wrt "      return offset() + %s;"
-        (ad |>> (fun i -> prn "stride(%d) * pos%d" i i) |> cwe "0" " + ")
+    wrt "      return this->offset() + %s;"
+        (ad |>> (fun i -> prn "this->stride(%d) * pos%d" i i) |> cwe "0" " + ")
     wrt "  }"
     wrt "  _dev size_t index(const size_t *pos) const {"
-    wrt "      return offset() + %s;"
-        (ad |>> (fun i -> prn "stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
+    wrt "      return this->offset() + %s;"
+        (ad |>> (fun i -> prn "this->stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
     wrt "  }"
     wrt "  _dev size_t index(const Pos%dD &pos) const {" dims
-    wrt "      return offset() + %s;"
-        (ad |>> (fun i -> prn "stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
+    wrt "      return this->offset() + %s;"
+        (ad |>> (fun i -> prn "this->stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
     wrt "  }"
     wrt "  _dev size_t size() const {"
     wrt "    return %s;"
-        (ad |>> prn "shape(%d)" |> cwe "1" " * ")
+        (ad |>> prn "this->shape(%d)" |> cwe "1" " * ")
     wrt "  }"
-    wrt "  _dev Pos%dD linearIdxToPos(size_t idx) const { return Pos%dD::fromLinearIdx(this, idx); }" dims dims
-    wrt "  _dev Pos%dD linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos%dD::fromLinearIdxWithLastDimSetToZero<Shape>(this, idx); }" dims dims
+    wrt "  _dev Pos%dD linearIdxToPos(size_t idx) const { return Pos%dD::fromLinearIdx(*this, idx); }" dims dims
+    wrt "  _dev Pos%dD linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos%dD::fromLinearIdxWithLastDimSetToZero(*this, idx); }" dims dims
     wrt "  _dev TData *data() { return mData; }"
     wrt "  _dev const TData *data() const { return mData; }"
     wrt "  _dev TData &element(%s) {"

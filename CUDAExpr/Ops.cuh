@@ -39,6 +39,16 @@ struct ConstEOp_t
 };
 
 
+struct ZerosEOp_t
+{
+	_dev float operator() () const
+	{
+		return 0.0f;
+	}
+};
+
+
+
 struct NegateEOp_t
 {
 	_dev float operator() (float a) const
