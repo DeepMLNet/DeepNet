@@ -102,8 +102,8 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <AdditionalDependencies>cuda.lib;cudart.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy *.cuh "$(SolutionDir)\Test\bin\Debug"
+copy *.cuh "$(SolutionDir)\Test\bin\Release"</Command>
     </PostBuildEvent>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>

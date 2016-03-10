@@ -296,7 +296,7 @@ module ModelContextTypes =
                                              device:          IDevice,                                             
                                              compileEnv:      CompileEnvT) =
 
-        let parameterStorage = ParameterStorageT (parameterSet, compileEnv.SymSizes, device.Allocator)
+        let parameterStorage = ParameterStorageT (parameterSet, compileEnv.SymSizes, device.Allocator)        
 
         let compileSpec resultLoc = 
             // add ParameterStorage to variable locations

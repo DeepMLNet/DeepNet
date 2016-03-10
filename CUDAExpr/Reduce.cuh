@@ -27,7 +27,7 @@ struct LinearIndexToSumAxisKey : public thrust::unary_function<size_t, size_t> {
 	LinearIndexToSumAxisKey(TArrayND ary) : arrayND(ary)  { }
 
 	_dev size_t operator() (size_t linearIdx) {
-		return arrayND.idxToPosWithLastDimSetToZero(linearIdx).toIdx();
+		return arrayND.linearIdxToPosWithLastDimSetToZero(linearIdx).toLinearIdx(arrayND);
 	}
 };
 

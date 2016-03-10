@@ -191,7 +191,7 @@ module Func =
                 |> EvalEnv.create
             evaluator evalEnv
 
-        // If all size symbols and variable storage locations are known, then we can immidietly compile
+        // If all size symbols and variable storage locations are known, then we can immedietly compile
         // the expression. Otherwise we have to wait for a VarEnv to infer the missing sizes and locations.
         match tryCompile baseCompileEnv false with
         | Some (evaluator, neededVars) -> performEval baseCompileEnv evaluator neededVars

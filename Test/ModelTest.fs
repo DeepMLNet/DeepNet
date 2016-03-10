@@ -9,7 +9,7 @@ open Models
 open Datasets
 
 
-let mnist = Mnist.load @"C:\Local\surban\dev\fexpr\Data\MNIST"
+let mnist = Mnist.load @"..\..\..\Data\MNIST"
 
 
 let ``Test neural net`` () =
@@ -57,8 +57,10 @@ let ``Test neural net`` () =
     let dLossFun = mi.Func (dLoss) |> arg2 input target
 
     // calcualte test loss on MNIST
+    #if !CUDA_DUMMY
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
+    #endif
 
     ()
 

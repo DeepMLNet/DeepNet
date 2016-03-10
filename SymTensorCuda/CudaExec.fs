@@ -92,6 +92,7 @@ module Compile =
         //use jitLogVerbose = new CudaJOLogVerbose(true)
         //jitOpts.Add(jitLogVerbose)
 
+        #if !CUDA_DUMMY
         let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
@@ -106,6 +107,12 @@ module Compile =
                 krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
                 Map.empty
         krnls, cuMod
+
+        #else
+
+        let krnls: Map<string, CudaKernel> = Map.empty
+        krnls, CUmodule()
+        #endif
 
     /// unloads previously loaded CUDA kernel code
     let unloadCudaCode cuMod =
@@ -217,11 +224,12 @@ module CudaExprWorkspaceTypes =
                 | CudaCallT.CallCFunc(name, dgte, _) -> name, dgte
                 | _ -> failwith "unexpected C call")
             |> Map.ofList
-
+        
         // compile and load CUDA kernel module
         /// CUDA kernels
         let kernels, krnlModHndl = Compile.loadKernelCode recipe.KernelCode kernelCNames
 
+        #if !CUDA_DUMMY
         /// CUDA launch sizes for specified WorkDims
         let kernelLaunchDims =
             kernelDistinctLaunches
@@ -230,6 +238,9 @@ module CudaExprWorkspaceTypes =
                 let maxBlockSize = kernels.[name].GetOccupancyMaxPotentialBlockSize().blockSize
                 (name, workDim), CudaSup.computeLaunchDim workDim maxBlockSize)
             |> Map.ofSeq
+        #else
+        let kernelLaunchDims = Map.empty    
+        #endif
 
         // compile and load CUDA C++ host/device module
         /// C++ functions
@@ -339,8 +350,10 @@ module CudaExprWorkspaceTypes =
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
         // initialize
+#if !CUDA_DUMMY
         do
             execCalls recipe.InitCalls
+#endif
 
         // finalizer
         interface System.IDisposable with

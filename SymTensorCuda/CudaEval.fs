@@ -109,12 +109,16 @@ module CudaEvalTypes =
     let DevCuda = { 
         new IDevice with
             member this.Allocator shp : ArrayNDT<'T> = 
+                #if !CUDA_DUMMY
                 let gm = typeof<AllocatorT>.GetMethod ("Allocator", 
                                                        BindingFlags.NonPublic ||| 
                                                        BindingFlags.Public ||| 
                                                        BindingFlags.Static)
                 let m = gm.MakeGenericMethod ([|typeof<'T>|])
                 m.Invoke(null, [|shp|]) :?> ArrayNDT<'T>
+                #else
+                ArrayNDHost.newContiguous shp
+                #endif
                 
             member this.Compiler = CudaEval.cudaEvaluator
             member this.DefaultLoc = LocDev

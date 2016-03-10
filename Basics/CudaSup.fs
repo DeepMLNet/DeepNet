@@ -35,6 +35,7 @@ module CudaSup =
             with
             e ->
                 printfn "Cannot create CUDA context: %s" e.Message
+                failwith "Cannot creat CUDA context"
                 exit 10
 
         cudaCntxt
