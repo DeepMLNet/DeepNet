@@ -46,3 +46,18 @@ _dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t *, nDim
 }
 
 
+
+template <typename TDynTrgt, 
+	      TCopyFun copyfun, 
+	      typename TCopyFun, 
+	      typename TBaseTrgt, 
+	      typename TTrgtIdx, 
+	      typename TSrc>
+	_dev void copyToDynamicSubtensor2(TBaseTrgt &baseTrgt, 
+									  const TTrgtIdx &trgtIdx,
+									  const TSrc &src)
+{
+
+}
+
+

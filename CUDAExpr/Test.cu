@@ -132,3 +132,42 @@ int main()
 
 	return 0;
 }
+
+
+//extern "C" __global__ void copyToDynamicSubtensor_1 (
+//	ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<10,7850,1>> p0,  // MATCH
+//	Array<size_t *, 2> p1,                                                  // MATCH
+//	ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>> p2    /*MATCH*/) {
+//	copyToDynamicSubtensor2<
+//		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<10,7850,1>>,  //MATCH
+//		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideDynamic2D>,            //MATCH 
+//		2,                                                                   //MATCH
+//		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>>,   //MATCH
+//		elemwise1Ary2DHeterogenous<IdEOp_t,                   //MATCH
+//		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideDynamic2D>, // MATCH 
+//		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>> /*MATCH*/>
+//	> (p0, p1, p2);
+//}
+
+
+extern "C" __global__ void copyToDynamicSubtensor_1 (
+	ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<10,7850,1>> p0,  // MATCH
+	Array<size_t *, 2> p1,                                                  // MATCH
+	ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>> p2    /*MATCH*/) {
+
+	typedef TElemwise1Ary<IdEOp_t, 
+		                  ArrayND2D<float, ShapeStatic2D<1,7840>, StrideDynamic2D>, 
+				          ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>>>::type elemwiseFuncT;
+	elemwiseFuncT a; 
+		//elemwise1Ary2DHeterogenous<IdEOp_t,                   //MATCH
+		//                            ArrayND2D<float, ShapeStatic2D<1,7840>, StrideDynamic2D>, // MATCH 
+ 	//	                            ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>>>;
+
+	copyToDynamicSubtensor<
+		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<10,7850,1>>,  //MATCH
+		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideDynamic2D>,            //MATCH 
+		2,                                                                   //MATCH
+		ArrayND2D<float, ShapeStatic2D<1,7840>, StrideStatic2D<0,7840,1>>,    //MATCH
+		a
+	> (p0, p1, p2);
+}

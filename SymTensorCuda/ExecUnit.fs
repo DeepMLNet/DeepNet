@@ -25,7 +25,7 @@ module ExecUnitsTypes =
     /// result of an evaluation request
     type EvalResultT = {
         ExecUnitId:     ExecUnitIdT; 
-        View:           ArrayNDManikinT; 
+        Manikin:        ArrayNDManikinT; 
         Shared:         bool;
     }
 
@@ -34,7 +34,7 @@ module ExecUnitsTypes =
         Id:             int; 
         Expr:           UExprT; 
         Multiplicity:   int; 
-        View:           ArrayNDManikinT option; 
+        ReqManikin:     ArrayNDManikinT option; 
         OnCompletion:   EvalResultT -> unit
     }
 
@@ -145,7 +145,7 @@ module ExecUnit =
         let submitEvalRequest expr multiplicity storage onCompletion =
             evalRequestIdCnt <- evalRequestIdCnt + 1
             evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Multiplicity=multiplicity; 
-                             View=storage; OnCompletion=onCompletion} :: evalRequests
+                             ReqManikin=storage; OnCompletion=onCompletion} :: evalRequests
 
         // evaluated requests
         let mutable evaluatedExprs : Map<UExprT, EvalResultT> = Map.empty
@@ -157,7 +157,7 @@ module ExecUnit =
                 // First, look if there are any expressions which are already computed.
                 match evalRequests |> List.tryFind (fun erq -> evaluatedExprs |> Map.containsKey erq.Expr) with
                 | Some computedErq -> computedErq, 
-                                      Some evaluatedExprs.[computedErq.Expr].View, 
+                                      Some evaluatedExprs.[computedErq.Expr].Manikin, 
                                       Some evaluatedExprs.[computedErq.Expr],
                                       0, 0
                 | None ->
@@ -169,9 +169,9 @@ module ExecUnit =
                     let requestors = erqsForExpr |> List.length
 
                     // If a request from the group has a specified storage target, process it first.
-                    match List.tryFind (fun erq -> erq.View <> None) erqsForExpr with
+                    match List.tryFind (fun erq -> erq.ReqManikin <> None) erqsForExpr with
                     | Some erqWithStorage -> 
-                        erqWithStorage, erqWithStorage.View, None, multiplicity, requestors
+                        erqWithStorage, erqWithStorage.ReqManikin, None, multiplicity, requestors
                     | None -> 
                         // Otherwise process any (the first) request from the group.
                         erqsForExpr.[0], None, None, multiplicity, requestors
@@ -203,7 +203,7 @@ module ExecUnit =
                             // determine our definitive target storage
                             let srcViews, srcShared, srcExeUnitIds = 
                                 srcs 
-                                |> List.map (fun s -> subres.[s].View, subres.[s].Shared, subres.[s].ExecUnitId) 
+                                |> List.map (fun s -> subres.[s].Manikin, subres.[s].Shared, subres.[s].ExecUnitId) 
                                 |> List.unzip3
                             let trgtView, trgtShared =
                                 gen.TrgtGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
@@ -220,7 +220,7 @@ module ExecUnit =
                             }                                    
                             submitExecUnit eu
 
-                            completeEvalRequest {ExecUnitId=eu.Id; View=trgtView; Shared=trgtShared}
+                            completeEvalRequest {ExecUnitId=eu.Id; Manikin=trgtView; Shared=trgtShared}
 
                     // submit eval requests from sources
                     if List.isEmpty srcs then onMaybeCompleted ()
