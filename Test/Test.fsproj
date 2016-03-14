@@ -80,6 +80,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="MNIST.fs" />
     <Compile Include="Models.fs" />
+    <Compile Include="Optimizers.fs" />
     <Compile Include="ModelTest.fs" />
     <None Include="Program.fs" />
     <None Include="Program2.fs" />

@@ -266,6 +266,10 @@ module ModelContextTypes =
         /// Variable locations
         member this.VarLocs = varLocs
         
+        /// Substitutes the ParameterSet into the given expression
+        member this.Subst expr =
+            this.ParameterSet.Subst expr
+
         /// Derivative of "expr" w.r.t. flat vector containing all model parameters
         member this.WrtParameters expr =
             this.ParameterSet.WrtFlat expr

@@ -30,11 +30,11 @@ let ``Test neural net`` () =
     let mc = mc.ParametersComplete ()
 
     // expressions
-    let loss = NeuralLayer.loss pars input target
-    let dLoss = mc.WrtParameters loss
+    let loss = NeuralLayer.loss pars input target |> mc.Subst
+    //let dLoss = mc.WrtParameters loss
 
-    let loss = Optimizer.optimize loss
-    let dLoss = Optimizer.optimize dLoss
+    //let loss = Optimizer.optimize loss
+    //let dLoss = Optimizer.optimize dLoss
 
     //printfn "loss:\n%A" loss
     //printfn "dLoss:\n%A" dLoss
@@ -60,11 +60,23 @@ let ``Test neural net`` () =
 
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
-    let dLossFun = mi.Func (dLoss) |> arg2 input target
+    //let dLossFun = mi.Func (dLoss) |> arg2 input target
 
     // calcualte test loss on MNIST
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
+
+    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat
+    
+    let optFun = mi.Func opt |> arg2 input target
+    
+    printfn "Optimizing..."
+    for itr = 0 to 100 do
+        optFun tstImgs tstLbls |> ignore
+        let l = lossFun tstImgs tstLbls
+        printfn "Loss afer %d iterations: %A" itr l
+
+
 
     ()
 
