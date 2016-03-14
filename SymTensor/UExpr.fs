@@ -4,8 +4,18 @@ open System.Reflection
 open System.Collections.Generic
 open Expr
 
+
+
 [<AutoOpen>]
 module UExprTypes = 
+
+    /// unified variable specification
+    [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
+    type UVarSpecT = {
+        Name:      string; 
+        Shape:     ShapeSpecT;
+        TypeName:  TypeNameT;
+    }
 
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpecT<int>
@@ -85,6 +95,42 @@ module UExprTypes =
             | UExpr (UUnaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs.[0]
             | UExpr (UBinaryOp uop, tn, ss, subs) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
             | UExpr (UNaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs
+
+
+module UVarSpec =
+
+    /// create variable specifation by name and shape
+    let inline ofNameShapeAndTypeName name shape typeName : UVarSpecT =
+        {Name=name; Shape=shape; TypeName=typeName;}
+
+    let ofVarSpec (vs: #IVarSpec) =
+        {Name=vs.Name; Shape=vs.Shape; TypeName=vs.TypeName}
+
+    let toVarSpec (vs: UVarSpecT) : VarSpecT<'T> =
+        {Name=vs.Name; Shape=vs.Shape;}
+
+    let name (vs: UVarSpecT) =
+        vs.Name
+
+    let shape (vs: UVarSpecT) =
+        vs.Shape
+
+    let typ (vs: UVarSpecT) = 
+        vs.TypeName |> TypeName.getType 
+
+    let substSymSizes symSizes (vs: UVarSpecT) = 
+        {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
+
+    let tryFindByName (vs: UVarSpecT) map =
+        map |> Map.tryPick 
+            (fun cvs value -> 
+                if name cvs = name vs then Some value
+                else None)
+
+    let findByName vs map =
+        match tryFindByName vs map with
+        | Some value -> value
+        | None -> raise (KeyNotFoundException())
 
 
 module UExprRngsSpec =

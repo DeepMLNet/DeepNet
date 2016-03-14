@@ -45,10 +45,12 @@ let ``Test neural net`` () =
         |> ArrayND.reorderAxes [2; 0; 1] 
         |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
         |> fun x -> x.[*, 0..10]
+        |> ArrayNDCuda.toDev
     let tstLbls =  
         mnist.TstLbls
         |> ArrayND.reorderAxes [1; 0] 
         |> fun x -> x.[*, 0..10]
+        |> ArrayNDCuda.toDev
 
     // infer sizes and variable locations from dataset
     mc.UseTmplVal input tstImgs     

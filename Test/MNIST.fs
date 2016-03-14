@@ -12,10 +12,10 @@ open ArrayNDNS
 module MnistTypes =
 
     type MnistT = {
-        TrnImgs:      ArrayNDT<single>;
-        TrnLbls:      ArrayNDT<single>;
-        TstImgs:      ArrayNDT<single>;
-        TstLbls:      ArrayNDT<single>;   
+        TrnImgs:      ArrayNDHostT<single>;
+        TrnLbls:      ArrayNDHostT<single>;
+        TstImgs:      ArrayNDHostT<single>;
+        TstLbls:      ArrayNDHostT<single>;   
     }
 
 
@@ -62,7 +62,7 @@ module Mnist =
 
         for smpl in 0 .. nSamples - 1 do
             let label = labelReader.ReadByte() |> int
-            let labelHot : ArrayNDT<single> = ArrayNDHost.zeros [10];
+            let labelHot : ArrayNDHostT<single> = ArrayNDHost.zeros [10];
             labelHot.[[label]] <- 1.0f
 
             let image = imageReader.ReadBytes (nRows * nCols)           

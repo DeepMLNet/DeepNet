@@ -27,6 +27,7 @@ struct Pos0D {
 
 struct ShapeStatic0D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       return 0;
    }
 };
@@ -37,6 +38,7 @@ struct ShapeDynamic0D {
 
 template <size_t offset_>
 struct StrideStatic0D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         default: return 0;
@@ -214,6 +216,7 @@ struct Pos1D {
 template <size_t shape0>
 struct ShapeStatic1D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       switch (dim) {
         case 0: return shape0;
         default: return 0;
@@ -228,6 +231,7 @@ struct ShapeDynamic1D {
 
 template <size_t offset_, size_t stride0>
 struct StrideStatic1D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         case 0: return stride0;
@@ -447,6 +451,7 @@ struct Pos2D {
 template <size_t shape0, size_t shape1>
 struct ShapeStatic2D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -462,6 +467,7 @@ struct ShapeDynamic2D {
 
 template <size_t offset_, size_t stride0, size_t stride1>
 struct StrideStatic2D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         case 0: return stride0;
@@ -710,6 +716,7 @@ struct Pos3D {
 template <size_t shape0, size_t shape1, size_t shape2>
 struct ShapeStatic3D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -726,6 +733,7 @@ struct ShapeDynamic3D {
 
 template <size_t offset_, size_t stride0, size_t stride1, size_t stride2>
 struct StrideStatic3D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         case 0: return stride0;
@@ -1003,6 +1011,7 @@ struct Pos4D {
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3>
 struct ShapeStatic4D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -1020,6 +1029,7 @@ struct ShapeDynamic4D {
 
 template <size_t offset_, size_t stride0, size_t stride1, size_t stride2, size_t stride3>
 struct StrideStatic4D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         case 0: return stride0;
@@ -1338,6 +1348,7 @@ struct Pos5D {
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3, size_t shape4>
 struct ShapeStatic5D {
   	_dev size_t shape(const size_t dim) const {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -1356,6 +1367,7 @@ struct ShapeDynamic5D {
 
 template <size_t offset_, size_t stride0, size_t stride1, size_t stride2, size_t stride3, size_t stride4>
 struct StrideStatic5D {
+   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
   	_dev size_t stride(const size_t dim) const {
       switch (dim) {
         case 0: return stride0;

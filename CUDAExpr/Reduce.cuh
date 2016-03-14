@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdio>
+
 #include "Utils.cuh"
 #include "ThrustInterface.cuh"
 
@@ -7,6 +9,9 @@
 /// Sums all elements in src and stores them into the first element of trgt.
 template <typename TTarget, typename TSrc>
 void sum(TTarget &trgt, TSrc &src) {
+	//std::printf("entering sum with trgt=%p and src=%p\n",
+	//			trgt.data(), src.data()); 
+
 	ArrayNDRange<TSrc> srcRange(src);
 	ArrayNDRange<TTarget> trgtRange(trgt);
 

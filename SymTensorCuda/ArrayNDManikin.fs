@@ -23,7 +23,7 @@ module ArrayNDManikinTypes =
     /// Memory can either be on the host or the accelerator.
     type MemManikinT =
         | MemAlloc of MemAllocManikinT
-        | MemExternal of IVarSpec
+        | MemExternal of UVarSpecT
 
     type IArrayNDManikin =
         abstract member Storage : MemManikinT

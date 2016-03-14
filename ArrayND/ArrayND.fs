@@ -202,12 +202,12 @@ module ArrayND =
         false // TODO
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newContiguousOfType shp (a: ArrayNDT<'T>) =
-        a.NewOfSameType (ArrayNDLayout.newContiguous shp)
+    let inline newContiguousOfType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+        a.NewOfSameType (ArrayNDLayout.newContiguous shp) :?> 'A
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newColumnMajorOfType shp (a: ArrayNDT<'T>) =
-        a.NewOfSameType (ArrayNDLayout.newColumnMajor shp)
+    let inline newColumnMajorOfType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+        a.NewOfSameType (ArrayNDLayout.newColumnMajor shp) :?> 'A
 
     /// creates a new ArrayND with existing data but new layout
     let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
@@ -219,7 +219,7 @@ module ArrayND =
 
     /// Copies all elements from source to destination.
     /// Both ArrayNDs must have the same shape.
-    let inline copyTo (source: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
+    let inline copyTo (source: #ArrayNDT<'T>) (dest: #ArrayNDT<'T>) =
         source.CopyTo dest
 
     /// Returns a continguous copy of the given ArrayND.
@@ -297,8 +297,14 @@ module ArrayND =
     // array creation functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// creates a scalar ArrayND of given value and type
+    let scalarOfType (value: 'T) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
+        let ary = newContiguousOfType [] a
+        set [] value ary
+        ary
+
     /// fills the specified ArrayND with zeros
-    let inline fillWithZeros (a: ArrayNDT<'T>) =
+    let inline fillWithZeros (a: #ArrayNDT<'T>) =
         for idx in allIdx a do
             set idx (ArrayNDT<'T>.Zero) a
    
@@ -311,7 +317,7 @@ module ArrayND =
         newContiguousOfType (shape a) a
 
     /// fills the specified ArrayND with ones
-    let inline fillWithOnes (a: ArrayNDT<'T>) =
+    let inline fillWithOnes (a: #ArrayNDT<'T>) =
         for idx in allIdx a do
             set idx (ArrayNDT<'T>.One) a
 
@@ -322,17 +328,11 @@ module ArrayND =
         n        
 
     /// ArrayND of same shape filled with ones.
-    let inline onesLike (a: ArrayNDT<'T>) =
+    let inline onesLike a =
         onesOfType (shape a) a
 
-    /// creates a scalar ArrayND of given value and type
-    let inline scalarOfType value a =
-        let ary = newContiguousOfType [] a
-        set [] value ary
-        ary
-
     /// fills the diagonal of a quadratic matrix with ones
-    let inline fillDiagonalWithOnes (a: ArrayNDT<'T>) =
+    let inline fillDiagonalWithOnes (a: #ArrayNDT<'T>) =
         match shape a with
         | [n; m] when n = m ->
             for i = 0 to n - 1 do
@@ -345,20 +345,20 @@ module ArrayND =
    
     /// Applies the given function elementwise to the given ArrayND and 
     /// stores the result in a new ArrayND.
-    let inline map f (a: ArrayNDT<'T>) =
+    let inline map f (a: #ArrayNDT<'T>) =
         let c = zerosLike a
         for idx in allIdx a do
             set idx (f (get idx a)) c
         c
 
     /// Applies the given function elementwise to the given ArrayND inplace.
-    let inline mapInplace f (a: ArrayNDT<'T>) =
+    let inline mapInplace f (a: #ArrayNDT<'T>) =
         for idx in allIdx a do
             set idx (f (get idx a)) a
             
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
-    let inline map2 f (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline map2 f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         let a, b = broadcastToSame a b
         let c = zerosLike a
         for idx in allIdx a do
@@ -368,7 +368,7 @@ module ArrayND =
 
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
-    let inline map2Inplace f (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline map2Inplace f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         let a, b = broadcastToSame a b
         for idx in allIdx a do
             let cv = f (get idx a) (get idx b)
@@ -378,30 +378,31 @@ module ArrayND =
     let inline unsp (a: 'T) : 'R = 
         failwithf "operation unsupported for type %A" typeof<'T>
 
-    let inline uncheckedApply (f: ArrayNDT<'A> -> ArrayNDT<'A>) (a: ArrayNDT<'T>) =
+    let inline uncheckedApply (f: ArrayNDT<'A> -> ArrayNDT<'A>) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
         let aCast = a.Cast<'A> ()
         let mCast = f aCast
         let m = a.CastToMe mCast
-        m
+        m :?> 'B
 
-    let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) 
+            (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : 'B =
         let aCast = a.Cast<'A> ()
         let bCast = b.Cast<'A> ()
         let mCast = f aCast bCast
         let m = a.CastToMe mCast
-        m
+        m :?> 'B
 
-    let inline uncheckedMap (f: 'A -> 'A) (a: ArrayNDT<'T>) =
+    let inline uncheckedMap (f: 'A -> 'A) (a: #ArrayNDT<'T>) =
         uncheckedApply (map f) a
 
-    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         uncheckedApply2 (map2 f) a b
 
     let inline typedApply   (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>)
-                            (a: ArrayNDT<'T>) =
+                            (a: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
@@ -412,7 +413,7 @@ module ArrayND =
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<int>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<byte>)
-                            (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+                            (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
@@ -423,14 +424,14 @@ module ArrayND =
                         (fSingle: single -> single)
                         (fInt:    int    -> int)
                         (fByte:   byte   -> byte)
-                        (a: ArrayNDT<'T>) =
+                        (a: #ArrayNDT<'T>) =
         typedApply (map fDouble) (map fSingle) (map fInt) (map fByte) a
 
     let inline typedMap2 (fDouble: double -> double -> double) 
                          (fSingle: single -> single -> single)
                          (fInt:    int    -> int    -> int)
                          (fByte:   byte   -> byte   -> byte)
-                         (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+                         (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         typedApply2 (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
 
     let inline signImpl (x: 'T) =
@@ -439,56 +440,56 @@ module ArrayND =
     type ArrayNDT<'T> with    
 
         // elementwise unary
-        static member (~+) (a: ArrayNDT<'T>) = typedMap (~+) (~+) (~+) (unsp) a
-        static member (~-) (a: ArrayNDT<'T>) = typedMap (~-) (~-) (~-) (unsp) a
-        static member Abs (a: ArrayNDT<'T>) = typedMap abs abs abs (unsp) a
-        static member SignT (a: ArrayNDT<'T>) = typedMap signImpl signImpl sign (unsp) a
-        static member Log (a: ArrayNDT<'T>) = typedMap log log (unsp) (unsp) a
-        static member Log10 (a: ArrayNDT<'T>) = typedMap log10 log10 (unsp) (unsp) a
-        static member Exp (a: ArrayNDT<'T>) = typedMap exp exp (unsp) (unsp) a
-        static member Sin (a: ArrayNDT<'T>) = typedMap sin sin (unsp) (unsp) a
-        static member Cos (a: ArrayNDT<'T>) = typedMap cos cos (unsp) (unsp) a
-        static member Tan (a: ArrayNDT<'T>) = typedMap tan tan (unsp) (unsp) a
-        static member Asin (a: ArrayNDT<'T>) = typedMap asin asin (unsp) (unsp) a
-        static member Acos (a: ArrayNDT<'T>) = typedMap acos acos (unsp) (unsp) a
-        static member Atan (a: ArrayNDT<'T>) = typedMap atan atan (unsp) (unsp) a
-        static member Sinh (a: ArrayNDT<'T>) = typedMap sinh sinh (unsp) (unsp) a
-        static member Cosh (a: ArrayNDT<'T>) = typedMap cosh cosh (unsp) (unsp) a
-        static member Tanh (a: ArrayNDT<'T>) = typedMap tanh tanh (unsp) (unsp) a
-        static member Sqrt (a: ArrayNDT<'T>) = typedMap sqrt sqrt (unsp) (unsp) a
-        static member Ceiling (a: ArrayNDT<'T>) = typedMap ceil ceil (unsp) (unsp) a
-        static member Floor (a: ArrayNDT<'T>) = typedMap floor floor (unsp) (unsp) a
-        static member Round (a: ArrayNDT<'T>) = typedMap round round (unsp) (unsp) a
-        static member Truncate (a: ArrayNDT<'T>) = typedMap truncate truncate (unsp) (unsp) a
+        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (~+) (~+) (~+) (unsp) a
+        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (~-) (~-) (~-) (unsp) a
+        static member Abs       (a: #ArrayNDT<'T>) = typedMap abs abs abs (unsp) a
+        static member SignT     (a: #ArrayNDT<'T>) = typedMap signImpl signImpl sign (unsp) a
+        static member Log       (a: #ArrayNDT<'T>) = typedMap log log (unsp) (unsp) a
+        static member Log10     (a: #ArrayNDT<'T>) = typedMap log10 log10 (unsp) (unsp) a
+        static member Exp       (a: #ArrayNDT<'T>) = typedMap exp exp (unsp) (unsp) a
+        static member Sin       (a: #ArrayNDT<'T>) = typedMap sin sin (unsp) (unsp) a
+        static member Cos       (a: #ArrayNDT<'T>) = typedMap cos cos (unsp) (unsp) a
+        static member Tan       (a: #ArrayNDT<'T>) = typedMap tan tan (unsp) (unsp) a
+        static member Asin      (a: #ArrayNDT<'T>) = typedMap asin asin (unsp) (unsp) a
+        static member Acos      (a: #ArrayNDT<'T>) = typedMap acos acos (unsp) (unsp) a
+        static member Atan      (a: #ArrayNDT<'T>) = typedMap atan atan (unsp) (unsp) a
+        static member Sinh      (a: #ArrayNDT<'T>) = typedMap sinh sinh (unsp) (unsp) a
+        static member Cosh      (a: #ArrayNDT<'T>) = typedMap cosh cosh (unsp) (unsp) a
+        static member Tanh      (a: #ArrayNDT<'T>) = typedMap tanh tanh (unsp) (unsp) a
+        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap sqrt sqrt (unsp) (unsp) a
+        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap ceil ceil (unsp) (unsp) a
+        static member Floor     (a: #ArrayNDT<'T>) = typedMap floor floor (unsp) (unsp) a
+        static member Round     (a: #ArrayNDT<'T>) = typedMap round round (unsp) (unsp) a
+        static member Truncate  (a: #ArrayNDT<'T>) = typedMap truncate truncate (unsp) (unsp) a
 
         // elementwise binary
-        static member (+) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
-        static member (-) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (-) (-) (-) (-) a b
-        static member (*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (*) (*) (*) (*) a b
-        static member (/) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (/) (/) (/) (/) a b
-        static member (%) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 (%) (%) (%) (%) a b
-        static member Pow (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
+        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
+        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (-) (-) (-) (-) a b
+        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (*) (*) (*) (*) a b
+        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (/) (/) (/) (/) a b
+        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (%) (%) (%) (%) a b
+        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
 
         // elementwise binary with scalars
-        static member (+) (a: ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
-        static member (-) (a: ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
-        static member (*) (a: ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
-        static member (/) (a: ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
-        static member (%) (a: ArrayNDT<'T>, b: 'T) = a % (scalarOfType b a)
-        static member Pow (a: ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)
+        static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
+        static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
+        static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
+        static member inline (/) (a: #ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
+        static member inline (%) (a: #ArrayNDT<'T>, b: 'T) = a % (scalarOfType b a)
+        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)
 
-        static member (+) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) + b
-        static member (-) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) - b
-        static member (*) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) * b
-        static member (/) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) / b
-        static member (%) (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) % b
-        static member Pow (a: 'T, b: ArrayNDT<'T>) = (scalarOfType a b) ** b
+        static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) + b
+        static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) - b
+        static member inline (*) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) * b
+        static member inline (/) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) / b
+        static member inline (%) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) % b
+        static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) ** b
 
         // transposition
         member this.T = transpose this
 
     /// sign keeping type
-    let inline signt (a: ArrayNDT<'T>) =
+    let inline signt (a: #ArrayNDT<'T>) =
         ArrayNDT<'T>.SignT a 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -514,7 +515,7 @@ module ArrayND =
         scalarOfType value a
 
     /// elementwise sum
-    let inline sum (a: ArrayNDT<'T>) =
+    let inline sum (a: #ArrayNDT<'T>) =
         typedApply sumImpl sumImpl sumImpl sumImpl a 
 
     /// elementwise sum over given axis
@@ -526,7 +527,7 @@ module ArrayND =
         scalarOfType value a
 
     /// elementwise product
-    let inline product (a: ArrayNDT<'T>) =
+    let inline product (a: #ArrayNDT<'T>) =
         typedApply productImpl productImpl productImpl productImpl a 
 
     /// elementwise product over given axis
@@ -565,7 +566,7 @@ module ArrayND =
 
     type ArrayNDT<'T> with   
         /// dot product
-        static member (.*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 dotImpl dotImpl dotImpl dotImpl a b
+        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 dotImpl dotImpl dotImpl dotImpl a b
 
     /// dot product between vec*vec, mat*vec, mat*mat
     let inline dot a b =
@@ -651,7 +652,7 @@ module ArrayND =
    
     type ArrayNDT<'T> with
         /// tensor product
-        static member (%*) (a: ArrayNDT<'T>, b: ArrayNDT<'T>) = typedApply2 tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
@@ -702,7 +703,7 @@ module ArrayND =
   
     type ArrayNDT<'T> with
 
-        member this.ToRng (allArgs: obj []) =
+        member internal this.ToRng (allArgs: obj []) =
             let rec toRng (args: obj list) =
                 match args with
                 // direct range specification
@@ -734,7 +735,7 @@ module ArrayND =
             |> Array.toList
             |> toRng
 
-        member inline this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             view (this.ToRng allArgs) this
 
         member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =

@@ -64,7 +64,7 @@ module Compile =
 
         dumpCode modName modCode
 
-        let cacheKey = modCode, headerModTimes
+        let cacheKey = modCode, headerModTimes, cmplrArgs
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
             | Some ptx -> ptx
@@ -125,17 +125,24 @@ module Compile =
         let modName = generateCudaModName ()
         let libName = (Path.GetFileNameWithoutExtension modName) + ".dll"
 
-        let cmplrArgs = ["--shared";
-                         sprintf "--compiler-bindir \"%s\"" hostCompilerDir;
-                         sprintf "--gpu-architecture=%s" gpuArch; 
-                         sprintf "--include-path=\"%s\"" includePath;
-                         sprintf "-o \"%s\"" libName;
-                         sprintf "\"%s\"" modName]
+        let baseCmplrArgs = [
+            "--shared";
+            "--machine 64";
+            "--debug";
+            sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
+            sprintf "--gpu-architecture=%s" gpuArch; 
+            sprintf "--include-path=\"%s\"" includePath
+        ]
+        let cmplrArgs = 
+            baseCmplrArgs @ [
+                sprintf "-o \"%s\"" libName;
+                sprintf "\"%s\"" modName
+            ]
         let cmplrArgStr = cmplrArgs |> String.concat " "
 
         dumpCode modName modCode
 
-        let cacheKey = modCode, headerModTimes
+        let cacheKey = modCode, headerModTimes, baseCmplrArgs
         match cppModCache.TryGet cacheKey with
         | Some libData ->
             System.IO.File.WriteAllBytes (libName, libData)
@@ -334,7 +341,7 @@ module CudaExprWorkspaceTypes =
  
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
-                // CUBLAS
+                // CUBLAS 
                 | CublasSetStram strm ->
                     CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt) ->   
@@ -350,10 +357,10 @@ module CudaExprWorkspaceTypes =
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
         // initialize
-#if !CUDA_DUMMY
+        #if !CUDA_DUMMY
         do
             execCalls recipe.InitCalls
-#endif
+        #endif
 
         // finalizer
         interface System.IDisposable with
@@ -363,12 +370,12 @@ module CudaExprWorkspaceTypes =
                 Compile.unloadCudaCode krnlModHndl
 
         /// Evaluate expression.
-        member this.Eval(externalVar: Map<IVarSpec, IArrayNDT>,
-                         hostVar:     Map<IVarSpec, IArrayNDT>) =
+        member this.Eval(externalVar: Map<UVarSpecT, IArrayNDT>,
+                         hostVar:     Map<UVarSpecT, IArrayNDT>) =
 
-            execEnv.ExternalVar <- Map.map (fun _ (v: IArrayNDT) -> v :?> IArrayNDCudaT) externalVar
-            execEnv.HostVar <- Map.map (fun _ (v: IArrayNDT) -> v :?> IArrayNDHostT) hostVar
-
+            execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
+            execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
+            
             execCalls recipe.ExecCalls
 
             CudaSup.context.Synchronize () // TODO: remove and signal otherwise

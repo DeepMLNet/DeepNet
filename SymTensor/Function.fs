@@ -7,24 +7,33 @@ open ArrayNDNS
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable environment
-    type VarEnvT = Map<IVarSpec, IArrayNDT>
+    type VarEnvT = Map<UVarSpecT, IArrayNDT>
 
     /// specification of variable storage locations
-    type VarLocsT = Map<IVarSpec, ArrayLocT>
+    type VarLocsT = Map<UVarSpecT, ArrayLocT>
 
 
 module VarEnv = 
+
+    /// add variable value to environment
+    let addUVarSpec (vs: UVarSpecT) (value: IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
+        Map.add vs value varEnv
+
+    /// add variable value to environment
+    let addVarSpecT (vs: VarSpecT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
+        addUVarSpec (UVarSpec.ofVarSpec vs) (value :> IArrayNDT) varEnv        
+
     /// add variable value to environment
     let add (var: Expr.ExprT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
-        let vs = Expr.extractVar var
-        Map.add (vs :> IVarSpec) (value :> IArrayNDT) varEnv
+        addVarSpecT (Expr.extractVar var) value varEnv
 
-    let addIVarSpec (vs: IVarSpec) (value: IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
-        Map.add vs value varEnv
+    /// get variable value from environment
+    let getUnified (vs: UVarSpecT) (varEnv: VarEnvT) : IArrayNDT =
+        varEnv.[vs]
 
     /// get variable value from environment
     let getVarSpecT (vs: VarSpecT<'T>) (varEnv: VarEnvT) : ArrayNDT<'T> =
-        varEnv.[vs] :?> ArrayNDT<'T>
+        getUnified (UVarSpec.ofVarSpec vs) varEnv :?> ArrayNDT<'T>
 
     /// get variable value from environment
     let get (var: Expr.ExprT<'T>) (varEnv: VarEnvT) : ArrayNDT<'T> =
@@ -42,18 +51,24 @@ module VarEnv =
     let inferSymSizes (varEnv: VarEnvT) =
         varEnv |> Map.fold 
             (fun env vSym vVal ->
-                let symShape = VarSpec.shape vSym
+                let symShape = UVarSpec.shape vSym
                 let valShape = ArrayND.shape vVal |> List.map (Fixed >> Base)
                 SymSizeEnv.needEqualShape symShape valShape env)
             SymSizeEnv.empty 
 
     /// substitues the given symbol sizes into the variable environment
-    let substSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
-        varEnv |> Map.fold 
-            (fun env vSym vVal ->
-                Map.add (vSym.SubstSymSizes symSizes) vVal env)
-            Map.empty
-
+    let checkAndSubstSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
+        varEnv 
+        |> Map.toSeq
+        |> Seq.map (fun (vs, value) -> 
+            let ss = UVarSpec.shape vs
+            let ns = ss |> SymSizeEnv.substShape symSizes |> ShapeSpec.eval
+            if ArrayND.shape value <> ns then
+                failwithf "variable %A was expected to be of shape %A (%A) but a \
+                           value with shape %A was provided" vs ns ss (ArrayND.shape value)
+            UVarSpec.substSymSizes symSizes vs, value)
+        |> Map.ofSeq
+        
     /// gets the type names of the variable value arrays
     let valueTypeNames (varEnv: VarEnvT) =
         varEnv |> Map.map (fun _ vVal -> TypeName.ofObject vVal)
@@ -87,6 +102,7 @@ module EnvTypes =
     /// a function that compiles a unified expression into a function
     type UExprCompilerT = CompileEnvT -> UExprT list -> CompiledUExprT
 
+    /// compile specification, consisting of a compiler and a compile environment
     type CompileSpecT = UExprCompilerT * CompileEnvT
 
 
@@ -128,11 +144,11 @@ module CompileEnv =
 
 module Func =
 
-    type private UExprGenT = SymSizeEnvT -> (UExprT * Set<IVarSpec> * bool) 
+    type private UExprGenT = SymSizeEnvT -> (UExprT * Set<UVarSpecT> * bool) 
 
     let private uExprGen baseExpr symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes 
-        let vars = Expr.extractVars expr |> Set.map (fun vs -> vs :> IVarSpec)
+        let vars = Expr.extractVars expr |> Set.map UVarSpec.ofVarSpec
         UExpr.toUExpr expr, vars, Expr.canEvalAllSymSizes expr
 
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) : (VarEnvT -> IArrayNDT list) =      
@@ -158,7 +174,7 @@ module Func =
             let varLocs =
                 compileEnv.VarLocs
                 |> Map.toSeq
-                |> Seq.map (fun (vs, loc) -> (vs |> VarSpec.substSymSizes compileEnv.SymSizes, loc))
+                |> Seq.map (fun (vs, loc) -> (vs |> UVarSpec.substSymSizes compileEnv.SymSizes, loc))
                 |> Map.ofSeq
             let compileEnv = {compileEnv with VarLocs=varLocs}
 
@@ -178,14 +194,19 @@ module Func =
 
         /// Performs evaluation of a compiled function.
         let performEval compileEnv evaluator neededVars varEnv = 
-            // substitute symbol sizes
-            let varEnv = varEnv |> VarEnv.substSymSizes compileEnv.SymSizes
+            // substitute and check symbol sizes
+            let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileEnv.SymSizes
 
-            // check if evaluation is possible
-            let missingVars = Set.filter (fun v -> not (Map.containsKey v varEnv)) neededVars
-            if not (Set.isEmpty missingVars) then
-                failwithf "cannot evaluate expression because values for variable(s) %A is missing"
-                    (missingVars |> Set.toList)
+            // check that variable locations match with compile environment
+            let varLocs = VarEnv.valueLocations varEnv
+            for vs in neededVars do
+                match varLocs |> Map.tryFind vs with
+                | Some loc when loc <> UVarSpec.findByName vs compileEnv.VarLocs ->
+                    failwithf "variable %A was expected to be in location %A but a value in \
+                               location %A was specified" vs compileEnv.VarLocs.[vs] loc
+                | Some _ -> ()
+                | None -> 
+                    failwithf "cannot evaluate expression because value for variable %A is missing" vs
 
             // evaluate using compiled function
             let evalEnv = EvalEnv.create varEnv 

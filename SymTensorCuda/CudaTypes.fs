@@ -3,6 +3,7 @@
 open System
 open System.Runtime.InteropServices
 open ManagedCuda
+open ManagedCuda.BasicTypes
 
 open Basics
 open Basics.Cuda
@@ -68,8 +69,8 @@ module Types =
         Stream:                 Dictionary<StreamT, CudaStream>;
         Event:                  Dictionary<EventObjectT, CudaEvent>;
         InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>;
-        mutable ExternalVar:    Map<IVarSpec, IArrayNDCudaT>;
-        mutable HostVar:        Map<IVarSpec, IArrayNDHostT>;
+        mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>;
+        mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>;
     }
     
     /// CUDA device memory range
@@ -113,25 +114,23 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im]
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            if (ArrayND.shape ev) = (ArrayND.shape manikin) && 
-                    (ArrayND.stride ev) = (ArrayND.stride manikin) && 
-                    (ArrayND.offset ev) = (ArrayND.offset manikin) then
-                (ev :?> IDeviceStorage).ByteData
+            if ArrayND.offset ev = 0 && ArrayND.isContiguous ev then
+                ev.Storage.ByteData
             else
-                failwithf "external variable is of form %A but form %A was expected" ev manikin
+                failwithf "external variable %A was expected to be contiguous \
+                           with zero offset" vs 
 
     /// gets host memory for an external reference
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]
-            if (ArrayND.shape hv) = (ArrayND.shape manikin) && 
-                    (ArrayND.stride hv) = (ArrayND.stride manikin) && 
-                    (ArrayND.offset hv) = (ArrayND.offset manikin) then
+            if ArrayND.offset hv = 0 && ArrayND.isContiguous hv then
                 ArrayNDHostReg.getCudaRegisteredMemory hv
             else
-                failwithf "host variable is of form %A but form %A was expected" hv manikin
-        | _ -> failwithf "host variable must be of type ExternalMem"
+                failwithf "host variable %A was expected to be contiguous \
+                           with zero offset" vs
+        | _ -> failwithf "host variable must be of type ExternalMem" 
 
 
 [<AutoOpen>]
@@ -159,12 +158,13 @@ module ArgTemplates =
     type IHostMemRngTmpl =
         abstract member GetRng : CudaExecEnvT -> HostMemRngT
 
-//    [<Struct>]
-//    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-//    /// C++ ArrayND with static shape and static offset/stride
-//    type ArrayNDSSArg =
-//        val mData : IntPtr
-//        new (data: IntPtr) = {mData = data}
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    /// C++ ArrayND with static shape and static offset/stride
+    type ArrayNDSSArg =
+        val Dummy : IntPtr 
+        val Data : IntPtr
+        new (data: IntPtr) = {Dummy = nativeint 0xdeaddead; Data = data}
 
     /// Literal C++ typename 
     type CPPTemplateValue (cppTypeName) =
@@ -179,7 +179,9 @@ module ArgTemplates =
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env =
                 // C++ struct just contains the pointer to data memory
-                (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr :> obj
+                let ptr = (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
+                //printfn "Passing pointer 0x%x" ptr
+                ArrayNDSSArg(ptr) :> obj
 
     type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
@@ -337,9 +339,7 @@ module ArgTemplates =
 module NativeFunctionDelegates =
 
     [<CPPFuncName("sum")>]
-    type CPPSum = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
-    //type CPPSum = delegate of NDArrayDev * NDArrayDev -> unit
+    type CPPSum = delegate of ArrayNDSSArg * ArrayNDSSArg -> unit
 
     [<CPPFuncName("sumLastAxis")>]
-    type CPPSumLastAxis = delegate of BasicTypes.CUdeviceptr * BasicTypes.CUdeviceptr -> unit
-    //type CPPSumLastAxis = delegate of NDArrayDev * NDArrayDev -> unit
+    type CPPSumLastAxis = delegate of ArrayNDSSArg * ArrayNDSSArg -> unit

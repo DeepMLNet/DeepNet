@@ -23,6 +23,7 @@ module ArrayNDCudaTypes =
         abstract ByteData: CudaDeviceVariable<byte>
 
     type IDeviceStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> =
+        inherit IDeviceStorage
         abstract Item: int -> 'T with get, set
         abstract Data: CudaDeviceVariable<'T>
 
@@ -58,6 +59,7 @@ module ArrayNDCudaTypes =
 
     type IArrayNDCudaT =
         inherit IArrayNDT
+        abstract Storage: IDeviceStorage
 
     /// an N-dimensional array with reshape and subview abilities stored in GPU device memory
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
@@ -85,7 +87,33 @@ module ArrayNDCudaTypes =
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
 
-        interface IArrayNDCudaT
+        interface IArrayNDCudaT with
+            member this.Storage = this.Storage :> IDeviceStorage
+
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            ArrayND.view (this.ToRng allArgs) this
+        member this.Item
+            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
+            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
 
 module ArrayNDCuda = 
@@ -133,7 +161,7 @@ module ArrayNDCuda =
         if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
             invalidArg "dst" "dst must be contiguous without offset"
 
-        let src = ensureContiguousAndOffsetFree src :?> ArrayNDHostT<'T>
+        let src = ensureContiguousAndOffsetFree src 
         use srcMem = src.Storage.Pin()
         
         match dst.Storage with
@@ -156,7 +184,7 @@ module ArrayNDCuda =
         if not (ArrayND.isContiguous src && ArrayND.offset src = 0) then
             invalidArg "src" "src must be contiguous without offset"
 
-        let src = ensureContiguousAndOffsetFree src :?> ArrayNDCudaT<'T>
+        let src = ensureContiguousAndOffsetFree src 
         use dstMem = dst.Storage.Pin()
         
         match src.Storage with
@@ -167,7 +195,7 @@ module ArrayNDCuda =
 
     /// Copies a ArrayNDCudaT to the host
     let toHost (src: ArrayNDCudaT<'T>) =
-        let dst = ArrayNDHost.newContiguous<'T> (shape src) :?> ArrayNDHostT<'T>
+        let dst = ArrayNDHost.newContiguous<'T> (shape src) 
         copyIntoHost dst src
         dst
 

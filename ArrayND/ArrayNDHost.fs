@@ -104,17 +104,40 @@ module ArrayNDHostTypes =
                 | _ -> base.CopyTo dest
             | _ -> base.CopyTo dest
                               
-
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            ArrayND.view (this.ToRng allArgs) this
+        member this.Item
+            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
+            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
 module ArrayNDHost = 
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let inline newContiguous<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp) :> ArrayNDT<'T>
+        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp) 
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
     let inline newColumnMajor<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp) :> ArrayNDT<'T>
+        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp) 
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let inline scalar value =
@@ -145,11 +168,12 @@ module ArrayNDHost =
         if ArrayNDLayout.nElems layout <> Array.length data then
             failwithf "specified shape %A has %d elements, but passed data array has %d elements"
                 shp (ArrayNDLayout.nElems layout) (Array.length data)
-        ArrayNDHostT<'T> (layout, ManagedArrayStorageT<'T> (data)) :> ArrayNDT<'T>
+        ArrayNDHostT<'T> (layout, ManagedArrayStorageT<'T> (data)) 
         
-
     /// Creates a ArrayNDT of given type and layout in host memory.
     let newOfType typ (layout: ArrayNDLayoutT) = 
         let gt = typedefof<ArrayNDHostT<_>>
         let t = gt.MakeGenericType [|typ|]
         Activator.CreateInstance (t, [|layout|]) :?> IArrayNDT
+
+

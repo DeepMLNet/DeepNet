@@ -17,7 +17,7 @@ module ModelContextTypes =
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
-            member this.Allocator shp = ArrayNDHost.newContiguous shp
+            member this.Allocator shp = ArrayNDHost.newContiguous shp :> ArrayNDT<_>
             member this.Compiler = onHost
             member this.DefaultLoc = LocHost
     }
@@ -244,7 +244,7 @@ module ModelContextTypes =
 
         /// sets the location of the given variable
         member this.SetLoc var loc =
-            varLocs <- varLocs |> Map.add (Expr.extractVar var :> IVarSpec) loc
+            varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) loc
 
         /// Infers localtion symbolic size by matching a variables symbolic shape to the shape
         /// of the given variable value.
@@ -255,7 +255,7 @@ module ModelContextTypes =
             |> SymSizeEnv.merge symSizeEnv
             |> fun ss -> symSizeEnv <- ss
 
-            varLocs <- varLocs |> Map.add (Expr.extractVar var :> IVarSpec) (ArrayND.location value)
+            varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) (ArrayND.location value)
 
         /// ParameterSet of this module's (and all submodules') parameteres
         member this.ParameterSet = parameterSet
@@ -285,8 +285,8 @@ module ModelContextTypes =
             // apply default variable location
             let mutable varLocs = varLocs
             for var in vars do
-                if not (varLocs |> Map.containsKey var) then
-                    varLocs <- varLocs |> Map.add var device.DefaultLoc
+                if not (varLocs |> Map.containsKey (UVarSpec.ofVarSpec var)) then
+                    varLocs <- varLocs |> Map.add (UVarSpec.ofVarSpec var) device.DefaultLoc
 
             // create compile environement
             let compileEnv =
@@ -304,7 +304,7 @@ module ModelContextTypes =
 
         let compileSpec resultLoc = 
             // add ParameterStorage to variable locations
-            let psVar = Expr.extractVar parameterSet.Flat :> IVarSpec
+            let psVar = Expr.extractVar parameterSet.Flat |> UVarSpec.ofVarSpec
             let psVal = parameterStorage.Flat
             let varLocs =
                 compileEnv.VarLocs

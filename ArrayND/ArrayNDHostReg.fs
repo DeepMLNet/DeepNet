@@ -80,7 +80,7 @@ module CudaRegMem =
     /// gets the CudaRegisteredMemory for already locked data without increment the reference count
     let getCudaRegisteredMemory (data: IHostStorage) =
         if not (dataRegistrations.ContainsKey(data)) then
-            failwithf "%A is not registered data" data
+            failwithf "the specified array is not registered data" 
         let dr = dataRegistrations.[data] :?> CudaRegMemHnd
         dr.CudaRegisteredMemory
             

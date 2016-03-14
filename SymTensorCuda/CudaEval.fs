@@ -32,7 +32,7 @@ module CudaEval =
                     // expression has data that needs to be stored       
                     // create variable that will be inserted into expression
                     let resVarName = sprintf "__RESULT%d__" i
-                    let resVar = VarSpec.ofNameShapeAndTypeName resVarName shp tn                     
+                    let resVar = UVarSpec.ofNameShapeAndTypeName resVarName shp tn                     
 
                     // insert StoreToVar op in expression
                     UExpr (UUnaryOp (StoreToVar resVar), tn, shp, [uexpr]), Some resVar, resAllocator
@@ -58,12 +58,7 @@ module CudaEval =
                 UExpr (UNaryOp Discard, tn, ShapeSpec.emptyVector, transferUExprs)                       
 
         // build variable locations
-        let varLocs =
-            compileEnv.VarLocs
-            |> Map.toSeq
-            |> Seq.map (fun (vs, loc) -> UVarSpec.ofVarSpec vs, loc)
-            |> Map.ofSeq
-            |> Map.join resVarLocs
+        let varLocs = Map.join compileEnv.VarLocs resVarLocs
 
         // compile expression and create workspace
         let cudaCompileEnv = {VarStorLoc = varLocs}
@@ -79,7 +74,7 @@ module CudaEval =
                 ||> List.zip
                 |> List.fold (fun varEnv (var, value) -> 
                         match var with
-                        | Some vs -> varEnv |> VarEnv.addIVarSpec vs value
+                        | Some vs -> varEnv |> VarEnv.addUVarSpec vs value
                         | None -> varEnv)
                     evalEnv.VarEnv               
 

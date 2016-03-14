@@ -148,7 +148,7 @@ module CudaExecUnit =
         | ULeafOp (Var vs) ->       
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
-                // we assume that all device input vars are continguous
+                // we assume that all device input vars are contiguous
                 ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape, true
             | LocHost ->
                 // will transfer variable from host to device during execution
@@ -500,13 +500,13 @@ module CudaExecUnit =
             copyItems @ setItems
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
-
-
+         
+         
     /// generates CUDA execution units that will evaluate the given unified expression
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
         ExecUnit.exprToExecUnits {ExecItemsForOp=execItemsForOp compileEnv; 
                                   TrgtGivenSrc=trgtGivenSrc compileEnv;
-                                  SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv;}
+                                  SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv;} 
 
 
 

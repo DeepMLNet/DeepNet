@@ -92,7 +92,7 @@ module TmplInstCache =
             let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
             let declStr =
                 sprintf "extern \"C\" %s %s %s (%s) {\n" krnlStr ti.RetType cName argDeclStr
-                //+ sprintf "  %s %s (%s);\n" retCmd ti.FuncName argCallStr
+                //+ sprintf "  printf(\"%s\\n\");" ti.FuncName
                 + sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
                 + sprintf "}\n"
                 + sprintf "\n"
@@ -105,7 +105,7 @@ module CudaRecipe =
 
     let commonIncludes = ["NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
     let kernelModuleIncludes = commonIncludes
-    let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"]
+    let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"; "stdio.h"]
 
     let generateIncludes incls =
         incls

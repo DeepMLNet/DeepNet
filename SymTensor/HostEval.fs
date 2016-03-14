@@ -18,7 +18,7 @@ module HostEval =
 
     /// evaluate expression to numeric array 
     let rec eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
-        let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv
+        let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<_>
         let shapeEval symShape = ShapeSpec.eval symShape
         let sizeEval symSize = SizeSpec.eval symSize
         let rngEval = SimpleRangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
