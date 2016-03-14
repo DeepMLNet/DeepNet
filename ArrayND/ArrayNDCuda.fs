@@ -175,5 +175,5 @@ module ArrayNDCuda =
     let newOfType typ (layout: ArrayNDLayoutT) = 
         let gt = typedefof<ArrayNDCudaT<_>>
         let t = gt.MakeGenericType [|typ|]
-        Activator.CreateInstance (t, [|layout|]) :?> IArrayNDT
+        Activator.CreateInstance (t, [|layout :> obj|]) :?> IArrayNDT
 

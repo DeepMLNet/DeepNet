@@ -710,13 +710,14 @@ module ArrayND =
 
                 // slices
                 | (:? (int option) as so) :: (:? (int option) as fo)  :: rest ->
-                    Rng (Some so.Value, Some fo.Value) :: toRng rest
-                | (:? (int option) as so) :: null                     :: rest ->
-                    Rng (Some so.Value, None) :: toRng rest
-                | null                    :: (:? (int option) as fo)  :: rest ->
-                    Rng (None, Some fo.Value) :: toRng rest
-                | null                    :: null                     :: rest ->            
-                    Rng (None, None) :: toRng rest
+                    Rng (so, fo) :: toRng rest
+                //  Rng (Some so.Value, Some fo.Value) :: toRng rest
+                //| (:? (int option) as so) :: null                     :: rest ->
+                //    Rng (Some so.Value, None) :: toRng rest
+                //| null                    :: (:? (int option) as fo)  :: rest ->
+                //    Rng (None, Some fo.Value) :: toRng rest
+                //| null                    :: null                     :: rest ->            
+                //    Rng (None, None) :: toRng rest
 
                 // items
                 | (:? int as i)           :: rest ->

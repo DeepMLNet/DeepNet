@@ -83,7 +83,7 @@ module HostEval =
                 | TensorProduct -> av %* bv
                 | SetSubtensor sr -> 
                     let v = ArrayND.copy av
-                    v.[sr] <- bv
+                    v.[rngEval sr] <- bv
                     v
 
             | Nary(op, es) ->

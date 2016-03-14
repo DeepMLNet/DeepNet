@@ -44,9 +44,11 @@ let ``Test neural net`` () =
         mnist.TstImgs
         |> ArrayND.reorderAxes [2; 0; 1] 
         |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
+        |> fun x -> x.[*, 0..10]
     let tstLbls =  
         mnist.TstLbls
         |> ArrayND.reorderAxes [1; 0] 
+        |> fun x -> x.[*, 0..10]
 
     // infer sizes and variable locations from dataset
     mc.UseTmplVal input tstImgs     
@@ -56,7 +58,8 @@ let ``Test neural net`` () =
     printfn "inferred locations: %A" mc.VarLocs
 
     // instantiate model
-    let mi = mc.Instantiate DevHost
+    let mi = mc.Instantiate DevCuda
+    //let mi = mc.Instantiate DevHost
 
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
@@ -71,7 +74,7 @@ let ``Test neural net`` () =
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
-    for itr = 0 to 100 do
+    for itr = 0 to 10 do
         optFun tstImgs tstLbls |> ignore
         let l = lossFun tstImgs tstLbls
         printfn "Loss afer %d iterations: %A" itr l
