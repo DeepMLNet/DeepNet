@@ -310,19 +310,10 @@ module CudaExecUnit =
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
         let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
-        //let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
-
-        let elemwiseFuncname, _ = elemwiseFuncnameAndArgs trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src] 
-        let elemwiseArgs = [          
-            (NoArgEOpArgTmpl("IdEOp_t", false) :> ICudaArgTmpl).CPPTypeName;
-            (ArrayNDArgTmpl trgt :> ICudaArgTmpl).CPPTypeName;
-            (srcDynTmpl :> ICudaArgTmpl).CPPTypeName
-        ]
-        let elemwiseTmplInst = cppTemplateInstantiation elemwiseFuncname elemwiseArgs
 
         execItemsForKernel 
             "copyFromDynamicSubtensor" 
-            [ArrayNDArgTmpl trgt; srcTmpl; srcDynTmpl; CPPTemplateValue nDimsStr; CPPTemplateValue elemwiseTmplInst]
+            [ArrayNDArgTmpl trgt; srcTmpl; srcDynTmpl; CPPTemplateValue nDimsStr]
             [ArrayNDArgTmpl trgt; srcTmpl; srcIdxPntrsTmpl]
             (workDimForElemwise trgt false)
 
@@ -332,24 +323,13 @@ module CudaExecUnit =
         //          TElemwise1Ary<IdEOp_t, TDynTrgt, TSrc>::type copyFun>
         //_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t, nDims> &trgtIdx,
         //                                 const TSrc &src)
-
+          
         let trgtTmpl, trgtDynTmpl, trgtIdxPntrsTmpl = dynamicSubtensorTmplAndIdx trgt rngs rngManikins
-        let nDimsStr = sprintf "%d" (ArrayND.nDims src)
-//        let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims src)
-
-        //let elemwiseFunc = sprintf "elemwise1Ary%dD" (ArrayND.nDims trgt)
-
-        let elemwiseFuncname, _ = elemwiseFuncnameAndArgs trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src] 
-        let elemwiseArgs = [          
-            (NoArgEOpArgTmpl("IdEOp_t", false) :> ICudaArgTmpl).CPPTypeName;           
-            (trgtDynTmpl :> ICudaArgTmpl).CPPTypeName;
-            (ArrayNDArgTmpl src :> ICudaArgTmpl).CPPTypeName;
-        ]
-        let elemwiseTmplInst = cppTemplateInstantiation elemwiseFuncname elemwiseArgs
+        let nDimsStr = sprintf "%d" (ArrayND.nDims src)  
 
         execItemsForKernel 
             "copyToDynamicSubtensor" 
-            [trgtTmpl; trgtDynTmpl; CPPTemplateValue nDimsStr; ArrayNDArgTmpl src; CPPTemplateValue elemwiseTmplInst]
+            [trgtTmpl; trgtDynTmpl; CPPTemplateValue nDimsStr; ArrayNDArgTmpl src]
             [trgtTmpl; trgtIdxPntrsTmpl; ArrayNDArgTmpl src]
             (workDimForElemwise src false)
 

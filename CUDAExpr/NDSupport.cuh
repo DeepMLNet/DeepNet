@@ -54,6 +54,7 @@ struct StrideDynamic0D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND0D : TShape, TStride {
   typedef Pos0D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 0; }
@@ -83,6 +84,11 @@ struct ArrayND0D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos0D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos0D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary0D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>
@@ -241,6 +247,7 @@ struct StrideDynamic1D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND1D : TShape, TStride {
   typedef Pos1D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 1; }
@@ -270,6 +277,11 @@ struct ArrayND1D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos1D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos1D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary1D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>
@@ -470,6 +482,7 @@ struct StrideDynamic2D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND2D : TShape, TStride {
   typedef Pos2D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 2; }
@@ -499,6 +512,11 @@ struct ArrayND2D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos2D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos2D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary2D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>
@@ -729,6 +747,7 @@ struct StrideDynamic3D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND3D : TShape, TStride {
   typedef Pos3D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 3; }
@@ -758,6 +777,11 @@ struct ArrayND3D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos3D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos3D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary3D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>
@@ -1018,6 +1042,7 @@ struct StrideDynamic4D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND4D : TShape, TStride {
   typedef Pos4D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 4; }
@@ -1047,6 +1072,11 @@ struct ArrayND4D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos4D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos4D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary4D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>
@@ -1349,6 +1379,7 @@ struct StrideDynamic5D {
 template <typename TData, typename TShape, typename TStride>
 struct ArrayND5D : TShape, TStride {
   typedef Pos5D Pos;
+  typedef TData DataType;
   TData *mData;
 
   _dev size_t nDim() const { return 5; }
@@ -1378,6 +1409,11 @@ struct ArrayND5D : TShape, TStride {
   _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }
   _dev TData &element(const Pos5D &pos) { return data()[index(pos)]; }
   _dev const TData &element(const Pos5D &pos) const { return data()[index(pos)]; }
+
+  template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {
+    elemwise1Ary5D(op, trgt, src0);
+  }
 };
 
 template <typename TElemwiseOp, typename TTarget>

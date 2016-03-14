@@ -127,6 +127,7 @@ for dims = 0 to maxDims do
     wrt "template <typename TData, typename TShape, typename TStride>"
     wrt "struct ArrayND%dD : TShape, TStride {" dims
     wrt "  typedef Pos%dD Pos;" dims
+    wrt "  typedef TData DataType;"
     wrt "  TData *mData;"
     wrt ""
     wrt "  _dev size_t nDim() const { return %d; }" dims
@@ -165,6 +166,11 @@ for dims = 0 to maxDims do
     wrt "  _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }"
     wrt "  _dev TData &element(const Pos%dD &pos) { return data()[index(pos)]; }" dims
     wrt "  _dev const TData &element(const Pos%dD &pos) const { return data()[index(pos)]; }" dims
+    wrt ""
+    wrt "  template <typename TElemwiseOp, typename TTarget, typename TSrc0>"
+    wrt "  _dev static void elemwise1Ary(const TElemwiseOp &op, TTarget &trgt, TSrc0 &src0) {"
+    wrt "    elemwise1Ary%dD(op, trgt, src0);" dims
+    wrt "  }"
     wrt "};"
     wrt ""
 

@@ -4,18 +4,10 @@
 #include "Ops.cuh"
 
 
-
-
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-struct TElemwise1Ary {
-	typedef void type(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0);
-};
-
-
 template <typename TDyn, typename TBase, typename TIdx>
-_dev TDyn dynamicSubtensor(const TBase &base, const TIdx &idx) {
+_dev TDyn dynamicSubtensor(TBase &base, const TIdx &idx) {
 	TDyn dyn;
-	dyn.mData = base.data();
+	dyn.mData = const_cast<typename TDyn::DataType *>(base.data());
 	dyn.mOffset = base.offset();
 	for (size_t dim = 0; dim < dyn.nDim(); dim++) {
 		if (idx[dim])
@@ -25,39 +17,28 @@ _dev TDyn dynamicSubtensor(const TBase &base, const TIdx &idx) {
 	return dyn;
 }
 
-template <typename TTrgt, typename TBaseSrc, typename TDynSrc, size_t nDims,
-		  typename TElemwise1Ary<IdEOp_t, TTrgt, TDynSrc>::type copyFun>
-_dev void copyFromDynamicSubtensor(TTrgt &trgt, 
-								   const TBaseSrc &baseSrc, const Array<size_t *, nDims> &srcIdx)
-{
-	IdEOp_t copyOp;
-	TDynSrc dynSrc = dynamicSubtensor(baseSrc, srcIdx);
-	copyFun(copyOp, trgt, dynSrc);
+template <typename TDyn, typename TBase, typename TIdx>
+_dev const TDyn dynamicSubtensor(const TBase &base, const TIdx &idx) {
+	return dynamicSubtensor(const_cast<TBase>(base), idx);
 }
 
-template <typename TBaseTrgt, typename TDynTrgt, size_t nDims, typename TSrc,
-		  typename TElemwise1Ary<IdEOp_t, TDynTrgt, TSrc>::type copyFun>
-_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t *, nDims> &trgtIdx,
+
+template <typename TTrgt, typename TBaseSrc, typename TDynSrc, size_t nTrgtIdxs>
+_dev void copyFromDynamicSubtensor(TTrgt &trgt, 
+								   const TBaseSrc &baseSrc, const Array<size_t *, nTrgtIdxs> &srcIdx)
+{
+	IdEOp_t copyOp;
+	TDynSrc dynSrc = dynamicSubtensor<TDynSrc>(baseSrc, srcIdx);
+	TTrgt::elemwise1Ary(copyOp, trgt, dynSrc);
+}
+
+
+template <typename TBaseTrgt, typename TDynTrgt, size_t nTrgtIdxs, typename TSrc>
+_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t *, nTrgtIdxs> &trgtIdx,
 								 const TSrc &src)
 {
 	IdEOp_t copyOp;
-	TDynTrgt dynTrgt = dynamicSubtensor(baseTrgt, trgtIdx);
-	copyFun(copyOp, dynTrgt, src);
+	TDynTrgt dynTrgt = dynamicSubtensor<TDynTrgt>(baseTrgt, trgtIdx);
+	TDynTrgt::elemwise1Ary(copyOp, dynTrgt, src);
 }
-
-
-
-template <typename TDynTrgt, 
-	      TCopyFun copyfun, 
-	      typename TCopyFun, 
-	      typename TBaseTrgt, 
-	      typename TTrgtIdx, 
-	      typename TSrc>
-	_dev void copyToDynamicSubtensor2(TBaseTrgt &baseTrgt, 
-									  const TTrgtIdx &trgtIdx,
-									  const TSrc &src)
-{
-
-}
-
 
