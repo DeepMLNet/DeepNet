@@ -144,6 +144,7 @@ module Deriv =
     let compute (expr: ExprT<'T>) : DerivT<'T> =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identity
         reverseDiffStep expr eg
+        //|> Map.map (fun _ expr -> Optimizer.optimize expr)
 
     /// extracts the Jacobian of the given variable
     let ofVar var (varDiffs: DerivT<'T>) =

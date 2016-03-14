@@ -33,6 +33,12 @@ let ``Test neural net`` () =
     let loss = NeuralLayer.loss pars input target
     let dLoss = mc.WrtParameters loss
 
+    let loss = Optimizer.optimize loss
+    let dLoss = Optimizer.optimize dLoss
+
+    //printfn "loss:\n%A" loss
+    //printfn "dLoss:\n%A" dLoss
+
     // MNIST dataset
     let tstImgs =  
         mnist.TstImgs
@@ -50,17 +56,15 @@ let ``Test neural net`` () =
     printfn "inferred locations: %A" mc.VarLocs
 
     // instantiate model
-    let mi = mc.Instantiate DevCuda
+    let mi = mc.Instantiate DevHost
 
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
     let dLossFun = mi.Func (dLoss) |> arg2 input target
 
     // calcualte test loss on MNIST
-    #if !CUDA_DUMMY
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
-    #endif
 
     ()
 

@@ -109,7 +109,8 @@ module UExprRngsSpec =
     let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT<int> list)  =
         match srs, drs with
         | SRSSymStartSymEnd (s, fo) :: srs, _         -> SRSSymStartSymEnd (s, fo)   :: toExprRngsSpec srs drs
-        | SRSDynStartSymSize (_, f) :: srs, dr :: drs -> SRSDynStartSymSize (dr, f)  :: toExprRngsSpec srs drs
+        | SRSDynStartSymSize (_, f) :: srs, dr :: rdrs-> SRSDynStartSymSize (dr, f)  :: toExprRngsSpec srs rdrs
+        | []                              , []        -> []
         | _                               , _         -> failwith "invalid unified subtensor spec"
 
 

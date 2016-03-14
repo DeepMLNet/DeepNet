@@ -78,6 +78,7 @@
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="Expr.fs" />
+    <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />
     <Compile Include="Function.fs" />
     <Compile Include="HostEval.fs" />

@@ -466,8 +466,13 @@ module ShapeSpec =
     let disableAllBroadcasts sa =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
+    let equalWithBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
+        List.length sa = List.length sb &&
+            List.forall2 SizeSpec.equalWithBroadcastability sa sb
+
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
-        List.forall2 (.=) sa sb
+         List.length sa = List.length sb &&
+            List.forall2 SizeSpec.equalWithBroadcastability sa sb
 
     /// evaluates shape to numeric shape, if possible
     let tryEval (sa: ShapeSpecT) : NShapeSpecT option =

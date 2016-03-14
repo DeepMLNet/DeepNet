@@ -178,6 +178,9 @@ module Func =
 
         /// Performs evaluation of a compiled function.
         let performEval compileEnv evaluator neededVars varEnv = 
+            // substitute symbol sizes
+            let varEnv = varEnv |> VarEnv.substSymSizes compileEnv.SymSizes
+
             // check if evaluation is possible
             let missingVars = Set.filter (fun v -> not (Map.containsKey v varEnv)) neededVars
             if not (Set.isEmpty missingVars) then
@@ -185,10 +188,7 @@ module Func =
                     (missingVars |> Set.toList)
 
             // evaluate using compiled function
-            let evalEnv = 
-                varEnv 
-                |> VarEnv.substSymSizes compileEnv.SymSizes
-                |> EvalEnv.create
+            let evalEnv = EvalEnv.create varEnv 
             evaluator evalEnv
 
         // If all size symbols and variable storage locations are known, then we can immedietly compile
