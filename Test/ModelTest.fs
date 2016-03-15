@@ -75,11 +75,11 @@ let ``Test neural net`` () =
     
     let optFun = mi.Func opt |> arg2 input target
     
-    printfn "Optimizing..."
-    for itr = 0 to 10 do
-        optFun tstImgs tstLbls |> ignore
-        let l = lossFun tstImgs tstLbls
-        printfn "Loss afer %d iterations: %A" itr l
+//    printfn "Optimizing..."
+//    for itr = 0 to 100 do
+//        optFun tstImgs tstLbls |> ignore
+//        let l = lossFun tstImgs tstLbls
+//        printfn "Loss afer %d iterations: %A" itr l
 
 
 
@@ -108,7 +108,9 @@ let ``Test Autoencoder`` () =
 
 [<EntryPoint>]
 let main argv = 
-    
+    Basics.Cuda.CudaSup.init ()
+    ManagedCuda.CudaContext.ProfilerStart()
+
     ``Test neural net`` ()
 
     //``Test Autoencoder`` ()
@@ -116,5 +118,6 @@ let main argv =
     // need code to load data and perform regression
         
 
-    
+    printfn "CUDA shutdown."
+    Basics.Cuda.CudaSup.shutdown ()
     0

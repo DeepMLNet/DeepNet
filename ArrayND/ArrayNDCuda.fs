@@ -68,7 +68,10 @@ module ArrayNDCudaTypes =
         
         /// a new ArrayND stored on the GPU using newly allocated device memory
         new (layout: ArrayNDLayoutT) =
-            ArrayNDCudaT<'T> (layout, CudaDeviceVariableStorageT<'T>(ArrayNDLayout.nElems layout))
+            let elems = ArrayNDLayout.nElems layout
+            // CUDA cannot allocate memory of size zero
+            let size = if elems > 0 then elems else 1
+            ArrayNDCudaT<'T> (layout, CudaDeviceVariableStorageT<'T> size)
 
         /// storage
         member this.Storage = storage

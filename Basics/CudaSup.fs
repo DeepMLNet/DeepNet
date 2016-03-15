@@ -75,8 +75,9 @@ module CudaSup =
     /// shutsdown CUDA (necessary for correct profiler results)  
     let shutdown () =
         context.Synchronize ()
-        blas.Dispose ()
         CudaContext.ProfilerStop ()
+        context.Synchronize ()
+        blas.Dispose ()
         context.Dispose ()
 
 

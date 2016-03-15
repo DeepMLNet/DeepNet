@@ -30,16 +30,10 @@ module PassArrayByVal =
                                            TypeAttributes.Public ||| TypeAttributes.SequentialLayout,
                                            typeof<ValueType>);
 
-            // define public field "Data" of type valueType[]
-            let arrayType = valueType.MakeArrayType()       
-            let fb = tb.DefineField("Data", arrayType, FieldAttributes.Public)
-
-            // set MarshalAs(UnmanagedType.ByValArray, SizeConst=size) attribute on field
-            let cTorInfo = typeof<MarshalAsAttribute>.GetConstructor([| typeof<UnmanagedType> |])
-            let sizeConstInfo = typeof<MarshalAsAttribute>.GetField("SizeConst")
-            let ab = CustomAttributeBuilder(cTorInfo, [| UnmanagedType.ByValArray :> obj |],
-                                            [| sizeConstInfo |], [| box size |])                
-            fb.SetCustomAttribute(ab)
+            // define public fields "DataXXX" of type valueType
+            for i = 0 to size - 1 do
+                let fn = sprintf "Data%d" i
+                tb.DefineField(fn, valueType, FieldAttributes.Public) |> ignore
 
             // create defined type and cache it
             let typ = tb.CreateType()
@@ -54,7 +48,14 @@ module PassArrayByVal =
         let strct = Activator.CreateInstance(strctType)
 
         // set data
-        strct.GetType().GetField("Data").SetValue(strct, data)
+        for i = 0 to Array.length data - 1 do
+            strct.GetType().GetField(sprintf "Data%d" i).SetValue(strct, data.[i])
+
+        // test if marshalling works
+        //let size = Marshal.SizeOf strct
+        //let mem = Marshal.AllocHGlobal size
+        //Marshal.StructureToPtr (strct, mem, false)
+        //Marshal.FreeHGlobal mem
 
         strct
 

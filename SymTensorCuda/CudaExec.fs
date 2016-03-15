@@ -58,9 +58,12 @@ module Compile =
         let modName = generateCudaModName ()
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-        let cmplrArgs = [|"--std=c++11";
-                          sprintf "--gpu-architecture=%s" gpuArch; 
-                          sprintf "--include-path=\"%s\"" includePath|]
+        let cmplrArgs = [|
+            "--std=c++11";
+            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
+            sprintf "--gpu-architecture=%s" gpuArch; 
+            sprintf "--include-path=\"%s\"" includePath
+        |]
 
         dumpCode modName modCode
 
@@ -129,6 +132,7 @@ module Compile =
             "--shared";
             "--machine 64";
             "--debug";
+            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
             sprintf "--gpu-architecture=%s" gpuArch; 
             sprintf "--include-path=\"%s\"" includePath
