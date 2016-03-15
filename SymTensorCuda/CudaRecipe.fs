@@ -102,6 +102,9 @@ module TmplInstCache =
 
 module CudaRecipe =
 
+    [<Literal>]
+    let EnableWarmup = false
+
     let commonIncludes = ["NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
     let kernelModuleIncludes = commonIncludes
     let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"; "stdio.h"]
@@ -332,11 +335,13 @@ module CudaRecipe =
         let warmupCalls = 
             generateWarmup warmup tmplInstCache
 
-        printfn "Warmup calls:\n%A" warmupCalls
+        let initCalls =
+            if EnableWarmup then allocCalls @ warmupCalls
+            else allocCalls
 
         {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
          CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;
-         InitCalls = allocCalls @ warmupCalls;
+         InitCalls = initCalls;
          DisposeCalls = disposeCalls;
          ExecCalls = execCalls;}
 

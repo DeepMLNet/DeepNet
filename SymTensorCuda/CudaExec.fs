@@ -21,6 +21,7 @@ module Compile =
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
     let gpuArch = "compute_30"
+    let gpuCode = "sm_30"
     let includePath = Util.assemblyDirectory
 
     let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
@@ -86,6 +87,7 @@ module Compile =
                 krnlPtxCache.Set cacheKey ptx
                 ptx    
 
+        #if !CUDA_DUMMY
         //printfn "CUDA jitting of %s:" modName
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
@@ -95,7 +97,6 @@ module Compile =
         //use jitLogVerbose = new CudaJOLogVerbose(true)
         //jitOpts.Add(jitLogVerbose)
 
-        #if !CUDA_DUMMY
         let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
@@ -103,6 +104,7 @@ module Compile =
         //printfn "%s" jitInfoBuffer.Value   
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
+        //printfn "JIT done."
 
         let krnls =
             krnlNames
@@ -115,6 +117,7 @@ module Compile =
 
         let krnls: Map<string, CudaKernel> = Map.empty
         krnls, CUmodule()
+
         #endif
 
     /// unloads previously loaded CUDA kernel code
@@ -135,6 +138,7 @@ module Compile =
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
             sprintf "--gpu-architecture=%s" gpuArch; 
+            sprintf "--gpu-code=%s" gpuCode;
             sprintf "--include-path=\"%s\"" includePath
         ]
         let cmplrArgs = 
@@ -362,6 +366,7 @@ module CudaExprWorkspaceTypes =
         // initialize
         #if !CUDA_DUMMY
         do
+            CudaSup.context.Synchronize () // Test
             execCalls recipe.InitCalls
         #endif
 
