@@ -139,7 +139,7 @@ module ArgTemplates =
     /// CUDA C++ argument template
     type ICudaArgTmpl =
         abstract member CPPTypeName : string
-        abstract member GetArg : CudaExecEnvT -> obj 
+        abstract member GetArg : CudaExecEnvT -> StreamT -> obj 
 
     /// CUDA C++ argument template for values that are passed by value in an array
     type ICudaArrayMemberArgTmpl<'T when 'T :> ValueType> =
@@ -170,14 +170,14 @@ module ArgTemplates =
     type CPPTemplateValue (cppTypeName) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = cppTypeName
-            member this.GetArg env = failwith "TemplateValue has no argument value"
+            member this.GetArg env strm = failwith "TemplateValue has no argument value"
 
     /// ArrayND argument template
     type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
         // TShape is ShapeStaicXD and TStride is StrideStaticXD.
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.CPPType
-            member this.GetArg env =
+            member this.GetArg env strm =
                 // C++ struct just contains the pointer to data memory
                 let ptr = (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
                 //printfn "Passing pointer 0x%x" ptr
@@ -187,7 +187,7 @@ module ArgTemplates =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.DynamicCPPType
-            member this.GetArg env =
+            member this.GetArg env strm =
                 // currently this cannot be passed as an argument
                 failwith "passing ArrayNDSDArg is not implemented"
 
@@ -216,26 +216,42 @@ module ArgTemplates =
         interface ICudaArgTmpl with
             member this.CPPTypeName = 
                 sprintf "Array<%s, %d>" (valueTmpls.Head.CPPTypeName) (List.length valueTmpls)
-            member this.GetArg env =
+            member this.GetArg env strm =
                 let argVals =
                     valueTmpls
                     |> List.map (fun vt -> vt.GetArg env)
                     |> List.toArray
                 PassArrayByVal.passArrayByValue argVals
 
-
     type NullPtrArgTmpl () =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "void *"
-            member this.GetArg env = (System.IntPtr 0) :> obj
+            member this.GetArg env strm = box (System.IntPtr 0) 
+
+    type BytePtrArgTmpl (memManikin) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "char *"
+            member this.GetArg env strm = 
+                let storage = 
+                    match memManikin with
+                    | MemAlloc im -> env.InternalMem.[im]
+                    | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
+                storage.DevicePointer |> CudaSup.getIntPtr |> box
 
     type SizeTArgTmpl (value: int) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "size_t"
-            member this.GetArg env = (nativeint value) :> obj
+            member this.GetArg env strm = box (nativeint value) 
+
+    type ExecStreamArgTmpl () =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "CUstream"
+            member this.GetArg env strm = 
+                box env.Stream.[strm].Stream 
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
+        do if not (ArrayND.isContiguous manikin) then failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
                 {DeviceMem = CudaExecEnv.getDevMemForManikin env manikin;
@@ -244,6 +260,7 @@ module ArgTemplates =
     
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
+        do if not (ArrayND.isContiguous manikin) then failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =
                 {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;
@@ -295,7 +312,7 @@ module ArgTemplates =
 
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float"
-            member this.GetArg env = 
+            member this.GetArg env strm = 
                 let devVar = CudaExecEnv.getDevMemForManikin env manikin
                 // need to adjust by offset
                 let offsetBytes = ArrayNDManikin.offsetInBytes manikin
@@ -313,7 +330,7 @@ module ArgTemplates =
     type ConstEOpArgTmpl<'T> (value: 'T) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "ConstEOp_t"
-            member this.GetArg env = 
+            member this.GetArg env strm = 
                 match box value with
                 | :? single as n -> ConstEOpArg(n) :> obj
                 | :? double as n -> ConstEOpArg(n) :> obj
@@ -330,7 +347,7 @@ module ArgTemplates =
     type NoArgEOpArgTmpl (cppTypeName: string, indexed: bool) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = cppTypeName
-            member this.GetArg env = NoArgEOpArg() :> obj
+            member this.GetArg env strm = NoArgEOpArg() :> obj
         interface ICudaOp with
             member this.IsIndexed = indexed
 
@@ -339,7 +356,7 @@ module ArgTemplates =
 module NativeFunctionDelegates =
 
     [<CPPFuncName("sum")>]
-    type CPPSum = delegate of ArrayNDSSArg * ArrayNDSSArg -> unit
+    type CPPSum = delegate of ArrayNDSSArg * ArrayNDSSArg * CUstream * IntPtr * nativeint -> unit
 
     [<CPPFuncName("sumLastAxis")>]
     type CPPSumLastAxis = delegate of ArrayNDSSArg * ArrayNDSSArg -> unit

@@ -5,13 +5,85 @@
 #pragma warning (push)
 #pragma warning (disable : 4267 4244 4503) 
 #include <thrust/device_vector.h>
+#include <thrust/system/cuda/vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/generate.h>
+#include <thrust/sort.h>
+#include <thrust/pair.h>
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <cassert>
+#include <string>
 #pragma warning (pop)
 
 
 #include "Utils.cuh"
 
 
-/// thrust range for iterating over a ArrayND with arbitrary strides and offset
+/// Thrust allocator that assigns memory sequentially from a preallocated buffer.
+class buffer_allocator 
+{
+  private:
+	std::string name;
+	char *buffer;
+	const size_t size;
+
+	size_t allocs = 0;
+	size_t pos = 0;
+	size_t freed = 0;
+
+  public:
+    typedef char value_type;
+
+    buffer_allocator(std::string name, char *buffer, size_t size) 
+		: name(name), buffer(buffer), size(size)
+	{
+	}
+
+    ~buffer_allocator()
+    {
+		std::cout << "destructing ";
+		print_statistics();
+    }
+
+	void print_statistics()
+	{
+		std::cout << "buffer_allocator " << name << ": ";
+		std::cout << "allocations=" << allocs << "  ";
+		std::cout << "size=" << (size / 1024) << " kB  ";
+		std::cout << "used=" << (pos / 1024) << " kB  ";
+		std::cout << "remaining=" << ((size - pos) / 1024) << " kB  ";
+		std::cout << "freed=" << (freed / 1024) << " kB" << std::endl;
+	}
+
+    char *allocate(std::ptrdiff_t num_bytes)
+    {
+		// check if enough memory is available
+		if (pos + num_bytes >= size)
+		{	
+			std::cerr << "buffer_allocator is out of memory " <<
+				"while processing request of size " << (num_bytes / 1024) << "kB" << std::endl;
+			print_statistics();
+			throw std::bad_alloc();
+		}
+
+		// perform allocation
+		char *result = buffer + pos;
+		pos += num_bytes;
+		allocs++;
+		return result;
+    }
+
+    void deallocate(char *ptr, size_t num_bytes)
+    {
+		// we do not free any memory
+		freed += num_bytes;
+    }
+};
+
+
+/// thrust range for iterating over an ArrayND with arbitrary strides and offset
 template <typename TArrayND>
 class ArrayNDRange
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <cuda.h>
 
 #include "Utils.cuh"
 #include "ThrustInterface.cuh"
@@ -8,15 +9,19 @@
 
 /// Sums all elements in src and stores them into the first element of trgt.
 template <typename TTarget, typename TSrc>
-void sum(TTarget &trgt, TSrc &src) {
+void sum(TTarget &trgt, TSrc &src, 
+	     CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size) {
 	//std::printf("entering sum with trgt=%p and src=%p\n",
 	//			trgt.data(), src.data()); 
+
+	buffer_allocator alloc("sum", tmp_buffer, tmp_buffer_size);
 
 	ArrayNDRange<TSrc> srcRange(src);
 	ArrayNDRange<TTarget> trgtRange(trgt);
 
 	thrust::constant_iterator<int> cnstKey(0);
-	thrust::reduce_by_key(cnstKey,
+	thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
+						  cnstKey,
 						  cnstKey + src.size(),
 						  srcRange.begin(),
 						  thrust::make_discard_iterator(),

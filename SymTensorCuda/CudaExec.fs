@@ -232,7 +232,7 @@ module CudaExprWorkspaceTypes =
             cppCalls
             |> List.map (fun l ->
                 match l with
-                | CudaCallT.CallCFunc(name, dgte, _) -> name, dgte
+                | CudaCallT.CallCFunc(name, dgte, _, _) -> name, dgte
                 | _ -> failwith "unexpected C call")
             |> Map.ofList
         
@@ -326,7 +326,7 @@ module CudaExprWorkspaceTypes =
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
                     // instantiate args
-                    let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
+                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv strm)
                     let argArray = args |> List.toArray
 
                     // launch configuration
@@ -338,26 +338,25 @@ module CudaExprWorkspaceTypes =
                     kernels.[krnl].RunAsync(execEnv.Stream.[strm].Stream, argArray)
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
-                | CudaCallT.CallCFunc (name, _, argTmpls) ->
+                | CudaCallT.CallCFunc (name, _, strm, argTmpls) ->
                     // instantiate args
-                    let args = argTmpls |> List.map (fun (arg: ICudaArgTmpl) -> arg.GetArg execEnv)
+                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv strm)
                     let argArray = args |> List.toArray
  
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
                 // CUBLAS 
-                | CublasSetStram strm ->
-                    CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
-                | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt) ->   
-                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
-                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
-                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv :?> CudaDeviceVariable<single>            
+                | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
+                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
+                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
+                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
                     let m = a.GetRowsForOp execEnv aOp
                     let n = b.GetColumnsForOp execEnv bOp
                     let k = a.GetColumnsForOp execEnv aOp
                     let ldA = a.GetLeadingDimension execEnv
                     let ldB = b.GetLeadingDimension execEnv
                     let ldTrgt = trgt.GetLeadingDimension execEnv
+                    CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
         // initialize

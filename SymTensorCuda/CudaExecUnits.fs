@@ -335,7 +335,7 @@ module CudaExecUnit =
 
 
     /// generate ExecItems to call a C++ template function
-    let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> argTmpls =
+    let execItemsForCFunc<'FuncDelegate when 'FuncDelegate :> System.Delegate> tmplTmpls argTmpls =
         let cDelegateType = typeof<'FuncDelegate>
         let cAttributes = cDelegateType.GetCustomAttributes(typeof<CPPFuncNameAttribute>, false)
         if Array.isEmpty cAttributes then
@@ -346,7 +346,7 @@ module CudaExecUnit =
         let cFuncTmpl =
             {FuncName=cppFuncName;
              Domain=CPPFunc;
-             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;
+             TmplArgs=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) tmplTmpls;
              RetType="void";
              ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
         [CallCFunc(cFuncTmpl, cDelegateType, argTmpls)]
@@ -417,14 +417,21 @@ module CudaExecUnit =
         | UUnaryOp Truncate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcs
         // reductions
         | UUnaryOp Sum -> 
-            execItemsForCFunc<CPPSum> [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0]]
+            // C++ signature:
+            // void sum(TTarget &trgt, TSrc &src, 
+            //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
+            let tmpSize = ArrayNDManikin.sizeInBytes srcs.[0]
+            let tmp = memAllocator TypeName.ofType<byte> tmpSize
+            
+            execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0];
+                                          ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
         | UUnaryOp (SumAxis ax) -> 
             // we need to swap axes so that the axes the summation is performed over comes last
             let src = srcs.[0]
             let nd = ArrayND.nDims src
             let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
             let srcAdj = ArrayND.reorderAxes axOrder src
-            execItemsForCFunc<CPPSumLastAxis> [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj]
+            execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj]
         // shape operations
         | UUnaryOp (Reshape _) ->
             if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]

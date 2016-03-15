@@ -115,10 +115,8 @@ module ArrayNDManikin =
     let inline offsetInBytes ary =
         (typeSize ary) * (ArrayND.offset ary)
 
-    /// size in bytes for contiguous arrays
+    /// size in bytes 
     let inline sizeInBytes ary =
-        if ArrayND.isContiguous ary then
-            (typeSize ary) * (ArrayND.nElems ary)
-        else failwith "size calculation currently only possible for continguous arrays"
+        (typeSize ary) * (ArrayND.nElems ary)
 
         

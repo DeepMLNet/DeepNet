@@ -26,8 +26,8 @@ struct Pos0D {
 };
 
 struct ShapeStatic0D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       return 0;
    }
 };
@@ -215,8 +215,8 @@ struct Pos1D {
 
 template <size_t shape0>
 struct ShapeStatic1D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       switch (dim) {
         case 0: return shape0;
         default: return 0;
@@ -450,8 +450,8 @@ struct Pos2D {
 
 template <size_t shape0, size_t shape1>
 struct ShapeStatic2D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -715,8 +715,8 @@ struct Pos3D {
 
 template <size_t shape0, size_t shape1, size_t shape2>
 struct ShapeStatic3D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -1010,8 +1010,8 @@ struct Pos4D {
 
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3>
 struct ShapeStatic4D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;
@@ -1347,8 +1347,8 @@ struct Pos5D {
 
 template <size_t shape0, size_t shape1, size_t shape2, size_t shape3, size_t shape4>
 struct ShapeStatic5D {
-  	_dev size_t shape(const size_t dim) const {
    char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes
+  	_dev size_t shape(const size_t dim) const {
       switch (dim) {
         case 0: return shape0;
         case 1: return shape1;

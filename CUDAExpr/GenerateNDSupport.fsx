@@ -75,8 +75,8 @@ for dims = 0 to maxDims do
     if dims > 0 then
         wrt "template <%s>" (ad |>> prn "size_t shape%d" |> cw ", ")
     wrt "struct ShapeStatic%dD {" dims
-    wrt "  	_dev size_t shape(const size_t dim) const {"
     wrt "   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes"
+    wrt "  	_dev size_t shape(const size_t dim) const {"
     if dims > 0 then
         wrt "      switch (dim) {"
         for d in ad do

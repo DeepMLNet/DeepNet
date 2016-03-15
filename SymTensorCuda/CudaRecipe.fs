@@ -34,12 +34,11 @@ module CudaRecipeTypes =
         // execution control
         | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-        | CallCFunc         of string * System.Type * (ICudaArgTmpl list)
+        | CallCFunc         of string * System.Type * StreamT * (ICudaArgTmpl list)
         // CUBLAS
-        | CublasSetStram    of StreamT
         | CublasSgemm       of CudaBlas.Operation * CudaBlas.Operation *
                                single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
-                               single * BlasTransposedMatrixTmpl 
+                               single * BlasTransposedMatrixTmpl * StreamT
 
 
     /// function instantiation state
@@ -236,7 +235,7 @@ module CudaRecipe =
                         | LaunchKernel(ti, workDim, args) -> 
                             [LaunchCKernel(TmplInstCache.instCPPTmplFunc ti cache, workDim, 0, strmIdToProcess, args)]
                         | CudaExecItemT.CallCFunc(ti, dlgte, args) ->
-                            [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, args)]
+                            [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strmIdToProcess, args)]
                         | MemcpyDtoD(src, trgt) -> 
                             [MemcpyAsync(trgt, src, strmIdToProcess)]
                         | MemcpyHtoD(hostSrc, trgt) -> 
@@ -246,9 +245,8 @@ module CudaRecipe =
                         | Memset(value, trgt) ->                        
                             [MemsetD32Async(trgt, single value, strmIdToProcess)]      
                         | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
-                            [CublasSetStram(strmIdToProcess);
-                             CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                                         aFac, a, b, trgtFac, trgt)]      
+                            [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
+                                         aFac, a, b, trgtFac, trgt, strmIdToProcess)]      
 
                     calls @ generate streamCallHistory activeEvents remainingStreams
                 | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 
