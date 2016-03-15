@@ -10,15 +10,19 @@
 #include <thrust/generate.h>
 #include <thrust/sort.h>
 #include <thrust/pair.h>
+#pragma warning (pop)
+
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <cassert>
 #include <string>
-#pragma warning (pop)
-
 
 #include "Utils.cuh"
+
+
+//#define PRINT_BUFFER_ALLOCATOR_STATS
+
 
 
 /// Thrust allocator that assigns memory sequentially from a preallocated buffer.
@@ -43,8 +47,10 @@ class buffer_allocator
 
     ~buffer_allocator()
     {
+		#ifdef PRINT_BUFFER_ALLOCATOR_STATS
 		std::cout << "destructing ";
 		print_statistics();
+		#endif
     }
 
 	void print_statistics()

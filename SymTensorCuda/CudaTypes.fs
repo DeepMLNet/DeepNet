@@ -359,4 +359,4 @@ module NativeFunctionDelegates =
     type CPPSum = delegate of ArrayNDSSArg * ArrayNDSSArg * CUstream * IntPtr * nativeint -> unit
 
     [<CPPFuncName("sumLastAxis")>]
-    type CPPSumLastAxis = delegate of ArrayNDSSArg * ArrayNDSSArg -> unit
+    type CPPSumLastAxis = delegate of ArrayNDSSArg * ArrayNDSSArg * CUstream * IntPtr * nativeint -> unit

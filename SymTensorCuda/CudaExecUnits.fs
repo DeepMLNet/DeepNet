@@ -421,8 +421,7 @@ module CudaExecUnit =
             // void sum(TTarget &trgt, TSrc &src, 
             //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
             let tmpSize = ArrayNDManikin.sizeInBytes srcs.[0]
-            let tmp = memAllocator TypeName.ofType<byte> tmpSize
-            
+            let tmp = memAllocator TypeName.ofType<byte> tmpSize           
             execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0];
                                           ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
         | UUnaryOp (SumAxis ax) -> 
@@ -431,7 +430,14 @@ module CudaExecUnit =
             let nd = ArrayND.nDims src
             let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
             let srcAdj = ArrayND.reorderAxes axOrder src
-            execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj]
+
+            // C++ signature:
+            // void sumLastAxis(TTarget &trgt, TSrc &src, 
+            //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
+            let tmpSize = ArrayNDManikin.sizeInBytes srcs.[0]
+            let tmp = memAllocator TypeName.ofType<byte> tmpSize
+            execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
+                                                  ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
         // shape operations
         | UUnaryOp (Reshape _) ->
             if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]

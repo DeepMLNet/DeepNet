@@ -44,7 +44,11 @@ struct LinearIndexToSumAxisKey : public thrust::unary_function<size_t, size_t> {
 
 /// Sums over the last axis in src and stores the partial sums into trgt.
 template <typename TTarget, typename TSrc>
-void sumLastAxis(TTarget &trgt, TSrc &src) {
+void sumLastAxis(TTarget &trgt, TSrc &src,
+	             CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size) {
+
+	buffer_allocator alloc("sumLastAxis", tmp_buffer, tmp_buffer_size);
+
 	ArrayNDRange<TSrc> srcRange(src);
 	ArrayNDRange<TTarget> trgtRange(trgt);
 
@@ -56,7 +60,8 @@ void sumLastAxis(TTarget &trgt, TSrc &src) {
 	KeyIteratorT sumKeys(LinearIndexIteratorT(0), IdxToKeyT(src));
 
 	// perform sum by axis
-	thrust::reduce_by_key(sumKeys,
+	thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
+						  sumKeys,
 						  sumKeys + src.size(),
 						  srcRange.begin(),
 						  thrust::make_discard_iterator(),
