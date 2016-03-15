@@ -41,6 +41,8 @@ module ExecUnitsTypes =
     /// generator function record
     type ExecUnitsGeneratorT<'e> = {ExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
                                                     ArrayNDManikinT list -> 'e list;
+                                    WarmupExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
+                                                          ArrayNDManikinT list -> 'e list;
                                     TrgtGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> 
                                                   ArrayNDManikinT option -> UOpT -> ArrayNDManikinT list -> bool list -> 
                                                   ArrayNDManikinT * bool;
@@ -131,6 +133,10 @@ module ExecUnit =
         let submitExecUnit eu =
             execUnits <- eu :: execUnits
 
+        let mutable warmupItems = []
+        let submitWarmupItems wi =
+            warmupItems <- wi @ warmupItems
+
         // storage space
         let mutable memAllocIdCnt = 0
         let mutable memAllocs = []
@@ -220,6 +226,9 @@ module ExecUnit =
                             }                                    
                             submitExecUnit eu
 
+                            // handle warmup items
+                            submitWarmupItems (gen.WarmupExecItemsForOp newMemory trgtView op srcViews)
+                            
                             completeEvalRequest {ExecUnitId=eu.Id; Manikin=trgtView; Shared=trgtShared}
 
                     // submit eval requests from sources
@@ -335,6 +344,6 @@ module ExecUnit =
         let execUnits =
             buildRerunAfter execUnits []      
 
-        execUnits, exprRes, memAllocs
+        execUnits, exprRes, memAllocs, warmupItems
 
 

@@ -135,8 +135,27 @@ module CudaRecipe =
             | _ -> false)
         (extract recipe.InitCalls) @ (extract recipe.DisposeCalls) @ (extract recipe.ExecCalls)
 
+    /// Cuda calls for executing an CudaExecItem in the given stream
+    let callsForExecItem cmd cache strm =
+        match cmd with
+        | LaunchKernel(ti, workDim, args) -> 
+            [LaunchCKernel(TmplInstCache.instCPPTmplFunc ti cache, workDim, 0, strm, args)]
+        | CudaExecItemT.CallCFunc(ti, dlgte, args) ->
+            [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strm, args)]
+        | MemcpyDtoD(src, trgt) -> 
+            [MemcpyAsync(trgt, src, strm)]
+        | MemcpyHtoD(hostSrc, trgt) -> 
+            [MemcpyHtoDAsync(trgt, hostSrc, strm)]
+        | MemcpyDtoH(src, hostTrgt) ->
+            [MemcpyDtoHAsync(hostTrgt, src, strm)]   
+        | Memset(value, trgt) ->                        
+            [MemsetD32Async(trgt, single value, strm)]      
+        | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
+            [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
+                            aFac, a, b, trgtFac, trgt, strm)]    
+
     /// generates a sequence of CUDA calls from streams
-    let generateCalls streams =    
+    let generateCalls streams cache =    
         /// the number of times WaitOnEvent is called for a particular correlation
         let correlationIdWaiters =
             seq {
@@ -147,9 +166,6 @@ module CudaRecipe =
                         | _ -> ()
             } |> Seq.countBy id |> Map.ofSeq
         
-        /// mutable kernel instantiation cache
-        let cache = {Insts=[]; Code=[]}
-
         let rec generate streamCallHistory activeEvents streams =
             if List.exists ((<>) []) streams then
                 // sort streams by call history
@@ -256,10 +272,10 @@ module CudaRecipe =
                 // streams are all empty
                 []
 
-        generate [] [] streams, cache
+        generate [] [] streams
 
     /// generates init and dispose calls for CUDA resources
-    let generateInitAndDispose memAllocs streamCnt eventObjCnt =
+    let generateAllocAndDispose memAllocs streamCnt eventObjCnt =
         let memAllocCalls = 
             memAllocs 
             |> List.map CudaCallT.MemAlloc
@@ -271,7 +287,7 @@ module CudaRecipe =
             {0 .. streamCnt - 1} 
             |> Seq.map (fun strmId -> StreamCreate(strmId, BasicTypes.CUStreamFlags.NonBlocking))
             |> Seq.toList
-        let streamDisposeCalls=
+        let streamDisposeCalls =
             {0 .. streamCnt - 1} 
             |> Seq.map (fun strmId -> StreamDestory(strmId))
             |> Seq.toList
@@ -289,17 +305,38 @@ module CudaRecipe =
 
         memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
 
+    /// generate warmup CUDA calls
+    let generateWarmup warmupItems cache =
+        seq { for cmd in warmupItems do
+                  yield! callsForExecItem cmd cache 0 }
+        |> Seq.toList
+
     /// builds a CUDA recipe for the given unified expression
     let build compileEnv expr =
-        let execUnits, exprRes, memAllocs = CudaExecUnit.exprToCudaExecUnits compileEnv expr
+        let tmplInstCache = {Insts=[]; Code=[]}
+
+        // generate execution units from unified expression
+        let execUnits, exprRes, memAllocs, warmup = CudaExecUnit.exprToCudaExecUnits compileEnv expr
+
+        // map execution units to streams
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
-        let execCalls, tmplInstCache = generateCalls streams
-        let initCalls, disposeCalls = 
-            generateInitAndDispose memAllocs (List.length streams) eventObjCnt
+
+        // generate CUDA calls for execution
+        let execCalls = generateCalls streams tmplInstCache
+
+        // generate CUDA calls for resource management
+        let allocCalls, disposeCalls = 
+            generateAllocAndDispose memAllocs (List.length streams) eventObjCnt
+
+        // generate CUDA calls for warmup
+        let warmupCalls = 
+            generateWarmup warmup tmplInstCache
+
+        printfn "Warmup calls:\n%A" warmupCalls
 
         {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
          CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;
-         InitCalls = initCalls;
+         InitCalls = allocCalls @ warmupCalls;
          DisposeCalls = disposeCalls;
          ExecCalls = execCalls;}
 

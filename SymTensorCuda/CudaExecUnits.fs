@@ -378,6 +378,29 @@ module CudaExecUnit =
         | [1; _] -> ArrayND.transpose manikin
         | _ -> failwith "cannot use specified view as BLAS target"
 
+    let execItemsForSum memAllocator trgt src =
+        // C++ signature:
+        // void sum(TTarget &trgt, TSrc &src, 
+        //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
+        let tmpSize = ArrayNDManikin.sizeInBytes src
+        let tmp = memAllocator TypeName.ofType<byte> tmpSize           
+        execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl src;
+                                        ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+
+    let execItemsForSumAxis memAllocator ax trgt src =
+        // we need to swap axes so that the axes the summation is performed over comes last
+        let nd = ArrayND.nDims src
+        let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
+        let srcAdj = ArrayND.reorderAxes axOrder src
+
+        // C++ signature:
+        // void sumLastAxis(TTarget &trgt, TSrc &src, 
+        //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
+        let tmpSize = ArrayNDManikin.sizeInBytes srcAdj
+        let tmp = memAllocator TypeName.ofType<byte> tmpSize
+        execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
+                                                ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv memAllocator trgt op srcs =
         match op with 
@@ -416,28 +439,9 @@ module CudaExecUnit =
         | UUnaryOp Round -> execItemsForElemwise trgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcs
         | UUnaryOp Truncate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcs
         // reductions
-        | UUnaryOp Sum -> 
-            // C++ signature:
-            // void sum(TTarget &trgt, TSrc &src, 
-            //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-            let tmpSize = ArrayNDManikin.sizeInBytes srcs.[0]
-            let tmp = memAllocator TypeName.ofType<byte> tmpSize           
-            execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcs.[0];
-                                          ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
-        | UUnaryOp (SumAxis ax) -> 
-            // we need to swap axes so that the axes the summation is performed over comes last
-            let src = srcs.[0]
-            let nd = ArrayND.nDims src
-            let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
-            let srcAdj = ArrayND.reorderAxes axOrder src
+        | UUnaryOp Sum -> execItemsForSum memAllocator trgt srcs.[0]
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax trgt srcs.[0]
 
-            // C++ signature:
-            // void sumLastAxis(TTarget &trgt, TSrc &src, 
-            //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-            let tmpSize = ArrayNDManikin.sizeInBytes srcs.[0]
-            let tmp = memAllocator TypeName.ofType<byte> tmpSize
-            execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
-                                                  ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
         // shape operations
         | UUnaryOp (Reshape _) ->
             if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
@@ -515,9 +519,25 @@ module CudaExecUnit =
 
          
          
+    /// returns the execution units for the specified op
+    let warmupExecItemsForOp compileEnv memAllocator trgt op (srcs: ArrayNDManikinT list) =
+        let warmupManikin (manikin: ArrayNDManikinT) =
+            match manikin.Storage with
+            | MemAlloc _ -> manikin
+            | _ -> ArrayNDManikin.newContiguous memAllocator 
+                                                (ArrayNDManikin.typeName manikin) 
+                                                (ArrayNDLayout.shape manikin.Layout) 
+
+        match op with 
+        | UUnaryOp Sum -> execItemsForSum memAllocator (warmupManikin trgt) (warmupManikin srcs.[0])
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax (warmupManikin trgt) (warmupManikin srcs.[0])
+        | _ -> []
+
+
     /// generates CUDA execution units that will evaluate the given unified expression
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
         ExecUnit.exprToExecUnits {ExecItemsForOp=execItemsForOp compileEnv; 
+                                  WarmupExecItemsForOp=warmupExecItemsForOp compileEnv;
                                   TrgtGivenSrc=trgtGivenSrc compileEnv;
                                   SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv;} 
 
