@@ -68,13 +68,10 @@ let ``Test neural net`` () =
     //let dLossFun = mi.Func (dLoss) |> arg2 input target
 
     // calcualte test loss on MNIST
-    for i = 1 to 20 do
-        let tstLoss = lossFun tstImgs tstLbls
-        //printfn "Test loss on MNIST calculated"
-        printfn "Test loss on MNIST=%A" tstLoss
+    let tstLoss = lossFun tstImgs tstLbls
+    printfn "Test loss on MNIST=%A" tstLoss
 
-    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat
-    
+    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
@@ -82,8 +79,6 @@ let ``Test neural net`` () =
         optFun tstImgs tstLbls |> ignore
         let l = lossFun tstImgs tstLbls
         printfn "Loss afer %d iterations: %A" itr l
-
-
 
     ()
 

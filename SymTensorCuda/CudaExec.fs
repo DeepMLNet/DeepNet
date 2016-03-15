@@ -366,7 +366,6 @@ module CudaExprWorkspaceTypes =
         // initialize
         #if !CUDA_DUMMY
         do
-            CudaSup.context.Synchronize () // Test
             execCalls recipe.InitCalls
         #endif
 
