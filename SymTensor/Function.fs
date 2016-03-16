@@ -100,10 +100,12 @@ module EnvTypes =
     type CompiledUExprT = EvalEnvT -> IArrayNDT list
 
     /// a function that compiles a unified expression into a function
-    type UExprCompilerT = CompileEnvT -> UExprT list -> CompiledUExprT
+    type IUExprCompiler = 
+        abstract Name:     string
+        abstract Compile:  CompileEnvT -> UExprT list -> CompiledUExprT
 
     /// compile specification, consisting of a compiler and a compile environment
-    type CompileSpecT = UExprCompilerT * CompileEnvT
+    type CompileSpecT = IUExprCompiler * CompileEnvT
 
 
 module EvalEnv = 
@@ -151,6 +153,13 @@ module Func =
         let vars = Expr.extractVars expr |> Set.map UVarSpec.ofVarSpec
         UExpr.toUExpr expr, vars, Expr.canEvalAllSymSizes expr
 
+    type private CompileResultT = {
+        Exprs:      UExprT list;
+        Eval:       CompiledUExprT;
+        NeededVars: Set<UVarSpecT>;
+        CompileEnv: CompileEnvT;
+    }
+
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) : (VarEnvT -> IArrayNDT list) =      
         let compiler, baseCompileEnv = compileSpec
 
@@ -189,35 +198,49 @@ module Func =
                 failwithf "cannot compile expression because location of variable(s) %A is missing"                
                     (neededVars - allKnownLocs |> Set.toList)
 
-            if allSizesAvail && allLocsAvail then Some (compiler compileEnv uexprs, neededVars)
+            if allSizesAvail && allLocsAvail then 
+                Some {
+                    Exprs=uexprs; 
+                    CompileEnv=compileEnv;
+                    Eval=compiler.Compile compileEnv uexprs; 
+                    NeededVars=neededVars
+                }
             else None
 
         /// Performs evaluation of a compiled function.
-        let performEval compileEnv evaluator neededVars varEnv = 
+        let performEval compileRes varEnv = 
             // substitute and check symbol sizes
-            let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileEnv.SymSizes
+            let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileRes.CompileEnv.SymSizes
 
             // check that variable locations match with compile environment
             let varLocs = VarEnv.valueLocations varEnv
-            for vs in neededVars do
+            for vs in compileRes.NeededVars do
                 match varLocs |> Map.tryFind vs with
-                | Some loc when loc <> UVarSpec.findByName vs compileEnv.VarLocs ->
+                | Some loc when loc <> UVarSpec.findByName vs compileRes.CompileEnv.VarLocs ->
                     failwithf "variable %A was expected to be in location %A but a value in \
-                               location %A was specified" vs compileEnv.VarLocs.[vs] loc
+                               location %A was specified" vs compileRes.CompileEnv.VarLocs.[vs] loc
                 | Some _ -> ()
                 | None -> 
                     failwithf "cannot evaluate expression because value for variable %A is missing" vs
 
+            // start tracing
+            Trace.start compileRes.Exprs compiler.Name
+
             // evaluate using compiled function
             let evalEnv = EvalEnv.create varEnv 
-            evaluator evalEnv
+            let res = compileRes.Eval evalEnv
+
+            // stop tracing
+            Trace.stop ()
+
+            res
 
         // If all size symbols and variable storage locations are known, then we can immedietly compile
         // the expression. Otherwise we have to wait for a VarEnv to infer the missing sizes and locations.
         match tryCompile baseCompileEnv false with
-        | Some (evaluator, neededVars) -> performEval baseCompileEnv evaluator neededVars
+        | Some compileRes -> performEval compileRes
         | None ->
-            let mutable evaluators = Map.empty
+            let mutable variants = Map.empty
             fun varEnv ->
                 // infer size symbols from variables and substitute into expression and variables
                 let symSizes = VarEnv.inferSymSizes varEnv
@@ -226,12 +249,11 @@ module Func =
                                                       VarLocs  = Map.join baseCompileEnv.VarLocs varLocs}
 
                 // compile and cache compiled function if necessary
-                if not (Map.containsKey compileEnv evaluators) then
-                    evaluators <- evaluators |> Map.add compileEnv (tryCompile compileEnv true).Value
+                if not (Map.containsKey compileEnv variants) then
+                    variants <- variants |> Map.add compileEnv (tryCompile compileEnv true).Value
 
                 // evaluate
-                let evaluator, neededVars = evaluators.[compileEnv]
-                performEval compileEnv evaluator neededVars varEnv
+                performEval variants.[compileEnv] varEnv
 
 
     /// makes a function that evaluates the given expression 

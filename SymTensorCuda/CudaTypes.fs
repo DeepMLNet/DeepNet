@@ -133,6 +133,13 @@ module CudaExecEnv =
         | _ -> failwithf "host variable must be of type ExternalMem" 
 
 
+    /// gets an IArrayNDCudaT in device memory for the specified manikin
+    let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+        let ptr = (getDevMemForManikin env manikin).DevicePointer
+        let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
+        ArrayNDCuda.fromPtrAndType ptr typ (manikin.Layout)
+
+
 [<AutoOpen>]
 module ArgTemplates =
 

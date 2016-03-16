@@ -24,8 +24,8 @@ module CudaEval =
                 // create result storage allocator
                 let resAllocator = fun () ->
                     match compileEnv.ResultLoc with
-                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout   
-                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout   
+                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> IArrayNDT
+                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> IArrayNDT  
                     | l -> failwithf "CUDA cannot work with result location %A" l      
 
                 if List.fold (*) 1 nshp > 0 then
@@ -115,7 +115,9 @@ module CudaEvalTypes =
                 ArrayNDHost.newContiguous shp
                 #endif
                 
-            member this.Compiler = CudaEval.cudaEvaluator
+            member this.Compiler = { new IUExprCompiler with 
+                                        member this.Name = "Cuda"
+                                        member this.Compile env exprs = CudaEval.cudaEvaluator env exprs }
             member this.DefaultLoc = LocDev
     }
 

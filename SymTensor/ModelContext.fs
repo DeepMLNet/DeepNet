@@ -11,14 +11,16 @@ module ModelContextTypes =
     /// Model evaluation device specification.
     type IDevice =
         abstract member Allocator: NShapeSpecT -> ArrayNDT<'T> 
-        abstract member Compiler: UExprCompilerT
+        abstract member Compiler: IUExprCompiler
         abstract member DefaultLoc: ArrayLocT
 
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
             member this.Allocator shp = ArrayNDHost.newContiguous shp :> ArrayNDT<_>
-            member this.Compiler = onHost
+            member this.Compiler = { new IUExprCompiler with 
+                                        member this.Name = "Host"
+                                        member this.Compile env exprs = onHost env exprs }
             member this.DefaultLoc = LocHost
     }
 

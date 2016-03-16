@@ -57,13 +57,16 @@ module ArrayNDCudaTypes =
         member this.CudaDeviceVariabe = data
 
 
+    /// type-neutral interface to an ArrayNDCudaT
     type IArrayNDCudaT =
         inherit IArrayNDT
         abstract Storage: IDeviceStorage
+        abstract ToHost: unit -> IArrayNDHostT
 
     /// an N-dimensional array with reshape and subview abilities stored in GPU device memory
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                                    (layout: ArrayNDLayoutT, storage: IDeviceStorage<'T>) = 
+                                    (layout: ArrayNDLayoutT, 
+                                     storage: IDeviceStorage<'T>) = 
         inherit ArrayNDT<'T>(layout)
         
         /// a new ArrayND stored on the GPU using newly allocated device memory
@@ -90,9 +93,6 @@ module ArrayNDCudaTypes =
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
 
-        interface IArrayNDCudaT with
-            member this.Storage = this.Storage :> IDeviceStorage
-
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this
         member this.Item
@@ -118,16 +118,75 @@ module ArrayNDCudaTypes =
             with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
+        /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
+        static member NewContiguous shp =
+            ArrayNDCudaT<_> (ArrayNDLayout.newContiguous shp)    
+
+        /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
+        static member NewColumnMajor shp =
+            ArrayNDCudaT<_>(ArrayNDLayout.newColumnMajor shp)
+
+        /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.
+        /// Both must of same shape. dst must also be contiguous and with offset zero.
+        static member CopyIntoDev (dst: ArrayNDCudaT<'T>) (src: ArrayNDHostT<'T>) =
+            if ArrayND.shape dst <> ArrayND.shape src then
+                invalidArg "dst" "dst and src must be of same shape"
+            if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
+                invalidArg "dst" "dst must be contiguous without offset"
+
+            let src = ArrayND.makeContiguousAndOffsetFree src 
+            use srcMem = src.Storage.Pin()
+        
+            match dst.Storage with
+            | :? CudaDeviceVariableStorageT<'T> as ds ->
+                ds.CudaDeviceVariabe.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
+                                                  SizeT(sizeof<'T> * ArrayND.nElems src))
+            | _ -> failwith "cannot copy to that device storage"
+
+        /// Copies the specified ArrayNDHostT to the device
+        static member OfHost (src: ArrayNDHostT<'T>) =
+            let dst = ArrayNDCudaT<_>.NewContiguous (ArrayND.shape src)
+            ArrayNDCudaT<_>.CopyIntoDev dst src
+            dst
+
+        /// Copies a ArrayNDCudaT into the specified ArrayNDHostT.
+        /// Both must of same shape. dst must also be contiguous and with offset zero.
+        static member CopyIntoHost (dst: ArrayNDHostT<'T>) (src: ArrayNDCudaT<'T>) =
+            if ArrayND.shape dst <> ArrayND.shape src then
+                invalidArg "dst" "dst and src must be of same shape"
+            if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
+                invalidArg "dst" "dst must be contiguous without offset"
+
+            let src = ArrayND.makeContiguousAndOffsetFree src 
+            use dstMem = dst.Storage.Pin()
+        
+            match src.Storage with
+            | :? CudaDeviceVariableStorageT<'T> as ds ->
+                ds.CudaDeviceVariabe.CopyToHost(dstMem.Ptr, SizeT(0), SizeT(0), 
+                                                SizeT(sizeof<'T> * ArrayND.nElems src))
+            | _ -> failwith "cannot copy from unkown device storage"
+
+        /// Copies this ArrayNDCudaT to the host
+        member this.ToHost () =
+            let dst = ArrayNDHost.newContiguous (ArrayND.shape this) 
+            ArrayNDCudaT<_>.CopyIntoHost dst this
+            dst
+
+        interface IArrayNDCudaT with
+            member this.Storage = this.Storage :> IDeviceStorage
+            member this.ToHost () = this.ToHost () :> IArrayNDHostT
+
+
 
 module ArrayNDCuda = 
 
     /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
-    let inline newContiguous<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> shp =
-        ArrayNDCudaT<'T>(ArrayNDLayout.newContiguous shp)
+    let inline newContiguous shp =
+        ArrayNDCudaT<_>.NewContiguous shp
 
     /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
-    let inline newColumnMajor<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> shp =
-        ArrayNDCudaT<'T>(ArrayNDLayout.newColumnMajor shp)
+    let inline newColumnMajor shp =
+        ArrayNDCudaT<_>.NewColumnMajor shp
 
     /// ArrayNDCudaT with zero dimensions (scalar) and given value
     let inline scalar value =
@@ -151,60 +210,33 @@ module ArrayNDCuda =
         ArrayND.fillDiagonalWithOnes a
         a
 
-    /// makes a contiguous copy of ary if it is not contiguous and with zero offset
-    let inline ensureContiguousAndOffsetFree ary = 
-        if ArrayND.isContiguous ary && ArrayND.offset ary = 0 then ary
-        else ArrayND.copy ary 
-
     /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.
     /// Both must of same shape. dst must also be contiguous and with offset zero.
-    let copyIntoDev (dst: ArrayNDCudaT<'T>) (src: ArrayNDHostT<'T>) =
-        if ArrayND.shape dst <> ArrayND.shape src then
-            invalidArg "dst" "dst and src must be of same shape"
-        if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
-            invalidArg "dst" "dst must be contiguous without offset"
-
-        let src = ensureContiguousAndOffsetFree src 
-        use srcMem = src.Storage.Pin()
-        
-        match dst.Storage with
-        | :? CudaDeviceVariableStorageT<'T> as ds ->
-            ds.CudaDeviceVariabe.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
-                                              SizeT(sizeof<'T> * ArrayND.nElems src))
-        | _ -> failwith "cannot copy to that device storage"
+    let copyIntoDev dst src = ArrayNDCudaT.CopyIntoDev dst src
 
     /// Copies a ArrayNDHostT to the device
-    let toDev (src: ArrayNDHostT<'T>) =
-        let dst = newContiguous<'T> (shape src)
-        copyIntoDev dst src
-        dst
+    let toDev src = ArrayNDCudaT.OfHost src
 
     /// Copies a ArrayNDCudaT into the specified ArrayNDHostT.
     /// Both must of same shape. dst must also be contiguous and with offset zero.
-    let copyIntoHost (dst: ArrayNDHostT<'T>) (src: ArrayNDCudaT<'T>) =
-        if ArrayND.shape dst <> ArrayND.shape src then
-            invalidArg "dst" "dst and src must be of same shape"
-        if not (ArrayND.isContiguous src && ArrayND.offset src = 0) then
-            invalidArg "src" "src must be contiguous without offset"
+    let copyIntoHost dst src = ArrayNDCudaT.CopyIntoHost dst src
 
-        let src = ensureContiguousAndOffsetFree src 
-        use dstMem = dst.Storage.Pin()
-        
-        match src.Storage with
-        | :? CudaDeviceVariableStorageT<'T> as ds ->
-            ds.CudaDeviceVariabe.CopyToHost(dstMem.Ptr, SizeT(0), SizeT(0), 
-                                            SizeT(sizeof<'T> * ArrayND.nElems src))
-        | _ -> failwith "cannot copy from that device storage"
+    /// Copies the specified ArrayNDCudaT to the host
+    let toHost (src: ArrayNDCudaT<_>) = src.ToHost()
 
-    /// Copies a ArrayNDCudaT to the host
-    let toHost (src: ArrayNDCudaT<'T>) =
-        let dst = ArrayNDHost.newContiguous<'T> (shape src) 
-        copyIntoHost dst src
-        dst
-
-    /// Creates a ArrayNDT of given type and layout in device memory.
+    /// Creates a new IArrayNDT of given type and layout in device memory.
     let newOfType typ (layout: ArrayNDLayoutT) = 
-        let gt = typedefof<ArrayNDCudaT<_>>
-        let t = gt.MakeGenericType [|typ|]
-        Activator.CreateInstance (t, [|layout :> obj|]) :?> IArrayNDT
+        let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typ|]
+        Activator.CreateInstance (aryType, [|box layout|]) :?> IArrayNDCudaT
+
+    /// Creates a IArrayNDT for the given pointer, type and layout.
+    let fromPtrAndType (ptr: CUdeviceptr) typ (layout: ArrayNDLayoutT) = 
+        let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
+        let devVar = Activator.CreateInstance (devVarType, [|box ptr|])
+
+        let devStorType = typedefof<CudaDeviceVariableStorageT<_>>.MakeGenericType [|typ|]
+        let devStor = Activator.CreateInstance (devStorType, [|devVar|])
+
+        let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typ|]
+        Activator.CreateInstance (aryType, [|box layout; devStor|]) :?> IArrayNDCudaT
 

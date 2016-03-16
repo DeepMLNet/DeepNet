@@ -3,6 +3,7 @@
 open ManagedCuda
 open Basics
 open Basics.Cuda
+open SymTensor
 open SymTensor.Compiler
 
 
@@ -39,6 +40,8 @@ module CudaRecipeTypes =
         | CublasSgemm       of CudaBlas.Operation * CudaBlas.Operation *
                                single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                                single * BlasTransposedMatrixTmpl * StreamT
+        // misc
+        | Trace             of UExprT * ArrayNDManikinT
 
 
     /// function instantiation state
@@ -156,6 +159,7 @@ module CudaRecipe =
         | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
             [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
                             aFac, a, b, trgtFac, trgt, strm)]    
+        | CudaExecItemT.Trace (expr, res) -> [Trace (expr, res)]
 
     /// generates a sequence of CUDA calls from streams
     let generateCalls streams cache =    
@@ -265,7 +269,9 @@ module CudaRecipe =
                             [MemsetD32Async(trgt, single value, strmIdToProcess)]      
                         | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
                             [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                                         aFac, a, b, trgtFac, trgt, strmIdToProcess)]      
+                                         aFac, a, b, trgtFac, trgt, strmIdToProcess)]  
+                        | CudaExecItemT.Trace(uexpr, res) ->
+                            [Trace(uexpr, res)]    
 
                     calls @ generate streamCallHistory activeEvents remainingStreams
                 | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 

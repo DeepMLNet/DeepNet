@@ -349,6 +349,7 @@ module CudaExprWorkspaceTypes =
  
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
+
                 // CUBLAS 
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
                     let aVar = (a :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
@@ -362,6 +363,12 @@ module CudaExprWorkspaceTypes =
                     let ldTrgt = trgt.GetLeadingDimension execEnv
                     CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
+
+                // misc
+                | Trace (uexpr, res) ->
+                    let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
+                    let resHost = resDev.ToHost()
+                    Trace.exprEvaled uexpr resHost
 
         // initialize
         #if !CUDA_DUMMY

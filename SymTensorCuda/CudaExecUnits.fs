@@ -26,6 +26,8 @@ module CudaExecUnitTypes =
         | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  
                       single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                       single * BlasTransposedMatrixTmpl
+        // misc
+        | Trace of UExprT * ArrayNDManikinT
 
 
 module CudaExecUnit =
@@ -533,13 +535,22 @@ module CudaExecUnit =
         | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax (warmupManikin trgt) (warmupManikin srcs.[0])
         | _ -> []
 
+    /// returns the execution units for tracing the result
+    let execItemsForTrace compileEnv memAllocator trgt uexpr =
+        // need to copy to host and then call trace function when done
+
+        [Trace (uexpr, trgt)]
+
 
     /// generates CUDA execution units that will evaluate the given unified expression
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
-        ExecUnit.exprToExecUnits {ExecItemsForOp=execItemsForOp compileEnv; 
-                                  WarmupExecItemsForOp=warmupExecItemsForOp compileEnv;
-                                  TrgtGivenSrc=trgtGivenSrc compileEnv;
-                                  SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv;} 
+        ExecUnit.exprToExecUnits {
+            ExecItemsForOp=execItemsForOp compileEnv
+            WarmupExecItemsForOp=warmupExecItemsForOp compileEnv
+            ExecItemsForTrace=execItemsForTrace compileEnv
+            TrgtGivenSrc=trgtGivenSrc compileEnv
+            SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv
+        } 
 
 
 

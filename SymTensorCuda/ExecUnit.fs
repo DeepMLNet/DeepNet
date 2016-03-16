@@ -43,6 +43,8 @@ module ExecUnitsTypes =
                                                     ArrayNDManikinT list -> 'e list;
                                     WarmupExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
                                                           ArrayNDManikinT list -> 'e list;
+                                    ExecItemsForTrace: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> 
+                                                       UExprT -> 'e list;
                                     TrgtGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> 
                                                   ArrayNDManikinT option -> UOpT -> ArrayNDManikinT list -> bool list -> 
                                                   ArrayNDManikinT * bool;
@@ -215,14 +217,20 @@ module ExecUnit =
                                 gen.TrgtGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
                             let trgtShared = trgtShared || erqResultShared
 
+                            // generate execution items
+                            let items = 
+                                gen.ExecItemsForOp newMemory trgtView op srcViews  @
+                                if Trace.Enabled then gen.ExecItemsForTrace newMemory trgtView erqExpr
+                                else []
+
                             // emit execution unit 
                             let eu = {
-                                Id         = newExecUnitId();
-                                Items      = gen.ExecItemsForOp newMemory trgtView op srcViews;
-                                DependsOn  = srcExeUnitIds;
-                                Expr       = erqExpr;
-                                Manikins   = trgtView::srcViews;
-                                RerunAfter = [];
+                                Id         = newExecUnitId()
+                                Items      = items
+                                DependsOn  = srcExeUnitIds
+                                Expr       = erqExpr
+                                Manikins   = trgtView :: srcViews
+                                RerunAfter = []
                             }                                    
                             submitExecUnit eu
 

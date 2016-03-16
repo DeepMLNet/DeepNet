@@ -32,6 +32,7 @@ module ArrayNDTypes =
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
         abstract DataType:          System.Type
         abstract Location:          ArrayLocT
+        abstract Copy:              unit -> IArrayNDT
 
     type SpecialAxisT =
         | NewAxis
@@ -94,15 +95,6 @@ module ArrayND =
         /// storage location of the ArrayND
         abstract Location: ArrayLocT
 
-        interface IHasLayout with
-            member this.Layout = this.Layout
-        interface IArrayNDT with
-            member this.CPPType = this.CPPType         
-            member this.NewView layout = this.NewView layout :> IArrayNDT    
-            member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
-            member this.DataType = this.DataType
-            member this.Location = this.Location
-
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
             let thisBoxed = box this
@@ -126,6 +118,20 @@ module ArrayND =
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
+
+        interface IHasLayout with
+            member this.Layout = this.Layout
+        interface IArrayNDT with
+            member this.CPPType = this.CPPType         
+            member this.NewView layout = this.NewView layout :> IArrayNDT    
+            member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
+            member this.DataType = this.DataType
+            member this.Location = this.Location
+            member this.Copy () = 
+                let shp = ArrayNDLayout.shape this.Layout
+                let trgt = this.NewOfSameType (ArrayNDLayout.newContiguous shp)
+                this.CopyTo trgt
+                trgt :> IArrayNDT
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -202,7 +208,7 @@ module ArrayND =
         false // TODO
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newContiguousOfType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+    let inline newContiguousOfType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newContiguous shp) :?> 'A
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
@@ -228,10 +234,18 @@ module ArrayND =
         copyTo source dest
         dest
 
+    /// Returns a continguous copy of the given IArrayNDT.
+    let inline copyUntyped (source: 'T when 'T :> IArrayNDT) =
+        source.Copy() :?> 'T
+
     /// If the ArrayND is not continguous, returns a continguous copy; otherwise
     /// the given ArrayND is returned unchanged.
     let inline makeContiguous a =
         if isContiguous a then a else copy a
+
+    /// makes a contiguous copy of ary if it is not contiguous and with zero offset
+    let inline makeContiguousAndOffsetFree a = 
+        if isContiguous a && offset a = 0 then a else copy a 
 
     /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
