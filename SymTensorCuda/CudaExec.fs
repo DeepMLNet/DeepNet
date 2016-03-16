@@ -366,14 +366,14 @@ module CudaExprWorkspaceTypes =
 
                 // misc
                 | Trace (uexpr, res) ->
+                    CudaSup.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                     let resHost = resDev.ToHost()
                     Trace.exprEvaled uexpr resHost
 
         // initialize
         #if !CUDA_DUMMY
-        do
-            execCalls recipe.InitCalls
+        do execCalls recipe.InitCalls
         #endif
 
         // finalizer

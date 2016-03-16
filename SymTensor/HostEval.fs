@@ -88,7 +88,7 @@ module HostEval =
                     | Discard -> ArrayNDHost.zeros [0]
                     | ExtensionOp eop -> failwith "not implemented"
 
-            if Trace.Enabled then
+            if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) res
             res
             

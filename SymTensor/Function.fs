@@ -224,14 +224,14 @@ module Func =
                     failwithf "cannot evaluate expression because value for variable %A is missing" vs
 
             // start tracing
-            Trace.start compileRes.Exprs compiler.Name
+            Trace.startExprEval compileRes.Exprs compiler.Name
 
             // evaluate using compiled function
             let evalEnv = EvalEnv.create varEnv 
             let res = compileRes.Eval evalEnv
 
             // stop tracing
-            Trace.stop ()
+            Trace.endExprEval ()
 
             res
 

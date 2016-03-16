@@ -220,7 +220,7 @@ module ExecUnit =
                             // generate execution items
                             let items = 
                                 gen.ExecItemsForOp newMemory trgtView op srcViews  @
-                                if Trace.Enabled then gen.ExecItemsForTrace newMemory trgtView erqExpr
+                                if Trace.isActive () then gen.ExecItemsForTrace newMemory trgtView erqExpr
                                 else []
 
                             // emit execution unit 
