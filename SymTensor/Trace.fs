@@ -11,7 +11,7 @@ open Basics
 module Trace =
     
     type EvalEvent = 
-        | ExprEvaled of UExprT * IArrayNDT
+        | ExprEvaled of UExprT * IArrayNDT * string 
 
     type ExprEvaluation = {
         Id:             int
@@ -97,22 +97,26 @@ module Trace =
             ses.End <- Some DateTime.Now
             activeExprEval.Value <- None
 
-    let exprEvaled uexpr res =
+    let exprEvaledWithMsg uexpr res msg =
         if isActive () then
             let ee = getActiveExpr ()
-            ee.Trace.Add (ExprEvaled (uexpr, ArrayND.copyUntyped res))
+            ee.Trace.Add (ExprEvaled (uexpr, ArrayND.copyUntyped res, msg))
             
+    let exprEvaled uexpr res =
+        exprEvaledWithMsg uexpr res ""
 
     let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
         let epsilon = 1e-4f
         let a = a :?> ArrayNDT<single>
         let b = b :?> ArrayNDT<single>
         let diff = abs (a - b)
-        let maxDiff = ArrayND.max diff |> ArrayND.value
-        maxDiff <= epsilon
+        if ArrayND.nElems diff > 0 then
+            let maxDiff = ArrayND.max diff |> ArrayND.value
+            maxDiff <= epsilon
+        else true
 
     let compareCustom isSimilar a b =
-        let maxDiffs = 5
+        let maxDiffs = 3
         let mutable diffs = 0
 
         printfn "Comparing trace sessions %s and %s:" a.Name b.Name
@@ -125,14 +129,22 @@ module Trace =
                 printfn ""
                 printfn "Evaluation %d using evaluator %s vs %s:" e ae.Compiler be.Compiler
 
-                for ExprEvaled (uexpr, aRes) in ae.Trace do
-                    match Seq.tryPick (fun (ExprEvaled (oexpr, bRes)) -> 
-                                            if oexpr = uexpr then Some bRes else None) be.Trace with
-                    | Some bRes ->
+                for ExprEvaled (uexpr, aRes, aMsg) in ae.Trace do
+                    match Seq.tryPick (fun (ExprEvaled (oexpr, bRes, bMsg)) -> 
+                                            if oexpr = uexpr then Some (bRes, bMsg) else None) be.Trace with
+                    | Some (bRes, bMsg) ->
                         if not (isSimilar aRes bRes) then
                             if diffs < maxDiffs then
-                                printfn "Difference in %A: %A vs %A" uexpr aRes bRes
+                                printfn ""
+                                printfn "Difference in expression:\n%A" uexpr
+                                printfn ""
+                                if aMsg.Length > 0 then printfn "%s message: %s" a.Name aMsg
+                                if bMsg.Length > 0 then printfn "%s message: %s" b.Name bMsg
+                                printfn ""
+                                printfn "%s result:\n%A\n" a.Name aRes
+                                printfn "%s result:\n%A\n" b.Name bRes
                             elif diffs = maxDiffs then
+                                printfn ""
                                 printfn "(more differences not shown)"
                             diffs <- diffs + 1
                     | None -> ()

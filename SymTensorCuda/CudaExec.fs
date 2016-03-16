@@ -263,8 +263,9 @@ module CudaExprWorkspaceTypes =
     
         /// executes the specified calls
         let execCalls calls =
-
+            let mutable previousCall = None
             for call in calls do
+
                 match call with 
                 // memory management
                 | CudaCallT.MemAlloc mem -> 
@@ -369,7 +370,10 @@ module CudaExprWorkspaceTypes =
                     CudaSup.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                     let resHost = resDev.ToHost()
-                    Trace.exprEvaled uexpr resHost
+                    let msg = sprintf "previous call: %A" previousCall
+                    Trace.exprEvaledWithMsg uexpr resHost msg
+
+                previousCall <- Some call
 
         // initialize
         #if !CUDA_DUMMY
