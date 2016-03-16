@@ -103,7 +103,44 @@ module Trace =
             ee.Trace.Add (ExprEvaled (uexpr, ArrayND.copyUntyped res))
             
 
+    let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
+        let epsilon = 1e-4f
+        let a = a :?> ArrayNDT<single>
+        let b = b :?> ArrayNDT<single>
+        let diff = abs (a - b)
+        let maxDiff = ArrayND.max diff |> ArrayND.value
+        maxDiff <= epsilon
 
+    let compareCustom isSimilar a b =
+        let maxDiffs = 5
+        let mutable diffs = 0
 
+        printfn "Comparing trace sessions %s and %s:" a.Name b.Name
+
+        if a.ExprEvals.Count <> b.ExprEvals.Count then
+            printfn "Different number of expression evaluations: %d vs %d" 
+                a.ExprEvals.Count b.ExprEvals.Count
+        else
+            for e, (ae, be) in Seq.indexed (Seq.zip a.ExprEvals b.ExprEvals) do
+                printfn ""
+                printfn "Evaluation %d using evaluator %s vs %s:" e ae.Compiler be.Compiler
+
+                for ExprEvaled (uexpr, aRes) in ae.Trace do
+                    match Seq.tryPick (fun (ExprEvaled (oexpr, bRes)) -> 
+                                            if oexpr = uexpr then Some bRes else None) be.Trace with
+                    | Some bRes ->
+                        if not (isSimilar aRes bRes) then
+                            if diffs < maxDiffs then
+                                printfn "Difference in %A: %A vs %A" uexpr aRes bRes
+                            elif diffs = maxDiffs then
+                                printfn "(more differences not shown)"
+                            diffs <- diffs + 1
+                    | None -> ()
+        printfn ""
+        printfn "Total number of differences: %d" diffs
+
+    let compare = compareCustom maxSimilar
+
+        
 
 

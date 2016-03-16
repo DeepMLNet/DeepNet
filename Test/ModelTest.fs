@@ -100,8 +100,10 @@ let compareHostCuda func =
     let cudaTrace = Trace.endSession ()
     printfn "Done."
 
-    printfn "Host trace:\n%A" hostTrace
-    printfn "CUDA trace:\n%A" cudaTrace
+    Trace.compare hostTrace cudaTrace
+
+    //printfn "Host trace:\n%A" hostTrace
+    //printfn "CUDA trace:\n%A" cudaTrace
 
 
 

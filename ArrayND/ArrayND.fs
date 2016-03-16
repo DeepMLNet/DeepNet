@@ -547,6 +547,22 @@ module ArrayND =
     /// elementwise product over given axis
     let inline productAxis dim a = axisReduce product dim a
 
+    let inline maxImpl a =
+        let value = allElems a |> Seq.reduce max
+        scalarOfType value a
+
+    let inline max a =
+        if nElems a = 0 then invalidArg "a" "cannot compute max of empty ArrayNDT"
+        typedApply maxImpl maxImpl maxImpl maxImpl a
+
+    let inline minImpl a =
+        let value = allElems a |> Seq.reduce min
+        scalarOfType value a
+
+    let inline min a =
+        if nElems a = 0 then invalidArg "a" "cannot compute min of empty ArrayNDT"
+        typedApply minImpl minImpl minImpl minImpl a
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
