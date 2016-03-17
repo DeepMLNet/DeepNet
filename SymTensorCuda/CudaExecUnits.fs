@@ -265,8 +265,8 @@ module CudaExecUnit =
         let nSrc = List.length srcViews
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
-        let heteroStr = if hetero then "Heterogenous" else ""
-        let funcName = sprintf "elemwise%dAry%dD%s%s" nSrc (ArrayND.nDims trgt) indexedStr heteroStr
+        let dimsStr = if hetero then "Heterogenous" else sprintf "%dD" (ArrayND.nDims trgt)
+        let funcName = sprintf "elemwise%dAry%s%s" nSrc dimsStr indexedStr 
         funcName, args
 
     /// execution items for an elementwise operation

@@ -62,6 +62,7 @@ module CudaRecipeTypes =
 
 
 module TmplInstCache =
+
     /// gets the generated code for the specified domain
     let getCodeForDomain domain cache =
         cache.Code
@@ -89,12 +90,15 @@ module TmplInstCache =
             let krnlStr = match ti.Domain with
                           | KernelFunc -> "__global__"
                           | CPPFunc -> "__declspec(dllexport)"
+            let traceFunc = match ti.Domain with
+                            | KernelFunc -> "KERNEL_TRACE"
+                            | CPPFunc -> "HOST_TRACE"
             let argDeclStr = ti.ArgTypes |> List.mapi (fun i t -> sprintf "%s p%d" t i)  |> String.concat ", "
             let argCallStr = ti.ArgTypes |> List.mapi (fun i _ -> sprintf "p%d" i) |> String.concat ", "
             let retCmd = if ti.RetType.Trim() = "void" then "" else "return"
             let declStr =
                 sprintf "extern \"C\" %s %s %s (%s) {\n" krnlStr ti.RetType cName argDeclStr
-                //+ sprintf "  printf(\"%s\\n\");" ti.FuncName
+                + sprintf "  %s(\"%s\");\n" traceFunc cName
                 + sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
                 + sprintf "}\n"
                 + sprintf "\n"
@@ -108,22 +112,30 @@ module CudaRecipe =
     [<Literal>]
     let EnableWarmup = false
 
-    let commonIncludes = ["NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
+    let commonIncludes = ["Utils.cuh"; "NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
     let kernelModuleIncludes = commonIncludes
     let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"; "stdio.h"]
 
     let generateIncludes incls =
         incls
         |> List.map (sprintf "#include \"%s\"\n")
-        |> String.concat "\n"
+        |> String.concat ""
+
+    let traceHeader = ""
+
+    //let traceHeader =
+    //    if Debug.TraceCalls then "#define ENABLE_CALL_TRACE  \n" 
+    //    else ""
 
     /// Header of generated CUDA kernel module
     let kernelModuleHeader = 
-        kernelModuleIncludes |> generateIncludes
+        traceHeader +
+        generateIncludes kernelModuleIncludes 
 
     /// Header of generated C++ module
     let cppModuleHeader =
-        cppModuleIncludes |> generateIncludes
+        traceHeader +
+        generateIncludes cppModuleIncludes 
 
     /// gets all CUDA C kernel launches performed 
     let getAllCKernelLaunches recipe = 

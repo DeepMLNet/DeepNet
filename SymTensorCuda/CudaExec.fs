@@ -47,7 +47,6 @@ module Compile =
         cudaModCntr <- cudaModCntr + 1
         sprintf "mod%d.cu" cudaModCntr
 
-
     /// dumps CUDA kernel code to a file
     let dumpCode (modName: string) (modCode: string) =
         File.WriteAllText(modName, modCode)
@@ -88,6 +87,7 @@ module Compile =
                 ptx    
 
         #if !CUDA_DUMMY
+
         //printfn "CUDA jitting of %s:" modName
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
@@ -197,6 +197,8 @@ module CudaExprWorkspaceTypes =
     /// Workspace for evaluation of an expression compiled to a CudaRecipeT.
     type CudaExprWorkspace(recipe: CudaRecipeT) =
 
+        do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
+
         /// execution environment
         let execEnv = {
             Stream = new Dictionary<StreamT, CudaStream>();
@@ -261,6 +263,10 @@ module CudaExprWorkspaceTypes =
         /// C++ functions
         let cFuncs, cLibHndl = Compile.loadCppCode recipe.CPPCode cFuncDelegates
     
+        let getStream strm = 
+            if Debug.DisableStreams then CUstream.NullStream
+            else execEnv.Stream.[strm].Stream
+
         /// executes the specified calls
         let execCalls calls =
             let mutable previousCall = None
@@ -284,7 +290,7 @@ module CudaExprWorkspaceTypes =
                                                  SizeT(srcOffset), 
                                                  SizeT(dstOffset), 
                                                  SizeT(length), 
-                                                 execEnv.Stream.[strm].Stream)
+                                                 getStream strm)
                 | MemcpyHtoDAsync (dst, src, strm) ->
                     let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     let {HostMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
@@ -292,7 +298,7 @@ module CudaExprWorkspaceTypes =
                                                                           BasicTypes.SizeT(length))
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
-                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, execEnv.Stream.[strm].Stream)
+                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, getStream strm)
                 | MemcpyDtoHAsync (dst, src, strm) ->
                     let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
@@ -300,22 +306,25 @@ module CudaExprWorkspaceTypes =
                                                                     BasicTypes.SizeT(length))
                     use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
                                                                           BasicTypes.SizeT(length))
-                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, execEnv.Stream.[strm].Stream)
+                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
                 | MemsetD32Async (dst, value, strm) ->
                     let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
-                    dstOffsetVar.MemsetAsync(intval, execEnv.Stream.[strm].Stream)
+                    dstOffsetVar.MemsetAsync(intval, getStream strm)
 
                 // stream management
                 | StreamCreate (strm, flags) ->
-                    execEnv.Stream.Add(strm, new CudaStream(flags))
+                    if not Debug.DisableStreams then
+                        execEnv.Stream.Add(strm, new CudaStream(flags))
                 | StreamDestory strm ->
-                    execEnv.Stream.[strm].Dispose()
-                    execEnv.Stream.Remove(strm) |> ignore
+                    if not Debug.DisableStreams then
+                        execEnv.Stream.[strm].Dispose()
+                        execEnv.Stream.Remove(strm) |> ignore
                 | StreamWaitEvent (strm, evnt) ->
-                    execEnv.Stream.[strm].WaitEvent(execEnv.Event.[evnt].Event)
+                    if not Debug.DisableStreams then
+                        execEnv.Stream.[strm].WaitEvent(execEnv.Event.[evnt].Event)
 
                 // event management
                 | EventCreate (evnt, flags) ->
@@ -324,14 +333,14 @@ module CudaExprWorkspaceTypes =
                     execEnv.Event.[evnt].Dispose()
                     execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
-                    execEnv.Event.[evnt].Record(execEnv.Stream.[strm].Stream)
+                    execEnv.Event.[evnt].Record(getStream strm)
                 | EventSynchronize evnt ->
                     execEnv.Event.[evnt].Synchronize()
 
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
                     // instantiate args
-                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv strm)
+                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv (getStream strm))
                     let argArray = args |> List.toArray
 
                     // launch configuration
@@ -340,29 +349,40 @@ module CudaExprWorkspaceTypes =
                     kernels.[krnl].GridDimensions <- CudaSup.toDim3 gridDim
                     kernels.[krnl].DynamicSharedMemory <- uint32 smemSize
 
-                    kernels.[krnl].RunAsync(execEnv.Stream.[strm].Stream, argArray)
+                    if Debug.TraceCalls then
+                        printfn "Launching kernel %s on stream %d with work dims %A using block dims %A and grid dims %A" 
+                            krnl (getStream strm).Pointer workDim blockDim gridDim
+
+                    if Debug.DisableStreams then
+                        kernels.[krnl].Run(argArray) |> ignore
+                    else
+                        kernels.[krnl].RunAsync(getStream strm, argArray)
+                    
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
                 | CudaCallT.CallCFunc (name, _, strm, argTmpls) ->
                     // instantiate args
-                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv strm)
+                    let args = argTmpls |> List.map (fun (tmpl: ICudaArgTmpl) -> tmpl.GetArg execEnv (getStream strm))
                     let argArray = args |> List.toArray
  
+                    if Debug.TraceCalls then
+                        printfn "Calling C function %s on stream %d" name (getStream strm).Pointer
+
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
 
                 // CUBLAS 
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
-                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
-                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv strm :?> CudaDeviceVariable<single>            
+                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
+                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
+                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
                     let m = a.GetRowsForOp execEnv aOp
                     let n = b.GetColumnsForOp execEnv bOp
                     let k = a.GetColumnsForOp execEnv aOp
                     let ldA = a.GetLeadingDimension execEnv
                     let ldB = b.GetLeadingDimension execEnv
                     let ldTrgt = trgt.GetLeadingDimension execEnv
-                    CudaSup.blas.Stream <- execEnv.Stream.[strm].Stream
+                    CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
                 // misc

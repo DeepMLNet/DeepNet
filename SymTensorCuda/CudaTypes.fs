@@ -15,6 +15,16 @@ open SymTensor.Compiler
 #nowarn "9"
 
 
+module Debug =
+    /// redirects all stream calls to the null stream
+    [<Literal>]
+    let DisableStreams = true
+
+    /// outputs messages when a function / kernel is launched
+    [<Literal>]
+    let TraceCalls = true
+
+
 [<AutoOpen>]
 module Types =
 
@@ -146,7 +156,7 @@ module ArgTemplates =
     /// CUDA C++ argument template
     type ICudaArgTmpl =
         abstract member CPPTypeName : string
-        abstract member GetArg : CudaExecEnvT -> StreamT -> obj 
+        abstract member GetArg : CudaExecEnvT -> CUstream -> obj 
 
     /// CUDA C++ argument template for values that are passed by value in an array
     type ICudaArrayMemberArgTmpl<'T when 'T :> ValueType> =
@@ -253,8 +263,7 @@ module ArgTemplates =
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "CUstream"
-            member this.GetArg env strm = 
-                box env.Stream.[strm].Stream 
+            member this.GetArg env strm = box strm
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =

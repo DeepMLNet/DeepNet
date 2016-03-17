@@ -129,14 +129,16 @@ module Trace =
                 printfn ""
                 printfn "Evaluation %d using evaluator %s vs %s:" e ae.Compiler be.Compiler
 
-                for ExprEvaled (uexpr, aRes, aMsg) in ae.Trace do
-                    match Seq.tryPick (fun (ExprEvaled (oexpr, bRes, bMsg)) -> 
-                                            if oexpr = uexpr then Some (bRes, bMsg) else None) be.Trace with
-                    | Some (bRes, bMsg) ->
+                for ExprEvaled (uexpr, aRes, aMsg) as aEvent in ae.Trace do
+                    match Seq.tryFind (fun (ExprEvaled (oexpr, _, _)) -> oexpr = uexpr) be.Trace with
+                    | Some (ExprEvaled (_, bRes, bMsg) as bEvent) ->
                         if not (isSimilar aRes bRes) then
                             if diffs < maxDiffs then
                                 printfn ""
                                 printfn "Difference in expression:\n%A" uexpr
+                                printfn "%s index: %d    %s index: %d" 
+                                    a.Name (Seq.findIndex ((=) aEvent) ae.Trace)
+                                    b.Name (Seq.findIndex ((=) bEvent) be.Trace)
                                 printfn ""
                                 if aMsg.Length > 0 then printfn "%s message: %s" a.Name aMsg
                                 if bMsg.Length > 0 then printfn "%s message: %s" b.Name bMsg
@@ -153,6 +155,34 @@ module Trace =
 
     let compare = compareCustom maxSimilar
 
-        
+    let dump file trace =
+        let out fmt = fprintfn file fmt
+        out "Trace session %s" trace.Name
+        out "Start: %A" trace.Start
+        out "End:   %A" trace.End.Value
+        out ""
+
+        for exprEval in trace.ExprEvals do
+            out "Evaluation of expression(s) %A" exprEval.Exprs
+            out "Id:       %d" exprEval.Id
+            out "Compiler: %s" exprEval.Compiler
+            out "Start:    %A" exprEval.Start
+            out "End:      %A" exprEval.End.Value
+            out ""
+            out "==== Begin of trace ===="
+            out ""
+
+            for idx, evnt in Seq.indexed exprEval.Trace do
+                out "Event index:  %d" idx
+                match evnt with
+                | ExprEvaled (uexpr, res, msg) ->
+                    out "Expression: %A" uexpr
+                    out "Result:\n%A" res
+                    out "Message: %s" msg
+                out ""
+
+            out "==== End of trace ===="
+            out ""
+
 
 

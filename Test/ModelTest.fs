@@ -1,5 +1,8 @@
 ﻿module ModelTest
 
+open System.IO
+
+
 open Basics
 open ArrayNDNS
 
@@ -75,8 +78,7 @@ let ``Test neural net`` device =
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
 
-
-    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat   
+    let opt = Optimizers.gradientDescent {Step=1e-1f} loss mc.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
@@ -93,11 +95,15 @@ let compareHostCuda func =
     Trace.startSession "Host"
     func DevHost
     let hostTrace = Trace.endSession ()
+    use tw = File.CreateText("Host.txt")
+    Trace.dump tw hostTrace
 
     printfn "Evaluating on CUDA device..."
     Trace.startSession "CUDA"
     func DevCuda
     let cudaTrace = Trace.endSession ()
+    use tw = File.CreateText("CUDA.txt")
+    Trace.dump tw cudaTrace
     printfn "Done."
 
     Trace.compare hostTrace cudaTrace

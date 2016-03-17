@@ -110,20 +110,6 @@ _dev void elemwise0Ary0D(const TElemwiseOp &op, TTarget &trgt) {
 
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary0DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
@@ -141,20 +127,6 @@ _dev void elemwise1Ary0D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
 
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary0DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
@@ -170,20 +142,6 @@ _dev void elemwise2Ary0D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
 
   trgt.element() = op(src0.element(), src1.element());
 
-}
-
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary0DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
-
-    }
-    }
 }
 
 // ======================== dimensionality: 1 ==================================
@@ -291,7 +249,7 @@ struct ArrayND1D : TShape, TStride {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
@@ -306,7 +264,7 @@ _dev void elemwise0Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary1D(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
@@ -317,24 +275,10 @@ _dev void elemwise0Ary1D(const TElemwiseOp &op, TTarget &trgt) {
     }
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
@@ -349,7 +293,7 @@ _dev void elemwise1Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary1D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
@@ -360,24 +304,10 @@ _dev void elemwise1Ary1D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
@@ -392,26 +322,12 @@ _dev void elemwise2Ary1DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary1D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
 
   trgt.element(pos0) = op(src0.element(pos0), src1.element(pos0));
-
-    }
-    }
-}
-
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary1DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
 
     }
     }
@@ -424,12 +340,12 @@ struct Pos2D {
     template<typename TArrayND>
    _dev static Pos2D fromLinearIdx(const TArrayND &ary, size_t idx) {
      Pos2D p;
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     p.pos[1] = idx / incr1;
-     idx -= p.pos[1] * incr1;
+     const size_t incr1 = 1;
+     const size_t incr0 = incr1 * ary.shape(1);
      p.pos[0] = idx / incr0;
      idx -= p.pos[0] * incr0;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
      return p;
    }
     template<typename TArrayND>
@@ -440,8 +356,8 @@ struct Pos2D {
     }
     template<typename TArrayND>
    _dev size_t toLinearIdx(const TArrayND &ary) const {
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
+     const size_t incr1 = 1;
+     const size_t incr0 = incr1 * ary.shape(1);
      return incr0 * pos[0] + incr1 * pos[1];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -528,8 +444,8 @@ struct ArrayND2D : TShape, TStride {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -547,8 +463,8 @@ _dev void elemwise0Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary2D(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -562,25 +478,11 @@ _dev void elemwise0Ary2D(const TElemwiseOp &op, TTarget &trgt) {
     }
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -598,8 +500,8 @@ _dev void elemwise1Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary2D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -613,25 +515,11 @@ _dev void elemwise1Ary2D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -649,8 +537,8 @@ _dev void elemwise2Ary2DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary2D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
@@ -664,20 +552,6 @@ _dev void elemwise2Ary2D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary2DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 // ======================== dimensionality: 3 ==================================
 
 struct Pos3D {
@@ -685,15 +559,15 @@ struct Pos3D {
     template<typename TArrayND>
    _dev static Pos3D fromLinearIdx(const TArrayND &ary, size_t idx) {
      Pos3D p;
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
-     p.pos[2] = idx / incr2;
-     idx -= p.pos[2] * incr2;
-     p.pos[1] = idx / incr1;
-     idx -= p.pos[1] * incr1;
+     const size_t incr2 = 1;
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      p.pos[0] = idx / incr0;
      idx -= p.pos[0] * incr0;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
      return p;
    }
     template<typename TArrayND>
@@ -704,9 +578,9 @@ struct Pos3D {
     }
     template<typename TArrayND>
    _dev size_t toLinearIdx(const TArrayND &ary) const {
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
+     const size_t incr2 = 1;
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -795,9 +669,9 @@ struct ArrayND3D : TShape, TStride {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -818,9 +692,9 @@ _dev void elemwise0Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary3D(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -837,26 +711,12 @@ _dev void elemwise0Ary3D(const TElemwiseOp &op, TTarget &trgt) {
     }
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -877,9 +737,9 @@ _dev void elemwise1Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary3D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -896,26 +756,12 @@ _dev void elemwise1Ary3D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -936,9 +782,9 @@ _dev void elemwise2Ary3DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary3D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter2 = 0; iter2 < iters2; iter2++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -955,20 +801,6 @@ _dev void elemwise2Ary3D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary3DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 // ======================== dimensionality: 4 ==================================
 
 struct Pos4D {
@@ -976,18 +808,18 @@ struct Pos4D {
     template<typename TArrayND>
    _dev static Pos4D fromLinearIdx(const TArrayND &ary, size_t idx) {
      Pos4D p;
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
-     const size_t incr3 = incr2 * ary.shape(2);
-     p.pos[3] = idx / incr3;
-     idx -= p.pos[3] * incr3;
-     p.pos[2] = idx / incr2;
-     idx -= p.pos[2] * incr2;
-     p.pos[1] = idx / incr1;
-     idx -= p.pos[1] * incr1;
+     const size_t incr3 = 1;
+     const size_t incr2 = incr3 * ary.shape(3);
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      p.pos[0] = idx / incr0;
      idx -= p.pos[0] * incr0;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
+     p.pos[3] = idx / incr3;
+     idx -= p.pos[3] * incr3;
      return p;
    }
     template<typename TArrayND>
@@ -998,10 +830,10 @@ struct Pos4D {
     }
     template<typename TArrayND>
    _dev size_t toLinearIdx(const TArrayND &ary) const {
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
-     const size_t incr3 = incr2 * ary.shape(2);
+     const size_t incr3 = 1;
+     const size_t incr2 = incr3 * ary.shape(3);
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2] + incr3 * pos[3];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -1092,9 +924,9 @@ struct ArrayND4D : TShape, TStride {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1121,9 +953,9 @@ _dev void elemwise0Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary4D(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1146,26 +978,12 @@ _dev void elemwise0Ary4D(const TElemwiseOp &op, TTarget &trgt) {
     }
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1192,9 +1010,9 @@ _dev void elemwise1Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary4D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1217,26 +1035,12 @@ _dev void elemwise1Ary4D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1263,9 +1067,9 @@ _dev void elemwise2Ary4DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary4D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1288,20 +1092,6 @@ _dev void elemwise2Ary4D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary4DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)), src1.element(src1.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 // ======================== dimensionality: 5 ==================================
 
 struct Pos5D {
@@ -1309,21 +1099,21 @@ struct Pos5D {
     template<typename TArrayND>
    _dev static Pos5D fromLinearIdx(const TArrayND &ary, size_t idx) {
      Pos5D p;
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
-     const size_t incr3 = incr2 * ary.shape(2);
-     const size_t incr4 = incr3 * ary.shape(3);
-     p.pos[4] = idx / incr4;
-     idx -= p.pos[4] * incr4;
-     p.pos[3] = idx / incr3;
-     idx -= p.pos[3] * incr3;
-     p.pos[2] = idx / incr2;
-     idx -= p.pos[2] * incr2;
-     p.pos[1] = idx / incr1;
-     idx -= p.pos[1] * incr1;
+     const size_t incr4 = 1;
+     const size_t incr3 = incr4 * ary.shape(4);
+     const size_t incr2 = incr3 * ary.shape(3);
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      p.pos[0] = idx / incr0;
      idx -= p.pos[0] * incr0;
+     p.pos[1] = idx / incr1;
+     idx -= p.pos[1] * incr1;
+     p.pos[2] = idx / incr2;
+     idx -= p.pos[2] * incr2;
+     p.pos[3] = idx / incr3;
+     idx -= p.pos[3] * incr3;
+     p.pos[4] = idx / incr4;
+     idx -= p.pos[4] * incr4;
      return p;
    }
     template<typename TArrayND>
@@ -1334,11 +1124,11 @@ struct Pos5D {
     }
     template<typename TArrayND>
    _dev size_t toLinearIdx(const TArrayND &ary) const {
-     const size_t incr0 = 1;
-     const size_t incr1 = incr0 * ary.shape(0);
-     const size_t incr2 = incr1 * ary.shape(1);
-     const size_t incr3 = incr2 * ary.shape(2);
-     const size_t incr4 = incr3 * ary.shape(3);
+     const size_t incr4 = 1;
+     const size_t incr3 = incr4 * ary.shape(4);
+     const size_t incr2 = incr3 * ary.shape(3);
+     const size_t incr1 = incr2 * ary.shape(2);
+     const size_t incr0 = incr1 * ary.shape(1);
      return incr0 * pos[0] + incr1 * pos[1] + incr2 * pos[2] + incr3 * pos[3] + incr4 * pos[4];
    }
   	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }
@@ -1431,9 +1221,9 @@ struct ArrayND5D : TShape, TStride {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1463,9 +1253,9 @@ _dev void elemwise0Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt) {
 template <typename TElemwiseOp, typename TTarget>
 _dev void elemwise0Ary5D(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1491,26 +1281,12 @@ _dev void elemwise0Ary5D(const TElemwiseOp &op, TTarget &trgt) {
     }
 }
 
-template <typename TElemwiseOp, typename TTarget>
-_dev void elemwise0Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op();
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1540,9 +1316,9 @@ _dev void elemwise1Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0>
 _dev void elemwise1Ary5D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1568,26 +1344,12 @@ _dev void elemwise1Ary5D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0>
-_dev void elemwise1Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
-
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
-    for (size_t iter = 0; iter < iters; iter++) {
-    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
-    if (idx < trgt.size()) {
-
-  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
-
-    }
-    }
-}
-
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1617,9 +1379,9 @@ _dev void elemwise2Ary5DIndexed(const TElemwiseOp &op, TTarget &trgt, const TSrc
 template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elemwise2Ary5D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t itersRest = (trgt.shape(2) * trgt.shape(3) * trgt.shape(4)) / (gridDim.z * blockDim.z) + 1;
-    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;
-    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;
+    const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
+    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
+    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {
     for (size_t iter1 = 0; iter1 < iters1; iter1++) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
@@ -1645,10 +1407,38 @@ _dev void elemwise2Ary5D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
-_dev void elemwise2Ary5DHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
+template <typename TElemwiseOp, typename TTarget>
+_dev void elemwise0AryHeterogenous(const TElemwiseOp &op, TTarget &trgt) {
 
-    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;
+    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < trgt.size()) {
+
+  trgt.element(trgt.linearIdxToPos(idx)) = op();
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0>
+_dev void elemwise1AryHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0) {
+
+    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);
+    for (size_t iter = 0; iter < iters; iter++) {
+    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
+    if (idx < trgt.size()) {
+
+  trgt.element(trgt.linearIdxToPos(idx)) = op(src0.element(src0.linearIdxToPos(idx)));
+
+    }
+    }
+}
+
+template <typename TElemwiseOp, typename TTarget, typename TSrc0, typename TSrc1>
+_dev void elemwise2AryHeterogenous(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
+
+    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);
     for (size_t iter = 0; iter < iters; iter++) {
     const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);
     if (idx < trgt.size()) {

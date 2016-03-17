@@ -71,6 +71,7 @@ module CudaSup =
     /// Ensures that CUDA is initialized. Multiple calls are allowed and have no effect.
     let init () =
         context |> ignore
+        //context.SetLimit(CULimit.PrintfFIFOSize, SizeT 1000000)
 
     /// shutsdown CUDA (necessary for correct profiler results)  
     let shutdown () =
@@ -85,6 +86,10 @@ module CudaSup =
     /// It is possible that the calculated launch dimensions will be smaller than the
     /// specified work dimensions, since the maximum block and grid sizes are limited.
     let computeLaunchDim (workDim: WorkDimT) maxBlockSize =
+        let (./) a b =
+            if a % b = 0 then a / b 
+            else a / b + 1 
+
         let wx, wy, wz = workDim
         let mbx, mby, mbz = maxBlockDim
         let mgx, mgy, mgz = maxGridDim
@@ -93,9 +98,13 @@ module CudaSup =
         let by = min mby (min wy (maxBlockSize / bx))
         let bz = min mbz (min wz (maxBlockSize / (bx * by)))
 
-        let gx = min mgx (wx / bx + 1)
-        let gy = min mgy (wy / by + 1)
-        let gz = min mgz (wz / bz + 1)
+        let gx = min mgx (wx ./ bx)
+        let gy = min mgy (wy ./ by)
+        let gz = min mgz (wz ./ bz)
+
+        assert (if wx = 1 then bx = 1 && gx = 1 else true)
+        assert (if wy = 1 then by = 1 && gy = 1 else true)
+        assert (if wz = 1 then bz = 1 && gz = 1 else true)
 
         {Block = bx, by, bz; Grid = gx, gy, gz;}
 

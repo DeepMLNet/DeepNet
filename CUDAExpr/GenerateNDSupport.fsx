@@ -41,10 +41,10 @@ for dims = 0 to maxDims do
     wrt "   _dev static Pos%dD fromLinearIdx(const TArrayND &ary, size_t idx) {" dims
     wrt "     Pos%dD p;" dims
     if dims >= 1 then
-        wrt "     const size_t incr0 = 1;"
-    for d = 1 to dims - 1 do
-        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d-1) (d-1)
-    for d = dims - 1 downto 0 do
+        wrt "     const size_t incr%d = 1;" (dims-1)
+    for d = dims - 2 downto 0 do
+        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
+    for d = 0 to dims - 1 do
         wrt "     p.pos[%d] = idx / incr%d;" d d
         wrt "     idx -= p.pos[%d] * incr%d;" d d
     if dims = 0 then
@@ -62,9 +62,9 @@ for dims = 0 to maxDims do
     wrt "    template<typename TArrayND>"
     wrt "   _dev size_t toLinearIdx(const TArrayND &ary) const {"
     if dims >= 1 then
-        wrt "     const size_t incr0 = 1;"
-    for d = 1 to dims - 1 do
-        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d-1) (d-1)
+        wrt "     const size_t incr%d = 1;" (dims-1)
+    for d = dims - 2 downto 0 do
+        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
     wrt "     return %s;" (ad |>> (fun i -> prn "incr%d * pos[%d]" i i) |> cwe "0" " + ")
     wrt "   }"
     wrt "  	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }"
@@ -181,13 +181,13 @@ for dims = 0 to maxDims do
         if dims > 3 then
             let restElements = 
                 {2 .. dims - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
-            wrt "    const size_t itersRest = (%s) / (gridDim.z * blockDim.z) + 1;" restElements
+            wrt "    const size_t itersRest = divCeil(%s, gridDim.z * blockDim.z);" restElements
         if dims = 3 then
-            wrt "    const size_t iters2 = trgt.shape(2) / (gridDim.z * blockDim.z) + 1;"
+            wrt "    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);"
         if dims >= 2 then
-            wrt "    const size_t iters1 = trgt.shape(1) / (gridDim.y * blockDim.y) + 1;"
+            wrt "    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);"
         if dims >= 1 then
-            wrt "    const size_t iters0 = trgt.shape(0) / (gridDim.x * blockDim.x) + 1;"
+            wrt "    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);"
 
         if dims > 3 then
             wrt "    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {"
@@ -258,47 +258,46 @@ for dims = 0 to maxDims do
         wrt "}"
         wrt ""
 
-    let elementwiseHeterogenousLoop fBody =
-        wrt "" 
-        wrt "    const size_t iters = trgt.size() / (gridDim.x * blockDim.x) + 1;" 
-        wrt "    for (size_t iter = 0; iter < iters; iter++) {"
-        wrt "    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);"   
-        wrt "    if (idx < trgt.size()) {"
-
-        wrt ""
-        fBody dims
-        wrt ""
-
-        wrt "    }"
-        wrt "    }"
-
-    let elementwiseHeterogenousWrapper ary =
-        let srcTmpl = 
-            {0 .. ary - 1} |> Seq.map (sprintf "typename TSrc%d") |> Seq.toList
-        let allTmpl = "typename TTarget" :: srcTmpl
-        wrt "template <typename TElemwiseOp, %s>" (allTmpl |> cw ", ")
-
-        let srcArgDecls =
-            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
-        let allArgDecls = "const TElemwiseOp &op" :: "TTarget &trgt" :: srcArgDecls
-        wrt "_dev void elemwise%dAry%dDHeterogenous(%s) {" ary dims (allArgDecls |> cw ", ")        
-        elementwiseHeterogenousLoop (fun dims ->      
-            let srcArgs = 
-                {0 .. ary - 1} 
-                |> Seq.map (fun a -> sprintf "src%d.element(src%d.linearIdxToPos(idx))" a a) 
-                |> Seq.toList
-            let allArgs = srcArgs
-            wrt "  trgt.element(trgt.linearIdxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
-        wrt "}"
-        wrt ""
-
-
     for ary = 0 to maxArity do
         for withIndexes in [true; false] do
             elementwiseWrapper ary withIndexes
-        elementwiseHeterogenousWrapper ary
 
-    ()
+let elementwiseHeterogenousLoop fBody =
+    wrt "" 
+    wrt "    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);" 
+    wrt "    for (size_t iter = 0; iter < iters; iter++) {"
+    wrt "    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);"   
+    wrt "    if (idx < trgt.size()) {"
+
+    wrt ""
+    fBody ()
+    wrt ""
+
+    wrt "    }"
+    wrt "    }"
+
+let elementwiseHeterogenousWrapper ary =
+    let srcTmpl = 
+        {0 .. ary - 1} |> Seq.map (sprintf "typename TSrc%d") |> Seq.toList
+    let allTmpl = "typename TTarget" :: srcTmpl
+    wrt "template <typename TElemwiseOp, %s>" (allTmpl |> cw ", ")
+
+    let srcArgDecls =
+        {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
+    let allArgDecls = "const TElemwiseOp &op" :: "TTarget &trgt" :: srcArgDecls
+    wrt "_dev void elemwise%dAryHeterogenous(%s) {" ary (allArgDecls |> cw ", ")        
+    elementwiseHeterogenousLoop (fun () ->      
+        let srcArgs = 
+            {0 .. ary - 1} 
+            |> Seq.map (fun a -> sprintf "src%d.element(src%d.linearIdxToPos(idx))" a a) 
+            |> Seq.toList
+        let allArgs = srcArgs
+        wrt "  trgt.element(trgt.linearIdxToPos(idx)) = op(%s);" (allArgs |> cw ", "))        
+    wrt "}"
+    wrt ""
+
+for ary = 0 to maxArity do
+    elementwiseHeterogenousWrapper ary
 
 
 // save only if content changed to preserve modification time
