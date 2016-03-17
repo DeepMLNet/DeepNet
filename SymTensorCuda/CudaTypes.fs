@@ -18,11 +18,15 @@ open SymTensor.Compiler
 module Debug =
     /// redirects all stream calls to the null stream
     [<Literal>]
-    let DisableStreams = true
+    let DisableStreams = false
 
     /// outputs messages when a function / kernel is launched
     [<Literal>]
-    let TraceCalls = true
+    let TraceCalls = false
+
+    /// compiles kernels with debug information and no optimizations
+    [<Literal>]
+    let DebugCompile = false
 
 
 [<AutoOpen>]

@@ -58,12 +58,18 @@ module Compile =
         let modName = generateCudaModName ()
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-        let cmplrArgs = [|
+        let cmplrArgs = [
             "--std=c++11";
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--gpu-architecture=%s" gpuArch; 
             sprintf "--include-path=\"%s\"" includePath
-        |]
+        ]
+
+        let dbgArgs = 
+            if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
+            else []
+
+        let cmplrArgs = cmplrArgs @ dbgArgs
 
         dumpCode modName modCode
 
@@ -73,7 +79,7 @@ module Compile =
             | Some ptx -> ptx
             | None ->
                 printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modName 
-                try cmplr.Compile(cmplrArgs)
+                try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
@@ -131,16 +137,20 @@ module Compile =
         let modName = generateCudaModName ()
         let libName = (Path.GetFileNameWithoutExtension modName) + ".dll"
 
+        // build argument list
         let baseCmplrArgs = [
             "--shared";
             "--machine 64";
-            "--debug";
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
             sprintf "--gpu-architecture=%s" gpuArch; 
             sprintf "--gpu-code=%s" gpuCode;
             sprintf "--include-path=\"%s\"" includePath
         ]
+        let dbgArgs = 
+            if Debug.DebugCompile then ["--debug"; "--device-debug"; "--generate-line-info"]
+            else ["--optimize 2"]
+        let baseCmplrArgs = baseCmplrArgs @ dbgArgs
         let cmplrArgs = 
             baseCmplrArgs @ [
                 sprintf "-o \"%s\"" libName;
