@@ -273,6 +273,10 @@ module ArrayND =
     let inline broadcastToShape shp a =
         relayout (ArrayNDLayout.broadcastToShape shp (layout a)) a
 
+    /// returns true if at least one dimension is broadcasted
+    let inline isBroadcasted a =
+        ArrayNDLayout.isBroadcasted (layout a)
+
     /// Reshape array assuming a contiguous (row-major) memory layout.
     /// The current memory layout (as given by the strides) has no influence 
     /// on the reshape operation.

@@ -141,8 +141,11 @@ module CudaExecUnit =
 
         // target that reuses a srcView, if it may be overwritten
         let inplaceOvrwrtTrgt =
-            match List.tryFindIndex not srcShared with
-            | Some i -> srcs.[i], false
+            match List.zip srcs srcShared 
+                  |> List.tryFind (fun (src, shared) ->
+                                       not (ArrayND.isBroadcasted src) && 
+                                       not shared) with
+            | Some (src, _) -> src, false
             | None -> outplaceTrgt     
 
         match op with
@@ -455,16 +458,16 @@ module CudaExecUnit =
             let varShp, varType = ArrayND.shape srcs.[0], srcs.[0].TypeName
 
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev when trgt.Storage <> (MemExternal vs) -> 
+            | LocDev when srcs.[0].Storage = (MemExternal vs) ->
+                // Source was evaluated directly into the variable storage.
+                // No copy necessary.
+                []
+            | LocDev  -> 
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
                 // We assume that all device vars are continguous.
                 let dv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
                 copyExecItems dv srcs.[0]
-            | LocDev ->
-                // Source was evaluated directly into the variable storage.
-                // No copy necessary.
-                []
             | LocHost ->            
                 let copyItems, memcpySrc = 
                     if ArrayND.isContiguous srcs.[0] then 

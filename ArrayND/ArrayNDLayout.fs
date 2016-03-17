@@ -162,6 +162,11 @@ module ArrayNDLayout =
             | _ -> failwithf "cannot broadcast shape %A to shape %A" (shape ain) bs
         a
 
+    /// returns true if at least one dimension is broadcasted
+    let inline isBroadcasted a =
+        (shape a, stride a)
+        ||> List.exists2 (fun shp str -> str = 0 && shp > 1)
+
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
     let inline reshape shp a =

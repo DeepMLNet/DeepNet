@@ -173,7 +173,7 @@ module Trace =
             out ""
 
             for idx, evnt in Seq.indexed exprEval.Trace do
-                out "Event index:  %d" idx
+                out "Event index: %d" idx
                 match evnt with
                 | ExprEvaled (uexpr, res, msg) ->
                     out "Expression: %A" uexpr
