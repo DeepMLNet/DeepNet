@@ -82,10 +82,10 @@ let ``Test neural net`` device =
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
-    for itr = 0 to 0 do
+    for itr = 0 to 2 do
         optFun tstImgs tstLbls |> ignore
-        //let l = lossFun tstImgs tstLbls
-        //printfn "Loss afer %d iterations: %A" itr l
+        let l = lossFun tstImgs tstLbls
+        printfn "Loss afer %d iterations: %A" itr l
 
     ()
 
