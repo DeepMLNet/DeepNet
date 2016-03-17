@@ -51,12 +51,12 @@ let ``Test neural net`` device =
         mnist.TstImgs
         |> ArrayND.reorderAxes [2; 0; 1] 
         |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
-        |> fun x -> x.[*, 0..10]
+        //|> fun x -> x.[*, 0..10]
         |> post
     let tstLbls =  
         mnist.TstLbls
         |> ArrayND.reorderAxes [1; 0] 
-        |> fun x -> x.[*, 0..10]
+        //|> fun x -> x.[*, 0..10]
         |> post
 
     // infer sizes and variable locations from dataset
@@ -78,19 +78,28 @@ let ``Test neural net`` device =
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
 
-    let opt = Optimizers.gradientDescent {Step=1e-1f} loss mc.ParameterSet.Flat   
+    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
-    for itr = 0 to 2 do
+    let iters = 1000
+    for itr = 0 to iters do
         optFun tstImgs tstLbls |> ignore
-        let l = lossFun tstImgs tstLbls
-        printfn "Loss afer %d iterations: %A" itr l
+    let l = lossFun tstImgs tstLbls
+    printfn "Loss afer %d iterations: %A" iters l
 
     ()
 
 
 let compareHostCuda func =
+    printfn "Evaluating on host..."
+    func DevHost
+    printfn "Evaluating on CUDA device..."
+    func DevCuda
+    printfn "Done."
+
+
+let compareTraceHostCuda func =
     printfn "Evaluating on host..."
     Trace.startSession "Host"
     func DevHost
@@ -138,9 +147,9 @@ let main argv =
     Basics.Cuda.CudaSup.init ()
     ManagedCuda.CudaContext.ProfilerStart()
 
-    //``Test neural net`` ()
-    compareHostCuda ``Test neural net``
-
+    //compareTraceHostCuda ``Test neural net`` 
+    //compareHostCuda ``Test neural net`` 
+    ``Test neural net`` DevCuda
 
     //``Test Autoencoder`` ()
 

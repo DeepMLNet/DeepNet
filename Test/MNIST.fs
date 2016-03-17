@@ -57,7 +57,7 @@ module Mnist =
         let nCols = imageReader.ReadInt32() |> swapEndians
 
         let nSamples = 
-            if TestDataset then min 500 nSamples
+            if TestDataset then min 2000 nSamples
             else nSamples
 
         for smpl in 0 .. nSamples - 1 do
@@ -88,7 +88,8 @@ module Mnist =
          TstImgs = tstImgs; TstLbls = tstLbls;}
 
     let load directory =
-        let hdfPath = Path.Combine (directory, "MNIST.h5")
+        let testStr = if TestDataset then "-Test" else ""
+        let hdfPath = Path.Combine (directory, sprintf "MNIST%s.h5" testStr)
         if File.Exists hdfPath then
             use hdf = new HDF5 (hdfPath, HDF5Read)
             {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
