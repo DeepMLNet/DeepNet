@@ -21,6 +21,7 @@
 #include "Utils.cuh"
 
 
+//#define TRACE_BUFFER_ALLOCATOR
 //#define PRINT_BUFFER_ALLOCATOR_STATS
 
 
@@ -29,6 +30,8 @@
 class buffer_allocator 
 {
   private:
+	static const std::ptrdiff_t alignment = 8;
+
 	std::string name;
 	char *buffer;
 	const size_t size;
@@ -68,23 +71,35 @@ class buffer_allocator
 		// check if enough memory is available
 		if (pos + num_bytes >= size)
 		{	
-			std::cerr << "buffer_allocator is out of memory " <<
+			std::cerr << "buffer_allocator " << name << " is out of memory " <<
 				"while processing request of size " << (num_bytes / 1024) << "kB" << std::endl;
 			print_statistics();
 			throw std::bad_alloc();
 		}
 
-		// perform allocation
-		char *result = buffer + pos;
-		pos += num_bytes;
+		// perform allocation, rounding up to satisfy alignment
+		char *ptr = buffer + pos;
+		std::ptrdiff_t padded = (num_bytes / alignment + 1) * alignment;
+		pos += padded;
 		allocs++;
-		return result;
+
+		#ifdef TRACE_BUFFER_ALLOCATOR
+		std::cout << "buffer allocator " << name << " allocated " << num_bytes << " bytes " <<
+			"at 0x" << std::hex << static_cast<void *>(ptr) << std::endl;
+		#endif	
+
+		return ptr;
     }
 
     void deallocate(char *ptr, size_t num_bytes)
     {
 		// we do not free any memory
 		freed += num_bytes;
+
+		#ifdef TRACE_BUFFER_ALLOCATOR
+		std::cout << "buffer allocator " << name << " freed " << num_bytes << " bytes " <<
+			"at 0x" << std::hex << static_cast<void *>(ptr) << std::endl;
+		#endif	
     }
 };
 
@@ -93,6 +108,9 @@ class buffer_allocator
 template <typename TArrayND>
 class ArrayNDRange
 {
+protected:
+	TArrayND BaseArray;
+
 public:
 	typedef float TValue;
 	typedef typename thrust::device_ptr<TValue> BaseIterator;
@@ -100,14 +118,15 @@ public:
 
     struct IndexFunctor : public thrust::unary_function<difference_type, difference_type>
     {
-        IndexFunctor(TArrayND baseArray) : BaseArray(baseArray) {}
+        TArrayND BaseArray;
+		
+		IndexFunctor(TArrayND baseArray) : BaseArray(baseArray) {}
+
         _dev difference_type operator()(const difference_type& linearIdx) const
         { 
 			// return the element position index given a linear index
 			return BaseArray.index(BaseArray.linearIdxToPos(linearIdx));
         }
-
-        TArrayND BaseArray;
     };
 
     typedef typename thrust::counting_iterator<difference_type>                   CountingIterator;
@@ -128,6 +147,4 @@ public:
         return begin() + BaseArray.size();
     }
     
-protected:
-	TArrayND BaseArray;
 };

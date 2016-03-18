@@ -83,10 +83,12 @@ let ``Test neural net`` device =
     
     printfn "Optimizing..."
     let iters = 1000
+    ManagedCuda.CudaContext.ProfilerStart()
     for itr = 0 to iters do
         optFun tstImgs tstLbls |> ignore
     let l = lossFun tstImgs tstLbls
     printfn "Loss afer %d iterations: %A" iters l
+    ManagedCuda.CudaContext.ProfilerStop()
 
     ()
 
@@ -145,7 +147,6 @@ let ``Test Autoencoder`` () =
 [<EntryPoint>]
 let main argv = 
     Basics.Cuda.CudaSup.init ()
-    ManagedCuda.CudaContext.ProfilerStart()
 
     //compareTraceHostCuda ``Test neural net`` 
     //compareHostCuda ``Test neural net`` 

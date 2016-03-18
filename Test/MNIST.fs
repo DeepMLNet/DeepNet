@@ -22,7 +22,7 @@ module MnistTypes =
 module Mnist = 
 
     [<Literal>]
-    let TestDataset = true
+    let TestDataset = false
 
     let private assemble dataSeq =
         let data = List.ofSeq dataSeq
