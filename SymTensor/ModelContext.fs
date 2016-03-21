@@ -146,10 +146,7 @@ module ModelContextTypes =
         let mutable symSizes = []
 
         let toSizeSpec (name: string) =            
-            if name.StartsWith ">" then 
-                let fullName = context + "." + name
-                SizeSpec.flexSymbol fullName
-            else SizeSpec.symbol name
+            SizeSpec.symbol name
 
         let toShapeSpec (shapeObj: obj list) =
             shapeObj |> List.map
@@ -242,7 +239,9 @@ module ModelContextTypes =
 
         /// sets a symbolic size to a value
         member this.SetSize size value =
-            symSizeEnv <- SymSizeEnv.needEqual size (SizeSpec.fix value) symSizeEnv
+            match size with
+            | Base (Sym sym) -> symSizeEnv <- SymSizeEnv.add sym (SizeSpec.fix value) symSizeEnv
+            | _ -> failwith "need a size symbol to set size"
 
         /// sets the location of the given variable
         member this.SetLoc var loc =

@@ -48,12 +48,22 @@ module VarEnv =
         Map.join a b
 
     /// infers symbol sizes from the variable environment
-    let inferSymSizes (varEnv: VarEnvT) =
+    let inferSymSizes (varEnv: VarEnvT) : SymSizeEnvT =
         varEnv |> Map.fold 
-            (fun env vSym vVal ->
-                let symShape = UVarSpec.shape vSym
-                let valShape = ArrayND.shape vVal |> List.map (Fixed >> Base)
-                SymSizeEnv.needEqualShape symShape valShape env)
+            (fun env vSym vVal ->                
+                (UVarSpec.shape vSym, ArrayND.shape vVal)
+                ||> List.zip
+                |> List.fold (fun env (svSym, svVal) ->
+                    match SizeSpec.simplify svSym with
+                    | Base (Sym sym) -> env |> SymSizeEnv.add sym (Base (Fixed svVal))
+                    | Base (Fixed f) -> 
+                        if f = svVal then env
+                        else failwithf "%A <> %d" svSym svVal
+                    | Broadcast ->
+                        if 1 = svVal then env
+                        else failwithf "1 <> %d" svVal
+                    | Multinom m -> failwithf "%A <> %d" m svVal
+                ) env)
             SymSizeEnv.empty 
 
     /// substitues the given symbol sizes into the variable environment

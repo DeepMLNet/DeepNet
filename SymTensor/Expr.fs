@@ -1,5 +1,7 @@
 ﻿namespace SymTensor
 
+open System.Collections.Generic
+
 open Basics
 open ArrayNDNS
 open ShapeSpec
@@ -325,63 +327,65 @@ module Expr =
     let broadcastIfNecessary ss expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
-    /// Infers symbol sizes from the given expression and checks ops' arguments for compatible shapes.
-    let rec inferSymSizes (expr: ExprT<'T>) =
-        match expr with
-        | Leaf op ->
-            SymSizeEnv.empty
+    /// expressions that were already checked for correctness
+    let checkedExprs = HashSet<obj>()
 
-        | Unary (op, a) ->
-            let env = inferSymSizes a
-            let sa = shapeOf a
+    /// Checks ops' arguments for compatible shapes.
+    let rec checkExpr (expr: ExprT<'T>) =
+        if not (checkedExprs.Contains expr) then
+            let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
+                if not (ssa .= ssb) then failwithf "%A <> %A" ssa ssb
+            let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
+                List.iter2 (.=) sa sb
 
-            match op with
-            | SumAxis(ax) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
-                failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
-            | Reshape(ss) ->
-                SymSizeEnv.needEqual (ShapeSpec.nElem sa) (ShapeSpec.nElem ss) env
-            | DoBroadcast(ss) -> 
-                if ShapeSpec.nDim ss <> ShapeSpec.nDim sa then
-                    failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
-                        sa ss
+            match expr with 
+            | Leaf op -> ()           
 
-                let mutable env = env
-                for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
-                    match sa.[dim], ss.[dim] with
-                    | SizeSpecT.Broadcast, _ -> ()
-                    | ssa, ssb -> env <- SymSizeEnv.needEqual ssa ssb env
-                env
+            | Unary (op, a) ->
+                checkExpr a
+                let sa = shapeOf a
+                match op with
+                | SumAxis(ax) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
+                    failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
+                | Reshape(ss) ->
+                    (ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss) 
+                | DoBroadcast(ss) -> 
+                    if ShapeSpec.nDim ss <> ShapeSpec.nDim sa then
+                        failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
+                            sa ss
+                    for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
+                        match sa.[dim], ss.[dim] with
+                        | SizeSpecT.Broadcast, _ -> ()
+                        | ssa, ssb -> ssa .= ssb
+                | SwapDim(ax1, ax2) when 
+                        not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
+                    failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+                | StoreToVar vs ->
+                    sa ..= (VarSpec.shape vs)
+                | _ -> ()
 
-            | SwapDim(ax1, ax2) when 
-                    not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
-                failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
-            | StoreToVar vs ->
-                SymSizeEnv.needEqualShape sa (VarSpec.shape vs) env
-            | _ -> env
+            | Binary (op, a, b) ->
+                checkExpr a
+                checkExpr b
+                let sa, sb = shapeOf a, shapeOf b
+                match op with
+                | BinaryElemwiseOp ->
+                    sa ..= sb 
+                | Dot -> 
+                    match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+                    | 2, 2 -> sa.[1] .= sb.[0] 
+                    | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
+                | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
+                    failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
+                | _ -> ()
 
-        | Binary (op, a, b) ->
-            let env = SymSizeEnv.merge (inferSymSizes a) (inferSymSizes b)
-            let sa, sb = shapeOf a, shapeOf b
+            | Nary (op, es) ->
+                es |> List.iter checkExpr
+                let ss = es |> List.map shapeOf
+                match op with
+                | _ -> ()
 
-            match op with
-            | BinaryElemwiseOp ->
-                SymSizeEnv.needEqualShape sa sb env
-            | Dot -> 
-                match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                | 2, 2 -> SymSizeEnv.needEqual sa.[1] sb.[0] env
-                | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-            | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
-                failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
-            | _ -> env
-
-        | Nary (op, es) ->
-            let env = 
-                es |> List.fold (fun env a -> SymSizeEnv.merge env (inferSymSizes a)) SymSizeEnv.empty 
-            let ss =
-                es |> List.map shapeOf
-
-            match op with
-            | _ -> env
+            checkedExprs.Add expr |> ignore
 
     /// substitues the given symbol sizes into the expression
     let rec substSymSizes symSizes (expr: ExprT<'T>) =
@@ -407,10 +411,6 @@ module Expr =
 
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
-    /// Infers symbol sizes from the given expression and substitues them into the expression.
-    let inferAndSubstSymSizes (expr: ExprT<'T>) =
-        substSymSizes (inferSymSizes expr) expr
-
     /// true if all shapes in the expression can be evaluated to numeric shapes
     let rec canEvalAllSymSizes (expr: ExprT<'T>) =
         match expr with
@@ -433,7 +433,7 @@ module Expr =
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT<'T>) : ExprT<'T> =
-        inferSymSizes expr |> ignore
+        checkExpr expr |> ignore
         expr
 
     /// Replaces all occurences of "part" in "expr" with "replacement".

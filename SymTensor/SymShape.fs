@@ -9,7 +9,6 @@ module SizeSymbolTypes =
     [<StructuredFormatDisplay ("\"{Name}\"")>]
     type SizeSymbolT = {
         Name:       string;
-        Flexible:   bool;
     }
 
     /// elementary size specification, can be either a symbol or a fixed quantity
@@ -25,14 +24,8 @@ module SizeSymbolTypes =
 
 
 module SizeSymbol =
-    [<Literal>]
-    let AllowFlexible = false
-
     let name sym =
         sym.Name
-
-    let isFlexible sym =
-        AllowFlexible && sym.Flexible
 
 
 //[<AutoOpen>]
@@ -305,29 +298,11 @@ module SizeSpec =
 
     /// symbolic size
     let symbol s =
-        Base (Sym {Name=s; Flexible=false})
-
-    /// flexible symbolic size
-    let flexSymbol s =
-        if not SizeSymbol.AllowFlexible then
-            failwith "flexible symbol support is disabled"
-        Base (Sym {Name=s; Flexible=true})
+        Base (Sym {Name=s})
 
     /// broadcastable size one
     let broadcastable =
         Broadcast
-
-    /// true if SizeSpec contains at least one flexible symbol
-    let isFlexible ss =
-        match ss with
-        | Base (Sym sym) -> SizeSymbol.isFlexible sym
-        | Base (Fixed _) -> false
-        | Broadcast -> false
-        | Multinom m ->            
-            m.Products
-            |> Map.exists (fun prod _ -> 
-                prod.Symbols
-                |> Map.exists (fun sym _ -> SizeSymbol.isFlexible sym))
 
     /// substitute the symbols into the SizeSpec and simplifies it
     let rec substSymbols symVals ss =
