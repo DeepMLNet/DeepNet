@@ -78,7 +78,7 @@ let ``Test neural net`` device =
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
 
-    let opt = Optimizers.gradientDescent {Step=1e-3f} loss mc.ParameterSet.Flat   
+    let opt = Optimizers.gradientDescent {Step=1e-6f} loss mc.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
