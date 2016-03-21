@@ -19,14 +19,9 @@ module ArrayNDTypes =
     let unsupLoc loc =
         failwithf "location %A is unsupported for this operation" loc
 
-    /// object that can be queried for shape
-    type IHasLayout =
-        /// shape of object
-        abstract Layout: ArrayNDLayoutT
-
     /// ArrayND of any type
     type IArrayNDT =
-        inherit IHasLayout
+        abstract Layout:            ArrayNDLayoutT
         abstract CPPType:           string
         abstract NewView:           ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
@@ -119,9 +114,8 @@ module ArrayND =
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
 
-        interface IHasLayout with
-            member this.Layout = this.Layout
         interface IArrayNDT with
+            member this.Layout = this.Layout
             member this.CPPType = this.CPPType         
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
@@ -164,7 +158,7 @@ module ArrayND =
     let inline location (a: #IArrayNDT) = a.Location
 
     /// layout
-    let inline layout (a: IHasLayout) = a.Layout
+    let inline layout (a: #IArrayNDT) = a.Layout
 
     /// number of dimensions
     let inline nDims a = layout a |> ArrayNDLayout.nDims

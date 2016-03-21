@@ -25,10 +25,6 @@ module ArrayNDManikinTypes =
         | MemAlloc of MemAllocManikinT
         | MemExternal of UVarSpecT
 
-    type IArrayNDManikin =
-        abstract member Storage : MemManikinT
-        abstract member TypeName : TypeNameT
-
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     type ArrayNDManikinT (layout: ArrayNDLayoutT, storage: MemManikinT) = 
         inherit ArrayNDT<int> (layout)  // generic type does not matter since we do not store data
@@ -41,12 +37,6 @@ module ArrayNDManikinTypes =
             match storage with
             | MemAlloc {TypeName=tn} -> tn
             | MemExternal vs -> vs.TypeName
-
-        interface IHasLayout with
-            member this.Layout = this.Layout
-        interface IArrayNDManikin with
-            member this.Storage = this.Storage
-            member this.TypeName = this.TypeName
 
         override this.Item
             with get pos = failwith "ArrayNDManikin does not store data"
@@ -85,14 +75,12 @@ module ArrayNDManikin =
         let layout = ArrayNDLayout.newContiguous shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
-//            :> ArrayNDT<int>
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout
     let inline newColumnMajor memAllocator typ shape = 
         let layout = ArrayNDLayout.newColumnMajor shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
-            //:> ArrayNDT<int>
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
     let inline externalContiguous storage shape =
