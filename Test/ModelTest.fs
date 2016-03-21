@@ -48,6 +48,9 @@ let ``Test neural net build`` () =
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
 
+    let opt = Optimizers.gradientDescent {Step=1e-6f} loss mc.ParameterSet.Flat   
+    let optFun = mi.Func opt |> arg2 input target
+    
 
     printfn "Model build time: %A" sw.Elapsed
     ()
@@ -139,12 +142,10 @@ let ``Test neural net`` device =
     
     printfn "Optimizing..."
     let iters = 1000
-    ManagedCuda.CudaContext.ProfilerStart()
     for itr = 0 to iters do
         optFun tstImgs tstLbls |> ignore
     let l = lossFun tstImgs tstLbls
     printfn "Loss afer %d iterations: %A" iters l
-    ManagedCuda.CudaContext.ProfilerStop()
 
     ()
 
@@ -205,9 +206,9 @@ let main argv =
     Basics.Cuda.CudaSup.init ()
     Basics.Cuda.CudaSup.printInfo()
 
-    ``Test MNIST load`` ()
+    //``Test MNIST load`` ()
 
-    //``Test neural net build`` ()
+    ``Test neural net build`` ()
 
     //compareTraceHostCuda ``Test neural net`` 
     //compareHostCuda ``Test neural net`` 
