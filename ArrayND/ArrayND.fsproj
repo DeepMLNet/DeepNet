@@ -76,6 +76,7 @@
     <Content Include="ArrayNDSliceMembers.txt" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ArrayNDLayout.fs" />
+    <Compile Include="FastLayout.fs" />
     <Compile Include="ArrayND.fs" />
     <Compile Include="ArrayNDHost.fs" />
     <Compile Include="ArrayNDHostReg.fs" />

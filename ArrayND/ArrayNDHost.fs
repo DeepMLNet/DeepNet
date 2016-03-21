@@ -10,102 +10,82 @@ open ArrayND
 [<AutoOpen>]
 module ArrayNDHostTypes = 
 
-    /// Pinned (unmovable) memory (from .NET or other source).
-    /// Can be used to obtain a pointer.
-    type IPinnedMemory =
-        inherit IDisposable
-        /// pointer to storage buffer (implementation specific)
-        abstract Ptr: IntPtr
-
-    /// type-neutral host storage for an ArrayND
-    type IHostStorage =
-        abstract Pin: unit -> IPinnedMemory
-        abstract SizeInBytes: int
-
-    /// host storage for an ArrayND
-    type IHostStorage<'T> = 
-        inherit IHostStorage
-        abstract Item: int -> 'T with get, set
-        abstract Pin: unit -> IPinnedMemory
-        abstract Size: int
-
     /// pinned .NET managed memory
-    type PinnedManagedMemoryT (gcHnd: GCHandle) =       
-        interface IPinnedMemory with
-            member this.Ptr = gcHnd.AddrOfPinnedObject()
+    type PinnedMemoryT (gcHnd: GCHandle) =       
+        /// pointer to storage array 
+        member this.Ptr = gcHnd.AddrOfPinnedObject()
+
+        interface IDisposable with
             member this.Dispose() = gcHnd.Free()
 
-    // ArrayND storage in a managed .NET array
-    type ManagedArrayStorageT<'T> (data: 'T[]) =
-        new (size: int) = ManagedArrayStorageT<'T>(Array.zeroCreate size)
-
-        member this.Pin () =
-            let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-            new PinnedManagedMemoryT (gcHnd) :> IPinnedMemory    
-
-        member this.Size = data.Length
-        member this.SizeInBytes = data.Length * sizeof<'T>
-        member this.Data = data
-
-        interface IHostStorage with
-            member this.Pin () = this.Pin ()
-            member this.SizeInBytes = this.SizeInBytes
-
-        interface IHostStorage<'T> with
-            member this.Item 
-                with get(index) = data.[index]
-                and set index value = data.[index] <- value
-            member this.Pin () = this.Pin ()        
-            member this.Size = this.Size
 
     type IArrayNDHostT =
         inherit IArrayNDT
-        abstract Storage: IHostStorage
+        abstract Pin: unit -> PinnedMemoryT
+        abstract DataObj: obj
+        abstract DataSizeInBytes: int
+
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
-    type ArrayNDHostT<'T> (layout: ArrayNDLayoutT, storage: IHostStorage<'T>) = 
+    type ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
+                           data:        'T []) = 
         inherit ArrayNDT<'T>(layout)
         
         /// a new ArrayND in host memory using a managed array as storage
         new (layout: ArrayNDLayoutT) =
-            ArrayNDHostT<'T>(layout, ManagedArrayStorageT<'T>(ArrayNDLayout.nElems layout))
+            ArrayNDHostT<'T>(layout, Array.zeroCreate (ArrayNDLayout.nElems layout))
 
-        /// storage
-        member this.Storage = storage
+        /// underlying data array
+        member this.Data = data
+
+        /// optimized layout operations
+        member this.FastLayout = FastLayout.ofLayout layout
+
+        /// pins the underlying data array and returns the corresponding GCHandle
+        member this.Pin () =
+            let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
+            new PinnedMemoryT (gcHnd) 
+
+        /// size of underlying data array in bytes
+        member this.DataSizeInBytes = data.Length * sizeof<'T>
+
+        interface IArrayNDHostT with
+            member this.Pin () = this.Pin ()
+            member this.DataObj = box data
+            member this.DataSizeInBytes = this.DataSizeInBytes
 
         override this.Location = LocHost
 
         override this.Item
-            with get pos = storage.[ArrayNDLayout.addr pos layout]
+            with get pos = data.[ArrayNDLayout.addr pos layout]
             and set pos value = 
                 ArrayND.doCheckFinite value
-                storage.[ArrayNDLayout.addr pos layout] <- value 
+                data.[ArrayNDLayout.addr pos layout] <- value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             ArrayNDHostT<'T>(layout) :> ArrayNDT<'T>
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDHostT<'T>(layout, storage) :> ArrayNDT<'T>
-
-        interface IArrayNDHostT with
-            member this.Storage = this.Storage :> IHostStorage
-
-
+            ArrayNDHostT<'T>(layout, data) :> ArrayNDT<'T>
 
         override this.CopyTo (dest: ArrayNDT<'T>) =
             ArrayNDT<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDHostT<'T> as dest ->
-                match this.Storage, dest.Storage with
-                | (:? ManagedArrayStorageT<'T> as ts), (:? ManagedArrayStorageT<'T> as ds) ->
-                    if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
-                            ArrayND.stride this = ArrayND.stride dest then
-                        // use block copy
-                        let nElems = ArrayNDLayout.nElems this.Layout
-                        Array.Copy (ts.Data, this.Layout.Offset, ds.Data, dest.Layout.Offset, nElems)
-                    else 
-                        base.CopyTo dest
-                | _ -> base.CopyTo dest
+
+                if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
+                        ArrayND.stride this = ArrayND.stride dest then
+                    // use array block copy
+                    let nElems = ArrayNDLayout.nElems this.Layout
+                    Array.Copy (this.Data, this.Layout.Offset, dest.Data, dest.Layout.Offset, nElems)
+                else
+                    // copy element by element
+                    let destData = dest.Data
+                    let destAddrs = FastLayout.allAddr dest.FastLayout
+                    let thisAddrs = FastLayout.allAddr this.FastLayout
+                    for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
+                        destData.[destAddr] <- data.[thisAddr]
+
             | _ -> base.CopyTo dest
                               
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
@@ -167,12 +147,12 @@ module ArrayNDHost =
 
     /// Creates an ArrayNDT using the specified data and shape with contiguous (row major) layout.
     /// The data is referenced, not copied.
-    let ofArray (data: 'T array) shp =
+    let ofArray (data: 'T []) shp =
         let layout = ArrayNDLayout.newContiguous shp
         if ArrayNDLayout.nElems layout <> Array.length data then
             failwithf "specified shape %A has %d elements, but passed data array has %d elements"
                 shp (ArrayNDLayout.nElems layout) (Array.length data)
-        ArrayNDHostT<'T> (layout, ManagedArrayStorageT<'T> (data)) 
+        ArrayNDHostT<'T> (layout, data) 
         
     /// Creates a ArrayNDT of given type and layout in host memory.
     let newOfType typ (layout: ArrayNDLayoutT) = 

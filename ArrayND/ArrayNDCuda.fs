@@ -19,79 +19,51 @@ module ArrayNDCudaTypes =
     let (|LocDev|_|) arg =
         if arg = ArrayLoc "CUDA" then Some () else None
 
-    type IDeviceStorage =
-        abstract ByteData: CudaDeviceVariable<byte>
-
-    type IDeviceStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> =
-        inherit IDeviceStorage
-        abstract Item: int -> 'T with get, set
-        abstract Data: CudaDeviceVariable<'T>
-
-    /// Storage in a CudaDeviceVariable. 
-    /// The underlying CudaDeviceVariable is disposed when this object is finalized.
-    type CudaDeviceVariableStorageT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                                                                               (data: CudaDeviceVariable<'T>) =
-
-        new (size: int) = 
-            CudaSup.init()
-            CudaDeviceVariableStorageT<'T> (new CudaDeviceVariable<'T> (SizeT(size)))
-
-        interface IDeviceStorage<'T> with
-            member this.Item 
-                with get(index) = 
-                    let hostBuf = ref (new 'T())
-                    data.CopyToHost(hostBuf, SizeT(index * sizeof<'T>))
-                    !hostBuf
-                and set index (value: 'T) = 
-                    data.CopyToDevice(value, SizeT(index * sizeof<'T>))
-
-            member this.Data = data
-
-        interface IDeviceStorage with
-            member this.ByteData =
-                new CudaDeviceVariable<byte> (data.DevicePointer, data.SizeInBytes)
-
-        override this.Finalize() =
-            data.Dispose()
-
-        member this.CudaDeviceVariabe = data
-
-
     /// type-neutral interface to an ArrayNDCudaT
     type IArrayNDCudaT =
         inherit IArrayNDT
-        abstract Storage: IDeviceStorage
+        abstract ByteData: CudaDeviceVariable<byte>
         abstract ToHost: unit -> IArrayNDHostT
 
     /// an N-dimensional array with reshape and subview abilities stored in GPU device memory
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                     (layout: ArrayNDLayoutT, 
-                                     storage: IDeviceStorage<'T>) = 
+                                     data: CudaDeviceVariable<'T>) = 
         inherit ArrayNDT<'T>(layout)
         
+        let getElement index =
+            let hostBuf = ref (new 'T())
+            data.CopyToHost(hostBuf, SizeT(index * sizeof<'T>))
+            !hostBuf
+
+        let setElement index (value: 'T) =
+            data.CopyToDevice(value, SizeT(index * sizeof<'T>))
+
         /// a new ArrayND stored on the GPU using newly allocated device memory
         new (layout: ArrayNDLayoutT) =
             let elems = ArrayNDLayout.nElems layout
             // CUDA cannot allocate memory of size zero
             let size = if elems > 0 then elems else 1
-            ArrayNDCudaT<'T> (layout, CudaDeviceVariableStorageT<'T> size)
+            ArrayNDCudaT<'T> (layout, new CudaDeviceVariable<'T> (SizeT size))
 
         /// storage
-        member this.Storage = storage
+        member this.Data = data
+
+        override this.Finalize() = data.Dispose()
 
         override this.Location = LocDev
 
         override this.Item
-            with get pos = storage.[ArrayNDLayout.addr pos layout]
+            with get pos = getElement (ArrayNDLayout.addr pos layout)
             and set pos value = 
                 ArrayND.doCheckFinite value            
-                storage.[ArrayNDLayout.addr pos layout] <- value 
+                setElement (ArrayNDLayout.addr pos layout) value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout) :> ArrayNDT<'T>
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
+            ArrayNDCudaT<'T>(layout, data) :> ArrayNDT<'T>
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this
@@ -135,13 +107,9 @@ module ArrayNDCudaTypes =
                 invalidArg "dst" "dst must be contiguous without offset"
 
             let src = ArrayND.makeContiguousAndOffsetFree src 
-            use srcMem = src.Storage.Pin()
-        
-            match dst.Storage with
-            | :? CudaDeviceVariableStorageT<'T> as ds ->
-                ds.CudaDeviceVariabe.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
-                                                  SizeT(sizeof<'T> * ArrayND.nElems src))
-            | _ -> failwith "cannot copy to that device storage"
+            use srcMem = src.Pin()       
+            dst.Data.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
+                                    SizeT(sizeof<'T> * ArrayND.nElems src))
 
         /// Copies the specified ArrayNDHostT to the device
         static member OfHost (src: ArrayNDHostT<'T>) =
@@ -158,13 +126,9 @@ module ArrayNDCudaTypes =
                 invalidArg "dst" "dst must be contiguous without offset"
 
             let src = ArrayND.makeContiguousAndOffsetFree src 
-            use dstMem = dst.Storage.Pin()
-        
-            match src.Storage with
-            | :? CudaDeviceVariableStorageT<'T> as ds ->
-                ds.CudaDeviceVariabe.CopyToHost(dstMem.Ptr, SizeT(0), SizeT(0), 
-                                                SizeT(sizeof<'T> * ArrayND.nElems src))
-            | _ -> failwith "cannot copy from unkown device storage"
+            use dstMem = dst.Pin()
+            src.Data.CopyToHost(dstMem.Ptr, SizeT(0), SizeT(0), 
+                                            SizeT(sizeof<'T> * ArrayND.nElems src))
 
         /// Copies this ArrayNDCudaT to the host
         member this.ToHost () =
@@ -173,8 +137,9 @@ module ArrayNDCudaTypes =
             dst
 
         interface IArrayNDCudaT with
-            member this.Storage = this.Storage :> IDeviceStorage
             member this.ToHost () = this.ToHost () :> IArrayNDHostT
+            member this.ByteData =
+                new CudaDeviceVariable<byte> (data.DevicePointer, data.SizeInBytes)
 
 
 
@@ -231,12 +196,9 @@ module ArrayNDCuda =
 
     /// Creates a IArrayNDT for the given pointer, type and layout.
     let fromPtrAndType (ptr: CUdeviceptr) typ (layout: ArrayNDLayoutT) = 
-        let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
-        let devVar = Activator.CreateInstance (devVarType, [|box ptr|])
-
-        let devStorType = typedefof<CudaDeviceVariableStorageT<_>>.MakeGenericType [|typ|]
-        let devStor = Activator.CreateInstance (devStorType, [|devVar|])
+        let dataType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
+        let data = Activator.CreateInstance (dataType, [|box ptr|])
 
         let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typ|]
-        Activator.CreateInstance (aryType, [|box layout; devStor|]) :?> IArrayNDCudaT
+        Activator.CreateInstance (aryType, [|box layout; data|]) :?> IArrayNDCudaT
 

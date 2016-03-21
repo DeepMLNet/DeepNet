@@ -129,7 +129,7 @@ module CudaExecEnv =
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
             if ArrayND.offset ev = 0 && ArrayND.isContiguous ev then
-                ev.Storage.ByteData
+                ev.ByteData
             else
                 failwithf "external variable %A was expected to be contiguous \
                            with zero offset" vs 
@@ -256,7 +256,7 @@ module ArgTemplates =
                 let storage = 
                     match memManikin with
                     | MemAlloc im -> env.InternalMem.[im]
-                    | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
+                    | MemExternal vs -> env.ExternalVar.[vs].ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
 
     type SizeTArgTmpl (value: int) =
