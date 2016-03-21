@@ -53,69 +53,80 @@ module ExecUnitsTypes =
 
 module ExecUnit =
 
-    /// gets an ExecUnit by its id
-    let byId id (eus: ExecUnitT<_> list) =
-        eus |> List.find (fun eu -> eu.Id = id)
 
-    /// sorts a list of ExecUnits so that an ExecUnit comes after all ExecUnits it depends on
-    let sortByDep (unsortedEus: ExecUnitT<'e> list) =
-        let unsorted = LinkedList(unsortedEus)
-        let sorted = List<ExecUnitT<'e>>(List.length unsortedEus)
+    /// a collection of ExecUnits
+    type Collection<'e> (eus: ExecUnitT<'e> seq) =
         
-        while unsorted.Count > 0 do           
-            let toAdd =
-                unsorted
-                |> Seq.filter (fun eu -> 
-                    eu.DependsOn |> List.forall (fun depId ->
-                        sorted |> Seq.exists (fun seu -> seu.Id = depId)))
+        let byIdMap =
+            eus
+            |> Seq.map (fun eu -> eu.Id, eu)
+            |> Map.ofSeq
+
+        let dependants =
+            let build =
+                seq { for eu in eus -> eu.Id, List<ExecUnitT<_>>()}
+                |> Map.ofSeq
+            for eu in eus do
+                for d in eu.DependsOn do
+                    build.[d].Add eu
+            build
+
+        let sortedByDep =
+            let unsorted = LinkedList eus
+            let sorted = List<ExecUnitT<'e>> (Seq.length eus)
+        
+            while unsorted.Count > 0 do           
+                let toAdd =
+                    unsorted
+                    |> Seq.filter (fun eu -> 
+                        eu.DependsOn |> List.forall (fun depId ->
+                            sorted |> Seq.exists (fun seu -> seu.Id = depId)))
             
-            for eu in toAdd |> Seq.toList do
-                sorted.Add eu |> ignore
-                unsorted.Remove eu |> ignore
+                for eu in toAdd |> Seq.toList do
+                    sorted.Add eu |> ignore
+                    unsorted.Remove eu |> ignore
 
-        sorted |> Seq.toList
+            sorted |> Seq.toList
 
-    /// true if a is a successor of b. 
-    let rec isSuccessorOf (a: ExecUnitT<_>) (b: ExecUnitT<_>) eus =
-        if b.DependsOn |> List.contains a.Id then true
-        else a.DependsOn |> List.exists (fun euId -> 
-            let eu = byId euId eus 
-            isSuccessorOf eu b eus)
 
-    /// returns all successors of a
-    let rec allSuccessorsOf (a: ExecUnitT<_>) eus = seq {
-        for eu in eus do
-            if eu.DependsOn |> List.contains a.Id then 
-                yield eu
-                yield! allSuccessorsOf eu eus
-    }
+        //member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly ()
 
-    /// returns all predecessors of a
-    let rec allPredecessorsOf (a: ExecUnitT<_>) eus = seq {
-        for deuId in a.DependsOn do
-            let deu = byId deuId eus
-            yield deu
-            yield! allPredecessorsOf deu eus
-    }
+        /// execution unit by id
+        member this.ById id = byIdMap.[id]
 
-    /// true if a reruns after b.
-    let rec rerunsAfter (a: ExecUnitT<_>) (b: ExecUnitT<_>) eus =
-        if a.RerunAfter |> List.contains b.Id then true
-        else a.DependsOn |> List.exists (fun euId -> 
-            let eu = byId euId eus 
-            rerunsAfter eu b eus)
+        /// a list of ExecUnits in this collection so that an ExecUnit comes after all ExecUnits it depends on
+        member this.SortedByDep = sortedByDep
+       
+        /// returns all successors of eu (execution units that depend (indirectly) on eu)
+        member this.AllSuccessorsOf (eu: ExecUnitT<'e>) = seq {
+            for deu in dependants.[eu.Id] do
+                yield deu
+                yield! this.AllSuccessorsOf deu
+        }
 
-    /// Return all EUs above or equal to "eu" that access "storage" for the last time.
-    let rec lastStorageAccess storage (eu: ExecUnitT<_>) eus = seq {
-        let isAccessing =
-            eu.Manikins
-            |> List.exists (fun m -> m.Storage = storage)
+        /// returns all predecessors of eu (execution units on which eu depends (indirectly))
+        member this.AllPredecessorsOf (eu: ExecUnitT<'e>) = seq {
+            for peuId in eu.DependsOn do
+                let peu = this.ById peuId
+                yield peu
+                yield! this.AllPredecessorsOf peu
+        }
 
-        if isAccessing then yield eu
-        else
-            for deuId in eu.DependsOn do
-                yield! lastStorageAccess storage (byId deuId eus) eus
-    }
+        /// true if a is a successor of b. (a depends (indirectly) on b)
+        member this.IsSuccessorOf (a: ExecUnitT<'e>) (b: ExecUnitT<'e>) =
+            this.AllSuccessorsOf b |> Seq.exists (fun eu -> eu.Id = a.Id)
+
+        /// Return all EUs above or equal to "eu" that access "storage" for the last time.
+        member this.LastStorageAccess storage (eu: ExecUnitT<_>) = seq {
+            let isAccessing =
+                eu.Manikins
+                |> List.exists (fun m -> m.Storage = storage)
+
+            if isAccessing then yield eu
+            else
+                for deuId in eu.DependsOn do
+                    yield! this.LastStorageAccess storage (this.ById deuId)
+        }
 
 
     /// generates execution units that will evaluate the given unified expression
@@ -290,20 +301,32 @@ module ExecUnit =
             )
 
         // Build RerunAfter dependencies.
-        let execUnits = sortByDep execUnits
+        let coll = Collection execUnits
+        let execUnits = coll.SortedByDep
         let lastEu = 
             execUnits 
-            |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)
-        let rec buildRerunAfter eus processedEUs =
-            match eus with
-            | eu::eus ->
+            |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)           
+        let emptyRerunAfter =
+            seq {for eu in execUnits -> eu.Id, []} |> Map.ofSeq
+        let rerunAfter =            
+            (emptyRerunAfter, execUnits)
+            ||> List.fold (fun (rerunAfterSoFar: Map<ExecUnitIdT, ExecUnitIdT list>) eu ->
+                /// true if a reruns after b. (either by having b in its RerunAfter list or by 
+                /// having a predecessor that has b in its RerunAfter list)
+                let rerunsAfter (a: ExecUnitT<'e>) (b: ExecUnitT<'e>) = 
+                    if rerunAfterSoFar.[a.Id] |> List.contains b.Id then true
+                    else
+                        coll.AllPredecessorsOf a
+                        |> Seq.exists (fun eu ->
+                            eu.RerunAfter |> List.contains b.Id)
+
                 // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
                 let rerunAfter = seq {
                     // For each storage:
                     for m in eu.Manikins do
                         // Starting from the result, find the last node in each tree branch that accesses the storage.
                         // We may only run again, after these ExecUnits.
-                        yield! lastStorageAccess m.Storage lastEu execUnits
+                        yield! coll.LastStorageAccess m.Storage lastEu 
 
                     // For each variable read:
                     match eu.Expr with
@@ -323,18 +346,18 @@ module ExecUnit =
                     |> Seq.filter (fun ra ->
                         // We can omit a node from our RerunAfter list, if
                         // - we depend on the node, because then we are run afterwards anyway,
-                        let euDependsOnRa = isSuccessorOf eu ra execUnits
+                        let euDependsOnRa = coll.IsSuccessorOf eu ra 
                         // - any of our predecessors has the node already in their RerunAfter list.
-                        let euDependsOnNodeRerunningAfterRa = rerunsAfter eu ra processedEUs
+                        let euDependsOnNodeRerunningAfterRa = rerunsAfter eu ra 
                         // - we, or any of our predecessors, have a succesor of the node already in our RerunAfter list.
                         let allRerunAfterIds =
-                            allPredecessorsOf eu processedEUs
-                            |> Seq.map (fun peu -> peu.RerunAfter)
+                            coll.AllPredecessorsOf eu 
+                            |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
                             |> Seq.concat
                             |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
                             |> Set.ofSeq
                         let successorsOfRaIds =
-                            allSuccessorsOf ra execUnits
+                            coll.AllSuccessorsOf ra 
                             |> Seq.map (fun eu -> eu.Id)
                             |> Set.ofSeq
                         let euRerunsAfterSuccessorOfRa =
@@ -347,10 +370,11 @@ module ExecUnit =
                     |> Seq.map (fun eu -> eu.Id)
                     |> Seq.toList
 
-                buildRerunAfter eus ({eu with RerunAfter=rerunAfterIds} :: processedEUs)
-            | [] -> List.rev processedEUs
+                rerunAfterSoFar |> Map.add eu.Id rerunAfterIds
+            )
         let execUnits =
-            buildRerunAfter execUnits []      
+            execUnits
+            |> List.map (fun eu -> {eu with RerunAfter=rerunAfter.[eu.Id]})
 
         execUnits, exprRes, memAllocs, warmupItems
 

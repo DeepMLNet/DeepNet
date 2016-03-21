@@ -212,7 +212,7 @@ let main argv =
 
     //compareTraceHostCuda ``Test neural net`` 
     //compareHostCuda ``Test neural net`` 
-    ``Test neural net`` DevCuda
+    //``Test neural net`` DevCuda
 
     //``Test Autoencoder`` ()
 
