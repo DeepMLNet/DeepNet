@@ -69,7 +69,7 @@ module CudaSup =
         new CudaBlas.CudaBlas()
 
     /// Ensures that CUDA is initialized. Multiple calls are allowed and have no effect.
-    let init () =
+    let init () =       
         context |> ignore
         //context.SetLimit(CULimit.PrintfFIFOSize, SizeT 1000000)
 

@@ -1,6 +1,7 @@
 ﻿module ModelTest
 
 open System.IO
+open System.Diagnostics
 
 
 open Basics
@@ -13,6 +14,61 @@ open Datasets
 
 
 let mnist = Mnist.load @"..\..\..\Data\MNIST"
+
+
+let ``Test neural net build`` () =
+
+    let sw = Stopwatch.StartNew()
+    printfn "Starting to build model..."
+
+    let mc = ModelBuilder<single> "NeuralNetModel"
+    // symbolic sizes
+    let batchSize  = mc.Size "BatchSize"
+    let nInput     = mc.Size "nInput"
+    let nTarget    = mc.Size "nTarget"
+
+    // model parameters
+    let pars = NeuralLayer.pars (mc.Module "Layer1") nInput nTarget
+    
+    // input / output variables
+    let input =  mc.Var "Input"  [nInput;  batchSize]
+    let target = mc.Var "Target" [nTarget; batchSize]
+
+    let mc = mc.ParametersComplete ()
+    mc.SetSize batchSize 1000
+    mc.SetSize nInput 784
+    mc.SetSize nTarget 10
+
+    // expressions
+    let loss = NeuralLayer.loss pars input target |> mc.Subst
+
+    // instantiate model
+    let mi = mc.Instantiate DevCuda
+
+    // compile functions
+    let lossFun = mi.Func (loss) |> arg2 input target
+
+
+    printfn "Model build time: %A" sw.Elapsed
+    ()
+
+
+let ``Test MNIST load`` () =
+    let sw = Stopwatch.StartNew()
+    printfn "Starting to load MNIST..."
+
+    let tstImgs =  
+        mnist.TstImgs
+        |> ArrayND.reorderAxes [2; 0; 1] 
+        |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
+        |> ArrayNDCuda.toDev
+    let tstLbls =  
+        mnist.TstLbls
+        |> ArrayND.reorderAxes [1; 0] 
+        |> ArrayNDCuda.toDev
+
+    printfn "MNIST load time: %A" sw.Elapsed
+
 
 
 let ``Test neural net`` device =
@@ -147,10 +203,15 @@ let ``Test Autoencoder`` () =
 [<EntryPoint>]
 let main argv = 
     Basics.Cuda.CudaSup.init ()
+    Basics.Cuda.CudaSup.printInfo()
+
+    ``Test MNIST load`` ()
+
+    //``Test neural net build`` ()
 
     //compareTraceHostCuda ``Test neural net`` 
     //compareHostCuda ``Test neural net`` 
-    ``Test neural net`` DevCuda
+    //``Test neural net`` DevCuda
 
     //``Test Autoencoder`` ()
 
