@@ -110,12 +110,12 @@ let ``Test neural net`` device =
         mnist.TstImgs
         |> ArrayND.reorderAxes [2; 0; 1] 
         |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
-        //|> fun x -> x.[*, 0..10]
+        |> fun x -> x.[*, 0..10]
         |> post
     let tstLbls =  
         mnist.TstLbls
         |> ArrayND.reorderAxes [1; 0] 
-        //|> fun x -> x.[*, 0..10]
+        |> fun x -> x.[*, 0..10]
         |> post
 
     // infer sizes and variable locations from dataset
@@ -141,7 +141,7 @@ let ``Test neural net`` device =
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."
-    let iters = 1000
+    let iters = 1
     for itr = 0 to iters do
         optFun tstImgs tstLbls |> ignore
     let l = lossFun tstImgs tstLbls
@@ -159,20 +159,19 @@ let compareHostCuda func =
 
 
 let compareTraceHostCuda func =
-    printfn "Evaluating on host..."
-    Trace.startSession "Host"
-    func DevHost
-    let hostTrace = Trace.endSession ()
-    use tw = File.CreateText("Host.txt")
-    Trace.dump tw hostTrace
-
     printfn "Evaluating on CUDA device..."
     Trace.startSession "CUDA"
     func DevCuda
     let cudaTrace = Trace.endSession ()
     use tw = File.CreateText("CUDA.txt")
     Trace.dump tw cudaTrace
-    printfn "Done."
+
+    printfn "Evaluating on host..."
+    Trace.startSession "Host"
+    func DevHost
+    let hostTrace = Trace.endSession ()
+    use tw = File.CreateText("Host.txt")
+    Trace.dump tw hostTrace
 
     Trace.compare hostTrace cudaTrace
 
@@ -208,9 +207,9 @@ let main argv =
 
     //``Test MNIST load`` ()
 
-    ``Test neural net build`` ()
+    //``Test neural net build`` ()
 
-    //compareTraceHostCuda ``Test neural net`` 
+    compareTraceHostCuda ``Test neural net`` 
     //compareHostCuda ``Test neural net`` 
     //``Test neural net`` DevCuda
 

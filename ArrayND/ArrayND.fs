@@ -303,6 +303,7 @@ module ArrayND =
 
     /// creates a subview of an ArrayND
     let inline view ranges a =
+        //printfn "layout=%A  ranges=%A   resulting layout=%A" (layout a) ranges (ArrayNDLayout.view ranges (layout a))
         relayout (ArrayNDLayout.view ranges (layout a)) a        
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

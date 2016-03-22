@@ -281,13 +281,14 @@ module CudaExprWorkspaceTypes =
         let execCalls calls =
             let mutable previousCall = None
             for call in calls do
+                //printfn "CUDA call: %A" call
 
                 match call with 
                 // memory management
                 | CudaCallT.MemAlloc mem -> 
                     let typeSize = Marshal.SizeOf (TypeName.getType mem.TypeName)
                     let elements = if mem.Elements > 0 then mem.Elements else 1
-                    execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT(elements * typeSize)))
+                    execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
                 | CudaCallT.MemFree mem ->
                     execEnv.InternalMem.[mem].Dispose()
                     execEnv.InternalMem.Remove(mem) |> ignore

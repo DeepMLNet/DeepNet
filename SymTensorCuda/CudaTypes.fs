@@ -129,7 +129,7 @@ module CudaExecEnv =
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
             if ArrayND.offset ev = 0 && ArrayND.isContiguous ev then
-                ev.ByteData
+                ev.Storage.ByteData
             else
                 failwithf "external variable %A was expected to be contiguous \
                            with zero offset" vs 
@@ -149,9 +149,9 @@ module CudaExecEnv =
 
     /// gets an IArrayNDCudaT in device memory for the specified manikin
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
-        let ptr = (getDevMemForManikin env manikin).DevicePointer
+        let devMem = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
-        ArrayNDCuda.fromPtrAndType ptr typ (manikin.Layout)
+        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer) typ (manikin.Layout)
 
 
 [<AutoOpen>]
@@ -256,7 +256,7 @@ module ArgTemplates =
                 let storage = 
                     match memManikin with
                     | MemAlloc im -> env.InternalMem.[im]
-                    | MemExternal vs -> env.ExternalVar.[vs].ByteData
+                    | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
 
     type SizeTArgTmpl (value: int) =
