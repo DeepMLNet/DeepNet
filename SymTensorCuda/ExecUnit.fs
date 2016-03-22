@@ -54,7 +54,6 @@ module ExecUnitsTypes =
 
 module ExecUnit =
 
-
     /// a collection of ExecUnits
     type Collection<'e> (eus: ExecUnitT<'e> seq) =
         
@@ -100,10 +99,14 @@ module ExecUnit =
             build         
             
 
-        //member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly ()
-
         /// execution unit by id
         member this.ById id = byIdMap.[id]
+
+        /// all ExecUnits that depend directly on eu
+        member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly () :> seq<_>
+
+        /// all ExecUnits that eu directly depends on
+        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> Seq.map this.ById
 
         /// a list of ExecUnits in this collection so that an ExecUnit comes after all ExecUnits it depends on
         member this.SortedByDep = sortedByDep

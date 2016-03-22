@@ -29,12 +29,15 @@ module CudaStreamSeq =
 
     /// converts execution units to stream commands
     let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
+        /// collection of ExecUnits we have to process
+        let coll = ExecUnit.Collection execUnits
+
         /// event counter
         let mutable eventObjectCnt = 0
         /// correlation counter
         let mutable correlationCnt = 0
         /// all allocated streams
-        let streams = new ResizeArray<StreamCmdsT<'e>>()
+        let streams = ResizeArray<ResizeArray<CudaCmdT<'e>>> ()
         /// stream used by an ExecUnit        
         let mutable streamOfUnit : Map<ExecUnitIdT, StreamT> = Map.empty
         /// event emitted by an ExecUnit when its execution is finished
@@ -45,70 +48,53 @@ module CudaStreamSeq =
         let mutable rerunEventWaiters : Map<ExecUnitIdT, ResizeArray<EventPlaceHolderT>> = Map.empty
         /// ExecUnits that still need to be processed
         let mutable execUnitsToProcess = execUnits
+        /// ExecUnitIds that have already been processed
+        let mutable processedExecUnitIds = Set.empty
 
         /// create a new event object id
-        let newEventObjectId() =
+        let newEventObjectId () =
             eventObjectCnt <- eventObjectCnt + 1
             eventObjectCnt - 1
 
         /// creates a new correlation id
-        let newCorrelationId() =
+        let newCorrelationId () =
             correlationCnt <- correlationCnt + 1
             correlationCnt - 1
 
         /// creates a new stream
         let newStream () =
-            streams.Add([])
+            streams.Add(ResizeArray<CudaCmdT<'e>> ())
             streams.Count - 1
 
         /// length of a stream
         let streamLength (s: int) =
-            List.length streams.[s]
+            streams.[s].Count
 
         /// emits an ExeOp to the given streams
         let emitToStream s (exeOp: CudaCmdT<'e>) =
-            streams.[s] <- streams.[s] @ [exeOp]
-
-        let rerunsSatisfiedOnStream s untilExecUnitId =           
-            let rec build strm = seq {               
-                match strm, untilExecUnitId with
-                | RerunSatisfied id :: rstrm, _ -> 
-                    yield id
-                    yield! build rstrm 
-                | ExecUnitEnd id :: _, Some stopId when stopId = id -> ()
-                | _ :: rstrm, _ -> yield! build rstrm
-                | [], _ -> ()
-            }
-            build streams.[s]
-
-        /// get the ExecUnit with the given id
-        let execUnitById (execUnitId: ExecUnitIdT) =
-            execUnits |> List.find (fun eu -> eu.Id = execUnitId)
-
-        /// gets the ExecUnits that depend on the specified unit
-        let dependants (execUnitId: ExecUnitIdT) =
-            execUnits |> List.filter (fun eu -> eu.DependsOn |> List.contains execUnitId)
-
-        /// gets all ExecUnits that are successors of the specified unit
-        let rec successors (execUnitId: ExecUnitIdT) = seq {
-            for d in dependants execUnitId do
-                yield d
-                yield! successors d.Id
-        }        
-
-        /// gets the ExecUnits on which the specified unit depends
-        let dependsOn (execUnitId: ExecUnitIdT) =
-            (execUnitById execUnitId).DependsOn
+            streams.[s].Add exeOp
 
         /// true if all ExecUnits that eu depends on have already been processed
         let dependsSatisfied eu =
             eu.DependsOn 
-            |> List.forall (fun id -> 
-                not (List.exists (fun (eutp: ExecUnitT<'e>) -> eutp.Id = id) execUnitsToProcess))
+            |> Seq.forall (fun depId -> Set.contains depId processedExecUnitIds)
+
+        /// all RerunAfter that are satisfied on the specified stream,
+        /// optionally up to the given ExecUnitId
+        let rerunsSatisfiedOnStream strmId untilExecUnitId =           
+            streams.[strmId]
+            |> Seq.takeWhile (fun cmd ->
+                match cmd, untilExecUnitId with
+                | ExecUnitEnd id, Some stopId when stopId = id -> false
+                | _ -> true)
+            |> Seq.choose (fun cmd ->
+                match cmd with
+                | RerunSatisfied id -> Some id
+                | _ -> None)       
 
         /// all streams that are used by the successors of an ExecUnit
         let rec usedStreamsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = seq {
-            for seu in Seq.append (Seq.singleton eu) (successors eu.Id) do
+            for seu in Seq.append (Seq.singleton eu) (coll.AllSuccessorsOf eu) do
                 match streamOfUnit |> Map.tryFind seu.Id with
                 | Some s -> yield s
                 | None -> ()
@@ -116,61 +102,57 @@ module CudaStreamSeq =
 
         /// all streams that can currently be reused safely below an ExecUnit
         let rec availableStreamsBelowExecUnit (eu: ExecUnitT<'e>) =
-            // streams already avaiable from the ExecUnits we depend on
+            // streams already avaiable from the ExecUnits we directly depend on
             let availFromAbove = 
-                eu.DependsOn |> List.map (execUnitById >> availableStreamsBelowExecUnit) |> List.concat |> Set.ofList
+                coll.DependsOn eu 
+                |> Seq.collect availableStreamsBelowExecUnit
+                |> Set.ofSeq
             // streams that end with the nodes that we depend on
             let endingHere = 
-                eu.DependsOn 
-                |> List.filter (fun pid -> 
-                    pid |> dependants |> List.exists (fun dep -> 
-                        streamOfUnit |> Map.tryFind dep.Id = Some streamOfUnit.[pid]) |> not)
-                |> List.map (fun pid -> streamOfUnit.[pid]) 
-                |> Set.ofList
+                coll.DependsOn eu
+                |> Seq.filter (fun deu -> 
+                    coll.DependantsOf deu
+                    |> Seq.exists (fun dep -> 
+                        (streamOfUnit |> Map.tryFind dep.Id) = Some streamOfUnit.[deu.Id]) 
+                    |> not)
+                |> Seq.map (fun deu -> streamOfUnit.[deu.Id]) 
+                |> Set.ofSeq
             // my stream
             let myStream = Set.singleton streamOfUnit.[eu.Id]
             // streams that are used by nodes that depend on us
             let usedBelow = 
-                eu.Id |> dependants |> List.map usedStreamsOfAndBelowExecUnit |> Seq.concat |> Set.ofSeq
+                coll.DependantsOf eu
+                |> Seq.collect usedStreamsOfAndBelowExecUnit 
+                |> Set.ofSeq
             
             (availFromAbove + endingHere + myStream) - usedBelow |> Set.toList
 
-        /// returns true if sucId is a successor (thus dependent on) pId
-        let rec isSuccessorOf pId sucId =
-            if pId = sucId then true
-            else pId |> dependants |> List.exists (fun d -> isSuccessorOf d.Id sucId) 
+        /// Find an event object id that can be used by the given ExecUnit "eu".
+        /// This can either be an existing event object id or a newly generated one.
+        let findAvailableEventObjectIdFor (eu: ExecUnitT<'e>)  =           
+            let rec tryFindReuseable (candEmitter: ExecUnitT<'e>) =               
+                match eventOfUnit |> Map.tryFind candEmitter.Id with
+                | Some candEvt when
+                    // An event "candEvt" emitted by "candEmitter" is reuseable by "eu", if ...
+                    // 1. eu depends on all dependants of the event emitter and 
+                    coll.DependantsOf candEmitter
+                    |> Seq.forall (fun depOfEmitter -> coll.IsSuccessorOf eu depOfEmitter)
+                    &&
+                    // 2. the event has not been already reused by a successor of the event emitter.
+                    coll.AllSuccessorsOf candEmitter
+                    |> Seq.forall (fun succOfEmitter -> 
+                        match eventOfUnit |> Map.tryFind succOfEmitter.Id with
+                        | Some succOfEmitterEvt when succOfEmitterEvt = candEvt -> false
+                        | _ -> true)
+                    -> Some candEvt.EventObjectId
+                | _ ->
+                    // Try the units above "candEmitter" if "candEvt" cannot be used.
+                    coll.DependsOn candEmitter |> Seq.tryPick tryFindReuseable
 
-        /// all streams that are used by the successors of an ExecUnit
-        let rec usedEventsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = seq {
-            for seu in Seq.append (Seq.singleton eu) (successors eu.Id) do
-                match eventOfUnit |> Map.tryFind seu.Id with
-                | Some evt -> yield evt
-                | None -> ()
-                for seud in seu.DependsOn do
-                    match eventOfUnit |> Map.tryFind seud with
-                    | Some evt -> yield evt
-                    | None -> ()
-        }
-
-        /// find reuseable event objects for the given ExecUnit
-        let rec tryFindAvailableEventObjectFor (eu: ExecUnitT<'e>)  =
-            // Event is reuseable by eu if eu depends on all dependants of the event emitter
-            // and the event has not been reused by a successor of the event emitter.
-            let rec findRec peuId =
-                match eventOfUnit |> Map.tryFind peuId with
-                | Some {EventObjectId=eObjId} as sevt when 
-                        peuId 
-                        |> dependants 
-                        |> List.forall (fun d -> isSuccessorOf d.Id eu.Id) 
-                        &&
-                        not(peuId 
-                            |> dependants 
-                            |> List.exists (usedEventsOfAndBelowExecUnit >> Seq.contains sevt.Value))
-                    -> Some eObjId
-                | _ -> 
-                    peuId |> dependsOn |> List.tryPick findRec            
-
-            findRec eu.Id
+            // if possible, reuse an existing event object
+            match coll.DependsOn eu |> Seq.tryPick tryFindReuseable with
+            | Some id -> id
+            | None -> newEventObjectId ()
 
         // generate streams
         while not execUnitsToProcess.IsEmpty do
@@ -178,11 +160,13 @@ module CudaStreamSeq =
             let eu = execUnitsToProcess |> List.find dependsSatisfied
 
             /// all streams that are reuseable below the units we depend on
-            let availStreams = 
-                eu.DependsOn |> List.map (execUnitById >> availableStreamsBelowExecUnit) |> List.concat |> Set.ofList
+            let availStreams =
+                coll.DependsOn eu 
+                |> Seq.collect availableStreamsBelowExecUnit 
+                |> Set.ofSeq
             /// all streams of the units we depend on
             let streamTakeOverCands = 
-                eu.DependsOn |> List.map (fun pId -> streamOfUnit.[pId]) |> Set.ofList
+                eu.DependsOn |> Seq.map (fun pId -> streamOfUnit.[pId]) |> Set.ofSeq
             /// all streams of the units we depend on, that have not been reused by our siblings or their successors
             let streamsNotYetTakenOver = Set.intersect availStreams streamTakeOverCands
 
@@ -201,18 +185,15 @@ module CudaStreamSeq =
             ExecUnitStart eu.Id |> emitToStream euStream
                
             // our stream needs to wait on the results of the streams we depend on
-            let endingUnits = eu.DependsOn |> List.filter (fun pId -> streamOfUnit.[pId] <> euStream)
+            let endingUnits = eu.DependsOn |> Seq.filter (fun pId -> streamOfUnit.[pId] <> euStream)
             for endingUnitId in endingUnits do            
                 match eventOfUnit |> Map.tryFind endingUnitId with
                 | Some evt ->
                     // wait on already emitted event, if possible
                     WaitOnEvent evt |> emitToStream euStream
                 | None ->
-                    // if possible, reuse an existing event object
-                    let evtObjId =
-                        match tryFindAvailableEventObjectFor (execUnitById endingUnitId) with
-                        | Some id -> id
-                        | None -> newEventObjectId()
+                    // assign an event (either new or reuseable) to the last ExecUnit of the ending stream
+                    let evtObjId = findAvailableEventObjectIdFor (coll.ById endingUnitId)
                     let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); EmittingExecUnitId=endingUnitId}
                     eventOfUnit <- eventOfUnit |> Map.add endingUnitId evt
                 
@@ -223,9 +204,7 @@ module CudaStreamSeq =
             // find out which RerunAfter constraints are not yet satisfied on this stream
             let rerunsSatisfiedByDeps =
                 endingUnits
-                |> List.map (fun pId ->
-                    rerunsSatisfiedOnStream streamOfUnit.[pId] (Some pId))
-                |> Seq.concat
+                |> Seq.collect (fun pId -> rerunsSatisfiedOnStream streamOfUnit.[pId] (Some pId))
                 |> Set.ofSeq
             let rerunsSatisfiedOnStream = rerunsSatisfiedOnStream euStream None |> Set.ofSeq
             let rerunsRequired = eu.RerunAfter |> Set.ofList
@@ -278,15 +257,17 @@ module CudaStreamSeq =
 
             // remove from queue
             execUnitsToProcess <- execUnitsToProcess |> List.withoutValue eu
+            processedExecUnitIds <- processedExecUnitIds |> Set.add eu.Id
 
         // remove empty EmitEvent placeholders
         let streams = 
             streams 
-            |> Seq.map (fun stream -> 
-                stream |> List.filter (fun op -> 
+            |> Seq.map (
+                Seq.filter (fun op -> 
                     match op with
                     | EmitEvent re when !re = None -> false
-                    | _ -> true))
+                    | _ -> true)
+                >> Seq.toList)
             |> Seq.toList
        
         streams, eventObjectCnt
