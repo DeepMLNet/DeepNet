@@ -1,5 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Diagnostics
+
 open ManagedCuda
 open Basics
 open Basics.Cuda
@@ -337,25 +339,33 @@ module CudaRecipe =
         let tmplInstCache = {Insts=[]; Code=[]}
 
         // generate execution units from unified expression
+        let sw = Stopwatch.StartNew()
         let execUnits, exprRes, memAllocs, warmup = CudaExecUnit.exprToCudaExecUnits compileEnv expr
+        let timeForExecUnits = sw.Elapsed
 
         // map execution units to streams
+        let sw = Stopwatch.StartNew()
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
+        let timeForStreams = sw.Elapsed
 
-        // generate CUDA calls for execution
+        // generate CUDA calls for execution and initializaton
+        let sw = Stopwatch.StartNew()
         let execCalls = generateCalls streams tmplInstCache
-
-        // generate CUDA calls for resource management
         let allocCalls, disposeCalls = 
             generateAllocAndDispose memAllocs (List.length streams) eventObjCnt
-
-        // generate CUDA calls for warmup
         let warmupCalls = 
             generateWarmup warmup tmplInstCache
-
         let initCalls =
             if EnableWarmup then allocCalls @ warmupCalls
             else allocCalls
+        let timeForCalls = sw.Elapsed
+
+        #if TIMING
+        printfn "Time for building CUDA recipe:"
+        printfn "Execution units:        %A" timeForExecUnits
+        printfn "Stream generation:      %A" timeForStreams
+        printfn "Call generation:        %A" timeForCalls
+        #endif
 
         {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
          CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;

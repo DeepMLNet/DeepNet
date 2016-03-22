@@ -1,5 +1,6 @@
 ﻿namespace SymTensor.Compiler
 
+open System
 open System.Collections.Generic
 
 open Basics
@@ -88,6 +89,16 @@ module ExecUnit =
 
             sorted |> Seq.toList
 
+        let storesByVar =
+            let build = Dictionary<UVarSpecT, List<ExecUnitT<_>>> ()
+            for eu in eus do
+                match eu.Expr with
+                | UExpr(UUnaryOp (StoreToVar vs), _, _, _) ->
+                    if not (build.ContainsKey vs) then build.[vs] <- List ()
+                    build.[vs].Add eu
+                | _ -> ()
+            build         
+            
 
         //member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly ()
 
@@ -127,6 +138,11 @@ module ExecUnit =
                 for deuId in eu.DependsOn do
                     yield! this.LastStorageAccess storage (this.ById deuId)
         }
+
+        /// all StoreToVar ExecUnits that store into the given variable
+        member this.StoresToVar vs =
+            if storesByVar.ContainsKey vs then storesByVar.[vs].AsReadOnly () :> seq<_>
+            else Seq.empty
 
 
     /// generates execution units that will evaluate the given unified expression
@@ -301,6 +317,7 @@ module ExecUnit =
             )
 
         // Build RerunAfter dependencies.
+        //#if ENABLE_RERUN_AFTER
         let coll = Collection execUnits
         let execUnits = coll.SortedByDep
         let lastEu = 
@@ -308,73 +325,73 @@ module ExecUnit =
             |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)           
         let emptyRerunAfter =
             seq {for eu in execUnits -> eu.Id, []} |> Map.ofSeq
-        let rerunAfter =            
+        let rerunAfterBuild =            
             (emptyRerunAfter, execUnits)
             ||> List.fold (fun (rerunAfterSoFar: Map<ExecUnitIdT, ExecUnitIdT list>) eu ->
-                /// true if a reruns after b. (either by having b in its RerunAfter list or by 
+
+                let allPredecessorsOfEu = coll.AllPredecessorsOf eu |> Seq.cache
+
+                /// true if eu reruns after b. (either by having b in its RerunAfter list or by 
                 /// having a predecessor that has b in its RerunAfter list)
-                let rerunsAfter (a: ExecUnitT<'e>) (b: ExecUnitT<'e>) = 
-                    if rerunAfterSoFar.[a.Id] |> List.contains b.Id then true
+                let rerunsAfter (b: ExecUnitT<'e>) = 
+                    if rerunAfterSoFar.[eu.Id] |> List.contains b.Id then true
                     else
-                        coll.AllPredecessorsOf a
-                        |> Seq.exists (fun eu ->
-                            eu.RerunAfter |> List.contains b.Id)
+                        allPredecessorsOfEu
+                        |> Seq.exists (fun peu -> rerunAfterSoFar.[peu.Id] |> List.contains b.Id)
 
                 // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
                 let rerunAfter = seq {
                     // For each storage:
                     for m in eu.Manikins do
                         // Starting from the result, find the last node in each tree branch that accesses the storage.
-                        // We may only run again, after these ExecUnits.
+                        // We may only run again, after these ExecUnits have finished.
                         yield! coll.LastStorageAccess m.Storage lastEu 
 
-                    // For each variable read:
+                    // If this execution unit is a variable read:
                     match eu.Expr with
                     | UExpr(ULeafOp (Var readVs), _, _, _) ->
                         // Find all StoreToVars to the same variable operations.
                         // We may only run again, after the previous variable write has been completed.
-                        for ceu in execUnits do
-                            match ceu.Expr with
-                            | UExpr(UUnaryOp (StoreToVar storeVs), _, _, _) when storeVs = readVs -> yield ceu
-                            | _ -> ()
+                        yield! coll.StoresToVar readVs
                     | _ -> ()
                 }
 
+                /// Rerun after ExecUnits of this eu and all its predecessors
+                let rerunAfterInclPredecessors =
+                    allPredecessorsOfEu
+                    |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
+                    |> Seq.concat
+                    |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
+                    |> Set.ofSeq
+
                 // Filter redundant RerunAfter dependencies.
-                let rerunAfterIds =
+                let rerunAfterFiltered =
                     rerunAfter
                     |> Seq.filter (fun ra ->
                         // We can omit a node from our RerunAfter list, if
                         // - we depend on the node, because then we are run afterwards anyway,
-                        let euDependsOnRa = coll.IsSuccessorOf eu ra 
+                        let euDependsOnRa = allPredecessorsOfEu |> Seq.contains ra
                         // - any of our predecessors has the node already in their RerunAfter list.
-                        let euDependsOnNodeRerunningAfterRa = rerunsAfter eu ra 
-                        // - we, or any of our predecessors, have a succesor of the node already in our RerunAfter list.
-                        let allRerunAfterIds =
-                            coll.AllPredecessorsOf eu 
-                            |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
-                            |> Seq.concat
-                            |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
-                            |> Set.ofSeq
+                        let euDependsOnNodeRerunningAfterRa = rerunsAfter ra 
+                        // - we, or any of our predecessors, have a successor of the node already in our RerunAfter list.
                         let successorsOfRaIds =
                             coll.AllSuccessorsOf ra 
                             |> Seq.map (fun eu -> eu.Id)
                             |> Set.ofSeq
                         let euRerunsAfterSuccessorOfRa =
-                            Set.intersect allRerunAfterIds successorsOfRaIds
+                            Set.intersect rerunAfterInclPredecessors successorsOfRaIds
                             |> Set.isEmpty
                             |> not
                         // combine
                         not (euDependsOnRa || euDependsOnNodeRerunningAfterRa || euRerunsAfterSuccessorOfRa)
-                        )
-                    |> Seq.map (fun eu -> eu.Id)
-                    |> Seq.toList
-
-                rerunAfterSoFar |> Map.add eu.Id rerunAfterIds
+                    )
+                                        
+                rerunAfterSoFar |> Map.add eu.Id (rerunAfterFiltered |> Seq.map (fun eu -> eu.Id) |> Seq.toList)
             )
         let execUnits =
             execUnits
-            |> List.map (fun eu -> {eu with RerunAfter=rerunAfter.[eu.Id]})
+            |> List.map (fun eu -> {eu with RerunAfter=rerunAfterBuild.[eu.Id]})
+        //#endif
 
         execUnits, exprRes, memAllocs, warmupItems
 
