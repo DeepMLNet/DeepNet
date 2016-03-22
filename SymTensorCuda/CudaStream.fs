@@ -92,40 +92,42 @@ module CudaStreamSeq =
                 | RerunSatisfied id -> Some id
                 | _ -> None)       
 
-        /// all streams that are used by the successors of an ExecUnit
-        let rec usedStreamsOfAndBelowExecUnit (eu: ExecUnitT<'e>) = seq {
-            for seu in Seq.append (Seq.singleton eu) (coll.AllSuccessorsOf eu) do
-                match streamOfUnit |> Map.tryFind seu.Id with
-                | Some s -> yield s
-                | None -> ()
-        }
+        /// all streams that are used by the successors of ExecUnit "eu"
+        let rec usedStreamsOfExecUnitAndItsSuccessors (eu: ExecUnitT<'e>) = 
+            seq {
+                for seu in Seq.append (Seq.singleton eu) (coll.AllSuccessorsOf eu) do
+                    match streamOfUnit |> Map.tryFind seu.Id with
+                    | Some s -> yield s
+                    | None -> ()
+            } |> Seq.cache
 
-        /// all streams that can currently be reused safely below an ExecUnit
-        let rec availableStreamsBelowExecUnit (eu: ExecUnitT<'e>) =
-            // streams already avaiable from the ExecUnits we directly depend on
-            let availFromAbove = 
-                coll.DependsOn eu 
-                |> Seq.collect availableStreamsBelowExecUnit
-                |> Set.ofSeq
-            // streams that end with the nodes that we depend on
-            let endingHere = 
-                coll.DependsOn eu
-                |> Seq.filter (fun deu -> 
-                    coll.DependantsOf deu
-                    |> Seq.exists (fun dep -> 
-                        (streamOfUnit |> Map.tryFind dep.Id) = Some streamOfUnit.[deu.Id]) 
-                    |> not)
-                |> Seq.map (fun deu -> streamOfUnit.[deu.Id]) 
-                |> Set.ofSeq
-            // my stream
-            let myStream = Set.singleton streamOfUnit.[eu.Id]
-            // streams that are used by nodes that depend on us
-            let usedBelow = 
+        /// all streams that can currently be reused below ExecUnit "eu"
+        let rec availableStreamsBelowExecUnit (cache: Map<ExecUnitIdT, StreamT seq>) eu = seq {
+            // extend usedStreamsOfExecUnitAndItsSuccessors cache by our dependants
+            let mutable cache = cache
+            for dep in coll.DependantsOf eu do
+                if not (cache |> Map.containsKey dep.Id) then
+                    cache <- cache |> Map.add dep.Id (usedStreamsOfExecUnitAndItsSuccessors dep)
+
+            // streams that are used by our successors
+            let usedBySuccessors = 
                 coll.DependantsOf eu
-                |> Seq.collect usedStreamsOfAndBelowExecUnit 
-                |> Set.ofSeq
-            
-            (availFromAbove + endingHere + myStream) - usedBelow |> Set.toList
+                |> Seq.collect (fun dep -> cache.[dep.Id])
+
+            // check if eu's stream is available
+            let euStream = streamOfUnit.[eu.Id]
+            if not (usedBySuccessors |> Seq.contains euStream) then
+                yield euStream
+
+            // extend usedStreamsOfExecUnitAndItsSuccessors cache by ourselves
+            let usedByEuAndSuccessors =
+                Seq.append (Seq.singleton euStream) usedBySuccessors
+            cache <- cache |> Map.add eu.Id usedByEuAndSuccessors
+
+            // yield streams available from above
+            for parent in coll.DependsOn eu do
+                yield! availableStreamsBelowExecUnit cache parent 
+        }
 
         /// Find an event object id that can be used by the given ExecUnit "eu".
         /// This can either be an existing event object id or a newly generated one.
@@ -159,24 +161,24 @@ module CudaStreamSeq =
             // find an execution unit that has all dependencies satisfied
             let eu = execUnitsToProcess |> List.find dependsSatisfied
 
-            /// all streams that are reuseable below the units we depend on
+            /// all streams that are reuseable below the units we depend on            
             let availStreams =
                 coll.DependsOn eu 
-                |> Seq.collect availableStreamsBelowExecUnit 
-                |> Set.ofSeq
-            /// all streams of the units we depend on
+                |> Seq.collect (availableStreamsBelowExecUnit (Map.empty |> Map.add eu.Id Seq.empty))
+                |> Seq.cache
+            /// all streams of the units we directly depend on, that are reuseable below the units we depend on            
             let streamTakeOverCands = 
-                eu.DependsOn |> Seq.map (fun pId -> streamOfUnit.[pId]) |> Set.ofSeq
-            /// all streams of the units we depend on, that have not been reused by our siblings or their successors
-            let streamsNotYetTakenOver = Set.intersect availStreams streamTakeOverCands
+                eu.DependsOn 
+                |> Seq.map (fun pId -> streamOfUnit.[pId]) 
+                |> Seq.filter (fun strm -> availStreams |> Seq.contains strm)
 
             // If we can take over a stream, then take over the one with least commands in it.
             // Otherwise, use the first available reusable stream or create a new one.
-            let euStream = match streamsNotYetTakenOver |> Set.toList with
-                           | _::_ as cs -> cs |> List.minBy streamLength
-                           | [] -> match availStreams |> Set.toList with
-                                   | s::_ -> s
-                                   | [] -> newStream ()
+            let euStream = 
+                if Seq.isEmpty streamTakeOverCands then 
+                    if Seq.isEmpty availStreams then newStream ()
+                    else Seq.head availStreams
+                else streamTakeOverCands |> Seq.minBy streamLength
 
             // store stream
             streamOfUnit <- streamOfUnit |> Map.add eu.Id euStream
