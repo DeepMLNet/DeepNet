@@ -1,4 +1,4 @@
-﻿namespace Test.AssemblyInfo
+﻿namespace AllTests.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,11 +7,11 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("Test")>]
+[<assembly: AssemblyTitle("AllTests")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("Technische Universität München")>]
-[<assembly: AssemblyProduct("Test")>]
+[<assembly: AssemblyProduct("AllTests")>]
 [<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
@@ -22,7 +22,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("6a84f33f-744e-4d7c-84df-02e003f119bc")>]
+[<assembly: Guid("d5cd7ec0-fb57-4cba-89e8-43e101d23ced")>]
 
 // Version information for an assembly consists of the following four values:
 // 

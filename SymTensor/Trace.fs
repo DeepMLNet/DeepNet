@@ -152,6 +152,7 @@ module Trace =
                     | None -> ()
         printfn ""
         printfn "Total number of differences: %d" diffs
+        diffs
 
     let compare = compareCustom maxSimilar
 

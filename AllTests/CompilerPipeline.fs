@@ -1,11 +1,18 @@
-﻿open Xunit
+﻿module CompilerPipeline
+
+open System.Diagnostics
+open System.IO
+open Xunit
+open FsUnit.Xunit
 
 open Basics
-open Basics.Cuda
 open ArrayNDNS
 open SymTensor
-open SymTensor.Compiler
 open SymTensor.Compiler.Cuda
+open Models
+open Datasets
+open Optimizers
+open TestUtils
 
 
 
@@ -15,7 +22,16 @@ let printExpr label expr =
 let printVal label value =
     printfn "%s =\n%A\nshape of %s: %A\n" label value label (ArrayND.shape value)
 
-//type ExprTs = ExprT<single>
+let printList execSeq =
+    for i, item in List.indexed execSeq do
+        printfn "%d. %A" (i+1) item
+
+let printStreams streams =
+    for i, stream in List.indexed streams do
+        printfn "==============================================="
+        printfn "stream %d:" i
+        printList stream
+
 
 type LinearRegression<'T> = {
     a: ExprT<'T>; 
@@ -91,29 +107,24 @@ let linearRegressionEvalEnv (lr: LinearRegression<'T>) =
         |> VarEnv.add lr.lossWrtBOut lossWrtBVal
         |> VarEnv.add lr.lossWrtXOut lossWrtXVal
         |> VarEnv.add lr.lossWrtTOut lossWrtTVal
-    EvalEnv.create varEnv (Seq.singleton lr.Loss)
+    EvalEnv.create varEnv
 
 let linearRegressionCompileEnv (lr: LinearRegression<'T>) =
     let varLocs =
-        [lr.a |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.b |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.x |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.t |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.predOut |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.lossOut |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.lossWrtAOut |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.lossWrtBOut |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.lossWrtXOut |> Expr.extractVar :> IVarSpec, LocHost;
-         lr.lossWrtTOut |> Expr.extractVar :> IVarSpec, LocHost;]
+        [lr.a |> UVarSpec.ofExpr, LocHost;
+         lr.b |> UVarSpec.ofExpr, LocHost;
+         lr.x |> UVarSpec.ofExpr, LocHost;
+         lr.t |> UVarSpec.ofExpr, LocHost;
+         lr.predOut |> UVarSpec.ofExpr, LocHost;
+         lr.lossOut |> UVarSpec.ofExpr, LocHost;
+         lr.lossWrtAOut |> UVarSpec.ofExpr, LocHost;
+         lr.lossWrtBOut |> UVarSpec.ofExpr, LocHost;
+         lr.lossWrtXOut |> UVarSpec.ofExpr, LocHost;
+         lr.lossWrtTOut |> UVarSpec.ofExpr, LocHost;]
         |> Map.ofList
     {CudaCompileEnvT.VarStorLoc = varLocs}
 
 
-[<Fact>]
-let ``Pretty print ArrayND`` () =
-    printfn "3x4 one matrix:       \n%A" (ArrayNDHost.ones [3; 4] :> ArrayNDT<float>)
-    printfn "6 zero vector:        \n%A" (ArrayNDHost.zeros [6] :> ArrayNDT<float>)
-    printfn "5x5 identity matrix:  \n%A" (ArrayNDHost.identity 5 :> ArrayNDT<float>)
 
 
 [<Fact>]
@@ -127,23 +138,17 @@ let ``Linear regression symbol size inference`` () =
     let lr = linearRegression<single> ()
     let env = linearRegressionEvalEnv lr
 
-    printfn "Inferred symbol sizes without variable values:"
-    let senv = Expr.inferSymSizes lr.Loss
-    SymSizeEnv.dump senv
-
     printfn "Inferred symbol sizes with variable values:"
     let vsenv = VarEnv.inferSymSizes env.VarEnv
-    let esenv = Expr.inferSymSizes lr.Loss
-    let senv = SymSizeEnv.merge vsenv esenv
-    SymSizeEnv.dump senv
+    SymSizeEnv.dump vsenv
 
 
 [<Fact>]
 let ``Eval linear regression`` () =
     let lr = linearRegression<single> ()
     let env = linearRegressionEvalEnv lr
-    printfn "CPU: pred=\n%A" (Eval.evalWithEvalEnv env lr.Pred)
-    printfn "CPU: loss=\n%A" (Eval.evalWithEvalEnv env lr.Loss)
+    printfn "CPU: pred=\n%A" (HostEval.eval env lr.Pred)
+    printfn "CPU: loss=\n%A" (HostEval.eval env lr.Loss)
 
 
 [<Fact>]
@@ -162,10 +167,10 @@ let ``Eval reverse gradient of linear regression`` () =
     let lrg = linearRegressionReverseGradient lr
     let env = linearRegressionEvalEnv lr
     printfn "Reverse gradient:"
-    printfn "CPU: lossWrtA=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtA)
-    printfn "CPU: lossWrtB=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtB)
-    printfn "CPU: lossWrtX=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtX) 
-    printfn "CPU: lossWrtT=\n%A" (Eval.evalWithEvalEnv env lrg.LossWrtT)
+    printfn "CPU: lossWrtA=\n%A" (HostEval.eval env lrg.LossWrtA)
+    printfn "CPU: lossWrtB=\n%A" (HostEval.eval env lrg.LossWrtB)
+    printfn "CPU: lossWrtX=\n%A" (HostEval.eval env lrg.LossWrtX) 
+    printfn "CPU: lossWrtT=\n%A" (HostEval.eval env lrg.LossWrtT)
 
 [<Fact>]
 let ``Check reverse gradient of linear regression`` () =
@@ -174,15 +179,7 @@ let ``Check reverse gradient of linear regression`` () =
     DerivCheck.checkReverseDiff env lr.Loss
     printfn "linear regression gradient checked"
 
-let printList execSeq =
-    for i, item in List.indexed execSeq do
-        printfn "%d. %A" (i+1) item
 
-let printStreams streams =
-    for i, stream in List.indexed streams do
-        printfn "==============================================="
-        printfn "stream %d:" i
-        printList stream
 
 [<Fact>]
 let ``Build execution sequence of linear regression`` () =
@@ -284,29 +281,3 @@ let ``Evaluate linear regression gradient using CUDA`` () =
 
 
 
-[<EntryPoint>]
-let main argv = 
-    //CudaSup.printInfo ()
-
-    //``Pretty print ArrayND`` ()
-
-    ``Build linear regression`` ()
-    ``Eval linear regression`` ()
-
-    ``Linear regression symbol size inference`` ()
-    
-    //``Reverse gradient of linear regression`` ()
-    //``Check reverse gradient of linear regression`` ()
-    //``Build execution sequence of linear regression`` ()
-    //``Build execution sequence of linear regression gradient`` ()
-    //``Build CUDA recipe for linear regression gradient`` ()
-    
-    //``Eval linear regression`` ()
-    ``Evaluate linear regression using CUDA`` ()
-
-    //``Eval reverse gradient of linear regression`` ()
-    ``Evaluate linear regression gradient using CUDA`` ()
-    
-    
-    CudaSup.shutdown ()
-    0

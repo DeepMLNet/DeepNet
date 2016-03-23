@@ -106,6 +106,9 @@ module UVarSpec =
     let ofVarSpec (vs: #IVarSpec) =
         {Name=vs.Name; Shape=vs.Shape; TypeName=vs.TypeName}
 
+    let ofExpr expr =
+        expr |> Expr.extractVar |> ofVarSpec
+
     let toVarSpec (vs: UVarSpecT) : VarSpecT<'T> =
         {Name=vs.Name; Shape=vs.Shape;}
 

@@ -4,6 +4,7 @@ open ArrayNDNS
 open System
 
 
+
 module DerivCheck =
 
 
@@ -44,7 +45,7 @@ module DerivCheck =
         let mutable devs = Map.empty
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs |> Map.toSeq do
-            let exprFun = (expr |> Eval.toFun |> Eval.addArg (Expr.makeVar wrt)) |> Eval.usingEvalEnv evalEnv
+            let exprFun = (expr |> Func.make onHost |> arg (Expr.makeVar wrt)) |> Eval.usingEvalEnv evalEnv
             let rDiffFun = (rDiff |> Eval.toFun |> Eval.addArg (Expr.makeVar wrt)) |> Eval.usingEvalEnv evalEnv
 
             let value = EvalEnv.getVarSpecT wrt evalEnv

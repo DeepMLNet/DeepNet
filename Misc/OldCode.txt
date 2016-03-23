@@ -1,0 +1,17 @@
+let ``Test Autoencoder`` () =
+    let mc = ModelBuilder<single> "Autoencoder"
+    
+    // symbolic sizes
+    let batchSize  = mc.Size "BatchSize"
+    let nInput     = mc.Size "nInput"
+    
+    let pars = Autoencoder.pars (mc.Module "Autoencoder1") {NVisible=nInput; NLatent=mc.Fix 50; Tied=false}
+    
+    let input  =     mc.Var "Input"  [nInput; batchSize]
+
+    let loss = Autoencoder.loss pars input 
+
+    printfn "Autoencoder:\n%A" loss
+    let dloss = Deriv.compute loss
+    ()
+    //printfn "%A" dloss
