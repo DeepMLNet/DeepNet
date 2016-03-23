@@ -483,6 +483,9 @@ module ArrayND =
         static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (%) (%) (%) (%) a b
         static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
 
+        //static member (=) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (=) (=) (=) (=) a b
+        //static member (<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
+
         // elementwise binary with scalars
         static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
         static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)

@@ -15,9 +15,14 @@ module HDF5Support =
     do
         H5.``open`` () |> check |> ignore
 
-    let hdfType<'T> =
-        if   typeof<'T> = typeof<int32> then H5T.NATIVE_INT32
+    let hdfType<'T> =        
+        if   typeof<'T> = typeof<bool> then H5T.NATIVE_UINT8
+        elif typeof<'T> = typeof<int8> then H5T.NATIVE_INT8
+        elif typeof<'T> = typeof<int16> then H5T.NATIVE_INT16
+        elif typeof<'T> = typeof<int32> then H5T.NATIVE_INT32
         elif typeof<'T> = typeof<int64> then H5T.NATIVE_INT64
+        elif typeof<'T> = typeof<uint8> then H5T.NATIVE_UINT8
+        elif typeof<'T> = typeof<uint16> then H5T.NATIVE_UINT16
         elif typeof<'T> = typeof<uint32> then H5T.NATIVE_UINT32
         elif typeof<'T> = typeof<uint64> then H5T.NATIVE_UINT64
         elif typeof<'T> = typeof<single> then H5T.NATIVE_FLOAT
@@ -61,7 +66,9 @@ module HDF5Types =
             if List.exists ((>) 0) shape then
                 failwithf "shape %A has negative elements" shape
 
-                       
+        /// opens a HDF5 file for reading
+        new (path: string) = new HDF5 (path, HDF5Read)
+
         interface IDisposable with
             member this.Dispose () =
                 if fileHnd >= 0 then

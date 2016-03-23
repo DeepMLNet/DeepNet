@@ -1,43 +1,16 @@
-- Should probably switch to Thrust for all operations
-- can it be done?
-	- should definintely work for sum and sumaxis
-	- would also be nice for elementwise functions
-- drawback: 
-	- need full nvcc compiler
-
-- can also use arrayfire for dimensions <= 4
-
-- thrust should work with any dimension when iterators are defined appropirately
-- both require host calls
-- arrayfire is fixed to a particular stream for now
-
-
 TODO:
-	- implement CUBLAS DONE
-	- implement host call interface  DONE
-	- implement host call function generation / compilation DONE
-	- implement host call function calling DONE
-	- implement Thrust iterators DONE
-	- implement elementwise / reductions using Thrust DONE
-	- (later: implement calls to arrayfire)
+	- get training of line following neural network to work
+	- for that we need:
+		1. find out how it was done in Python
+		2. check if necessary tools are available
+		3. convert or load numpy files
+		4. build model
+		5. train it
+		6. compare training performance
+		7. optimize as needed
 
 
-- okay, where is the problem?
-- solution 1:
-	- define delgates for all functions we call
-	- means: number of parameters and their types must be known during compile time
-		- not really: we still can just pass an IntPtr
-	- advantage: quite save and easy
-
-
-TODO:
-	- compare GPU and CPU result
-	- perhaps to it automatically?
-
-
-	- nice frontend
-	- cleanup cuda code
-	- directory structure
-	- tanh / sigmoid
-	- simple neural network
-	- ArrayFire HEAD?
+have lots of .npz files:
+	- need to read and convert to HDF5
+	- also need to think about how to layout dataset, i.e. training testing
+	- generic dataset class?

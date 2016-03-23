@@ -82,6 +82,7 @@
     <Compile Include="ArrayNDHostReg.fs" />
     <Compile Include="ArrayNDCuda.fs" />
     <Compile Include="ArrayNDHDF.fs" />
+    <Compile Include="NumpyFiles.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -127,6 +128,8 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Numerics" />
     <ProjectReference Include="..\Basics\Basics.fsproj">
       <Name>Basics</Name>
