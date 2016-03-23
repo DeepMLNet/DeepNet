@@ -41,6 +41,19 @@ let ``Loading of .npz files`` () =
     let dtRef : ArrayNDHostT<float> = ArrayNDHDF.read hdf "dt"
     let distortionActivesRef : ArrayNDHostT<bool> = ArrayNDHDF.read hdf "distortion_actives"
 
+    let curvePosEqual = curvePos ==== curvePosRef
+    let dtRefEqual = dt ==== dtRef
+    let distortionActivesEqual = distortionActives ==== distortionActivesRef
+
+    printfn "curvePosEqual:\n%A" curvePosEqual
+    printfn "dtRefEqual:\n%A" dtRefEqual
+    printfn "distortionActivesEqual:\n%A" distortionActivesEqual
+
+    ArrayND.all curvePosEqual |> ArrayND.value |> should equal true
+    ArrayND.all dtRefEqual |> ArrayND.value |> should equal true
+    ArrayND.all distortionActivesEqual |> ArrayND.value |> should equal true
+
+
 
 
 

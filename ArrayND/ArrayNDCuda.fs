@@ -81,6 +81,11 @@ module ArrayNDCudaTypes =
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout) :> ArrayNDT<'T>
 
+        override this.NewOfType<'N> (layout: ArrayNDLayoutT) = 
+            // drop constraint on 'N
+            let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typeof<'N>|]
+            Activator.CreateInstance (aryType, [|box layout|]) :?> ArrayNDT<'N>
+
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
 
@@ -108,6 +113,11 @@ module ArrayNDCudaTypes =
         member this.Item
             with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
+
+        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDCudaT<bool>
+        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDCudaT<bool>
+        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDCudaT<bool>
+        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDCudaT<bool>
 
         /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
         static member NewContiguous shp =

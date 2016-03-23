@@ -25,6 +25,7 @@ module ArrayNDTypes =
         abstract CPPType:           string
         abstract NewView:           ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
+        abstract NewOfType:         ArrayNDLayoutT -> System.Type -> IArrayNDT
         abstract DataType:          System.Type
         abstract Location:          ArrayLocT
         abstract Copy:              unit -> IArrayNDT
@@ -64,6 +65,9 @@ module ArrayND =
 
         /// a new ArrayND of same type and new storage allocation for given layout
         abstract NewOfSameType : ArrayNDLayoutT -> ArrayNDT<'T>
+
+        /// a new ArrayND of given type and new storage allocation for given layout
+        abstract NewOfType<'N> : ArrayNDLayoutT -> ArrayNDT<'N>
 
         /// a new ArrayND of same type with same storage allocation but new layout
         abstract NewView : ArrayNDLayoutT -> ArrayNDT<'T>
@@ -119,6 +123,10 @@ module ArrayND =
             member this.CPPType = this.CPPType         
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
+            member this.NewOfType layout typ = 
+                let gm = this.GetType().GetMethod("NewOfType")
+                let m = gm.MakeGenericMethod [|typ|]
+                m.Invoke(this, [|box layout|]) :?> IArrayNDT
             member this.DataType = this.DataType
             member this.Location = this.Location
             member this.Copy () = 
@@ -202,12 +210,20 @@ module ArrayND =
         false // TODO
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newContiguousOfType shp (a: 'A when 'A :> IArrayNDT) : 'A =
+    let inline newContiguousOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newContiguous shp) :?> 'A
 
+    /// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
+    let inline newContiguousOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+        a.NewOfType (ArrayNDLayout.newContiguous shp) 
+
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newColumnMajorOfType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+    let inline newColumnMajorOfSameType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
         a.NewOfSameType (ArrayNDLayout.newColumnMajor shp) :?> 'A
+
+    /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
+    let inline newColumnMajorOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+        a.NewOfType (ArrayNDLayout.newColumnMajor shp) 
 
     /// creates a new ArrayND with existing data but new layout
     let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
@@ -224,7 +240,7 @@ module ArrayND =
 
     /// Returns a continguous copy of the given ArrayND.
     let inline copy source =
-        let dest = newContiguousOfType (shape source) source
+        let dest = newContiguousOfSameType (shape source) source
         copyTo source dest
         dest
 
@@ -312,7 +328,7 @@ module ArrayND =
 
     /// creates a scalar ArrayND of given value and type
     let scalarOfType (value: 'T) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
-        let ary = newContiguousOfType [] a
+        let ary = newContiguousOfSameType [] a
         set [] value ary
         ary
 
@@ -322,12 +338,12 @@ module ArrayND =
             set idx (ArrayNDT<'T>.Zero) a
    
     /// ArrayND of specified shape and same type as a filled with zeros.
-    let inline zerosOfType shp a =
-        newContiguousOfType shp a
+    let inline zerosOfSameType shp a =
+        newContiguousOfSameType shp a
 
     /// ArrayND of same shape filled with zeros.
     let inline zerosLike a =
-        newContiguousOfType (shape a) a
+        newContiguousOfSameType (shape a) a
 
     /// fills the specified ArrayND with ones
     let inline fillWithOnes (a: #ArrayNDT<'T>) =
@@ -335,14 +351,14 @@ module ArrayND =
             set idx (ArrayNDT<'T>.One) a
 
     /// ArrayND of specified shape and same type as a filled with ones.
-    let inline onesOfType shp a =
-        let n = newContiguousOfType shp a
+    let inline onesOfSameType shp a =
+        let n = newContiguousOfSameType shp a
         fillWithOnes n
         n        
 
     /// ArrayND of same shape filled with ones.
     let inline onesLike a =
-        onesOfType (shape a) a
+        onesOfSameType (shape a) a
 
     /// fills the diagonal of a quadratic matrix with ones
     let inline fillDiagonalWithOnes (a: #ArrayNDT<'T>) =
@@ -380,6 +396,16 @@ module ArrayND =
         c        
 
     /// Applies the given binary function elementwise to the two given ArrayNDs 
+    /// and stores the result in a new ArrayND.
+    let inline map2TypeChange (f: 'T -> 'T -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        let a, b = broadcastToSame a b
+        let c : ArrayNDT<'R> = newContiguousOfType (shape a) a
+        for idx in allIdx a do
+            let cv = f (get idx a) (get idx b)
+            set idx cv c
+        c        
+
+    /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
     let inline map2Inplace f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         let a, b = broadcastToSame a b
@@ -391,6 +417,7 @@ module ArrayND =
     let inline unsp (a: 'T) : 'R = 
         failwithf "operation unsupported for type %A" typeof<'T>
 
+   
     let inline uncheckedApply (f: ArrayNDT<'A> -> ArrayNDT<'A>) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
         let aCast = a.Cast<'A> ()
         let mCast = f aCast
@@ -405,47 +432,85 @@ module ArrayND =
         let m = a.CastToMe mCast
         m :?> 'B
 
+    let inline uncheckedApply2TypeChange (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'R>) 
+            (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : ArrayNDT<'R> =
+        let aCast = a.Cast<'A> ()
+        let bCast = b.Cast<'A> ()
+        let mCast = f aCast bCast
+        mCast
+
     let inline uncheckedMap (f: 'A -> 'A) (a: #ArrayNDT<'T>) =
         uncheckedApply (map f) a
 
     let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         uncheckedApply2 (map2 f) a b
 
-    let inline typedApply   (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
+    let inline uncheckedMap2TypeChange (f: 'A -> 'A -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        uncheckedApply2TypeChange (map2TypeChange f) a b
+
+    let inline typedApply   (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>) 
+                            (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>)
                             (a: #ArrayNDT<'T>) =
-        if   typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
+        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply fBool a 
+        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
 
-    let inline typedApply2  (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
+    let inline typedApply2  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<bool>) 
+                            (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<int>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<byte>)
                             (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        if   typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
+        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2 fBool   a b        
+        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
         else failwith "unknown type"
 
-    let inline typedMap (fDouble: double -> double) 
+    let inline typedApply2TypeChange  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<'R>) 
+                                      (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<'R>) 
+                                      (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<'R>)
+                                      (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<'R>)
+                                      (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<'R>)
+                                      (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2TypeChange fBool   a b
+        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2TypeChange fDouble a b
+        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2TypeChange fSingle a b
+        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2TypeChange fInt    a b
+        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2TypeChange fByte   a b
+        else failwith "unknown type"
+
+    let inline typedMap (fBool:   bool   -> bool)
+                        (fDouble: double -> double) 
                         (fSingle: single -> single)
                         (fInt:    int    -> int)
                         (fByte:   byte   -> byte)
                         (a: #ArrayNDT<'T>) =
-        typedApply (map fDouble) (map fSingle) (map fInt) (map fByte) a
+        typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fByte) a
 
-    let inline typedMap2 (fDouble: double -> double -> double) 
+    let inline typedMap2 (fBool:   bool   -> bool   -> bool)
+                         (fDouble: double -> double -> double) 
                          (fSingle: single -> single -> single)
                          (fInt:    int    -> int    -> int)
                          (fByte:   byte   -> byte   -> byte)
                          (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedApply2 (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
+        typedApply2 (map2 fBool) (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
+
+    let inline typedMap2TypeChange (fBool:   bool   -> bool   -> 'R)
+                                   (fDouble: double -> double -> 'R)
+                                   (fSingle: single -> single -> 'R)
+                                   (fInt:    int    -> int    -> 'R)
+                                   (fByte:   byte   -> byte   -> 'R)
+                                   (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        typedApply2TypeChange (map2TypeChange fBool) (map2TypeChange fDouble) (map2TypeChange fSingle) 
+            (map2TypeChange fInt) (map2TypeChange fByte) a b
 
     let inline signImpl (x: 'T) =
         conv<'T> (sign x)
@@ -453,38 +518,48 @@ module ArrayND =
     type ArrayNDT<'T> with    
 
         // elementwise unary
-        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (~+) (~+) (~+) (unsp) a
-        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (~-) (~-) (~-) (unsp) a
-        static member Abs       (a: #ArrayNDT<'T>) = typedMap abs abs abs (unsp) a
-        static member SignT     (a: #ArrayNDT<'T>) = typedMap signImpl signImpl sign (unsp) a
-        static member Log       (a: #ArrayNDT<'T>) = typedMap log log (unsp) (unsp) a
-        static member Log10     (a: #ArrayNDT<'T>) = typedMap log10 log10 (unsp) (unsp) a
-        static member Exp       (a: #ArrayNDT<'T>) = typedMap exp exp (unsp) (unsp) a
-        static member Sin       (a: #ArrayNDT<'T>) = typedMap sin sin (unsp) (unsp) a
-        static member Cos       (a: #ArrayNDT<'T>) = typedMap cos cos (unsp) (unsp) a
-        static member Tan       (a: #ArrayNDT<'T>) = typedMap tan tan (unsp) (unsp) a
-        static member Asin      (a: #ArrayNDT<'T>) = typedMap asin asin (unsp) (unsp) a
-        static member Acos      (a: #ArrayNDT<'T>) = typedMap acos acos (unsp) (unsp) a
-        static member Atan      (a: #ArrayNDT<'T>) = typedMap atan atan (unsp) (unsp) a
-        static member Sinh      (a: #ArrayNDT<'T>) = typedMap sinh sinh (unsp) (unsp) a
-        static member Cosh      (a: #ArrayNDT<'T>) = typedMap cosh cosh (unsp) (unsp) a
-        static member Tanh      (a: #ArrayNDT<'T>) = typedMap tanh tanh (unsp) (unsp) a
-        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap sqrt sqrt (unsp) (unsp) a
-        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap ceil ceil (unsp) (unsp) a
-        static member Floor     (a: #ArrayNDT<'T>) = typedMap floor floor (unsp) (unsp) a
-        static member Round     (a: #ArrayNDT<'T>) = typedMap round round (unsp) (unsp) a
-        static member Truncate  (a: #ArrayNDT<'T>) = typedMap truncate truncate (unsp) (unsp) a
+        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~+) (~+) (~+) (unsp) a
+        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~-) (~-) (~-) (unsp) a
+        static member Abs       (a: #ArrayNDT<'T>) = typedMap (unsp) abs abs abs (unsp) a
+        static member SignT     (a: #ArrayNDT<'T>) = typedMap (unsp) signImpl signImpl sign (unsp) a
+        static member Log       (a: #ArrayNDT<'T>) = typedMap (unsp) log log (unsp) (unsp) a
+        static member Log10     (a: #ArrayNDT<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) a
+        static member Exp       (a: #ArrayNDT<'T>) = typedMap (unsp) exp exp (unsp) (unsp) a
+        static member Sin       (a: #ArrayNDT<'T>) = typedMap (unsp) sin sin (unsp) (unsp) a
+        static member Cos       (a: #ArrayNDT<'T>) = typedMap (unsp) cos cos (unsp) (unsp) a
+        static member Tan       (a: #ArrayNDT<'T>) = typedMap (unsp) tan tan (unsp) (unsp) a
+        static member Asin      (a: #ArrayNDT<'T>) = typedMap (unsp) asin asin (unsp) (unsp) a
+        static member Acos      (a: #ArrayNDT<'T>) = typedMap (unsp) acos acos (unsp) (unsp) a
+        static member Atan      (a: #ArrayNDT<'T>) = typedMap (unsp) atan atan (unsp) (unsp) a
+        static member Sinh      (a: #ArrayNDT<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) a
+        static member Cosh      (a: #ArrayNDT<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) a
+        static member Tanh      (a: #ArrayNDT<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) a
+        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) a
+        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) a
+        static member Floor     (a: #ArrayNDT<'T>) = typedMap (unsp) floor floor (unsp) (unsp) a
+        static member Round     (a: #ArrayNDT<'T>) = typedMap (unsp) round round (unsp) (unsp) a
+        static member Truncate  (a: #ArrayNDT<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) a
+
+        // elementwise unary logic
+        static member (~~~~)    (a: #ArrayNDT<bool>) = map not a
 
         // elementwise binary
-        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
-        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (-) (-) (-) (-) a b
-        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (*) (*) (*) (*) a b
-        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (/) (/) (/) (/) a b
-        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (%) (%) (%) (%) a b
-        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 ( ** ) ( ** ) (unsp) (unsp) a b
+        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (+) (+) (+) (+) a b
+        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (-) (-) (-) (-) a b
+        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (*) (*) (*) (*) a b
+        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (/) (/) (/) (/) a b
+        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (%) (%) (%) (%) a b
+        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) a b
 
-        //static member (=) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (=) (=) (=) (=) a b
-        //static member (<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (+) (+) (+) (+) a b
+        // elementwise binary logic
+        static member (&&&&) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (&&) a b
+        static member (||||) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (||) a b
+
+        // elementwise binary comparision
+        static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) a b
+        static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) a b
+        static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) a b
+        static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a b
 
         // elementwise binary with scalars
         static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
@@ -492,7 +567,9 @@ module ArrayND =
         static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
         static member inline (/) (a: #ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
         static member inline (%) (a: #ArrayNDT<'T>, b: 'T) = a % (scalarOfType b a)
-        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)
+        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)       
+        static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfType b a)
+        static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfType b a)
 
         static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) + b
         static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) - b
@@ -500,6 +577,8 @@ module ArrayND =
         static member inline (/) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) / b
         static member inline (%) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) % b
         static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) ** b
+        static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) &&&& b
+        static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) |||| b
 
         // transposition
         member this.T = transpose this
@@ -520,7 +599,7 @@ module ArrayND =
       
     /// applies the given reduction function over the given dimension
     let inline axisReduce f dim a =
-        let c = newContiguousOfType (List.without dim (shape a)) a
+        let c = newContiguousOfSameType (List.without dim (shape a)) a
         for srcRng, dstIdx in ArrayNDLayout.allSourceRangesAndTargetIdxsForAxisReduction dim (layout a) do
             set dstIdx (f (view srcRng a) |> get []) c
         c
@@ -532,7 +611,7 @@ module ArrayND =
 
     /// elementwise sum
     let inline sum (a: #ArrayNDT<'T>) =
-        typedApply sumImpl sumImpl sumImpl sumImpl a 
+        typedApply (unsp) sumImpl sumImpl sumImpl sumImpl a 
 
     /// elementwise sum over given axis
     let inline sumAxis dim a = axisReduce sum dim a
@@ -544,7 +623,7 @@ module ArrayND =
 
     /// elementwise product
     let inline product (a: #ArrayNDT<'T>) =
-        typedApply productImpl productImpl productImpl productImpl a 
+        typedApply (unsp) productImpl productImpl productImpl productImpl a 
 
     /// elementwise product over given axis
     let inline productAxis dim a = axisReduce product dim a
@@ -555,7 +634,7 @@ module ArrayND =
 
     let inline max a =
         if nElems a = 0 then invalidArg "a" "cannot compute max of empty ArrayNDT"
-        typedApply maxImpl maxImpl maxImpl maxImpl a
+        typedApply (unsp) maxImpl maxImpl maxImpl maxImpl a
 
     let inline minImpl a =
         let value = allElems a |> Seq.reduce min
@@ -563,7 +642,15 @@ module ArrayND =
 
     let inline min a =
         if nElems a = 0 then invalidArg "a" "cannot compute min of empty ArrayNDT"
-        typedApply minImpl minImpl minImpl minImpl a
+        typedApply (unsp) minImpl minImpl minImpl minImpl a
+
+    let inline all a =
+        let value = allElems a |> Seq.fold (&&) true
+        scalarOfType value a
+
+    let inline any a =
+        let value = allElems a |> Seq.fold (||) false
+        scalarOfType value a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations
@@ -575,7 +662,7 @@ module ArrayND =
             let nI = (shape a).[0]
             let nJ = (shape a).[1]
             let nK = (shape b).[1]
-            let c = newContiguousOfType [nI; nK] a
+            let c = newContiguousOfSameType [nI; nK] a
             for k=0 to nK - 1 do
                 for i=0 to nI - 1 do
                     let v = 
@@ -598,7 +685,7 @@ module ArrayND =
 
     type ArrayNDT<'T> with   
         /// dot product
-        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 dotImpl dotImpl dotImpl dotImpl a b
+        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl a b
 
     /// dot product between vec*vec, mat*vec, mat*mat
     let inline dot a b =
@@ -656,7 +743,7 @@ module ArrayND =
                   
         let tmplArray = Option.get (anyArray bs)
         let joinedShape = joinedBlocksShape 0 bs
-        let joined = newContiguousOfType joinedShape tmplArray
+        let joined = newContiguousOfSameType joinedShape tmplArray
         let startPos = List.replicate (List.length joinedShape) 0
 
         for pos, ary in blockPosAndContents 0 startPos bs do
@@ -684,7 +771,7 @@ module ArrayND =
    
     type ArrayNDT<'T> with
         /// tensor product
-        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b

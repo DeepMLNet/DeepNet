@@ -45,6 +45,9 @@ module ArrayNDManikinTypes =
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             failwith "ArrayNDManikin cannot allocate memory on its own"
 
+        override this.NewOfType<'N> (layout: ArrayNDLayoutT) : ArrayNDT<'N> = 
+            failwith "ArrayNDManikin cannot allocate memory on its own"
+
         override this.NewView (layout: ArrayNDLayoutT) = 
             ArrayNDManikinT(layout, storage) :> ArrayNDT<int>
 
