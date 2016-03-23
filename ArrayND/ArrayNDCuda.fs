@@ -30,6 +30,7 @@ module ArrayNDCudaTypes =
         new (elems: int) =
             // CUDA cannot allocate memory of size zero
             let elems = if elems > 0 then elems else 1
+            CudaSup.init ()
             CudaStorageT<'T> (new CudaDeviceVariable<'T> (SizeT elems))
 
         member this.Data = data

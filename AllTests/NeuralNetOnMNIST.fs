@@ -15,7 +15,7 @@ open Optimizers
 open TestUtils
 
 
-let mnistPath = @"..\..\..\Data\MNIST"
+let mnistPath = @"C:\Local\surban\dev\fexpr\Data\MNIST"
 
 
 let build device batch = 
@@ -75,10 +75,12 @@ let getMnist device samples =
 let train device samples iters = 
     let tstImgs, tstLbls = getMnist device (Some samples)
     let lossFun, optFun = build device samples
-    let initialLoss = lossFun tstImgs tstLbls
+    let initialLoss = lossFun tstImgs tstLbls |> ArrayND.value
+    printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
         optFun tstImgs tstLbls |> ignore
-    let finalLoss = lossFun tstImgs tstLbls
+    let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
+    printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss
 
 [<Fact>]

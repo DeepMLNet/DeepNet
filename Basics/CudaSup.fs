@@ -70,8 +70,8 @@ module CudaSup =
 
     /// Ensures that CUDA is initialized. Multiple calls are allowed and have no effect.
     let init () =       
-        context |> ignore
-        //context.SetLimit(CULimit.PrintfFIFOSize, SizeT 1000000)
+        // make a dummy call on the context to ensure that it is created
+        context.GetSharedMemConfig() |> ignore
 
     /// shutsdown CUDA (necessary for correct profiler results)  
     let shutdown () =
