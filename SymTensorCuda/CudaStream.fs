@@ -144,7 +144,8 @@ module CudaStreamSeq =
                     coll.AllSuccessorsOf candEmitter
                     |> Seq.forall (fun succOfEmitter -> 
                         match eventOfUnit |> Map.tryFind succOfEmitter.Id with
-                        | Some succOfEmitterEvt when succOfEmitterEvt = candEvt -> false
+                        | Some succOfEmitterEvt when 
+                            succOfEmitterEvt.EventObjectId = candEvt.EventObjectId -> false
                         | _ -> true)
                     -> Some candEvt.EventObjectId
                 | _ ->
