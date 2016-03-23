@@ -80,7 +80,7 @@ module Util =
         System.IO.Path.GetDirectoryName(path)
 
     /// path to application directory under AppData\Local
-    let localAppData = 
+    let localAppData =  
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
         System.IO.Path.Combine (lad, "expr2")
     
