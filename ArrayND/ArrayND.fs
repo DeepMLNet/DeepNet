@@ -7,7 +7,13 @@ open Basics
 module ArrayNDTypes =
 
     /// Array storage location
-    type ArrayLocT = ArrayLoc of string
+    [<StructuredFormatDisplay("{Pretty}")>]
+    type ArrayLocT = 
+        | ArrayLoc of string
+        with 
+            member this.Pretty = 
+                let (ArrayLoc loc) = this
+                loc
 
     /// variable stored on host
     let LocHost = ArrayLoc "Host"

@@ -17,7 +17,25 @@ open ArrayNDNS
 open Datasets
 
 
-type Arrayf = ArrayNDHostT<float>
+type Arrayf = ArrayNDT<float>
+
+type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
+
+let loadData srcDir =
+    seq {
+        for pageDir in Directory.EnumerateDirectories srcDir do
+            for curveDir in Directory.EnumerateDirectories pageDir do
+                let filename = curveDir + "/tactile.npz"   
+                yield async {
+                    use tactile = NPZFile.Open filename
+                    return {Time=tactile.Get "time"
+                            Pos=tactile.Get "pos"
+                            Vels=tactile.Get "vels"
+                            Biotac=tactile.Get "biotac"}
+                }
+    }
+    |> Async.Parallel |> Async.RunSynchronously
+
 
 
 type CLIArgs =
@@ -32,31 +50,19 @@ let args = parser.Parse(cmdLine, errorHandler=ProcessExiter())
 
 let srcDir = args.GetResult <@ SrcDir @>
 
-type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
+let allData = loadData srcDir |> Seq.toList
 
-let loadData srcDir =
-    let files = seq {
-        for pageDir in Directory.EnumerateDirectories srcDir do
-            for curveDir in Directory.EnumerateDirectories pageDir do
-                yield curveDir + "/tactile.npz"   
-    }
-    let loadFile filename = async {
-        use tactile = NPZFile.Open filename
-        return {Time=tactile.Get "time"
-                Pos=tactile.Get "pos"
-                Vels=tactile.Get "vels"
-                Biotac=tactile.Get "biotac"}
-    }
-    files
-    |> Seq.map loadFile
-    |> Async.Parallel
-    |> Async.RunSynchronously
-
-let allData = loadData srcDir 
-
-let dataset = Dataset.FromSamples allData
+let dataset = allData |> Dataset.FromSamples |> Dataset.ToCuda
 
 
+// next step?
+// define models
+
+// input data for neural network is computed in python code
+// do the same here during dataset loading
+
+dataset.[0..2].Biotac |> ArrayND.shape
+// how is the target velocity calculated? where is it stored?
 
 //for smpl in allData do
 //    printfn "Time: %A" (ArrayND.shape smpl.Time)
@@ -66,8 +72,8 @@ let dataset = Dataset.FromSamples allData
 //    printfn ""
 
 // need to make         
-let posChart = Chart.Line (Seq.zip allData.[3].Time.Data allData.[3].Pos.Data) |> Chart.WithTitle "pos" 
-let velChart = Chart.Line allData.[3].Vels.Data |> Chart.WithTitle "vels"
-Chart.Rows [posChart; velChart]
+//let posChart = Chart.Line (Seq.zip allData.[3].Time.Data allData.[3].Pos.Data) |> Chart.WithTitle "pos" 
+//let velChart = Chart.Line allData.[3].Vels.Data |> Chart.WithTitle "vels"
+//Chart.Rows [posChart; velChart]
 //|> Chart.Save (__SOURCE_DIRECTORY__ + "/chart.pdf")
 

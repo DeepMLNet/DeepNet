@@ -14,7 +14,7 @@ module DatasetTypes =
     /// A dataset of a record type 'S containing ArrayNDHostT<_> data variables.
     /// The last dimension of each record field is the sample.
     /// All record fields must contain the same number of samples.
-    [<StructuredFormatDisplay("Dataset (Samples={NSamples} Contents={SampleType})")>]
+    [<StructuredFormatDisplay("Dataset (Samples={NSamples}; Location={Location}; Contents={SampleType})")>]
     type Dataset<'S> (fieldStorages: IArrayNDT list) =
 
         // verify that all fields have equal number of samples
@@ -48,6 +48,9 @@ module DatasetTypes =
                 |> List.transpose
             partitionedFieldStorages |> List.map Dataset<'S>
 
+        /// Partitions this dataset using the given ratios.
+        static member Partition (this: Dataset<'S>, ratios) = this.Partition ratios
+
         /// Returns a record of type 'S containing the sample with the given index.
         member this.Item 
             with get (smpl: int) =
@@ -75,6 +78,9 @@ module DatasetTypes =
 
         /// data type of samples
         member this.SampleType = typeof<'S>
+
+        /// storage location
+        member this.Location = fieldStorages.[0].Location
 
         /// Generates a function that returns a sequence of batches with the given size of this dataset.
         /// If the number of samples in this dataset is not a multiple of the batch size,
@@ -112,6 +118,11 @@ module DatasetTypes =
                     | None -> ()        
                 }           
 
+        /// Generates a function that returns a sequence of batches with the given size of this dataset.
+        /// If the number of samples in this dataset is not a multiple of the batch size,
+        /// the last batch will still have the specified size but is padded with zeros.
+        static member Batches (this: Dataset<'S>, batchSize) = this.Batches batchSize
+
         /// maps the field storages using the given function creating a new dataset
         member this.MapFieldStorage (f: IArrayNDT -> #IArrayNDT) =
             fieldStorages
@@ -122,6 +133,9 @@ module DatasetTypes =
         member this.ToCuda () =
             this.MapFieldStorage (fun fs ->
                 ArrayNDCuda.toDevUntyped (fs :?> IArrayNDHostT))
+
+        /// copies this dataset to a CUDA GPU
+        static member ToCuda (this: Dataset<'S>) = this.ToCuda ()
 
         interface IEnumerable<'S> with
             member this.GetEnumerator() =

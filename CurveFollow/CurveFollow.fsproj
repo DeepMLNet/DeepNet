@@ -40,6 +40,29 @@
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <Tailcalls>false</Tailcalls>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
+    <Prefer32Bit>true</Prefer32Bit>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>bin\Release\CurveFollow.XML</DocumentationFile>
+    <Prefer32Bit>true</Prefer32Bit>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
       <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">
@@ -76,6 +99,43 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
+      <Name>ArrayND</Name>
+      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Basics\Basics.fsproj">
+      <Name>Basics</Name>
+      <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Datasets\Datasets.fsproj">
+      <Name>Datasets</Name>
+      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Models\Models.fsproj">
+      <Name>Models</Name>
+      <Project>{28168025-4211-4de2-bb66-b267378f74a7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Optimizers\Optimizers.fsproj">
+      <Name>Optimizers</Name>
+      <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\SymTensorCuda\SymTensorCuda.fsproj">
+      <Name>SymTensorCuda</Name>
+      <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
+      <Name>SymTensor</Name>
+      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
