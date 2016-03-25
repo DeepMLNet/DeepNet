@@ -35,7 +35,7 @@ type CurveDataset () =
     [<Fact>]
     member this.``Accessing elements`` () =
         printfn "\naccessing elements:"
-        for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) do
+        for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) |> Seq.take 3 do
             printfn "idx %d has sample biotac %A pos %A" 
                 idx (smpl.Biotac |> ArrayND.shape) (smpl.Pos |> ArrayND.shape)
             smpl.Biotac ==== orig.Biotac |> ArrayND.all |> ArrayND.value |> should equal true
@@ -63,5 +63,8 @@ type CurveDataset () =
                 idx (batch.Biotac |> ArrayND.shape) (batch.Pos |> ArrayND.shape)
             batch.Biotac |> ArrayND.shape |> List.last |> should equal batchSize
 
-
+    [<Fact>]
+    member this.``To CUDA GPU`` () =
+        let dsCuda = dataset.ToCuda()
+        printfn "copied to CUDA: %A" dsCuda
 

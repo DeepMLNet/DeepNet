@@ -1,6 +1,7 @@
 ﻿namespace ArrayNDNS
 
 open System
+open System.Reflection
 open ManagedCuda
 open ManagedCuda.BasicTypes
 open Basics.Cuda
@@ -207,8 +208,14 @@ module ArrayNDCuda =
     /// Both must of same shape. dst must also be contiguous and with offset zero.
     let copyIntoDev dst src = ArrayNDCudaT.CopyIntoDev dst src
 
-    /// Copies a ArrayNDHostT to the device
+    /// Copies an ArrayNDHostT to the device
     let toDev src = ArrayNDCudaT.OfHost src
+
+    /// Copies an IArrayNDHostT to the device 
+    let toDevUntyped (src: IArrayNDHostT) =
+        let devVarType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|src.DataType|]
+        let ofHost = devVarType.GetMethod("OfHost", BindingFlags.Static ||| BindingFlags.Public)
+        ofHost.Invoke (null, [|box src|]) :?> IArrayNDCudaT  
 
     /// Copies a ArrayNDCudaT into the specified ArrayNDHostT.
     /// Both must of same shape. dst must also be contiguous and with offset zero.
@@ -216,6 +223,9 @@ module ArrayNDCuda =
 
     /// Copies the specified ArrayNDCudaT to the host
     let toHost (src: ArrayNDCudaT<_>) = src.ToHost()
+
+    /// Copies the specified IArrayNDCudaT to the host
+    let toHostUntyped (src: IArrayNDCudaT) = src.ToHost()
 
     /// Creates a new IArrayNDT of given type and layout in device memory.
     let newOfType typ (layout: ArrayNDLayoutT) = 

@@ -14,6 +14,7 @@ module DatasetTypes =
     /// A dataset of a record type 'S containing ArrayNDHostT<_> data variables.
     /// The last dimension of each record field is the sample.
     /// All record fields must contain the same number of samples.
+    [<StructuredFormatDisplay("Dataset (Samples={NSamples} Contents={SampleType})")>]
     type Dataset<'S> (fieldStorages: IArrayNDT list) =
 
         // verify that all fields have equal number of samples
@@ -72,6 +73,9 @@ module DatasetTypes =
         /// number of samples
         member this.NSamples = nSamples
 
+        /// data type of samples
+        member this.SampleType = typeof<'S>
+
         /// Generates a function that returns a sequence of batches with the given size of this dataset.
         /// If the number of samples in this dataset is not a multiple of the batch size,
         /// the last batch will still have the specified size but is padded with zeros.
@@ -107,6 +111,17 @@ module DatasetTypes =
                         yield FSharpValue.MakeRecord (typeof<'S>, data) :?> 'S     
                     | None -> ()        
                 }           
+
+        /// maps the field storages using the given function creating a new dataset
+        member this.MapFieldStorage (f: IArrayNDT -> #IArrayNDT) =
+            fieldStorages
+            |> List.map (f >> (fun fs -> fs :> IArrayNDT))
+            |> Dataset<'S>
+
+        /// copies this dataset to a CUDA GPU
+        member this.ToCuda () =
+            this.MapFieldStorage (fun fs ->
+                ArrayNDCuda.toDevUntyped (fs :?> IArrayNDHostT))
 
         interface IEnumerable<'S> with
             member this.GetEnumerator() =
