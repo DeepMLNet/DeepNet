@@ -80,6 +80,7 @@
     <Compile Include="TestUtils.fs" />
     <Compile Include="ArrayNDTests.fs" />
     <Compile Include="NumpyFilesTest.fs" />
+    <Compile Include="DatasetTests.fs" />
     <None Include="CompilerPipeline.fs" />
     <Compile Include="MNISTTests.fs" />
     <Compile Include="NeuralNetOnMNIST.fs" />
@@ -94,6 +95,9 @@
     <Reference Include="FsUnit.Xunit">
       <HintPath>..\packages\FsUnit.xUnit.1.4.1.0\lib\net45\FsUnit.Xunit.dll</HintPath>
       <Private>True</Private>
+    </Reference>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="NHamcrest">

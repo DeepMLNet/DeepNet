@@ -154,7 +154,9 @@ module NPZFileTypes =
             let entry = zipFile.GetEntry filename
             use stream = entry.Open()
             NPYFile.loadFromStream stream
-            
+
+        /// opens the specified .npz file
+        static member Open path = new NPZFile (path)
 
         interface IDisposable with
             member this.Dispose () = zipFile.Dispose()

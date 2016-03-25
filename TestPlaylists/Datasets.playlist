@@ -1,0 +1,1 @@
+<Playlist Version="1.0"><Add Test="DatasetTests.Loading curve dataset works" /><Add Test="MNISTTests.Load MNIST" /><Add Test="MNISTTests.Save MNIST as HDF5" /><Add Test="DatasetTests.Accessing dataset elements" /></Playlist>

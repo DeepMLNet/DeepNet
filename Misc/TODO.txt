@@ -10,7 +10,12 @@ TODO:
 		7. optimize as needed
 
 
+Need to make one big array for dataset.
+Write DataSet class.
+
+
+
 have lots of .npz files:
-	- need to read and convert to HDF5
-	- also need to think about how to layout dataset, i.e. training testing
+	- can read numpy files
+	- write function that reads them and creates a dataset array
 	- generic dataset class?

@@ -31,6 +31,12 @@ module List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
+    /// transposes a list list
+    let rec transpose = function
+        | (_::_)::_ as m -> List.map List.head m :: transpose (List.map List.tail m)
+        | _ -> []
+
+
 module Map = 
     /// adds all items from q to p
     let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 

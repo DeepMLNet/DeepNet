@@ -29,6 +29,18 @@ module ArrayNDTypes =
         abstract DataType:          System.Type
         abstract Location:          ArrayLocT
         abstract Copy:              unit -> IArrayNDT
+        abstract CopyTo:            IArrayNDT -> unit
+        abstract GetSlice:          [<System.ParamArray>] args: obj [] -> IArrayNDT
+        abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
+        abstract Item:              [<System.ParamArray>] allArgs: obj [] -> IArrayNDT with get
+        abstract Item:              obj -> IArrayNDT with set
+        abstract Item:              obj * obj -> IArrayNDT with set
+        abstract Item:              obj * obj * obj -> IArrayNDT with set
+        abstract Item:              obj * obj * obj * obj -> IArrayNDT with set
+        abstract Item:              obj * obj * obj * obj * obj -> IArrayNDT with set
+        abstract Item:              obj * obj * obj * obj * obj * obj -> IArrayNDT with set
+        abstract Item:              obj * obj * obj * obj * obj * obj * obj -> IArrayNDT with set
+
 
     type SpecialAxisT =
         | NewAxis
@@ -118,6 +130,78 @@ module ArrayND =
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
 
+        /// a view of this ArrayNDT over the given range 
+        member this.View rng =
+            this.NewView (ArrayNDLayout.view rng this.Layout)
+
+        member internal this.ToRng (allArgs: obj []) =
+            let rec toRng (args: obj list) =
+                match args with
+                // direct range specification
+                | [:? (RangeT list) as rngs] -> rngs
+
+                // slices
+                | (:? (int option) as so) :: (:? (int option) as fo)  :: rest ->
+                    Rng (so, fo) :: toRng rest
+                //  Rng (Some so.Value, Some fo.Value) :: toRng rest
+                //| (:? (int option) as so) :: null                     :: rest ->
+                //    Rng (Some so.Value, None) :: toRng rest
+                //| null                    :: (:? (int option) as fo)  :: rest ->
+                //    Rng (None, Some fo.Value) :: toRng rest
+                //| null                    :: null                     :: rest ->            
+                //    Rng (None, None) :: toRng rest
+
+                // items
+                | (:? int as i)           :: rest ->
+                    RngElem i :: toRng rest
+                | (:? SpecialAxisT as sa) :: rest ->
+                    match sa with
+                    | NewAxis -> RngNewAxis :: toRng rest
+                    | Fill    -> RngAllFill :: toRng rest
+
+                | [] -> []
+                | _  -> failwithf "invalid item/slice specification: %A" allArgs 
+
+            allArgs 
+            |> Array.toList
+            |> toRng
+
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            this.View (this.ToRng allArgs) 
+
+        member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
+            let rngArgs = allArgs.[0 .. allArgs.Length - 2] 
+            let trgt = this.View (this.ToRng rngArgs) 
+            let valueObj = Array.last allArgs
+            match valueObj with
+            | :? ArrayNDT<'T> as value -> value.CopyTo trgt
+            | _ -> failwithf "need array of same type to assign, but got type %A" 
+                        (valueObj.GetType())
+                
+        // item setter does not accept <ParamArray>, thus we have to write it out
+        member this.Item
+            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
+            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
+        member this.Item
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
+
         interface IArrayNDT with
             member this.Layout = this.Layout
             member this.CPPType = this.CPPType         
@@ -134,6 +218,37 @@ module ArrayND =
                 let trgt = this.NewOfSameType (ArrayNDLayout.newContiguous shp)
                 this.CopyTo trgt
                 trgt :> IArrayNDT
+            member this.CopyTo dest = 
+                match dest with
+                | :? ArrayNDT<'T> as dest -> this.CopyTo dest
+                | _ -> failwith "destination must be of same type as source"
+            member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+                this.GetSlice (allArgs) :> IArrayNDT
+            member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
+                this.SetSlice (allArgs)
+            member this.Item
+                with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> IArrayNDT
+                and set (arg0: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj, arg2: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
+            member this.Item
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: IArrayNDT) = 
+                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -319,7 +434,6 @@ module ArrayND =
 
     /// creates a subview of an ArrayND
     let inline view ranges a =
-        //printfn "layout=%A  ranges=%A   resulting layout=%A" (layout a) ranges (ArrayNDLayout.view ranges (layout a))
         relayout (ArrayNDLayout.view ranges (layout a)) a        
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -814,82 +928,6 @@ module ArrayND =
     type ArrayNDT<'T> with
         /// pretty contents string
         member this.PrettyString = prettyString this
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // pretty slicing and item access
-    ////////////////////////////////////////////////////////////////////////////////////////////////         
-  
-    type ArrayNDT<'T> with
-
-        member internal this.ToRng (allArgs: obj []) =
-            let rec toRng (args: obj list) =
-                match args with
-                // direct range specification
-                | [:? (RangeT list) as rngs] -> rngs
-
-                // slices
-                | (:? (int option) as so) :: (:? (int option) as fo)  :: rest ->
-                    Rng (so, fo) :: toRng rest
-                //  Rng (Some so.Value, Some fo.Value) :: toRng rest
-                //| (:? (int option) as so) :: null                     :: rest ->
-                //    Rng (Some so.Value, None) :: toRng rest
-                //| null                    :: (:? (int option) as fo)  :: rest ->
-                //    Rng (None, Some fo.Value) :: toRng rest
-                //| null                    :: null                     :: rest ->            
-                //    Rng (None, None) :: toRng rest
-
-                // items
-                | (:? int as i)           :: rest ->
-                    RngElem i :: toRng rest
-                | (:? SpecialAxisT as sa) :: rest ->
-                    match sa with
-                    | NewAxis -> RngNewAxis :: toRng rest
-                    | Fill    -> RngAllFill :: toRng rest
-
-                | [] -> []
-                | _  -> failwithf "invalid item/slice specification: %A" allArgs 
-
-            allArgs 
-            |> Array.toList
-            |> toRng
-
-        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            view (this.ToRng allArgs) this
-
-        member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
-            let rngArgs = allArgs.[0 .. allArgs.Length - 2] 
-            let trgt = view (this.ToRng rngArgs) this
-            let valueObj = Array.last allArgs
-            match valueObj with
-            | :? ArrayNDT<'T> as value -> copyTo value trgt
-            | _ -> failwithf "need array of same type to assign, but got type %A" 
-                        (valueObj.GetType())
-                
-        // item setter does not accept <ParamArray>, thus we have to write it out
-        member this.Item
-            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
-
 
 
 [<AutoOpen>]

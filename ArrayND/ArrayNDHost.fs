@@ -123,13 +123,27 @@ module ArrayNDHostTypes =
 
 module ArrayNDHost = 
 
+    /// Creates a ArrayNDT of given type and layout in host memory.
+    let newOfType typ (layout: ArrayNDLayoutT) = 
+        let gt = typedefof<ArrayNDHostT<_>>
+        let t = gt.MakeGenericType [|typ|]
+        Activator.CreateInstance (t, [|box layout|]) :?> IArrayNDHostT
+
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let inline newContiguous<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp) 
 
+    /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given type and shape 
+    let inline newContiguousOfType typ shp =
+        newOfType typ (ArrayNDLayout.newContiguous shp)
+
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
     let inline newColumnMajor<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp) 
+
+    /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given type and shape
+    let inline newColumnMajorOfType typ shp =
+        newOfType typ (ArrayNDLayout.newColumnMajor shp)
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let inline scalar value =
@@ -162,10 +176,5 @@ module ArrayNDHost =
                 shp (ArrayNDLayout.nElems layout) (Array.length data)
         ArrayNDHostT<'T> (layout, data) 
         
-    /// Creates a ArrayNDT of given type and layout in host memory.
-    let newOfType typ (layout: ArrayNDLayoutT) = 
-        let gt = typedefof<ArrayNDHostT<_>>
-        let t = gt.MakeGenericType [|typ|]
-        Activator.CreateInstance (t, [|layout|]) :?> IArrayNDHostT
 
 
