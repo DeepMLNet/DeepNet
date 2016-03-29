@@ -163,7 +163,7 @@ module ArrayND =
 
         /// maps all elements using the specified function into a new ArrayNDT
         member this.Map (f: 'T -> 'R) =
-            let res = this.NewOfType<'R> (ArrayNDLayout.newContiguous this.Shape)
+            let res = this.NewOfType<'R> (ArrayNDLayout.newC this.Shape)
             this.MapImpl f res
             res
 
@@ -179,7 +179,7 @@ module ArrayND =
                 failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (other.GetType())
             let this, other = this.BroadcastToSame other
-            let res = this.NewOfType<'R> (ArrayNDLayout.newContiguous this.Shape)
+            let res = this.NewOfType<'R> (ArrayNDLayout.newC this.Shape)
             this.Map2Impl f other res
             res
 
@@ -264,7 +264,7 @@ module ArrayND =
             member this.Location = this.Location
             member this.Copy () = 
                 let shp = ArrayNDLayout.shape this.Layout
-                let trgt = this.NewOfSameType (ArrayNDLayout.newContiguous shp)
+                let trgt = this.NewOfSameType (ArrayNDLayout.newC shp)
                 this.CopyTo trgt
                 trgt :> IArrayNDT
             member this.CopyTo dest = 
@@ -357,37 +357,37 @@ module ArrayND =
     let inline allElems a = allIdx a |> Seq.map (fun i -> get i a)
 
     /// true if the ArrayND is continguous
-    let inline isContiguous a = layout a |> ArrayNDLayout.isContiguous
+    let inline isC a = layout a |> ArrayNDLayout.isC
 
     /// true if the ArrayND is in Fortran order
-    let inline isColumnMajor a = layout a |> ArrayNDLayout.isColumnMajor
+    let inline isF a = layout a |> ArrayNDLayout.isF
 
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
 
     /// true if ArrayND can be target of a BLAS operation
     let inline isBlasTargetable a =
-        (nDims a = 2) && (isColumnMajor a)
+        (nDims a = 2) && (isF a)
 
     /// true if a and b have at least one element in common
     let inline overlapping a b = 
         false // TODO
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newContiguousOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
-        a.NewOfSameType (ArrayNDLayout.newContiguous shp) :?> 'A
+    let inline newCOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
+        a.NewOfSameType (ArrayNDLayout.newC shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
-    let inline newContiguousOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
-        a.NewOfType (ArrayNDLayout.newContiguous shp) 
+    let inline newCOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+        a.NewOfType (ArrayNDLayout.newC shp) 
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newColumnMajorOfSameType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
-        a.NewOfSameType (ArrayNDLayout.newColumnMajor shp) :?> 'A
+    let inline newFOfSameType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+        a.NewOfSameType (ArrayNDLayout.newF shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
-    let inline newColumnMajorOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
-        a.NewOfType (ArrayNDLayout.newColumnMajor shp) 
+    let inline newFOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+        a.NewOfType (ArrayNDLayout.newF shp) 
 
     /// creates a new ArrayND with existing data but new layout
     let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
@@ -404,7 +404,7 @@ module ArrayND =
 
     /// Returns a continguous copy of the given ArrayND.
     let inline copy source =
-        let dest = newContiguousOfSameType (shape source) source
+        let dest = newCOfSameType (shape source) source
         copyTo source dest
         dest
 
@@ -414,12 +414,12 @@ module ArrayND =
 
     /// If the ArrayND is not continguous, returns a continguous copy; otherwise
     /// the given ArrayND is returned unchanged.
-    let inline makeContiguous a =
-        if isContiguous a then a else copy a
+    let inline ensureC a =
+        if isC a then a else copy a
 
     /// makes a contiguous copy of ary if it is not contiguous and with zero offset
-    let inline makeContiguousAndOffsetFree a = 
-        if isContiguous a && offset a = 0 then a else copy a 
+    let inline ensureCAndOffsetFree a = 
+        if isC a && offset a = 0 then a else copy a 
 
     /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
@@ -467,7 +467,7 @@ module ArrayND =
     /// One element can be -1, in which case the size of that element is
     /// inferred automatically.
     let inline reshape shp a =
-        reshapeView shp (makeContiguous a)
+        reshapeView shp (ensureC a)
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =
@@ -491,7 +491,7 @@ module ArrayND =
 
     /// creates a scalar ArrayND of given value and type
     let scalarOfType (value: 'T) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
-        let ary = newContiguousOfSameType [] a
+        let ary = newCOfSameType [] a
         set [] value ary
         ary
 
@@ -502,11 +502,11 @@ module ArrayND =
    
     /// ArrayND of specified shape and same type as a filled with zeros.
     let inline zerosOfSameType shp a =
-        newContiguousOfSameType shp a
+        newCOfSameType shp a
 
     /// ArrayND of same shape filled with zeros.
     let inline zerosLike a =
-        newContiguousOfSameType (shape a) a
+        newCOfSameType (shape a) a
 
     /// fills the specified ArrayND with ones
     let inline fillWithOnes (a: #ArrayNDT<'T>) =
@@ -515,7 +515,7 @@ module ArrayND =
 
     /// ArrayND of specified shape and same type as a filled with ones.
     let inline onesOfSameType shp a =
-        let n = newContiguousOfSameType shp a
+        let n = newCOfSameType shp a
         fillWithOnes n
         n        
 
@@ -753,7 +753,7 @@ module ArrayND =
       
     /// applies the given reduction function over the given dimension
     let inline axisReduce f dim a =
-        let c = newContiguousOfSameType (List.without dim (shape a)) a
+        let c = newCOfSameType (List.without dim (shape a)) a
         for srcRng, dstIdx in ArrayNDLayout.allSourceRangesAndTargetIdxsForAxisReduction dim (layout a) do
             set dstIdx (f (view srcRng a) |> get []) c
         c
@@ -816,7 +816,7 @@ module ArrayND =
             let nI = (shape a).[0]
             let nJ = (shape a).[1]
             let nK = (shape b).[1]
-            let c = newContiguousOfSameType [nI; nK] a
+            let c = newCOfSameType [nI; nK] a
             for k=0 to nK - 1 do
                 for i=0 to nI - 1 do
                     let v = 
@@ -897,7 +897,7 @@ module ArrayND =
                   
         let tmplArray = Option.get (anyArray bs)
         let joinedShape = joinedBlocksShape 0 bs
-        let joined = newContiguousOfSameType joinedShape tmplArray
+        let joined = newCOfSameType joinedShape tmplArray
         let startPos = List.replicate (List.length joinedShape) 0
 
         for pos, ary in blockPosAndContents 0 startPos bs do

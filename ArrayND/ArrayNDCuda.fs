@@ -130,29 +130,29 @@ module ArrayNDCudaTypes =
         static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDCudaT<bool>
 
         /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
-        static member NewContiguous shp =
-            ArrayNDCudaT<_> (ArrayNDLayout.newContiguous shp)    
+        static member NewC shp =
+            ArrayNDCudaT<_> (ArrayNDLayout.newC shp)    
 
         /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
-        static member NewColumnMajor shp =
-            ArrayNDCudaT<_>(ArrayNDLayout.newColumnMajor shp)
+        static member NewF shp =
+            ArrayNDCudaT<_>(ArrayNDLayout.newF shp)
 
         /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.
         /// Both must of same shape. dst must also be contiguous and with offset zero.
         static member CopyIntoDev (dst: ArrayNDCudaT<'T>) (src: ArrayNDHostT<'T>) =
             if ArrayND.shape dst <> ArrayND.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
+            if not (ArrayND.isC dst && ArrayND.offset dst = 0) then
                 invalidArg "dst" "dst must be contiguous without offset"
 
-            let src = ArrayND.makeContiguousAndOffsetFree src 
+            let src = ArrayND.ensureCAndOffsetFree src 
             use srcMem = src.Pin()       
             dst.Storage.Data.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
                                           SizeT(sizeof<'T> * ArrayND.nElems src))
 
         /// Copies the specified ArrayNDHostT to the device
         static member OfHost (src: ArrayNDHostT<'T>) =
-            let dst = ArrayNDCudaT<_>.NewContiguous (ArrayND.shape src)
+            let dst = ArrayNDCudaT<_>.NewC (ArrayND.shape src)
             ArrayNDCudaT<_>.CopyIntoDev dst src
             dst
 
@@ -161,17 +161,17 @@ module ArrayNDCudaTypes =
         static member CopyIntoHost (dst: ArrayNDHostT<'T>) (src: ArrayNDCudaT<'T>) =
             if ArrayND.shape dst <> ArrayND.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isContiguous dst && ArrayND.offset dst = 0) then
+            if not (ArrayND.isC dst && ArrayND.offset dst = 0) then
                 invalidArg "dst" "dst must be contiguous without offset"
 
-            let src = ArrayND.makeContiguousAndOffsetFree src 
+            let src = ArrayND.ensureCAndOffsetFree src 
             use dstMem = dst.Pin()
             src.Storage.Data.CopyToHost(dstMem.Ptr, SizeT 0, SizeT 0, 
                                         SizeT (sizeof<'T> * ArrayND.nElems src))
 
         /// Copies this ArrayNDCudaT to the host
         member this.ToHost () =
-            let dst = ArrayNDHost.newContiguous (ArrayND.shape this) 
+            let dst = ArrayNDHost.newC (ArrayND.shape this) 
             ArrayNDCudaT<_>.CopyIntoHost dst this
             dst
 
@@ -184,26 +184,26 @@ module ArrayNDCudaTypes =
 module ArrayNDCuda = 
 
     /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
-    let inline newContiguous shp =
-        ArrayNDCudaT<_>.NewContiguous shp
+    let inline newC shp =
+        ArrayNDCudaT<_>.NewC shp
 
     /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
-    let inline newColumnMajor shp =
-        ArrayNDCudaT<_>.NewColumnMajor shp
+    let inline newF shp =
+        ArrayNDCudaT<_>.NewF shp
 
     /// ArrayNDCudaT with zero dimensions (scalar) and given value
     let inline scalar value =
-        let a = newContiguous [] 
+        let a = newC [] 
         ArrayND.set [] value a
         a
 
     /// ArrayNDCudaT of given shape filled with zeros.
     let inline zeros shape =
-        newContiguous shape
+        newC shape
 
     /// ArrayNDCudaT of given shape filled with ones.
     let inline ones shape =
-        let a = newContiguous shape
+        let a = newC shape
         ArrayND.fillWithOnes a
         a
 

@@ -17,7 +17,7 @@ module ModelContextTypes =
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
-            member this.Allocator shp = ArrayNDHost.newContiguous shp :> ArrayNDT<_>
+            member this.Allocator shp = ArrayNDHost.newC shp :> ArrayNDT<_>
             member this.Compiler = { new IUExprCompiler with 
                                         member this.Name = "Host"
                                         member this.Compile env exprs = onHost env exprs }

@@ -128,18 +128,15 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im]
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            if ArrayND.offset ev = 0 && ArrayND.isContiguous ev then
-                ev.Storage.ByteData
-            else
-                failwithf "external variable %A was expected to be contiguous \
-                           with zero offset" vs 
+            if ArrayND.isC ev then ev.Storage.ByteData
+            else failwithf "external variable %A was expected to be contiguous" vs
 
     /// gets host memory for an external reference
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]
-            if ArrayND.offset hv = 0 && ArrayND.isContiguous hv then
+            if ArrayND.offset hv = 0 && ArrayND.isC hv then
                 ArrayNDHostReg.getCudaRegisteredMemory hv
             else
                 failwithf "host variable %A was expected to be contiguous \
@@ -200,9 +197,10 @@ module ArgTemplates =
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env strm =
                 // C++ struct just contains the pointer to data memory
-                let ptr = (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
+                let basePtr = (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
+                let ptr = basePtr + IntPtr ((ArrayND.offset manikin) * Marshal.SizeOf(manikin.DataType))
                 //printfn "Passing pointer 0x%x" ptr
-                ArrayNDSSArg(ptr) :> obj
+                ArrayNDSSArg ptr |> box
 
     type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
@@ -271,7 +269,7 @@ module ArgTemplates =
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isContiguous manikin) then failwith "manikin for MemRng is not contiguous"
+        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
                 {DeviceMem = CudaExecEnv.getDevMemForManikin env manikin;
@@ -280,7 +278,7 @@ module ArgTemplates =
     
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isContiguous manikin) then failwith "manikin for MemRng is not contiguous"
+        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =
                 {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;

@@ -74,20 +74,20 @@ module ArrayNDManikin =
     open ArrayND
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with contiguous layout
-    let inline newContiguous memAllocator typ shape = 
-        let layout = ArrayNDLayout.newContiguous shape
+    let inline newC memAllocator typ shape = 
+        let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout
-    let inline newColumnMajor memAllocator typ shape = 
-        let layout = ArrayNDLayout.newColumnMajor shape
+    let inline newF memAllocator typ shape = 
+        let layout = ArrayNDLayout.newF shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
-    let inline externalContiguous storage shape =
-        let layout = ArrayNDLayout.newContiguous shape
+    let inline externalC storage shape =
+        let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, storage) 
 
     /// storage

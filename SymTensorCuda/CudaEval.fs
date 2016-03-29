@@ -19,7 +19,7 @@ module CudaEval =
             uexprs
             |> List.mapi (fun i (UExpr (_, tn, shp, _) as uexpr) ->
                 let nshp = ShapeSpec.eval shp
-                let layout = ArrayNDLayout.newContiguous nshp
+                let layout = ArrayNDLayout.newC nshp
 
                 // create result storage allocator
                 let resAllocator = fun () ->
@@ -97,7 +97,7 @@ module CudaEvalTypes =
     type private AllocatorT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
                 (shp: NShapeSpecT) : ArrayNDT<'T> =
-            let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newContiguous shp 
+            let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newC shp 
             ary :> ArrayNDT<'T>
 
     /// Evaluates the model on a CUDA GPU.

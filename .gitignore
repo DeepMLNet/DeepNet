@@ -212,3 +212,5 @@ _Pvt_Extensions/
 ModelManifest.xml
 *.opendb
 /Data/MNIST/MNIST.h5
+/CurveFollow/mod1.cu
+/Data/DeepBraille/curv2/dataset.h5

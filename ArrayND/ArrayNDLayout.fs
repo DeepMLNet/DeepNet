@@ -75,17 +75,17 @@ module ArrayNDLayout =
         { 0 .. a.Shape.[dim] - 1}
 
     /// computes the stride given the shape for the ArrayND to be continguous (row-major)
-    let rec contiguousStride (shape: int list) =
+    let rec cStride (shape: int list) =
         match shape with
         | [] -> []
         | [l] -> [1]
         | l::(lp::lrest) ->
-            match contiguousStride (lp::lrest) with 
+            match cStride (lp::lrest) with 
             | sp::srest -> (lp*sp)::sp::srest
             | [] -> failwith "unexpected"    
 
     /// computes the stride given the shape for the ArrayND to be in Fortran order (column-major)
-    let inline columnMajorStride (shape: int list) =
+    let inline fStride (shape: int list) =
         let rec buildStride elemsLeft shape =
             match shape with
             | [] -> []
@@ -94,26 +94,26 @@ module ArrayNDLayout =
         buildStride 1 shape
 
     /// a contiguous (row-major) ArrayND layout of the given shape 
-    let inline newContiguous shp =
-        {Shape=shp; Stride=contiguousStride shp; Offset=0;}
+    let inline newC shp =
+        {Shape=shp; Stride=cStride shp; Offset=0;}
 
     /// a Fortran (column-major) ArrayND layout of the given shape 
-    let inline newColumnMajor shp =
-        {Shape=shp; Stride=columnMajorStride shp; Offset=0;}
+    let inline newF shp =
+        {Shape=shp; Stride=fStride shp; Offset=0;}
 
     /// an ArrayND layout for an empty (zero elements) vector (1D)
     let emptyVector =
         {Shape=[0]; Stride=[1]; Offset=0;}
 
     /// true if the ArrayND is contiguous
-    let inline isContiguous a = (stride a = contiguousStride (shape a))
+    let inline isC a = (stride a = cStride (shape a))
 
     /// true if the ArrayND is in Fortran order
-    let inline isColumnMajor a = (stride a = columnMajorStride (shape a))
+    let inline isF a = (stride a = fStride (shape a))
 
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a =
-        isContiguous a || isColumnMajor a
+        isC a || isF a
         // TODO: extend to any memory ordering
 
     /// adds a new dimension of size one to the left
@@ -170,7 +170,7 @@ module ArrayNDLayout =
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
     let inline reshape shp a =
-        if not (isContiguous a) then
+        if not (isC a) then
             invalidArg "a" "layout must be contiguous for reshape"
 
         let shp =
@@ -190,7 +190,7 @@ module ArrayNDLayout =
         if shpElems <> nElems a then
             failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
                 (shape a) (nElems a) shp shpElems
-        {a with Shape=shp; Stride=contiguousStride shp;}
+        {a with Shape=shp; Stride=cStride shp;}
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =

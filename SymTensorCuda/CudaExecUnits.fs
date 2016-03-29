@@ -78,7 +78,7 @@ module CudaExecUnit =
         // shape operations
         | UUnaryOp (Reshape _) ->        
             match reqView with
-            | Some rv when ArrayND.isContiguous rv ->
+            | Some rv when ArrayND.isC rv ->
                 [Some (ArrayND.reshapeView srcShapes.[0] rv)]
             | _ -> noSrcReqs
         | UUnaryOp (DoBroadcast _) -> noSrcReqs
@@ -92,7 +92,7 @@ module CudaExecUnit =
             | LocDev -> 
                 // request to store directly into external var
                 // we assume that all device input vars are continguous
-                [Some (ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape)]
+                [Some (ArrayNDManikin.externalC (MemExternal vs) trgtShape)]
             | LocHost -> noSrcReqs
             | loc -> unsupLoc loc
         // misc
@@ -125,7 +125,7 @@ module CudaExecUnit =
 
         // new allocated target
         let newTrgt =
-            ArrayNDManikin.newContiguous memAllocator typ trgtShape, false        
+            ArrayNDManikin.newC memAllocator typ trgtShape, false        
 
         // target that shares no elements with any srcView 
         let outplaceTrgt =
@@ -137,7 +137,7 @@ module CudaExecUnit =
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) &&
                            ArrayND.isBlasTargetable rv -> rv, false
-            | _ -> ArrayNDManikin.newColumnMajor memAllocator typ trgtShape, false
+            | _ -> ArrayNDManikin.newF memAllocator typ trgtShape, false
 
         // target that reuses a srcView, if it may be overwritten
         let inplaceOvrwrtTrgt =
@@ -154,13 +154,13 @@ module CudaExecUnit =
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
                 // we assume that all device input vars are contiguous
-                ArrayNDManikin.externalContiguous (MemExternal vs) trgtShape, true
+                ArrayNDManikin.externalC (MemExternal vs) trgtShape, true
             | LocHost ->
                 // will transfer variable from host to device during execution
                 // need continguous memory for that
                 match req with
-                | Some rv when ArrayND.isContiguous rv -> rv, false
-                | _ -> ArrayNDManikin.newContiguous memAllocator typ trgtShape, false    
+                | Some rv when ArrayND.isC rv -> rv, false
+                | _ -> ArrayNDManikin.newC memAllocator typ trgtShape, false    
             | loc -> unsupLoc loc                    
         // tensor creation
         | ULeafOp _ -> outplaceTrgt        
@@ -192,7 +192,7 @@ module CudaExecUnit =
         // shape operations
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
-            if ArrayND.isContiguous srcs.[0] then
+            if ArrayND.isC srcs.[0] then
                 ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0] 
             else outplaceTrgt  // will copy
         | UUnaryOp (DoBroadcast _) ->
@@ -371,7 +371,7 @@ module CudaExecUnit =
         | [1; _] -> ArrayND.transpose manikin, BlasId, []
         | [_; _] -> 
             // need to copy
-            let tmpView = ArrayNDManikin.newContiguous memAllocator 
+            let tmpView = ArrayNDManikin.newC memAllocator 
                                                        (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
             let copyOps = copyExecItems tmpView manikin
             tmpView, BlasTranspose, copyOps
@@ -419,7 +419,7 @@ module CudaExecUnit =
             | LocDev -> []
             | LocHost -> 
                 // we assume that host variable has continguous stride and zero offset
-                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) (ArrayND.shape trgt)
+                let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape trgt)
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
             | loc -> unsupLoc loc
         // unary elementwise
@@ -466,21 +466,21 @@ module CudaExecUnit =
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
                 // We assume that all device vars are continguous.
-                let dv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
+                let dv = ArrayNDManikin.externalC (MemExternal vs) varShp
                 copyExecItems dv srcs.[0]
             | LocHost ->            
                 let copyItems, memcpySrc = 
-                    if ArrayND.isContiguous srcs.[0] then 
+                    if ArrayND.isC srcs.[0] then 
                         // Source is contiguous. Can directly copy to host.
                         [], srcs.[0]
                     else
                         // Need to copy to temporary contiguous storage first.
-                        let tmp = ArrayNDManikin.newContiguous memAllocator varType varShp
+                        let tmp = ArrayNDManikin.newC memAllocator varType varShp
                         copyExecItems tmp srcs.[0], tmp
 
                 // We assume that all host vars are continguous.
                 // trgtView has contingous stride
-                let hv = ArrayNDManikin.externalContiguous (MemExternal vs) varShp
+                let hv = ArrayNDManikin.externalC (MemExternal vs) varShp
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | loc -> unsupLoc loc                              
         // misc
@@ -529,7 +529,7 @@ module CudaExecUnit =
         let warmupManikin (manikin: ArrayNDManikinT) =
             match manikin.Storage with
             | MemAlloc _ -> manikin
-            | _ -> ArrayNDManikin.newContiguous memAllocator 
+            | _ -> ArrayNDManikin.newC memAllocator 
                                                 (ArrayNDManikin.typeName manikin) 
                                                 (ArrayNDLayout.shape manikin.Layout) 
 

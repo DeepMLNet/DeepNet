@@ -20,6 +20,10 @@ module DatasetTypes =
         do if not (FSharpType.IsRecord typeof<'S>) then
             failwith "Dataset sample type must be a record containing ArrayNDHostTs"
 
+        //let fieldStorages =
+            //fieldStorages
+           // |> List.map ArrayND.makeContiguous
+
         // verify that all fields have equal number of samples
         let nSamples = fieldStorages.[0] |> ArrayND.shape |> List.last
         do
@@ -100,7 +104,7 @@ module DatasetTypes =
                     |> List.map (fun fsAll ->
                         let shpAll = ArrayND.shape fsAll
                         let shpBatch = shpAll |> List.set (List.length shpAll - 1) batchSize                    
-                        let fsBatch = fsAll |> ArrayND.newContiguousOfSameType shpBatch 
+                        let fsBatch = fsAll |> ArrayND.newCOfSameType shpBatch 
                         fsBatch.[Fill, 0 .. lastBatchElems-1] <- fsAll.[Fill, lastBatchStart .. nSamples-1]
                         fsBatch)
                     |> Some
@@ -206,7 +210,7 @@ module DatasetTypes =
                 let maxSmplShp = maxShape fieldSmpls
                 let storShp = maxSmplShp @ [nSamples]
                 let fieldTyp = (Seq.head fieldSmpls).DataType
-                let stor = ArrayNDHost.newContiguousOfType fieldTyp storShp 
+                let stor = ArrayNDHost.newFOfType fieldTyp storShp 
                 for smpl, smplVal in Seq.indexed fieldSmpls do
                     stor.[Fill, smpl] <- smplVal
                 stor :> IArrayNDT            

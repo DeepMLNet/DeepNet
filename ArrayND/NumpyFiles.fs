@@ -101,8 +101,8 @@ module NPYFile =
 
         // create layout
         let layout =
-            if fortranOrder then ArrayNDLayout.newColumnMajor shp
-            else ArrayNDLayout.newContiguous shp
+            if fortranOrder then ArrayNDLayout.newF shp
+            else ArrayNDLayout.newC shp
         let nElems = ArrayNDLayout.nElems layout
 
         // read data

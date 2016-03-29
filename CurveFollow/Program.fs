@@ -74,9 +74,8 @@ let main argv =
     // infer sizes and variable locations from dataset
     md.UseTmplVal biotac     tmpl.Biotac
     md.UseTmplVal optimalVel tmpl.OptimalVel
-
-    printfn "inferred sizes: %A" md.SymSizeEnv
-    printfn "inferred locations: %A" md.VarLocs
+    //printfn "inferred sizes: %A" md.SymSizeEnv
+    //printfn "inferred locations: %A" md.VarLocs
 
     // instantiate model
     let mi = md.Instantiate DevCuda

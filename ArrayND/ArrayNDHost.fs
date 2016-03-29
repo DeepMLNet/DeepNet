@@ -151,34 +151,34 @@ module ArrayNDHost =
         Activator.CreateInstance (t, [|box layout|]) :?> IArrayNDHostT
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
-    let inline newContiguous<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newContiguous shp) 
+    let inline newC<'T> shp =
+        ArrayNDHostT<'T>(ArrayNDLayout.newC shp) 
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given type and shape 
-    let inline newContiguousOfType typ shp =
-        newOfType typ (ArrayNDLayout.newContiguous shp)
+    let inline newCOfType typ shp =
+        newOfType typ (ArrayNDLayout.newC shp)
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
-    let inline newColumnMajor<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newColumnMajor shp) 
+    let inline newF<'T> shp =
+        ArrayNDHostT<'T>(ArrayNDLayout.newF shp) 
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given type and shape
-    let inline newColumnMajorOfType typ shp =
-        newOfType typ (ArrayNDLayout.newColumnMajor shp)
+    let inline newFOfType typ shp =
+        newOfType typ (ArrayNDLayout.newF shp)
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let inline scalar value =
-        let a = newContiguous [] 
+        let a = newC [] 
         ArrayND.set [] value a
         a
 
     /// ArrayNDHostT of given shape filled with zeros.
     let inline zeros shape =
-        newContiguous shape
+        newC shape
 
     /// ArrayNDHostT of given shape filled with ones.
     let inline ones shape =
-        let a = newContiguous shape
+        let a = newC shape
         ArrayND.fillWithOnes a
         a
 
@@ -191,7 +191,7 @@ module ArrayNDHost =
     /// Creates an ArrayNDT using the specified data and shape with contiguous (row major) layout.
     /// The data is referenced, not copied.
     let ofArray (data: 'T []) shp =
-        let layout = ArrayNDLayout.newContiguous shp
+        let layout = ArrayNDLayout.newC shp
         if ArrayNDLayout.nElems layout <> Array.length data then
             failwithf "specified shape %A has %d elements, but passed data array has %d elements"
                 shp (ArrayNDLayout.nElems layout) (Array.length data)
