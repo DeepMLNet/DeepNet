@@ -26,7 +26,8 @@ module ArrayNDManikinTypes =
         | MemExternal of UVarSpecT
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
-    type ArrayNDManikinT (layout: ArrayNDLayoutT, storage: MemManikinT) = 
+    type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
+                          storage:          MemManikinT) = 
         inherit ArrayNDT<int> (layout)  // generic type does not matter since we do not store data
 
         /// storage manikin

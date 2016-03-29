@@ -122,13 +122,14 @@ module Types =
 
 module CudaExecEnv = 
 
-    /// gets device memory for an internal allocation or external reference
+    /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
-        | MemAlloc im -> env.InternalMem.[im]
+        | MemAlloc im -> env.InternalMem.[im], 0
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            if ArrayND.isC ev then ev.Storage.ByteData
+            if ArrayND.isC ev then 
+                ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
             else failwithf "external variable %A was expected to be contiguous" vs
 
     /// gets host memory for an external reference
@@ -146,9 +147,9 @@ module CudaExecEnv =
 
     /// gets an IArrayNDCudaT in device memory for the specified manikin
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
-        let devMem = getDevMemForManikin env manikin
+        let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
-        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer) typ (manikin.Layout)
+        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ (manikin.Layout)
 
 
 [<AutoOpen>]
@@ -197,9 +198,8 @@ module ArgTemplates =
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env strm =
                 // C++ struct just contains the pointer to data memory
-                let basePtr = (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
-                let ptr = basePtr + IntPtr ((ArrayND.offset manikin) * Marshal.SizeOf(manikin.DataType))
-                //printfn "Passing pointer 0x%x" ptr
+                let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
+                let ptr = mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
                 ArrayNDSSArg ptr |> box
 
     type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
@@ -228,7 +228,8 @@ module ArgTemplates =
                 match manikinOpt with
                 | Some manikin ->
                     // pass pointer to (only) element
-                    (CudaExecEnv.getDevMemForManikin env manikin).DevicePointer |> CudaSup.getIntPtr
+                    let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
+                    mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
                 | None -> IntPtr.Zero
 
     type CPPArrayTmpl<'T when 'T :> ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
@@ -272,9 +273,10 @@ module ArgTemplates =
         do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
-                {DeviceMem = CudaExecEnv.getDevMemForManikin env manikin;
-                 OffsetInBytes = ArrayNDManikin.offsetInBytes manikin;
-                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}
+                let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
+                {DeviceMem = mem
+                 OffsetInBytes = offset + ArrayNDManikin.offsetInBytes manikin
+                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin}
     
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
@@ -331,11 +333,11 @@ module ArgTemplates =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float"
             member this.GetArg env strm = 
-                let devVar = CudaExecEnv.getDevMemForManikin env manikin
+                let devVar, offset = CudaExecEnv.getDevMemForManikin env manikin
                 // need to adjust by offset
-                let offsetBytes = ArrayNDManikin.offsetInBytes manikin
-                new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetBytes), 
-                                               devVar.SizeInBytes - offsetBytes) :> obj
+                let offsetTotal = offset + ArrayNDManikin.offsetInBytes manikin
+                new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetTotal), 
+                                               devVar.SizeInBytes - offsetTotal) :> obj
 
 
     [<Struct>]

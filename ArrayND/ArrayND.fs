@@ -338,13 +338,13 @@ module ArrayND =
     /// number of elements 
     let inline nElems a = layout a |> ArrayNDLayout.nElems
     
-    /// shape 
+    /// shape in elements
     let inline shape a = layout a |> ArrayNDLayout.shape
 
-    /// stride
+    /// stride in elements
     let inline stride a = layout a |> ArrayNDLayout.stride
 
-    /// offset 
+    /// offset in elements
     let inline offset a = layout a |> ArrayNDLayout.offset
 
     /// sequence of all indices 
