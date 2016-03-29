@@ -74,6 +74,12 @@ module HDF5Types =
                 if fileHnd >= 0 then
                     H5F.close fileHnd |> check |> ignore
                     
+        /// opens the specified HDF5 file for reading
+        static member OpenRead  path = new HDF5 (path, HDF5Read)
+
+        /// Opens the specified HDF5 file for writing.
+        /// If the file already exists it will be overwritten.
+        static member OpenWrite path = new HDF5 (path, HDF5Overwrite)
 
         /// Write data array using specified name and shape.
         member this.Write (name: string, data: 'T array, shape: int list) =

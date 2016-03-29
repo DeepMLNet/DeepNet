@@ -118,6 +118,9 @@ module UVarSpec =
     let shape (vs: UVarSpecT) =
         vs.Shape
 
+    let nDims vs =
+        shape vs |> List.length
+
     let typ (vs: UVarSpecT) = 
         vs.TypeName |> TypeName.getType 
 

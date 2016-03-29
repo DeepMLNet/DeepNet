@@ -140,6 +140,49 @@ module ArrayND =
         member this.View rng =
             this.NewView (ArrayNDLayout.view rng this.Layout)
 
+        /// shape
+        member this.Shape = ArrayNDLayout.shape this.Layout
+
+        /// number of dimensions
+        member this.NDims = ArrayNDLayout.nDims this.Layout
+
+        /// number of elements
+        member this.NElems = ArrayNDLayout.nElems this.Layout
+
+        /// broadcasts this and other to the same shape if possible
+        member this.BroadcastToSame (other: ArrayNDT<_>) =
+            let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
+            this.NewView lThis, other.NewView lOther
+
+        /// implements a storage specific version of map
+        abstract MapImpl: ('T -> 'R) -> ArrayNDT<'R> -> unit
+        default this.MapImpl f result =
+            // slow fallback mapping
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                result.[idx] <- f this.[idx]
+
+        /// maps all elements using the specified function into a new ArrayNDT
+        member this.Map (f: 'T -> 'R) =
+            let res = this.NewOfType<'R> (ArrayNDLayout.newContiguous this.Shape)
+            this.MapImpl f res
+            res
+
+        abstract Map2Impl: ('T -> 'T -> 'R) -> ArrayNDT<'T> -> ArrayNDT<'R> -> unit
+        default this.Map2Impl f other result =
+            // slow fallback mapping
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                result.[idx] <- f this.[idx] other.[idx]
+
+        /// maps all elements of this and other using the specified function into a new ArrayNDT
+        member this.Map2 (f: 'T -> 'T -> 'R) (other: #ArrayNDT<'T>) =
+            if other.GetType() <> this.GetType() then
+                failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (other.GetType())
+            let this, other = this.BroadcastToSame other
+            let res = this.NewOfType<'R> (ArrayNDLayout.newContiguous this.Shape)
+            this.Map2Impl f other res
+            res
+
         member internal this.ToRng (allArgs: obj []) =
             let rec toRng (args: obj list) =
                 match args with
@@ -494,11 +537,13 @@ module ArrayND =
    
     /// Applies the given function elementwise to the given ArrayND and 
     /// stores the result in a new ArrayND.
-    let inline map f (a: #ArrayNDT<'T>) =
-        let c = zerosLike a
-        for idx in allIdx a do
-            set idx (f (get idx a)) c
-        c
+    let inline map (f: 'T -> 'T) (a: 'A when 'A :> ArrayNDT<'T>) =
+        a.Map f :?> 'A
+
+    /// Applies the given function elementwise to the given ArrayND and 
+    /// stores the result in a new ArrayND.
+    let inline mapTC (f: 'T -> 'R) (a: #ArrayNDT<'T>) =
+        a.Map f
 
     /// Applies the given function elementwise to the given ArrayND inplace.
     let inline mapInplace f (a: #ArrayNDT<'T>) =
@@ -507,23 +552,13 @@ module ArrayND =
             
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
-    let inline map2 f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        let a, b = broadcastToSame a b
-        let c = zerosLike a
-        for idx in allIdx a do
-            let cv = f (get idx a) (get idx b)
-            set idx cv c
-        c        
+    let inline map2 f (a: 'A when 'A :> ArrayNDT<'T>) (b: 'A) =
+        a.Map2 f b :?> 'A
 
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
-    let inline map2TypeChange (f: 'T -> 'T -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        let a, b = broadcastToSame a b
-        let c : ArrayNDT<'R> = newContiguousOfType (shape a) a
-        for idx in allIdx a do
-            let cv = f (get idx a) (get idx b)
-            set idx cv c
-        c        
+    let inline map2TC (f: 'T -> 'T -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        a.Map2 f b 
 
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
@@ -566,7 +601,7 @@ module ArrayND =
         uncheckedApply2 (map2 f) a b
 
     let inline uncheckedMap2TypeChange (f: 'A -> 'A -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        uncheckedApply2TypeChange (map2TypeChange f) a b
+        uncheckedApply2TypeChange (map2TC f) a b
 
     let inline typedApply   (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>) 
                             (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
@@ -629,8 +664,7 @@ module ArrayND =
                                    (fInt:    int    -> int    -> 'R)
                                    (fByte:   byte   -> byte   -> 'R)
                                    (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedApply2TypeChange (map2TypeChange fBool) (map2TypeChange fDouble) (map2TypeChange fSingle) 
-            (map2TypeChange fInt) (map2TypeChange fByte) a b
+        typedApply2TypeChange (map2TC fBool) (map2TC fDouble) (map2TC fSingle) (map2TC fInt) (map2TC fByte) a b
 
     let inline signImpl (x: 'T) =
         conv<'T> (sign x)

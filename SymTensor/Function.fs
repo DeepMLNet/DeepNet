@@ -50,7 +50,10 @@ module VarEnv =
     /// infers symbol sizes from the variable environment
     let inferSymSizes (varEnv: VarEnvT) : SymSizeEnvT =
         varEnv |> Map.fold 
-            (fun env vSym vVal ->                
+            (fun env vSym vVal ->   
+                if UVarSpec.nDims vSym <> ArrayND.nDims vVal then
+                    failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
+                        (ArrayND.shape vVal) vSym
                 (UVarSpec.shape vSym, ArrayND.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->

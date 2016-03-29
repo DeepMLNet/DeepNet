@@ -22,10 +22,10 @@ module NPYFile =
         | Float
 
     /// loads a .npy file from the specified stream
-    let loadFromStream (stream: Stream) : ArrayNDHostT<'T> =
+    let loadFromStream (stream: Stream) name : ArrayNDHostT<'T> =
         // read and check prelude
         let inline checkByte req value =
-            if (byte req) <> (byte value) then failwith "not a valid npy file header"
+            if (byte req) <> (byte value) then failwithf "not a valid npy file header in %s" name
         stream.ReadByte () |> checkByte 0x93
         stream.ReadByte () |> checkByte 'N'
         stream.ReadByte () |> checkByte 'U'
@@ -35,7 +35,7 @@ module NPYFile =
         let verMajor = stream.ReadByte ()
         let verMinor = stream.ReadByte ()
         if verMajor <> 1 && verMinor <> 0 then
-            failwithf "npy file format version %d.%d is not supported" verMajor verMinor
+            failwithf "npy file format version %d.%d is not supported in %s" verMajor verMinor name
         let lenLo, lenHi = stream.ReadByte (), stream.ReadByte ()
         let headerLen = (lenHi <<< 8) ||| lenLo
 
@@ -49,7 +49,7 @@ module NPYFile =
         let headerRegex = 
             @"^{'descr': '([0-9a-z<>\|]+)', 'fortran_order': (False|True), 'shape': \(([0-9L, ]*)\), }"
         let m = Regex.Match (header, headerRegex)
-        if not m.Success then failwithf "cannot parse npy header: %s" header
+        if not m.Success then failwithf "cannot parse npy header in %s: %s" name header
         let descrStr = m.Groups.[1].Value
         let fortranOrder = (m.Groups.[2].Value = "True")
         let shapeStr = m.Groups.[3].Value
@@ -59,14 +59,14 @@ module NPYFile =
             match descrStr.[0] with
             | v when v = '<' || v = '|' -> LittleEndian
             | v when v = '>' -> BigEndian
-            | _ -> failwithf "unsupported endianness in npy file: %s" descrStr
+            | _ -> failwithf "unsupported endianness \"%s\" in %s" descrStr name
         let numpyType =
             match descrStr.[1] with
             | v when v = 'b' -> Bool
             | v when v = 'i' -> SignedInt
             | v when v = 'u' -> UnsignedInt
             | v when v = 'f' -> Float
-            | _ -> failwithf "unsupported data type in npy file: %s" descrStr
+            | _ -> failwithf "Unsupported numpy data type \"%s\" in %s" descrStr name
         let typeBits = (int (descrStr.[2..])) * 8
 
         // parse shape
@@ -82,7 +82,7 @@ module NPYFile =
         // check that data format matches
         match endian with
         | LittleEndian -> ()
-        | BigEndian -> failwith "only .npy files in little endian format are supported"
+        | BigEndian -> failwithf "numpy big endian format is unsupported in %s" name
         match numpyType with
         | Bool when typeBits = 8 && typeof<'T> = typeof<bool> -> ()
         | SignedInt when typeBits = 8  && typeof<'T> = typeof<int8>  -> ()
@@ -96,8 +96,8 @@ module NPYFile =
         | Float when typeBits = 32 && typeof<'T> = typeof<single> -> ()
         | Float when typeBits = 64 && typeof<'T> = typeof<double> -> ()
         | t -> 
-            failwithf ".npy data type %s does not match type %A or is unsupported"
-                descrStr typeof<'T>
+            failwithf "numpy data type \"%s\" does not match type %A or is unsupported in %s" 
+                descrStr typeof<'T> name
 
         // create layout
         let layout =
@@ -110,8 +110,8 @@ module NPYFile =
         let dataBytes : byte[] = Array.zeroCreate sizeInBytes
         let nRead = stream.Read (dataBytes, 0, sizeInBytes)
         if nRead <> sizeInBytes then
-            failwithf "premature end of .npy file after reading %d bytes but expecting %d bytes"
-                nRead sizeInBytes
+            failwithf "premature end of .npy file after reading %d bytes but expecting %d bytes in %s"
+                nRead sizeInBytes name
 
         // convert to correct data type
         let data : 'T[] = Array.zeroCreate nElems
@@ -124,7 +124,7 @@ module NPYFile =
     /// loads a .npy file from the specified path 
     let load path = 
         use fs = File.OpenRead path
-        loadFromStream fs
+        loadFromStream fs path
 
 
 [<AutoOpen>]
@@ -139,21 +139,23 @@ module NPZFileTypes =
         member this.Path = path
 
         /// returns all variable names in the .npz file
-        member this.Names = seq {
+        member this.Names = [
             for entry in zipFile.Entries do
                 let filename = entry.Name
                 if not (filename.EndsWith ".npy") then
-                    failwithf "invalid filename %s in .npz archive" filename
+                    failwithf "invalid zip entry %s in npz file %s" filename path
                 let name = filename.[0 .. filename.Length-5]
                 yield name
-        }
+        ]
 
         /// gets the variable with the specified name from the .npz file
         member this.Get name =
             let filename = name + ".npy"
-            let entry = zipFile.GetEntry filename
-            use stream = entry.Open()
-            NPYFile.loadFromStream stream
+            match zipFile.GetEntry filename with
+            | null -> failwithf "variable %s does not exist in %s" name path
+            | entry ->
+                use stream = entry.Open()
+                NPYFile.loadFromStream stream (path + ":" + name)
 
         /// opens the specified .npz file
         static member Open path = new NPZFile (path)

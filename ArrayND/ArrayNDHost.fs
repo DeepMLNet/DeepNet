@@ -31,6 +31,8 @@ module ArrayNDHostTypes =
                            data:        'T []) = 
         inherit ArrayNDT<'T>(layout)
         
+        let fastLayout = FastLayout.ofLayout layout
+
         /// a new ArrayND in host memory using a managed array as storage
         new (layout: ArrayNDLayoutT) =
             ArrayNDHostT<'T>(layout, Array.zeroCreate (ArrayNDLayout.nElems layout))
@@ -39,7 +41,7 @@ module ArrayNDHostTypes =
         member this.Data = data
 
         /// optimized layout operations
-        member this.FastLayout = FastLayout.ofLayout layout
+        member this.FastLayout = fastLayout
 
         /// pins the underlying data array and returns the corresponding GCHandle
         member this.Pin () =
@@ -90,6 +92,25 @@ module ArrayNDHostTypes =
                         destData.[destAddr] <- data.[thisAddr]
 
             | _ -> base.CopyTo dest
+
+        override this.MapImpl (f: 'T -> 'R) (dest: ArrayNDT<'R>) =
+            let dest = dest :?> ArrayNDHostT<'R>
+            let destData = dest.Data
+            let destAddrs = FastLayout.allAddr dest.FastLayout
+            let thisAddrs = FastLayout.allAddr this.FastLayout
+            for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
+                destData.[destAddr] <- f data.[thisAddr]
+
+        override this.Map2Impl (f: 'T -> 'T -> 'R) (other: ArrayNDT<'T>) (dest: ArrayNDT<'R>) =
+            let dest = dest :?> ArrayNDHostT<'R>
+            let other = other :?> ArrayNDHostT<'T>
+            let destData = dest.Data
+            let otherData = other.Data
+            let destAddrs = FastLayout.allAddr dest.FastLayout
+            let thisAddrs = FastLayout.allAddr this.FastLayout
+            let otherAddrs = FastLayout.allAddr other.FastLayout
+            for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
+                destData.[destAddr] <- f data.[thisAddr] otherData.[otherAddr]
                               
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this

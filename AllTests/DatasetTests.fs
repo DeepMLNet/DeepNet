@@ -68,3 +68,9 @@ type CurveDataset () =
         let dsCuda = dataset.ToCuda()
         printfn "copied to CUDA: %A" dsCuda
 
+    [<Fact>]
+    member this.``Saving and loading`` () =
+        dataset.Save "DatasetTests.h5"
+        printfn "Saved"
+        let dataset2 : Dataset<CurveSample> = Dataset.Load "DatasetTests.h5"
+        printfn "Loaded."

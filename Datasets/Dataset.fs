@@ -17,6 +17,9 @@ module DatasetTypes =
     [<StructuredFormatDisplay("Dataset (Samples={NSamples}; Location={Location}; Contents={SampleType})")>]
     type Dataset<'S> (fieldStorages: IArrayNDT list) =
 
+        do if not (FSharpType.IsRecord typeof<'S>) then
+            failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+
         // verify that all fields have equal number of samples
         let nSamples = fieldStorages.[0] |> ArrayND.shape |> List.last
         do
@@ -118,10 +121,9 @@ module DatasetTypes =
                     | None -> ()        
                 }           
 
-        /// Generates a function that returns a sequence of batches with the given size of this dataset.
-        /// If the number of samples in this dataset is not a multiple of the batch size,
-        /// the last batch will still have the specified size but is padded with zeros.
-        static member Batches (this: Dataset<'S>, batchSize) = this.Batches batchSize
+        /// template batch
+        member this.TmplBatch batchSize = 
+            this.Batches batchSize () |> Seq.head
 
         /// maps the field storages using the given function creating a new dataset
         member this.MapFieldStorage (f: IArrayNDT -> #IArrayNDT) =
@@ -137,6 +139,30 @@ module DatasetTypes =
         /// copies this dataset to a CUDA GPU
         static member ToCuda (this: Dataset<'S>) = this.ToCuda ()
 
+        /// saves this dataset into a HDF5 file
+        member this.Save filename =
+            let fldInfos = FSharpType.GetRecordFields (typeof<'S>)
+            use hdf = HDF5.OpenWrite filename
+            for fldInfo, fs in Seq.zip fldInfos fieldStorages do
+                match fs with
+                | :? IArrayNDHostT as fs -> ArrayNDHDF.writeUntyped hdf fldInfo.Name fs
+                | _ -> failwith "can only save a dataset stored on the host"
+
+        /// loads a dataset from a HDF5 file
+        static member Load<'S> filename =
+            if not (FSharpType.IsRecord typeof<'S>) then
+                failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+            use hdf = HDF5.OpenRead filename
+            FSharpType.GetRecordFields typeof<'S>
+            |> Seq.map (fun fldInfo ->
+                if not (typeof<IArrayNDT>.IsAssignableFrom fldInfo.PropertyType) then 
+                    failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+                let dataType = fldInfo.PropertyType.GenericTypeArguments.[0]
+                ArrayNDHDF.readUntyped hdf fldInfo.Name dataType :> IArrayNDT)
+            |> Seq.toList
+            |> Dataset<'S>
+
+        // enumerator interfaces
         interface IEnumerable<'S> with
             member this.GetEnumerator() =
                 (seq { for idx in 0 .. nSamples - 1 -> this.[idx] }).GetEnumerator()
@@ -185,7 +211,10 @@ module DatasetTypes =
                     stor.[Fill, smpl] <- smplVal
                 stor :> IArrayNDT            
 
-            let fieldStorages = [for fld=0 to nFields-1 do yield fieldStorage ary.[*, fld]]
+            let fieldStorages = 
+                seq { for fld=0 to nFields-1 do yield async { return fieldStorage ary.[*, fld] } }
+                |> Async.Parallel |> Async.RunSynchronously
+                |> Array.toList
             Dataset<'S> fieldStorages
 
  
