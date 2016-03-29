@@ -25,11 +25,11 @@ module DatasetTypes =
            // |> List.map ArrayND.makeContiguous
 
         // verify that all fields have equal number of samples
-        let nSamples = fieldStorages.[0] |> ArrayND.shape |> List.last
+        let nSamples = fieldStorages.[0] |> ArrayND.shape |> List.head
         do
             fieldStorages
             |> List.iter (fun fs ->
-                if ArrayND.shape fs |> List.last <> nSamples then
+                if ArrayND.shape fs |> List.head <> nSamples then
                     invalidArg "fieldStorages" "unequal number of samples in fields")
 
         /// checks arguments for being in range
@@ -50,7 +50,7 @@ module DatasetTypes =
                             let smpls =
                                 if isLast then nSamples - pos
                                 else int (ratio / ratioSum * (float nSamples))
-                            fs.[Fill, pos .. pos+smpls-1], pos+smpls)    
+                            fs.[pos .. pos+smpls-1, Fill], pos+smpls)    
                     fsPart)
                 |> List.transpose
             partitionedFieldStorages |> List.map Dataset<'S>
@@ -63,7 +63,7 @@ module DatasetTypes =
             with get (smpl: int) =
                 checkRange smpl
                 let smplData =
-                    [| for fs in fieldStorages -> fs.[Fill, smpl] |> box |]
+                    [| for fs in fieldStorages -> fs.[smpl, Fill] |> box |]
                 FSharpValue.MakeRecord (typeof<'S>, smplData) :?> 'S
 
         /// Returns a record of type 'S containing a slice of samples.
@@ -71,7 +71,7 @@ module DatasetTypes =
             match start with | Some smpl -> checkRange smpl | None -> ()
             match stop  with | Some smpl -> checkRange smpl | None -> ()  
             let sliceData =
-                [| for fs in fieldStorages -> fs.[[RngAllFill; Rng (start, stop)]] |> box |]
+                [| for fs in fieldStorages -> fs.[[Rng (start, stop); RngAllFill]] |> box |]
             FSharpValue.MakeRecord (typeof<'S>, sliceData) :?> 'S            
                             
         /// Returns a record of type 'S containing all samples.
@@ -103,9 +103,9 @@ module DatasetTypes =
                     fieldStorages
                     |> List.map (fun fsAll ->
                         let shpAll = ArrayND.shape fsAll
-                        let shpBatch = shpAll |> List.set (List.length shpAll - 1) batchSize                    
+                        let shpBatch = shpAll |> List.set 0 batchSize                    
                         let fsBatch = fsAll |> ArrayND.newCOfSameType shpBatch 
-                        fsBatch.[Fill, 0 .. lastBatchElems-1] <- fsAll.[Fill, lastBatchStart .. nSamples-1]
+                        fsBatch.[0 .. lastBatchElems-1, Fill] <- fsAll.[lastBatchStart .. nSamples-1, Fill]
                         fsBatch)
                     |> Some
 
@@ -119,8 +119,7 @@ module DatasetTypes =
                     // padded last batch if necessary
                     match lastBatch with
                     | Some lastBatch ->
-                        let data =
-                            [| for fs in lastBatch -> fs |> box |]
+                        let data = [|for fs in lastBatch -> fs |> box|]
                         yield FSharpValue.MakeRecord (typeof<'S>, data) :?> 'S     
                     | None -> ()        
                 }           
@@ -208,11 +207,11 @@ module DatasetTypes =
             // build data storage
             let fieldStorage (fieldSmpls: IArrayNDT seq) =
                 let maxSmplShp = maxShape fieldSmpls
-                let storShp = maxSmplShp @ [nSamples]
+                let storShp = nSamples :: maxSmplShp
                 let fieldTyp = (Seq.head fieldSmpls).DataType
-                let stor = ArrayNDHost.newFOfType fieldTyp storShp 
+                let stor = ArrayNDHost.newCOfType fieldTyp storShp 
                 for smpl, smplVal in Seq.indexed fieldSmpls do
-                    stor.[Fill, smpl] <- smplVal
+                    stor.[smpl, Fill] <- smplVal
                 stor :> IArrayNDT            
 
             let fieldStorages = 

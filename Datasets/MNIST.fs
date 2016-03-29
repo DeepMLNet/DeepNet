@@ -29,7 +29,7 @@ module Mnist =
         let nSamples = List.length data
 
         let dataShape = ArrayND.shape data.[0]
-        let ds = ArrayNDHost.zeros ([nSamples] @ dataShape)
+        let ds = ArrayNDHost.zeros (nSamples :: dataShape)
 
         data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)
         ds

@@ -61,7 +61,7 @@ type CurveDataset () =
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 
                 idx (batch.Biotac |> ArrayND.shape) (batch.Pos |> ArrayND.shape)
-            batch.Biotac |> ArrayND.shape |> List.last |> should equal batchSize
+            batch.Biotac |> ArrayND.shape |> List.head |> should equal batchSize
 
     [<Fact>]
     member this.``To CUDA GPU`` () =
