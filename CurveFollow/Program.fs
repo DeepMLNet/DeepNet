@@ -1,39 +1,105 @@
 ﻿open Microsoft.VisualStudio.Profiler
 open System
 open System.IO
+open System.Diagnostics
 open Argu
 open FSharp.Charting
-open System.Diagnostics
 
 open ArrayNDNS
 open Datasets
+open SymTensor
+open SymTensor.Compiler.Cuda
+open Optimizers
+open Models
 open Data
+
+
+/// command line arguments
+type CLIArgs =
+    | [<Mandatory>] SrcDir of string
+    | NoCache 
+with interface IArgParserTemplate with 
+        member x.Usage = 
+            match x with
+            | SrcDir _ -> "source directory"         
+            | NoCache -> "disables loading a Dataset.h5 cache file"
 
 
 [<EntryPoint>]
 let main argv = 
     DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
 
-    let srcDir = __SOURCE_DIRECTORY__ + "/../Data/DeepBraille/curv2"
+    let parser = ArgumentParser.Create<CLIArgs>("Creates a curve dataset.")
+    let args = parser.Parse(errorHandler=ProcessExiter())
+    let srcDir = args.GetResult <@ SrcDir @>
+    let noCache = args.Contains <@ NoCache @>
 
+    // load data set
     let sw = Stopwatch.StartNew()
-    let allCurves = loadCurves srcDir
-    printfn "Curve loading took %A" sw.Elapsed
+    let cache = srcDir + "/Dataset.h5"
+    let dataset : Dataset<TactilePoint> = 
+        if File.Exists cache && not noCache then
+            Dataset.Load cache
+        else
+            let dataset = loadPoints srcDir |> Dataset.FromSamples 
+            dataset.Save cache
+            dataset
+        |> Dataset.ToCuda
+    printfn "Dataset %A loaded in %A" dataset sw.Elapsed   
 
-    let sw = Stopwatch.StartNew()
-    let allPoints = loadPoints srcDir |> Seq.toList
-    printfn "Point loading took %A" sw.Elapsed
-    printfn "number of points: %d" (List.length allPoints)
+    // minibatch generation
+    let batches = dataset.Batches 1000
+    let tmpl = batches () |> Seq.head
 
-//    DataCollection.StartProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
-//    let sw = Stopwatch.StartNew()
-//    let dataset = allPoints |> Dataset.FromSamples
-//    printfn "Dataset building took %A" sw.Elapsed
-//    dataset.Save (srcDir + "/dataset.h5")
-//    //DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
+    // define model
+    let mc = ModelBuilder<single> "CurveFollow"
+    
+    // symbolic sizes
+    let batchSize   = mc.Size "BatchSize"
+    let nBiotac     = mc.Size "nBiotac"
+    let nOptimalVel = mc.Size "nOptimalVel"
 
-    let sw = Stopwatch.StartNew()
-    let datasetLoad : Dataset<TactilePoint> = Dataset.Load (srcDir + "/dataset.h5")
-    printfn "Dataset loading from HDF5 took %A" sw.Elapsed
+    // model parameters
+    let pars = NeuralLayer.pars (mc.Module "Layer1") nBiotac nOptimalVel
+    
+    // input / output variables
+    let biotac     = mc.Var "Biotac"     [nBiotac;     batchSize]
+    let optimalVel = mc.Var "OptimalVel" [nOptimalVel; batchSize]
+    let md = mc.ParametersComplete ()
+
+    // expressions
+    let loss = NeuralLayer.loss pars biotac optimalVel |> md.Subst
+    let dLoss = md.WrtParameters loss
+
+    // infer sizes and variable locations from dataset
+    md.UseTmplVal biotac     tmpl.Biotac
+    md.UseTmplVal optimalVel tmpl.OptimalVel
+
+    printfn "inferred sizes: %A" md.SymSizeEnv
+    printfn "inferred locations: %A" md.VarLocs
+
+    // instantiate model
+    let mi = md.Instantiate DevCuda
+
+    // compile functions
+    let lossFun = mi.Func (loss) |> arg2 biotac optimalVel
+    let opt = GradientDescent.minimize {Step=1e-5f} loss md.ParameterSet.Flat   
+    let optFun = mi.Func opt |> arg2 biotac optimalVel
+
+    // train
+    for itr, batch in Seq.indexed (batches()) do
+        let loss = lossFun batch.Biotac batch.OptimalVel
+        printfn "Loss after %d iterations: %A" itr loss
+        optFun batch.Biotac batch.OptimalVel |> ignore
+   
+    printfn "Training complete."
+
+
+    // need to make         
+    //let posChart = Chart.Line (Seq.zip allData.[3].Time.Data allData.[3].Pos.Data) |> Chart.WithTitle "pos" 
+    //let velChart = Chart.Line allData.[3].Vels.Data |> Chart.WithTitle "vels"
+    //Chart.Rows [posChart; velChart]
+    //|> Chart.Save (__SOURCE_DIRECTORY__ + "/chart.pdf")
+
 
     0 

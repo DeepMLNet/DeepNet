@@ -14,7 +14,7 @@ module DatasetTypes =
     /// A dataset of a record type 'S containing ArrayNDHostT<_> data variables.
     /// The last dimension of each record field is the sample.
     /// All record fields must contain the same number of samples.
-    [<StructuredFormatDisplay("Dataset (Samples={NSamples}; Location={Location}; Contents={SampleType})")>]
+    [<StructuredFormatDisplay("Dataset ({NSamples} samples of {SampleType} in {Location} storage)")>]
     type Dataset<'S> (fieldStorages: IArrayNDT list) =
 
         do if not (FSharpType.IsRecord typeof<'S>) then

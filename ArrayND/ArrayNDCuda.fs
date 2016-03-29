@@ -56,12 +56,21 @@ module ArrayNDCudaTypes =
         inherit ArrayNDT<'T>(layout)
        
         let getElement index =
-            let hostBuf = ref (new 'T())
-            storage.Data.CopyToHost(hostBuf, SizeT(index * sizeof<'T>))
-            !hostBuf
+            if typeof<'T> = typeof<bool> then
+                let hostBuf : byte ref = ref 0uy
+                (storage :> ICudaStorage).ByteData.CopyToHost(hostBuf, SizeT (index * sizeof<byte>))
+                !hostBuf <> 0uy |> box |> unbox
+            else
+                let hostBuf = ref (new 'T())
+                storage.Data.CopyToHost(hostBuf, SizeT (index * sizeof<'T>))
+                !hostBuf
 
         let setElement index (value: 'T) =
-            storage.Data.CopyToDevice(value, SizeT(index * sizeof<'T>))
+            if typeof<'T> = typeof<bool> then
+                let byteVal = if (box value :?> bool) then 1uy else 0uy
+                (storage :> ICudaStorage).ByteData.CopyToDevice(byteVal, SizeT (index * sizeof<bool>))
+            else
+                storage.Data.CopyToDevice(value, SizeT (index * sizeof<'T>))
 
         /// a new ArrayND stored on the GPU using newly allocated device memory
         new (layout: ArrayNDLayoutT) =

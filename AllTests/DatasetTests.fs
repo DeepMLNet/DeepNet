@@ -11,7 +11,7 @@ open Datasets
 
 let dataDir = Util.assemblyDirectory + "/../../TestData/curve"
 
-type Arrayf = ArrayNDHostT<float>
+type Arrayf = ArrayNDT<float>
 type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
 
 let dataSamples = 
@@ -55,8 +55,8 @@ type CurveDataset () =
     
     [<Fact>]
     member this.``Batching`` () =
-        let batchSize = 10
-        let batchGen = dataset.Batches batchSize
+        let batchSize = 11
+        let batchGen = dataset.ToCuda().Batches batchSize
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 

@@ -26,30 +26,31 @@ open Data
 // argument parsing
 type CLIArgs =
     | [<Mandatory>] SrcDir of string
+    | NoCache 
 with interface IArgParserTemplate with 
         member x.Usage = 
             match x with
             | SrcDir _ -> "source directory"         
+            | NoCache -> "disables loading a Dataset.h5 cache file"
 let parser = ArgumentParser.Create<CLIArgs>("Creates a curve dataset.")
 let args = parser.Parse(cmdLine, errorHandler=ProcessExiter())
 let srcDir = args.GetResult <@ SrcDir @>
+let noCache = args.Contains <@ NoCache @>
 
 // load data set
-let allData = loadPoints srcDir |> Seq.toList
-let dataset = allData |> Dataset.FromSamples |> Dataset.ToCuda
+let cache = srcDir + "/Dataset.h5"
+let dataset : Dataset<TactilePoint> = 
+    if File.Exists cache && not noCache then
+        Dataset.Load cache
+    else
+        let dataset = loadPoints srcDir |> Dataset.FromSamples 
+        dataset.Save cache
+        dataset
+    |> Dataset.ToCuda
 
-
-dataset.[0].Biotac.Shape
-dataset.[0].OptimalVel.Shape
-
-// next step?
-// define models
-
-let batches = dataset.Batches 10
+// minibatch generation
+let batches = dataset.Batches 1000
 let tmpl = batches () |> Seq.head
-
-
-// how is the target velocity calculated? where is it stored?
 
 // define model
 let mc = ModelBuilder<single> "CurveFollow"
