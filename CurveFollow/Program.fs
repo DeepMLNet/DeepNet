@@ -46,10 +46,12 @@ let main argv =
             dataset
         |> Dataset.ToCuda
     printfn "Dataset %A loaded in %A" dataset sw.Elapsed   
+    let ds = TrnValTst.Of dataset
 
-    // minibatch generation
-    let batches = dataset.Batches 1000
-    let tmpl = batches () |> Seq.head
+    // training minibatch generation
+    let trnBatches = ds.Trn.Batches 10000
+    let tmpl = trnBatches () |> Seq.head
+    let tstBatch = trnBatches() |> Seq.head
 
     // define model
     let mc = ModelBuilder<single> "CurveFollow"
@@ -58,39 +60,56 @@ let main argv =
     let batchSize   = mc.Size "BatchSize"
     let nBiotac     = mc.Size "nBiotac"
     let nOptimalVel = mc.Size "nOptimalVel"
+    let nHidden     = mc.Size "nHidden"
 
     // model parameters
-    let pars = NeuralLayer.pars (mc.Module "Layer1") nBiotac nOptimalVel
+    let layer1 = NeuralLayer.pars (mc.Module "Layer1") nBiotac nHidden
+    let layer2 = NeuralLayer.pars (mc.Module "Layer2") nHidden nOptimalVel
     
     // input / output variables
-    let biotac     = mc.Var "Biotac"     [nBiotac;     batchSize]
-    let optimalVel = mc.Var "OptimalVel" [nOptimalVel; batchSize]
+    let biotac     = mc.Var "Biotac"     [batchSize; nBiotac]
+    let optimalVel = mc.Var "OptimalVel" [batchSize; nOptimalVel]
     let md = mc.ParametersComplete ()
 
     // expressions
-    let loss = NeuralLayer.loss pars biotac optimalVel |> md.Subst
-    let dLoss = md.WrtParameters loss
+    let hidden = NeuralLayer.pred layer1 biotac.T
+    let loss = NeuralLayer.loss layer2 hidden optimalVel.T
 
     // infer sizes and variable locations from dataset
     md.UseTmplVal biotac     tmpl.Biotac
     md.UseTmplVal optimalVel tmpl.OptimalVel
+    md.SetSize    nHidden    100
     //printfn "inferred sizes: %A" md.SymSizeEnv
     //printfn "inferred locations: %A" md.VarLocs
 
     // instantiate model
     let mi = md.Instantiate DevCuda
+    printfn "Number of parameters in model: %d" (ArrayND.nElems mi.ParameterStorage.Flat)
+
+    // initialize parameters
+    let rng = Random (10)
+    let initPars : ArrayNDHostT<single> = 
+        ArrayNDHost.zeros mi.ParameterStorage.Flat.Shape
+        |> ArrayND.map (fun _ ->
+            rng.NextDouble() - 0.5 |> single
+        )    
+    mi.ParameterStorage.Flat.[Fill] <- initPars |> ArrayNDCuda.toDev   
 
     // compile functions
+    let loss = md.Subst loss
     let lossFun = mi.Func (loss) |> arg2 biotac optimalVel
-    let opt = GradientDescent.minimize {Step=1e-5f} loss md.ParameterSet.Flat   
+    let opt = GradientDescent.minimize {Step=1e-8f} loss md.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 biotac optimalVel
 
     // train
-    for itr, batch in Seq.indexed (batches()) do
-        let loss = lossFun batch.Biotac batch.OptimalVel
+    let iters = 100
+    printfn "Training for %d iterations..." iters
+    for itr = 0 to iters do
+        let loss = lossFun tstBatch.Biotac tstBatch.OptimalVel
         printfn "Loss after %d iterations: %A" itr loss
-        optFun batch.Biotac batch.OptimalVel |> ignore
-   
+
+        for trnBatch in trnBatches() do
+            optFun trnBatch.Biotac trnBatch.OptimalVel |> ignore  
     printfn "Training complete."
 
 
@@ -101,4 +120,6 @@ let main argv =
     //|> Chart.Save (__SOURCE_DIRECTORY__ + "/chart.pdf")
 
 
+    Basics.Cuda.CudaSup.shutdown ()    
+    Async.Sleep 1000 |> Async.RunSynchronously
     0 

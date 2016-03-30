@@ -20,9 +20,10 @@ module DatasetTypes =
         do if not (FSharpType.IsRecord typeof<'S>) then
             failwith "Dataset sample type must be a record containing ArrayNDHostTs"
 
-        //let fieldStorages =
-            //fieldStorages
-           // |> List.map ArrayND.makeContiguous
+        // make sure that all field storages are in C-order
+        do for fs in fieldStorages do
+            if not (ArrayND.isC fs) then
+                failwith "all field storages in must be in C-order"
 
         // verify that all fields have equal number of samples
         let nSamples = fieldStorages.[0] |> ArrayND.shape |> List.head
