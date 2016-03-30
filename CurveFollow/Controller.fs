@@ -17,8 +17,21 @@ type IController =
     abstract Predict: biotac: Arrays -> Arrays
 
 
+type MLPController (mlpHyperPars:    MLP.HyperPars,
+                    batchSize:       int) =
 
+    let mc = ModelBuilder<single> "MLPController"
+    let pars = MLP.pars mc mlpHyperPars
+    let md = mc.ParametersComplete ()
+    let mi = md.Instantiate DevCuda
 
-//type MLPController () =
+    let biotac = mc.Var "Biotac" [SizeSpec.fix 23; SizeSpec.fix batchSize]
+    let pred = MLP.pred pars biotac
+    let predFun = mi.Func (pred |> md.Subst) |> arg biotac
+
+    interface IController with
+        member this.Predict biotac = (predFun biotac.T).T
+
+            
 
      

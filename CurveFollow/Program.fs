@@ -97,15 +97,13 @@ let main argv =
     let rng = Random (10)
     let initPars : ArrayNDHostT<single> = 
         ArrayNDHost.zeros mi.ParameterStorage.Flat.Shape
-        |> ArrayND.map (fun _ ->
-            rng.NextDouble() - 0.5 |> single
-        )    
+        |> ArrayND.map (fun _ -> rng.NextDouble() - 0.5 |> single)    
     mi.ParameterStorage.Flat.[Fill] <- initPars |> ArrayNDCuda.toDev   
 
     // compile functions
     let loss = md.Subst loss
     let lossFun = mi.Func (loss) |> arg2 biotac optimalVel
-    let opt = GradientDescent.minimize {Step=1e-8f} loss md.ParameterSet.Flat   
+    let opt = GradientDescent.minimize {Step=1e-5f} loss md.ParameterSet.Flat   
     let optFun = mi.Func opt |> arg2 biotac optimalVel
 
     // train
