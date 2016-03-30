@@ -30,6 +30,7 @@ module HostEval =
                     match op with
                     | Identity ss -> ArrayNDHost.identity (sizeEval ss) 
                     | Zeros ss -> ArrayNDHost.zeros (shapeEval ss)
+                    | SizeValue sv -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | ScalarConst f -> ArrayNDHost.scalar f
                     | Var(vs) -> varEval vs 
                 | Unary(op, a) ->

@@ -27,7 +27,8 @@ let build device batch =
     let nTarget    = mc.Size "nTarget"
 
     // model parameters
-    let pars = NeuralLayer.pars (mc.Module "Layer1") nInput nTarget
+    let pars = NeuralLayer.pars (mc.Module "Layer1") 
+                {NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
     
     // input / output variables
     let input =  mc.Var "Input"  [nInput;  batchSize]
@@ -43,7 +44,8 @@ let build device batch =
     let mi = mc.Instantiate device
 
     // expressions
-    let loss = NeuralLayer.loss pars input target |> mc.Subst
+    let pred = NeuralLayer.pred pars input
+    let loss = LossLayer.loss LossLayer.MSE pred target |> mc.Subst
     let opt = GradientDescent.minimize {Step=1e-6f} loss mc.ParameterSet.Flat   
 
     // compile functions

@@ -169,6 +169,10 @@ module ArgTemplates =
     type ICudaOp =
         abstract member IsIndexed : bool  
 
+    type ICudaOpAndArgTmpl =
+        inherit ICudaOp
+        inherit ICudaArgTmpl
+
     /// CUDA device memory range template
     type IDevMemRngTmpl =
         abstract member GetRng : CudaExecEnvT -> DevMemRngT
@@ -359,6 +363,7 @@ module ArgTemplates =
                 | _ -> failwithf "unsupported type %A" (value.GetType())
         interface ICudaOp with
             member this.IsIndexed = false
+        interface ICudaOpAndArgTmpl
 
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]

@@ -14,6 +14,7 @@ open Models
 open Data
 
 
+
 /// command line arguments
 type CLIArgs =
     | [<Mandatory>] SrcDir of string
@@ -25,11 +26,14 @@ with interface IArgParserTemplate with
             | NoCache -> "disables loading a Dataset.h5 cache file"
 
 
+
+
+
 [<EntryPoint>]
 let main argv = 
     DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
 
-    let parser = ArgumentParser.Create<CLIArgs>("Creates a curve dataset.")
+    let parser = ArgumentParser.Create<CLIArgs>("Curve following")
     let args = parser.Parse(errorHandler=ProcessExiter())
     let srcDir = args.GetResult <@ SrcDir @>
     let noCache = args.Contains <@ NoCache @>
@@ -63,8 +67,12 @@ let main argv =
     let nHidden     = mc.Size "nHidden"
 
     // model parameters
-    let layer1 = NeuralLayer.pars (mc.Module "Layer1") nBiotac nHidden
-    let layer2 = NeuralLayer.pars (mc.Module "Layer2") nHidden nOptimalVel
+    let pars = MLP.pars mc {
+        MLP.Layers = 
+            [ { NInput=nBiotac; NOutput=nHidden;     TransferFunc=NeuralLayer.Tanh }
+              { NInput=nHidden; NOutput=nOptimalVel; TransferFunc=NeuralLayer.Identity } ]
+        MLP.LossMeasure = LossLayer.MSE
+    }
     
     // input / output variables
     let biotac     = mc.Var "Biotac"     [batchSize; nBiotac]
@@ -72,8 +80,7 @@ let main argv =
     let md = mc.ParametersComplete ()
 
     // expressions
-    let hidden = NeuralLayer.pred layer1 biotac.T
-    let loss = NeuralLayer.loss layer2 hidden optimalVel.T
+    let loss = MLP.loss pars biotac.T optimalVel.T
 
     // infer sizes and variable locations from dataset
     md.UseTmplVal biotac     tmpl.Biotac

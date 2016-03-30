@@ -29,6 +29,7 @@ module UExprTypes =
         | Identity of SizeSpecT
         | Zeros of ShapeSpecT                   
         | ScalarConst of System.IComparable
+        | SizeValue of SizeSpecT
         | Var of UVarSpecT
 
     type UUnaryOpT =
@@ -182,6 +183,7 @@ module UExpr =
         | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
         | Leaf (Expr.Zeros ss)          -> leaf (Zeros ss)
         | Leaf (Expr.ScalarConst v)     -> leaf (ScalarConst (box v :?> System.IComparable))
+        | Leaf (Expr.SizeValue sv)      -> leaf (SizeValue sv)
         | Leaf (Expr.Var vs)            -> leaf (Var (UVarSpec.ofVarSpec vs))
 
         | Unary (Expr.Negate, a)        -> unary Negate a
@@ -249,6 +251,7 @@ module UExpr =
         | ULeafOp (Identity ss)             -> leaf (Expr.Identity ss)
         | ULeafOp (Zeros ss)                -> leaf (Expr.Zeros ss)
         | ULeafOp (ScalarConst v)           -> leaf (Expr.ScalarConst (box v :?> 'T))
+        | ULeafOp (SizeValue sv)            -> leaf (Expr.SizeValue sv)
         | ULeafOp (Var vs)                  -> leaf (Expr.Var (UVarSpec.toVarSpec vs))
 
         | UUnaryOp Negate                   -> unary Expr.Negate

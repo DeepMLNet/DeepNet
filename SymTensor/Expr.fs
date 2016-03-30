@@ -43,6 +43,8 @@ module Expr =
         | Zeros of ShapeSpecT                   
         /// scalar of given value
         | ScalarConst of 'T
+        /// scalar of the given size
+        | SizeValue of SizeSpecT
 
         // ==== variable access ====
         /// variable read
@@ -240,9 +242,10 @@ module Expr =
         match expr with
 
         // tensor creation
-        | Leaf(Identity(ss)) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros(ss)) -> ss
-        | Leaf(ScalarConst(_)) -> ShapeSpec.scalar
+        | Leaf(Identity ss) -> ShapeSpec.matrix ss ss
+        | Leaf(Zeros ss) -> ss
+        | Leaf(ScalarConst _) -> ShapeSpec.scalar
+        | Leaf(SizeValue _) -> ShapeSpec.scalar
 
         // variable access
         | Leaf(Var vs) -> VarSpec.shape vs
@@ -318,6 +321,9 @@ module Expr =
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
         | Nary(ExtensionOp _, _) -> failwith "not implemented"
 
+    /// number of elements 
+    let nElems expr =
+        expr |> shapeOf |> ShapeSpec.nElem
 
     /// Wraps the given op in a Reshape op if its shape does not match ss.
     let reshapeIfNecessary ss expr =
@@ -397,6 +403,7 @@ module Expr =
         match expr with
         | Leaf (Identity ss) -> Leaf (Identity (sSize ss))
         | Leaf (Zeros ss) -> Leaf (Zeros (sShp ss))
+        | Leaf (SizeValue sc) -> Leaf (SizeValue (sSize sc))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
         | Leaf _ -> expr
 
@@ -416,6 +423,7 @@ module Expr =
         match expr with
         | Leaf (Identity ss) -> SizeSpec.canEval ss
         | Leaf (Zeros ss) -> ShapeSpec.canEval ss
+        | Leaf (SizeValue sc) -> SizeSpec.canEval sc
         | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
         | Leaf _ -> true
 
@@ -448,16 +456,16 @@ module Expr =
             | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
             | Nary (op, es) -> Nary (op, es |> List.map subSubst)
 
-        //let symSizes = inferSymSizes expr
         doSubst part replacement expr |> check
-
 
     /// scalar of given value
     let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
 
     /// scalar of given value and type
-    let inline scalart<'T> f =
-        scalar (conv<'T> f)
+    let inline scalart<'T> f = scalar (conv<'T> f)
+
+    /// scalar with value of given size
+    let sizeValue size = Leaf(SizeValue size)
 
     /// scalar 0 of appropriate type
     let inline zero<'T> () = scalar (ArrayNDT<'T>.Zero)
@@ -542,6 +550,7 @@ module Expr =
     let signt (a: ExprT<'T>) =
         ExprT<'T>.SignT a 
 
+    /// square root
     let sqrtt (a: ExprT<'T>) =
         ExprT<'T>.Sqrt a
 
@@ -572,6 +581,18 @@ module Expr =
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
     let sumKeepingAxis ax a =
         a |> sumAxis ax |> insertBroadcastAxis ax
+
+    /// mean over all elements
+    let mean (a: ExprT<'T>) = 
+        sum a / sizeValue (nElems a)
+
+    /// mean over given dimension
+    let meanAxis ax (a: ExprT<'T>) =
+        sumAxis ax a / sizeValue ((shapeOf a).[ax])
+
+    /// mean over given dimension, while keeping the axis with one (broadcastable) element
+    let meanKeepingAxis ax a =
+        a |> meanAxis ax |> insertBroadcastAxis ax
 
     /// identity matrix of given size
     let identity size = Leaf(Identity(size)) |> check
@@ -747,22 +768,7 @@ module Expr =
                 this.GetSlice (allArgs)
                       
 
-    let testme () =
-        let a : ExprT<float> = Leaf (Identity (SizeSpec.one))
-        let b : ExprT<int> = Leaf (Identity (SizeSpec.one))
-        let c : ExprT<int> = Leaf (Identity (SizeSpec.one))
-        let aitm1 = a.[SizeSpec.one]
-        let aitm1b = a.[SizeSpec.one, 12, 3 .. 6]
 
-        let asl1 = a.[SizeSpec.fix 5 .. SizeSpec.fix 10]
-        //let asl2 = a.[b .. c]
-        let asl2b = a.[b ..]
-        let asl3c = a.[*]
-
-        //let d = b + (SizeSpec.one)
-        let asl3 = a.[b .. PlusElems 3, b .. b, 33]
-        //let asl3 = a.[b .. b]
-        ()
 
 
 [<AutoOpen>]

@@ -413,6 +413,11 @@ module CudaExecUnit =
         | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
         | ULeafOp (Zeros _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
         | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) [] 
+        | ULeafOp (SizeValue sv) -> 
+            let value = Convert.ChangeType(SizeSpec.eval sv, trgt.DataType)
+            let opType = typedefof<ConstEOpArgTmpl<_>>.MakeGenericType(trgt.DataType)
+            let op = Activator.CreateInstance(opType, value) :?> ICudaOpAndArgTmpl 
+            execItemsForElemwise trgt op [] 
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with

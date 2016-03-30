@@ -39,6 +39,7 @@ module Deriv =
             match op with
             | Zeros ss -> Map.empty
             | ScalarConst _ -> Map.empty
+            | SizeValue _ -> Map.empty
             | Identity ss -> Map.empty
             | Var v -> Map.empty |> Map.add v eg
 
