@@ -23,9 +23,13 @@ type MLPController (mlpHyperPars:    MLP.HyperPars,
     let mc = ModelBuilder<single> "MLPController"
     let pars = MLP.pars mc mlpHyperPars
     let md = mc.ParametersComplete ()
+    let nBiotac = SizeSpec.symbol "nBiotac"
+    do md.SetSize nBiotac 23
+    let nVelocity = SizeSpec.symbol "nVelocity"
+    do md.SetSize nVelocity 2
     let mi = md.Instantiate DevCuda
 
-    let biotac = mc.Var "Biotac" [SizeSpec.fix 23; SizeSpec.fix batchSize]
+    let biotac = mc.Var "Biotac" [nBiotac; SizeSpec.fix batchSize]
     let pred = MLP.pred pars biotac
     let predFun = mi.Func (pred |> md.Subst) |> arg biotac
 
