@@ -77,33 +77,31 @@ let main argv =
     // input / output variables
     let biotac     = mc.Var "Biotac"     [batchSize; nBiotac]
     let optimalVel = mc.Var "OptimalVel" [batchSize; nOptimalVel]
-    let md = mc.ParametersComplete ()
 
     // expressions
     let loss = MLP.loss pars biotac.T optimalVel.T
 
     // infer sizes and variable locations from dataset
-    md.UseTmplVal biotac     tmpl.Biotac
-    md.UseTmplVal optimalVel tmpl.OptimalVel
-    md.SetSize    nHidden    100
+    mc.UseTmplVal biotac     tmpl.Biotac
+    mc.UseTmplVal optimalVel tmpl.OptimalVel
+    mc.SetSize    nHidden    100
     //printfn "inferred sizes: %A" md.SymSizeEnv
     //printfn "inferred locations: %A" md.VarLocs
 
     // instantiate model
-    let mi = md.Instantiate DevCuda
-    printfn "Number of parameters in model: %d" (ArrayND.nElems mi.ParameterStorage.Flat)
+    let mi = mc.Instantiate DevCuda
+    printfn "Number of parameters in model: %d" (ArrayND.nElems mi.ParameterValues)
 
     // initialize parameters
     let rng = Random (10)
     let initPars : ArrayNDHostT<single> = 
-        ArrayNDHost.zeros mi.ParameterStorage.Flat.Shape
+        ArrayNDHost.zeros mi.ParameterValues.Shape
         |> ArrayND.map (fun _ -> rng.NextDouble() - 0.5 |> single)    
-    mi.ParameterStorage.Flat.[Fill] <- initPars |> ArrayNDCuda.toDev   
+    mi.ParameterValues.[Fill] <- initPars |> ArrayNDCuda.toDev   
 
     // compile functions
-    let loss = md.Subst loss
     let lossFun = mi.Func (loss) |> arg2 biotac optimalVel
-    let opt = GradientDescent.minimize {Step=1e-5f} loss md.ParameterSet.Flat   
+    let opt = GradientDescent.minimize {Step=1e-5f} loss mi.ParameterVector
     let optFun = mi.Func opt |> arg2 biotac optimalVel
 
     // train

@@ -1,27 +1,40 @@
 ﻿namespace SymTensor
 
+open System
+
+open Basics
 open ArrayNDNS
 
 [<AutoOpen>]
 module ModelContextTypes =
 
-    /// allocates an ArrayNDT given the shape
-    type ArrayAllocatorT<'T> = NShapeSpecT -> ArrayNDT<'T>
+    /// function that returns an initialization value for a parameter
+    type Initializer<'T> = int -> int list -> ArrayNDHostT<'T>
+
+    /// model parameter
+    type ParameterInfo<'T> = {
+        ExprRef:        ExprT<'T> ref
+        Initializer:    Initializer<'T>
+    }
 
     /// Model evaluation device specification.
     type IDevice =
-        abstract member Allocator: NShapeSpecT -> ArrayNDT<'T> 
-        abstract member Compiler: IUExprCompiler
-        abstract member DefaultLoc: ArrayLocT
+        abstract member Allocator:      NShapeSpecT -> ArrayNDT<'T> 
+        abstract member ToDev:          ArrayNDHostT<'T> -> ArrayNDT<'T>
+        abstract member ToHost:         ArrayNDT<'T> -> ArrayNDHostT<'T>
+        abstract member Compiler:       IUExprCompiler
+        abstract member DefaultLoc:     ArrayLocT
 
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
             member this.Allocator shp = ArrayNDHost.newC shp :> ArrayNDT<_>
-            member this.Compiler = { new IUExprCompiler with 
-                                        member this.Name = "Host"
-                                        member this.Compile env exprs = onHost env exprs }
-            member this.DefaultLoc = LocHost
+            member this.ToDev ary =     ary :> ArrayNDT<_>
+            member this.ToHost ary =    ary :?> ArrayNDHostT<_>
+            member this.Compiler =      { new IUExprCompiler with 
+                                            member this.Name = "Host"
+                                            member this.Compile env exprs = onHost env exprs }
+            member this.DefaultLoc =    LocHost
     }
 
     /// A set of symbolic variables forming a set of parameters for a model.
@@ -100,7 +113,7 @@ module ModelContextTypes =
     type ParameterStorageT<'T when 'T: equality> 
             (parameterSet:    ParameterSetT<'T>,
              symSizes:        SymSizeEnvT,
-             allocator:       ArrayAllocatorT<'T>) =
+             device:          IDevice) =
 
         let evalSize = SymSizeEnv.subst symSizes >> SizeSpec.eval
         let evalShape = List.map evalSize
@@ -109,7 +122,7 @@ module ModelContextTypes =
         let nStartIdxs = parameterSet.StartIdxs |> List.map evalSize       
         let nTotalElems = parameterSet.TotalElems |> evalSize
 
-        let dataVal = allocator [nTotalElems]
+        let dataVal = device.Allocator [nTotalElems]
 
         let parameterVals = 
             (nStartIdxs, nShapes)
@@ -135,15 +148,33 @@ module ModelContextTypes =
         member this.Use varEnv =
             varEnv |> VarEnv.add parameterSet.Flat this.Flat
 
+        /// Loads the parameter values from a previously saved HDF5 file.
+        member this.Load filename = 
+            use hdf = HDF5.OpenRead filename
+            for KeyValue(vs, vsView) in parameterVals do
+                let value = ArrayNDHDF.read hdf vs.Name
+                vsView.[Fill] <- device.ToDev value
+
+        /// Saves the parameter values to a HDF5 file.
+        /// Each parameter is stored in a separate HDF5 record under its name.
+        member this.Save filename =
+            use hdf = HDF5.OpenWrite filename
+            for KeyValue(vs, vsView) in parameterVals do
+                let value = device.ToHost vsView
+                ArrayNDHDF.write hdf vs.Name value
 
     /// A model builder.
     [<StructuredFormatDisplay("{PrettyString}")>]
-    type ModelBuilder<'T when 'T: equality> (context: string) =
+    type ModelBuilder<'T when 'T: equality> (context:       string,
+                                             isSubModule:   bool) =
 
         let mutable subMBs = Map.empty
-        let mutable parameters : Set<VarSpecT<'T>> = Set.empty
+        let mutable parameters : Map<VarSpecT<'T>, ParameterInfo<'T>> = Map.empty
         let mutable vars : Set<IVarSpec> = Set.empty
         let mutable symSizes = []
+        let mutable symSizeEnv = SymSizeEnv.empty
+        let mutable varLocs : VarLocsT = Map.empty
+        let mutable instantiated = false
 
         let toSizeSpec (name: string) =            
             SizeSpec.symbol name
@@ -157,13 +188,23 @@ module ModelContextTypes =
                 | r -> failwithf "size must be either a size symbol name (string), \
                                   a fixed size (positive integer) or -1 for broadcast, but got %A" r)
 
+        let defaultInitializer (seed: int) (shp: int list) =
+            let rng = Random(seed)
+            rng.SeqDouble (-0.01, 0.01) 
+            |> Seq.map conv<'T>
+            |> ArrayNDHost.ofSeqWithShape shp
+
+        new (context: string) = ModelBuilder(context, false)
+
         /// creates and returns a submodule
         member this.Module (name: string) =
+            if instantiated then failwith "cannot add module after model has been instantiated"
+
             let subContext = context + "." + name
             match Map.tryFind subContext subMBs with
             | Some subMC -> subMC
             | None ->
-                let subMC = ModelBuilder (subContext)
+                let subMC = ModelBuilder (subContext, true)
                 subMBs <- subMBs |> Map.add subContext subMC
                 subMC
 
@@ -174,10 +215,14 @@ module ModelContextTypes =
             v
 
         /// Creates and returns a model parameter.
-        member this.Param (name: string) (shape: ShapeSpecT) =
+        member this.Param (name: string, shape: ShapeSpecT, ?initializer: Initializer<'T>) =
+            let initializer = defaultArg initializer defaultInitializer
+            if instantiated then failwith "cannot add parameter after model has been instantiated"
+
             let p = Expr.var (context + "." + name) shape
-            parameters <- parameters |> Set.add (Expr.extractVar p)
-            p
+            let pRef = ref p
+            parameters <- parameters |> Map.add (Expr.extractVar p) {ExprRef = pRef; Initializer = initializer}
+            pRef
 
         /// Creates and returns a symbolic size.
         /// If the name starts with ">" a dynamic size is created.
@@ -200,8 +245,7 @@ module ModelContextTypes =
         /// parameters of this model and all submodels
         member this.Parameters = 
             seq {for KeyValue(_, smc) in subMBs -> smc.Parameters}
-            |> Set.unionMany 
-            |> Set.union parameters
+            |> Seq.fold Map.join parameters
 
         /// variables of this model and all submodels
         member this.Vars =
@@ -216,26 +260,6 @@ module ModelContextTypes =
             |> Seq.map (fun (_, m) -> m.SymSizes)
             |> List.concat
             |> List.append symSizes
-
-        /// Completes the definition of model parameters and size symbols
-        /// and returns a DefinedModel.
-        member this.ParametersComplete () =
-            DefinedModel (context, this.Parameters, this.Vars, this.SymSizes)
-            
-        member this.PrettyString = 
-            sprintf "%A {%s}"
-                context (this.Parameters |> Set.toSeq |> Seq.map (sprintf "%A") |> String.concat ", ")
-
-
-    /// A model with all parameters and symbolic sizes defined.
-    and DefinedModel<'T when 'T: equality> (context:     string,
-                                            parameters:  Set<VarSpecT<'T>>,
-                                            vars:        Set<IVarSpec>,
-                                            symSizes:    SizeSpecT list) =
-
-        let parameterSet = ParameterSetT (context, parameters)
-        let mutable symSizeEnv = SymSizeEnv.empty
-        let mutable varLocs : VarLocsT = Map.empty
 
         /// sets a symbolic size to a value
         member this.SetSize size value =
@@ -258,25 +282,17 @@ module ModelContextTypes =
 
             varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) (ArrayND.location value)
 
-        /// ParameterSet of this module's (and all submodules') parameteres
-        member this.ParameterSet = parameterSet
-
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
 
         /// Variable locations
         member this.VarLocs = varLocs
-        
-        /// Substitutes the ParameterSet into the given expression
-        member this.Subst expr =
-            this.ParameterSet.Subst expr
 
-        /// Derivative of "expr" w.r.t. flat vector containing all model parameters
-        member this.WrtParameters expr =
-            this.ParameterSet.WrtFlat expr
-
-        /// instantiates the model with numeric sizes for all size symbols
+        /// instantiates the model with numeric sizes for all size symbols and initializes the parameter values
         member this.Instantiate (device: IDevice) =
+            if isSubModule then failwith "a submoule cannot be instantiated"
+            if instantiated then failwith "this model has already been instantiated"
+
             // check if instantiable
             for symSize in symSizes do
                 if not (SymSizeEnv.subst symSizeEnv symSize |> SizeSpec.canEval) then
@@ -293,15 +309,32 @@ module ModelContextTypes =
             let compileEnv =
                 {SymSizes=symSizeEnv; VarLocs=varLocs; ResultLoc=device.DefaultLoc; CanDelay=false}
 
-            ModelInstance (parameterSet, device, compileEnv)
+            // instantiate
+            instantiated <- true
+            let mi = ModelInstance (context, this.Parameters, device, compileEnv)
+            mi.InitPars 0
+            mi
+
+            
+        member this.PrettyString = 
+            sprintf "%A {%s}"
+                context (this.Parameters |> Map.toSeq |> Seq.map (fst >> sprintf "%A") |> String.concat ", ")
 
 
     /// A model with numeric sizes for all size symbols and allocated parameter storage.
-    and ModelInstance<'T when 'T: equality> (parameterSet:    ParameterSetT<'T>,
+    and ModelInstance<'T when 'T: equality> (context:         string,
+                                             parameters:      Map<VarSpecT<'T>, ParameterInfo<'T>>,
                                              device:          IDevice,                                             
                                              compileEnv:      CompileEnvT) =
 
-        let parameterStorage = ParameterStorageT (parameterSet, compileEnv.SymSizes, device.Allocator)        
+        // create parameter set and parameter storage
+        let parameterSpecs = parameters |> Map.toSeq |> Seq.map fst
+        let parameterSet = ParameterSetT (context, parameterSpecs)
+        let parameterStorage = ParameterStorageT (parameterSet, compileEnv.SymSizes, device)        
+
+        // set references to view into ParameterSet
+        do for KeyValue(ps, pi) in parameters do
+             pi.ExprRef := parameterSet.[ps]
 
         let compileSpec resultLoc = 
             // add ParameterStorage to variable locations
@@ -314,29 +347,60 @@ module ModelContextTypes =
             device.Compiler, {compileEnv with ResultLoc = resultLoc;
                                               VarLocs   = varLocs}
 
-        let subst = parameterSet.Subst
-        let usePars = parameterStorage.Use
+        let useParStorage = parameterStorage.Use
+
+        /// ParameterSet of this module's (and all submodules') parameteres
+        member this.ParameterSet = parameterSet
+
+        /// symbolic flat parameter vector
+        member this.ParameterVector = this.ParameterSet.Flat
+
+        /// Derivative of "expr" w.r.t. flat vector containing all model parameters
+        member this.WrtParameters expr =
+            this.ParameterSet.WrtFlat expr
 
         /// Parameter values.
         member this.ParameterStorage = parameterStorage
 
+        /// numeric flat parameter vector
+        member this.ParameterValues = this.ParameterStorage.Flat
+
         /// Compile environment.
         member this.CompileEnv = compileEnv
+
+        /// Load parameter values.
+        member this.LoadPars filename = this.ParameterStorage.Load filename
+
+        /// Save parameter values.
+        member this.SavePars filename = this.ParameterStorage.Save filename
+
+        /// Initializes the specified paramter value using the initialization function.
+        member this.InitPar (seed: int) (ps: VarSpecT<'T>) = 
+            let pi = parameters.[ps]
+            let shp = this.ParameterStorage.[ps].Shape
+            this.ParameterStorage.[ps] <- pi.Initializer seed shp |> device.ToDev
+
+        /// Initializes all parameter values using their respective initialization functions.
+        member this.InitPars (globalSeed: int) : unit =
+            let rng = Random globalSeed
+            for KeyValue(ps, _) in parameters do
+                let seed = rng.Next ()
+                this.InitPar seed ps
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT<'T>) =
-            Func.make (compileSpec resultLoc) (subst expr0) << usePars
+            Func.make (compileSpec resultLoc) expr0 << useParStorage
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT<'T>, expr1: ExprT<'T>) =
-            Func.make2 (compileSpec resultLoc) (subst expr0) (subst expr1) << usePars
+            Func.make2 (compileSpec resultLoc) expr0 expr1 << useParStorage
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT<'T>, expr1: ExprT<'T>, expr2: ExprT<'T>) =
-            Func.make3 (compileSpec resultLoc) (subst expr0) (subst expr1) (subst expr2) << usePars
+            Func.make3 (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.

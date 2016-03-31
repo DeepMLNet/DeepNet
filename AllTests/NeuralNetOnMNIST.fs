@@ -35,7 +35,6 @@ let build device batch =
     let target = mc.Var "Target" [nTarget; batchSize]
 
     // set sizes
-    let mc = mc.ParametersComplete ()
     mc.SetSize batchSize batch
     mc.SetSize nInput 784
     mc.SetSize nTarget 10
@@ -45,8 +44,9 @@ let build device batch =
 
     // expressions
     let pred = NeuralLayer.pred pars input
-    let loss = LossLayer.loss LossLayer.MSE pred target |> mc.Subst
-    let opt = GradientDescent.minimize {Step=1e-6f} loss mc.ParameterSet.Flat   
+    let loss = LossLayer.loss LossLayer.MSE pred target
+    printfn "loss is:%A" loss
+    let opt = GradientDescent.minimize {Step=1e-2f} loss mi.ParameterSet.Flat   
 
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
@@ -101,7 +101,7 @@ let ``Neural net compiles for GPU`` () =
 let ``Loss decreases during training on GPU`` () =
     let sw = Stopwatch.StartNew()
     let initialLoss, finalLoss = train DevCuda 1000 10
-    finalLoss |> should lessThan initialLoss
+    finalLoss |> should lessThan (initialLoss - 0.001f)
     printfn "Model build and train time: %A" sw.Elapsed
 
 [<Fact>]

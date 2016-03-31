@@ -145,11 +145,12 @@ module Deriv =
     let compute (expr: ExprT<'T>) : DerivT<'T> =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identity
         reverseDiffStep expr eg
-        //|> Map.map (fun _ expr -> Optimizer.optimize expr)
 
     /// extracts the Jacobian of the given variable
     let ofVar var (varDiffs: DerivT<'T>) =
-        varDiffs.[extractVar var]
+        match varDiffs |> Map.tryFind (extractVar var) with
+        | Some d -> d
+        | None -> failwithf "the variable %A is not present in the expression" (extractVar var)
 
 
 

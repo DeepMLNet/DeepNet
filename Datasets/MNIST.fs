@@ -67,7 +67,7 @@ module Mnist =
 
             let image = imageReader.ReadBytes (nRows * nCols)           
             let imageSingle = Array.map (fun p -> single p / 255.0f) image
-            let imageMat = ArrayNDHost.ofArray imageSingle [nRows; nCols]
+            let imageMat = ArrayNDHost.ofArray imageSingle |> ArrayND.reshape [nRows; nCols]
 
             yield labelHot, imageMat
     }

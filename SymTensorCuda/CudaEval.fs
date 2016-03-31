@@ -94,27 +94,45 @@ module CudaEval =
 [<AutoOpen>]
 module CudaEvalTypes =
 
-    type private AllocatorT =
+    type private HelperT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
                 (shp: NShapeSpecT) : ArrayNDT<'T> =
             let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newC shp 
             ary :> ArrayNDT<'T>
 
+        static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
+                (ary: ArrayNDHostT<'T>) : ArrayNDT<'T> =
+            ArrayNDCuda.toDev ary :> ArrayNDT<'T>
+
+        static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
+                (ary: ArrayNDT<'T>) : ArrayNDHostT<'T> =
+            ArrayNDCuda.toHost (ary :?> ArrayNDCudaT<'T>)
+
+    let private invokeHelperMethod<'T> name args = 
+        let gm = typeof<HelperT>.GetMethod (name, 
+                                            BindingFlags.NonPublic ||| 
+                                            BindingFlags.Public ||| 
+                                            BindingFlags.Static)
+        let m = gm.MakeGenericMethod ([|typeof<'T>|])
+        m.Invoke(null, args)  
+
+
     /// Evaluates the model on a CUDA GPU.
     let DevCuda = { 
         new IDevice with
-            member this.Allocator shp : ArrayNDT<'T> = 
-                #if !CUDA_DUMMY
-                let gm = typeof<AllocatorT>.GetMethod ("Allocator", 
-                                                       BindingFlags.NonPublic ||| 
-                                                       BindingFlags.Public ||| 
-                                                       BindingFlags.Static)
-                let m = gm.MakeGenericMethod ([|typeof<'T>|])
-                m.Invoke(null, [|shp|]) :?> ArrayNDT<'T>
-                #else
-                ArrayNDHost.newContiguous shp
-                #endif
-                
+            
+            #if !CUDA_DUMMY
+            member this.Allocator shp : ArrayNDT<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
+            member this.ToDev ary : ArrayNDT<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
+            member this.ToHost ary : ArrayNDHostT<'T2>  = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
+
+            #else
+
+            member this.Allocator shp : ArrayNDT<'T> = ArrayNDHost.newContiguous shp
+            member this.ToDev ary : ArrayNDT<'T1> = box |> unbox 
+            member this.ToHost ary : ArrayNDHostT<'T2>  = box |> unbox 
+            #endif
+            
             member this.Compiler = { new IUExprCompiler with 
                                         member this.Name = "Cuda"
                                         member this.Compile env exprs = CudaEval.cudaEvaluator env exprs }

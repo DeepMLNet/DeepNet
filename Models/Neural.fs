@@ -1,5 +1,7 @@
 ﻿namespace Models
 
+open Basics
+open ArrayNDNS
 open SymTensor
 
 
@@ -33,19 +35,33 @@ module NeuralLayer =
     }
 
     type Pars<'T> = {
-        Weights:        ExprT<'T>
-        Bias:           ExprT<'T>
+        Weights:        ExprT<'T> ref
+        Bias:           ExprT<'T> ref
         HyperPars:      HyperPars
     }
 
+    let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
+        let fanOut = shp.[0] |> float
+        let fanIn = shp.[1] |> float
+        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
+        let rng = System.Random seed
+        
+        rng.SeqDouble(-r, r)
+        |> Seq.map conv<'T>
+        |> ArrayNDHost.ofSeqWithShape shp
+        
+    let internal initBias seed (shp: int list) : ArrayNDHostT<'T> =
+        Seq.initInfinite (fun _ -> conv<'T> 0)
+        |> ArrayNDHost.ofSeqWithShape shp
+
     let pars (mc: ModelBuilder<_>) hp = {
-        Weights   = mc.Param "Weights"     [hp.NOutput; hp.NInput]
-        Bias      = mc.Param "Bias"        [hp.NOutput]
+        Weights   = mc.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
+        Bias      = mc.Param ("Bias",    [hp.NOutput],            initBias)
         HyperPars = hp
     }
 
     let pred pars input =
-        let activation = pars.Weights .* input + pars.Bias
+        let activation = !pars.Weights .* input + !pars.Bias
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
         | Identity -> activation

@@ -167,6 +167,16 @@ module ArrayND =
             this.MapImpl f res
             res
 
+        abstract MapInplaceImpl: ('T -> 'T) -> unit
+        default this.MapInplaceImpl f = 
+            // slow fallback mapping
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                this.[idx] <- f this.[idx]
+
+        /// maps all elements using the specified function in-place
+        member this.MapInplace (f: 'T -> 'T) =
+            this.MapInplaceImpl f
+
         abstract Map2Impl: ('T -> 'T -> 'R) -> ArrayNDT<'T> -> ArrayNDT<'R> -> unit
         default this.Map2Impl f other result =
             // slow fallback mapping
@@ -547,8 +557,23 @@ module ArrayND =
 
     /// Applies the given function elementwise to the given ArrayND inplace.
     let inline mapInplace f (a: #ArrayNDT<'T>) =
+        a.MapInplace f
+
+    /// Fills the array with the values returned by the function.
+    let inline fill (f: unit -> 'T) (a: #ArrayNDT<'T>) =
+        mapInplace (fun _ -> f ()) a
+
+    /// Fills the array with the values returned by the given sequence.
+    let fillWithSeq (data: 'T seq) (a: #ArrayNDT<'T>) =
+        use enumerator = data.GetEnumerator()
+        a |> fill (fun () -> 
+            if enumerator.MoveNext() then enumerator.Current
+            else failwith "sequence ended before ArrayNDT was filled")
+
+    /// Fills the array with the values returned by the function.
+    let inline fillIndexed (f: int list -> 'T) (a: #ArrayNDT<'T>) =
         for idx in allIdx a do
-            set idx (f (get idx a)) a
+            a.[idx] <- f idx
             
     /// Applies the given binary function elementwise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.

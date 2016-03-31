@@ -101,6 +101,12 @@ module ArrayNDHostTypes =
             for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
                 destData.[destAddr] <- f data.[thisAddr]
 
+        override this.MapInplaceImpl (f: 'T -> 'T) = 
+            let thisAddrs = FastLayout.allAddr this.FastLayout
+            for thisAddr in thisAddrs do
+                data.[thisAddr] <- f data.[thisAddr]
+
+
         override this.Map2Impl (f: 'T -> 'T -> 'R) (other: ArrayNDT<'T>) (dest: ArrayNDT<'R>) =
             let dest = dest :?> ArrayNDHostT<'R>
             let other = other :?> ArrayNDHostT<'T>
@@ -188,14 +194,35 @@ module ArrayNDHost =
         ArrayND.fillDiagonalWithOnes a
         a
 
-    /// Creates an ArrayNDT using the specified data and shape with contiguous (row major) layout.
-    /// The data is referenced, not copied.
-    let ofArray (data: 'T []) shp =
-        let layout = ArrayNDLayout.newC shp
-        if ArrayNDLayout.nElems layout <> Array.length data then
-            failwithf "specified shape %A has %d elements, but passed data array has %d elements"
-                shp (ArrayNDLayout.nElems layout) (Array.length data)
-        ArrayNDHostT<'T> (layout, data) 
-        
+    /// Creates a new ArrayNDHostT of the given shape and uses the given function to initialize it.
+    let init<'T> shp (f: unit -> 'T) =
+        let a = newC<'T> shp
+        ArrayND.fill f a
+        a
 
+    /// Creates a new ArrayNDHostT of the given shape and uses the given function to initialize it.
+    let initIndexed<'T> shp (f: int list -> 'T) =
+        let a = newC<'T> shp
+        ArrayND.fillIndexed f a
+        a   
+
+    /// Creates a one-dimensional ArrayNDT using the specified data.
+    /// The data is referenced, not copied.
+    let ofArray (data: 'T []) =
+        let shp = [Array.length data]
+        let layout = ArrayNDLayout.newC shp
+        ArrayNDHostT<'T> (layout, data) 
+
+    /// Creates a one-dimensional ArrayNDT using the specified sequence.       
+    let ofSeq (data: 'T seq) =
+        data |> Array.ofSeq |> ofArray
+
+    /// Creates a one-dimensional ArrayNDT using the specified sequence and shape.       
+    let ofSeqWithShape (shape: int list) (data: 'T seq) =
+        let nElems = shape |> List.fold (*) 1
+        data |> Seq.take nElems |> ofSeq |> ArrayND.reshape shape
+
+    /// Creates a one-dimensional ArrayNDT using the specified list.       
+    let ofList (data: 'T list) =
+        data |> Array.ofList |> ofArray
 
