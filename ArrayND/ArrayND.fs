@@ -1,5 +1,8 @@
 namespace ArrayNDNS
 
+open System.Collections
+open System.Collections.Generic
+
 open Basics
 
 
@@ -192,6 +195,15 @@ module ArrayND =
             let res = this.NewOfType<'R> (ArrayNDLayout.newC this.Shape)
             this.Map2Impl f other res
             res
+
+        // enumerator interfaces
+        interface IEnumerable<'T> with
+            member this.GetEnumerator() =
+                ArrayNDLayout.allIdx this.Layout
+                |> Seq.map (fun idx -> this.[idx])
+                |> fun s -> s.GetEnumerator()
+            member this.GetEnumerator() =
+                (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
 
         member internal this.ToRng (allArgs: obj []) =
             let rec toRng (args: obj list) =

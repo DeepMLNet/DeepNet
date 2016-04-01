@@ -43,7 +43,7 @@ type MLPController (cfg:   MLPControllerCfg) =
 
     let mi = mc.Instantiate DevCuda
 
-    let pred = MLP.pred mlp biotac.T
+    let pred = (MLP.pred mlp biotac.T).T
     let predFun = mi.Func pred |> arg biotac 
 
     let loss = MLP.loss mlp biotac.T optimalVel.T
@@ -52,8 +52,7 @@ type MLPController (cfg:   MLPControllerCfg) =
     let opt = GradientDescent.minimize {Step=cfg.StepSize} loss mi.ParameterVector
     let optFun = mi.Func opt |> arg2 biotac optimalVel   
 
-    interface IController with
-        member this.Predict biotac = (predFun biotac.T).T
+    member this.Predict (biotac: Arrays) = predFun biotac
 
     member this.Train (dataset: Dataset<TactilePoint>) =
         printfn "Number of parameters in model: %d" (ArrayND.nElems mi.ParameterValues)
@@ -77,6 +76,9 @@ type MLPController (cfg:   MLPControllerCfg) =
 
     member this.Save filename = mi.SavePars filename     
     member this.Load filename = mi.LoadPars filename
+
+    interface IController with
+        member this.Predict biotac = this.Predict biotac
             
 
      

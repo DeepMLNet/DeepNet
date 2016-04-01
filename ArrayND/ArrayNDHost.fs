@@ -2,6 +2,7 @@
 
 open System
 open System.Runtime.InteropServices
+open System.Collections.Generic
 
 open Basics
 open ArrayND
@@ -106,7 +107,6 @@ module ArrayNDHostTypes =
             for thisAddr in thisAddrs do
                 data.[thisAddr] <- f data.[thisAddr]
 
-
         override this.Map2Impl (f: 'T -> 'T -> 'R) (other: ArrayNDT<'T>) (dest: ArrayNDT<'R>) =
             let dest = dest :?> ArrayNDHostT<'R>
             let other = other :?> ArrayNDHostT<'T>
@@ -117,6 +117,14 @@ module ArrayNDHostTypes =
             let otherAddrs = FastLayout.allAddr other.FastLayout
             for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
                 destData.[destAddr] <- f data.[thisAddr] otherData.[otherAddr]
+
+        interface IEnumerable<'T> with
+            member this.GetEnumerator() =
+                FastLayout.allAddr this.FastLayout
+                |> Seq.map (fun addr -> this.Data.[addr])
+                |> fun s -> s.GetEnumerator()
+            member this.GetEnumerator() =
+                (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
                               
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this

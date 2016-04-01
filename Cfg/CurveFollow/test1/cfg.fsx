@@ -18,7 +18,7 @@ let cfg = {
          LossMeasure = LossLayer.MSE}
        BatchSize      = 1000
        Seed           = 1
-       Iters          = 100
+       Iters          = 1000
        StepSize       = 1e-3f}
 }
 
