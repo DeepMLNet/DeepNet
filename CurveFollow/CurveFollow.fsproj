@@ -51,7 +51,7 @@
     <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <StartArguments>--srcdir ..\..\..\Data\DeepBraille\curv2</StartArguments>
+    <StartArguments>--mode train --cfgdir ..\..\..\Cfg\CurveFollow\test1</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>

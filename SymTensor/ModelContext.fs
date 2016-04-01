@@ -276,8 +276,7 @@ module ModelContextTypes =
         member this.UseTmplVal var value =
             VarEnv.empty 
             |> VarEnv.add var value
-            |> VarEnv.inferSymSizes
-            |> SymSizeEnv.merge symSizeEnv
+            |> VarEnv.inferSymSizes symSizeEnv
             |> fun ss -> symSizeEnv <- ss
 
             varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) (ArrayND.location value)
@@ -289,15 +288,24 @@ module ModelContextTypes =
         member this.VarLocs = varLocs
 
         /// instantiates the model with numeric sizes for all size symbols and initializes the parameter values
-        member this.Instantiate (device: IDevice) =
+        member this.Instantiate (device: IDevice, ?canDelay: bool) =
+            let canDelay = defaultArg canDelay true
             if isSubModule then failwith "a submoule cannot be instantiated"
             if instantiated then failwith "this model has already been instantiated"
 
-            // check if instantiable
-            for symSize in symSizes do
-                if not (SymSizeEnv.subst symSizeEnv symSize |> SizeSpec.canEval) then
-                    failwithf "Cannot instantiate model because size symbol %A has no value."
-                        symSize
+            // Check that SymSizes that are required for ParameterStorage instantiation can
+            // be evaluated to a numeric value.
+            let neededSymSizes = 
+                this.Parameters
+                |> Map.toSeq
+                |> Seq.collect (fun (vs, _) -> VarSpec.shape vs)
+                |> Set.ofSeq
+            let missingSymSizes =
+                neededSymSizes
+                |> Set.filter (SymSizeEnv.subst symSizeEnv >> SizeSpec.canEval >> not)
+            if not (Set.isEmpty missingSymSizes) then
+                failwithf "Cannot instantiate model because size symbols %A have no value."
+                    (missingSymSizes |> Set.toList)
 
             // apply default variable location
             let mutable varLocs = varLocs
@@ -307,7 +315,7 @@ module ModelContextTypes =
 
             // create compile environement
             let compileEnv =
-                {SymSizes=symSizeEnv; VarLocs=varLocs; ResultLoc=device.DefaultLoc; CanDelay=false}
+                {SymSizes=symSizeEnv; VarLocs=varLocs; ResultLoc=device.DefaultLoc; CanDelay=canDelay}
 
             // instantiate
             instantiated <- true

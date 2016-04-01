@@ -48,16 +48,17 @@ module VarEnv =
         Map.join a b
 
     /// infers symbol sizes from the variable environment
-    let inferSymSizes (varEnv: VarEnvT) : SymSizeEnvT =
-        varEnv |> Map.fold 
+    let inferSymSizes (symSizeEnv: SymSizeEnvT) (varEnv: VarEnvT) : SymSizeEnvT =
+        (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
                 if UVarSpec.nDims vSym <> ArrayND.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
                         (ArrayND.shape vVal) vSym
+
                 (UVarSpec.shape vSym, ArrayND.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
-                    match SizeSpec.simplify svSym with
+                    match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
                     | Base (Sym sym) -> env |> SymSizeEnv.add sym (Base (Fixed svVal))
                     | Base (Fixed f) -> 
                         if f = svVal then env
@@ -67,7 +68,6 @@ module VarEnv =
                         else failwithf "1 <> %d" svVal
                     | Multinom m -> failwithf "%A <> %d" m svVal
                 ) env)
-            SymSizeEnv.empty 
 
     /// substitues the given symbol sizes into the variable environment
     let checkAndSubstSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
@@ -256,9 +256,9 @@ module Func =
             let mutable variants = Map.empty
             fun varEnv ->
                 // infer size symbols from variables and substitute into expression and variables
-                let symSizes = VarEnv.inferSymSizes varEnv
+                let symSizes = VarEnv.inferSymSizes baseCompileEnv.SymSizes varEnv
                 let varLocs = VarEnv.valueLocations varEnv
-                let compileEnv = {baseCompileEnv with SymSizes = SymSizeEnv.merge baseCompileEnv.SymSizes symSizes
+                let compileEnv = {baseCompileEnv with SymSizes = symSizes
                                                       VarLocs  = Map.join baseCompileEnv.VarLocs varLocs}
 
                 // compile and cache compiled function if necessary

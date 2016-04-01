@@ -214,3 +214,4 @@ ModelManifest.xml
 /Data/MNIST/MNIST.h5
 /CurveFollow/mod1.cu
 /Data/DeepBraille/curv2/dataset.h5
+/Cfg/CurveFollow/test1/model.h5

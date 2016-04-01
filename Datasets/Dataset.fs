@@ -224,6 +224,7 @@ module DatasetTypes =
  
 
     /// A training/validation/test partioning of a dataset.
+    [<StructuredFormatDisplay("{Pretty}")>]
     type TrnValTst<'S> = 
         { Trn:    Dataset<'S>
           Val:    Dataset<'S>
@@ -231,12 +232,14 @@ module DatasetTypes =
         with 
             /// Creates the partitioning from the specified dataset.
             static member Of (dataset: Dataset<'S>, ?trnRatio: float, ?valRatio: float, ?tstRatio: float) =
-                let trnRatio = defaultArg trnRatio 0.75
-                let valRatio = defaultArg valRatio 0.15
-                let tstRatio = defaultArg tstRatio 0.15
+                let trnRatio = defaultArg trnRatio 0.80
+                let valRatio = defaultArg valRatio 0.10
+                let tstRatio = defaultArg tstRatio 0.10
                 match dataset.Partition [trnRatio; valRatio; tstRatio] with
                 | [trn; vali; tst] -> {Trn=trn; Val=vali; Tst=tst}
                 | _ -> failwith "impossible"
 
-
+            member internal this.Pretty = 
+                sprintf "Dataset (%d training, %d validation, %d test %As)"
+                    this.Trn.NSamples this.Val.NSamples this.Tst.NSamples this.Trn.SampleType
             

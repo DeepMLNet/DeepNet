@@ -40,7 +40,7 @@ let build device batch =
     mc.SetSize nTarget 10
 
     // instantiate model
-    let mi = mc.Instantiate device
+    let mi = mc.Instantiate (device, false)
 
     // expressions
     let pred = NeuralLayer.pred pars input
