@@ -65,7 +65,6 @@ module CudaEval =
         let rcpt = CudaRecipe.build cudaCompileEnv mergedUexpr
         let workspace = new CudaExprWorkspace (rcpt)
 
-
         fun (evalEnv: EvalEnvT) ->           
             // create arrays for results and add them to VarEnv
             let resArrays = resAllocators |> List.map (fun a -> a())

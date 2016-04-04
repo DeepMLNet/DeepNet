@@ -2,6 +2,9 @@
 
 open System.Runtime.InteropServices
 open System.IO
+open System.Reflection
+open System.Security.Cryptography
+
 open ManagedCuda
 open ManagedCuda.BasicTypes
 open Basics
@@ -30,6 +33,7 @@ module Compile =
     let cppModCacheDir = Path.Combine(Util.localAppData, "CPPCache")
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
+    let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
 
     /// modification time of C++ header files
     let headerModTimes =
@@ -38,6 +42,48 @@ module Compile =
             Path.GetFileName headerFile, File.GetLastWriteTimeUtc headerFile)
         |> Map.ofSeq
 
+    /// prepares a compile directory
+    let prepareCompileDir code =        
+        // create temp directory
+        let rec getTempDir () = 
+            let dirname = Path.Combine(compileDirRoot, Path.GetRandomFileName())
+            if not (Directory.Exists dirname) then dirname
+            else getTempDir()
+        let compileDir = getTempDir ()
+        Directory.CreateDirectory compileDir |> ignore
+
+        // get embedded header files from out assembly
+        let asmbly = Assembly.GetExecutingAssembly()
+        let headers =
+            asmbly.GetManifestResourceNames ()
+            |> Seq.filter (fun s -> s.EndsWith(".cuh") || s.EndsWith(".h"))
+
+        // calculate MD5 sum of headers
+        let headerHashes =
+            headers
+            |> Seq.map (fun header -> 
+                use strm = asmbly.GetManifestResourceStream(header)
+                use md5 = MD5.Create()
+                (header, md5.ComputeHash strm |> Array.toList))
+            |> Map.ofSeq
+
+        // write headers to compile directory
+        headers
+        |> Seq.iter (fun header -> 
+            use strm = asmbly.GetManifestResourceStream(header)
+            let filename = Path.Combine (compileDir, header)
+            use fileStrm = File.OpenWrite filename
+            strm.CopyTo fileStrm)
+
+        // write module code
+        let modPath = Path.Combine (compileDir, "mod.cu")
+        File.WriteAllText(modPath, code)
+
+        compileDir, modPath, headerHashes
+
+    /// removes a compile directory
+    let removeCompileDir compileDir =
+        Directory.Delete(compileDir, true)       
    
     /// generated CUDA module counter
     let mutable cudaModCntr = 0
@@ -55,30 +101,29 @@ module Compile =
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
     let loadKernelCode modCode krnlNames =
-        let modName = generateCudaModName ()
+        let compileDir, modPath, headerHashes = prepareCompileDir modCode
 
-        use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modName)
-        let cmplrArgs = [
+        use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)
+        let baseCmplrArgs = [
             "--std=c++11";
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--gpu-architecture=%s" gpuArch; 
-            sprintf "--include-path=\"%s\"" includePath
         ]
-
         let dbgArgs = 
             if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
             else []
+        let baseCmplrArgs = baseCmplrArgs @ dbgArgs
+        let cmplrArgs = 
+            baseCmplrArgs @ [ 
+                sprintf "--include-path=\"%s\"" compileDir
+            ]
 
-        let cmplrArgs = cmplrArgs @ dbgArgs
-
-        dumpCode modName modCode
-
-        let cacheKey = modCode, headerModTimes, cmplrArgs
+        let cacheKey = modCode, headerHashes, baseCmplrArgs
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
             | Some ptx -> ptx
             | None ->
-                printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modName 
+                printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
@@ -95,6 +140,7 @@ module Compile =
         #if !CUDA_DUMMY
 
         //printfn "CUDA jitting of %s:" modName
+        
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
         jitOpts.Add(jitInfoBuffer)
@@ -117,12 +163,12 @@ module Compile =
             |> Seq.fold (fun krnls name -> 
                 krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
                 Map.empty
-        krnls, cuMod
+        krnls, cuMod, compileDir
 
         #else
 
         let krnls: Map<string, CudaKernel> = Map.empty
-        krnls, CUmodule()
+        krnls, CUmodule(), compileDir
 
         #endif
 
@@ -134,8 +180,8 @@ module Compile =
     /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
     /// functions objects for the specified C function names.
     let loadCppCode modCode (funcDelegates: Map<string, System.Type>)  =
-        let modName = generateCudaModName ()
-        let libName = (Path.GetFileNameWithoutExtension modName) + ".dll"
+        let compileDir, modPath, headerHashes = prepareCompileDir modCode
+        let libPath = Path.Combine (compileDir, "mod.dll")
 
         // build argument list
         let baseCmplrArgs = [
@@ -145,7 +191,6 @@ module Compile =
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
             sprintf "--gpu-architecture=%s" gpuArch; 
             sprintf "--gpu-code=%s" gpuCode;
-            sprintf "--include-path=\"%s\"" includePath
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--debug"; "--device-debug"; "--generate-line-info"]
@@ -153,17 +198,16 @@ module Compile =
         let baseCmplrArgs = baseCmplrArgs @ dbgArgs
         let cmplrArgs = 
             baseCmplrArgs @ [
-                sprintf "-o \"%s\"" libName;
-                sprintf "\"%s\"" modName
+                sprintf "--include-path=\"%s\"" compileDir
+                sprintf "-o \"%s\"" libPath;
+                sprintf "\"%s\"" modPath
             ]
         let cmplrArgStr = cmplrArgs |> String.concat " "
 
-        dumpCode modName modCode
-
-        let cacheKey = modCode, headerModTimes, baseCmplrArgs
+        let cacheKey = modCode, headerHashes, baseCmplrArgs
         match cppModCache.TryGet cacheKey with
         | Some libData ->
-            System.IO.File.WriteAllBytes (libName, libData)
+            System.IO.File.WriteAllBytes (libPath, libData)
         | None ->
             printfn "nvcc %s" cmplrArgStr
             use prcs = new System.Diagnostics.Process()
@@ -176,12 +220,12 @@ module Compile =
                 printfn "Compile error"
                 exit 1
 
-            cppModCache.Set cacheKey (System.IO.File.ReadAllBytes libName)
+            cppModCache.Set cacheKey (System.IO.File.ReadAllBytes libPath)
 
         // load compiled library
-        let libHndl = Native.LoadLibrary(libName)
+        let libHndl = Native.LoadLibrary(libPath)
         if libHndl = System.IntPtr.Zero then
-            raise (System.ComponentModel.Win32Exception(sprintf "LoadLibrary of %s failed" libName))
+            raise (System.ComponentModel.Win32Exception(sprintf "LoadLibrary of %s failed" libPath))
 
         // get function addresses and build delegates
         let funcs =
@@ -189,10 +233,10 @@ module Compile =
             |> Map.map (fun name delegateType ->
                 let addr = Native.GetProcAddress(libHndl, name)
                 if addr = System.IntPtr.Zero then
-                     raise (System.ComponentModel.Win32Exception(sprintf "GetProcAddress of %s in %s failed" name libName))
+                     raise (System.ComponentModel.Win32Exception(sprintf "GetProcAddress of %s in %s failed" name libPath))
                 System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer (addr, delegateType))
 
-        funcs, libHndl
+        funcs, libHndl, compileDir
 
     /// unloads previously loaded CUDA C++ code
     let unloadCppCode libHndl =
@@ -206,6 +250,7 @@ module CudaExprWorkspaceTypes =
 
     /// Workspace for evaluation of an expression compiled to a CudaRecipeT.
     type CudaExprWorkspace(recipe: CudaRecipeT) =
+        let mutable disposed = false
 
         do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
 
@@ -254,7 +299,8 @@ module CudaExprWorkspaceTypes =
         
         // compile and load CUDA kernel module
         /// CUDA kernels
-        let kernels, krnlModHndl = Compile.loadKernelCode recipe.KernelCode kernelCNames
+        let kernels, krnlModHndl, krnlCompileDir = 
+            Compile.loadKernelCode recipe.KernelCode kernelCNames
 
         #if !CUDA_DUMMY
         /// CUDA launch sizes for specified WorkDims
@@ -271,7 +317,7 @@ module CudaExprWorkspaceTypes =
 
         // compile and load CUDA C++ host/device module
         /// C++ functions
-        let cFuncs, cLibHndl = Compile.loadCppCode recipe.CPPCode cFuncDelegates
+        let cFuncs, cLibHndl, cCompileDir = Compile.loadCppCode recipe.CPPCode cFuncDelegates
     
         let getStream strm = 
             if Debug.DisableStreams then CUstream.NullStream
@@ -341,6 +387,7 @@ module CudaExprWorkspaceTypes =
                 | EventCreate (evnt, flags) ->
                     execEnv.Event.Add(evnt, new CudaEvent(flags))
                 | EventDestory evnt ->
+                    // WORKAROUND: disposing events currently causes a CUDA access violation
                     execEnv.Event.[evnt].Dispose()
                     execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
@@ -414,13 +461,29 @@ module CudaExprWorkspaceTypes =
         // finalizer
         interface System.IDisposable with
             member this.Dispose() = 
-                execCalls recipe.DisposeCalls
+                if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
+
+                try 
+                    // execute dummy CUDA function to check that CUDA context is not
+                    // disposed yet
+                    CudaSup.context.GetDeviceInfo() |> ignore
+                    execCalls recipe.DisposeCalls
+                    Compile.unloadCudaCode krnlModHndl
+                with :? System.ObjectDisposedException -> ()
+
                 Compile.unloadCppCode cLibHndl
-                Compile.unloadCudaCode krnlModHndl
+                Compile.removeCompileDir cCompileDir
+                Compile.removeCompileDir krnlCompileDir
+                disposed <- true
+
+        override this.Finalize() =
+            if not disposed then
+                (this :> System.IDisposable).Dispose()
 
         /// Evaluate expression.
         member this.Eval(externalVar: Map<UVarSpecT, IArrayNDT>,
                          hostVar:     Map<UVarSpecT, IArrayNDT>) =
+            if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
 
             execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
             execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)

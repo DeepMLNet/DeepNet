@@ -17,6 +17,9 @@ let ``Demo neural net`` device =
     let sampleLimit = None
     let iters = 10
 
+    // MNIST dataset
+    let tstImgs, tstLbls = NeuralNetOnMNIST.getMnist device sampleLimit
+
     let mc = ModelBuilder<single> "NeuralNetModel"
     
     // symbolic sizes
@@ -25,36 +28,29 @@ let ``Demo neural net`` device =
     let nTarget    = mc.Size "nTarget"
 
     // model parameters
-    let pars = NeuralLayer.pars (mc.Module "Layer1") nInput nTarget
+    let hpars = { NeuralLayer.NInput=nInput; NeuralLayer.NOutput=nTarget; NeuralLayer.TransferFunc=NeuralLayer.Tanh }
+    let pars = NeuralLayer.pars (mc.Module "Layer1") hpars
     
     // input / output variables
     let input =  mc.Var "Input"  [nInput;  batchSize]
     let target = mc.Var "Target" [nTarget; batchSize]
 
-    let mc = mc.ParametersComplete ()
-
-    // expressions
-    let loss = NeuralLayer.loss pars input target |> mc.Subst
-    let dLoss = mc.WrtParameters loss
-
-    //let loss = Optimizer.optimize loss
-    //let dLoss = Optimizer.optimize dLoss
-
-    //printfn "loss:\n%A" loss
-    //printfn "dLoss:\n%A" dLoss
-
-    // MNIST dataset
-    let tstImgs, tstLbls = NeuralNetOnMNIST.getMnist device sampleLimit
-
     // infer sizes and variable locations from dataset
     mc.UseTmplVal input tstImgs     
     mc.UseTmplVal target tstLbls
-
     printfn "inferred sizes: %A" mc.SymSizeEnv
     printfn "inferred locations: %A" mc.VarLocs
 
     // instantiate model
-    let mi = mc.Instantiate device
+    let mi = mc.Instantiate DevCuda
+
+    // expressions
+    let pred = NeuralLayer.pred pars input
+    let loss = LossLayer.loss LossLayer.MSE pred target
+    let dLoss = mi.WrtParameters loss
+
+    //printfn "loss:\n%A" loss
+    //printfn "dLoss:\n%A" dLoss
 
     // compile functions
     let lossFun = mi.Func (loss) |> arg2 input target
@@ -64,7 +60,7 @@ let ``Demo neural net`` device =
     let tstLoss = lossFun tstImgs tstLbls
     printfn "Test loss on MNIST=%A" tstLoss
 
-    let opt = GradientDescent.minimize {Step=1e-6f} loss mc.ParameterSet.Flat   
+    let opt = GradientDescent.minimize {Step=1e-3f} loss mi.ParameterVector
     let optFun = mi.Func opt |> arg2 input target
     
     printfn "Optimizing..."

@@ -83,30 +83,24 @@
     <Compile Include="CudaCheck.fs" />
     <Compile Include="VarEnvReg.fs" />
     <Content Include="packages.config" />
-    <Content Include="..\CUDAExpr\ThrustInterface.cuh">
+    <EmbeddedResource Include="..\CUDAExpr\ThrustInterface.cuh">
       <Link>ThrustInterface.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\CUDAExpr\NDSupport.cuh">
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\CUDAExpr\NDSupport.cuh">
       <Link>NDSupport.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="..\CUDAExpr\Ops.cuh">
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\CUDAExpr\Ops.cuh">
       <Link>Ops.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\CUDAExpr\Reduce.cuh">
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\CUDAExpr\Reduce.cuh">
       <Link>Reduce.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\CUDAExpr\Utils.cuh">
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\CUDAExpr\Utils.cuh">
       <Link>Utils.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\CUDAExpr\Subtensor.cuh">
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\CUDAExpr\Subtensor.cuh">
       <Link>Subtensor.cuh</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
