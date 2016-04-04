@@ -82,26 +82,26 @@ type DiskMap<'TKey, 'TValue> (baseDir: string, keyFilename: string, valueFilenam
         | :? (byte[]) as binData -> binData
         | _ -> binarySerializer.Pickle data
 
-    let toKey binData =
+    let toKey binData : 'TKey =
         if typeof<'TKey>.Equals(typeof<byte[]>) then box binData :?> 'TKey
         else binarySerializer.UnPickle<'TKey> binData
 
-    let toValue binData =
+    let toValue binData : 'TValue =
         if typeof<'TValue>.Equals(typeof<byte[]>) then box binData :?> 'TValue
         else binarySerializer.UnPickle<'TValue> binData
 
-    member this.TryGet key =
+    member this.TryGet (key: 'TKey) =
         match binaryMap.TryGet (toBinary key) with
         | Some binValue -> Some (toValue binValue)
         | None -> None
 
-    member this.Get key =
+    member this.Get (key: 'TKey) =
         toValue (binaryMap.Get (toBinary key))
 
-    member this.Remove key =
+    member this.Remove (key: 'TKey) =
         binaryMap.Remove (toBinary key)
 
-    member this.Set key value =
+    member this.Set (key: 'TKey) (value: 'TValue) =
         binaryMap.Set (toBinary key) (toBinary value)
     
     member this.Clear () =

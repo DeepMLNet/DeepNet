@@ -19,13 +19,12 @@ open DiskMap
 
 module Compile = 
 
-    type ModCacheKey = {Code: string; HeaderModTimes: Map<string, System.DateTime>}
+    type ModCacheKey = {Code: string; HeaderHashes: Map<string, byte list>; CompilerArgs: string list}
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
     let gpuArch = "compute_30"
     let gpuCode = "sm_30"
-    let includePath = Util.assemblyDirectory
 
     let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
     let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
@@ -36,11 +35,12 @@ module Compile =
     let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
 
     /// modification time of C++ header files
-    let headerModTimes =
-        Directory.EnumerateFiles(includePath, "*.cuh")
-        |> Seq.map (fun headerFile ->
-            Path.GetFileName headerFile, File.GetLastWriteTimeUtc headerFile)
-        |> Map.ofSeq
+    //let headerModTimes =
+    //    let includePath = Util.assemblyDirectory
+    //    Directory.EnumerateFiles(includePath, "*.cuh")
+    //    |> Seq.map (fun headerFile ->
+    //        Path.GetFileName headerFile, File.GetLastWriteTimeUtc headerFile)
+    //    |> Map.ofSeq
 
     /// prepares a compile directory
     let prepareCompileDir code =        
@@ -85,19 +85,6 @@ module Compile =
     let removeCompileDir compileDir =
         Directory.Delete(compileDir, true)       
    
-    /// generated CUDA module counter
-    let mutable cudaModCntr = 0
-
-    /// generates a CUDA module name
-    let generateCudaModName () =
-        cudaModCntr <- cudaModCntr + 1
-        sprintf "mod%d.cu" cudaModCntr
-
-    /// dumps CUDA kernel code to a file
-    let dumpCode (modName: string) (modCode: string) =
-        File.WriteAllText(modName, modCode)
-        //printfn "Wrote module code to %s" modName
-
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
     let loadKernelCode modCode krnlNames =
@@ -118,7 +105,7 @@ module Compile =
                 sprintf "--include-path=\"%s\"" compileDir
             ]
 
-        let cacheKey = modCode, headerHashes, baseCmplrArgs
+        let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
             | Some ptx -> ptx
@@ -204,7 +191,7 @@ module Compile =
             ]
         let cmplrArgStr = cmplrArgs |> String.concat " "
 
-        let cacheKey = modCode, headerHashes, baseCmplrArgs
+        let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
         match cppModCache.TryGet cacheKey with
         | Some libData ->
             System.IO.File.WriteAllBytes (libPath, libData)
