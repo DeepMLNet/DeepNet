@@ -3,7 +3,6 @@
 open System
 open System.IO
 open System.Text
-open Microsoft.FSharp.Compiler.SourceCodeServices
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
 open Basics
@@ -17,7 +16,13 @@ module Config =
         // Build command line arguments & start FSI session
         let inStream = new StringReader("")
         let argv = [| "C:\\fsi.exe" |]
-        let allArgs = Array.append argv [|"--noninteractive"; "--quiet"|]
+        let allArgs = Array.append argv [|"--noninteractive"
+                                          "--quiet"
+                                          "--lib:" + Util.assemblyDirectory
+                                          "--reference:Models.dll"
+                                          "--reference:SymTensor.dll"
+                                          "--define:CONFIG"
+                                          |]        
         let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
         let fsiSession = FsiEvaluationSession.Create(fsiConfig, allArgs, inStream, Console.Out, Console.Error, true)  
 
@@ -41,6 +46,8 @@ module Config =
         if not (File.Exists filename) then
             failwithf "configuration file %s does not exist" (Path.GetFullPath filename)
         
+        Directory.SetCurrentDirectory directory
+
         try 
             let eval = FsiEvaluator()
             eval.EvalScript filename

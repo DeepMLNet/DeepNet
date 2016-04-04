@@ -1,6 +1,10 @@
-#r "../../../CurveFollow/bin/Debug/CurveFollow.exe"
-#r "../../../CurveFollow/bin/Debug/Models.dll"
-#r "../../../CurveFollow/bin/Debug/SymTensor.dll"
+#if !CONFIG
+#I "../../../CurveFollow/bin/Debug"
+#endif 
+
+#r "Models.dll"
+#r "SymTensor.dll"
+#r "CurveFollow.exe"
 
 open Controller
 open Program
