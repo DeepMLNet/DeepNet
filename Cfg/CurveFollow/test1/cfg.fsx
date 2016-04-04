@@ -20,9 +20,9 @@ let cfg = {
           [ {NInput = Controller.nBiotac; NOutput = SizeSpec.fix 100;     TransferFunc=NeuralLayer.Tanh}
             {NInput = SizeSpec.fix 100;   NOutput = Controller.nVelocity; TransferFunc=NeuralLayer.Identity} ]
          LossMeasure = LossLayer.MSE}
-       BatchSize      = 1000
-       Seed           = 1
+       BatchSize      = 10000
+       Seed           = System.Random().Next()
        Iters          = 1000
-       StepSize       = 1e-3f}
+       StepSize       = 1e-4f}
 }
 

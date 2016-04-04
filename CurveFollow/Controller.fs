@@ -2,6 +2,7 @@
 
 open System
 
+open Basics
 open ArrayNDNS
 open Datasets
 open SymTensor
@@ -61,12 +62,30 @@ type MLPController (cfg:   MLPControllerCfg) =
         let ds = TrnValTst.Of dataset
         printfn "%A" ds
         let trnBatches = ds.Trn.Batches cfg.BatchSize
-        let tstBatch = ds.Tst.All
+        let tstBatch = ds.Tst.[0..10000-1]
+
+        // save training set for testing
+        //ds.Trn.ToHost().Save "TrnData.h5"
+        //ds.Tst.ToHost().Save "TstData.h5"
+
+        //let workDs = ds.Trn.[0..10000-1]
 
         // train
         mi.InitPars cfg.Seed
+
+        let rng = System.Random()
+        mi.ParameterStorage.Flat <- 
+            ArrayNDHost.init mi.ParameterValues.Shape (fun () -> rng.NextDouble() * 0.2 - 0.1 |> single)
+            |> ArrayNDCuda.toDev
+        //ArrayND.fill (fun () -> rng.NextDouble() * 0.2 - 0.1 |> single)  mi.ParameterValues
+
         printfn "Training for %d iterations with batch size %d..." cfg.Iters cfg.BatchSize
         for itr = 0 to cfg.Iters do
+            //let loss = lossFun workDs.Biotac workDs.OptimalVel
+            //printfn "Training loss after %d iterations: %A" itr loss
+
+            //optFun workDs.Biotac workDs.OptimalVel |> ignore  
+
             let loss = lossFun tstBatch.Biotac tstBatch.OptimalVel
             printfn "Test loss after %d iterations: %A" itr loss
 

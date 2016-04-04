@@ -140,8 +140,16 @@ module DatasetTypes =
             this.MapFieldStorage (fun fs ->
                 ArrayNDCuda.toDevUntyped (fs :?> IArrayNDHostT))
 
+        /// copies this dataset to the host
+        member this.ToHost () =
+            this.MapFieldStorage (fun fs ->
+                ArrayNDCuda.toHostUntyped (fs :?> IArrayNDCudaT))
+
         /// copies this dataset to a CUDA GPU
         static member ToCuda (this: Dataset<'S>) = this.ToCuda ()
+
+        /// copies this dataset to the host
+        static member ToHost (this: Dataset<'S>) = this.ToHost ()
 
         /// saves this dataset into a HDF5 file
         member this.Save filename =
