@@ -30,6 +30,7 @@ module RecorderTypes =
         abstract Clear: unit -> unit
         abstract SampleAt: float list -> IArrayNDHostT list
         abstract PrintStatistics: unit -> unit 
+        abstract IsEmpty: bool
 
     type internal Channel<'T> (sensor:       ISensor<'T>,
                                startTime:    int64 ref,
@@ -40,9 +41,11 @@ module RecorderTypes =
 
         let sampleAcquired (data: ArrayNDHostT<'T>) =
             if !recording then               
-                let time = (float (Stopwatch.GetTimestamp() - !startTime)) / (float Stopwatch.Frequency)
-                sampleTimes.Add time
-                sampleDatas.Add data
+                lock sampleTimes (fun () -> 
+                    let time = (float (Stopwatch.GetTimestamp() - !startTime)) / (float Stopwatch.Frequency)
+                    sampleTimes.Add time
+                    sampleDatas.Add data
+                )
 
         do sensor.SampleAcquired.Add sampleAcquired
 
@@ -98,6 +101,7 @@ module RecorderTypes =
                 this.SampleAt times
                 |> List.map (fun x -> x :> IArrayNDHostT)
             member this.PrintStatistics () = this.PrintStatistics ()
+            member this.IsEmpty = sampleTimes.Count = 0
 
         static member Create (sensor: ISensor) (startTime: int64 ref) (recording: bool ref) = 
             let t = typedefof<Channel<_>>.MakeGenericType(sensor.DataType)
@@ -168,37 +172,41 @@ module RecorderTypes =
         member this.GetSamples (interval: float option) = 
             if !recording then failwith "cannot get samples while recording"
 
-            // find start, stop time and interval
-            let startTime =
-                channels
-                |> List.map (fun ch -> ch.FirstSampleTime)
-                |> List.max
-            let stopTime =
-                channels
-                |> List.map (fun ch -> ch.LastSampleTime)
-                |> List.min
-            let interval =
-                match interval with
-                | Some i -> i
-                | None ->
-                    // use inter-sample interval from fastest channel
+            // check if any channel is empty
+            if channels |> List.exists (fun ch -> ch.IsEmpty) then 
+                Seq.empty
+            else
+                // find start, stop time and interval
+                let startTime =
                     channels
-                    |> List.map (fun ch -> ch.AverageSampleInterval)
+                    |> List.map (fun ch -> ch.FirstSampleTime)
+                    |> List.max
+                let stopTime =
+                    channels
+                    |> List.map (fun ch -> ch.LastSampleTime)
                     |> List.min
+                let interval =
+                    match interval with
+                    | Some i -> i
+                    | None ->
+                        // use inter-sample interval from fastest channel
+                        channels
+                        |> List.map (fun ch -> ch.AverageSampleInterval)
+                        |> List.min
 
-            // sample data at common times for all sensors
-            let times = [ startTime .. interval .. stopTime ]
-            let data = 
-                channels 
-                |> List.map (fun ch -> ch.SampleAt times |> Array.ofList)
-                |> Array.ofList
+                // sample data at common times for all sensors
+                let times = [ startTime .. interval .. stopTime ]
+                let data = 
+                    channels 
+                    |> List.map (fun ch -> ch.SampleAt times |> Array.ofList)
+                    |> Array.ofList
 
-            // convert data into samples
-            seq {
-                for idx, time in List.indexed times do
-                    let chData = [for ch = 0 to List.length sensors - 1 do yield data.[ch].[idx]]
-                    yield makeSample time chData
-            } 
+                // convert data into samples
+                seq {
+                    for idx, time in List.indexed times do
+                        let chData = [for ch = 0 to List.length sensors - 1 do yield data.[ch].[idx]]
+                        yield makeSample time chData
+                } 
 
         /// Gets the recorded data as a Dataset<'S>. See GetSamples for details.
         member this.GetDataset (interval: float option) =
