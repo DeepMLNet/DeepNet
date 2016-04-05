@@ -83,10 +83,11 @@ module RecorderTypes =
             (this.LastSampleTime - this.FirstSampleTime) / (float this.NSamples)
 
         member this.PrintStatistics () =
-            printfn "Channel %A:  first sample time: %.3f s;  last sample time: %.3f s;  average interval: %.3f s"
-                (sensor.GetType()) this.FirstSampleTime this.LastSampleTime this.AverageSampleInterval
-            printfn "          number of samples: %d;  sampling rate: %.3f Hz"
-                this.NSamples (1.0 / this.AverageSampleInterval)
+            printfn "Channel %A:" (sensor.GetType())
+            printfn "         first sample time: %.3f s  last sample time: %.3f s" 
+                 this.FirstSampleTime this.LastSampleTime 
+            printfn "         average interval: %.3f s  number of samples: %d  sampling rate: %.1f Hz"
+                this.AverageSampleInterval this.NSamples (1.0 / this.AverageSampleInterval)
 
         interface IChannel with
             member this.FirstSampleTime = this.FirstSampleTime
