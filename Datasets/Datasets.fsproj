@@ -49,6 +49,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="MNIST.fs" />
     <Compile Include="Dataset.fs" />
+    <Compile Include="Recorder.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
