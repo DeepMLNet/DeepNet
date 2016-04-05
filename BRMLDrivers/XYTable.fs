@@ -526,7 +526,11 @@ module XYTable =
         override this.Finalize() =
             terminate ()
 
-
+        interface Datasets.RecorderTypes.ISensor<single> with
+            member this.DataType = typeof<single>
+            member this.SampleAcquired =
+                this.PosAcquired
+                |> Event.map (fun (x, y) ->  [single x; single y] |> ArrayNDNS.ArrayNDHost.ofList)
 
 
 

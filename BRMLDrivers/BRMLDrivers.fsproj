@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>BRMLDrivers</RootNamespace>
     <AssemblyName>BRMLDrivers</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <Name>BRMLDrivers</Name>
     <TargetFrameworkProfile />
@@ -83,6 +83,9 @@
     <Reference Include="cheetah_net">
       <HintPath>cheetah_net.dll</HintPath>
     </Reference>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
@@ -90,6 +93,23 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
+      <Name>ArrayND</Name>
+      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Basics\Basics.fsproj">
+      <Name>Basics</Name>
+      <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Datasets\Datasets.fsproj">
+      <Name>Datasets</Name>
+      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
