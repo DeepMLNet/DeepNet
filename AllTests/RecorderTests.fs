@@ -42,9 +42,9 @@ type DummySensor<'T> (plusValue: int, interval: float) =
 
 
 type DummySample = {
-    Time:       ArrayNDHostT<single>
-    Sensor1:    ArrayNDHostT<single>
-    Sensor2:    ArrayNDHostT<float>
+    Time:       float
+    Sensor1:    single
+    Sensor2:    float
 }
 
 
@@ -61,6 +61,6 @@ let ``Test Recorder`` () =
     printfn "Samples:"
     for smpl in smpls do
         printfn "Time: %f  Sensor1: %f  Sensor2: %f" 
-            (ArrayND.value smpl.Time) (ArrayND.value smpl.Sensor1) (ArrayND.value smpl.Sensor2)
+            smpl.Time smpl.Sensor1 smpl.Sensor2
 
     

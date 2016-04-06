@@ -82,8 +82,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Data.fs" />
     <Compile Include="Controller.fs" />
-    <Compile Include="Record.fs" />
-    <Compile Include="Curves.fs" />
+    <Compile Include="TactileCurve.fs" />
+    <Compile Include="Movement.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="CreateCurveDataset.fsx" />
