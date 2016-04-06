@@ -257,18 +257,22 @@ module XYTable =
 
     type XYTupleT = float * float
 
-    type MsgT =
+    type private MsgT =
         | MsgHome
         | MsgDriveTo of XYTupleT * XYTupleT * XYTupleT * XYTupleT
         | MsgDriveWithVel of XYTupleT * XYTupleT 
         | MsgStop of XYTupleT
 
-    type ReplyT =
+    type private ReplyT =
         | ReplyOk
         | ReplyNotHomed
         | ReplyOutOfRange
 
-    type MsgWithReplyT = MsgT * AsyncReplyChannel<ReplyT>
+    type private MsgWithReplyT = MsgT * AsyncReplyChannel<ReplyT>
+
+    type private TrackMode =
+        | Query
+        | Simulate
 
     type XYTableT (config: XYTableConfigT) =
         inherit System.Runtime.ConstrainedExecution.CriticalFinalizerObject()
@@ -294,8 +298,26 @@ module XYTable =
         let posInRange (x, y) =
             -0.2 <= x && x <= config.X.MaxPos && -0.2 <= y && y <= config.Y.MaxPos
 
+        let lastPosQuery = Stopwatch.StartNew()
+        let lastPosReport = Stopwatch.StartNew()
+
         [<VolatileField>]
         let mutable currentPos = 0., 0.
+
+        [<VolatileField>]
+        let mutable currentVel = 0., 0.
+
+        [<VolatileField>]
+        let mutable targetVel = 0., 0.
+
+        [<VolatileField>]
+        let mutable currentAccel = 0., 0.
+
+        [<VolatileField>]
+        let mutable currentTime = 0.
+
+        [<VolatileField>]
+        let mutable trackMode = Query
         
         [<VolatileField>]
         let mutable overshoot = false
@@ -307,7 +329,7 @@ module XYTable =
         let mutable waitingForReady = false
 
         [<VolatileField>]
-        let mutable posSampleInterval = 10
+        let mutable posReportInterval = 10
 
         [<VolatileField>]
         let mutable sentinelThreadShouldRun = true
@@ -326,36 +348,100 @@ module XYTable =
 
         let posAcquired = new Event<XYTupleT>()
 
+        let simulateToNow () =
+            let maxDt = 0.001
+
+            let stepAxis tVel pos vel accel dt =
+                let dVel = tVel - vel
+                let vel = 
+                    if abs dVel < accel * dt then tVel
+                    else vel + accel * (sign dVel |> float) * dt
+                let pos = pos + vel * dt
+                pos, vel
+
+            lock currentPos (fun () ->
+                let toTime = float (Stopwatch.GetTimestamp()) / float Stopwatch.Frequency
+                while abs (toTime - currentTime) >= maxDt do
+                    let x, y = currentPos
+                    let vx, vy = currentVel
+                    let ax, ay = currentAccel
+                    let tvx, tvy = targetVel
+                    let dt = 
+                        if toTime - currentTime > maxDt then maxDt
+                        else toTime - currentTime
+                    let x, vx = stepAxis tvx x vx ax dt
+                    let y, vy = stepAxis tvy y vy ay dt
+                    currentPos <- x, y
+                    currentVel <- vx, vy
+                    currentTime <- currentTime + dt
+            )
+
+        let startSimulation () =
+            lock currentPos (fun () ->
+                currentVel <- 0., 0.
+                currentAccel <- 0., 0.
+                currentTime <- float (Stopwatch.GetTimestamp()) / float Stopwatch.Frequency
+                trackMode <- Simulate
+            )
+
+        let stopSimulation () =
+            lock currentPos (fun () ->
+                simulateToNow ()
+                trackMode <- Query       
+            )
+
+        let setTargetVel vel accel =
+            lock currentPos (fun () ->
+                simulateToNow ()
+                targetVel <- vel
+                currentAccel <- accel
+            )            
+                
+
+        let queryPosAndStatus () =
+            Stepper.enableEcho xStepper; Stepper.enableEcho yStepper
+
+            currentPos <- fetchPos ()      
+            lastPosQuery.Restart ()             
+                    
+            if waitingForReady then                       
+                let xStatus, yStatus = fetchStatus ()
+                if xStatus.Ready && yStatus.Ready then
+                    readyEventInt.Trigger()
+                if xStatus.PosErr || yStatus.PosErr then
+                    printfn "====== XYTable position error"
+                    quickStop ()
+                    exit -1
+                if Stepper.Debug then
+                    printfn "X status: %A" xStatus
+                    printfn "Y status: %A" yStatus 
+                    printfn "Position: %A" currentPos
+
         let sentinelThread = Thread(fun () -> 
             while sentinelThreadShouldRun do
-                lock port (fun () ->
-                    Stepper.enableEcho xStepper; Stepper.enableEcho yStepper
 
-                    currentPos <- fetchPos ()                   
-                    
-                    if waitingForReady then                       
-                        let xStatus, yStatus = fetchStatus ()
-                        if xStatus.Ready && yStatus.Ready then
-                            readyEventInt.Trigger()
-                        if xStatus.PosErr || yStatus.PosErr then
-                            printfn "====== XYTable position error"
-                            quickStop ()
-                            exit -1
-                        if Stepper.Debug then
-                            printfn "X status: %A" xStatus
-                            printfn "Y status: %A" yStatus 
-                            printfn "Position: %A" currentPos
+                // update position
+                if trackMode = Simulate then simulateToNow ()               
+                let needQuery = 
+                    match trackMode with
+                    | Query -> true
+                    | Simulate -> waitingForReady || lastPosQuery.ElapsedMilliseconds > 200L
+                if needQuery then lock port queryPosAndStatus
 
-                    if homed && not (posInRange currentPos) then
-                        printfn "====== XYTable overshoot: %A" currentPos 
-                        overshoot <- true
-                        quickStop ()
-                        exit -1
-                )        
-                async { posAcquired.Trigger currentPos } |> Async.Start
-                if waitingForReady || posSampleInterval = 0 then Thread.Yield() |> ignore
-                else Thread.Sleep(posSampleInterval)
-                if Stepper.Debug then Thread.Sleep(500)           
+                // check that position is in range
+                if homed && not (posInRange currentPos) then
+                    printfn "====== XYTable overshoot: %A" currentPos 
+                    overshoot <- true
+                    lock port quickStop
+                    exit -1                
+
+                // report position
+                if lastPosReport.ElapsedMilliseconds >= int64 posReportInterval then
+                    async { posAcquired.Trigger currentPos } |> Async.Start
+                    lastPosReport.Restart ()
+
+                if trackMode = Query then Thread.Yield() |> ignore
+                if Stepper.Debug then Thread.Sleep(500)                           
         )
 
         do sentinelThread.Start()
@@ -383,7 +469,6 @@ module XYTable =
                         
                         // sending commands at a too high rate will hang the motor controller
                         while not (lastRequest.ElapsedMilliseconds > 7L) do ()
-                        //SpinWait.SpinUntil (fun () -> lastRequest.ElapsedMilliseconds > 7L)
                                            
                         match msg with
                         | MsgHome ->
@@ -432,6 +517,9 @@ module XYTable =
                                         vmActive := true
                                         vmVel := vel
                                         vmAccel := accel
+
+                                        startSimulation ()
+                                        setTargetVel vel accel
                                     else
                                         Stepper.disableEcho xStepper; Stepper.disableEcho yStepper                                        
                                         if accel <> !vmAccel then
@@ -443,6 +531,8 @@ module XYTable =
                                             Stepper.adjustVelocity (xDeg xvel) (sign xvel <> sign vmXVel) xStepper
                                             Stepper.adjustVelocity (yDeg yvel) (sign yvel <> sign vmYVel) yStepper
                                             vmVel := vel
+
+                                        setTargetVel vel accel
                                 )
                                 rc.Reply ReplyOk
 
@@ -456,6 +546,8 @@ module XYTable =
                                 Stepper.stop xStepper
                                 Stepper.stop yStepper
                                 vmActive := false
+
+                                stopSimulation ()
                             )
                             do! waitForReady()
                             rc.Reply ReplyOk
@@ -487,7 +579,9 @@ module XYTable =
             AppDomain.CurrentDomain.DomainUnload.Add(fun _ -> terminate())
             Console.CancelKeyPress.Add(fun _ -> terminate())
 
-        member this.CurrentPos = currentPos
+        member this.CurrentPos = 
+            if trackMode = Simulate then simulateToNow ()
+            currentPos
 
         member this.PosAcquired = posAcquired.Publish
 
@@ -511,11 +605,11 @@ module XYTable =
             let accel = defaultArg accel (config.DefaultAccel, config.DefaultAccel)       
             postMsg (MsgStop (accel)) |> Async.RunSynchronously
 
-        member this.PosSampleInterval 
-            with get () = posSampleInterval
+        member this.PosReportInterval 
+            with get () = posReportInterval
             and set value = 
-                if 0 <= value && value <= 200 then posSampleInterval <- value
-                else invalidArg "value" "PosSampleInterval out of range"
+                if 0 <= value then posReportInterval <- value
+                else invalidArg "value" "PosReportInterval must be >= 0 ms"
 
         interface IDisposable with
             member this.Dispose () =
@@ -526,11 +620,15 @@ module XYTable =
         override this.Finalize() =
             terminate ()
 
-        interface Datasets.RecorderTypes.ISensor<single> with
-            member this.DataType = typeof<single>
-            member this.SampleAcquired =
-                this.PosAcquired
-                |> Event.map (fun (x, y) ->  [single x; single y] |> ArrayNDNS.ArrayNDHost.ofList)
+        interface Datasets.RecorderTypes.ISensor<XYTupleT> with
+            member this.DataType = typeof<XYTupleT>
+            member this.SampleAcquired = this.PosAcquired
+            member this.Interpolate fac a b =
+                let ax, ay = a
+                let bx, by = b
+                let x = (1.-fac) * ax + bx
+                let y = (1.-fac) * ay + by
+                x, y
 
 
 

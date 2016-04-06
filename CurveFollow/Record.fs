@@ -27,9 +27,9 @@ type private DrivePoint = {
 
 
 type DrivenCurve = {
-    Time:               Arrays
-    Pos:                Arrays
-    Biotac:             Arrays
+    Time:               float
+    Pos:                float * float
+    Biotac:             int []
 }
 
 
@@ -84,7 +84,6 @@ let recordCurve (curve: DriveCurve) =
     Devices.XYTable.Stop ()
     gotoStart false |> Async.Start
 
-    recorder.GetDataset(None).All
 
 
 

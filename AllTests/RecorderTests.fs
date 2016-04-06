@@ -16,7 +16,7 @@ type DummySensor<'T> (plusValue: int, interval: float) =
     let sw = Stopwatch.StartNew()
     let mutable cnt = 0
 
-    let sampleEvent = new Event<ArrayNDHostT<'T>>()
+    let sampleEvent = new Event<'T>()
 
     let timer = new Timer (interval)
     do 
@@ -25,13 +25,17 @@ type DummySensor<'T> (plusValue: int, interval: float) =
             cnt <- cnt + 1
             cnt + plusValue
             |> conv<'T>
-            |> ArrayNDHost.scalar
             |> sampleEvent.Trigger)
         timer.Start ()
 
     interface ISensor<'T> with
         member this.DataType = typeof<'T>
         member this.SampleAcquired = sampleEvent.Publish
+        member this.Interpolate fac a b =
+            let a = conv<float> a
+            let b = conv<float> b
+            let t = (1. - fac) * a + b
+            conv<'T> t
 
     interface System.IDisposable with
         member this.Dispose () = timer.Dispose ()
@@ -59,7 +63,4 @@ let ``Test Recorder`` () =
         printfn "Time: %f  Sensor1: %f  Sensor2: %f" 
             (ArrayND.value smpl.Time) (ArrayND.value smpl.Sensor1) (ArrayND.value smpl.Sensor2)
 
-    let dataset = recorder.GetDataset None
-    printfn "Dataset: %A" dataset
-
-
+    

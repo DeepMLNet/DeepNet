@@ -5,6 +5,7 @@ open System.Diagnostics
 open Argu
 open FSharp.Charting
 
+open Basics
 open ArrayNDNS
 open Datasets
 open SymTensor

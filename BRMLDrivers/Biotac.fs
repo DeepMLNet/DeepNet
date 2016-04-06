@@ -232,10 +232,13 @@ module Biotac =
                 acquisitionEnabled <- false
                 acquisitionThread.Join()
 
-        interface Datasets.RecorderTypes.ISensor<single> with
-            member this.DataType = typeof<single>
+        interface Datasets.RecorderTypes.ISensor<BioTacValueT []> with
+            member this.DataType = typeof<BioTacValueT []>
             member this.SampleAcquired =
                 this.SampleAcquired
-                |> Event.map (fun smpl ->  smpl.Flat |> Array.map single |> ArrayNDNS.ArrayNDHost.ofArray)
+                |> Event.map (fun smpl -> smpl.Flat)
+            member this.Interpolate fac a b =
+                (a, b)
+                ||> Array.map2 (fun a b -> (1.0 - fac) * (float a) + (float b) |> int)
 
 

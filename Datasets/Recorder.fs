@@ -20,7 +20,10 @@ module RecorderTypes =
     type ISensor<'T> = 
         inherit ISensor
         /// Event that must be fired every time a sample was acquired.
-        abstract SampleAcquired : IEvent<ArrayNDHostT<'T>>
+        abstract SampleAcquired : IEvent<'T>
+        /// Interpolates between the two samples using the formula
+        /// (1.0 - fac) * a + fac * b.
+        abstract Interpolate : fac: float -> a: 'T -> b: 'T -> 'T
 
 
     type internal IChannel =
@@ -28,7 +31,7 @@ module RecorderTypes =
         abstract LastSampleTime: float
         abstract AverageSampleInterval: float
         abstract Clear: unit -> unit
-        abstract SampleAt: float list -> IArrayNDHostT list
+        abstract SampleAt: float list -> obj list
         abstract PrintStatistics: unit -> unit 
         abstract IsEmpty: bool
 
@@ -37,9 +40,9 @@ module RecorderTypes =
                                recording:    bool ref) =
 
         let sampleTimes = ResizeArray<float>()
-        let sampleDatas = ResizeArray<ArrayNDHostT<'T>>()
+        let sampleDatas = ResizeArray<'T>()
 
-        let sampleAcquired (data: ArrayNDHostT<'T>) =
+        let sampleAcquired (data: 'T) =
             if !recording then               
                 lock sampleTimes (fun () -> 
                     let time = (float (Stopwatch.GetTimestamp() - !startTime)) / (float Stopwatch.Frequency)
@@ -57,7 +60,7 @@ module RecorderTypes =
 
         member this.SampleAt times = 
             let rec interpolate (times: float list) (smplTimes: float list) 
-                    (smplDatas: ArrayNDHostT<'T> list) (interpDatas: ArrayNDHostT<'T> list) = 
+                    (smplDatas: 'T list) (interpDatas: 'T list) = 
                 match times, smplTimes, smplDatas with
                 | [], _, _ ->
                     List.rev interpDatas
@@ -69,10 +72,7 @@ module RecorderTypes =
                     failwithf "cannot extrapolate to time %f before first sample at time %f" t st
                 | t::rTimes, st::stNext::_, data::dataNext::_ when st <= t && t <= stNext ->
                     let pos = (t - st) / (stNext - st) 
-                    let oneMinusPos = 1. - pos
-                    let pos = pos |> conv<'T> |> ArrayNDHost.scalar
-                    let oneMinusPos = oneMinusPos |> conv<'T> |> ArrayNDHost.scalar
-                    let ipData = oneMinusPos * data + pos * dataNext
+                    let ipData = sensor.Interpolate pos data dataNext
                     interpolate rTimes smplTimes smplDatas (ipData::interpDatas)
                 | _, _::rSmplTimes, _::rSmplDatas ->
                     interpolate times rSmplTimes rSmplDatas interpDatas
@@ -97,9 +97,7 @@ module RecorderTypes =
             member this.LastSampleTime = this.LastSampleTime
             member this.AverageSampleInterval = this.AverageSampleInterval
             member this.Clear () = this.Clear ()
-            member this.SampleAt times = 
-                this.SampleAt times
-                |> List.map (fun x -> x :> IArrayNDHostT)
+            member this.SampleAt times = this.SampleAt times |> List.map box
             member this.PrintStatistics () = this.PrintStatistics ()
             member this.IsEmpty = sampleTimes.Count = 0
 
@@ -115,19 +113,14 @@ module RecorderTypes =
         // check the sensors match sample record type
         do 
             if not (FSharpType.IsRecord typeof<'S>) then
-                failwith "Recorder sample type must be a record containing ArrayNDHostTs"
+                failwith "Recorder sample type must be a record"
             let flds = FSharpType.GetRecordFields typeof<'S>
             if Seq.length flds <> Seq.length sensors + 1 then
                 failwith "Sensor count does not match recorder sample type count"
-            if not (flds.[0].Name = "Time" && flds.[0].PropertyType = typeof<ArrayNDHostT<single>>) then
-                failwith "First field of recorder sample type must be \"Time: ArrayNDHostT<single>\""
+            if not (flds.[0].Name = "Time" && flds.[0].PropertyType = typeof<float>) then
+                failwith "First field of recorder sample type must be \"Time: float>\""
             for fld, sensor in Seq.zip flds.[1..] sensors do
-                let baseType = fld.PropertyType.GetGenericTypeDefinition()
-                if baseType <> typedefof<ArrayNDHostT<_>> then
-                    failwithf "All recorder sample type fields must be of type ArrayNDHostT<_> but \
-                        field %s is of type %A" fld.Name fld.PropertyType
-                let fldDataType = fld.PropertyType.GenericTypeArguments.[0]
-                if fldDataType <> sensor.DataType then
+                if fld.PropertyType <> sensor.DataType then
                     failwithf "Field %s is of type %A but corresponding sensor records data of type %A"
                         fld.Name fld.PropertyType sensor.DataType
 
@@ -143,8 +136,7 @@ module RecorderTypes =
             |> List.map (fun s -> Channel<_>.Create s startTime recording)
 
         /// make a sample from given time and data arrays
-        let makeSample (time: float) (data: IArrayNDHostT list) =
-            let time = time |> single |> ArrayNDHost.scalar
+        let makeSample (time: float) (data: obj list) =
             let values = (box time) :: (List.map box data) |> Array.ofList
             FSharpValue.MakeRecord (typeof<'S>, values) :?> 'S
 
@@ -208,11 +200,6 @@ module RecorderTypes =
                         yield makeSample time chData
                 } 
 
-        /// Gets the recorded data as a Dataset<'S>. See GetSamples for details.
-        member this.GetDataset (interval: float option) =
-            this.GetSamples interval
-            |> Dataset.FromSamples
-        
         /// Prints recording statistics for all channels.
         member this.PrintStatistics () =
             printfn "Recorder for %A samples:" typeof<'S>
