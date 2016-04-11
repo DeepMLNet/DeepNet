@@ -1,5 +1,9 @@
 ﻿module Movement
 
+open System
+open System.IO
+open Python.Runtime
+open FSharp.Interop.Dynamic
 
 open Basics
 open ArrayNDNS
@@ -88,6 +92,7 @@ type Cfg = {
     MaxVel:         float
     MaxControlVel:  float
     Mode:           Mode
+    IndentorPos:    float
 }
 
 type MovementPoint = {
@@ -100,6 +105,7 @@ type MovementPoint = {
 
 type Movement = {
     StartPos:       XY
+    IndentorPos:    float
     Accel:          float
     Points:         MovementPoint list
 }
@@ -205,14 +211,15 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
 
     {
         StartPos    = startPos
+        IndentorPos = cfg.IndentorPos
         Accel       = cfg.Accel
         Points      = movement
     }
 
 
-let toDriveCurve indentorPos (movement: Movement) = 
+let toDriveCurve (movement: Movement) = 
     {
-        TactileCurve.IndentorPos = indentorPos
+        TactileCurve.IndentorPos = movement.IndentorPos
         TactileCurve.StartPos    = movement.StartPos
         TactileCurve.Accel       = movement.Accel
         TactileCurve.Points      = [ for mp in movement.Points -> 
@@ -258,5 +265,104 @@ let syncTactileCurve (tc: TactileCurve.TactileCurve) (m: Movement) =
     }
 
 let loadCurves path =
-    // load curves from disk
-    // then generate movements for each curve
+    use file = NPZFile.Open path
+    let pos: ArrayNDHostT<float> = file.Get "pos" // pos[dim, idx, smpl]
+    seq { for smpl = 0 to pos.Shape.[2] - 1 do
+              yield [for idx = 0 to pos.Shape.[1] do
+                         yield pos.[[0; idx; smpl]], pos.[[1; idx; smpl]]] }  
+    |> List.ofSeq
+    
+let toArray extract points = 
+    let ary = ArrayNDHost.zeros [List.length points; 2]
+    for idx, pnt in List.indexed points do
+        let x, y = extract pnt
+        ary.[[idx; 0]] <- x
+        ary.[[idx; 1]] <- y
+    ary
+
+
+let multifig heightRatios =
+    use gil = Py.GIL()
+    let plt = Py.Import("matplotlib.pyplot")
+    let gs = Py.Import("matplotlib.gridspec")
+
+    let fs = PyTuple([|(box 15).ToPython(); (box 15).ToPython()|])
+    plt?figure (Py.kw("figsize", fs))
+    gs?GridSpec (List.length heightRatios), 1, Py.kw("height_ratios", heightRatios)
+
+
+let plotMovement (curve: XY list) (movement: Movement) =
+    use gil = Py.GIL()
+    let plt = Py.Import("matplotlib.pyplot")
+
+    let curveAry = toArray id curve
+    let posAry = toArray (fun (p: MovementPoint) -> p.Pos) movement.Points
+    let controlVelAry = toArray (fun (p: MovementPoint) -> p.ControlVel) movement.Points
+    let optimalVelAry = toArray (fun (p: MovementPoint) -> p.OptimalVel) movement.Points
+    let distorted = movement.Points |> List.map (fun p -> p.Distorted) |> ArrayNDHost.ofList
+
+//    pos = data['pos']
+//    col = pos[0, :]
+//    row = pos[1, :]
+//    tar_vel = data['tar_vel'][1, :]
+//    con_vel = data['con_vel'][1, :]
+//    con_time = data['con_time']
+//    override_active = data['override_active'][1, :]
+//    curve_pos = data['curve_pos']
+//    curve_col = curve_pos[0, :]
+//    curve_row = curve_pos[1, :]
+//
+//    sg = multifig([4, 2, 1])
+//
+    plt?subplot(sg[0])
+//    plt.ylim(row[0] - 0.6, row[0] + 0.6)
+//    shade_regions(col, override_active)
+//    plt.plot(col, row[0] * np.ones_like(col), 'k')
+//    plt.plot(curve_col, curve_row, 'b-', label="curve")
+//    plt.plot(col, row, 'r.', label="driven")
+//    plt.xlim(0, 24)
+//
+//    plt.xlabel("column")
+//    plt.ylabel("row")
+//    plt.title("position")
+//
+//    plt.subplot(sg[1])
+//    plt.ylim(-2, 2)
+//    shade_regions(col, override_active)
+//    plt.plot(col, tar_vel, 'b.-', label='used')
+//    plt.plot(col, con_vel, 'r.-', label='model')
+//    plt.legend()
+//    plt.xlabel('column')
+//    plt.ylabel('velocity')
+//    plt.xlim(0, 24)
+//    plt.title("velocity")
+//
+//    plt.subplot(sg[2])
+//    plt.plot(con_time)
+//    plt.xlabel("control step")
+//    plt.ylabel("time")
+//    plt.title("control")
+//
+//    plt.tight_layout()
+//    plt.savefig(plotfilename)
+//    plt.close()
+    
+
+    ()
+
+
+let generateMovementForFile cfgs path =
+    let rnd = Random ()
+    let baseDir = Path.Combine(Path.GetDirectoryName path, Path.GetFileNameWithoutExtension path)
+    let curves = loadCurves path
+    for curveIdx, curve in List.indexed curves do
+        for cfgIdx, cfg in List.indexed cfgs do
+            let dir = Path.Combine(baseDir, sprintf "Curve%d" curveIdx, sprintf "Cfg%d" cfgIdx)
+            Directory.CreateDirectory dir |> ignore
+
+            let movement = generate cfg rnd curve
+            let driveCurve = toDriveCurve movement
+
+            // plot movement
+
+            

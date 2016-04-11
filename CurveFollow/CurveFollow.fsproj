@@ -94,8 +94,16 @@
       <HintPath>..\packages\Argu.2.1\lib\net40\Argu.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Dynamitey">
+      <HintPath>..\packages\Dynamitey.1.0.2.0\lib\net40\Dynamitey.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="FSharp.Charting">
       <HintPath>..\packages\FSharp.Charting.0.90.13\lib\net40\FSharp.Charting.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Interop.Dynamic">
+      <HintPath>..\packages\FSharp.Interop.Dynamic.3.0.0.0\lib\portable-net45+sl50+win\FSharp.Interop.Dynamic.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="ManagedCuda">
@@ -113,6 +121,9 @@
       <HintPath>..\..\..\..\..\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64\Microsoft.VisualStudio.Profiler.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
+    <Reference Include="Python.Runtime">
+      <HintPath>..\Lib\Python.Runtime.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
