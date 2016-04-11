@@ -74,11 +74,13 @@ module OptimalControl =
 type DistortionCfg = {
     DistortionsPerSec:      float
     MaxOffset:              float
+    MinHold:                float
     MaxHold:                float
+    NotAgainFor:            float
 }
 
 type private DistortionState = 
-    | Inactive
+    | InactiveUntil of float
     | GotoPos of float
     | HoldUntil of float
 
@@ -146,7 +148,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
             Pos         = state.Pos
             ControlVel  = cVel
             OptimalVel  = optVel
-            Distorted   = distState <> Inactive
+            Distorted   = match distState with InactiveUntil _ -> true | _ -> false
         }
         let x, y = state.Pos
         match curve with
@@ -169,19 +171,19 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
                 yield! generate curve (XYTableSim.step cVel tblCfg state) distState
             | Distortions dc ->
                 match distState with
-                | Inactive ->               
+                | InactiveUntil iu ->               
                     let prob = dc.DistortionsPerSec * cfg.Dt
-                    if rnd.NextDouble() < prob then
-                        let trgt = rnd.NextDouble() * dc.MaxOffset
+                    if x >= iu && rnd.NextDouble() < prob then
+                        let trgt = cy + (2.0 * rnd.NextDouble() - 1.0) * dc.MaxOffset
                         let trgt = min trgt (baseY + 0.5)
                         let trgt = max trgt (baseY - 0.5)
                         yield! generate curve state (GotoPos trgt)
                     else 
                         yield movementPoint optVel optVel
-                        yield! generate curve state Inactive
+                        yield! generate curve (XYTableSim.step optVel tblCfg state) distState
                 | GotoPos trgt ->
                     if abs (y - trgt) < 0.05 then
-                        let hu = x + rnd.NextDouble() * dc.MaxHold
+                        let hu = x + dc.MinHold + rnd.NextDouble() * (dc.MaxHold - dc.MinHold)
                         yield! generate curve state (HoldUntil hu)
                     else
                         let _, cVelY = OptimalControl.toPos (0., trgt) (0., cfg.MaxControlVel) tblCfg state
@@ -191,7 +193,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
                         yield! generate curve (XYTableSim.step cVel tblCfg state) distState
                 | HoldUntil hu ->
                     if x >= hu then
-                        yield! generate curve state Inactive
+                        yield! generate curve state (InactiveUntil (x + dc.NotAgainFor))
                     else
                         let cVel = cfg.VelX, 0.
                         yield movementPoint cVel optVel
@@ -208,7 +210,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
     }
 
     let state = {XYTableSim.Time=0.; XYTableSim.Pos=startPos; XYTableSim.Vel=0., 0. }
-    let movement = generate curve state Inactive |> Seq.toList 
+    let movement = generate curve state (InactiveUntil 0.3) |> Seq.toList 
 
     {
         StartPos    = startPos
@@ -269,7 +271,7 @@ let loadCurves path =
     use file = NPZFile.Open path
     let pos: ArrayNDHostT<float> = file.Get "pos" // pos[dim, idx, smpl]
     seq { for smpl = 0 to pos.Shape.[2] - 1 do
-              yield [for idx = 0 to pos.Shape.[1] do
+              yield [for idx = 0 to pos.Shape.[1] - 1 do
                          yield pos.[[0; idx; smpl]], pos.[[1; idx; smpl]]] }  
     |> List.ofSeq
     
@@ -284,6 +286,43 @@ let toArray extract points =
 
 
 
+module RCall =
+    let empty : (string * obj) list = []
+    let param (name: string) value args = 
+        match value with
+        | Some xval -> (name, box xval) :: args
+        | None -> args
+    let call func args =
+        args |> namedParams |> func |> ignore
+
+
+type R () =
+
+    static member plot2 (?xlim, ?ylim, ?title, ?xlabel, ?ylabel) =
+        RCall.empty
+        |> RCall.param "xlim" xlim
+        |> RCall.param "ylim" ylim
+        |> RCall.param "main" title
+        |> RCall.param "xlab" xlabel
+        |> RCall.param "ylab" ylabel
+        |> RCall.param "x" (Some (R.vector()))
+        |> RCall.param "y" (Some (R.vector()))
+        |> RCall.call R.plot
+
+    static member lines2 (?x, ?y, ?color) =
+        RCall.empty
+        |> RCall.param "x" x
+        |> RCall.param "y" y
+        |> RCall.param "col" color
+        |> RCall.call R.lines
+
+    static member par2 (param, value) =
+        RCall.empty
+        |> RCall.param param (Some value)
+        |> RCall.call R.par
+
+        
+
 let plotMovement (path: string) (curve: XY list) (movement: Movement) =
     let curveX, curveY = toArray id curve
     let posX, posY = toArray (fun (p: MovementPoint) -> p.Pos) movement.Points
@@ -292,50 +331,22 @@ let plotMovement (path: string) (curve: XY list) (movement: Movement) =
     let distorted = movement.Points |> List.map (fun p -> p.Distorted) |> Array.ofList
 
     R.pdf (path) |> ignore
+    R.par2 ("oma", [0; 0; 0; 0])
+    R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+    R.par2 ("mgp", [1.7; 0.7; 0.0])
+    R.par2 ("mfrow", [2; 1])
 
-    R.plot (namedParams ["x",    box curveX
-                         "y",    box curveY
-                         "col",  box "black"
-                         "xlim", box [0; 24]
-                         "ylim", box [curveY.[0] - 0.6; curveY.[0] + 0.6]])    |> ignore
-
+    R.plot2 ([0; 24], [curveY.[0] - 0.6; curveY.[0] + 0.6], "position", "column", "row")
     R.abline(h=curveY.[0]) |> ignore
-    R.lines (namedParams ["x",    box posX
-                          "y",    box posY
-                          "col",  box "blue"])   |> ignore
+    R.lines2 (curveX, curveY, "black")
+    R.lines2 (posX, posY, "blue")
+
+    R.plot2 ([0; 24], [-2; 2], "velocity", "column", "velocity")
+    R.abline(h=0) |> ignore
+    R.lines2 (posX, controlVelY, "blue")
+    R.lines2 (posX, optimalVelY, "red")
 
     R.dev_off() |> ignore
-
-//
-//    sg = multifig([4, 2])
-//
-//    plt.subplot(sg[0])
-//    plt.ylim(curve[0, 1] - 0.6, curve[0, 1] + 0.6)
-//    shade_regions(curve[:, 0], distorted)
-//    plt.plot(curve[:, 0], curve[0, 1] * np.ones_like(curve[:, 0]), 'k')
-//    plt.plot(curve[:, 0], curve[:, 1], 'b-', label="curve")
-//    plt.plot(movement_pos[:, 0], movement_pos[:, 1], 'r.', label="movement")
-//    plt.xlim(0, 24)
-//
-//    plt.xlabel("column")
-//    plt.ylabel("row")
-//    plt.title("position")
-//
-//    plt.subplot(sg[1])
-//    plt.ylim(-2, 2)
-//    shade_regions(curve[:, 0], distorted)
-//    plt.plot(movement_control_vel[:, 0], movement_control_vel[:, 1], 'b.-', label='control')
-//    plt.plot(movement_optimal_vel[:, 0], movement_optimal_vel[:, 1], 'b.-', label='optimal')
-//    plt.legend()
-//    plt.xlabel('column')
-//    plt.ylabel('velocity')
-//    plt.xlim(0, 24)
-//    plt.title("velocity")
-//
-//    plt.tight_layout()
-//    plt.savefig(path)
-//    plt.close()
-
 
 let generateMovementForFile cfgs path =
     let rnd = Random ()
@@ -353,7 +364,8 @@ let generateMovementForFile cfgs path =
             plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
             
 let generateMovementForDir cfgs dir =
-    for file in Directory.EnumerateFiles(Path.Combine(dir, "*.cur.npz")) do
+    let dir = Path.GetFullPath dir
+    for file in Directory.EnumerateFiles(dir, "*.cur.npz") do
         generateMovementForFile cfgs file
 
 

@@ -36,25 +36,18 @@ type CurveFollowCfg = {
     DatasetDir:         string
     MLPControllerCfg:   Controller.MLPControllerCfg    
 }
-let cfgDir = args.GetResult <@ CfgDir @>
-printfn "Using configuration direction %s" (Path.GetFullPath cfgDir)
-let cfg : CurveFollowCfg = Config.load cfgDir   
-
-// model
-let modelFile = Path.Combine (cfgDir, "model.h5")
-let mlpController = Controller.MLPController cfg.MLPControllerCfg
 
 
 /// loads the dataset specified in the configuration
-let loadPointDataset () =
+let loadPointDataset datasetDir =
     let noCache = args.Contains <@ NoCache @>
     let sw = Stopwatch.StartNew()
-    let cache = Path.Combine (cfg.DatasetDir, "PointDataset.h5")
+    let cache = Path.Combine (datasetDir, "PointDataset.h5")
     let dataset : Dataset<TactilePoint> = 
         if File.Exists cache && not noCache then
             Dataset.Load cache
         else
-            let dataset = loadPoints cfg.DatasetDir |> Dataset.FromSamples 
+            let dataset = loadPoints datasetDir |> Dataset.FromSamples 
             dataset.Save cache
             dataset
         |> Dataset.ToCuda
@@ -62,15 +55,15 @@ let loadPointDataset () =
     dataset
 
 /// loads the dataset specified in the configuration
-let loadCurveDataset () =
+let loadCurveDataset datasetDir =
     let noCache = args.Contains <@ NoCache @>
     let sw = Stopwatch.StartNew()
-    let cache = Path.Combine (cfg.DatasetDir, "CurveDataset.h5")
+    let cache = Path.Combine (datasetDir, "CurveDataset.h5")
     let dataset : Dataset<TactileCurve> = 
         if File.Exists cache && not noCache then
             Dataset.Load cache
         else
-            let dataset = loadCurves cfg.DatasetDir |> Dataset.FromSamples 
+            let dataset = loadCurves datasetDir |> Dataset.FromSamples 
             dataset.Save cache
             dataset
         |> Dataset.ToCuda
@@ -79,11 +72,20 @@ let loadCurveDataset () =
 
 
 let doTrain () =  
+    // configuration
+    let cfgDir = args.GetResult <@ CfgDir @>
+    printfn "Using configuration direction %s" (Path.GetFullPath cfgDir)
+    let cfg : CurveFollowCfg = Config.load cfgDir   
+
+    // model
+    let mlpController = Controller.MLPController cfg.MLPControllerCfg
+
     // train
-    let dataset = loadPointDataset ()
+    let dataset = loadPointDataset cfg.DatasetDir
     mlpController.Train dataset
 
     // save
+    let modelFile = Path.Combine (cfgDir, "model.h5")
     mlpController.Save modelFile
     printfn "Saved model to %s" (Path.GetFullPath modelFile)
 
@@ -95,9 +97,15 @@ let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
 
 
 let doPlot () =
-    mlpController.Load modelFile
+    let cfgDir = args.GetResult <@ CfgDir @>
+    printfn "Using configuration direction %s" (Path.GetFullPath cfgDir)
+    let cfg : CurveFollowCfg = Config.load cfgDir   
 
-    let dataset = loadCurveDataset ()
+    // model
+    let mlpController = Controller.MLPController cfg.MLPControllerCfg
+    mlpController.Load (Path.Combine (cfgDir, "model.h5"))
+
+    let dataset = loadCurveDataset cfg.DatasetDir
     
     for idx, smpl in Seq.indexed (dataset |> Seq.take 10) do
         let predVel = mlpController.Predict smpl.Biotac
@@ -137,19 +145,25 @@ let doFollow () =
     ()
 
 let doMovement () =
-    match args.TryGetResult <@ Curves @> with
-    | None -> parser.Usage ("curve directory missing") |> printfn "%s"
-    | Some curveDir ->
-        let cfg = {
-            Movement.Dt             = 0.01
-            Movement.Accel          = 10.0 
-            Movement.VelX           = 1.0 
-            Movement.MaxVel         = 10.0
-            Movement.MaxControlVel  = 5.0
-            Movement.Mode           = Movement.FixedOffset 0.
-            Movement.IndentorPos    = -10.        
-        }
-        Movement.generateMovementForDir [cfg] curveDir
+    let curveDir = args.GetResult <@ Curves @> 
+    let cfg = {
+        Movement.Dt             = 0.01
+        Movement.Accel          = 10.0 
+        Movement.VelX           = 1.0 
+        Movement.MaxVel         = 10.0
+        Movement.MaxControlVel  = 5.0
+        //Movement.Mode           = Movement.FixedOffset 0.2
+        Movement.Mode = 
+            Movement.Distortions {
+                Movement.DistortionsPerSec = 1.0
+                Movement.MaxOffset         = 0.3
+                Movement.MinHold           = 0.1
+                Movement.MaxHold           = 0.3            
+                Movement.NotAgainFor       = 0.5
+            }         
+        Movement.IndentorPos    = -10.        
+    }
+    Movement.generateMovementForDir [cfg] curveDir
 
 
 [<EntryPoint>]
