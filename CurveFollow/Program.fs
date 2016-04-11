@@ -18,7 +18,8 @@ open Data
 /// command line arguments
 type CLIArgs =
     | [<Mandatory>] Mode of string
-    | [<Mandatory>] CfgDir of string
+    | CfgDir of string
+    | Curves of string
     | NoCache 
 with interface IArgParserTemplate with 
         member x.Usage = 
@@ -26,6 +27,7 @@ with interface IArgParserTemplate with
             | Mode _ -> "mode: train, follow"
             | CfgDir _ -> "configuration directory"         
             | NoCache -> "disables loading a Dataset.h5 cache file"
+            | Curves _ -> "directory where curve files (*.cur.npz) are stored"
 let parser = ArgumentParser.Create<CLIArgs>("Curve following")
 let args = parser.Parse(errorHandler=ProcessExiter())
 
@@ -134,6 +136,20 @@ let doPlot () =
 let doFollow () =
     ()
 
+let doMovement () =
+    match args.TryGetResult <@ Curves @> with
+    | None -> parser.Usage ("curve directory missing") |> printfn "%s"
+    | Some curveDir ->
+        let cfg = {
+            Movement.Dt             = 0.01
+            Movement.Accel          = 10.0 
+            Movement.VelX           = 1.0 
+            Movement.MaxVel         = 10.0
+            Movement.MaxControlVel  = 5.0
+            Movement.Mode           = Movement.FixedOffset 0.
+            Movement.IndentorPos    = -10.        
+        }
+        Movement.generateMovementForDir [cfg] curveDir
 
 
 [<EntryPoint>]
@@ -145,6 +161,7 @@ let main argv =
     | _ when mode = "train" -> doTrain () ; doPlot ()
     | _ when mode = "plot" -> doPlot ()
     | _ when mode = "follow" -> doFollow ()
+    | _ when mode = "movement" -> doMovement ()
     | _ -> parser.Usage ("unknown mode") |> printfn "%s"
 
     // shutdown

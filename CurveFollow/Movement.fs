@@ -2,12 +2,13 @@
 
 open System
 open System.IO
-open Python.Runtime
-open FSharp.Interop.Dynamic
 
 open Basics
 open ArrayNDNS
 
+open RProvider
+open RProvider.graphics
+open RProvider.grDevices
 
 type XY = float * float
 
@@ -273,53 +274,47 @@ let loadCurves path =
     |> List.ofSeq
     
 let toArray extract points = 
-    let ary = ArrayNDHost.zeros [List.length points; 2]
+    let xAry = Array.zeroCreate (List.length points)
+    let yAry = Array.zeroCreate (List.length points)
     for idx, pnt in List.indexed points do
         let x, y = extract pnt
-        ary.[[idx; 0]] <- x
-        ary.[[idx; 1]] <- y
-    ary
+        xAry.[idx] <- x
+        yAry.[idx] <- y
+    xAry, yAry
 
 
-let multifig heightRatios =
-    use gil = Py.GIL()
-    let plt = Py.Import("matplotlib.pyplot")
-    let gs = Py.Import("matplotlib.gridspec")
 
-    let fs = PyTuple([|(box 15).ToPython(); (box 15).ToPython()|])
-    plt?figure (Py.kw("figsize", fs))
-    gs?GridSpec (List.length heightRatios), 1, Py.kw("height_ratios", heightRatios)
+let plotMovement (path: string) (curve: XY list) (movement: Movement) =
+    let curveX, curveY = toArray id curve
+    let posX, posY = toArray (fun (p: MovementPoint) -> p.Pos) movement.Points
+    let controlVelX, controlVelY = toArray (fun (p: MovementPoint) -> p.ControlVel) movement.Points
+    let optimalVelX, optimalVelY = toArray (fun (p: MovementPoint) -> p.OptimalVel) movement.Points
+    let distorted = movement.Points |> List.map (fun p -> p.Distorted) |> Array.ofList
 
+    R.pdf (path) |> ignore
 
-let plotMovement (curve: XY list) (movement: Movement) =
-    use gil = Py.GIL()
-    let plt = Py.Import("matplotlib.pyplot")
+    R.plot (namedParams ["x",    box curveX
+                         "y",    box curveY
+                         "col",  box "black"
+                         "xlim", box [0; 24]
+                         "ylim", box [curveY.[0] - 0.6; curveY.[0] + 0.6]])    |> ignore
 
-    let curveAry = toArray id curve
-    let posAry = toArray (fun (p: MovementPoint) -> p.Pos) movement.Points
-    let controlVelAry = toArray (fun (p: MovementPoint) -> p.ControlVel) movement.Points
-    let optimalVelAry = toArray (fun (p: MovementPoint) -> p.OptimalVel) movement.Points
-    let distorted = movement.Points |> List.map (fun p -> p.Distorted) |> ArrayNDHost.ofList
+    R.abline(h=curveY.[0]) |> ignore
+    R.lines (namedParams ["x",    box posX
+                          "y",    box posY
+                          "col",  box "blue"])   |> ignore
 
-//    pos = data['pos']
-//    col = pos[0, :]
-//    row = pos[1, :]
-//    tar_vel = data['tar_vel'][1, :]
-//    con_vel = data['con_vel'][1, :]
-//    con_time = data['con_time']
-//    override_active = data['override_active'][1, :]
-//    curve_pos = data['curve_pos']
-//    curve_col = curve_pos[0, :]
-//    curve_row = curve_pos[1, :]
+    R.dev_off() |> ignore
+
 //
-//    sg = multifig([4, 2, 1])
+//    sg = multifig([4, 2])
 //
-    plt?subplot(sg[0])
-//    plt.ylim(row[0] - 0.6, row[0] + 0.6)
-//    shade_regions(col, override_active)
-//    plt.plot(col, row[0] * np.ones_like(col), 'k')
-//    plt.plot(curve_col, curve_row, 'b-', label="curve")
-//    plt.plot(col, row, 'r.', label="driven")
+//    plt.subplot(sg[0])
+//    plt.ylim(curve[0, 1] - 0.6, curve[0, 1] + 0.6)
+//    shade_regions(curve[:, 0], distorted)
+//    plt.plot(curve[:, 0], curve[0, 1] * np.ones_like(curve[:, 0]), 'k')
+//    plt.plot(curve[:, 0], curve[:, 1], 'b-', label="curve")
+//    plt.plot(movement_pos[:, 0], movement_pos[:, 1], 'r.', label="movement")
 //    plt.xlim(0, 24)
 //
 //    plt.xlabel("column")
@@ -328,27 +323,18 @@ let plotMovement (curve: XY list) (movement: Movement) =
 //
 //    plt.subplot(sg[1])
 //    plt.ylim(-2, 2)
-//    shade_regions(col, override_active)
-//    plt.plot(col, tar_vel, 'b.-', label='used')
-//    plt.plot(col, con_vel, 'r.-', label='model')
+//    shade_regions(curve[:, 0], distorted)
+//    plt.plot(movement_control_vel[:, 0], movement_control_vel[:, 1], 'b.-', label='control')
+//    plt.plot(movement_optimal_vel[:, 0], movement_optimal_vel[:, 1], 'b.-', label='optimal')
 //    plt.legend()
 //    plt.xlabel('column')
 //    plt.ylabel('velocity')
 //    plt.xlim(0, 24)
 //    plt.title("velocity")
 //
-//    plt.subplot(sg[2])
-//    plt.plot(con_time)
-//    plt.xlabel("control step")
-//    plt.ylabel("time")
-//    plt.title("control")
-//
 //    plt.tight_layout()
-//    plt.savefig(plotfilename)
+//    plt.savefig(path)
 //    plt.close()
-    
-
-    ()
 
 
 let generateMovementForFile cfgs path =
@@ -364,5 +350,10 @@ let generateMovementForFile cfgs path =
             let driveCurve = toDriveCurve movement
 
             // plot movement
-
+            plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
             
+let generateMovementForDir cfgs dir =
+    for file in Directory.EnumerateFiles(Path.Combine(dir, "*.cur.npz")) do
+        generateMovementForFile cfgs file
+
+
