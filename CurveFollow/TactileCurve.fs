@@ -51,7 +51,7 @@ let record (curve: DriveCurve) =
                 do! Devices.Linmot.DriveTo curve.IndentorPos
         } 
     let gotoStartTask = gotoStart true |> Async.StartAsTask
-
+    
     Devices.XYTable.PosReportInterval <- 2
     let sensors = [Devices.XYTable :> ISensor; Devices.Biotac :> ISensor]
     let recorder = Recorder<TactilePoint> sensors
@@ -60,20 +60,23 @@ let record (curve: DriveCurve) =
     let rec control (points: DrivePoint list) =
         let t = (float sw.ElapsedMilliseconds) / 1000.
         match points with
+        | _ when (let x, y = Devices.XYTable.CurrentPos in x > 142.) -> ()
         | [] -> ()
-        | {Time=ct}::_ when t < ct ->
-            let dt = ct - t
-            if dt > 0.02 then Thread.Sleep (dt * 1000. |> int)
-            control points
         | {Time=ct; Vel=vel}::({Time=ctNext}::_ as rPoints) when ct <= t && t < ctNext ->
             Devices.XYTable.DriveWithVel (vel, (curve.Accel, curve.Accel))  
             control rPoints
+        | {Time=ct}::_ when t < ct ->
+            //let dt = ct - t
+            //if dt > 0.02 then Thread.Sleep (dt * 1000. |> int)
+            control points
         | _::rCurve ->
             control rCurve
 
     gotoStartTask.Wait ()
+    //exit 0
 
     recorder.Start ()
+    sw.Start()
     control curve.Points
     recorder.Stop ()
 

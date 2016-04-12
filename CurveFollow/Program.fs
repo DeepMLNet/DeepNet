@@ -123,6 +123,7 @@ let doMovement () =
     Movement.generateMovementUsingCfg cfg
 
 let doRecord () =
+    BRML.Drivers.Devices.init ()
     let dir = args.GetResult <@ Dir @>
     Movement.recordMovements dir
 

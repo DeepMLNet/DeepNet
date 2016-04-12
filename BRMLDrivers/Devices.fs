@@ -4,7 +4,7 @@
 module Config = 
     
     let XYTable : XYTableCfgT = {
-            PortName       = "COM7";
+            PortName       = "COM5";
             PortBaud       = 115200;
             X              = { StepperConfig = {Id=1; AnglePerStep=1.8; StepMode=8; StartVel=1000.;}
                                DegPerMM      = 360. / 1.25;
@@ -20,7 +20,7 @@ module Config =
     }
 
     let Linmot: LinmotCfgT = {
-            PortName       = "COM4";
+            PortName       = "COM6";
             PortBaud       = 57600;
             Id             = 0x11;    
             DefaultVel     = 50.0;
@@ -39,3 +39,11 @@ module Devices =
     let Biotac = new BiotacT(Config.Biotac)
 
     let LinmotUpPos = -10.
+
+    let init () =
+        async {
+            do! Linmot.Home () 
+            do! Linmot.DriveTo LinmotUpPos
+            do! XYTable.Home ()
+        }
+        |> Async.RunSynchronously

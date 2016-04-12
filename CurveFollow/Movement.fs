@@ -38,7 +38,8 @@ module BrailleCS =
     let clip_width = 10.0       // mm
     let clip_height = 1.0       // mm
     let clip_thickness = 6.0    // mm
-    let col_offset = 3.0        // chars
+    //let col_offset = 3.0        // chars
+    let col_offset = -3.0        // chars
     let row_offset = 0.0        // lines
 
     /// Relative position of dot (0..5) to character in mm.
@@ -352,17 +353,17 @@ let plotMovement (path: string) (curve: XY list) (movement: Movement) =
     R.par2 ("mgp", [1.7; 0.7; 0.0])
     R.par2 ("mfrow", [2; 1])
 
-    R.plot2 ([40; 190], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
+    R.plot2 ([0; 150], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
     R.abline(h=curveY.[0]) |> ignore
     R.lines2 (curveX, curveY, "black")
     R.lines2 (posX, posY, "blue")
-    R.legend (155., curveY.[0] + 6., ["curve"; "movement"], col=["black"; "blue"], lty=[1;1]) |> ignore
+    R.legend (115., curveY.[0] + 6., ["curve"; "movement"], col=["black"; "blue"], lty=[1;1]) |> ignore
 
-    R.plot2 ([40; 190], [-20; 20], "velocity", "x", "y velocity")
+    R.plot2 ([0; 150], [-20; 20], "velocity", "x", "y velocity")
     R.abline(h=0) |> ignore
     R.lines2 (posX, controlVelY, "blue")
     R.lines2 (posX, optimalVelY, "red")
-    R.legend (165., 20, ["control"; "optimal"], col=["blue"; "red"], lty=[1;1]) |> ignore
+    R.legend (125., 20, ["control"; "optimal"], col=["blue"; "red"], lty=[1;1]) |> ignore
 
     R.dev_off() |> ignore
 

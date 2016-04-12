@@ -51,7 +51,7 @@
     <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <StartArguments>--mode movement --cfg ..\..\..\Cfg\Movements\OffsetAndDistortions.fsx</StartArguments>
+    <StartArguments>--mode record --dir ..\..\..\Data\DeepBraille\Movements\test1\08.cur</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>
@@ -134,7 +134,7 @@
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.6.0.5\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="RDotNet">

@@ -87,8 +87,13 @@ module Stepper =
         recvTime <- recvTime + sw.ElapsedMilliseconds
         recvReqs <- recvReqs + 1
         #else
-        let msgStr = stepper.Port.ReadTo "\r"
+        let msgStr = 
+            try stepper.Port.ReadTo "\r"
+            with :? TimeoutException ->
+                printfn "timeout while communicating with XY table"
+                exit 1
         #endif
+
 
         if Debug then printfn "received: %s" msgStr            
         let m = Regex.Match(msgStr, @"^(\d+)([!-*,./:-~]+)([+-]?\d+)?$")
@@ -280,6 +285,8 @@ module XYTable =
         let port = new SerialPort(config.PortName, config.PortBaud)     
         do
             port.Open()  
+            port.ReadTimeout <- 30000
+            port.WriteTimeout <- 30000
 
         let xStepper = {Stepper.StepperT.Port=port; Stepper.StepperT.Config=config.X.StepperConfig; Stepper.StepperT.Echo=false}
         let yStepper = {Stepper.StepperT.Port=port; Stepper.StepperT.Config=config.Y.StepperConfig; Stepper.StepperT.Echo=false}
@@ -468,7 +475,7 @@ module XYTable =
                         let! msg, rc = inbox.Receive()    
                         
                         // sending commands at a too high rate will hang the motor controller
-                        while not (lastRequest.ElapsedMilliseconds > 7L) do ()
+                        while not (lastRequest.ElapsedMilliseconds > 10L) do ()
                                            
                         match msg with
                         | MsgHome ->
@@ -510,12 +517,18 @@ module XYTable =
                         | MsgDriveWithVel ((xvel, yvel as vel), (xaccel, yaccel as accel)) ->
                             if not homed then rc.Reply ReplyNotHomed
                             else
+                                let minVel = 0.001
+                                let cntrlXvel = if config.X.Home = Stepper.Right then -xvel else xvel
+                                let cntrlYvel = if config.Y.Home = Stepper.Right then -yvel else yvel
+                                let cntrlXvel = if abs cntrlXvel < minVel then minVel else cntrlXvel
+                                let cntrlYvel = if abs cntrlYvel < minVel then minVel else cntrlYvel
+                                let cntrlVel = cntrlXvel, cntrlYvel
                                 lock port (fun () ->
                                     if not !vmActive then
-                                        Stepper.startConstantVelocityDrive (xDeg xvel) (xDeg xaccel) (xDeg xaccel) xStepper
-                                        Stepper.startConstantVelocityDrive (yDeg yvel) (yDeg yaccel) (yDeg yaccel) yStepper
+                                        Stepper.startConstantVelocityDrive (xDeg cntrlXvel) (xDeg xaccel) (xDeg xaccel) xStepper
+                                        Stepper.startConstantVelocityDrive (yDeg cntrlYvel) (yDeg yaccel) (yDeg yaccel) yStepper
                                         vmActive := true
-                                        vmVel := vel
+                                        vmVel := cntrlVel
                                         vmAccel := accel
 
                                         startSimulation ()
@@ -526,11 +539,11 @@ module XYTable =
                                             Stepper.adjustAccelDecel (xDeg xaccel) (xDeg xaccel) xStepper
                                             Stepper.adjustAccelDecel (yDeg yaccel) (yDeg yaccel) yStepper
                                             vmAccel := accel
-                                        if vel <> !vmVel then
+                                        if cntrlVel <> !vmVel then
                                             let vmXVel, vmYVel = !vmVel
-                                            Stepper.adjustVelocity (xDeg xvel) (sign xvel <> sign vmXVel) xStepper
-                                            Stepper.adjustVelocity (yDeg yvel) (sign yvel <> sign vmYVel) yStepper
-                                            vmVel := vel
+                                            Stepper.adjustVelocity (xDeg cntrlXvel) (sign xvel <> sign vmXVel) xStepper
+                                            Stepper.adjustVelocity (yDeg cntrlYvel) (sign yvel <> sign vmYVel) yStepper
+                                            vmVel := cntrlVel
 
                                         setTargetVel vel accel
                                 )
@@ -569,9 +582,9 @@ module XYTable =
             if not disposed then
                 try
                     sentinelThreadShouldRun <- false         
-                    if sentinelThread.IsAlive then sentinelThread.Join ()
+                    if sentinelThread <> null && sentinelThread.IsAlive then sentinelThread.Join ()
                 finally
-                    quickStop ()                     
+                    if port.IsOpen then quickStop ()                     
 
         do
             AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> terminate())

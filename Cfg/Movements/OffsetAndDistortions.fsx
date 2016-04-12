@@ -9,7 +9,7 @@ open Movement
 
 let baseMovement = {
     Movement.Dt             = 0.01
-    Movement.IndentorPos    = -10.        
+    Movement.IndentorPos    = -41.        
     Movement.Accel          = 40.0 
     Movement.VelX           = 6.0 
     Movement.MaxVel         = 40.0
