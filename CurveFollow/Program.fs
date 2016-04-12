@@ -18,16 +18,16 @@ open Data
 /// command line arguments
 type CLIArgs =
     | [<Mandatory>] Mode of string
-    | CfgDir of string
-    | Curves of string
+    | Cfg of string
+    | Dir of string
     | NoCache 
 with interface IArgParserTemplate with 
         member x.Usage = 
             match x with
             | Mode _ -> "mode: train, follow"
-            | CfgDir _ -> "configuration directory"         
+            | Cfg _ -> "configuration file"         
+            | Dir _ -> "data (movments) directory"
             | NoCache -> "disables loading a Dataset.h5 cache file"
-            | Curves _ -> "directory where curve files (*.cur.npz) are stored"
 let parser = ArgumentParser.Create<CLIArgs>("Curve following")
 let args = parser.Parse(errorHandler=ProcessExiter())
 
@@ -72,22 +72,12 @@ let loadCurveDataset datasetDir =
 
 
 let doTrain () =  
-    // configuration
-    let cfgDir = args.GetResult <@ CfgDir @>
-    printfn "Using configuration direction %s" (Path.GetFullPath cfgDir)
-    let cfg : CurveFollowCfg = Config.load cfgDir   
+    let cfg : CurveFollowCfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)
 
-    // model
     let mlpController = Controller.MLPController cfg.MLPControllerCfg
-
-    // train
     let dataset = loadPointDataset cfg.DatasetDir
     mlpController.Train dataset
-
-    // save
-    let modelFile = Path.Combine (cfgDir, "model.h5")
-    mlpController.Save modelFile
-    printfn "Saved model to %s" (Path.GetFullPath modelFile)
+    mlpController.Save "model.h5"
 
 
 let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
@@ -97,16 +87,12 @@ let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
 
 
 let doPlot () =
-    let cfgDir = args.GetResult <@ CfgDir @>
-    printfn "Using configuration direction %s" (Path.GetFullPath cfgDir)
-    let cfg : CurveFollowCfg = Config.load cfgDir   
+    let cfg : CurveFollowCfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)   
 
-    // model
     let mlpController = Controller.MLPController cfg.MLPControllerCfg
-    mlpController.Load (Path.Combine (cfgDir, "model.h5"))
+    mlpController.Load "model.h5"
 
-    let dataset = loadCurveDataset cfg.DatasetDir
-    
+    let dataset = loadCurveDataset cfg.DatasetDir   
     for idx, smpl in Seq.indexed (dataset |> Seq.take 10) do
         let predVel = mlpController.Predict smpl.Biotac
 
@@ -124,46 +110,21 @@ let doPlot () =
             |> Chart.WithYAxis (Title="Velocity", Min=(-2.0), Max=2.0)
             |> Chart.WithLegend ()
 
-
-
         let chart = Chart.Rows [posChart; controlCharts]
-
-        let filename = sprintf "curve%03d.png" idx
-        chart |> saveChart (Path.Combine (cfgDir, filename))
-
-
-    // need to make         
-    //let posChart = Chart.Line (Seq.zip allData.[3].Time.Data allData.[3].Pos.Data) |> Chart.WithTitle "pos" 
-    //let velChart = Chart.Line allData.[3].Vels.Data |> Chart.WithTitle "vels"
-    //Chart.Rows [posChart; velChart]
-    //|> Chart.Save (__SOURCE_DIRECTORY__ + "/chart.pdf")
-
-    ()
-    
+        chart |> saveChart (sprintf "curve%03d.png" idx)   
  
 let doFollow () =
     ()
 
+
+
 let doMovement () =
-    let curveDir = args.GetResult <@ Curves @> 
-    let cfg = {
-        Movement.Dt             = 0.01
-        Movement.Accel          = 10.0 
-        Movement.VelX           = 1.0 
-        Movement.MaxVel         = 10.0
-        Movement.MaxControlVel  = 5.0
-        //Movement.Mode           = Movement.FixedOffset 0.2
-        Movement.Mode = 
-            Movement.Distortions {
-                Movement.DistortionsPerSec = 1.0
-                Movement.MaxOffset         = 0.3
-                Movement.MinHold           = 0.1
-                Movement.MaxHold           = 0.3            
-                Movement.NotAgainFor       = 0.5
-            }         
-        Movement.IndentorPos    = -10.        
-    }
-    Movement.generateMovementForDir [cfg] curveDir
+    let cfg : Movement.GenCfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)  
+    Movement.generateMovementUsingCfg cfg
+
+let doRecord () =
+    let dir = args.GetResult <@ Dir @>
+    Movement.recordMovements dir
 
 
 [<EntryPoint>]
@@ -176,6 +137,7 @@ let main argv =
     | _ when mode = "plot" -> doPlot ()
     | _ when mode = "follow" -> doFollow ()
     | _ when mode = "movement" -> doMovement ()
+    | _ when mode = "record" -> doRecord ()
     | _ -> parser.Usage ("unknown mode") |> printfn "%s"
 
     // shutdown

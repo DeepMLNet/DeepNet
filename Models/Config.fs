@@ -2,16 +2,15 @@
 
 open System
 open System.IO
-open System.Text
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
 open Basics
 
 
-
+/// Configuration loader.
 module Config = 
 
-    type FsiEvaluator () =
+    type private FsiEvaluator () =
 
         // Build command line arguments & start FSI session
         let inStream = new StringReader("")
@@ -41,20 +40,27 @@ module Config =
             fsiSession.EvalInteraction (File.ReadAllText path)
             
 
-    let load directory = 
-        let filename = Path.Combine (directory, "cfg.fsx")
-        if not (File.Exists filename) then
-            failwithf "configuration file %s does not exist" (Path.GetFullPath filename)
-        
-        Directory.SetCurrentDirectory directory
+    /// Load configuration F# script (.fsx file) and returns the variable named "cfg".
+    let load path = 
+        if not (File.Exists path) then
+            failwithf "configuration file %s does not exist" (Path.GetFullPath path)
+        printfn "Using configuration file %s" (Path.GetFullPath path)
 
         try 
             let eval = FsiEvaluator()
-            eval.EvalScript filename
+            eval.EvalScript path
             eval.EvalExpression "cfg"
         with
         | _ -> 
-            fprintfn Console.Error "Loading configuration file %s failed." (Path.GetFullPath filename)
+            fprintfn Console.Error "Loading configuration file %s failed." (Path.GetFullPath path)
             exit 1
+
+    /// Loads configuration script and changes current directory to output directory for that configuration.
+    let loadAndChdir path = 
+        if not (File.Exists path) then
+            failwithf "configuration file %s does not exist" (Path.GetFullPath path)
+        Directory.SetCurrentDirectory (Path.GetDirectoryName path)
+        load (Path.GetFileName path)
+
     
 

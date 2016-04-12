@@ -2,15 +2,64 @@
 
 open System
 open System.IO
+open RProvider
+open RProvider.graphics
+open RProvider.grDevices
+open Nessos.FsPickler.Json
 
 open Basics
 open ArrayNDNS
 
-open RProvider
-open RProvider.graphics
-open RProvider.grDevices
 
 type XY = float * float
+
+/// Braille coordinate system.
+module BrailleCS =
+
+    let dot_radius = 0.72       // mm
+    let dot_height = 0.48       // mm
+    let dot_dist = 2.34         // mm
+    let char_dist = 6.2         // mm
+    let line_dist = 10.0        // mm
+    let x_offset = 22.67        // mm
+    let y_offset = 18.5         // mm
+    let hole1_x = 6.5           // mm
+    let hole1_y = 31.0          // mm
+    let hole1_radius = 3.2      // mm
+    let hole2_x = 7.5           // mm
+    let hole2_y = 111.5         // mm
+    let hole2_radius = 3.3      // mm
+    let label_x = 4.0           // mm
+    let label_y = 42.0          // mm
+    let label_thickness = 1.0   // mm
+    let page_width = 206.0      // mm
+    let page_height = 145.0     // mm
+    let page_thickness = 0.4    // mm
+    let clip_width = 10.0       // mm
+    let clip_height = 1.0       // mm
+    let clip_thickness = 6.0    // mm
+    let col_offset = 3.0        // chars
+    let row_offset = 0.0        // lines
+
+    /// Relative position of dot (0..5) to character in mm.
+    let dotRelMM (dot: int) =
+        assert (0 <= dot && dot < 6)
+        let x = dot_dist * float (dot / 3) - dot_dist / 2.
+        let y = dot_dist * float (dot % 3) - dot_dist
+        x, y
+
+    /// Braille character index to table position in mm.
+    let charToMM (col: float, row: float) = 
+        let x = char_dist * (col + col_offset) + x_offset
+        let y = line_dist * (row + row_offset) + y_offset
+        x, y
+
+    /// Braille character index and dot number to table position in mm.
+    let dotToMM (col, row) dot =
+        let xc, yc = charToMM (col, row)
+        let xd, yd = dotRelMM dot
+        xc + xd, yc + yd
+
 
 
 module XYTableSim =
@@ -29,7 +78,7 @@ module XYTableSim =
 
     let private stepAxis tVel pos vel accel maxVel dt =
         let tVel = 
-            if abs(tVel) > maxVel then float (sign tVel) * maxVel
+            if abs tVel > maxVel then float (sign tVel) * maxVel
             else tVel
         let dVel = tVel - vel
         let vel = 
@@ -51,22 +100,25 @@ module XYTableSim =
 module OptimalControl = 
     open XYTableSim
 
-    let private optimalVelAxis tPos pos accel maxVel = 
+    let private optimalVelAxis tPos pos accel maxVel dt = 
         let d = tPos - pos
-        let accel = if abs d < 0.1 then accel / 4.0 else accel
-        let stopVel = sqrt (2.0 * accel * abs d) * float (sign d)
-        let vel = 
-            if abs stopVel > maxVel then float (sign d) * maxVel
-            else stopVel
-        vel        
+        if abs d < 0.2 then
+            d / (dt * 5.)
+        else
+            let accel = if abs d < 0.7 then accel / 4.0 else accel
+            let stopVel = sqrt (2.0 * accel * abs d) * float (sign d)
+            let vel = 
+                if abs stopVel > maxVel then float (sign d) * maxVel
+                else stopVel
+            vel        
 
     let toPos tPos maxControlVel cfg state =
         let tPosX, tPosY = tPos
         let maxControlVelX, maxControlVelY = maxControlVel
         let {Accel=accelX, accelY} = cfg
         let {Pos=posX, posY} = state
-        let vx = optimalVelAxis tPosX posX accelX maxControlVelX
-        let vy = optimalVelAxis tPosY posY accelY maxControlVelY
+        let vx = optimalVelAxis tPosX posX accelX maxControlVelX cfg.Dt
+        let vy = optimalVelAxis tPosY posY accelY maxControlVelY cfg.Dt
         vx, vy
 
 
@@ -156,7 +208,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
         | (x1,y1) :: (x2,y2) :: _ when x1 <= x && x < x2 ->
             // interpolate curve points
             let fac = (x2 - x) / (x2 - x1)
-            let cy = fac * y2 + (1. - fac) * y1
+            let cy = fac * y1 + (1. - fac) * y2
 
             // optimal velocity to track curve
             let _, optVelY = OptimalControl.toPos (0., cy) (0., cfg.MaxControlVel) tblCfg state
@@ -243,8 +295,8 @@ let syncTactileCurve (tc: TactileCurve.TactileCurve) (m: Movement) =
             let interp a b = 
                 let xa, ya = a
                 let xb, yb = b
-                let x = (1.0 - fac) * xa + fac * xb
-                let y = (1.0 - fac) * ya + fac * yb
+                let x = fac * xa + (1.0 - fac) * xb
+                let y = fac * ya + (1.0 - fac) * yb
                 x, y
             yield {
                 Time       = tct
@@ -272,7 +324,9 @@ let loadCurves path =
     let pos: ArrayNDHostT<float> = file.Get "pos" // pos[dim, idx, smpl]
     seq { for smpl = 0 to pos.Shape.[2] - 1 do
               yield [for idx = 0 to pos.Shape.[1] - 1 do
-                         yield pos.[[0; idx; smpl]], pos.[[1; idx; smpl]]] }  
+                         // convert to mm
+                         let col, row = pos.[[0; idx; smpl]], pos.[[1; idx; smpl]]
+                         yield BrailleCS.charToMM (col, row) ] }  
     |> List.ofSeq
     
 let toArray extract points = 
@@ -283,45 +337,7 @@ let toArray extract points =
         xAry.[idx] <- x
         yAry.[idx] <- y
     xAry, yAry
-
-
-
-module RCall =
-    let empty : (string * obj) list = []
-    let param (name: string) value args = 
-        match value with
-        | Some xval -> (name, box xval) :: args
-        | None -> args
-    let call func args =
-        args |> namedParams |> func |> ignore
-
-
-type R () =
-
-    static member plot2 (?xlim, ?ylim, ?title, ?xlabel, ?ylabel) =
-        RCall.empty
-        |> RCall.param "xlim" xlim
-        |> RCall.param "ylim" ylim
-        |> RCall.param "main" title
-        |> RCall.param "xlab" xlabel
-        |> RCall.param "ylab" ylabel
-        |> RCall.param "x" (Some (R.vector()))
-        |> RCall.param "y" (Some (R.vector()))
-        |> RCall.call R.plot
-
-    static member lines2 (?x, ?y, ?color) =
-        RCall.empty
-        |> RCall.param "x" x
-        |> RCall.param "y" y
-        |> RCall.param "col" color
-        |> RCall.call R.lines
-
-    static member par2 (param, value) =
-        RCall.empty
-        |> RCall.param param (Some value)
-        |> RCall.call R.par
-
-        
+    
 
 let plotMovement (path: string) (curve: XY list) (movement: Movement) =
     let curveX, curveY = toArray id curve
@@ -336,36 +352,77 @@ let plotMovement (path: string) (curve: XY list) (movement: Movement) =
     R.par2 ("mgp", [1.7; 0.7; 0.0])
     R.par2 ("mfrow", [2; 1])
 
-    R.plot2 ([0; 24], [curveY.[0] - 0.6; curveY.[0] + 0.6], "position", "column", "row")
+    R.plot2 ([40; 190], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
     R.abline(h=curveY.[0]) |> ignore
     R.lines2 (curveX, curveY, "black")
     R.lines2 (posX, posY, "blue")
+    R.legend (155., curveY.[0] + 6., ["curve"; "movement"], col=["black"; "blue"], lty=[1;1]) |> ignore
 
-    R.plot2 ([0; 24], [-2; 2], "velocity", "column", "velocity")
+    R.plot2 ([40; 190], [-20; 20], "velocity", "x", "y velocity")
     R.abline(h=0) |> ignore
     R.lines2 (posX, controlVelY, "blue")
     R.lines2 (posX, optimalVelY, "red")
+    R.legend (165., 20, ["control"; "optimal"], col=["blue"; "red"], lty=[1;1]) |> ignore
 
     R.dev_off() |> ignore
 
-let generateMovementForFile cfgs path =
+let generateMovementForFile cfgs path outDir =
     let rnd = Random ()
-    let baseDir = Path.Combine(Path.GetDirectoryName path, Path.GetFileNameWithoutExtension path)
+    let baseName = Path.Combine(Path.GetDirectoryName path, Path.GetFileNameWithoutExtension path)
     let curves = loadCurves path
-    for curveIdx, curve in List.indexed curves do
+    use curveHdf = HDF5.OpenWrite (baseName + ".h5")
+
+    for curveIdx, curve in List.indexed curves do      
+        // write curve to HDF5 file
+        let ary = ArrayNDHost.zeros [List.length curve; 2]
+        for idx, (x, y) in List.indexed curve do
+            ary.[[idx; 0]] <- x
+            ary.[[idx; 1]] <- y
+        ArrayNDHDF.write curveHdf (sprintf "curve%d" curveIdx) ary
+
+        // generate movements
         for cfgIdx, cfg in List.indexed cfgs do
-            let dir = Path.Combine(baseDir, sprintf "Curve%d" curveIdx, sprintf "Cfg%d" cfgIdx)
+            let dir = Path.Combine(outDir, sprintf "Curve%dCfg%d" curveIdx cfgIdx)
             Directory.CreateDirectory dir |> ignore
 
             let movement = generate cfg rnd curve
+            plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
+
+            let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+            use tw = File.OpenWrite(Path.Combine (dir, "movement.json"))
+            p.Serialize(tw, movement)
+            
+type GenCfg = {
+    CurveDir:           string
+    MovementDir:        string
+    MovementCfgs:       Cfg list
+}
+
+let generateMovementUsingCfg cfg  =
+    for file in Directory.EnumerateFiles(cfg.CurveDir, "*.cur.npz") do
+        printfn "%s" (Path.GetFullPath file)
+        let outDir = Path.Combine(cfg.MovementDir, Path.GetFileNameWithoutExtension file)
+        generateMovementForFile cfg.MovementCfgs file outDir
+
+
+
+/// Records data for all */movement.json files in the given directory.
+let recordMovements dir =
+    let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+    
+    for subDir in Directory.EnumerateDirectories dir do
+        let movementFile = Path.Combine (subDir, "movement.json")
+        if File.Exists movementFile then
+            printfn "%s" movementFile
+            use tr = File.OpenRead movementFile
+            let movement : Movement = p.Deserialize tr
             let driveCurve = toDriveCurve movement
 
-            // plot movement
-            plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
-            
-let generateMovementForDir cfgs dir =
-    let dir = Path.GetFullPath dir
-    for file in Directory.EnumerateFiles(dir, "*.cur.npz") do
-        generateMovementForFile cfgs file
+            let tactileCurve = TactileCurve.record driveCurve
+            use tw = File.OpenWrite (Path.Combine (subDir, "tactile.json"))
+            p.Serialize (tw, tactileCurve)
 
+            let recMovement = syncTactileCurve tactileCurve movement
+            use tw = File.OpenWrite (Path.Combine (subDir, "recorded.json"))
+            p.Serialize (tw, recMovement)
 
