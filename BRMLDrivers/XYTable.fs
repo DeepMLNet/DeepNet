@@ -639,8 +639,8 @@ module XYTable =
             member this.Interpolate fac a b =
                 let ax, ay = a
                 let bx, by = b
-                let x = (1.-fac) * ax + bx
-                let y = (1.-fac) * ay + by
+                let x = (1.-fac) * ax + fac * bx
+                let y = (1.-fac) * ay + fac * by
                 x, y
 
 

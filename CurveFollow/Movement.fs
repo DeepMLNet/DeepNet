@@ -173,6 +173,7 @@ type RecordedMovementPoint = {
     ControlVel:     XY
     OptimalVel:     XY
     Distorted:      bool
+    Biotac:         float []
 }
 
 type RecordedMovement = {
@@ -287,10 +288,11 @@ let toDriveCurve (movement: Movement) =
 
 
 let syncTactileCurve (tc: TactileCurve.TactileCurve) (m: Movement) =
-    let rec syncPoints (tcPoints: TactileCurve.TactilePoint list) (mPoints: MovementPoint list) = seq {
+    let rec syncPoints (tcPoints: TactileCurve.TactilePoint list) (mPoints: MovementPoint list) synced = 
+        //printfn "tcPoints: %A   mPoints: %A" (List.head tcPoints) (List.head mPoints) 
         match tcPoints, mPoints with
-        | [], _ -> ()
-        | _, [] -> ()
+        | [], _  
+        | _, [] -> List.rev synced
         | ({Time=tct} as t)::tcRest, ({Time=mt} as m)::({Time=mtNext} as mNext)::_ when mt <= tct && tct < mtNext ->
             let fac = float (mtNext - tct) / float (mtNext - mt)
             let interp a b = 
@@ -299,25 +301,27 @@ let syncTactileCurve (tc: TactileCurve.TactileCurve) (m: Movement) =
                 let x = fac * xa + (1.0 - fac) * xb
                 let y = fac * ya + (1.0 - fac) * yb
                 x, y
-            yield {
+            let rp = {
                 Time       = tct
                 SimPos     = interp m.Pos mNext.Pos
                 DrivenPos  = t.Pos
                 ControlVel = interp m.ControlVel mNext.ControlVel
                 OptimalVel = interp m.OptimalVel mNext.OptimalVel
                 Distorted  = m.Distorted
+                Biotac     = t.Biotac
             }
-            yield! syncPoints tcRest mPoints
+            syncPoints tcRest mPoints (rp::synced)
         | {Time=tct}::tcRest, {Time=mt}::_ when tct < mt ->
-            yield! syncPoints tcRest mPoints
+            syncPoints tcRest mPoints synced
         | _, _::mRest ->
-            yield! syncPoints tcPoints mRest
-    }
-    
+            syncPoints tcPoints mRest synced
+       
+    let synced = syncPoints tc.Points m.Points []
+
     {
         IndentorPos = tc.IndentorPos
         Accel       = tc.Accel
-        Points      = syncPoints tc.Points m.Points |> List.ofSeq
+        Points      = synced
     }
 
 let loadCurves path =
@@ -367,6 +371,90 @@ let plotMovement (path: string) (curve: XY list) (movement: Movement) =
 
     R.dev_off() |> ignore
 
+
+let plotTactile (path: string) (curve: XY list) (tactile: TactileCurve.TactileCurve) =
+    let curveX, curveY = toArray id curve
+    let drivenPosX, drivenPosY = tactile.Points |> toArray (fun p -> p.Pos) 
+    let biotac = tactile.Points |> List.map (fun p -> p.Biotac)
+
+    let dt = tactile.Points.[1].Time - tactile.Points.[0].Time
+    let drivenVelY =
+        drivenPosY
+        |> Array.toSeq
+        |> Seq.pairwise
+        |> Seq.map (fun (a, b) -> (b - a) / dt)
+        |> Seq.append (Seq.singleton 0.)
+        |> Array.ofSeq
+
+    R.pdf (path) |> ignore
+    R.par2 ("oma", [0; 0; 0; 0])
+    R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+    R.par2 ("mgp", [1.7; 0.7; 0.0])
+    R.par2 ("mfrow", [2; 1])
+
+    R.plot2 ([0; 150], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
+    R.abline(h=curveY.[0]) |> ignore
+    R.lines2 (curveX, curveY, "black")
+    R.lines2 (drivenPosX, drivenPosY, "yellow")
+    R.legend (115., curveY.[0] + 6., ["curve"; "driven"], col=["black"; "yellow"], lty=[1;1]) |> ignore
+
+    R.plot2 ([0; 150], [-20; 20], "velocity", "x", "y velocity")
+    R.abline(h=0) |> ignore
+    R.lines2 (drivenPosX, drivenVelY, "yellow")
+    R.legend (125., 20, ["driven"], col=["yellow"], lty=[1;1]) |> ignore
+
+    R.dev_off() |> ignore
+
+
+let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedMovement) =
+    let curveX, curveY = toArray id curve
+    let simPosX, simPosY = recMovement.Points |> toArray (fun p -> p.SimPos) 
+    let drivenPosX, drivenPosY = recMovement.Points |> toArray (fun p -> p.DrivenPos) 
+    let controlVelX, controlVelY = recMovement.Points |> toArray (fun p -> p.ControlVel) 
+    let optimalVelX, optimalVelY = recMovement.Points |> toArray (fun p -> p.OptimalVel) 
+    let distorted = recMovement.Points |> List.map (fun p -> p.Distorted) |> Array.ofList
+    let biotac = recMovement.Points |> List.map (fun p -> p.Biotac)
+
+    let dt = recMovement.Points.[1].Time - recMovement.Points.[0].Time
+    let drivenVelY =
+        drivenPosY
+        |> Array.toSeq
+        |> Seq.pairwise
+        |> Seq.map (fun (a, b) -> (b - a) / dt)
+        |> Seq.append (Seq.singleton 0.)
+        |> Array.ofSeq
+
+    R.pdf (path) |> ignore
+    R.par2 ("oma", [0; 0; 0; 0])
+    R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+    R.par2 ("mgp", [1.7; 0.7; 0.0])
+    R.par2 ("mfrow", [3; 1])
+
+    R.plot2 ([0; 150], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
+    R.abline(h=curveY.[0]) |> ignore
+    R.lines2 (curveX, curveY, "black")
+    R.lines2 (simPosX, simPosY, "blue")
+    R.lines2 (drivenPosX, drivenPosY, "yellow")
+    R.legend (115., curveY.[0] + 6., ["curve"; "movement"; "driven"], col=["black"; "blue"; "yellow"], lty=[1;1]) |> ignore
+
+    R.plot2 ([0; 150], [-10; 10], "velocity", "x", "y velocity")
+    R.abline(h=0) |> ignore
+    R.lines2 (drivenPosX, controlVelY, "blue")
+    R.lines2 (drivenPosX, optimalVelY, "red")
+    R.lines2 (drivenPosX, drivenVelY, "yellow")
+    R.legend (125., 10, ["control"; "optimal"; "driven"], col=["blue"; "red"; "yellow"], lty=[1;1]) |> ignore
+
+    // plot biotac
+    let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose
+    let minVal, maxVal = ArrayND.min biotacImg, ArrayND.max biotacImg
+    let scaledImg = (biotacImg - minVal) / (maxVal - minVal)
+    R.image2 (ArrayNDHost.toArray2D scaledImg, lim=(0.0, 1.0),
+              xlim=(0., 150.), colormap=Gray, title="biotac", xlabel="x", ylabel="channel")
+
+    R.dev_off() |> ignore
+
+
+
 let generateMovementForFile cfgs path outDir =
     let rnd = Random ()
     let baseName = Path.Combine(Path.GetDirectoryName path, Path.GetFileNameWithoutExtension path)
@@ -389,9 +477,12 @@ let generateMovementForFile cfgs path outDir =
             let movement = generate cfg rnd curve
             plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
 
-            let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
-            use tw = File.OpenWrite(Path.Combine (dir, "movement.json"))
-            p.Serialize(tw, movement)
+            if curveIdx <> 0 then
+                let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+                use tw = File.OpenWrite(Path.Combine (dir, "movement.json"))
+                p.Serialize(tw, movement)
+                use tw = File.OpenWrite(Path.Combine (dir, "curve.json"))
+                p.Serialize(tw, curve)
             
 type GenCfg = {
     CurveDir:           string
@@ -417,13 +508,20 @@ let recordMovements dir =
             printfn "%s" movementFile
             use tr = File.OpenRead movementFile
             let movement : Movement = p.Deserialize tr
-            let driveCurve = toDriveCurve movement
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.json"))
+            let curve : XY list = p.Deserialize tr
 
+            let driveCurve = toDriveCurve movement
             let tactileCurve = TactileCurve.record driveCurve
             use tw = File.OpenWrite (Path.Combine (subDir, "tactile.json"))
             p.Serialize (tw, tactileCurve)
+            plotTactile (Path.Combine (subDir, "tactile.pdf")) curve tactileCurve
 
             let recMovement = syncTactileCurve tactileCurve movement
             use tw = File.OpenWrite (Path.Combine (subDir, "recorded.json"))
             p.Serialize (tw, recMovement)
 
+            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
+
+
+            exit 0

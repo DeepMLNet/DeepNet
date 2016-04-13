@@ -30,7 +30,7 @@ type DriveCurve = {
 type TactilePoint = {
     Time:               float
     Pos:                float * float
-    Biotac:             int []
+    Biotac:             float []
 }
 
 /// A tactile data curve.
@@ -59,7 +59,10 @@ let record (curve: DriveCurve) =
     let sw = Stopwatch()
     let rec control (points: DrivePoint list) =
         let t = (float sw.ElapsedMilliseconds) / 1000.
+        let x, y = Devices.XYTable.CurrentPos 
+        printf "t=%.3f s     x=%.3f mm     y=%.3f mm       \r" t x y
         match points with
+        //| _ when (let x, y = Devices.XYTable.CurrentPos in x > 30.) -> ()
         | _ when (let x, y = Devices.XYTable.CurrentPos in x > 142.) -> ()
         | [] -> ()
         | {Time=ct; Vel=vel}::({Time=ctNext}::_ as rPoints) when ct <= t && t < ctNext ->
@@ -73,7 +76,6 @@ let record (curve: DriveCurve) =
             control rCurve
 
     gotoStartTask.Wait ()
-    //exit 0
 
     recorder.Start ()
     sw.Start()
@@ -82,6 +84,9 @@ let record (curve: DriveCurve) =
 
     Devices.XYTable.Stop ()
     gotoStart false |> Async.Start
+    
+    printf "                                                            \r"
+    recorder.PrintStatistics ()
 
     {
         IndentorPos = curve.IndentorPos

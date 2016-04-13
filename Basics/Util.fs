@@ -50,6 +50,13 @@ module String =
         else String.concat sep items
 
 
+module Array2D =
+
+    /// returns a transposed copy of the matrix
+    let transpose m = 
+        Array2D.init (Array2D.length2 m) (Array2D.length1 m) (fun y x -> m.[x, y])
+
+
 
 [<AutoOpen>]
 module UtilTypes =

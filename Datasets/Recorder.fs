@@ -70,9 +70,10 @@ module RecorderTypes =
                         t (List.last smplTimes)
                 | t::_, st::_, _ when t < st ->
                     failwithf "cannot extrapolate to time %f before first sample at time %f" t st
-                | t::rTimes, st::stNext::_, data::dataNext::_ when st <= t && t <= stNext ->
+                | t::rTimes, st::stNext::_, data::dataNext::_ when st <= t && t < stNext ->
                     let pos = (t - st) / (stNext - st) 
                     let ipData = sensor.Interpolate pos data dataNext
+                    //printfn "Interpolated at t=%.3f using factor %.3f with a=%A b=%A to %A" t pos data dataNext ipData
                     interpolate rTimes smplTimes smplDatas (ipData::interpDatas)
                 | _, _::rSmplTimes, _::rSmplDatas ->
                     interpolate times rSmplTimes rSmplDatas interpDatas
@@ -187,7 +188,7 @@ module RecorderTypes =
                         |> List.min
 
                 // sample data at common times for all sensors
-                let times = [ startTime .. interval .. stopTime ]
+                let times = [startTime .. interval .. stopTime]
                 let data = 
                     channels 
                     |> List.map (fun ch -> ch.SampleAt times |> Array.ofList)

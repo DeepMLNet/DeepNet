@@ -57,7 +57,7 @@ module Cheetah =
 module Biotac =
 
     type BioTacChannelT = int
-    type BioTacValueT = int
+    type BioTacValueT = float
 
     type BioTacSampleT = {
         Flat:           BioTacValueT []
@@ -75,6 +75,7 @@ module Biotac =
         let SpiBitrate =        4400          // kHz
         let AfterSampleDelay =  50000         // ns
         let AfterReadDelay =    10000         // ns
+        let MaxValue =          8192          // maximum data value
 
         /// sensor query frame
         let QueryFrame = 
@@ -186,7 +187,7 @@ module Biotac =
                         for pos in {2 .. 4 .. responseLength - 1} do
                             let msb, lsb = uint16 response.[pos], uint16 response.[pos+1]
                             let highData, lowData = msb >>> 1, lsb >>> 3
-                            yield int ((highData <<< 5) ||| lowData)
+                            yield float ((highData <<< 5) ||| lowData) / float MaxValue
                     }
                     |> Array.ofSeq
                 assert (Array.length dataFrame = List.length QueryFrame)
@@ -239,6 +240,6 @@ module Biotac =
                 |> Event.map (fun smpl -> smpl.Flat)
             member this.Interpolate fac a b =
                 (a, b)
-                ||> Array.map2 (fun a b -> (1.0 - fac) * (float a) + (float b) |> int)
+                ||> Array.map2 (fun a b -> (1.0 - fac) * a + fac * b)
 
 

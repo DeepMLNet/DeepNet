@@ -221,6 +221,18 @@ module ArrayNDHost =
         let layout = ArrayNDLayout.newC shp
         ArrayNDHostT<'T> (layout, data) 
 
+    /// Creates a two-dimensional ArrayNDT using the specified data. 
+    /// The data is copied.
+    let ofArray2D (data: 'T [,]) =
+        let shp = [Array2D.length1 data; Array2D.length2 data]
+        initIndexed shp (fun idx -> data.[idx.[0], idx.[1]])
+
+    /// Creates a two-dimensional ArrayNDT using the specified data. 
+    /// The data is copied.
+    let ofArray3D (data: 'T [,,]) =
+        let shp = [Array3D.length1 data; Array3D.length2 data; Array3D.length3 data]
+        initIndexed shp (fun idx -> data.[idx.[0], idx.[1], idx.[2]])
+
     /// Creates a one-dimensional ArrayNDT using the specified sequence.       
     let ofSeq (data: 'T seq) =
         data |> Array.ofSeq |> ofArray
@@ -234,3 +246,20 @@ module ArrayNDHost =
     let ofList (data: 'T list) =
         data |> Array.ofList |> ofArray
 
+    /// Creates an Array from the data in this ArrayNDT. The data is copied.
+    let toArray (ary: ArrayNDHostT<_>) =
+        if ArrayND.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
+        let shp = ArrayND.shape ary
+        Array.init shp.[0] (fun i0 -> ary.[[i0]])
+
+    /// Creates an Array2D from the data in this ArrayNDT. The data is copied.
+    let toArray2D (ary: ArrayNDHostT<_>) =
+        if ArrayND.nDims ary <> 2 then failwith "ArrayNDT must have 2 dimensions"
+        let shp = ArrayND.shape ary
+        Array2D.init shp.[0] shp.[1] (fun i0 i1 -> ary.[[i0; i1]])
+
+    /// Creates an Array3D from the data in this ArrayNDT. The data is copied.
+    let toArray3D (ary: ArrayNDHostT<_>) =
+        if ArrayND.nDims ary <> 3 then failwith "ArrayNDT must have 3 dimensions"
+        let shp = ArrayND.shape ary
+        Array3D.init shp.[0] shp.[1] shp.[2] (fun i0 i1 i2 -> ary.[[i0; i1; i2]])
