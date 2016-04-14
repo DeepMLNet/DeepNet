@@ -34,6 +34,6 @@ let cfg = {
     MovementDir     = "../../Data/DeepBraille/Movements/test1"
     MovementCfgs    = 
         [
-            baseMovement
+            {baseMovement with Mode = distortionMode}
         ]
 }

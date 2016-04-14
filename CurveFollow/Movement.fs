@@ -5,6 +5,7 @@ open System.IO
 open RProvider
 open RProvider.graphics
 open RProvider.grDevices
+open Nessos.FsPickler
 open Nessos.FsPickler.Json
 
 open Basics
@@ -478,7 +479,7 @@ let generateMovementForFile cfgs path outDir =
             plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
 
             if curveIdx <> 0 then
-                let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+                let p = FsPickler.CreateJsonSerializer(indent=true)
                 use tw = File.OpenWrite(Path.Combine (dir, "movement.json"))
                 p.Serialize(tw, movement)
                 use tw = File.OpenWrite(Path.Combine (dir, "curve.json"))
@@ -498,9 +499,12 @@ let generateMovementUsingCfg cfg  =
 
 
 
+
+
 /// Records data for all */movement.json files in the given directory.
 let recordMovements dir =
-    let p = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+    let p = FsPickler.CreateJsonSerializer(indent=true)
+    let bp = FsPickler.CreateBinarySerializer()
     
     for subDir in Directory.EnumerateDirectories dir do
         let movementFile = Path.Combine (subDir, "movement.json")
@@ -518,10 +522,27 @@ let recordMovements dir =
             plotTactile (Path.Combine (subDir, "tactile.pdf")) curve tactileCurve
 
             let recMovement = syncTactileCurve tactileCurve movement
-            use tw = File.OpenWrite (Path.Combine (subDir, "recorded.json"))
-            p.Serialize (tw, recMovement)
+            use tw = File.OpenWrite (Path.Combine (subDir, "recorded.dat"))
+            bp.Serialize (tw, recMovement)
 
             plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
 
 
             exit 0
+
+
+let plotRecordedMovements dir =
+    let p = FsPickler.CreateJsonSerializer(indent=true)
+    let bp = FsPickler.CreateBinarySerializer()
+    
+    for subDir in Directory.EnumerateDirectories dir do
+        let recordedFile = Path.Combine (subDir, "recorded.dat")
+        if File.Exists recordedFile then
+            printfn "%s" recordedFile
+            use tr = File.OpenRead recordedFile
+            let recMovement : RecordedMovement = bp.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.json"))
+            let curve : XY list = p.Deserialize tr
+
+            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
+

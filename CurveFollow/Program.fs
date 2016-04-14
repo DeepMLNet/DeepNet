@@ -127,6 +127,11 @@ let doRecord () =
     let dir = args.GetResult <@ Dir @>
     Movement.recordMovements dir
 
+let doPlotRecorded () =
+    let dir = args.GetResult <@ Dir @>
+    Movement.plotRecordedMovements dir
+
+
 
 [<EntryPoint>]
 let main argv = 
@@ -139,6 +144,7 @@ let main argv =
     | _ when mode = "follow" -> doFollow ()
     | _ when mode = "movement" -> doMovement ()
     | _ when mode = "record" -> doRecord ()
+    | _ when mode = "plotRecorded" -> doPlotRecorded ()
     | _ -> parser.Usage ("unknown mode") |> printfn "%s"
 
     // shutdown
