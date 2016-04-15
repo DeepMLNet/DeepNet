@@ -34,7 +34,17 @@ let cfg = {
     MovementDir     = "../../Data/DeepBraille/Movements/test1"
     MovementCfgs    = 
         [
-            //baseMovement
+            baseMovement
+
+            {baseMovement with Mode = Movement.FixedOffset 1.0}
+            {baseMovement with Mode = Movement.FixedOffset 3.0}
+            {baseMovement with Mode = Movement.FixedOffset 7.0}
+            {baseMovement with Mode = Movement.FixedOffset -1.0}
+            {baseMovement with Mode = Movement.FixedOffset -3.0}
+            {baseMovement with Mode = Movement.FixedOffset -7.0}
+
+            {baseMovement with Mode = distortionMode}
+            {baseMovement with Mode = distortionMode}
             {baseMovement with Mode = distortionMode}
         ]
 }

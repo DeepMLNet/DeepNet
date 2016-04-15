@@ -143,6 +143,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
         PID.ITime       = 0.05
         PID.DTime       = 0.05
     }
+    let maxOffset = 9.6
 
     let rec generate curve (state: XYTableSim.State) distState = seq {
         let movementPoint cVel cy = {
@@ -163,7 +164,10 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
 
             match cfg.Mode with
             | FixedOffset ofst ->         
-                let cVel = cfg.VelX, controlPid.Simulate (cy + ofst) y t
+                let trgt = cy + ofst
+                let trgt = min trgt (baseY + maxOffset)
+                let trgt = max trgt (baseY - maxOffset)
+                let cVel = cfg.VelX, controlPid.Simulate trgt y t
                 yield movementPoint cVel cy
                 yield! generate curve (XYTableSim.step cVel tblCfg state) distState
             | Distortions dc ->
@@ -173,8 +177,8 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
                         let prob = dc.DistortionsPerSec * cfg.Dt
                         if x >= iu && rnd.NextDouble() < prob then
                             let trgt = cy + (2.0 * rnd.NextDouble() - 1.0) * dc.MaxOffset
-                            let trgt = min trgt (baseY + 7.0)
-                            let trgt = max trgt (baseY - 7.0)
+                            let trgt = min trgt (baseY + maxOffset)
+                            let trgt = max trgt (baseY - maxOffset)
                             cy, GotoPos trgt
                         else cy, distState
                     | GotoPos trgt ->
