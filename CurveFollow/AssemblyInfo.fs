@@ -10,9 +10,9 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyTitle("CurveFollow")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
+[<assembly: AssemblyCompany("Deep.Net developers")>]
 [<assembly: AssemblyProduct("CurveFollow")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net developers 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 

@@ -11,9 +11,9 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyTitle("AllTests")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
+[<assembly: AssemblyCompany("Deep.Net developers")>]
 [<assembly: AssemblyProduct("AllTests")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net developers 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
