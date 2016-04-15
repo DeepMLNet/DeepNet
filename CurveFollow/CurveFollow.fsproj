@@ -51,7 +51,7 @@
     <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <StartArguments>--mode record --dir ..\..\..\Data\DeepBraille\Movements\test1\08.cur</StartArguments>
+    <StartArguments>--mode plotRecorded --dir ..\..\..\Data\DeepBraille\Movements\test1\08.cur</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>

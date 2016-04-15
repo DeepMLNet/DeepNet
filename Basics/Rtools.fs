@@ -59,7 +59,7 @@ type R () =
             | Some Terrain -> Some (R.terrain_colors(nc))
             | Some Topo    -> Some (R.topo_colors(nc))
             | Some Cm      -> Some (R.cm_colors(nc))
-            | Some Gray    -> Some (R.gray_colors(nc))
+            | Some Gray    -> Some (R.gray_colors(nc, start=0.0, ``end``=1.0))
             | None         -> None
 
         let lim = lim |> Option.map (fun (a, b) -> [a; b])
@@ -84,6 +84,7 @@ type R () =
         |> RCall.param "main" title
         |> RCall.param "xlab" xlabel
         |> RCall.param "ylab" ylabel
+        |> RCall.param "useRaster" (Some true)
         |> RCall.call R.image
 
  

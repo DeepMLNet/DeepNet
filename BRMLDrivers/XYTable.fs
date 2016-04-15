@@ -451,6 +451,7 @@ module XYTable =
                 if Stepper.Debug then Thread.Sleep(500)                           
         )
 
+        do sentinelThread.IsBackground <- true
         do sentinelThread.Start()
 
         let waitForReady() = async {

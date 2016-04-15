@@ -157,6 +157,11 @@ module ArrayND =
             let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
             this.NewView lThis, other.NewView lOther
 
+        /// broadcasts this array to the given shape if possible
+        member this.BroadcastToShape shp = 
+            let l = ArrayNDLayout.broadcastToShape shp this.Layout
+            this.NewView l
+
         /// implements a storage specific version of map
         abstract MapImpl: ('T -> 'R) -> ArrayNDT<'R> -> unit
         default this.MapImpl f result =
@@ -245,7 +250,7 @@ module ArrayND =
             let trgt = this.View (this.ToRng rngArgs) 
             let valueObj = Array.last allArgs
             match valueObj with
-            | :? ArrayNDT<'T> as value -> value.CopyTo trgt
+            | :? ArrayNDT<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
             | _ -> failwithf "need array of same type to assign, but got type %A" 
                         (valueObj.GetType())
                 
@@ -795,51 +800,63 @@ module ArrayND =
             set dstIdx (f (view srcRng a) |> get []) c
         c
 
-    /// elementwise sum
-    let inline sumImpl (a: ArrayNDT<'T>) =
+    let inline private sumImpl (a: ArrayNDT<'T>) =
         let value = allElems a |> Seq.fold (+) ArrayNDT<'T>.Zero         
         scalarOfType value a
 
     /// elementwise sum
-    let inline sum (a: #ArrayNDT<'T>) =
+    let sum (a: #ArrayNDT<'T>) =
         typedApply (unsp) sumImpl sumImpl sumImpl sumImpl a 
 
     /// elementwise sum over given axis
-    let inline sumAxis dim a = axisReduce sum dim a
+    let sumAxis dim a = 
+        axisReduce sum dim a
     
-    /// elementwise product
-    let inline productImpl (a: ArrayNDT<'T>) =
+    let inline private productImpl (a: ArrayNDT<'T>) =
         let value = allElems a |> Seq.fold (*) ArrayNDT<'T>.One
         scalarOfType value a
 
     /// elementwise product
-    let inline product (a: #ArrayNDT<'T>) =
+    let product (a: #ArrayNDT<'T>) =
         typedApply (unsp) productImpl productImpl productImpl productImpl a 
 
     /// elementwise product over given axis
-    let inline productAxis dim a = axisReduce product dim a
+    let productAxis dim a = 
+        axisReduce product dim a
 
-    let inline maxImpl a =
+    let inline private maxImpl a =
         let value = allElems a |> Seq.reduce max
         scalarOfType value a
 
-    let inline max a =
+    /// maximum value
+    let max a =
         if nElems a = 0 then invalidArg "a" "cannot compute max of empty ArrayNDT"
         typedApply (unsp) maxImpl maxImpl maxImpl maxImpl a
 
-    let inline minImpl a =
+    /// maximum value over given axis
+    let maxAxis dim a = 
+        axisReduce max dim a
+
+    let inline private minImpl a =
         let value = allElems a |> Seq.reduce min
         scalarOfType value a
 
-    let inline min a =
+    /// minimum value
+    let min a =
         if nElems a = 0 then invalidArg "a" "cannot compute min of empty ArrayNDT"
         typedApply (unsp) minImpl minImpl minImpl minImpl a
 
-    let inline all a =
+    /// minimum value over given axis
+    let minAxis dim a = 
+        axisReduce min dim a
+
+    /// true if all elements of the array are true
+    let all a =
         let value = allElems a |> Seq.fold (&&) true
         scalarOfType value a
 
-    let inline any a =
+    /// true if any element of the array is true
+    let any a =
         let value = allElems a |> Seq.fold (||) false
         scalarOfType value a
 

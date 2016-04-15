@@ -133,8 +133,8 @@ module ArrayNDLayout =
 
     /// pads shapes from the right until they have same rank
     let rec padToSame a b =
-        if nDims a < nDims b then padToSame (padRight a) b
-        elif nDims b < nDims a then padToSame a (padRight b)
+        if nDims a < nDims b then padToSame (padLeft a) b
+        elif nDims b < nDims a then padToSame a (padLeft b)
         else a, b
 
     /// broadcasts to have the same size
@@ -151,10 +151,12 @@ module ArrayNDLayout =
     /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape bs ain =
         let bsDim = List.length bs
-        if bsDim <> nDims ain then
-            failwithf "shape %A has different rank than shape %A" bs (shape ain)
+        if bsDim < nDims ain then
+            failwithf "cannot broadcast to shape %A from shape %A of higher rank" bs (shape ain)        
 
         let mutable a = ain
+        while nDims a < bsDim do
+            a <- padLeft a
         for d = 0 to bsDim - 1 do
             match (shape a).[d], bs.[d] with
             | al, bl when al = bl -> ()

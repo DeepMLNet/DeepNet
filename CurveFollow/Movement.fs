@@ -446,9 +446,9 @@ let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedM
     R.legend (125., 10, ["control"; "optimal"; "driven"], col=["blue"; "red"; "yellow"], lty=[1;1]) |> ignore
 
     // plot biotac
-    let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose
-    let minVal, maxVal = ArrayND.min biotacImg, ArrayND.max biotacImg
-    let scaledImg = (biotacImg - minVal) / (maxVal - minVal)
+    let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose  // [chnl, smpl]
+    let minVal, maxVal = ArrayND.minAxis 1 biotacImg, ArrayND.maxAxis 1 biotacImg
+    let scaledImg = (biotacImg - minVal.[*, NewAxis]) / (maxVal - minVal).[*, NewAxis]
     R.image2 (ArrayNDHost.toArray2D scaledImg, lim=(0.0, 1.0),
               xlim=(0., 150.), colormap=Gray, title="biotac", xlabel="x", ylabel="channel")
 
@@ -526,9 +526,6 @@ let recordMovements dir =
             bp.Serialize (tw, recMovement)
 
             plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
-
-
-            exit 0
 
 
 let plotRecordedMovements dir =

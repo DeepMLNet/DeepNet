@@ -74,7 +74,7 @@ module Biotac =
 
         let SpiBitrate =        4400          // kHz
         let AfterSampleDelay =  50000         // ns
-        let AfterReadDelay =    10000         // ns
+        let AfterReadDelay =    20000         // ns
         let MaxValue =          8192          // maximum data value
 
         /// sensor query frame
@@ -182,10 +182,26 @@ module Biotac =
                 CheetahApi.ch_spi_async_collect (cheetah, responseLength, response) |> ignore
 
                 // parse data
+                let mutable sampleValid = true
                 let dataFrame =
                     seq {
                         for pos in {2 .. 4 .. responseLength - 1} do
-                            let msb, lsb = uint16 response.[pos], uint16 response.[pos+1]
+                            let msb, lsb = response.[pos], response.[pos+1]
+
+                            // check parity
+                            let parity (x: byte) =
+                                seq {
+                                    let mutable x = x
+                                    for b = 0 to 7 do
+                                        yield x &&& 1uy
+                                        x <- x >>> 1 
+                                    }
+                                |> Seq.fold (fun s b -> s ^^^ b) 0uy
+                            if parity msb <> 1uy || parity lsb <> 1uy then
+                                //printfn "received invalid biotac sample: pos=%d data=0x%x%x" pos msb lsb
+                                sampleValid <- false
+
+                            let msb, lsb = uint16 msb, uint16 lsb
                             let highData, lowData = msb >>> 1, lsb >>> 3
                             yield float ((highData <<< 5) ||| lowData) / float MaxValue
                     }
@@ -197,8 +213,9 @@ module Biotac =
                 }
 
                 // save data and fire event
-                currentSample <- Some sample
-                async { sampleAcquired.Trigger sample } |> Async.Start
+                if sampleValid then
+                    currentSample <- Some sample
+                    async { sampleAcquired.Trigger sample } |> Async.Start
 
                 // queue next batch
                 CheetahApi.ch_spi_async_submit (cheetah) |> ignore
@@ -209,6 +226,7 @@ module Biotac =
             Cheetah.closeDevice cheetah
         )
             
+        do acquisitionThread.IsBackground <- true
         do acquisitionThread.Start()
             
         /// a new sample has been acquired

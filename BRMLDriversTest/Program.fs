@@ -165,13 +165,13 @@ let main argv =
 
     //let demoLinmot = demoLinmot linmot |> Async.StartAsTask  
     //let demoTbl = async { demoTablePos xyTable } |> Async.StartAsTask
-    //let demoBt = async { demoBiotac biotac } |> Async.StartAsTask
+    let demoBt = async { demoBiotac biotac } |> Async.StartAsTask
 
-    //demoBt.Wait()
+    demoBt.Wait()
     //demoTbl.Wait()
     //demoLinmot.Wait()
 
-    testTbl()
+    //testTbl()
 
     printfn "All done."
     0 
