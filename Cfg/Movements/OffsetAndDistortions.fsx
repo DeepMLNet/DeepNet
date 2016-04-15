@@ -21,7 +21,7 @@ let baseMovement = {
 let distortionMode = 
     Movement.Distortions {
         Movement.DistortionsPerSec = 0.9
-        Movement.MaxOffset         = 3.0
+        Movement.MaxOffset         = 5.0
         Movement.MinHold           = 0.6
         Movement.MaxHold           = 2.0
         Movement.NotAgainFor       = 20.0
@@ -34,6 +34,7 @@ let cfg = {
     MovementDir     = "../../Data/DeepBraille/Movements/test1"
     MovementCfgs    = 
         [
+            //baseMovement
             {baseMovement with Mode = distortionMode}
         ]
 }

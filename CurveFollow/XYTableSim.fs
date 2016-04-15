@@ -54,3 +54,13 @@ let optimalVelToPos tPos maxControlVel cfg state =
     let vx = optimalVelAxis tPosX posX accelX maxControlVelX cfg.Dt
     let vy = optimalVelAxis tPosY posY accelY maxControlVelY cfg.Dt
     vx, vy
+
+               
+/// XY table PID controller configuration
+let pidCfg = {
+    PID.PFactor     = 0.8
+    PID.IFactor     = 0.2
+    PID.DFactor     = 1.0
+    PID.ITime       = 0.05
+    PID.DTime       = 0.05
+}

@@ -38,6 +38,10 @@ type Controller (cfg: Cfg) =
     /// Computes the PID control for given target and current value.
     member this.Control target value =
         let t = float timer.ElapsedMilliseconds / 1000.
+        this.Simulate target value t
+
+    /// Computes the PID control for given target, current value and time.
+    member this.Simulate target value t =
         let state = {Time=t; Target=target; Value=value}           
         history.Enqueue state
         dequeueUntil (t - max cfg.ITime cfg.DTime)

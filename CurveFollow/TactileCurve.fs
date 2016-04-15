@@ -18,7 +18,6 @@ type XY = float * float
 /// Drive point.
 type DrivePoint = {
     XPos:               float
-    YVel:               float
     YPos:               float
 }
 
@@ -46,18 +45,6 @@ type TactileCurve = {
 }
 
 
-
-                  
-/// XY table PID controller configuration
-let tablePidCfg = {
-    PID.PFactor     = 0.8
-    PID.IFactor     = 0.2
-    PID.DFactor     = 1.0
-    PID.ITime       = 0.05
-    PID.DTime       = 0.05
-}
-
-
 /// Records a tactile curve given a drive curve.
 let record (curve: DriveCurve) =
 
@@ -75,7 +62,7 @@ let record (curve: DriveCurve) =
     let recorder = Recorder<TactilePoint> sensors
 
     let sw = Stopwatch()
-    let pidController = PID.Controller (tablePidCfg)
+    let pidController = PID.Controller XYTableSim.pidCfg
     let rec pidControl (points: DrivePoint list) =
         let t = (float sw.ElapsedMilliseconds) / 1000.
         let x, y = Devices.XYTable.CurrentPos 
