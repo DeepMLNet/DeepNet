@@ -31,6 +31,8 @@ type R () =
         RCall.empty
         |> RCall.param "xlim" xlim
         |> RCall.param "ylim" ylim
+        |> RCall.param "xaxs" (Some "i")
+        |> RCall.param "yaxs" (Some "i")
         |> RCall.param "main" title
         |> RCall.param "xlab" xlabel
         |> RCall.param "ylab" ylabel

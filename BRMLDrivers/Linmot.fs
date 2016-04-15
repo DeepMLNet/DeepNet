@@ -288,6 +288,7 @@ module Linmot =
                 Thread.Yield () |> ignore
                 if Debug then Thread.Sleep (1000) |> ignore
             )
+        do statusThread.IsBackground <- true
 
         let rec waitForState cond = async {
             let! sts, _ = Async.AwaitEvent statusUpdatedEvent

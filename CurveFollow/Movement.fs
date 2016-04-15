@@ -63,68 +63,6 @@ module BrailleCS =
         xc + xd, yc + yd
 
 
-
-module XYTableSim =
-
-    type State = {
-        Time:  float
-        Pos:   XY
-        Vel:   XY     
-    }
-
-    type Cfg = {
-        Accel:  XY
-        MaxVel: XY
-        Dt:     float
-    }
-
-    let private stepAxis tVel pos vel accel maxVel dt =
-        let tVel = 
-            if abs tVel > maxVel then float (sign tVel) * maxVel
-            else tVel
-        let dVel = tVel - vel
-        let vel = 
-            if abs dVel < accel * dt then tVel
-            else vel + accel * (sign dVel |> float) * dt
-        let pos = pos + vel * dt
-        pos, vel
-
-    let step tVel cfg state =
-        let tVelX, tVelY = tVel
-        let {Accel=accelX, accelY; MaxVel=maxVelX, maxVelY; Dt=dt} = cfg
-        let {Time=t; Pos=posX, posY; Vel=velX, velY} = state
-        let t = t + dt
-        let posX, velX = stepAxis tVelX posX velX accelX maxVelX dt
-        let posY, velY = stepAxis tVelY posY velY accelY maxVelY dt
-        {Time=t; Pos=posX, posY; Vel=velX, velY}
-
-
-module OptimalControl = 
-    open XYTableSim
-
-    let private optimalVelAxis tPos pos accel maxVel dt = 
-        let d = tPos - pos
-        if abs d < 0.2 then
-            d / (dt * 5.)
-        else
-            let accel = if abs d < 0.7 then accel / 4.0 else accel
-            let stopVel = sqrt (2.0 * accel * abs d) * float (sign d)
-            let vel = 
-                if abs stopVel > maxVel then float (sign d) * maxVel
-                else stopVel
-            vel        
-
-    let toPos tPos maxControlVel cfg state =
-        let tPosX, tPosY = tPos
-        let maxControlVelX, maxControlVelY = maxControlVel
-        let {Accel=accelX, accelY} = cfg
-        let {Pos=posX, posY} = state
-        let vx = optimalVelAxis tPosX posX accelX maxControlVelX cfg.Dt
-        let vy = optimalVelAxis tPosY posY accelY maxControlVelY cfg.Dt
-        vx, vy
-
-
-
 type DistortionCfg = {
     DistortionsPerSec:      float
     MaxOffset:              float
@@ -164,6 +102,7 @@ type Movement = {
     StartPos:       XY
     IndentorPos:    float
     Accel:          float
+    VelX:           float
     Points:         MovementPoint list
 }
 
@@ -214,12 +153,12 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
             let cy = fac * y1 + (1. - fac) * y2
 
             // optimal velocity to track curve
-            let _, optVelY = OptimalControl.toPos (0., cy) (0., cfg.MaxControlVel) tblCfg state
+            let _, optVelY = XYTableSim.optimalVelToPos (0., cy) (0., cfg.MaxControlVel) tblCfg state
             let optVel = cfg.VelX, optVelY
 
             match cfg.Mode with
             | FixedOffset ofst ->         
-                let _, cVelY = OptimalControl.toPos (0., cy + ofst) (0., cfg.MaxControlVel) tblCfg state
+                let _, cVelY = XYTableSim.optimalVelToPos (0., cy + ofst) (0., cfg.MaxControlVel) tblCfg state
                 let cVel = cfg.VelX, cVelY
 
                 yield movementPoint cVel optVel
@@ -241,7 +180,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
                         let hu = x + dc.MinHold + rnd.NextDouble() * (dc.MaxHold - dc.MinHold)
                         yield! generate curve state (HoldUntil hu)
                     else
-                        let _, cVelY = OptimalControl.toPos (0., trgt) (0., cfg.MaxControlVel) tblCfg state
+                        let _, cVelY = XYTableSim.optimalVelToPos (0., trgt) (0., cfg.MaxControlVel) tblCfg state
                         let cVel = cfg.VelX, cVelY
 
                         yield movementPoint cVel optVel
@@ -271,6 +210,7 @@ let generate (cfg: Cfg) (rnd: System.Random) (curve: XY list) =
         StartPos    = startPos
         IndentorPos = cfg.IndentorPos
         Accel       = cfg.Accel
+        VelX        = cfg.VelX
         Points      = movement
     }
 
@@ -280,10 +220,12 @@ let toDriveCurve (movement: Movement) =
         TactileCurve.IndentorPos = movement.IndentorPos
         TactileCurve.StartPos    = movement.StartPos
         TactileCurve.Accel       = movement.Accel
+        TactileCurve.XVel        = movement.VelX
         TactileCurve.Points      = [ for mp in movement.Points -> 
                                      {
-                                        TactileCurve.Time = mp.Time
-                                        TactileCurve.Vel  = mp.ControlVel
+                                        TactileCurve.XPos = fst mp.Pos
+                                        TactileCurve.YPos = snd mp.Pos
+                                        TactileCurve.YVel = snd mp.ControlVel
                                      } ]            
     }
 
@@ -416,6 +358,8 @@ let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedM
     let distorted = recMovement.Points |> List.map (fun p -> p.Distorted) |> Array.ofList
     let biotac = recMovement.Points |> List.map (fun p -> p.Biotac)
 
+    let left, right = Array.min drivenPosX, Array.max drivenPosX
+
     let dt = recMovement.Points.[1].Time - recMovement.Points.[0].Time
     let drivenVelY =
         drivenPosY
@@ -431,26 +375,26 @@ let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedM
     R.par2 ("mgp", [1.7; 0.7; 0.0])
     R.par2 ("mfrow", [3; 1])
 
-    R.plot2 ([0; 150], [curveY.[0] - 6.; curveY.[0] + 6.], "position", "x", "y")
+    R.plot2 ([left; right], [curveY.[0] - 10.; curveY.[0] + 10.], "position", "x", "y")
     R.abline(h=curveY.[0]) |> ignore
     R.lines2 (curveX, curveY, "black")
     R.lines2 (simPosX, simPosY, "blue")
     R.lines2 (drivenPosX, drivenPosY, "yellow")
-    R.legend (115., curveY.[0] + 6., ["curve"; "movement"; "driven"], col=["black"; "blue"; "yellow"], lty=[1;1]) |> ignore
+    R.legend (125., curveY.[0] + 10., ["curve"; "movement"; "driven"], col=["black"; "blue"; "yellow"], lty=[1;1]) |> ignore
 
-    R.plot2 ([0; 150], [-10; 10], "velocity", "x", "y velocity")
+    R.plot2 ([left; right], [-15; 15], "velocity", "x", "y velocity")
     R.abline(h=0) |> ignore
     R.lines2 (drivenPosX, controlVelY, "blue")
     R.lines2 (drivenPosX, optimalVelY, "red")
     R.lines2 (drivenPosX, drivenVelY, "yellow")
-    R.legend (125., 10, ["control"; "optimal"; "driven"], col=["blue"; "red"; "yellow"], lty=[1;1]) |> ignore
+    R.legend (125., 15, ["control"; "optimal"; "driven"], col=["blue"; "red"; "yellow"], lty=[1;1]) |> ignore
 
     // plot biotac
     let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose  // [chnl, smpl]
     let minVal, maxVal = ArrayND.minAxis 1 biotacImg, ArrayND.maxAxis 1 biotacImg
     let scaledImg = (biotacImg - minVal.[*, NewAxis]) / (maxVal - minVal).[*, NewAxis]
     R.image2 (ArrayNDHost.toArray2D scaledImg, lim=(0.0, 1.0),
-              xlim=(0., 150.), colormap=Gray, title="biotac", xlabel="x", ylabel="channel")
+              xlim=(left, right), colormap=Gray, title="biotac", xlabel="x", ylabel="channel")
 
     R.dev_off() |> ignore
 
@@ -479,10 +423,10 @@ let generateMovementForFile cfgs path outDir =
             plotMovement (Path.Combine (dir, "movement.pdf")) curve movement
 
             if curveIdx <> 0 then
-                let p = FsPickler.CreateJsonSerializer(indent=true)
-                use tw = File.OpenWrite(Path.Combine (dir, "movement.json"))
+                let p = FsPickler.CreateBinarySerializer()
+                use tw = File.OpenWrite(Path.Combine (dir, "movement.dat"))
                 p.Serialize(tw, movement)
-                use tw = File.OpenWrite(Path.Combine (dir, "curve.json"))
+                use tw = File.OpenWrite(Path.Combine (dir, "curve.dat"))
                 p.Serialize(tw, curve)
             
 type GenCfg = {
@@ -507,13 +451,13 @@ let recordMovements dir =
     let bp = FsPickler.CreateBinarySerializer()
     
     for subDir in Directory.EnumerateDirectories dir do
-        let movementFile = Path.Combine (subDir, "movement.json")
+        let movementFile = Path.Combine (subDir, "movement.dat")
         if File.Exists movementFile then
             printfn "%s" movementFile
             use tr = File.OpenRead movementFile
-            let movement : Movement = p.Deserialize tr
-            use tr = File.OpenRead (Path.Combine (subDir, "curve.json"))
-            let curve : XY list = p.Deserialize tr
+            let movement : Movement = bp.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
+            let curve : XY list = bp.Deserialize tr
 
             let driveCurve = toDriveCurve movement
             let tactileCurve = TactileCurve.record driveCurve
@@ -527,6 +471,9 @@ let recordMovements dir =
 
             plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
 
+            //if movementFile = @".\Data\DeepBraille\Movements\test1\08.cur\Curve2Cfg0\movement.dat" then
+            //    exit 0
+
 
 let plotRecordedMovements dir =
     let p = FsPickler.CreateJsonSerializer(indent=true)
@@ -538,8 +485,9 @@ let plotRecordedMovements dir =
             printfn "%s" recordedFile
             use tr = File.OpenRead recordedFile
             let recMovement : RecordedMovement = bp.Deserialize tr
-            use tr = File.OpenRead (Path.Combine (subDir, "curve.json"))
-            let curve : XY list = p.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
+            let curve : XY list = bp.Deserialize tr
 
             plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
 
+            

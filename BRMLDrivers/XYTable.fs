@@ -625,6 +625,27 @@ module XYTable =
                 if 0 <= value then posReportInterval <- value
                 else invalidArg "value" "PosReportInterval must be >= 0 ms"
 
+        static member private OptimalVelAxis tPos pos accel maxVel = 
+            let d = tPos - pos
+            let accel = if abs d < 0.7 then accel / 4.0 else accel
+            let stopVel = sqrt (2.0 * accel * abs d) * float (sign d)
+            let vel = 
+                if abs stopVel > maxVel then float (sign d) * maxVel
+                else stopVel
+            vel        
+
+        /// Optimal velocity to reach target position in shortest time
+        /// with the specified maximum velocity and acceleration.
+        member this.OptimalVelToPos (tPos, ?maxVel, ?maxAccel) =
+            let maxVel = defaultArg maxVel config.DefaultVel
+            let maxAccel = defaultArg maxAccel config.DefaultAccel
+            let tPosX, tPosY = tPos
+            let posX, posY = this.CurrentPos
+            let vx = XYTableT.OptimalVelAxis tPosX posX maxAccel maxVel 
+            let vy = XYTableT.OptimalVelAxis tPosY posY maxAccel maxVel 
+            vx, vy
+
+
         interface IDisposable with
             member this.Dispose () =
                 terminate ()

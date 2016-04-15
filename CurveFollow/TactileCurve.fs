@@ -1,9 +1,11 @@
 ﻿module TactileCurve
 
 
+open System.Collections.Generic
 open System.Diagnostics
 open System.Threading
 open System.IO
+open System
 open Nessos.FsPickler.Json
 
 open Basics
@@ -11,25 +13,28 @@ open Datasets
 open BRML.Drivers
 
 
+type XY = float * float
 
 /// Drive point.
 type DrivePoint = {
-    Time:               float
-    Vel:                float * float
+    XPos:               float
+    YVel:               float
+    YPos:               float
 }
 
 /// Curve to record.
 type DriveCurve = {
     IndentorPos:        float
-    StartPos:           float * float
+    StartPos:           XY
     Accel:              float
+    XVel:               float
     Points:             DrivePoint list
 }
 
 /// A tactile point.
 type TactilePoint = {
     Time:               float
-    Pos:                float * float
+    Pos:                XY
     Biotac:             float []
 }
 
@@ -39,6 +44,19 @@ type TactileCurve = {
     Accel:              float
     Points:             TactilePoint list
 }
+
+
+
+                  
+/// XY table PID controller configuration
+let tablePidCfg = {
+    PID.PFactor     = 0.8
+    PID.IFactor     = 0.2
+    PID.DFactor     = 1.0
+    PID.ITime       = 0.05
+    PID.DTime       = 0.05
+}
+
 
 /// Records a tactile curve given a drive curve.
 let record (curve: DriveCurve) =
@@ -50,36 +68,42 @@ let record (curve: DriveCurve) =
             if withDown then
                 do! Devices.Linmot.DriveTo curve.IndentorPos
         } 
-    let gotoStartTask = gotoStart true |> Async.StartAsTask
-    
+    gotoStart true |> Async.RunSynchronously   
+
     Devices.XYTable.PosReportInterval <- 2
     let sensors = [Devices.XYTable :> ISensor; Devices.Biotac :> ISensor]
     let recorder = Recorder<TactilePoint> sensors
 
     let sw = Stopwatch()
-    let rec control (points: DrivePoint list) =
+    let pidController = PID.Controller (tablePidCfg)
+    let rec pidControl (points: DrivePoint list) =
         let t = (float sw.ElapsedMilliseconds) / 1000.
         let x, y = Devices.XYTable.CurrentPos 
+        
         printf "t=%.3f s     x=%.3f mm     y=%.3f mm       \r" t x y
-        match points with
-        //| _ when (let x, y = Devices.XYTable.CurrentPos in x > 30.) -> ()
-        | _ when (let x, y = Devices.XYTable.CurrentPos in x > 142.) -> ()
-        | [] -> ()
-        | {Time=ct; Vel=vel}::({Time=ctNext}::_ as rPoints) when ct <= t && t < ctNext ->
-            Devices.XYTable.DriveWithVel (vel, (curve.Accel, curve.Accel))  
-            control rPoints
-        | {Time=ct}::_ when t < ct ->
-            //let dt = ct - t
-            //if dt > 0.02 then Thread.Sleep (dt * 1000. |> int)
-            control points
-        | _::rCurve ->
-            control rCurve
+        if Console.KeyAvailable && Console.ReadKey().KeyChar = 'q' then
+            Devices.XYTable.Stop()
+            exit 0
 
-    gotoStartTask.Wait ()
+        match points with
+        | _ when x > 142. -> ()
+        | [] -> ()
+        | {XPos=cx; YPos=tYPos}::({XPos=ncx; YPos=nYPos}::_ as rPoints) 
+                when cx <= x && x < ncx ->
+            let fac = (ncx - x) * (ncx - cx)
+            let yTrgt = fac * tYPos + (1.-fac) * nYPos
+            let yVel = pidController.Control yTrgt y 
+            Devices.XYTable.DriveWithVel ((curve.XVel, yVel))
+            pidControl points
+        | {XPos=cx}::_ when x < cx ->
+            Devices.XYTable.DriveWithVel ((curve.XVel, 0.0))
+            pidControl points
+        | _::rCurve ->
+            pidControl rCurve
 
     recorder.Start ()
     sw.Start()
-    control curve.Points
+    pidControl curve.Points
     recorder.Stop ()
 
     Devices.XYTable.Stop ()
