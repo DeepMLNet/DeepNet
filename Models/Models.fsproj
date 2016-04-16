@@ -76,11 +76,11 @@
     <Compile Include="Neural.fs" />
     <Compile Include="Config.fs" />
     <Content Include="packages.config" />
-    <None Include="..\..\..\..\..\Program Files %28x86%29\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.4.0.0\FSharp.Core.optdata">
+    <None Include="C:\Program Files %28x86%29\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.4.0.0\FSharp.Core.optdata">
       <Link>FSharp.Core.optdata</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="..\..\..\..\..\Program Files %28x86%29\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.4.0.0\FSharp.Core.sigdata">
+    <None Include="C:\Program Files %28x86%29\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.4.0.0\FSharp.Core.sigdata">
       <Link>FSharp.Core.sigdata</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
