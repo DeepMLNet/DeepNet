@@ -251,3 +251,33 @@ module DatasetTypes =
                 sprintf "Dataset (%d training, %d validation, %d test %As)"
                     this.Trn.NSamples this.Val.NSamples this.Tst.NSamples this.Trn.SampleType
             
+            member this.ToCuda () = {
+                Trn = this.Trn.ToCuda ()
+                Val = this.Val.ToCuda ()
+                Tst = this.Tst.ToCuda ()
+            }
+
+            member this.ToHost () = {
+                Trn = this.Trn.ToHost ()
+                Val = this.Val.ToHost ()
+                Tst = this.Tst.ToHost ()
+            }
+
+            static member ToCuda (this: TrnValTst<'S>) = 
+                this.ToCuda ()
+
+            static member ToHost (this: TrnValTst<'S>) =
+                this.ToHost ()
+
+            member this.Save filename =
+                this.Trn.Save (filename + "-Trn.h5")
+                this.Val.Save (filename + "-Val.h5")
+                this.Tst.Save (filename + "-Tst.h5")
+
+            static member Load filename : TrnValTst<'S> = {
+                Trn = Dataset.Load (filename + "-Trn.h5")
+                Val = Dataset.Load (filename + "-Val.h5")
+                Tst = Dataset.Load (filename + "-Tst.h5")
+            }
+                
+

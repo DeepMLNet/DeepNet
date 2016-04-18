@@ -97,7 +97,7 @@ let main argv =
 
     let mode = args.GetResult <@ Mode @>
     match mode with
-    | _ when mode = "train" -> doTrain () ; doPlot ()
+    | _ when mode = "train" -> doTrain () 
     | _ when mode = "plot" -> doPlot ()
     | _ when mode = "follow" -> doFollow ()
     | _ when mode = "movement" -> doMovement ()

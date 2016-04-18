@@ -1,5 +1,7 @@
 ﻿namespace Models
 
+open System
+
 open Basics
 open ArrayNDNS
 open Datasets
@@ -102,6 +104,14 @@ module Train =
         LearningRates               = [1e-3f; 1e-4f; 1e-5f; 1e-6f]
     }
 
+    /// training faith
+    type Faith =
+        | Continue
+        | NoImprovement
+        | IterLimitReached
+        | TargetLossReached
+        | UserTerminated
+
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (modelInstance: ModelInstance<'P>) (lossFn: 'S -> single) (optFn: single -> 'S -> single Lazy) 
@@ -131,62 +141,70 @@ module Train =
                     TrainingLog.TstLoss = tstBatches () |> Seq.map lossFn |> Seq.average
                 }
                 let log = log |> TrainingLog.record entry modelInstance.ParameterValues
-                printfn "%5d:  trn=%3.4f  val=%3.4f  tst=%3.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
+                printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
 
                 // check termination criteria
-                let mutable terminate = false
+                let mutable faith = Continue
 
                 match cfg.TargetLoss with
                 | Some targetLoss when entry.ValLoss <= targetLoss -> 
                     printfn "Target loss reached"
-                    terminate <- true
+                    faith <- TargetLossReached
                 | _ -> ()
 
                 match cfg.Termination with
                 | FixedItersWithoutImprovement fiwi when 
                         TrainingLog.itersWithoutImprovement log > fiwi -> 
                     printfn "Trained for %d iterations without improvement" (TrainingLog.itersWithoutImprovement log)
-                    terminate <- true
+                    faith <- NoImprovement
                 | IterGain ig when
                         float iter > ig * float (TrainingLog.bestIter log) -> 
                     printfn "Trained for IterGain * %d = %d iterations" (TrainingLog.bestIter log) iter
-                    terminate <- true
+                    faith <- NoImprovement
                 | _ -> ()
 
                 match cfg.MaxIters with
                 | Some maxIters when iter >= maxIters -> 
                     printfn "Maximum number of iterations reached"
-                    terminate <- true
+                    faith <- IterLimitReached
                 | _ -> ()
                 match cfg.MinIters with
-                | Some minIters when iter < minIters -> terminate <- false
+                | Some minIters when iter < minIters -> faith <- Continue
                 | _ -> ()
 
-                if terminate then log
-                else doTrain (iter + 1) learningRate log
+                if Console.KeyAvailable && Console.ReadKey().KeyChar = 'q' then
+                    printfn "Termination by user"
+                    faith <- UserTerminated
+
+                match faith with
+                | Continue -> doTrain (iter + 1) learningRate log
+                | _ -> log, faith
             else
                 doTrain (iter + 1) learningRate log
 
         // train with decreasing learning rate
-        printfn "Training with dataset %A" dataset
-        let log =
-            (TrainingLog.create cfg.MinImprovement, cfg.LearningRates)
-            ||> Seq.fold (fun log lr ->
+        printfn "Training with %A" dataset
+        let rec trainLoop log learningRates = 
+            match learningRates with
+            | learningRate::rLearningRates ->
                 // rest log to best iteration so far
                 let log = log |> TrainingLog.removeToIter (TrainingLog.bestIter log)
                 // train
-                printfn "Training with learning rate %g" lr
-                let log = doTrain (TrainingLog.lastIter log) lr log
+                printfn "Using learning rate %g" learningRate
+                let log, faith = doTrain (TrainingLog.lastIter log) learningRate log
                 // restore best parameter values
                 match log.Best with
                 | Some (_, bestPv) -> modelInstance.ParameterValues.[Fill] <- bestPv
                 | None -> ()
 
-                log
-            )           
+                match faith with
+                | NoImprovement -> trainLoop log rLearningRates
+                | _ -> log, faith
+            | [] -> log, NoImprovement
+        let log, faith = trainLoop (TrainingLog.create cfg.MinImprovement) cfg.LearningRates
         printfn "Training completed"
 
-        log
+        log, faith
                                   
 
         

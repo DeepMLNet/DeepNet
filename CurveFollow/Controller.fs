@@ -30,10 +30,6 @@ type FollowSample = {
 
 type MLPControllerCfg = {
     MLP:            MLP.HyperPars
-    BatchSize:      int
-    Seed:           int
-    Iters:          int
-    StepSize:       single
 }
 
 let nBiotac = SizeSpec.symbol "nBiotac"
@@ -87,6 +83,7 @@ type Cfg = {
     TrnDirs:            string list
     ValDirs:            string list
     TstDirs:            string list
+    DatasetCache:       string option
     MLPControllerCfg:   MLPControllerCfg   
     TrainCfg:           Train.Cfg 
 }
@@ -104,20 +101,35 @@ let loadRecordedMovementAsDataset baseDirs =
                     for rmp in recorded.Points do
                         yield {
                             FollowSample.Biotac = rmp.Biotac |> Array.map single |> ArrayNDHost.ofArray
-                            FollowSample.YDist  = rmp.YDist |> single |> ArrayNDHost.scalar
+                            FollowSample.YDist  = rmp.YDist |> single 
+                                                  |> ArrayNDHost.scalar |> ArrayND.reshape [1]
                         }
     }            
     |> Dataset.FromSamples
      
+
+let loadDataset (cfg: Cfg) : TrnValTst<FollowSample> =
+    match cfg.DatasetCache with
+    | Some filename when File.Exists (filename + "-Trn.h5")
+                      && File.Exists (filename + "-Val.h5")
+                      && File.Exists (filename + "-Tst.h5") ->
+        printfn "Using cached dataset %s" (Path.GetFullPath filename)
+        TrnValTst.Load filename
+    | _ ->
+        let dataset = {
+            TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs 
+            TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs 
+            TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs 
+        }
+        match cfg.DatasetCache with
+        | Some filename -> dataset.Save filename
+        | _ -> ()
+        dataset
+
+        
      
 let train (cfg: Cfg) =
-    // load dataset
-    let dataset = {
-        TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs
-        TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs
-        TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs
-    }
-
+    let dataset = loadDataset cfg |> TrnValTst.ToCuda
     let mlpController = MLPController cfg.MLPControllerCfg
     mlpController.Train dataset cfg.TrainCfg |> ignore
     mlpController.Save "model.h5"
