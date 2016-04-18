@@ -2,7 +2,7 @@
 
 
 open System
-
+open System.Reflection
 
 module List =
     /// sets element with index elem to given value
@@ -74,6 +74,8 @@ module UtilTypes =
 
     /// Default value for options. Returns b if a is None, else the value of a.
     let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
+
+    let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
 
 module Util =
 

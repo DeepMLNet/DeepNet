@@ -71,11 +71,6 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Linear.fs" />
-    <Compile Include="Neural.fs" />
-    <Compile Include="Config.fs" />
-    <Content Include="packages.config" />
     <None Include="C:\Program Files %28x86%29\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.4.0.0\FSharp.Core.optdata">
       <Link>FSharp.Core.optdata</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -84,6 +79,12 @@
       <Link>FSharp.Core.sigdata</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Content Include="packages.config" />
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Linear.fs" />
+    <Compile Include="Neural.fs" />
+    <Compile Include="Config.fs" />
+    <Compile Include="Train.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Compiler.Service">
@@ -108,6 +109,11 @@
     <ProjectReference Include="..\Basics\Basics.fsproj">
       <Name>Basics</Name>
       <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Datasets\Datasets.fsproj">
+      <Name>Datasets</Name>
+      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">

@@ -304,6 +304,46 @@ module FuncTypes =
     let arg3 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) (vs2: ExprT<'T2>) f =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f
+            
+    let addArg (vs: ExprT<'T>) f =
+        fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
+            f (ve |> VarEnv.add vs value)
+
+    let inline addVarEnv f =
+        fun (ve: VarEnvT) (varEnv: VarEnvT) ->
+            f (VarEnv.join ve varEnv)
+
+    let (^@^) a b =
+        (addArg a) b
+            
+    let (^<|) a b =
+        a b
+
+//    let myFun  (ve: VarEnvT)  =
+//        3
+
+//    let testF () =
+//        let f2 = addArg (Expr.scalar 0) myFun
+//        let f3 = addArg (Expr.scalar 1.f) f2
+//        let f4 = addArg (Expr.scalar 1.f) (addArg (Expr.scalar 0) myFun)
+//        let f5 = addArg (Expr.scalar 1.f) ^<| addArg (Expr.scalar 0) myFun
+//
+//        let f6 = addArg (Expr.scalar 2.f) (addArg (Expr.scalar 1) (addArg (Expr.scalar 0.) myFun))
+//        let f7 = addArg (Expr.scalar 2.f) ^<| addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun
+//        let f8 = addArg (Expr.scalar 2.f) ^<| (addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun)
+//        
+//        let f9 = Expr.scalar 2.f ^@^ myFun
+//        let f10 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ myFun
+//        let f11 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. ^@^ myFun
+//
+//        let f12 = VarEnv.empty |> Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. ^@^ myFun
+//
+//        //let f13 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. 
+//
+//        //let f7b = addArg (Expr.scalar 2.f) ^<| addVarEnv ^<| addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun  
+//
+//        ()
+
 
 //    let inline (.|.) (varEnv: VarEnvT) (var: ExprT<'T>) =
 //        fun (varValue: ArrayNDT<'T>) ->

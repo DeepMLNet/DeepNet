@@ -85,6 +85,7 @@
     <Compile Include="Deriv.fs" />
     <None Include="DerivCheck.fs" />
     <Compile Include="ModelContext.fs" />
+    <Compile Include="RecordParams.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

@@ -5,6 +5,7 @@ open System.IO
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -15,7 +16,7 @@ open Optimizers
 open TestUtils
 
 
-let mnistPath = @"C:\Local\surban\dev\fexpr\Data\MNIST"
+let mnistPath = Util.assemblyDirectory + "../../../../Data/MNIST"
 
 
 let build device batch = 
@@ -29,7 +30,10 @@ let build device batch =
     // model parameters
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
                 {NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
-    
+  
+    // optimizer (with parameters)
+    let optimizer = GradientDescent device
+      
     // input / output variables
     let input =  mc.Var "Input"  [nInput;  batchSize]
     let target = mc.Var "Target" [nTarget; batchSize]
@@ -38,6 +42,7 @@ let build device batch =
     mc.SetSize batchSize batch
     mc.SetSize nInput 784
     mc.SetSize nTarget 10
+    optimizer.PublishCfgLoc mc
 
     // instantiate model
     let mi = mc.Instantiate (device, false)
@@ -46,11 +51,11 @@ let build device batch =
     let pred = NeuralLayer.pred pars input
     let loss = LossLayer.loss LossLayer.MSE pred target
     printfn "loss is:%A" loss
-    let opt = GradientDescent.minimize {Step=1e-2f} loss mi.ParameterSet.Flat   
+    let opt = optimizer.Minimize loss mi.ParameterSet.Flat   
 
     // compile functions
-    let lossFun = mi.Func (loss) |> arg2 input target
-    let optFun = mi.Func opt |> arg2 input target
+    let lossFun = mi.Func loss |> arg2 input target
+    let optFun = mi.Func opt |> optimizer.Cfg |> arg2 input target
     
     lossFun, optFun
 
@@ -80,7 +85,7 @@ let train device samples iters =
     let initialLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
-        optFun tstImgs tstLbls |> ignore
+        optFun tstImgs tstLbls {Step=1e-2f} |> ignore
     let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss

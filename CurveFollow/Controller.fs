@@ -1,6 +1,8 @@
 ﻿module Controller
 
 open System
+open System.IO
+open Nessos.FsPickler
 
 open Basics
 open ArrayNDNS
@@ -20,6 +22,12 @@ type IController =
     abstract Predict: biotac: Arrays -> Arrays
 
 
+type FollowSample = {
+    Biotac:          Arrays
+    YDist:           Arrays
+}
+
+
 type MLPControllerCfg = {
     MLP:            MLP.HyperPars
     BatchSize:      int
@@ -29,69 +37,43 @@ type MLPControllerCfg = {
 }
 
 let nBiotac = SizeSpec.symbol "nBiotac"
-let nVelocity = SizeSpec.symbol "nVelocity"
+let nTarget = SizeSpec.symbol "nTarget"
+
 
 type MLPController (cfg:   MLPControllerCfg) =
 
     let mc = ModelBuilder<single> "MLPController"
 
     do mc.SetSize nBiotac 23
-    do mc.SetSize nVelocity 2
+    do mc.SetSize nTarget 1
 
-    let biotac =     mc.Var "Biotac"     [SizeSpec.symbol "BatchSize"; nBiotac]
-    let optimalVel = mc.Var "OptimalVel" [SizeSpec.symbol "BatchSize"; nVelocity]
+    let biotac =  mc.Var "Biotac"  [SizeSpec.symbol "BatchSize"; nBiotac]
+    let target =  mc.Var "Target"  [SizeSpec.symbol "BatchSize"; nTarget]
     let mlp = MLP.pars mc cfg.MLP
 
     let mi = mc.Instantiate DevCuda
+    do printfn "Number of parameters in MLPController: %d" (ArrayND.nElems mi.ParameterValues)
 
     let pred = (MLP.pred mlp biotac.T).T
     let predFun = mi.Func pred |> arg biotac 
 
-    let loss = MLP.loss mlp biotac.T optimalVel.T
-    let lossFun = mi.Func loss |> arg2 biotac optimalVel
+    let loss = MLP.loss mlp biotac.T target.T
+    let lossFun = mi.Func loss |> arg2 biotac target
 
-    let opt = GradientDescent.minimize {Step=cfg.StepSize} loss mi.ParameterVector
-    let optFun = mi.Func opt |> arg2 biotac optimalVel   
+    let optimizer = GradientDescent DevCuda
+    let opt = optimizer.Minimize loss mi.ParameterVector
+    let optFun = mi.Func (opt, loss) |> optimizer.Cfg |> arg2 biotac target   
 
-    member this.Predict (biotac: Arrays) = predFun biotac
+    member this.Predict (biotac: Arrays) = 
+        predFun biotac
 
-    member this.Train (dataset: Dataset<TactilePoint>) =
-        printfn "Number of parameters in model: %d" (ArrayND.nElems mi.ParameterValues)
+    member this.Train (dataset: TrnValTst<FollowSample>) (cfg: Train.Cfg) =
+        let lossFn fs = lossFun fs.Biotac fs.YDist |> ArrayND.value
+        let optFn lr fs = 
+            let _, loss = optFun fs.Biotac fs.YDist {GradientDescent.Step=lr}
+            lazy (ArrayND.value loss)
+        Train.train mi lossFn optFn dataset cfg
 
-        // training minibatch generation
-        let ds = TrnValTst.Of dataset
-        printfn "%A" ds
-        let trnBatches = ds.Trn.Batches cfg.BatchSize
-        let tstBatch = ds.Tst.[0..10000-1]
-
-        // save training set for testing
-        //ds.Trn.ToHost().Save "TrnData.h5"
-        //ds.Tst.ToHost().Save "TstData.h5"
-
-        //let workDs = ds.Trn.[0..10000-1]
-
-        // train
-        mi.InitPars cfg.Seed
-
-        let rng = System.Random()
-        mi.ParameterStorage.Flat <- 
-            ArrayNDHost.init mi.ParameterValues.Shape (fun () -> rng.NextDouble() * 0.2 - 0.1 |> single)
-            |> ArrayNDCuda.toDev
-        //ArrayND.fill (fun () -> rng.NextDouble() * 0.2 - 0.1 |> single)  mi.ParameterValues
-
-        printfn "Training for %d iterations with batch size %d..." cfg.Iters cfg.BatchSize
-        for itr = 0 to cfg.Iters do
-            //let loss = lossFun workDs.Biotac workDs.OptimalVel
-            //printfn "Training loss after %d iterations: %A" itr loss
-
-            //optFun workDs.Biotac workDs.OptimalVel |> ignore  
-
-            let loss = lossFun tstBatch.Biotac tstBatch.OptimalVel
-            printfn "Test loss after %d iterations: %A" itr loss
-
-            for trnBatch in trnBatches() do
-                optFun trnBatch.Biotac trnBatch.OptimalVel |> ignore  
-        printfn "Done."
 
     member this.Save filename = mi.SavePars filename     
     member this.Load filename = mi.LoadPars filename
@@ -100,4 +82,75 @@ type MLPController (cfg:   MLPControllerCfg) =
         member this.Predict biotac = this.Predict biotac
             
 
+// configuration
+type Cfg = {
+    TrnDirs:            string list
+    ValDirs:            string list
+    TstDirs:            string list
+    MLPControllerCfg:   MLPControllerCfg   
+    TrainCfg:           Train.Cfg 
+}
+
+    
+let loadRecordedMovementAsDataset baseDirs = 
+    seq {
+        let s = FsPickler.CreateBinarySerializer()
+        for baseDir in baseDirs do
+            for dir in Directory.EnumerateDirectories baseDir do
+                let recordedFile = Path.Combine (dir, "recorded.dat")
+                if File.Exists recordedFile then
+                    use f = File.OpenRead recordedFile
+                    let recorded : Movement.RecordedMovement = s.Deserialize f           
+                    for rmp in recorded.Points do
+                        yield {
+                            FollowSample.Biotac = rmp.Biotac |> Array.map single |> ArrayNDHost.ofArray
+                            FollowSample.YDist  = rmp.YDist |> single |> ArrayNDHost.scalar
+                        }
+    }            
+    |> Dataset.FromSamples
      
+     
+let train (cfg: Cfg) =
+    // load dataset
+    let dataset = {
+        TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs
+        TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs
+        TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs
+    }
+
+    let mlpController = MLPController cfg.MLPControllerCfg
+    mlpController.Train dataset cfg.TrainCfg |> ignore
+    mlpController.Save "model.h5"
+
+
+let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
+    use control = new FSharp.Charting.ChartTypes.ChartControl(chart)
+    control.Size <- Drawing.Size(1280, 720)
+    chart.CopyAsBitmap().Save(path, Drawing.Imaging.ImageFormat.Png)
+
+let plot (cfg: Cfg) =
+//    let mlpController = Controller.MLPController cfg.MLPControllerCfg
+//    mlpController.Load "model.h5"
+//
+//    let dataset = loadCurveDataset cfg.DatasetDir   
+//    for idx, smpl in Seq.indexed (dataset |> Seq.take 10) do
+//        let predVel = mlpController.Predict smpl.Biotac
+//
+//        let posChart = 
+//            Chart.Line (Seq.zip smpl.Time smpl.DrivenPos.[*, 1])
+//            |> Chart.WithXAxis (Title="Time")
+//            |> Chart.WithYAxis (Title="Position", Min=0.0, Max=12.0)
+//        
+//        let controlCharts =
+//            Chart.Combine(
+//                [Chart.Line (Seq.zip smpl.Time predVel.[*, 1], Name="pred")
+//                 Chart.Line (Seq.zip smpl.Time smpl.OptimalVel.[*, 1], Name="optimal")
+//                 Chart.Line (Seq.zip smpl.Time smpl.DrivenVel.[*, 1], Name="driven") ])
+//            |> Chart.WithXAxis (Title="Time")
+//            |> Chart.WithYAxis (Title="Velocity", Min=(-2.0), Max=2.0)
+//            |> Chart.WithLegend ()
+//
+//        let chart = Chart.Rows [posChart; controlCharts]
+//        chart |> saveChart (sprintf "curve%03d.png" idx)   
+    ()
+

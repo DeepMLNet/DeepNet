@@ -7,7 +7,7 @@ open Basics
 open ArrayNDNS
 open Datasets
 
-let mnistPath = @"C:\Local\surban\dev\fexpr\Data\MNIST"
+let mnistPath = Util.assemblyDirectory + "../../../../Data/MNIST"
 
 [<Fact>]
 let ``Load MNIST`` () =
