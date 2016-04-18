@@ -236,3 +236,5 @@ ModelManifest.xml
 /Data/DeepBraille/Movements/test1/00.cur
 /Data/DeepBraille/Curves/test1/08.cur.h5
 /Data/DeepBraille/Movements/test1/08.cur
+/Cfg/Model/MLP1/model.h5
+/Data/DeepBraille/Movements/test1/ManSet
