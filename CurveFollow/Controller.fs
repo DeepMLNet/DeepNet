@@ -84,12 +84,13 @@ type Cfg = {
     ValDirs:            string list
     TstDirs:            string list
     DatasetCache:       string option
+    DownsampleFactor:   int
     MLPControllerCfg:   MLPControllerCfg   
     TrainCfg:           Train.Cfg 
 }
 
     
-let loadRecordedMovementAsDataset baseDirs = 
+let loadRecordedMovementAsDataset baseDirs downsampleFactor = 
     seq {
         let s = FsPickler.CreateBinarySerializer()
         for baseDir in baseDirs do
@@ -105,6 +106,7 @@ let loadRecordedMovementAsDataset baseDirs =
                                                   |> ArrayNDHost.scalar |> ArrayND.reshape [1]
                         }
     }            
+    |> Seq.everyNth downsampleFactor
     |> Dataset.FromSamples
      
 
@@ -117,9 +119,9 @@ let loadDataset (cfg: Cfg) : TrnValTst<FollowSample> =
         TrnValTst.Load filename
     | _ ->
         let dataset = {
-            TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs 
-            TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs 
-            TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs 
+            TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs cfg.DownsampleFactor
+            TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs cfg.DownsampleFactor
+            TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs cfg.DownsampleFactor
         }
         match cfg.DatasetCache with
         | Some filename -> dataset.Save filename

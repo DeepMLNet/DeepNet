@@ -4,6 +4,22 @@
 open System
 open System.Reflection
 
+
+module Seq = 
+
+    /// every n-th element of the given sequence
+    let everyNth n (input:seq<_>) = 
+      seq { use en = input.GetEnumerator()
+            // Call MoveNext at most 'n' times (or return false earlier)
+            let rec nextN n = 
+              if n = 0 then true
+              else en.MoveNext() && (nextN (n - 1)) 
+            // While we can move n elements forward...
+            while nextN n do
+              // Retrun each nth element
+              yield en.Current }
+
+
 module List =
     /// sets element with index elem to given value
     let rec set elem value lst =

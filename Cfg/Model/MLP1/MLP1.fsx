@@ -23,7 +23,8 @@ let trainCfg = {
     Models.Train.defaultCfg with
         Seed        = 1
         BatchSize   = 10000
-        LearningRates               = [1e-2f; 1e-3f; 1e-4f; 1e-5f; 1e-6f]
+        MinIters    = Some 2000
+        LearningRates = [1e-2f; 1e-3f; 1e-4f; 1e-5f; 1e-6f]
 }
 
 
@@ -32,6 +33,7 @@ let cfg = {
     ValDirs        = ["../../../Data/DeepBraille/Movements/test1/ManSet/val"]
     TstDirs        = ["../../../Data/DeepBraille/Movements/test1/ManSet/tst"]
     DatasetCache   = Some "../../../Data/DeepBraille/Movements/test1/ManSet/Cache"
+    DownsampleFactor = 20
     MLPControllerCfg = mlpControllerCfg
     TrainCfg       = trainCfg
 }

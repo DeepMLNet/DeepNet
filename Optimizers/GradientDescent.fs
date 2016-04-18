@@ -1,5 +1,6 @@
 ﻿namespace Optimizers
 
+open Basics
 open ArrayNDNS
 open SymTensor
 
@@ -33,6 +34,7 @@ module GradientDescentTypes =
 
         member this.PublishCfgLoc mb =
             rp.PublishLoc mb
+
 
 
 

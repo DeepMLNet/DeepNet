@@ -129,7 +129,7 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
             // execute training
-            let trnLosses = trnBatches () |> Seq.map (optFn learningRate) 
+            let trnLosses = trnBatches |> Seq.map (optFn learningRate) 
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
@@ -137,8 +137,8 @@ module Train =
                 let entry = {
                     TrainingLog.Iter    = iter
                     TrainingLog.TrnLoss = trnLosses |> Seq.averageBy (fun v -> v.Force())
-                    TrainingLog.ValLoss = valBatches () |> Seq.map lossFn |> Seq.average
-                    TrainingLog.TstLoss = tstBatches () |> Seq.map lossFn |> Seq.average
+                    TrainingLog.ValLoss = valBatches |> Seq.map lossFn |> Seq.average
+                    TrainingLog.TstLoss = tstBatches |> Seq.map lossFn |> Seq.average
                 }
                 let log = log |> TrainingLog.record entry modelInstance.ParameterValues
                 printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss

@@ -56,7 +56,7 @@ type CurveDataset () =
     [<Fact>]
     member this.``Batching`` () =
         let batchSize = 11
-        let batchGen = dataset.ToCuda().Batches batchSize
+        let batchGen = dataset.ToCuda().PaddedBatches batchSize
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 

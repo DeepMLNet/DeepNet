@@ -93,7 +93,7 @@ module DatasetTypes =
         /// Generates a function that returns a sequence of batches with the given size of this dataset.
         /// If the number of samples in this dataset is not a multiple of the batch size,
         /// the last batch will still have the specified size but is padded with zeros.
-        member this.Batches batchSize = 
+        member this.PaddedBatches batchSize = 
             let lastBatchElems = nSamples % batchSize
             let lastBatchStart = nSamples - lastBatchElems
 
@@ -125,9 +125,26 @@ module DatasetTypes =
                     | None -> ()        
                 }           
 
+        /// Returns a sequence of batches with the given size of this dataset.
+        /// If the number of samples in this dataset is not a multiple of the batch size,
+        /// the last batch will be smaller.
+        member this.Batches batchSize = 
+            let lastBatchElems = nSamples % batchSize
+            let lastBatchStart = nSamples - lastBatchElems
+
+            seq {
+                // all batches except last batch 
+                for start in 0 .. batchSize .. lastBatchStart-1 do
+                    let stop = start + batchSize - 1
+                    yield this.[start .. stop]  
+                    
+                // last batch 
+                yield this.[lastBatchStart ..]
+            }          
+
         /// template batch
         member this.TmplBatch batchSize = 
-            this.Batches batchSize () |> Seq.head
+            this.PaddedBatches batchSize () |> Seq.head
 
         /// maps the field storages using the given function creating a new dataset
         member this.MapFieldStorage (f: IArrayNDT -> #IArrayNDT) =
