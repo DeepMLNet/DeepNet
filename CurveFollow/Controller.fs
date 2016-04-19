@@ -56,9 +56,8 @@ type MLPController (cfg:   MLPControllerCfg) =
     let loss = MLP.loss mlp biotac.T target.T
     let lossFun = mi.Func loss |> arg2 biotac target
 
-    let optimizer = GradientDescent DevCuda
-    let opt = optimizer.Minimize loss mi.ParameterVector
-    let optFun = mi.Func (opt, loss) |> optimizer.Cfg |> arg2 biotac target   
+    let opt = GradientDescent (loss, mi.ParameterVector, DevCuda)
+    let optFun = mi.Func (opt.Minimize, loss) |> opt.Use |> arg2 biotac target   
 
     member this.Predict (biotac: Arrays) = 
         predFun biotac

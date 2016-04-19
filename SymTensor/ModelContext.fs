@@ -335,6 +335,8 @@ module ModelContextTypes =
                                              device:          IDevice,                                             
                                              compileEnv:      CompileEnvT) =
 
+        let mutable compileEnv = compileEnv
+
         // create parameter set and parameter storage
         let parameterSpecs = parameters |> Map.toSeq |> Seq.map fst
         let parameterSet = ParameterSetT (context, parameterSpecs)
@@ -375,6 +377,18 @@ module ModelContextTypes =
 
         /// Compile environment.
         member this.CompileEnv = compileEnv
+
+        /// sets the location of the given variable
+        member this.SetLoc var loc =
+            let uvs = var |> Expr.extractVar |> UVarSpec.ofVarSpec
+
+            match compileEnv.VarLocs |> Map.tryFind uvs with
+            | Some prvLoc when prvLoc <> loc ->
+                failwithf "cannot change location of variable %A from %A to %A after model instantiation"
+                    uvs prvLoc loc
+            | _ -> ()
+
+            compileEnv <- {compileEnv with VarLocs = compileEnv.VarLocs |> Map.add uvs loc}
 
         /// Load parameter values.
         member this.LoadPars filename = this.ParameterStorage.Load filename

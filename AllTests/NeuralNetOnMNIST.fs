@@ -31,9 +31,7 @@ let build device batch =
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
                 {NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
   
-    // optimizer (with parameters)
-    let optimizer = GradientDescent device
-      
+     
     // input / output variables
     let input =  mc.Var "Input"  [nInput;  batchSize]
     let target = mc.Var "Target" [nTarget; batchSize]
@@ -42,7 +40,6 @@ let build device batch =
     mc.SetSize batchSize batch
     mc.SetSize nInput 784
     mc.SetSize nTarget 10
-    optimizer.PublishCfgLoc mc
 
     // instantiate model
     let mi = mc.Instantiate (device, false)
@@ -50,12 +47,15 @@ let build device batch =
     // expressions
     let pred = NeuralLayer.pred pars input
     let loss = LossLayer.loss LossLayer.MSE pred target
-    printfn "loss is:%A" loss
-    let opt = optimizer.Minimize loss mi.ParameterSet.Flat   
+    printfn "loss is:\n%A" loss
+
+    // optimizer (with parameters)
+    let opt = GradientDescent (loss, mi.ParameterVector, device)
+    opt.PublishLoc mi
 
     // compile functions
     let lossFun = mi.Func loss |> arg2 input target
-    let optFun = mi.Func opt |> optimizer.Cfg |> arg2 input target
+    let optFun = mi.Func (opt.Minimize) |> opt.Use |> arg2 input target
     
     lossFun, optFun
 

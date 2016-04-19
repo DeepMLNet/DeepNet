@@ -47,12 +47,30 @@ module Adam =
 module AdamTypes = 
     open Adam
 
-    type Adam<'T when 'T: equality> (dev: IDevice) =
-        let rpCfg = RecordParams<Cfg<'T>, CfgExpr<'T>> dev
-        let cfg = rpCfg.Expr
+    type Adam<'T when 'T: equality> (loss:  ExprT<'T>,
+                                     pars:  ExprT<'T>,
+                                     dev:   IDevice) =
 
-        let rpState = RecordParams<State<'T>, StateExpr<'T>> dev
-        let state = rpState.Expr        
+        let cfg = {
+            CfgExpr.Step        = Expr.var "Adam.Cfg.Step"          []
+            CfgExpr.Momentum    = Expr.var "Adam.Cfg.Momentum"      []
+            CfgExpr.Decay       = Expr.var "Adam.Cfg.Decay"         []
+            CfgExpr.DecayMom1   = Expr.var "Adam.Cfg.DecayMom1"     []
+            CfgExpr.DecayMom2   = Expr.var "Adam.Cfg.DecayMom2"     []
+            CfgExpr.Offset      = Expr.var "Adam.Cfg.Offset"        []
+        }
+
+        let state = {
+            StateExpr.Iter      = Expr.var "Adam.State.Iter"        []
+            StateExpr.LastStep  = Expr.var "Adam.State.LastStep"    (Expr.shapeOf pars)
+            StateExpr.EstMom1   = Expr.var "Adam.State.EstMom1"     (Expr.shapeOf pars)
+            StateExpr.EstMom2   = Expr.var "Adam.State.EstMom2"     (Expr.shapeOf pars)
+            StateExpr.EstMom1B  = Expr.var "Adam.State.EstMom1B"    (Expr.shapeOf pars)
+            StateExpr.EstMom2B  = Expr.var "Adam.State.EstMom2B"    (Expr.shapeOf pars)            
+        }
+
+        let rpCfg = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)
+        let rpState = VarRecord<State<'T>, StateExpr<'T>> (state, dev)
 
         member this.DefaultCfg : Cfg<'T> = {
             Step        = conv<'T> 2e-4
@@ -74,7 +92,7 @@ module AdamTypes =
                 EstMom2B    = ArrayNDHost.zeros shp |> dev.ToDev
             }
 
-        member this.Minimize (loss: ExprT<'T>) pars  =
+        member this.Minimize =
             let gradient = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars)
 
             let one, two = Expr.scalart 1, Expr.scalart 2

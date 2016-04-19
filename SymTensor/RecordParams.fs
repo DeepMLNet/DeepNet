@@ -1,89 +1,115 @@
 ﻿namespace SymTensor
 
+open System
 open System.Reflection
 open FSharp.Reflection
 
 open Basics
 open ArrayNDNS
 
-module private RecordParamsId =
-    let mutable id = 0   
-    let next () =
-        id <- id + 1
-        id
-
-type private RecordParamsHelpers () =
-    static member VarOfType<'T> varname : ExprT<'T> = Expr.var varname []
-    static member PublishLoc<'T when 'T: equality> varname loc (mb: ModelBuilder<'T>) =
-        mb.SetLoc (RecordParamsHelpers.VarOfType<'T> varname) loc
+type private VarRecordHelpers () =
+    static member PublishLoc<'T when 'T: equality> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
+        mi.SetLoc expr loc
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
+    static member UVarSpecOfExpr<'T> (expr: ExprT<'T>) =
+        UVarSpec.ofExpr expr
 
-type RecordParams<'PVal, 'PExpr when 'PVal : equality> (dev: IDevice) =
+type private ValueType =
+    | Scalar of Type
+    | Array of Type
 
+type private RFieldInfo = {
+    Expr:           obj
+    VarSpec:        UVarSpecT
+    ValueType:      ValueType
+}
+
+/// Maps a value record (containing scalars or ArrayNDTs) to a expression record
+/// (containing ExprTs).
+type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
+                                                    dev:        IDevice) =
     do 
-        if not (FSharpType.IsRecord typeof<'PVal> && FSharpType.IsRecord typeof<'PExpr>) then
+        if not (FSharpType.IsRecord typeof<'RVal> && FSharpType.IsRecord typeof<'RExpr>) then
             failwith "'PVal and 'PExpr must both be record types"
 
-    let pValName = typeof<'PVal>.Name
-    let pValFields = FSharpType.GetRecordFields typeof<'PVal>
-    let pExprFields = FSharpType.GetRecordFields typeof<'PExpr>
+    let valFields = FSharpType.GetRecordFields typeof<'RVal>
+    let exprFields = FSharpType.GetRecordFields typeof<'RExpr>
+    let exprDatas = FSharpValue.GetRecordFields rExpr
 
-    do
-        if Array.length pValFields <> Array.length pExprFields then
-            failwith "'PVal and 'PExpr must both have the same number of fields"
+    do if Array.length valFields <> Array.length exprFields then
+        failwith "'PVal and 'PExpr must both have the same number of fields"
 
-        for pValField, pExprField in Seq.zip pValFields pExprFields do
-            if pValField.Name <> pExprField.Name then
-                failwithf "name mismatch for fields %s and %s" pValField.Name pExprField.Name
-            let reqType =
-                match pValField.PropertyType with
-                | t when t=typeof<int>    -> typeof<ExprT<int>>
-                | t when t=typeof<single> -> typeof<ExprT<single>>
-                | t when t=typeof<double> -> typeof<ExprT<double>>
-                | t -> failwithf "unsupported value type %A" t
-            if pExprField.PropertyType <> reqType then
-                failwithf "type mismatch for field %s: 'PVal type %A requires 'PExpr type %A but got %A"
-                    pValField.Name pValField.PropertyType reqType pExprField.PropertyType
+    let fieldInfos = 
+        seq {
+            for valField, exprField, exprData in Seq.zip3 valFields exprFields exprDatas do
+                if valField.Name <> exprField.Name then
+                    failwithf "name mismatch for fields %s and %s" valField.Name exprField.Name
 
-    let id = RecordParamsId.next()       
-    let pVarNames = pValFields |> Array.map (fun f -> sprintf "%s%d.%s" pValName id f.Name)
+                // get value type and corresponding expression type
+                let baseType, valueType, exprType =                   
+                    if valField.PropertyType.IsGenericType && 
+                            valField.PropertyType.GetGenericTypeDefinition() = typedefof<ArrayNDT<_>> then
+                        // ArrayNDT<'T> => ExprT<'T>
+                        let bt = valField.PropertyType.GetGenericArguments().[0]
+                        bt, Array bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
+                    else
+                        // 'T => ExprT<'T> (scalar)
+                        let bt = valField.PropertyType
+                        bt, Scalar bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
 
-    let mutable cache = None
+                if exprField.PropertyType <> exprType then
+                    failwithf "type mismatch for field %s: 'PVal type %A requires 'PExpr type %A but got %A"
+                        valField.Name valField.PropertyType exprType exprField.PropertyType
 
-    member this.Expr : 'PExpr =
-        let exprs =
-            (pValFields, pVarNames)
-            ||> Array.map2 (fun f varname ->
-                let mi = typeof<RecordParamsHelpers>.GetMethod("VarOfType", allBindingFlags)
-                let m = mi.MakeGenericMethod f.PropertyType
-                m.Invoke(null, [|box varname|])
-            )
-        FSharpValue.MakeRecord(typeof<'PExpr>, exprs) :?> 'PExpr
+                // extract UVarSpecT
+                let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", allBindingFlags) 
+                let m = mi.MakeGenericMethod baseType
+                let varSpec = m.Invoke(null, [|exprData|]) :?> UVarSpecT
 
-    member this.VarEnv (value: 'PVal) : VarEnvT =        
-        match cache with
+                yield {Expr=exprData; VarSpec=varSpec; ValueType=valueType}
+        } 
+
+    let mutable varEnvCache = None
+
+    /// the storage device
+    member this.Dev  = dev
+
+    /// the expression record
+    member this.Expr = rExpr
+
+    /// the VarEnv containing the values in the passed value record
+    member this.VarEnv (value: 'RVal) : VarEnvT =        
+        match varEnvCache with
         | Some (lastValue, lastVarEnv) when lastValue = value -> lastVarEnv
         | _ ->
-            let myVarEnv =
-                (VarEnv.empty, Seq.zip3 pVarNames (FSharpValue.GetRecordFields value) pValFields)
-                ||> Seq.fold (fun varEnv (varName, valData, valField) ->
-                    let vs = UVarSpec.ofNameShapeAndTypeName varName [] (TypeName.ofTypeInst valField.PropertyType)
-                    let mi = typeof<RecordParamsHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
-                    let m = mi.MakeGenericMethod valField.PropertyType
-                    let ary = m.Invoke(null, [|box valData; box dev|]) :?> IArrayNDT
-                    varEnv |> VarEnv.addUVarSpec vs ary
+            let values = FSharpValue.GetRecordFields value
+            let varEnv =
+                (VarEnv.empty, Seq.zip fieldInfos values)
+                ||> Seq.fold (fun varEnv (fi, value) ->
+                    match fi.ValueType with
+                    | Scalar baseType ->
+                        let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
+                        let m = mi.MakeGenericMethod baseType
+                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> IArrayNDT
+                        varEnv |> VarEnv.addUVarSpec fi.VarSpec valueAry
+                    | Array _ ->
+                        varEnv |> VarEnv.addUVarSpec fi.VarSpec (value :?> IArrayNDT)
                 )
-            cache <- Some (value, myVarEnv)
-            myVarEnv      
+            varEnvCache <- Some (value, varEnv)
+            varEnv      
         
+    /// extends the given function to accept a value record
     member this.Use (f: VarEnvT -> 'R) =
-        fun (ve: VarEnvT) (value: 'PVal) -> f (VarEnv.join ve (this.VarEnv value))
+        fun (ve: VarEnvT) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
 
-    member this.PublishLoc (mb: ModelBuilder<_>) =
-        (pValFields, pVarNames)
-        ||> Array.iter2 (fun f varname ->
-            let mi = typeof<RecordParamsHelpers>.GetMethod("PublishLoc", allBindingFlags)
-            let m = mi.MakeGenericMethod f.PropertyType
-            m.Invoke(null, [|box varname; dev.DefaultLoc; mb|]) |> ignore
+    /// publishes the locations of the used variables to the given ModelInstance
+    member this.PublishLoc (model: ModelInstance<_>) =
+        fieldInfos
+        |> Seq.iter (fun fi ->
+            match fi.ValueType with
+            | Scalar baseType | Array baseType ->
+                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLoc", allBindingFlags)
+                let m = mi.MakeGenericMethod baseType
+                m.Invoke(null, [|fi.Expr; dev.DefaultLoc; model|]) |> ignore
         )
