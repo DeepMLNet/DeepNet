@@ -129,14 +129,14 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
             // execute training
-            let trnLosses = trnBatches |> Seq.map (optFn learningRate) 
+            let trnLosses = trnBatches |> Seq.map (optFn learningRate) |> Seq.toList
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
                 // compute and log validation & test losses
                 let entry = {
                     TrainingLog.Iter    = iter
-                    TrainingLog.TrnLoss = trnLosses |> Seq.averageBy (fun v -> v.Force())
+                    TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
                     TrainingLog.ValLoss = valBatches |> Seq.map lossFn |> Seq.average
                     TrainingLog.TstLoss = tstBatches |> Seq.map lossFn |> Seq.average
                 }
@@ -169,12 +169,26 @@ module Train =
                     faith <- IterLimitReached
                 | _ -> ()
                 match cfg.MinIters with
-                | Some minIters when iter < minIters -> faith <- Continue
+                | Some minIters when iter < minIters -> 
+                    if faith <> Continue then
+                        printfn "But continuing since minimum number of iterations %d is not yet reached"
+                            minIters
+                    faith <- Continue
                 | _ -> ()
 
-                if Console.KeyAvailable && Console.ReadKey().KeyChar = 'q' then
+                // process user input
+                let key = 
+                    if Console.KeyAvailable then Some (Console.ReadKey().KeyChar)
+                    else None
+                match key with
+                | Some 'q' ->
                     printfn "Termination by user"
                     faith <- UserTerminated
+                | Some 'd' ->
+                    printfn "Learning rate decrease by user"
+                    faith <- NoImprovement
+                | _ -> ()
+
 
                 match faith with
                 | Continue -> doTrain (iter + 1) learningRate log
