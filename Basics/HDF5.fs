@@ -54,7 +54,8 @@ module HDF5Types =
         let fileHnd =
             match mode with
             | HDF5Read -> 
-                if not (File.Exists path) then raise (FileNotFoundException ("HDF5 file not found", path))
+                if not (File.Exists path) then 
+                    raise (FileNotFoundException (sprintf "HDF5 file not found: %s" path, path))
                 H5F.``open`` (path, H5F.ACC_RDONLY)
             | HDF5Overwrite -> H5F.create (path, H5F.ACC_TRUNC)
             |> check

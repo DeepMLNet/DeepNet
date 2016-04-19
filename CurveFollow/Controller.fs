@@ -3,6 +3,7 @@
 open System
 open System.IO
 open Nessos.FsPickler
+open Nessos.FsPickler.Json
 
 open Basics
 open ArrayNDNS
@@ -89,30 +90,59 @@ type Cfg = {
     DownsampleFactor:   int
     MLPControllerCfg:   MLPControllerCfg   
     TrainCfg:           Train.Cfg 
+    ModelFile:          string
 }
 
-    
-let loadRecordedMovementAsDataset baseDirs downsampleFactor = 
+
+let loadRecordedMovements baseDirs =
+    let s = FsPickler.CreateBinarySerializer()
     seq {
-        let s = FsPickler.CreateBinarySerializer()
         for baseDir in baseDirs do
             for dir in Directory.EnumerateDirectories baseDir do
                 let recordedFile = Path.Combine (dir, "recorded.dat")
                 if File.Exists recordedFile then
                     use f = File.OpenRead recordedFile
                     let recorded : Movement.RecordedMovement = s.Deserialize f           
-                    for rmp in recorded.Points do
-                        yield {
-                            FollowSample.Biotac = rmp.Biotac |> Array.map single |> ArrayNDHost.ofArray
-                            FollowSample.YDist  = rmp.YDist |> single 
-                                                  |> ArrayNDHost.scalar |> ArrayND.reshape [1]
-                        }
+                    yield recorded
+    }
+    
+let recordedMovementAsFollowSamples (recorded: Movement.RecordedMovement) = seq {
+    for rmp in recorded.Points do
+        yield {
+            FollowSample.Biotac = rmp.Biotac |> Array.map single |> ArrayNDHost.ofArray
+            FollowSample.YDist  = rmp.YDist |> single 
+                                  |> ArrayNDHost.scalar |> ArrayND.reshape [1]
+        }    
+}
+
+let loadRecordedMovementAsCurveDataset baseDirs =
+    seq {
+        for recorded in loadRecordedMovements baseDirs do
+            let nSteps = List.length recorded.Points
+            let nChannels = Array.length recorded.Points.[0].Biotac
+                    
+            let biotac = ArrayNDHost.zeros [nSteps; nChannels]
+            let ydist = ArrayNDHost.zeros [1; nChannels]
+
+            for step, rmp in List.indexed recorded.Points do
+                biotac.[step, *] <- rmp.Biotac |> Array.map single |> ArrayNDHost.ofArray
+                ydist.[[step; 0]] <- rmp.YDist |> single
+
+            yield {FollowSample.Biotac=biotac; FollowSample.YDist=ydist}                    
+    }            
+    |> Dataset.FromSamples
+
+
+let loadRecordedMovementAsPointDataset baseDirs downsampleFactor = 
+    seq {
+        for recorded in loadRecordedMovements baseDirs do    
+            yield! recordedMovementAsFollowSamples recorded     
     }            
     |> Seq.everyNth downsampleFactor
     |> Dataset.FromSamples
      
 
-let loadDataset (cfg: Cfg) : TrnValTst<FollowSample> =
+let loadPointDataset (cfg: Cfg) : TrnValTst<FollowSample> =
     match cfg.DatasetCache with
     | Some filename when File.Exists (filename + "-Trn.h5")
                       && File.Exists (filename + "-Val.h5")
@@ -121,52 +151,52 @@ let loadDataset (cfg: Cfg) : TrnValTst<FollowSample> =
         TrnValTst.Load filename
     | _ ->
         let dataset = {
-            TrnValTst.Trn = loadRecordedMovementAsDataset cfg.TrnDirs cfg.DownsampleFactor
-            TrnValTst.Val = loadRecordedMovementAsDataset cfg.ValDirs cfg.DownsampleFactor
-            TrnValTst.Tst = loadRecordedMovementAsDataset cfg.TstDirs cfg.DownsampleFactor
+            TrnValTst.Trn = loadRecordedMovementAsPointDataset cfg.TrnDirs cfg.DownsampleFactor
+            TrnValTst.Val = loadRecordedMovementAsPointDataset cfg.ValDirs cfg.DownsampleFactor
+            TrnValTst.Tst = loadRecordedMovementAsPointDataset cfg.TstDirs cfg.DownsampleFactor
         }
         match cfg.DatasetCache with
         | Some filename -> dataset.Save filename
         | _ -> ()
         dataset
 
-        
      
 let train (cfg: Cfg) =
-    let dataset = loadDataset cfg |> TrnValTst.ToCuda
+    let dataset = loadPointDataset cfg |> TrnValTst.ToCuda
     let mlpController = MLPController cfg.MLPControllerCfg
     mlpController.Train dataset cfg.TrainCfg |> ignore
-    mlpController.Save "model.h5"
-
+    mlpController.Save cfg.ModelFile
 
 let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
     use control = new FSharp.Charting.ChartTypes.ChartControl(chart)
     control.Size <- Drawing.Size(1280, 720)
     chart.CopyAsBitmap().Save(path, Drawing.Imaging.ImageFormat.Png)
 
-let plot (cfg: Cfg) =
-//    let mlpController = Controller.MLPController cfg.MLPControllerCfg
-//    mlpController.Load "model.h5"
-//
-//    let dataset = loadCurveDataset cfg.DatasetDir   
-//    for idx, smpl in Seq.indexed (dataset |> Seq.take 10) do
-//        let predVel = mlpController.Predict smpl.Biotac
-//
-//        let posChart = 
-//            Chart.Line (Seq.zip smpl.Time smpl.DrivenPos.[*, 1])
-//            |> Chart.WithXAxis (Title="Time")
-//            |> Chart.WithYAxis (Title="Position", Min=0.0, Max=12.0)
-//        
-//        let controlCharts =
-//            Chart.Combine(
-//                [Chart.Line (Seq.zip smpl.Time predVel.[*, 1], Name="pred")
-//                 Chart.Line (Seq.zip smpl.Time smpl.OptimalVel.[*, 1], Name="optimal")
-//                 Chart.Line (Seq.zip smpl.Time smpl.DrivenVel.[*, 1], Name="driven") ])
-//            |> Chart.WithXAxis (Title="Time")
-//            |> Chart.WithYAxis (Title="Velocity", Min=(-2.0), Max=2.0)
-//            |> Chart.WithLegend ()
-//
-//        let chart = Chart.Rows [posChart; controlCharts]
-//        chart |> saveChart (sprintf "curve%03d.png" idx)   
-    ()
+let plotCurvePredictions (cfg: Cfg) curveDir =
+    let bp = FsPickler.CreateBinarySerializer()
+    let jp = FsPickler.CreateJsonSerializer(indent=true)
+
+    let mlpController = MLPController cfg.MLPControllerCfg
+    mlpController.Load cfg.ModelFile
+    
+    for subDir in Directory.EnumerateDirectories curveDir do
+        let recordedFile = Path.Combine (subDir, "recorded.dat")
+        if File.Exists recordedFile then
+            printfn "%s" recordedFile
+            use tr = File.OpenRead recordedFile
+            let recMovement : Movement.RecordedMovement = bp.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
+            let curve : Movement.XY list = bp.Deserialize tr
+
+            // predict
+            let ds = recordedMovementAsFollowSamples recMovement |> Dataset.FromSamples 
+            let biotac = ds.All.Biotac :?> ArrayNDHostT<_> |> ArrayNDCuda.toDev
+            let pred = mlpController.Predict biotac :?> ArrayNDCudaT<_>
+            let predDistY = pred.[*, 0] |> ArrayNDCuda.toHost |> ArrayNDHost.toList |> List.map float
+
+            // save and plot
+            use tw = File.OpenWrite (Path.Combine (subDir, "predicted.json"))
+            jp.Serialize (tw, predDistY)
+            Movement.plotRecordedMovement (Path.Combine (subDir, "predicted.pdf")) curve recMovement (Some predDistY)
+
 

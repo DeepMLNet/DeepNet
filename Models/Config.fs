@@ -39,6 +39,11 @@ module Config =
         member this.EvalScript path = 
             fsiSession.EvalInteraction (File.ReadAllText path)
             
+    /// Directory of the currently loading configuration file.
+    let mutable cfgDir = ""
+
+    /// First ancessor directory of configuration file directory that contains a "Cfg" subdirectory.
+    let mutable baseDir = ""
 
     /// Load configuration F# script (.fsx file) and returns the variable named "cfg".
     let load path = 
@@ -46,6 +51,14 @@ module Config =
             failwithf "configuration file %s does not exist" (Path.GetFullPath path)
         printfn "Using configuration file %s" (Path.GetFullPath path)
 
+        // set paths for configuration file consumption
+        cfgDir <- path |> Path.GetFullPath |> Path.GetDirectoryName
+        let rec findBaseDir dir =
+            if Directory.Exists (Path.Combine (dir, "Cfg")) then Path.GetFullPath dir
+            else findBaseDir (Path.Combine (dir, ".."))
+        baseDir <- findBaseDir cfgDir
+
+        // evaluate configuration script
         try 
             let eval = FsiEvaluator()
             eval.EvalScript path

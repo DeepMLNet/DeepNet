@@ -263,3 +263,7 @@ module ArrayNDHost =
         if ArrayND.nDims ary <> 3 then failwith "ArrayNDT must have 3 dimensions"
         let shp = ArrayND.shape ary
         Array3D.init shp.[0] shp.[1] shp.[2] (fun i0 i1 i2 -> ary.[[i0; i1; i2]])
+
+    /// Creates a list from the data in this ArrayNDT. The data is copied.
+    let toList (ary: ArrayNDHostT<_>) =
+        ary |> toArray |> Array.toList

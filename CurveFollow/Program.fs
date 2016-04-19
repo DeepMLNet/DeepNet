@@ -66,18 +66,19 @@ let loadCurveDataset datasetDir =
 
 
 let doTrain () =  
-    let cfg : Controller.Cfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)
+    let cfg : Controller.Cfg = Config.load (args.GetResult <@ Cfg @>)
     Controller.train cfg
 
-let doPlot () =
-    let cfg : Controller.Cfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)
-    Controller.plot cfg
+let doPlotPredictions () =
+    let cfg : Controller.Cfg = Config.load (args.GetResult <@ Cfg @>)
+    let dir = args.GetResult <@ Dir @>
+    Controller.plotCurvePredictions cfg dir
  
 let doFollow () =
     ()
 
 let doMovement () =
-    let cfg : Movement.GenCfg = Config.loadAndChdir (args.GetResult <@ Cfg @>)  
+    let cfg : Movement.GenCfg = Config.load (args.GetResult <@ Cfg @>)  
     Movement.generateMovementUsingCfg cfg
 
 let doRecord () =
@@ -90,7 +91,6 @@ let doPlotRecorded () =
     Movement.plotRecordedMovements dir
 
 
-
 [<EntryPoint>]
 let main argv = 
     DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
@@ -98,7 +98,7 @@ let main argv =
     let mode = args.GetResult <@ Mode @>
     match mode with
     | _ when mode = "train" -> doTrain () 
-    | _ when mode = "plot" -> doPlot ()
+    | _ when mode = "plotPredictions" -> doPlotPredictions ()
     | _ when mode = "follow" -> doFollow ()
     | _ when mode = "movement" -> doMovement ()
     | _ when mode = "record" -> doRecord ()

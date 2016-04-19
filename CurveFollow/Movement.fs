@@ -347,7 +347,7 @@ let plotTactile (path: string) (curve: XY list) (tactile: TactileCurve.TactileCu
     R.dev_off() |> ignore
 
 
-let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedMovement) =
+let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedMovement) (predDistY: float list option) =
     let curveX, curveY = toArray id curve
     let simPosX, simPosY = recMovement.Points |> toArray (fun p -> p.SimPos) 
     let drivenPosX, drivenPosY = recMovement.Points |> toArray (fun p -> p.DrivenPos) 
@@ -389,6 +389,11 @@ let plotRecordedMovement (path: string) (curve: XY list) (recMovement: RecordedM
     R.plot2 ([left; right], [-8; 8], "distance to curve", "x", "y distance")
     R.abline(h=0) |> ignore
     R.lines2 (drivenPosX, distY, "blue")
+    match predDistY with
+    | Some predDistY -> 
+        R.lines2 (drivenPosX, predDistY, "red")
+        R.legend (125., 8, ["true"; "predicted"], col=["blue"; "red"], lty=[1;1]) |> ignore
+    | None -> ()
 
     // plot biotac
     let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose  // [chnl, smpl]
@@ -443,9 +448,6 @@ let generateMovementUsingCfg cfg  =
         generateMovementForFile cfg.MovementCfgs file outDir
 
 
-
-
-
 /// Records data for all */movement.json files in the given directory.
 let recordMovements dir =
     let p = FsPickler.CreateJsonSerializer(indent=true)
@@ -470,14 +472,10 @@ let recordMovements dir =
             use tw = File.OpenWrite (Path.Combine (subDir, "recorded.dat"))
             bp.Serialize (tw, recMovement)
 
-            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
-
-            //if movementFile = @".\Data\DeepBraille\Movements\test1\08.cur\Curve2Cfg0\movement.dat" then
-            //    exit 0
+            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement None
 
 
 let plotRecordedMovements dir =
-    let p = FsPickler.CreateJsonSerializer(indent=true)
     let bp = FsPickler.CreateBinarySerializer()
     
     for subDir in Directory.EnumerateDirectories dir do
@@ -489,6 +487,6 @@ let plotRecordedMovements dir =
             use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
             let curve : XY list = bp.Deserialize tr
 
-            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement
+            plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement None
 
             

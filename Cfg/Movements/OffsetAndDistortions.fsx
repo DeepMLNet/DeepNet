@@ -2,9 +2,11 @@
 #I "../../CurveFollow/bin/Debug"
 #endif 
 
+#r "Models.dll"
 #r "CurveFollow.exe"
 
 open Movement
+open Models
 
 
 let baseMovement = {
@@ -30,8 +32,8 @@ let distortionMode =
 
 
 let cfg = {
-    CurveDir        = "../../Data/DeepBraille/Curves/test1"
-    MovementDir     = "../../Data/DeepBraille/Movements/test1"
+    CurveDir        = Config.baseDir + "/Data/DeepBraille/Curves/test1"
+    MovementDir     = Config.baseDir + "/Data/DeepBraille/Movements/test1"
     MovementCfgs    = 
         [
             baseMovement

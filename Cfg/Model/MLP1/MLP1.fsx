@@ -29,11 +29,12 @@ let trainCfg = {
 
 
 let cfg = {
-    TrnDirs        = ["../../../Data/DeepBraille/Movements/test1/ManSet/trn"]
-    ValDirs        = ["../../../Data/DeepBraille/Movements/test1/ManSet/val"]
-    TstDirs        = ["../../../Data/DeepBraille/Movements/test1/ManSet/tst"]
-    DatasetCache   = Some "../../../Data/DeepBraille/Movements/test1/ManSet/Cache"
+    TrnDirs        = [Config.baseDir + "/Data/DeepBraille/Movements/test1/ManSet/trn"]
+    ValDirs        = [Config.baseDir + "/Data/DeepBraille/Movements/test1/ManSet/val"]
+    TstDirs        = [Config.baseDir + "/Data/DeepBraille/Movements/test1/ManSet/tst"]
+    DatasetCache   = Some (Config.baseDir + "/Data/DeepBraille/Movements/test1/ManSet/Cache")
     DownsampleFactor = 20
     MLPControllerCfg = mlpControllerCfg
     TrainCfg       = trainCfg
+    ModelFile      = Config.cfgDir + "/model.h5"
 }
