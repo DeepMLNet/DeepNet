@@ -542,8 +542,10 @@ module XYTable =
                                             vmAccel := accel
                                         if cntrlVel <> !vmVel then
                                             let vmXVel, vmYVel = !vmVel
-                                            Stepper.adjustVelocity (xDeg cntrlXvel) (sign xvel <> sign vmXVel) xStepper
-                                            Stepper.adjustVelocity (yDeg cntrlYvel) (sign yvel <> sign vmYVel) yStepper
+                                            Stepper.adjustVelocity (xDeg cntrlXvel) true xStepper
+                                            Stepper.adjustVelocity (yDeg cntrlYvel) true yStepper
+                                            //Stepper.adjustVelocity (xDeg cntrlXvel) (sign xvel <> sign vmXVel) xStepper
+                                            //Stepper.adjustVelocity (yDeg cntrlYvel) (sign yvel <> sign vmYVel) yStepper
                                             vmVel := cntrlVel
 
                                         setTargetVel vel accel

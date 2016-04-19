@@ -455,7 +455,9 @@ let recordMovements dir =
     
     for subDir in Directory.EnumerateDirectories dir do
         let movementFile = Path.Combine (subDir, "movement.dat")
-        if File.Exists movementFile then
+        let recordFile = Path.Combine (subDir, "recorded.dat")
+        if File.Exists movementFile && 
+                (not (File.Exists recordFile) || File.GetLastWriteTime movementFile > File.GetLastWriteTime recordFile) then
             printfn "%s" movementFile
             use tr = File.OpenRead movementFile
             let movement : Movement = bp.Deserialize tr
@@ -469,7 +471,7 @@ let recordMovements dir =
             plotTactile (Path.Combine (subDir, "tactile.pdf")) curve tactileCurve
 
             let recMovement = syncTactileCurve tactileCurve movement
-            use tw = File.OpenWrite (Path.Combine (subDir, "recorded.dat"))
+            use tw = File.Create recordFile
             bp.Serialize (tw, recMovement)
 
             plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement None
