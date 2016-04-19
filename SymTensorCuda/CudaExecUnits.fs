@@ -92,7 +92,7 @@ module CudaExecUnit =
             | LocDev -> 
                 // request to store directly into external var
                 // we assume that all device input vars are continguous
-                [Some (ArrayNDManikin.externalC (MemExternal vs) trgtShape)]
+                [Some (ArrayNDManikin.externalC (MemExternal vs) srcShapes.[0])]
             | LocHost -> noSrcReqs
             | loc -> unsupLoc loc
         // misc
@@ -200,7 +200,9 @@ module CudaExecUnit =
         | UUnaryOp (SwapDim (ax1, ax2)) ->
             ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
         // variable access
-        | UUnaryOp (StoreToVar _) -> newTrgt
+        | UUnaryOp (StoreToVar _) -> 
+            // output of StoreToVar is empty 
+            newTrgt
         // misc
         | UUnaryOp (Annotated _) -> srcs.[0], srcShared.[0]
 
@@ -275,7 +277,7 @@ module CudaExecUnit =
     /// execution items for an elementwise operation
     let execItemsForElemwise trgt cOp srcViews =
         if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
-            failwithf "sources have different number of elements than target"
+            failwithf "a source of an elemwise op has different number of elements than target"
 
         let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))

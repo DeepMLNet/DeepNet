@@ -56,7 +56,8 @@ type MLPController (cfg:   MLPControllerCfg) =
     let loss = MLP.loss mlp biotac.T target.T
     let lossFun = mi.Func loss |> arg2 biotac target
 
-    let opt = GradientDescent (loss, mi.ParameterVector, DevCuda)
+    //let opt = GradientDescent (loss, mi.ParameterVector, DevCuda)
+    let opt = Adam (loss, mi.ParameterVector, DevCuda)
     let optFun = mi.Func (opt.Minimize, loss) |> opt.Use |> arg2 biotac target   
 
     member this.Predict (biotac: Arrays) = 
@@ -64,8 +65,10 @@ type MLPController (cfg:   MLPControllerCfg) =
 
     member this.Train (dataset: TrnValTst<FollowSample>) (cfg: Train.Cfg) =
         let lossFn fs = lossFun fs.Biotac fs.YDist |> ArrayND.value
+        let optState = opt.InitialState mi.ParameterValues
         let optFn lr fs = 
-            let _, loss = optFun fs.Biotac fs.YDist {GradientDescent.Step=lr}
+            //let _, loss = optFun fs.Biotac fs.YDist {GradientDescent.Step=lr}
+            let _, loss = optFun fs.Biotac fs.YDist {opt.DefaultCfg with Step = lr} optState
             lazy (ArrayND.value loss)
         Train.train mi lossFn optFn dataset cfg
 
