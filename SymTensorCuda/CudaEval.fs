@@ -108,10 +108,7 @@ module CudaEvalTypes =
             ArrayNDCuda.toHost (ary :?> ArrayNDCudaT<'T>)
 
     let private invokeHelperMethod<'T> name args = 
-        let gm = typeof<HelperT>.GetMethod (name, 
-                                            BindingFlags.NonPublic ||| 
-                                            BindingFlags.Public ||| 
-                                            BindingFlags.Static)
+        let gm = typeof<HelperT>.GetMethod (name, allBindingFlags)
         let m = gm.MakeGenericMethod ([|typeof<'T>|])
         m.Invoke(null, args)  
 

@@ -6,13 +6,14 @@ open ArrayNDNS
 
 [<AutoOpen>]
 module VarEnvTypes = 
-    /// variable environment
+    /// variable value collection
     type VarEnvT = Map<UVarSpecT, IArrayNDT>
 
     /// specification of variable storage locations
     type VarLocsT = Map<UVarSpecT, ArrayLocT>
 
 
+/// Variable value collection.
 module VarEnv = 
 
     /// add variable value to environment
@@ -148,16 +149,20 @@ module EvalEnv =
         VarEnv.get var evalEnv.VarEnv
 
 
+/// Function compilation parameters
 module CompileEnv =
 
     /// empty compile environment
     let empty =
         {VarLocs=Map.empty; ResultLoc=LocHost; SymSizes=SymSizeEnv.empty; CanDelay=true;}
 
-
-     
-
+ 
+/// Generates F# function from expressions.
 module Func =
+
+    /// If true, then information about function instantiations for a particular set
+    /// of variable sizes and locations is printed.
+    let printInstantiations = false
 
     type private UExprGenT = SymSizeEnvT -> (UExprT * Set<UVarSpecT> * bool) 
 
@@ -262,8 +267,11 @@ module Func =
                                                       VarLocs  = Map.join baseCompileEnv.VarLocs varLocs}
 
                 // compile and cache compiled function if necessary
-                if not (Map.containsKey compileEnv variants) then
+                if not (Map.containsKey compileEnv variants) then 
+                    if printInstantiations then printfn "Instantiating new function variant for %A" compileEnv
                     variants <- variants |> Map.add compileEnv (tryCompile compileEnv true).Value
+                else
+                    if printInstantiations then printfn "Using cached function variant for %A" compileEnv
 
                 // evaluate
                 performEval variants.[compileEnv] varEnv

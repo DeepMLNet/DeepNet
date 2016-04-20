@@ -172,6 +172,8 @@ let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
     control.Size <- Drawing.Size(1280, 720)
     chart.CopyAsBitmap().Save(path, Drawing.Imaging.ImageFormat.Png)
 
+
+
 let plotCurvePredictions (cfg: Cfg) curveDir =
     let bp = FsPickler.CreateBinarySerializer()
     let jp = FsPickler.CreateJsonSerializer(indent=true)
@@ -181,7 +183,7 @@ let plotCurvePredictions (cfg: Cfg) curveDir =
     
     for subDir in Directory.EnumerateDirectories curveDir do
         let recordedFile = Path.Combine (subDir, "recorded.dat")
-        if File.Exists recordedFile then
+        if File.Exists recordedFile then 
             printfn "%s" recordedFile
             use tr = File.OpenRead recordedFile
             let recMovement : Movement.RecordedMovement = bp.Deserialize tr
@@ -195,7 +197,7 @@ let plotCurvePredictions (cfg: Cfg) curveDir =
             let predDistY = pred.[*, 0] |> ArrayNDCuda.toHost |> ArrayNDHost.toList |> List.map float
 
             // save and plot
-            use tw = File.OpenWrite (Path.Combine (subDir, "predicted.json"))
+            use tw = File.CreateText (Path.Combine (subDir, "predicted.json"))
             jp.Serialize (tw, predDistY)
             Movement.plotRecordedMovement (Path.Combine (subDir, "predicted.pdf")) curve recMovement (Some predDistY)
 

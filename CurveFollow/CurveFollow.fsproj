@@ -51,7 +51,8 @@
     <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <StartArguments>--mode train --cfg ..\..\..\Cfg\Model\MLP1\MLP1.fsx</StartArguments>
+    <StartArguments>--mode plotPredictions --cfg .\Cfg\Model\MLP1\MLP1.fsx --dir .\Data\DeepBraille\Movements\test1\ManSet\tst</StartArguments>
+    <StartWorkingDirectory>..\..\..</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>
@@ -131,9 +132,6 @@
     <Reference Include="MathNet.Numerics.FSharp">
       <HintPath>..\packages\MathNet.Numerics.FSharp.3.11.0\lib\net40\MathNet.Numerics.FSharp.dll</HintPath>
       <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.Profiler">
-      <HintPath>..\..\..\..\..\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64\Microsoft.VisualStudio.Profiler.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="Newtonsoft.Json">

@@ -474,10 +474,14 @@ module CudaExprWorkspaceTypes =
 
             execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
             execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
-            
-            execCalls recipe.ExecCalls
 
-            CudaSup.context.Synchronize () // TODO: remove and signal otherwise
+            // TODO: implement proper synchronization.
+            // For now we synchronize the whole context to make sure that data transfers
+            // from and to the GPU do not overlap with the computation that may involve
+            // the targets/sources of these transfers as input/output variables.
+            CudaSup.context.Synchronize () 
+            execCalls recipe.ExecCalls
+            CudaSup.context.Synchronize () 
 
 
 

@@ -1009,8 +1009,8 @@ module ArrayND =
             match nDims a with
             | 0 -> 
                 let v = value a
-                if   typeof<'T>.Equals(typeof<single>) then sprintf "%.4f" (v |> box :?> single)
-                elif typeof<'T>.Equals(typeof<double>) then sprintf "%.4f" (v |> box :?> double)
+                if   typeof<'T>.Equals(typeof<single>) then sprintf "%9.4f" (v |> box :?> single)
+                elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
                 elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
                 elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
                 else sprintf "%A;" v

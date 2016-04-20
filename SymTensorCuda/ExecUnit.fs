@@ -319,8 +319,9 @@ module ExecUnit =
                 | _ -> eu
             )
 
+        #if !DISABLE_RERUN_AFTER
+
         // Build RerunAfter dependencies.
-        //#if ENABLE_RERUN_AFTER
         let coll = Collection execUnits
         let execUnits = coll.SortedByDep
         let lastEu = 
@@ -394,7 +395,8 @@ module ExecUnit =
         let execUnits =
             execUnits
             |> List.map (fun eu -> {eu with RerunAfter=rerunAfterBuild.[eu.Id]})
-        //#endif
+
+        #endif // !DISABLE_RERUN_AFTER
 
         execUnits, exprRes, memAllocs, warmupItems
 

@@ -53,4 +53,58 @@ let testMe () =
 
 
 
+				
+        //printfn "CUDA Recipe:"
+        //printfn "Exec calls:"
+        //printfn "%A" rcpt.ExecCalls
+
+
+
+
+
+let plotCurvePredictions (cfg: Cfg) curveDir =
+    let bp = FsPickler.CreateBinarySerializer()
+    let jp = FsPickler.CreateJsonSerializer(indent=true)
+
+    let mlpController = MLPController cfg.MLPControllerCfg
+    mlpController.Load cfg.ModelFile
+    
+    let rfs =
+        seq {
+            for subDir in Directory.EnumerateDirectories curveDir do
+                let recordedFile = Path.Combine (subDir, "recorded.dat")
+                if File.Exists recordedFile then yield recordedFile, subDir
+                //&& not (recordedFile.Contains "Curve5Cfg4") then
+                //&& not (recordedFile.Contains "Curve5Cfg3") then //&& not (recordedFile.Contains "Curve5Cfg2")      then
+        } |> Seq.toList
+     
+           
+    for i = 0 to 2 do
+        printfn "iteration %d" i
+    
+        //Trace.startSession (sprintf "iter%d" i)
+
+        for recordedFile, subDir in rfs do
+            printfn "%s" recordedFile
+            use tr = File.OpenRead recordedFile
+            let recMovement : Movement.RecordedMovement = bp.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
+            let curve : Movement.XY list = bp.Deserialize tr
+
+            // predict
+            let ds = recordedMovementAsFollowSamples recMovement |> Dataset.FromSamples 
+            let biotac = ds.All.Biotac :?> ArrayNDHostT<_> |> ArrayNDCuda.toDev
+            let pred = mlpController.Predict biotac :?> ArrayNDCudaT<_>
+            let predDistY = pred.[*, 0] |> ArrayNDCuda.toHost |> ArrayNDHost.toList |> List.map float
+
+            printfn "predicated:"
+            printfn "%A" predDistY
+            //if recordedFile.Contains "Curve5Cfg5" then
+            //    exit 0
+
+            //Threading.Thread.Sleep(5000)
+
+        //let trace = Trace.endSession ()
+        //use tw = File.CreateText (trace.Name + ".txt")
+        //trace |> Trace.dump tw 
 

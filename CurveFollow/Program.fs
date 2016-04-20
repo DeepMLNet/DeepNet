@@ -1,4 +1,4 @@
-﻿open Microsoft.VisualStudio.Profiler
+﻿//open Microsoft.VisualStudio.Profiler
 open System
 open System.IO
 open System.Diagnostics
@@ -93,7 +93,7 @@ let doPlotRecorded () =
 
 [<EntryPoint>]
 let main argv = 
-    DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
+    //DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
 
     let mode = args.GetResult <@ Mode @>
     match mode with
