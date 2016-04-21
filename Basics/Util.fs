@@ -3,6 +3,7 @@
 open System
 open System.Reflection
 open System.IO
+open Nessos.FsPickler
 open Nessos.FsPickler.Json
 
 
@@ -157,3 +158,18 @@ module Json =
         serialzier.Serialize (tw, value)
 
 
+/// Binary serialization.
+module Pickle =
+    
+    let private serialzier = 
+        FsPickler.CreateBinarySerializer()
+
+    /// Loads binary data from the specified file.
+    let load path =
+        use tr = File.OpenRead path
+        serialzier.Deserialize (tr)
+
+    /// Saves an object to the specified file.
+    let save path value =
+        use tw = File.Create path
+        serialzier.Serialize (tw, value)

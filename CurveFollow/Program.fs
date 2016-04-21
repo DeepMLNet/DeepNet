@@ -74,8 +74,10 @@ let doPlotPredictions () =
     let dir = args.GetResult <@ Dir @>
     Controller.plotCurvePredictions cfg dir
  
-let doFollow () =
-    ()
+let doEvalController () =
+    let cfg : Controller.Cfg = Config.load (args.GetResult <@ Cfg @>)
+    let dir = args.GetResult <@ Dir @>
+    ControllerEval.evalController cfg dir
 
 let doMovement () =
     let cfg : Movement.GenCfg = Config.load (args.GetResult <@ Cfg @>)  
@@ -99,7 +101,7 @@ let main argv =
     match mode with
     | _ when mode = "train" -> doTrain () 
     | _ when mode = "plotPredictions" -> doPlotPredictions ()
-    | _ when mode = "follow" -> doFollow ()
+    | _ when mode = "evalController" -> doEvalController ()
     | _ when mode = "movement" -> doMovement ()
     | _ when mode = "record" -> doRecord ()
     | _ when mode = "plotRecorded" -> doPlotRecorded ()

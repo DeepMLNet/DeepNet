@@ -1,12 +1,7 @@
 ﻿module TactileCurve
 
-
-open System.Collections.Generic
 open System.Diagnostics
-open System.Threading
-open System.IO
 open System
-open Nessos.FsPickler.Json
 
 open Basics
 open Datasets
@@ -105,6 +100,5 @@ let record (curve: DriveCurve) =
         Points      = recorder.GetSamples None |> List.ofSeq
     }
     
-
 
 

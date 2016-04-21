@@ -85,8 +85,10 @@
     <Compile Include="PID.fs" />
     <Compile Include="XYTableSim.fs" />
     <Compile Include="TactileCurve.fs" />
+    <Compile Include="ControlCurve.fs" />
     <Compile Include="Movement.fs" />
     <Compile Include="Controller.fs" />
+    <Compile Include="ControllerEval.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="CreateCurveDataset.fsx" />
