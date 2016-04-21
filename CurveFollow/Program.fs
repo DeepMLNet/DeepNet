@@ -75,6 +75,7 @@ let doPlotPredictions () =
     Controller.plotCurvePredictions cfg dir
  
 let doEvalController () =
+    BRML.Drivers.Devices.init ()
     let cfg : Controller.Cfg = Config.load (args.GetResult <@ Cfg @>)
     let dir = args.GetResult <@ Dir @>
     ControllerEval.evalController cfg dir
