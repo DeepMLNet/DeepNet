@@ -83,6 +83,10 @@ let doMovement () =
     let cfg : Movement.GenCfg = Config.load (args.GetResult <@ Cfg @>)  
     Movement.generateMovementUsingCfg cfg
 
+let doDistortions () =
+    let cfg : ControllerEval.GenCfg = Config.load (args.GetResult <@ Cfg @>)  
+    ControllerEval.generateDistortionsUsingCfg cfg
+
 let doRecord () =
     BRML.Drivers.Devices.init ()
     let dir = args.GetResult <@ Dir @>
@@ -103,6 +107,7 @@ let main argv =
     | _ when mode = "plotPredictions" -> doPlotPredictions ()
     | _ when mode = "evalController" -> doEvalController ()
     | _ when mode = "movement" -> doMovement ()
+    | _ when mode = "distortions" -> doDistortions ()
     | _ when mode = "record" -> doRecord ()
     | _ when mode = "plotRecorded" -> doPlotRecorded ()
     | _ -> parser.Usage ("unknown mode") |> printfn "%s"

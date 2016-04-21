@@ -51,7 +51,7 @@
     <DocumentationFile>bin\Debug\CurveFollow.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <StartArguments>--mode plotPredictions --cfg .\Cfg\Model\MLP1\MLP1.fsx --dir .\Data\DeepBraille\Movements\test1\ManSet\tst</StartArguments>
+    <StartArguments>--mode distortions --cfg .\Cfg\Distortions\EvalDistortions-Curv2-Set1.fsx</StartArguments>
     <StartWorkingDirectory>..\..\..</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
