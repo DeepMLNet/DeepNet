@@ -1,6 +1,9 @@
 ﻿namespace Models
 
 open System
+open System.Diagnostics
+open System.IO
+open Nessos.FsPickler.Json
 
 open Basics
 open ArrayNDNS
@@ -16,6 +19,7 @@ module TrainingLog =
         TrnLoss:            single
         ValLoss:            single
         TstLoss:            single
+        LearningRate:       single
     }
 
     type Log<'P> = {
@@ -46,6 +50,9 @@ module TrainingLog =
         match log.Best with
         | Some ({Iter=iter}, _) -> iter
         | None -> 0
+
+    let best (log: Log<_>) =
+        log.Best.Value
 
     let itersWithoutImprovement (log: Log<_>) =
         match log.Best with
@@ -112,6 +119,19 @@ module Train =
         | TargetLossReached
         | UserTerminated
 
+
+    /// Result of training
+    type TrainingResult = {
+        Best:               TrainingLog.Entry
+        TerminationReason:  Faith
+        Duration:           TimeSpan
+        History:            TrainingLog.Entry list
+    } with
+        /// save as JSON file
+        member this.Save path = Json.save path this
+        /// load from JSON file
+        static member Load path : TrainingResult = Json.load path           
+
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (modelInstance: ModelInstance<'P>) (lossFn: 'S -> single) (optFn: single -> 'S -> single Lazy) 
@@ -139,6 +159,7 @@ module Train =
                     TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
                     TrainingLog.ValLoss = valBatches |> Seq.map lossFn |> Seq.average
                     TrainingLog.TstLoss = tstBatches |> Seq.map lossFn |> Seq.average
+                    TrainingLog.LearningRate = learningRate
                 }
                 let log = log |> TrainingLog.record entry modelInstance.ParameterValues
                 printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
@@ -177,10 +198,7 @@ module Train =
                 | _ -> ()
 
                 // process user input
-                let key = 
-                    if Console.KeyAvailable then Some (Console.ReadKey().KeyChar)
-                    else None
-                match key with
+                match Util.getKey () with
                 | Some 'q' ->
                     printfn "Termination by user"
                     faith <- UserTerminated
@@ -197,6 +215,7 @@ module Train =
                 doTrain (iter + 1) learningRate log
 
         // train with decreasing learning rate
+        let watch = Stopwatch.StartNew()
         printfn "Training with %A" dataset
         let rec trainLoop log learningRates = 
             match learningRates with
@@ -216,9 +235,17 @@ module Train =
                 | _ -> log, faith
             | [] -> log, NoImprovement
         let log, faith = trainLoop (TrainingLog.create cfg.MinImprovement) cfg.LearningRates
-        printfn "Training completed"
+        let bestEntry, _ = TrainingLog.best log
+        let duration = watch.Elapsed
+        printfn "Training completed after %d iterations in %A because %A" bestEntry.Iter duration faith
 
-        log, faith
+        {
+            History             = List.rev log.History
+            Best                = bestEntry
+            TerminationReason   = faith
+            Duration            = duration
+        }
+        
                                   
 
         

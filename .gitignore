@@ -249,3 +249,7 @@ ModelManifest.xml
 /Data/DeepBraille/Curves/curv2/02.cur.h5
 /Data/DeepBraille/Curves/curv2/01.cur.h5
 /Data/DeepBraille/Curves/curv2/00.cur.h5
+
+/Cfg/Model/Curv2-Set1-MLP-GS1/*/*
+model.h5
+result.json

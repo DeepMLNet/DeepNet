@@ -91,11 +91,23 @@
       <HintPath>..\packages\FSharp.Compiler.Service.2.0.0.8\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="FsPickler">
+      <HintPath>..\packages\FsPickler.2.1.0\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FsPickler.Json">
+      <HintPath>..\packages\FsPickler.Json.2.1.0\lib\net45\FsPickler.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="ManagedCuda">
       <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -121,6 +133,8 @@
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

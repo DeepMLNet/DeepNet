@@ -129,7 +129,11 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="FsPickler">
-      <HintPath>..\packages\FsPickler.1.8.0\lib\net45\FsPickler.dll</HintPath>
+      <HintPath>..\packages\FsPickler.2.1.0\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FsPickler.Json">
+      <HintPath>..\packages\FsPickler.Json.2.1.0\lib\net45\FsPickler.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="HDF.PInvoke">
@@ -149,6 +153,10 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="NPP">
       <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\NPP.dll</HintPath>
       <Private>True</Private>

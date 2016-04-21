@@ -1,8 +1,9 @@
 ﻿namespace Basics
 
-
 open System
 open System.Reflection
+open System.IO
+open Nessos.FsPickler.Json
 
 
 module Seq = 
@@ -127,5 +128,32 @@ module Util =
         | _ when typ = typeof<int>      -> "int"
         | _ when typ = typeof<byte>     -> "char"
         | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// Returns "Some key" when a key was pressed, otherwise "None".
+    let getKey () =
+        try
+            if Console.KeyAvailable then Some (Console.ReadKey().KeyChar)
+            else None
+        with :? InvalidOperationException -> 
+            // InvalidOperationException is thrown when process does not have a console or 
+            // input is redirected from a file.
+            None
+
+
+/// JSON serialization.
+module Json =
+    
+    let private serialzier = 
+        FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+
+    /// Loads JSON data from the specified file.
+    let load path =
+        use tr = File.OpenText path
+        serialzier.Deserialize (tr)
+
+    /// Saves an object as JSON to the specified file.
+    let save path value =
+        use tw = File.CreateText path
+        serialzier.Serialize (tw, value)
 
 

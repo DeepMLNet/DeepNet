@@ -92,9 +92,10 @@ module Compile =
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)
         let baseCmplrArgs = [
-            "--std=c++11";
-            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
-            sprintf "--gpu-architecture=%s" gpuArch; 
+            "--std=c++11"
+            "-DWIN32_LEAN_AND_MEAN"
+            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
+            sprintf "--gpu-architecture=%s" gpuArch
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
@@ -172,12 +173,13 @@ module Compile =
 
         // build argument list
         let baseCmplrArgs = [
-            "--shared";
-            "--machine 64";
+            "--shared"
+            "--machine 64"
+            "-DWIN32_LEAN_AND_MEAN"
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
-            sprintf "--compiler-bindir \"%s\"" hostCompilerDir;                         
-            sprintf "--gpu-architecture=%s" gpuArch; 
-            sprintf "--gpu-code=%s" gpuCode;
+            sprintf "--compiler-bindir \"%s\"" hostCompilerDir                        
+            sprintf "--gpu-architecture=%s" gpuArch 
+            sprintf "--gpu-code=%s" gpuCode
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--debug"; "--device-debug"; "--generate-line-info"]

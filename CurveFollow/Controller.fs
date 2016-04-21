@@ -91,6 +91,7 @@ type Cfg = {
     MLPControllerCfg:   MLPControllerCfg   
     TrainCfg:           Train.Cfg 
     ModelFile:          string
+    TrnResultFile:      string
 }
 
 
@@ -162,9 +163,11 @@ let loadPointDataset (cfg: Cfg) : TrnValTst<FollowSample> =
 
      
 let train (cfg: Cfg) =
+    printfn "Using configuration:\n%A" cfg
     let dataset = loadPointDataset cfg |> TrnValTst.ToCuda
     let mlpController = MLPController cfg.MLPControllerCfg
-    mlpController.Train dataset cfg.TrainCfg |> ignore
+    let trnRes = mlpController.Train dataset cfg.TrainCfg     
+    trnRes.Save cfg.TrnResultFile
     mlpController.Save cfg.ModelFile
 
 let saveChart (path: string) (chart:FSharp.Charting.ChartTypes.GenericChart) =
