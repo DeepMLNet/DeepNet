@@ -67,7 +67,8 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
     let estLock = obj ()
     use biotacHndlr = Devices.Biotac.SampleAcquired.Subscribe (fun biotac ->
         if Monitor.TryEnter estLock then
-            estDist <- distanceEstFn biotac.Flat
+            estDist <- 0.0
+            //estDist <- distanceEstFn biotac.Flat
             distEstSensor.DistanceEstimated estDist   
             Monitor.Exit estLock
     )

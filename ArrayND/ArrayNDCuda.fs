@@ -36,7 +36,8 @@ module ArrayNDCudaTypes =
 
         member this.Data = data
 
-        override this.Finalize() = data.Dispose()
+        override this.Finalize() = 
+            if data <> null then data.Dispose()
 
         interface ICudaStorage with
             member this.ByteData =

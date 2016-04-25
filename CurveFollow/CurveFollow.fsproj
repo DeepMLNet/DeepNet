@@ -53,6 +53,8 @@
     <PlatformTarget>x64</PlatformTarget>
     <StartArguments>--mode evalController --cfg .\Cfg\Model\Curv2-Set1-MLP1\Curv2-Set1-MLP1.fsx --dir .\Data\DeepBraille\Distortions\Curv2-Set1\09.cur</StartArguments>
     <StartWorkingDirectory>..\..\..</StartWorkingDirectory>
+    <EnableUnmanagedDebugging>true</EnableUnmanagedDebugging>
+    <UseVSHostingProcess>true</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>

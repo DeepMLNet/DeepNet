@@ -49,6 +49,12 @@ module CudaSup =
     let maxGridDim =
         int deviceInfo.MaxGridDim.x, int deviceInfo.MaxGridDim.y, int deviceInfo.MaxGridDim.z
     
+    let nvccArch =
+        sprintf "compute_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
+
+    let nvccCode =
+        sprintf "sm_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
+
     let printInfo () =
         let di = deviceInfo
         printfn "CUDA device:                                         %s" di.DeviceName
@@ -62,7 +68,6 @@ module CudaSup =
         printfn "CUDA device async engine count:                      %d" di.AsyncEngineCount
         printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
         printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
-
 
     // CUDA BLAS handle
     let blas =

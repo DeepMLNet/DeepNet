@@ -23,9 +23,6 @@ module Compile =
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
-    let gpuArch = "compute_30"
-    let gpuCode = "sm_30"
-
     let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
     let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
 
@@ -95,7 +92,7 @@ module Compile =
             "--std=c++11"
             "-DWIN32_LEAN_AND_MEAN"
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
-            sprintf "--gpu-architecture=%s" gpuArch
+            sprintf "--gpu-architecture=%s" CudaSup.nvccArch
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
@@ -178,8 +175,8 @@ module Compile =
             "-DWIN32_LEAN_AND_MEAN"
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir                        
-            sprintf "--gpu-architecture=%s" gpuArch 
-            sprintf "--gpu-code=%s" gpuCode
+            sprintf "--gpu-architecture=%s" CudaSup.nvccArch 
+            sprintf "--gpu-code=%s" CudaSup.nvccCode
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--debug"; "--device-debug"; "--generate-line-info"]
