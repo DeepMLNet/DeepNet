@@ -86,6 +86,20 @@ module CudaSup =
         blas.Dispose ()
         context.Dispose ()
 
+    /// Checks that the thread's current CUDA context is the CUDA context that was active
+    /// or created while this module was initialized.
+    let checkContext () =
+        let ctx = ref (CUcontext ())
+        if DriverAPINativeMethods.ContextManagement.cuCtxGetCurrent (ctx) <> CUResult.Success then
+            failwith "cuCtxGetCurrent failed"
+        if context.Context <> (!ctx) then
+            failwithf "Current CUDA context %A does not match library initialization CUDA context %A"
+                (!ctx).Pointer context.Context.Pointer
+
+    /// Sets the thread's current CUDA context to the CUDA context that was active
+    /// or created while this module was initialized.
+    let setContext () =
+        context.SetCurrent ()
 
     /// Computes CUDA launch dimensions from work dimensions and maximum block size.
     /// It is possible that the calculated launch dimensions will be smaller than the

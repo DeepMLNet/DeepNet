@@ -235,7 +235,7 @@ module Compile =
 module CudaExprWorkspaceTypes =    
 
     /// Workspace for evaluation of an expression compiled to a CudaRecipeT.
-    type CudaExprWorkspace(recipe: CudaRecipeT) =
+    type CudaExprWorkspace (recipe: CudaRecipeT) =
         let mutable disposed = false
 
         do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
@@ -441,7 +441,9 @@ module CudaExprWorkspaceTypes =
 
         // initialize
         #if !CUDA_DUMMY
-        do execCalls recipe.InitCalls
+        do 
+            CudaSup.checkContext ()
+            execCalls recipe.InitCalls
         #endif
 
         // finalizer
@@ -452,9 +454,11 @@ module CudaExprWorkspaceTypes =
                 try 
                     // execute dummy CUDA function to check that CUDA context is not
                     // disposed yet
+                    CudaSup.context.PushContext ()
                     CudaSup.context.GetDeviceInfo() |> ignore
                     execCalls recipe.DisposeCalls
                     Compile.unloadCudaCode krnlModHndl
+                    CudaSup.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
                 Compile.unloadCppCode cLibHndl
@@ -470,18 +474,21 @@ module CudaExprWorkspaceTypes =
         member this.Eval(externalVar: Map<UVarSpecT, IArrayNDT>,
                          hostVar:     Map<UVarSpecT, IArrayNDT>) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
+            CudaSup.checkContext ()
 
-            execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
-            execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
+            lock this (fun () ->
 
-            // TODO: implement proper synchronization.
-            // For now we synchronize the whole context to make sure that data transfers
-            // from and to the GPU do not overlap with the computation that may involve
-            // the targets/sources of these transfers as input/output variables.
-            CudaSup.context.Synchronize () 
-            execCalls recipe.ExecCalls
-            CudaSup.context.Synchronize () 
+                execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
+                execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
 
+                // TODO: implement proper synchronization.
+                // For now we synchronize the whole context to make sure that data transfers
+                // from and to the GPU do not overlap with the computation that may involve
+                // the targets/sources of these transfers as input/output variables.
+                CudaSup.context.Synchronize () 
+                execCalls recipe.ExecCalls
+                CudaSup.context.Synchronize () 
 
+            )
 
 

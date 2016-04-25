@@ -62,13 +62,14 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
         } 
     gotoStart true |> Async.RunSynchronously   
 
+    // setup distance estimator
     let distEstSensor = DistanceEstSensor ()
-    let mutable estDist = 0.0
     let estLock = obj ()
+    let mutable estDist = distanceEstFn Devices.Biotac.CurrentSample.Flat
     use biotacHndlr = Devices.Biotac.SampleAcquired.Subscribe (fun biotac ->
         if Monitor.TryEnter estLock then
-            estDist <- 0.0
-            //estDist <- distanceEstFn biotac.Flat
+            //estDist <- 0.0
+            estDist <- distanceEstFn biotac.Flat
             distEstSensor.DistanceEstimated estDist   
             Monitor.Exit estLock
     )

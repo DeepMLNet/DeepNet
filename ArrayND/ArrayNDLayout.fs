@@ -196,8 +196,7 @@ module ArrayNDLayout =
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =
-        let nElems = nElems a
-        if not (0 <= ax1 && ax1 < nElems && 0 <= ax2 && ax2 < nElems) then
+        if not (0 <= ax1 && ax1 < nDims a && 0 <= ax2 && ax2 < nDims a) then
             failwithf "cannot swap dimension %d with %d of for shape %A" ax1 ax2 (shape a)
         let shp, str = shape a, stride a
         {a with Shape=shp |> List.set ax1 shp.[ax2] |> List.set ax2 shp.[ax1]; 

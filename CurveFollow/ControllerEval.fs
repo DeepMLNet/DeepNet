@@ -9,6 +9,7 @@ open Nessos.FsPickler
 open Nessos.FsPickler.Json
 
 open Basics
+open Basics.Cuda
 open ArrayNDNS
 
 
@@ -151,6 +152,7 @@ let evalController (controllerCfg: Controller.Cfg) curveDir =
     mlpController.Load controllerCfg.ModelFile
     
     let estDistanceFn biotac =
+        CudaSup.setContext ()
         let biotacAry = biotac |> Array.map single |> ArrayNDHost.ofArray |> ArrayND.reshape [1; -1] |> ArrayNDCuda.toDev
         let predAry = mlpController.Predict biotacAry
         let pred = predAry.[[0; 0]] |> float
