@@ -68,7 +68,6 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
     let mutable estDist = distanceEstFn Devices.Biotac.CurrentSample.Flat
     use biotacHndlr = Devices.Biotac.SampleAcquired.Subscribe (fun biotac ->
         if Monitor.TryEnter estLock then
-            //estDist <- 0.0
             estDist <- distanceEstFn biotac.Flat
             distEstSensor.DistanceEstimated estDist   
             Monitor.Exit estLock
@@ -81,14 +80,23 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
     let recorder = Recorder<TactileControlPoint> sensors
 
     let sw = Stopwatch()
-    let pidController = PID.Controller XYTableSim.pidCfg
+    let pidController = PID.Controller {
+        PID.PFactor     = 2.0
+        PID.IFactor     = 0.0
+        PID.DFactor     = 0.0
+        PID.ITime       = 0.05
+        PID.DTime       = 0.05
+    }
+
+    let mutable overridden = false
     let rec control (points: ControlPoint list) =
         let t = (float sw.ElapsedMilliseconds) / 1000.
         let x, y = Devices.XYTable.CurrentPos 
         
-        printf "t=%7.3f s     x=%7.3f mm     y=%.3f mm     EstDist=%7.3f mm     \r" t x y estDist
-        if Console.KeyAvailable && Console.ReadKey().KeyChar = 'q' then
-            Devices.XYTable.Stop();  exit 0
+        printf "t=%7.3f s     x=%7.3f mm     y=%.3f mm     EstDist=%7.3f mm     Overridden=%b \r" t x y estDist overridden
+        match Util.getKey () with
+        | Some 'q' -> Devices.XYTable.Stop();  exit 0
+        | _ -> ()
 
         match points with
         | _ when x > 142. -> ()
@@ -98,11 +106,13 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
                 match tYPos, nYPos with
                 | Some tYPos, Some nYPos ->
                     // target position is overridden by control curve
+                    overridden <- true
                     let fac = (ncx - x) * (ncx - cx)
-                    fac * tYPos + (1.-fac) * nYPos
+                    fac * tYPos + (1.-fac) * nYPos                    
                 | _ ->
                     // distance is determined by model and we target zero distance
-                    y - estDist
+                    overridden <- false
+                    y + estDist                    
             let yVel = pidController.Control yTrgt y 
             Devices.XYTable.DriveWithVel ((curve.XVel, yVel))
             control points
