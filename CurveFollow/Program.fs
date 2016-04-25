@@ -97,6 +97,10 @@ let doPlotRecorded () =
     let dir = args.GetResult <@ Dir @>
     Movement.plotRecordedMovements dir
 
+let doPlotRecordedControl () =
+    let dir = args.GetResult <@ Dir @>
+    ControllerEval.plotRecordedControls dir
+
 
 [<EntryPoint>]
 let main argv = 
@@ -111,6 +115,7 @@ let main argv =
     | _ when mode = "distortions" -> doDistortions ()
     | _ when mode = "record" -> doRecord ()
     | _ when mode = "plotRecorded" -> doPlotRecorded ()
+    | _ when mode = "plotControl" -> doPlotRecordedControl ()
     | _ -> parser.Usage ("unknown mode") |> printfn "%s"
 
     // shutdown

@@ -31,6 +31,7 @@ type TactileControlPoint = {
     Pos:                XY
     Biotac:             float []
     EstDistance:        float
+    TargetY:            float
 }
 
 /// A tactile data curve.
@@ -40,14 +41,14 @@ type TactileControlCurve = {
 }
 
 
-type DistanceEstSensor () =
+type ValueSensor () =
     let sampleAcquired = Event<float> ()
     interface ISensor<float> with
         member this.DataType = typeof<float>
         member this.SampleAcquired = sampleAcquired.Publish
         member this.Interpolate fac a b = (1.0 - fac) * a + fac * b
 
-    member this.DistanceEstimated dist =
+    member this.PublishValue dist =
         sampleAcquired.Trigger dist
 
 /// Records a tactile curve given a drive curve and a distance estimation function.
@@ -63,27 +64,40 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
     gotoStart true |> Async.RunSynchronously   
 
     // setup distance estimator
-    let distEstSensor = DistanceEstSensor ()
+    let distEstSensor = ValueSensor ()
     let estLock = obj ()
     let mutable estDist = distanceEstFn Devices.Biotac.CurrentSample.Flat
     use biotacHndlr = Devices.Biotac.SampleAcquired.Subscribe (fun biotac ->
         if Monitor.TryEnter estLock then
             estDist <- distanceEstFn biotac.Flat
-            distEstSensor.DistanceEstimated estDist   
+            distEstSensor.PublishValue estDist   
             Monitor.Exit estLock
     )
 
+    let targetYSensor = ValueSensor ()
+
     Devices.XYTable.PosReportInterval <- 2
-    let sensors = [Devices.XYTable :> ISensor
-                   Devices.Biotac  :> ISensor
-                   distEstSensor   :> ISensor]
+    let sensors = [
+        Devices.XYTable :> ISensor
+        Devices.Biotac  :> ISensor
+        distEstSensor   :> ISensor
+        targetYSensor   :> ISensor
+    ]
     let recorder = Recorder<TactileControlPoint> sensors
 
     let sw = Stopwatch()
+
+//    let pidController = PID.Controller {
+//        PID.PFactor     = 2.0
+//        PID.IFactor     = 0.0
+//        PID.DFactor     = 0.0
+//        PID.ITime       = 0.05
+//        PID.DTime       = 0.05
+//    }
     let pidController = PID.Controller {
-        PID.PFactor     = 2.0
-        PID.IFactor     = 0.0
-        PID.DFactor     = 0.0
+        PID.PFactor     = 0.8
+        PID.IFactor     = 0.2
+        PID.DFactor     = 1.0
         PID.ITime       = 0.05
         PID.DTime       = 0.05
     }
@@ -112,7 +126,8 @@ let record (curve: ControlCurve) (distanceEstFn: float [] -> float) =
                 | _ ->
                     // distance is determined by model and we target zero distance
                     overridden <- false
-                    y + estDist                    
+                    y + estDist      
+            targetYSensor.PublishValue yTrgt              
             let yVel = pidController.Control yTrgt y 
             Devices.XYTable.DriveWithVel ((curve.XVel, yVel))
             control points

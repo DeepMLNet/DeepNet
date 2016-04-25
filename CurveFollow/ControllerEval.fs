@@ -129,11 +129,85 @@ let generateDistortionsUsingCfg cfg  =
         generateDistortionsForFile cfg.DistortionCfgs file outDir
 
 
+let toArray = Movement.toArray
+
+let curveAtPos (curve: XY list) (pos: float list) =
+    let rec curveAtPos (curve: XY list) (pos: float list) cpos =
+        match curve, pos with
+        | _, [] -> List.rev cpos
+        | [(_, cy)], _::rPos ->
+            curveAtPos curve rPos (cy::cpos)
+        | (cx1, cy1)::(cx2, _)::_, px::rPos when cx1 <= px && px < cx2 ->
+            curveAtPos curve rPos (cy1::cpos)
+        | (cx1, cy1)::_, px::rPos when px < cx1 ->
+            curveAtPos curve rPos (cy1::cpos)
+        | _::rCurve, _ ->
+            curveAtPos rCurve pos cpos
+        | _ -> failwith "empty curve"
+    curveAtPos curve pos []
+
+
+let plotControl (path: string) (curve: XY list) (recControl: ControlCurve.TactileControlCurve) =
+    let curveX, curveY = toArray id curve
+    let drivenPosX, drivenPosY = recControl.Points |> toArray (fun p -> p.Pos) 
+    let predDistY = recControl.Points |> List.map (fun p -> p.EstDistance) |> Array.ofList
+    let trgtY = recControl.Points |> List.map (fun p -> p.TargetY) |> Array.ofList
+    let biotac = recControl.Points |> List.map (fun p -> p.Biotac)
+    let curveDrivenY = curveAtPos curve (Array.toList drivenPosX) |> Array.ofList
+    let distY = (curveDrivenY, drivenPosY) ||> Array.map2 (fun cx dx -> cx - dx)
+
+    let left, right = Array.min drivenPosX, Array.max drivenPosX
+
+    let dt = recControl.Points.[1].Time - recControl.Points.[0].Time
+    let drivenVelY =
+        drivenPosY
+        |> Array.toSeq
+        |> Seq.pairwise
+        |> Seq.map (fun (a, b) -> (b - a) / dt)
+        |> Seq.append (Seq.singleton 0.)
+        |> Array.ofSeq
+
+    R.pdf (path) |> ignore
+    R.par2 ("oma", [0; 0; 0; 0])
+    R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+    R.par2 ("mgp", [1.7; 0.7; 0.0])
+    R.par2 ("mfrow", [4; 1])
+
+    R.plot2 ([left; right], [curveY.[0] - 10.; curveY.[0] + 10.], "position", "x", "y")
+    R.abline(h=curveY.[0]) |> ignore
+    R.lines2 (curveX, curveY, "black")
+    R.lines2 (drivenPosX, drivenPosY, "yellow")
+    R.lines2 (drivenPosX, trgtY, "red")
+    //R.lines2 (drivenPosX, curveDrivenY, "red")
+    R.legend (125., curveY.[0] + 10., ["curve"; "driven"; "target"], col=["black"; "yellow"; "red"], lty=[1;1]) |> ignore
+
+    R.plot2 ([left; right], [-15; 15], "velocity", "x", "y velocity")
+    R.abline(h=0) |> ignore
+    R.lines2 (drivenPosX, drivenVelY, "yellow")
+    //R.legend (125., 15, ["control"; "driven"], col=["blue"; "yellow"], lty=[1;1]) |> ignore
+
+    R.plot2 ([left; right], [-8; 8], "distance to curve", "x", "y distance")
+    R.abline(h=0) |> ignore
+    R.lines2 (drivenPosX, distY, "blue")
+    R.lines2 (drivenPosX, predDistY, "red")
+    R.legend (125., 8, ["true"; "predicted"], col=["blue"; "red"], lty=[1;1]) |> ignore
+
+    // plot biotac
+    let biotacImg = array2D biotac |> ArrayNDHost.ofArray2D |> ArrayND.transpose  // [chnl, smpl]
+    let minVal, maxVal = ArrayND.minAxis 1 biotacImg, ArrayND.maxAxis 1 biotacImg
+    let scaledImg = (biotacImg - minVal.[*, NewAxis]) / (maxVal - minVal).[*, NewAxis]
+    R.image2 (ArrayNDHost.toArray2D scaledImg, lim=(0.0, 1.0),
+              xlim=(left, right), colormap=Gray, title="biotac", xlabel="x", ylabel="channel")
+
+    R.dev_off() |> ignore
+
+
+
 /// Records data for all */movement.json files in the given directory.
 let recordControl dir estDistanceFn =   
     for subDir in Directory.EnumerateDirectories dir do
         let distortionFile = Path.Combine (subDir, "distortion.dat")
-        let recordFile = Path.Combine (subDir, "recorded.dat")
+        let recordFile = Path.Combine (subDir, "control.dat")
         if File.Exists distortionFile then
 
             printfn "%s" distortionFile
@@ -141,10 +215,25 @@ let recordControl dir estDistanceFn =
             let curve : XY list = Pickle.load (Path.Combine (subDir, "curve.dat"))
 
             let recControl = ControlCurve.record distortions estDistanceFn
-            //plotTactile (Path.Combine (subDir, "tactile.pdf")) curve tactileCurve
             recControl |> Pickle.save recordFile 
+            
+            plotControl (Path.Combine (subDir, "control.pdf")) curve recControl
 
-            //plotRecordedMovement (Path.Combine (subDir, "recorded.pdf")) curve recMovement None
+
+let plotRecordedControls dir =
+    let bp = FsPickler.CreateBinarySerializer()
+    
+    for subDir in Directory.EnumerateDirectories dir do
+        let recordedFile = Path.Combine (subDir, "control.dat")
+        if File.Exists recordedFile then
+            printfn "%s" recordedFile
+            use tr = File.OpenRead recordedFile
+            let recControl : ControlCurve.TactileControlCurve = bp.Deserialize tr
+            use tr = File.OpenRead (Path.Combine (subDir, "curve.dat"))
+            let curve : XY list = bp.Deserialize tr
+
+            plotControl (Path.Combine (subDir, "control.pdf")) curve recControl
+                        
 
 
 let evalController (controllerCfg: Controller.Cfg) curveDir = 
