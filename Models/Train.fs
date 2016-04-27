@@ -69,7 +69,7 @@ module Train =
     /// Training termination criterium
     type TerminationCriterium =
         /// terminates after the given number of iterations with improvement of the validation loss
-        | FixedItersWithoutImprovement of int
+        | ItersWithoutImprovement of int
         /// trains for IterGain*BestIterSoFar iterations
         | IterGain of float
         /// does not use this termination criterium
@@ -274,7 +274,7 @@ module Train =
                 | _ -> ()
 
                 match cfg.Termination with
-                | FixedItersWithoutImprovement fiwi when 
+                | ItersWithoutImprovement fiwi when 
                         TrainingLog.itersWithoutImprovement log > fiwi -> 
                     printfn "Trained for %d iterations without improvement" (TrainingLog.itersWithoutImprovement log)
                     faith <- NoImprovement
