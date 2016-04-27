@@ -37,6 +37,7 @@ let nBiotac = SizeSpec.symbol "nBiotac"
 let nTarget = SizeSpec.symbol "nTarget"
 
 
+    
 type MLPController (cfg:   MLPControllerCfg) =
 
     let mc = ModelBuilder<single> "MLPController"
@@ -55,24 +56,18 @@ type MLPController (cfg:   MLPControllerCfg) =
     let predFun = mi.Func pred |> arg biotac 
 
     let loss = MLP.loss mlp biotac.T target.T
-    let lossFun = mi.Func loss |> arg2 biotac target
-
-    //let opt = GradientDescent (loss, mi.ParameterVector, DevCuda)
-    let opt = Adam (loss, mi.ParameterVector, DevCuda)
-    let optFun = mi.Func (opt.Minimize, loss) |> opt.Use |> arg2 biotac target   
 
     member this.Predict (biotac: Arrays) = 
         predFun biotac
 
-    member this.Train (dataset: TrnValTst<FollowSample>) (cfg: Train.Cfg) =
-        let lossFn fs = lossFun fs.Biotac fs.YDist |> ArrayND.value
-        let optState = opt.InitialState mi.ParameterValues
-        let optFn lr fs = 
-            //let _, loss = optFun fs.Biotac fs.YDist {GradientDescent.Step=lr}
-            let _, loss = optFun fs.Biotac fs.YDist {opt.DefaultCfg with Step = lr} optState
-            lazy (ArrayND.value loss)
-        Train.train mi lossFn optFn dataset cfg
+    member this.Train (dataset: TrnValTst<FollowSample>) (trainCfg: Train.Cfg) =
+        let opt = Adam (loss, mi.ParameterVector, DevCuda)
+        let optCfg = opt.DefaultCfg
 
+        let trainable = 
+            Train.trainableFromLossExpr mi loss 
+                (fun fs -> VarEnv.ofSeq [biotac, fs.Biotac; target, fs.YDist]) opt optCfg
+        Train.train trainable dataset trainCfg
 
     member this.Save filename = mi.SavePars filename     
     member this.Load filename = mi.LoadPars filename

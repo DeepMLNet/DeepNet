@@ -24,7 +24,8 @@ let trainCfg = {
         Seed        = 1
         BatchSize   = 10000
         MinIters    = Some 2000
-        LearningRates = [1e-2f; 1e-3f; 1e-4f; 1e-5f; 1e-6f]
+        LearningRates = [1e-2; 1e-3; 1e-4; 1e-5; 1e-6]
+        CheckpointDir = Some (Config.cfgDir + "/checkpoint")
 }
 
 

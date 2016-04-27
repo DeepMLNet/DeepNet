@@ -47,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Optimizer.fs" />
     <Compile Include="GradientDescent.fs" />
     <Compile Include="Adam.fs" />
   </ItemGroup>

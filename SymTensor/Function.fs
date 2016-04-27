@@ -91,6 +91,11 @@ module VarEnv =
     let valueLocations (varEnv: VarEnvT) =
         varEnv |> Map.map (fun _ vVal -> ArrayND.location vVal)
 
+    /// Constructs a VarEnvT from a sequence of variable, value tuples.
+    let ofSeq (entries: (Expr.ExprT<'T> * ArrayNDT<'T>) seq) =
+        (empty, entries)
+        ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
+
 
 [<AutoOpen>]
 module EnvTypes =

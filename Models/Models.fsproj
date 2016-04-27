@@ -128,6 +128,11 @@
       <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Optimizers\Optimizers.fsproj">
+      <Name>Optimizers</Name>
+      <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
       <Name>SymTensor</Name>
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>

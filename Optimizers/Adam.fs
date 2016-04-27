@@ -14,7 +14,7 @@ module Adam =
         DecayMom1:      'T
         DecayMom2:      'T
         Offset:         'T
-    }
+    } 
 
     type CfgExpr<'T> = {
         Step:           ExprT<'T>
@@ -32,7 +32,7 @@ module Adam =
         EstMom2:        ArrayNDT<'T>
         EstMom1B:       ArrayNDT<'T>
         EstMom2B:       ArrayNDT<'T>
-    }
+    } 
 
     type StateExpr<'T> = {
         Iter:           ExprT<'T>  
@@ -81,7 +81,7 @@ module AdamTypes =
             Offset      = conv<'T> 1e-8       
         }
 
-        member this.InitialState parVals : State<'T> =
+        member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
             let shp = ArrayND.shape parVals
             {
                 Iter        = ArrayNDHost.zeros []  |> dev.ToDev
@@ -128,3 +128,11 @@ module AdamTypes =
         member this.PublishLoc mb =
             rpCfg.PublishLoc mb
             rpState.PublishLoc mb
+
+        interface IOptimizer<'T, Cfg<'T>, State<'T>> with
+            member this.OptStepExpr = this.Minimize
+            member this.Use f = this.Use f
+            member this.CfgWithLearningRate learningRate cfg = {cfg with Step=conv<'T> learningRate}
+            member this.InitialState cfg parVals = this.InitialState cfg parVals
+            member this.LoadState path = rpState.LoadValue path
+            member this.SaveState path state = rpState.SaveValue path state

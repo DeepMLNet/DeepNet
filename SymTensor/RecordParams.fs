@@ -14,6 +14,14 @@ type private VarRecordHelpers () =
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
     static member UVarSpecOfExpr<'T> (expr: ExprT<'T>) =
         UVarSpec.ofExpr expr
+    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
+        value |> dev.ToHost |> ArrayNDHDF.write hdf name
+    static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
+        value |> ArrayNDHost.scalar |> ArrayNDHDF.write hdf name
+    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : ArrayNDT<'T> =
+        ArrayNDHDF.read hdf name |> dev.ToDev
+    static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
+        ArrayNDHDF.read hdf name |> ArrayND.value
 
 type private ValueType =
     | Scalar of Type
@@ -113,3 +121,36 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 let m = mi.MakeGenericMethod baseType
                 m.Invoke(null, [|fi.Expr; dev.DefaultLoc; model|]) |> ignore
         )
+
+    /// Saves the record values as a HDF5 file.
+    member this.SaveValue path (value: 'RVal) =
+        use hdf = HDF5.OpenWrite path
+        let values = FSharpValue.GetRecordFields value
+        for fi, value in Seq.zip fieldInfos values do
+            match fi.ValueType with
+            | Scalar typ ->
+                let mi = typeof<VarRecordHelpers>.GetMethod("WriteScalarToHDF", allBindingFlags)
+                let m = mi.MakeGenericMethod typ
+                m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name; value|]) |> ignore
+            | Array typ ->
+                let mi = typeof<VarRecordHelpers>.GetMethod("WriteArrayToHDF", allBindingFlags)
+                let m = mi.MakeGenericMethod typ
+                m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name; value|]) |> ignore
+
+    /// Load the record value from a HDF5 file.
+    member this.LoadValue path : 'RVal =
+        use hdf = HDF5.OpenRead path
+        let values = seq {
+            for fi in fieldInfos do
+                match fi.ValueType with
+                | Scalar typ ->
+                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadScalarFromHDF", allBindingFlags)
+                    let m = mi.MakeGenericMethod typ
+                    yield m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name|]) 
+                | Array typ ->
+                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadArrayFromHDF", allBindingFlags)
+                    let m = mi.MakeGenericMethod typ
+                    yield m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name|])         
+        }
+        FSharpValue.MakeRecord (typeof<'RVal>, Array.ofSeq values) :?> 'RVal
+
