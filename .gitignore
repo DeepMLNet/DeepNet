@@ -254,3 +254,7 @@ ModelManifest.xml
 model.h5
 result.json
 /Data/DeepBraille/Distortions/Curv2-Set1
+
+bestmodel.h5
+optstate.h5
+trainstate.json
