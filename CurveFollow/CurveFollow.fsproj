@@ -172,34 +172,29 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
-      <Name>ArrayND</Name>
-      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Basics\Basics.fsproj">
-      <Name>Basics</Name>
-      <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\BRMLDrivers\BRMLDrivers.fsproj">
       <Name>BRMLDrivers</Name>
       <Project>{e50402f9-c245-4e5d-aeca-1cf1e1920237}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Datasets\Datasets.fsproj">
-      <Name>Datasets</Name>
+    <ProjectReference Include="..\MLDatasets\MLDatasets.fsproj">
+      <Name>MLDatasets</Name>
       <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Models\Models.fsproj">
-      <Name>Models</Name>
+    <ProjectReference Include="..\MLModels\MLModels.fsproj">
+      <Name>MLModels</Name>
       <Project>{28168025-4211-4de2-bb66-b267378f74a7}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Optimizers\Optimizers.fsproj">
-      <Name>Optimizers</Name>
+    <ProjectReference Include="..\MLOptimizers\MLOptimizers.fsproj">
+      <Name>MLOptimizers</Name>
       <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\RTools\RTools.fsproj">
+      <Name>RTools</Name>
+      <Project>{bdb5d832-bc10-4b8f-bde0-7142646aa9cf}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\SymTensorCuda\SymTensorCuda.fsproj">
@@ -210,6 +205,11 @@
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
       <Name>SymTensor</Name>
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Tensor\Tensor.fsproj">
+      <Name>Tensor</Name>
+      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

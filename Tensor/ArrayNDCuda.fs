@@ -4,12 +4,23 @@ open System
 open System.Reflection
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Basics.Cuda
 
 open Basics
 open ArrayND
 open ArrayNDHost
 
+
+module private CudaContext =
+    let mutable context = None
+    let init () =
+        match context with
+        | Some _ -> ()
+        | None ->
+            try
+                context <- Some (new CudaContext(createNew=false))
+            with e ->
+                printfn "Cannot create CUDA context: %s" e.Message
+                failwithf "Cannot create CUDA context: %s" e.Message
 
 [<AutoOpen>]
 module ArrayNDCudaTypes =
@@ -29,9 +40,10 @@ module ArrayNDCudaTypes =
                                     (data: CudaDeviceVariable<'T>) =
 
         new (elems: int) =
+            CudaContext.init ()
+
             // CUDA cannot allocate memory of size zero
             let elems = if elems > 0 then elems else 1
-            CudaSup.init ()
             CudaStorageT<'T> (new CudaDeviceVariable<'T> (SizeT elems))
 
         member this.Data = data

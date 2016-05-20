@@ -258,3 +258,4 @@ result.json
 bestmodel.h5
 optstate.h5
 trainstate.json
+/nuget.exe

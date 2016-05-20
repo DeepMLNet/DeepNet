@@ -32,8 +32,7 @@ module CudaSup =
         let cudaCntxt = 
             try
                 new CudaContext(createNew=false)
-            with
-            e ->
+            with e ->
                 printfn "Cannot create CUDA context: %s" e.Message
                 failwith "Cannot creat CUDA context"
                 exit 10

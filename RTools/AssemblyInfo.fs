@@ -1,4 +1,4 @@
-﻿namespace Basics.AssemblyInfo
+﻿namespace RTools.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,12 +7,12 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("Basics")>]
+[<assembly: AssemblyTitle("RTools")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Deep.Net developers")>]
-[<assembly: AssemblyProduct("Basics")>]
-[<assembly: AssemblyCopyright("Copyright © Deep.Net developers 2016")>]
+[<assembly: AssemblyCompany("Technische Universität München")>]
+[<assembly: AssemblyProduct("RTools")>]
+[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
@@ -22,7 +22,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("ac3f8299-e46e-4bf8-abf0-702557065639")>]
+[<assembly: Guid("bdb5d832-bc10-4b8f-bde0-7142646aa9cf")>]
 
 // Version information for an assembly consists of the following four values:
 // 

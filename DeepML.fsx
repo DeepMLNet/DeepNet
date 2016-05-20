@@ -10,14 +10,13 @@
 
 #else
 
-#r "Basics/bin/Debug/ManagedCuda.dll"
-#r "Basics/bin/Debug/Basics.dll"
-#r "ArrayND/bin/Debug/ArrayND.dll"
+#r "Tensor/bin/Debug/ManagedCuda.dll"
+#r "Tensor/bin/Debug/Tensor.dll"
 #r "SymTensor/bin/Debug/SymTensor.dll"
 #r "SymTensorCuda/bin/Debug/SymTensorCuda.dll"
-#r "Optimizers/bin/Debug/Optimizers.dll"
-#r "Models/bin/Debug/Models.dll"
-#r "Datasets/bin/Debug/Datasets.dll"
+#r "MLOptimizers/bin/Debug/MLOptimizers.dll"
+#r "MLModels/bin/Debug/MLModels.dll"
+#r "MLDatasets/bin/Debug/MLDatasets.dll"
 
 #endif
 

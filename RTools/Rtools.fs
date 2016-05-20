@@ -1,5 +1,6 @@
-﻿namespace Basics
+﻿namespace RTools
 
+open Basics
 open MathNet.Numerics
 open RProvider
 open RProvider.graphics

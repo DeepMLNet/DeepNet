@@ -10,6 +10,8 @@ open Nessos.FsPickler.Json
 
 open Basics
 open ArrayNDNS
+open RTools
+
 
 
 type XY = float * float

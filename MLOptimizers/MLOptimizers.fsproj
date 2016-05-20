@@ -8,11 +8,11 @@
     <ProjectGuid>c6ea7c8a-c74f-44df-828b-7c16b8a06329</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Optimizers</RootNamespace>
-    <AssemblyName>Optimizers</AssemblyName>
+    <AssemblyName>MLOptimizers</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>Optimizers</Name>
+    <Name>MLOptimizers</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -52,19 +52,14 @@
     <Compile Include="Adam.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ArrayND\ArrayND.fsproj">
-      <Name>ArrayND</Name>
-      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Basics\Basics.fsproj">
-      <Name>Basics</Name>
-      <Project>{ac3f8299-e46e-4bf8-abf0-702557065639}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
       <Name>SymTensor</Name>
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Tensor\Tensor.fsproj">
+      <Name>Tensor</Name>
+      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
@@ -79,7 +74,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Optimizers.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\MLOptimizers.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">

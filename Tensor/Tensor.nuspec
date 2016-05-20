@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.txt</licenseUrl>
+    <projectUrl>http://www.deepml.net</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>F# Tensor library.</description>
+    <releaseNotes>Initial release.</releaseNotes>
+    <copyright>Copyright 2016 DeepML.Net Developers</copyright>
+    <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND</tags>
+  </metadata>
+  <files>
+    <file src="HDF5DLLs\*.dll" target="lib\net461" />
+  </files>
+</package>
