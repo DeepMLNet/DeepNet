@@ -9,12 +9,12 @@
     <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.txt</licenseUrl>
     <projectUrl>http://www.deepml.net</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>F# Tensor library.</description>
+    <description>$description$</description>
     <releaseNotes>Initial release.</releaseNotes>
-    <copyright>Copyright 2016 DeepML.Net Developers</copyright>
+    <copyright>$copyright$</copyright>
     <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND</tags>
   </metadata>
   <files>
-    <file src="HDF5DLLs\*.dll" target="lib\net461" />
+    <file src="HDF5\*.dll" target="lib\net461" />
   </files>
 </package>

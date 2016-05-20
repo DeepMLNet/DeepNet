@@ -7,12 +7,13 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("Tensor")>]
-[<assembly: AssemblyDescription("Tensor library for F#")>]
+[<assembly: AssemblyTitle("F# Tensor Library")>]
+[<assembly: AssemblyDescription("Tensor library for F#. Provides n-dimensional arrays on host \
+                                 and CUDA GPU devices with reshape, slicing and BLAS functionality.")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("DeepML.Net developers")>]
-[<assembly: AssemblyProduct("Tensor")>]
-[<assembly: AssemblyCopyright("Copyright © DeepML.Net developers 2016")>]
+[<assembly: AssemblyProduct("DeepML.Net")>]
+[<assembly: AssemblyCopyright("Copyright © DeepML.Net Developers")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
