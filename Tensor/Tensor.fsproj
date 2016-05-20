@@ -90,19 +90,22 @@
     <Compile Include="NumpyFiles.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
-    <None Include="HDF5\hdf5.dll">
+    <None Include="build\Tensor.targets">
+      <Link>Tensor.targets</Link>
+    </None>
+    <None Include="build\hdf5.dll">
       <Link>hdf5.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="HDF5\hdf5_hl.dll">
+    <None Include="build\hdf5_hl.dll">
       <Link>hdf5_hl.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="HDF5\szip.dll">
+    <None Include="build\szip.dll">
       <Link>szip.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="HDF5\zlib.dll">
+    <None Include="build\zlib.dll">
       <Link>zlib.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -129,8 +132,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="HDF.PInvoke">
-      <HintPath>..\packages\HDF.PInvoke.1.8.16.10\lib\Net45\HDF.PInvoke.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>
     <Reference Include="ManagedCuda">
       <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
@@ -154,11 +156,10 @@
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Numerics" />
   </ItemGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild">
+    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration)">
+    </Exec>
   </Target>
-  -->
 </Project>

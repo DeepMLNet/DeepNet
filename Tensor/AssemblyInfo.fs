@@ -9,11 +9,13 @@ open System.Runtime.InteropServices
 // associated with an assembly.
 [<assembly: AssemblyTitle("F# Tensor Library")>]
 [<assembly: AssemblyDescription("Tensor library for F#. Provides n-dimensional arrays on host \
-                                 and CUDA GPU devices with reshape, slicing and BLAS functionality.")>]
+                                 and CUDA GPU devices with reshape and slicing functionality.")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("DeepML.Net developers")>]
 [<assembly: AssemblyProduct("DeepML.Net")>]
-[<assembly: AssemblyCopyright("Copyright © DeepML.Net Developers")>]
+[<assembly: AssemblyCopyright("Copyright © DeepML.Net Developers. Licensed under the Apache 2.0 license. \
+                               Includes HDF5 binaries that are licensed under the terms specified at
+                               https://www.hdfgroup.org/HDF5/doc/Copyright.html")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 

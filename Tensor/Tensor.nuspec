@@ -15,6 +15,7 @@
     <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND</tags>
   </metadata>
   <files>
-    <file src="HDF5\*.dll" target="lib\net461" />
+    <file src="HDF5\HDF.PInvoke.dll" target="lib\net461" /> 
+    <file src="build\**" target="build" /> 
   </files>
 </package>
