@@ -1,2 +1,10 @@
+version: 0.1.{build}
+
 before_build:
   - nuget restore
+
+platform: x64
+build:
+  project: DeepNet-CI.sln
+  verbosity: minimal
+  
