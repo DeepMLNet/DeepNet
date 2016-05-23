@@ -1,7 +1,7 @@
 version: 0.1.{build}
 
 before_build:
-  - nuget restore
+  - nuget restore DeepNet-CI.sln
 
 platform: x64
 build:
