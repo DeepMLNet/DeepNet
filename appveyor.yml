@@ -4,7 +4,7 @@ install:
   - cinst r.project
 
 before_build:
-  - nuget restore DeepNet-CI.sln
+  - nuget restore DeepNet-CI.sln -Verbosity quiet
 
 platform: x64
 build:
