@@ -1,5 +1,8 @@
 version: 0.1.{build}
 
+install:
+  - cinst r.project
+
 before_build:
   - nuget restore DeepNet-CI.sln
 
