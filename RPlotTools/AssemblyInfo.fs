@@ -1,4 +1,4 @@
-﻿namespace Data.AssemblyInfo
+﻿namespace RTools.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,14 +7,12 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("Deep.Net Dataset tools")>]
-[<assembly: AssemblyDescription("Dataset tools. Part of Deep.Net.")>]
+[<assembly: AssemblyTitle("R Plot Tools")>]
+[<assembly: AssemblyDescription("Tools for plotting using R from F#.")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("Deep.Net developers")>]
-[<assembly: AssemblyProduct("Deep.Net")>]
-[<assembly: AssemblyCopyright("Copyright © Deep.Net Developers. Licensed under the Apache 2.0 license. \
-                               Includes HDF5 binaries that are licensed under the terms specified at
-                               https://www.hdfgroup.org/HDF5/doc/Copyright.html")>]
+[<assembly: AssemblyProduct("R Plot Tools")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net developers.")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
@@ -24,7 +22,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("4e45833f-2658-465e-bb71-03400bba5534")>]
+[<assembly: Guid("bdb5d832-bc10-4b8f-bde0-7142646aa9cf")>]
 
 // Version information for an assembly consists of the following four values:
 // 

@@ -7,15 +7,15 @@
     <authors>$author$</authors>
     <owners>$author$</owners>
     <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.txt</licenseUrl>
-    <projectUrl>http://www.deepml.net</projectUrl>
+    <projectUrl>http://www.brml.org</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>$description$</description>
     <releaseNotes>Initial release.</releaseNotes>
     <copyright>$copyright$</copyright>
-    <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND DeepNet</tags>
+    <tags>BRML Drivers XYTable Linmot Biotac</tags>
   </metadata>
   <files>
-    <file src="HDF5\HDF.PInvoke.dll" target="lib\net461" /> 
+    <file src="cheetah_net.dll" target="lib\net461" /> 
     <file src="build\**" target="build" /> 
   </files>
 </package>

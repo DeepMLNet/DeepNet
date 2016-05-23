@@ -12,10 +12,6 @@
     <description>$description$</description>
     <releaseNotes>Initial release.</releaseNotes>
     <copyright>$copyright$</copyright>
-    <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND DeepNet</tags>
+    <tags>R Plot F#</tags>
   </metadata>
-  <files>
-    <file src="HDF5\HDF.PInvoke.dll" target="lib\net461" /> 
-    <file src="build\**" target="build" /> 
-  </files>
 </package>

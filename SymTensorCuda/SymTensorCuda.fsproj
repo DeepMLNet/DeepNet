@@ -109,11 +109,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SymTensorCudaSup\SymTensorCudaSup.vcxproj">
-      <Name>SymTensorCudaSup</Name>
-      <Project>{d746a1db-9c71-4b76-b184-a38031879282}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
       <Name>SymTensor</Name>
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>

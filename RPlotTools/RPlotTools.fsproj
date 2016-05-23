@@ -8,11 +8,11 @@
     <ProjectGuid>bdb5d832-bc10-4b8f-bde0-7142646aa9cf</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>RTools</RootNamespace>
-    <AssemblyName>RTools</AssemblyName>
+    <AssemblyName>RPlotTools</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>RTools</Name>
+    <Name>RPlotTools</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -74,6 +74,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Rtools.fs" />
     <Content Include="packages.config" />
+    <None Include="RPlotTools.nuspec" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="DynamicInterop">
@@ -111,19 +112,15 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj">
       <Name>Tensor</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
+  <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
+    <Exec Command="..\dist\nuget.exe pack RPlotTools.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)">
+    </Exec>
   </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>

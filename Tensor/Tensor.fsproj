@@ -55,7 +55,7 @@
     <DefineConstants>
     </DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\ArrayND.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\Tensor.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <Choose>
@@ -158,7 +158,7 @@
   </ItemGroup>
   <Target Name="BeforeBuild">
   </Target>
-  <Target Name="AfterBuild">
+  <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
     <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration)">
     </Exec>
   </Target>

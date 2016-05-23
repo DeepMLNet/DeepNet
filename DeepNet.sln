@@ -10,6 +10,9 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensor", "SymTensor\SymTensor.fsproj", "{2E96A03E-7031-43C3-AEEE-B9C9DC543448}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensorCuda", "SymTensorCuda\SymTensorCuda.fsproj", "{816E58DA-85A0-4272-B042-682BC6F0AA5B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D746A1DB-9C71-4B76-B184-A38031879282} = {D746A1DB-9C71-4B76-B184-A38031879282}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513B166-A2DB-48F4-94FC-20A582369AA1}"
 	ProjectSection(SolutionItems) = preProject
@@ -20,13 +23,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "1. Tensor", "1. Tensor", "{42C89650-7C3B-469E-91AD-4678EE1C8F6A}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2. DeepML.Net", "2. DeepML.Net", "{CDF577AE-ADEB-4B46-8546-816FB95AC9C4}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2. Deep.Net", "2. Deep.Net", "{CDF577AE-ADEB-4B46-8546-816FB95AC9C4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "9. Programs", "9. Programs", "{BC0206D8-5AFE-4D01-8FDD-8BE5D69F8C6E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{85080C9C-B579-46B2-AD08-D41B395C2347}"
 	ProjectSection(SolutionItems) = preProject
-		DeepML.fsx = DeepML.fsx
+		DeepNet.fsx = DeepNet.fsx
 		PerfDebug.psess = PerfDebug.psess
 		PerfRelease.psess = PerfRelease.psess
 	EndProjectSection
@@ -39,7 +42,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MLDatasets", "MLDatasets\ML
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AllTests", "AllTests\AllTests.fsproj", "{D5CD7EC0-FB57-4CBA-89E8-43E101D23CED}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3. DeepML.Net Components", "3. DeepML.Net Components", "{69798A19-ECB9-414E-AD43-8350B6C17203}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3. Deep.Net Components", "3. Deep.Net Components", "{69798A19-ECB9-414E-AD43-8350B6C17203}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MLOptimizers", "MLOptimizers\MLOptimizers.fsproj", "{C6EA7C8A-C74F-44DF-828B-7C16B8A06329}"
 EndProject
@@ -53,7 +56,9 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BRMLDriversTest", "BRMLDriv
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "8. Drivers and Tools", "8. Drivers and Tools", "{74B877B5-D69A-4DA5-BE59-90A1E191BD22}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RTools", "RTools\RTools.fsproj", "{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RPlotTools", "RPlotTools\RPlotTools.fsproj", "{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DeepNet", "DeepNet\DeepNet.fsproj", "{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -113,6 +118,10 @@ Global
 		{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF}.Debug|x64.Build.0 = Debug|x64
 		{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF}.Release|x64.ActiveCfg = Release|x64
 		{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF}.Release|x64.Build.0 = Release|x64
+		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}.Debug|x64.ActiveCfg = Debug|x64
+		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}.Debug|x64.Build.0 = Debug|x64
+		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}.Release|x64.ActiveCfg = Release|x64
+		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -131,5 +140,6 @@ Global
 		{E50402F9-C245-4E5D-AECA-1CF1E1920237} = {74B877B5-D69A-4DA5-BE59-90A1E191BD22}
 		{02E291D1-6D13-4CF7-BA08-70021961790F} = {74B877B5-D69A-4DA5-BE59-90A1E191BD22}
 		{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF} = {74B877B5-D69A-4DA5-BE59-90A1E191BD22}
+		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33} = {69798A19-ECB9-414E-AD43-8350B6C17203}
 	EndGlobalSection
 EndGlobal

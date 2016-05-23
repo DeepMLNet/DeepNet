@@ -1,12 +1,12 @@
 ﻿#if RELEASE
 
-#r "Basics/bin/Release/Basics.dll"
-#r "ArrayND/bin/Release/ArrayND.dll"
+#r "Tensor/bin/Release/ManagedCuda.dll"
+#r "Tensor/bin/Release/Tensor.dll"
 #r "SymTensor/bin/Release/SymTensor.dll"
 #r "SymTensorCuda/bin/Release/SymTensorCuda.dll"
-#r "Optimizers/bin/Release/Optimizers.dll"
-#r "Models/bin/Release/Models.dll"
-#r "Datasets/bin/Release/Datasets.dll"
+#r "MLOptimizers/bin/Release/MLOptimizers.dll"
+#r "MLModels/bin/Release/MLModels.dll"
+#r "MLDatasets/bin/Release/MLDatasets.dll"
 
 #else
 
@@ -20,6 +20,4 @@
 
 #endif
 
-#r "packages/Argu.2.1/lib/net40/Argu.dll"
-#load "packages/FSharp.Charting.0.90.13/FSharp.Charting.fsx"
 
