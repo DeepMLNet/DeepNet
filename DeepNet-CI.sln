@@ -3,16 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SymTensorCudaSup", "SymTensorCudaSup\SymTensorCudaSup.vcxproj", "{D746A1DB-9C71-4B76-B184-A38031879282}"
-EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor", "Tensor\Tensor.fsproj", "{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensor", "SymTensor\SymTensor.fsproj", "{2E96A03E-7031-43C3-AEEE-B9C9DC543448}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensorCuda", "SymTensorCuda\SymTensorCuda.fsproj", "{816E58DA-85A0-4272-B042-682BC6F0AA5B}"
-	ProjectSection(ProjectDependencies) = postProject
-		{D746A1DB-9C71-4B76-B184-A38031879282} = {D746A1DB-9C71-4B76-B184-A38031879282}
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513B166-A2DB-48F4-94FC-20A582369AA1}"
 	ProjectSection(SolutionItems) = preProject
@@ -58,9 +53,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D746A1DB-9C71-4B76-B184-A38031879282}.Debug|x64.ActiveCfg = Debug|x64
-		{D746A1DB-9C71-4B76-B184-A38031879282}.Debug|x64.Build.0 = Debug|x64
-		{D746A1DB-9C71-4B76-B184-A38031879282}.Release|x64.ActiveCfg = Release|x64
 		{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A}.Debug|x64.ActiveCfg = Debug|x64
 		{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A}.Debug|x64.Build.0 = Debug|x64
 		{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A}.Release|x64.ActiveCfg = Release|x64
@@ -106,7 +98,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{D746A1DB-9C71-4B76-B184-A38031879282} = {CDF577AE-ADEB-4B46-8546-816FB95AC9C4}
 		{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 		{2E96A03E-7031-43C3-AEEE-B9C9DC543448} = {CDF577AE-ADEB-4B46-8546-816FB95AC9C4}
 		{816E58DA-85A0-4272-B042-682BC6F0AA5B} = {CDF577AE-ADEB-4B46-8546-816FB95AC9C4}
