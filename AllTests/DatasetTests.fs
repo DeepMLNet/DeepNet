@@ -56,7 +56,7 @@ type CurveDataset () =
     [<Fact>]
     member this.``Batching`` () =
         let batchSize = 11
-        let batchGen = dataset.ToCuda().PaddedBatches batchSize
+        let batchGen = dataset.PaddedBatches batchSize
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 
@@ -64,6 +64,7 @@ type CurveDataset () =
             batch.Biotac |> ArrayND.shape |> List.head |> should equal batchSize
 
     [<Fact>]
+    [<Trait("Category", "Skip_CI")>]
     member this.``To CUDA GPU`` () =
         let dsCuda = dataset.ToCuda()
         printfn "copied to CUDA: %A" dsCuda

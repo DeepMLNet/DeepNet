@@ -11,3 +11,7 @@ build:
   project: DeepNet-CI.sln
   verbosity: minimal
   
+test:
+  categories:
+    except:
+      - Skip_CI

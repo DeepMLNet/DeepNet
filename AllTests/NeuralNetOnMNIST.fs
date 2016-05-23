@@ -91,18 +91,21 @@ let train device samples iters =
     initialLoss, finalLoss
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``MNIST loads`` () =
     let sw = Stopwatch.StartNew()
     getMnist DevCuda None |> ignore
     printfn "MNIST load time: %A" sw.Elapsed
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Neural net compiles for GPU`` () =
     let sw = Stopwatch.StartNew()
     build DevCuda 10000 |> ignore
     printfn "Model build time: %A" sw.Elapsed
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Loss decreases during training on GPU`` () =
     let sw = Stopwatch.StartNew()
     let initialLoss, finalLoss = train DevCuda 1000 10
@@ -110,6 +113,7 @@ let ``Loss decreases during training on GPU`` () =
     printfn "Model build and train time: %A" sw.Elapsed
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``CPU and GPU have same trace during training`` () =
     let diffs = compareTraces (fun dev -> train dev 10 1 |> ignore) false
     diffs |> should equal 0
