@@ -15,3 +15,15 @@ test:
   categories:
     except:
       - Skip_CI
+
+environment:
+  access_token:
+    secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
+
+on_success:
+  - git config --global credential.helper store
+  - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
+  - git config --global user.email "AppVeyor Build"
+  - git config --global user.name "urbans84@gmail.com"
+  - ps: .\Publish-Docs.ps1
+  
