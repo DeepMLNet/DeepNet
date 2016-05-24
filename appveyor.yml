@@ -1,4 +1,4 @@
-version: 0.1-CI{build}
+version: 0.1.{build}
 
 install:
   - cinst r.project
@@ -27,6 +27,7 @@ test:
 environment:
   access_token:
     secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
+  VERSUFFIX: ci
 
 on_success:
   - git config --global credential.helper store

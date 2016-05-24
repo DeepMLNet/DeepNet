@@ -101,7 +101,6 @@
     </ProjectReference>
   </ItemGroup>
   <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
-    <Exec Command="..\dist\nuget.exe pack DeepNet.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)">
-    </Exec>
+    <Exec Command="..\dist\nuget.exe pack DeepNet.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)  -Suffix &quot;$(VERSUFFIX)&quot;" />
   </Target>
 </Project>
