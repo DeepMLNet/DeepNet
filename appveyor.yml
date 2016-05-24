@@ -1,4 +1,4 @@
-version: 0.1.{build}
+version: 0.1-CI{build}
 
 install:
   - cinst r.project
@@ -15,9 +15,9 @@ build:
 assembly_info:
   patch: true
   file: AssemblyInfo.*
-  assembly_version: "{version}-pre"
-  assembly_file_version: "{version}-pre"
-  assembly_informational_version: "{version}-pre"  
+  assembly_version: "{version}"
+  assembly_file_version: "{version}"
+  assembly_informational_version: "{version}"  
   
 test:
   categories:
