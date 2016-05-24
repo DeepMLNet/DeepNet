@@ -2,7 +2,7 @@ $doctemp = "$env:TEMP\DeepNetDocs"
 if (Test-Path $doctemp) { rm -Recurse -Force $doctemp }
 mkdir $doctemp
 pushd $doctemp
-git clone -b gh-pages https://github.com/DeepMLNet/DeepNet.git .
+git clone -b gh-pages https://github.com/DeepMLNet/DeepNet.git . 2> $nul
 rm -Recurse *
 popd
 

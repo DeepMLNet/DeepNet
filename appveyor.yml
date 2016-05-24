@@ -22,6 +22,7 @@ environment:
 
 on_success:
   - git config --global credential.helper store
+  - git config --global push.default simple
   - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
   - git config --global user.email "AppVeyor Build"
   - git config --global user.name "urbans84@gmail.com"
