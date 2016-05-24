@@ -18,7 +18,7 @@ let githubLink = "http://github.com/DeepMLNet/DeepNet"
 
 // Specify more information about your project
 let info =
-  [ "project-name", "DeepNet"
+  [ "project-name", "Deep.Net"
     "project-author", "Deep.Net developers"
     "project-summary", "Deep.Net machine learning framework"
     "project-github", githubLink
