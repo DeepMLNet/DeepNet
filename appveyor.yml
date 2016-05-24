@@ -36,9 +36,12 @@ on_success:
   - git config --global user.name "urbans84@gmail.com"
   - ps: .\Publish-Docs.ps1
   
+artifacts:
+  - path: dist\Release\*.nupkg
+  
 deploy:
   - provider: NuGet
     api_key:
       secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-    artifact: /dist/Release/.*\.nupkg/
+    artifact: /.*\.nupkg/
     
