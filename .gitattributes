@@ -62,5 +62,3 @@
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
 
-appveyor.yml merge=ours
-
