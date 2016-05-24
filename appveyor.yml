@@ -7,61 +7,9 @@
 
   environment:
     VERSUFFIX: ci
+    access_token:
+      secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
-  on_success:
-    - git config --global credential.helper store
-    - git config --global push.default simple
-    - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
-    - git config --global user.email "AppVeyor Build"
-    - git config --global user.name "urbans84@gmail.com"
-    - ps: .\Publish-Docs.ps1
-   
-  deploy:
-    - provider: NuGet
-      api_key:
-        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-      artifact: /.*\.nupkg/
-
-    
--
-  branches:
-    only:
-      - develop
-
-  version: 0.2.0.{build}
-      
-  environment:
-    VERSUFFIX: develop
-    
--
-  branches:
-    only:
-      - 0.1
-      
-  version: 0.1.{build}
-      
-  deploy:
-    - provider: NuGet
-      api_key:
-        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-      artifact: /.*\.nupkg/
-
-
--
-  branches:
-    only:
-      - 0.2
-      
-  version: 0.2.0.{build}
-      
-  deploy:
-    - provider: NuGet
-      api_key:
-        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-      artifact: /.*\.nupkg/
-  
-    
--
   install:
     - cinst r.project
 
@@ -89,7 +37,99 @@
   artifacts:
     - path: dist\Release\*.nupkg
 
+  deploy:
+    - provider: NuGet
+      api_key:
+        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
+      artifact: /.*\.nupkg/
+
+    
+-
+  branches:
+    only:
+      - develop
+
+  version: 0.2.0.{build}
+      
+  environment:
+    VERSUFFIX: develop
+    access_token:
+      secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
+
+  install:
+    - cinst r.project
+
+  before_build:
+    - nuget restore DeepNet-CI.sln -Verbosity quiet
+
+  platform: x64
+  configuration: Release
+  build:
+    project: DeepNet-CI.sln
+    verbosity: minimal
+  
+  assembly_info:
+    patch: true
+    file: AssemblyInfo.*
+    assembly_version: "{version}"
+    assembly_file_version: "{version}"
+    assembly_informational_version: "{version}"  
+  
+  test:
+    categories:
+      except:
+        - Skip_CI
+
+  artifacts:
+    - path: dist\Release\*.nupkg
+
+-
+  branches:
+    only:
+      - 0.2
+      
   environment:
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
+  install:
+    - cinst r.project
+
+  before_build:
+    - nuget restore DeepNet-CI.sln -Verbosity quiet
+
+  platform: x64
+  configuration: Release
+  build:
+    project: DeepNet-CI.sln
+    verbosity: minimal
+  
+  assembly_info:
+    patch: true
+    file: AssemblyInfo.*
+    assembly_version: "{version}"
+    assembly_file_version: "{version}"
+    assembly_informational_version: "{version}"  
+  
+  test:
+    categories:
+      except:
+        - Skip_CI
+
+  artifacts:
+    - path: dist\Release\*.nupkg
+
+  on_success:
+    - git config --global credential.helper store
+    - git config --global push.default simple
+    - ps: Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
+    - git config --global user.email "AppVeyor Build"
+    - git config --global user.name "urbans84@gmail.com"
+    - ps: .\Publish-Docs.ps1
+   
+  deploy:
+    - provider: NuGet
+      api_key:
+        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
+      artifact: /.*\.nupkg/
+  
