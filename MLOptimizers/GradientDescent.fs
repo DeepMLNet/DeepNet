@@ -16,29 +16,27 @@ module GradientDescent =
     }
 
 
-[<AutoOpen>]
-module GradientDescentTypes = 
-    open GradientDescent
+open GradientDescent
 
-    type GradientDescent<'T when 'T: equality> (loss:   ExprT<'T>,
-                                                pars:   ExprT<'T>,    
-                                                dev:    IDevice) =
+type GradientDescent<'T when 'T: equality> (loss:   ExprT<'T>,
+                                            pars:   ExprT<'T>,    
+                                            dev:    IDevice) =
 
-        let cfg = {
-            Step        = Expr.var "GradientDescent.Cfg.Step" []
-        }
+    let cfg = {
+        Step        = Expr.var "GradientDescent.Cfg.Step" []
+    }
 
-        let rp = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)
+    let rp = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)
 
-        member this.Minimize =
-            let grad = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars)
-            Expr.storeToVar pars (pars - cfg.Step * grad)
+    member this.Minimize =
+        let grad = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars)
+        Expr.storeToVar pars (pars - cfg.Step * grad)
 
-        member this.Use f =
-            rp.Use f
+    member this.Use f =
+        rp.Use f
 
-        member this.PublishLoc mb =
-            rp.PublishLoc mb
+    member this.PublishLoc mb =
+        rp.PublishLoc mb
 
 
 

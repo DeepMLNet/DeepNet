@@ -102,6 +102,8 @@ module HDF5Types =
 
         /// Read data array using specified name. Returns tuple of data and shape.
         member this.Read<'T> (name: string) =            
+            if H5L.exists (fileHnd, name) <= 0 then
+                failwithf "HDF5 dataset %s does not exist in file %s" name path
             let dataHnd = H5D.``open`` (fileHnd, name) |> check
             let typeHnd = H5D.get_type dataHnd |> check
             let shapeHnd = H5D.get_space (dataHnd) |> check

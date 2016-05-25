@@ -11,11 +11,21 @@ open ArrayNDNS
 [<AutoOpen>]
 module MnistTypes =
 
+    /// MNIST dataset
     type MnistT = {
-        TrnImgs:      ArrayNDHostT<single>;
-        TrnLbls:      ArrayNDHostT<single>;
-        TstImgs:      ArrayNDHostT<single>;
-        TstLbls:      ArrayNDHostT<single>;   
+        /// 2d training images of shape [60000; 28; 28]
+        TrnImgs:      ArrayNDT<single>
+        /// flat training images of shape [60000; 784]
+        TrnImgsFlat:  ArrayNDT<single>
+        /// one-hot training labels of shape [60000; 10]
+        TrnLbls:      ArrayNDT<single>
+
+        /// 2d test images of shape [10000; 28; 28]
+        TstImgs:      ArrayNDT<single>
+        /// flat test images of shape [10000; 784]
+        TstImgsFlat:  ArrayNDT<single>
+        /// one-hot test labels of shape [10000; 10]
+        TstLbls:      ArrayNDT<single>   
     }
 
 
@@ -84,24 +94,40 @@ module Mnist =
             dataset (Path.Combine (directory, "t10k-labels-idx1-ubyte.gz")) 
                     (Path.Combine (directory, "t10k-images-idx3-ubyte.gz"))
     
-        {TrnImgs = trnImgs; TrnLbls = trnLbls;
-         TstImgs = tstImgs; TstLbls = tstLbls;}
+        let trnImgsFlat = trnImgs |> ArrayND.reshape [trnImgs.Shape.[0]; -1]
+        let tstImgsFlat = tstImgs |> ArrayND.reshape [tstImgs.Shape.[0]; -1]
+
+        {TrnImgs = trnImgs; TrnImgsFlat = trnImgsFlat; TrnLbls = trnLbls;
+         TstImgs = tstImgs; TstImgsFlat = tstImgsFlat; TstLbls = tstLbls;}
 
     let load directory =
         let testStr = if TestDataset then "-Test" else ""
         let hdfPath = Path.Combine (directory, sprintf "MNIST%s.h5" testStr)
         if File.Exists hdfPath then
             use hdf = new HDF5 (hdfPath, HDF5Read)
-            {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
-             TstImgs = ArrayNDHDF.read hdf "TstImgs"; TstLbls = ArrayNDHDF.read hdf "TstLbls";}
+            {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; 
+             TrnImgsFlat = ArrayNDHDF.read hdf "TrnImgsFlat"; 
+             TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
+             TstImgs = ArrayNDHDF.read hdf "TstImgs"; 
+             TstImgsFlat = ArrayNDHDF.read hdf "TstImgsFlat"; 
+             TstLbls = ArrayNDHDF.read hdf "TstLbls";}
         else
             printf "Converting MNIST to HDF5..."
             let mnist = loadRaw directory
             use hdf = new HDF5 (hdfPath, HDF5Overwrite)
-            ArrayNDHDF.write hdf "TrnImgs" mnist.TrnImgs
-            ArrayNDHDF.write hdf "TrnLbls" mnist.TrnLbls
-            ArrayNDHDF.write hdf "TstImgs" mnist.TstImgs
-            ArrayNDHDF.write hdf "TstLbls" mnist.TstLbls
+            ArrayNDHDF.write hdf "TrnImgs" (mnist.TrnImgs :?> ArrayNDHostT<single>)
+            ArrayNDHDF.write hdf "TrnImgsFlat" (mnist.TrnImgsFlat :?> ArrayNDHostT<single>)
+            ArrayNDHDF.write hdf "TrnLbls" (mnist.TrnLbls :?> ArrayNDHostT<single>)
+            ArrayNDHDF.write hdf "TstImgs" (mnist.TstImgs :?> ArrayNDHostT<single>)
+            ArrayNDHDF.write hdf "TstImgsFlat" (mnist.TstImgsFlat :?> ArrayNDHostT<single>)
+            ArrayNDHDF.write hdf "TstLbls" (mnist.TstLbls :?> ArrayNDHostT<single>)
             printfn "Done."
             mnist
 
+    let toCuda mnist =
+        {TrnImgs = mnist.TrnImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TrnImgsFlat = mnist.TrnImgsFlat :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TrnLbls = mnist.TrnLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TstImgs = mnist.TstImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TstImgsFlat = mnist.TstImgsFlat :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TstLbls = mnist.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}

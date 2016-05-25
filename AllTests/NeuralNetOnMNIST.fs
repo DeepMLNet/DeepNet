@@ -60,7 +60,7 @@ let build device batch =
     lossFun, optFun
 
 let getMnist device samples =
-    let cut (x: ArrayNDHostT<_>) =
+    let cut (x: ArrayNDT<_>) =
         match samples with
         | Some samples -> x.[*, 0..samples-1]
         | None -> x
