@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>VarEnv - Deep.Net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content=""/>
+    <meta name="author" content="Deep.Net developers"/>
+
+    <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet"/>
+
+    <link type="text/css" rel="stylesheet" href="http://www.deepml.net/content/style.css" />
+    <script type="text/javascript" src="http://www.deepml.net/content/tips.js"></script>
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <![endif]-->
+
+    <script type="text/javascript" async
+              src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://github.com/DeepMLNet/DeepNet">github page</a></li>
+        </ul>
+        <h3 class="muted"><a href="http://www.deepml.net/index.html">Deep.Net</a></h3>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="span9" id="main">
+          
+
+
+
+<h1>VarEnv</h1>
+<p>
+  <span>Namespace: SymTensor</span><br />
+</p>
+<div class="xmldoc">
+<p>Variable value collection.</p>
+
+</div>
+
+<!-- Render nested types and modules, if there are any -->
+
+  <h3>Functions and values</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Function or value</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '431', 431)" onmouseover="showTip(event, '431', 431)">
+            add var value varEnv
+          </code>
+          <div class="tip" id="431">
+            <strong>Signature:</strong> var:ExprT&lt;&#39;T&gt; -&gt; value:ArrayNDT&lt;&#39;T&gt; -&gt; varEnv:VarEnvT -&gt; VarEnvT<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L28-28" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>add variable value to environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '432', 432)" onmouseover="showTip(event, '432', 432)">
+            addUVarSpec vs value varEnv
+          </code>
+          <div class="tip" id="432">
+            <strong>Signature:</strong> vs:UVarSpecT -&gt; value:IArrayNDT -&gt; varEnv:VarEnvT -&gt; VarEnvT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L20-20" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>add variable value to environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '433', 433)" onmouseover="showTip(event, '433', 433)">
+            addVarSpecT vs value varEnv
+          </code>
+          <div class="tip" id="433">
+            <strong>Signature:</strong> vs:VarSpecT&lt;&#39;T&gt; -&gt; value:ArrayNDT&lt;&#39;T&gt; -&gt; varEnv:VarEnvT -&gt; VarEnvT<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L24-24" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>add variable value to environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '434', 434)" onmouseover="showTip(event, '434', 434)">
+            checkAndSubstSymSizes symSizes varEnv
+          </code>
+          <div class="tip" id="434">
+            <strong>Signature:</strong> symSizes:Map&lt;SizeSymbolT,SizeSpecT&gt; -&gt; varEnv:VarEnvT -&gt; VarEnvT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L74-74" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>substitues the given symbol sizes into the variable environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '435', 435)" onmouseover="showTip(event, '435', 435)">
+            empty 
+          </code>
+          <div class="tip" id="435">
+            <strong>Signature:</strong> VarEnvT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L44-44" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>empty variable environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '436', 436)" onmouseover="showTip(event, '436', 436)">
+            get var varEnv
+          </code>
+          <div class="tip" id="436">
+            <strong>Signature:</strong> var:ExprT&lt;&#39;T&gt; -&gt; varEnv:VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L40-40" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get variable value from environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '437', 437)" onmouseover="showTip(event, '437', 437)">
+            getUnified vs varEnv
+          </code>
+          <div class="tip" id="437">
+            <strong>Signature:</strong> vs:UVarSpecT -&gt; varEnv:VarEnvT -&gt; IArrayNDT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L32-32" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get variable value from environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '438', 438)" onmouseover="showTip(event, '438', 438)">
+            getVarSpecT vs varEnv
+          </code>
+          <div class="tip" id="438">
+            <strong>Signature:</strong> vs:VarSpecT&lt;&#39;T&gt; -&gt; varEnv:VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L36-36" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>get variable value from environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '439', 439)" onmouseover="showTip(event, '439', 439)">
+            inferSymSizes symSizeEnv varEnv
+          </code>
+          <div class="tip" id="439">
+            <strong>Signature:</strong> symSizeEnv:SymSizeEnvT -&gt; varEnv:VarEnvT -&gt; SymSizeEnvT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L52-52" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>infers symbol sizes from the variable environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '440', 440)" onmouseover="showTip(event, '440', 440)">
+            join a b
+          </code>
+          <div class="tip" id="440">
+            <strong>Signature:</strong> a:VarEnvT -&gt; b:VarEnvT -&gt; Map&lt;UVarSpecT,IArrayNDT&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L48-48" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>joins two variable environments</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '441', 441)" onmouseover="showTip(event, '441', 441)">
+            ofSeq entries
+          </code>
+          <div class="tip" id="441">
+            <strong>Signature:</strong> entries:seq&lt;ExprT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt;&gt; -&gt; VarEnvT<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L95-95" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Constructs a VarEnvT from a sequence of variable, value tuples.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '442', 442)" onmouseover="showTip(event, '442', 442)">
+            valueLocations varEnv
+          </code>
+          <div class="tip" id="442">
+            <strong>Signature:</strong> varEnv:VarEnvT -&gt; Map&lt;UVarSpecT,ArrayLocT&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L91-91" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets the locations of the variable value arrays</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '443', 443)" onmouseover="showTip(event, '443', 443)">
+            valueTypeNames varEnv
+          </code>
+          <div class="tip" id="443">
+            <strong>Signature:</strong> varEnv:VarEnvT -&gt; Map&lt;UVarSpecT,TypeNameT&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L87-87" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets the type names of the variable value arrays</p>
+
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+        </div>
+        <div class="span3">
+          <!-- <img src="http://www.deepml.net/img/logo.png" alt="Deep.Net logo" style="width:150px;margin:10px" /> -->  
+          <ul class="nav nav-list" id="menu" style="margin-top: 20px;">
+            <li class="nav-header">Deep.Net</li>
+            <li><a href="http://www.deepml.net/index.html">Home page</a></li>
+            <li class="divider"></li>
+            <li><a href="http://nuget.org/packages/DeepNet">Get Library via NuGet</a></li>
+            <li><a href="http://github.com/DeepMLNet/DeepNet">Source Code on GitHub</a></li>
+            <li><a href="http://www.deepml.net/release-notes.html">Release Notes</a></li>
+            
+            <li class="nav-header">Getting started</li>
+            <li><a href="http://www.deepml.net/mnist.html">Learning MNIST</a></li>
+
+            <li class="nav-header">Documentation</li>
+            <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <a href="http://github.com/DeepMLNet/DeepNet"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"/></a>
+  </body>
+  </html>
