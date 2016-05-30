@@ -37,8 +37,10 @@
         <div class="span9" id="main">
           
 <h1><a name="Learning-MNIST" class="anchor" href="#Learning-MNIST">Learning MNIST</a></h1>
-<p>In this example we will show how to learn MNIST classification using a two-layer feed-forward network.
-You can run this example by executing <code>FsiAnyCPU.exe docs\content\mnist.fsx</code> after cloning the Deep.Net repository.</p>
+<p>In this example we will show how to learn MNIST classification using a two-layer feed-forward network.</p>
+<p>You can run this example by executing <code>FsiAnyCPU.exe docs\content\mnist.fsx</code> after cloning the Deep.Net repository.
+You can move your mouse over any symbol in the code samples to see the full signature.
+A <a href="https://fsharpforfunandprofit.com/posts/function-signatures/">quick introduction to F# signatures</a> might be helpful.</p>
 <h3><a name="Namespaces" class="anchor" href="#Namespaces">Namespaces</a></h3>
 <p>The <code>ArrayNDNS</code> namespace houses the numeric tensor functionality.
 <code>SymTensor</code> houses the symbolic expression library.
@@ -218,23 +220,29 @@ Hence, in this example the resulting <code>lossFn</code> function takes two tens
 There are wrappers <code>arg1</code>, <code>arg3</code>, <code>arg4</code>, ... for different number of arguments.
 The return type of a compiled function is always a tensor.
 If the result of the expression is a scalar (as in our case), the tensor will have rank zero.</p>
+<h2><a name="Initializing-the-model-parameters" class="anchor" href="#Initializing-the-model-parameters">Initializing the model parameters</a></h2>
+<p>We initialize the parameters model by calling <code>mi.InitPars</code>.
+The only argument to that function is the seed to use for random initialization of the model's parameters.
+<code>mi.InitPars</code> samples from an uniform distribution with support <span class="math">\([-0.01, 0.01]\)</span> to initialize all model parameters that had no initializer specified when calling <code>mb.Param</code>.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span onmouseout="hideTip(event, 'fs13', 69)" onmouseover="showTip(event, 'fs13', 69)" class="i">mi</span><span class="o">.</span><span class="i">InitPars</span> <span class="n">123</span>
+</code></pre></td>
+</tr>
+</table>
+<p>We use a fixed seed of 123 to get reproducible results, but you can change it to a time-dependent value to get varying starting points.</p>
 <h2><a name="Testing-the-model" class="anchor" href="#Testing-the-model">Testing the model</a></h2>
 <p>We can now test our work so far by calculating the loss of the <em>untrained</em> model on the MNIST test set.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
 <span class="l">2: </span>
 <span class="l">3: </span>
-<span class="l">4: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span onmouseout="hideTip(event, 'fs13', 69)" onmouseover="showTip(event, 'fs13', 69)" class="i">mi</span><span class="o">.</span><span class="i">InitPars</span> <span class="n">123</span>
-<span class="k">let</span> <span onmouseout="hideTip(event, 'fs24', 70)" onmouseover="showTip(event, 'fs24', 70)" class="i">tstLossUntrained</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs23', 71)" onmouseover="showTip(event, 'fs23', 71)" class="f">lossFn</span> <span onmouseout="hideTip(event, 'fs1', 72)" onmouseover="showTip(event, 'fs1', 72)" class="i">mnist</span><span class="o">.</span><span class="i">TstImgsFlat</span> <span onmouseout="hideTip(event, 'fs1', 73)" onmouseover="showTip(event, 'fs1', 73)" class="i">mnist</span><span class="o">.</span><span class="i">TstLbls</span>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs24', 70)" onmouseover="showTip(event, 'fs24', 70)" class="i">tstLossUntrained</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs23', 71)" onmouseover="showTip(event, 'fs23', 71)" class="f">lossFn</span> <span onmouseout="hideTip(event, 'fs1', 72)" onmouseover="showTip(event, 'fs1', 72)" class="i">mnist</span><span class="o">.</span><span class="i">TstImgsFlat</span> <span onmouseout="hideTip(event, 'fs1', 73)" onmouseover="showTip(event, 'fs1', 73)" class="i">mnist</span><span class="o">.</span><span class="i">TstLbls</span>
                        <span class="o">|&gt;</span> <span class="i">ArrayND</span><span class="o">.</span><span class="i">value</span>
 <span onmouseout="hideTip(event, 'fs25', 74)" onmouseover="showTip(event, 'fs25', 74)" class="f">printfn</span> <span class="s">&quot;Test loss (untrained): </span><span class="pf">%.4f</span><span class="s">&quot;</span> <span onmouseout="hideTip(event, 'fs24', 75)" onmouseover="showTip(event, 'fs24', 75)" class="i">tstLossUntrained</span>
 </code></pre></td>
 </tr>
 </table>
-<p>We initialize the parameters model by calling <code>mi.InitPars</code>.
-The only argument to that function is the seed to use for random initialization of the model's parameters.
-We use a fixed seed of 123 to get reproducible results, but you can change it to a time-dependent value to get varying starting points.</p>
 <p>We call our compiled loss function as expected and pipe the result into the <code>Tensor.value</code> function to extract the float value from the zero-rank tensor.
 This should print something similar to</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
@@ -279,7 +287,9 @@ The gradient descent optimizer has a single configurable parameter: the learning
 </code></pre></td>
 </tr>
 </table>
-<p>We use a learning rate of <span class="math">\(0.1\)</span>.</p>
+<p>We use a learning rate of <span class="math">\(0.1\)</span>.
+This high learning rate is feasible because we will calculate the gradient on the whole dataset (50 000 images) and thus it will be very stable.
+If we did <a href="http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf">mini-batch training</a> instead, i.e. split the training set into small mini-batches and update the parameters after estimating the gradient on a mini-batch, we would have to use a smaller learning rate.</p>
 <h3><a name="Training-loop" class="anchor" href="#Training-loop">Training loop</a></h3>
 <p>We are now ready to train and evaluate our model using a simple training loop.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
@@ -296,7 +306,8 @@ The gradient descent optimizer has a single configurable parameter: the learning
 </code></pre></td>
 </tr>
 </table>
-<p>We train for 1000 iterations</p>
+<p>We train for 1000 iterations using the whole dataset (50 000 images) in each iteration.
+The loss is evaluated every 50 iterations on the test set (10 000 images) and printed.</p>
 <p>This should produce output similar to</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
 <span class="l">2: </span>
@@ -312,13 +323,11 @@ The gradient descent optimizer has a single configurable parameter: the learning
 </code></pre></td>
 </tr>
 </table>
-<p>In this example the high learning rate of 0.1 is feasible because we are evaluating the gradient on the whole dataset (50 000 images) and thus it is very stable.
-If we did <a href="http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf">mini-batch training</a> instead, i.e. split the training set into small mini-batches and update the parameters after estimating the gradient on a mini-batch, we would have to use a smaller learning rate.</p>
 <p>Deep.Net also provides a generic training function with parameter and loss logging, automatic adjustment of the learning rate and automatic termination.
 We will show its use in a later chapter.</p>
 <h2><a name="Conclusion" class="anchor" href="#Conclusion">Conclusion</a></h2>
-<p>In this introductory example we showed how to define symbolic sizes and a two-layer neural network using elementary mathematical operators.
-Training was performed using a simple training loop.</p>
+<p>In this introductory example we showed how to define symbolic sizes and build a two-layer neural network with a softmax output layer and cross-entropy loss using elementary mathematical operators.
+Training was performed on the MNIST dataset using a simple training loop.</p>
 <p>In the following sections, we will show how to assemble models from predefined blocks (such as neural layers and loss layers) and use a Deep.Net provided, configurable training loop.</p>
 
 <div class="tip" id="fs1">val mnist : obj<br /><br />Full name: Mnist.mnist</div>
