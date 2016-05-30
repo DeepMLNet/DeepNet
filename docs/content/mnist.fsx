@@ -1,14 +1,15 @@
 (*** hide ***)
 #load "../../DeepNet.fsx"
 
-SymTensor.Compiler.Cuda.Debug.Timing <- true
-SymTensor.Compiler.Cuda.Debug.MemUsage <- true
+//SymTensor.Compiler.Cuda.Debug.Timing <- true
+//SymTensor.Compiler.Cuda.Debug.MemUsage <- true
 
 (**
 Learning MNIST
 ==============
 
 In this example we will show how to learn MNIST classification using a two-layer feed-forward network.
+You can run this example by executing `FsiAnyCPU.exe docs\content\mnist.fsx` after cloning the Deep.Net repository.
 
 ### Namespaces
 The `ArrayNDNS` namespace houses the numeric tensor functionality.
@@ -194,13 +195,19 @@ Testing the model
 We can now test our work so far by calculating the loss of the *untrained* model on the MNIST test set.
 *)
 
+mi.InitPars 123
 let tstLossUntrained = lossFn mnist.TstImgsFlat mnist.TstLbls
                        |> ArrayND.value
 printfn "Test loss (untrained): %.4f" tstLossUntrained
 
 (**
+We initialize the parameters model by calling `mi.InitPars`.
+The only argument to that function is the seed to use for random initialization of the model's parameters.
+We use a fixed seed of 123 to get reproducible results, but you can change it to a time-dependent value to get varying starting points.
+
 We call our compiled loss function as expected and pipe the result into the `Tensor.value` function to extract the float value from the zero-rank tensor.
 This should print something similar to
+
     Test loss (untrained): 2.3019
 *)
 
@@ -237,33 +244,56 @@ An optimization function returns an empty tensor (zero length).
 
 Thus `optFn` is a function taking three parameters: the input images, the target labels and a record of type `GradientDescent.Cfg` that contains the optimizer configuration.
 
-We use a learning rate of $10^{-3}$.
+We still need to declare the optimizer configuration.
+The gradient descent optimizer has a single configurable parameter: the learning rate.
 *)
 
-let optCfg = { Optimizers.GradientDescent.Step=1e-3f }
+let optCfg = { Optimizers.GradientDescent.Step=1e-1f }
 
 (**
-Other optimizers (such as Adam) have more configuration parameters.
+We use a learning rate of $0.1$.
+*)
+
+(**
 
 ### Training loop
 
 We are now ready to train and evaluate our model using a simple training loop.
 *)
 
-for itr = 0 to 20 do
+for itr = 0 to 1000 do
     optFn mnist.TrnImgsFlat mnist.TrnLbls optCfg |> ignore
-    let l = lossFn mnist.TstImgsFlat mnist.TstLbls |> ArrayND.value
-    printfn "Test loss after %d iterations: %.4f" itr l
+    if itr % 50 = 0 then
+        let l = lossFn mnist.TstImgsFlat mnist.TstLbls |> ArrayND.value
+        printfn "Test loss after %5d iterations: %.4f" itr l
 
 (**
-This should produce output similar to
-    xxxx
-    xxxx
+We train for 1000 iterations 
 
-Deep.Net also provides a generic training function with parameter and loss logging and automatic stopping.
+This should produce output similar to
+    
+    Test loss after     0 iterations: 2.3019
+    Test loss after    50 iterations: 2.0094
+    Test loss after   100 iterations: 1.0628
+    ....
+    Test loss after  1000 iterations: 0.2713
+
+In this example the high learning rate of 0.1 is feasible because we are evaluating the gradient on the whole dataset (50 000 images) and thus it is very stable.
+If we did [mini-batch training](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf) instead, i.e. split the training set into small mini-batches and update the parameters after estimating the gradient on a mini-batch, we would have to use a smaller learning rate.
+
+
+Deep.Net also provides a generic training function with parameter and loss logging, automatic adjustment of the learning rate and automatic termination.
 We will show its use in a later chapter.
 
+*)
+
+(**
 
 Conclusion
 ----------
+In this introductory example we showed how to define symbolic sizes and a two-layer neural network using elementary mathematical operators.
+Training was performed using a simple training loop.
+
+In the following sections, we will show how to assemble models from predefined blocks (such as neural layers and loss layers) and use a Deep.Net provided, configurable training loop.
+
 *)
