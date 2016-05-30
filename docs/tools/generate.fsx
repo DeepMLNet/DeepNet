@@ -41,8 +41,10 @@ open FSharp.MetadataFormat
 // otherwise, use the current 'output' directory.
 #if RELEASE
 let root = website
+let compilerOptions = "--define:RELEASE"
 #else
 let root = "file://" + (__SOURCE_DIRECTORY__ @@ "../output")
+let compilerOptions = ""
 #endif
 
 // Paths with template/source/output locations
@@ -113,6 +115,7 @@ let buildDocumentation () =
 
   Literate.ProcessDirectory
     ( content, docTemplate, output, replacements = ("root", root)::info,
+      compilerOptions = compilerOptions,
       layoutRoots = layoutRootsAll.["en"],
       generateAnchors = true,
       processRecursive = false)
