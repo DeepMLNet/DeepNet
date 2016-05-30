@@ -9,7 +9,10 @@ Learning MNIST
 ==============
 
 In this example we will show how to learn MNIST classification using a two-layer feed-forward network.
+
 You can run this example by executing `FsiAnyCPU.exe docs\content\mnist.fsx` after cloning the Deep.Net repository.
+You can move your mouse over any symbol in the code samples to see the full signature.
+A [quick introduction to F# signatures](https://fsharpforfunandprofit.com/posts/function-signatures/) might be helpful.
 
 ### Namespaces
 The `ArrayNDNS` namespace houses the numeric tensor functionality.
@@ -188,6 +191,25 @@ Hence, in this example the resulting `lossFn` function takes two tensors as argu
 There are wrappers `arg1`, `arg3`, `arg4`, ... for different number of arguments.
 The return type of a compiled function is always a tensor.
 If the result of the expression is a scalar (as in our case), the tensor will have rank zero.
+*)
+
+(**
+
+Initializing the model parameters
+---------------------------------
+
+We initialize the parameters model by calling `mi.InitPars`.
+The only argument to that function is the seed to use for random initialization of the model's parameters.
+`mi.InitPars` samples from an uniform distribution with support $[-0.01, 0.01]$ to initialize all model parameters that had no initializer specified when calling `mb.Param`.
+
+*)
+
+mi.InitPars 123
+
+(**
+
+We use a fixed seed of 123 to get reproducible results, but you can change it to a time-dependent value to get varying starting points.
+
 
 Testing the model
 -----------------
@@ -195,16 +217,11 @@ Testing the model
 We can now test our work so far by calculating the loss of the *untrained* model on the MNIST test set.
 *)
 
-mi.InitPars 123
 let tstLossUntrained = lossFn mnist.TstImgsFlat mnist.TstLbls
                        |> ArrayND.value
 printfn "Test loss (untrained): %.4f" tstLossUntrained
 
 (**
-We initialize the parameters model by calling `mi.InitPars`.
-The only argument to that function is the seed to use for random initialization of the model's parameters.
-We use a fixed seed of 123 to get reproducible results, but you can change it to a time-dependent value to get varying starting points.
-
 We call our compiled loss function as expected and pipe the result into the `Tensor.value` function to extract the float value from the zero-rank tensor.
 This should print something similar to
 
@@ -252,6 +269,8 @@ let optCfg = { Optimizers.GradientDescent.Step=1e-1f }
 
 (**
 We use a learning rate of $0.1$.
+This high learning rate is feasible because we will calculate the gradient on the whole dataset (50 000 images) and thus it will be very stable.
+If we did [mini-batch training](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf) instead, i.e. split the training set into small mini-batches and update the parameters after estimating the gradient on a mini-batch, we would have to use a smaller learning rate.
 *)
 
 (**
@@ -268,7 +287,8 @@ for itr = 0 to 1000 do
         printfn "Test loss after %5d iterations: %.4f" itr l
 
 (**
-We train for 1000 iterations 
+We train for 1000 iterations using the whole dataset (50 000 images) in each iteration.
+The loss is evaluated every 50 iterations on the test set (10 000 images) and printed.
 
 This should produce output similar to
     
@@ -277,10 +297,6 @@ This should produce output similar to
     Test loss after   100 iterations: 1.0628
     ....
     Test loss after  1000 iterations: 0.2713
-
-In this example the high learning rate of 0.1 is feasible because we are evaluating the gradient on the whole dataset (50 000 images) and thus it is very stable.
-If we did [mini-batch training](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf) instead, i.e. split the training set into small mini-batches and update the parameters after estimating the gradient on a mini-batch, we would have to use a smaller learning rate.
-
 
 Deep.Net also provides a generic training function with parameter and loss logging, automatic adjustment of the learning rate and automatic termination.
 We will show its use in a later chapter.
@@ -291,8 +307,8 @@ We will show its use in a later chapter.
 
 Conclusion
 ----------
-In this introductory example we showed how to define symbolic sizes and a two-layer neural network using elementary mathematical operators.
-Training was performed using a simple training loop.
+In this introductory example we showed how to define symbolic sizes and build a two-layer neural network with a softmax output layer and cross-entropy loss using elementary mathematical operators.
+Training was performed on the MNIST dataset using a simple training loop.
 
 In the following sections, we will show how to assemble models from predefined blocks (such as neural layers and loss layers) and use a Deep.Net provided, configurable training loop.
 
