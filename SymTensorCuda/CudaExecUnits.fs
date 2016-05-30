@@ -51,7 +51,7 @@ module CudaExecUnit =
         match op with
         | ULeafOp _ -> []
 
-        // unary elementwise
+        // unary element-wise
         | UUnaryOp Negate -> inplaceFirstSrcReq                        
         | UUnaryOp Abs -> inplaceFirstSrcReq
         | UUnaryOp SignT -> inplaceFirstSrcReq
@@ -98,7 +98,7 @@ module CudaExecUnit =
         // misc
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
-        // binary elementwise
+        // binary element-wise
         | UBinaryOp Add -> inplaceFirstSrcReq
         | UBinaryOp Substract -> inplaceFirstSrcReq
         | UBinaryOp Multiply -> inplaceFirstSrcReq
@@ -124,29 +124,29 @@ module CudaExecUnit =
                      (op: UOpT) (srcs: ArrayNDManikinT list) (srcShared: bool list)  =
 
         // new allocated target
-        let newTrgt =
+        let newTrgt () =
             ArrayNDManikin.newC memAllocator typ trgtShape, false        
 
         // target that shares no elements with any srcView 
-        let outplaceTrgt =
+        let outplaceTrgt () =
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> newTrgt  
+            | _ -> newTrgt () 
              
-        let outplaceBlasTrgt = 
+        let outplaceBlasTrgt () = 
             match req with
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) &&
                            ArrayND.isBlasTargetable rv -> rv, false
             | _ -> ArrayNDManikin.newF memAllocator typ trgtShape, false
 
         // target that reuses a srcView, if it may be overwritten
-        let inplaceOvrwrtTrgt =
+        let inplaceOvrwrtTrgt () =
             match List.zip srcs srcShared 
                   |> List.tryFind (fun (src, shared) ->
                                        not (ArrayND.isBroadcasted src) && 
                                        not shared) with
             | Some (src, _) -> src, false
-            | None -> outplaceTrgt     
+            | None -> outplaceTrgt ()     
 
         match op with
         // variable access
@@ -157,44 +157,44 @@ module CudaExecUnit =
                 ArrayNDManikin.externalC (MemExternal vs) trgtShape, true
             | LocHost ->
                 // will transfer variable from host to device during execution
-                // need continguous memory for that
+                // need contiguous memory for that
                 match req with
                 | Some rv when ArrayND.isC rv -> rv, false
                 | _ -> ArrayNDManikin.newC memAllocator typ trgtShape, false    
             | loc -> unsupLoc loc                    
         // tensor creation
-        | ULeafOp _ -> outplaceTrgt        
+        | ULeafOp _ -> outplaceTrgt ()      
 
-        // unary elementwise
-        | UUnaryOp Negate -> inplaceOvrwrtTrgt                        
-        | UUnaryOp Abs -> inplaceOvrwrtTrgt
-        | UUnaryOp SignT -> inplaceOvrwrtTrgt
-        | UUnaryOp Log -> inplaceOvrwrtTrgt
-        | UUnaryOp Log10 -> inplaceOvrwrtTrgt                           
-        | UUnaryOp Exp -> inplaceOvrwrtTrgt                           
-        | UUnaryOp Sin -> inplaceOvrwrtTrgt
-        | UUnaryOp Cos -> inplaceOvrwrtTrgt
-        | UUnaryOp Tan -> inplaceOvrwrtTrgt
-        | UUnaryOp Asin -> inplaceOvrwrtTrgt
-        | UUnaryOp Acos -> inplaceOvrwrtTrgt
-        | UUnaryOp Atan -> inplaceOvrwrtTrgt
-        | UUnaryOp Sinh -> inplaceOvrwrtTrgt
-        | UUnaryOp Cosh -> inplaceOvrwrtTrgt
-        | UUnaryOp Tanh -> inplaceOvrwrtTrgt
-        | UUnaryOp Sqrt -> inplaceOvrwrtTrgt
-        | UUnaryOp Ceil -> inplaceOvrwrtTrgt
-        | UUnaryOp Floor -> inplaceOvrwrtTrgt
-        | UUnaryOp Round -> inplaceOvrwrtTrgt
-        | UUnaryOp Truncate -> inplaceOvrwrtTrgt    
+        // unary element-wise
+        | UUnaryOp Negate -> inplaceOvrwrtTrgt ()                       
+        | UUnaryOp Abs -> inplaceOvrwrtTrgt ()
+        | UUnaryOp SignT -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Log -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Log10 -> inplaceOvrwrtTrgt ()                          
+        | UUnaryOp Exp -> inplaceOvrwrtTrgt ()                           
+        | UUnaryOp Sin -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Cos -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Tan -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Asin -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Acos -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Atan -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Sinh -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Cosh -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Tanh -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Sqrt -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Ceil -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Floor -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Round -> inplaceOvrwrtTrgt ()
+        | UUnaryOp Truncate -> inplaceOvrwrtTrgt ()    
         // reductions
-        | UUnaryOp Sum -> outplaceTrgt
-        | UUnaryOp (SumAxis _) -> outplaceTrgt
+        | UUnaryOp Sum -> outplaceTrgt ()
+        | UUnaryOp (SumAxis _) -> outplaceTrgt ()
         // shape operations
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
             if ArrayND.isC srcs.[0] then
                 ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0] 
-            else outplaceTrgt  // will copy
+            else outplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
             ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
         | UUnaryOp (SwapDim (ax1, ax2)) ->
@@ -202,34 +202,34 @@ module CudaExecUnit =
         // variable access
         | UUnaryOp (StoreToVar _) -> 
             // output of StoreToVar is empty 
-            newTrgt
+            newTrgt ()
         // misc
         | UUnaryOp (Annotated _) -> srcs.[0], srcShared.[0]
 
-        // binary elementwise
-        | UBinaryOp Add -> inplaceOvrwrtTrgt
-        | UBinaryOp Substract -> inplaceOvrwrtTrgt
-        | UBinaryOp Multiply -> inplaceOvrwrtTrgt
-        | UBinaryOp Divide -> inplaceOvrwrtTrgt
-        | UBinaryOp Modulo -> inplaceOvrwrtTrgt
-        | UBinaryOp Power -> inplaceOvrwrtTrgt
+        // binary element-wise
+        | UBinaryOp Add -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Substract -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Multiply -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Divide -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Modulo -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Power -> inplaceOvrwrtTrgt ()
         // matrix/tensor operations
-        | UBinaryOp Dot -> outplaceBlasTrgt
-        | UBinaryOp TensorProduct -> outplaceTrgt
+        | UBinaryOp Dot -> outplaceBlasTrgt ()
+        | UBinaryOp TensorProduct -> outplaceTrgt ()
 
         // nary
-        | UNaryOp Discard -> outplaceTrgt
+        | UNaryOp Discard -> outplaceTrgt ()
         | UNaryOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
-                // dynamic subtensors will be copied out of the src
-                outplaceTrgt
+                // dynamic sub-tensors will be copied out of the src
+                outplaceTrgt ()
             else
-                // symbolic subtensors use a view of the src 
+                // symbolic sub-tensors use a view of the src 
                 let rng = SimpleRangesSpec.eval (fun _ -> failwith "is static") srs
                 srcs.[0].[rng] :?> ArrayNDManikinT, srcShared.[0]
         | UNaryOp (SetSubtensor _) ->
             if not (srcShared.[0]) then srcs.[0], false
-            else outplaceTrgt
+            else outplaceTrgt ()
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
    
     /// execution item to lunch the given kernel template function
@@ -242,7 +242,7 @@ module CudaExecUnit =
              ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls;}    
         [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
 
-    /// returns the CUDA work dimensions for an elementwise operation
+    /// returns the CUDA work dimensions for an element-wise operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
         | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
@@ -260,7 +260,7 @@ module CudaExecUnit =
         if List.isEmpty args then tmpl
         else sprintf "%s<%s>" tmpl (args |> String.concat ", ")
 
-    /// function name of elementwise wrapper and its arguments for the given target, operation and sources
+    /// function name of element-wise wrapper and its arguments for the given target, operation and sources
     let elemwiseFuncnameAndArgs trgt cOp srcViews =
         let args = 
             (cOp :> ICudaArgTmpl) ::
@@ -274,7 +274,7 @@ module CudaExecUnit =
         let funcName = sprintf "elemwise%dAry%s%s" nSrc dimsStr indexedStr 
         funcName, args
 
-    /// execution items for an elementwise operation
+    /// execution items for an element-wise operation
     let execItemsForElemwise trgt cOp srcViews =
         if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
             failwithf "a source of an elemwise op has different number of elements than target"
@@ -429,7 +429,7 @@ module CudaExecUnit =
                 let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape trgt)
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
             | loc -> unsupLoc loc
-        // unary elementwise
+        // unary element-wise
         | UUnaryOp Negate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcs
         | UUnaryOp Abs -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcs
         | UUnaryOp SignT -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SignTEOp_t", false)) srcs
@@ -493,7 +493,7 @@ module CudaExecUnit =
         // misc
         | UUnaryOp (Annotated _) -> []
 
-        // binary elementwise
+        // binary element-wise
         | UBinaryOp Add ->       execItemsForElemwise trgt (NoArgEOpArgTmpl("AddEOp_t",       false)) srcs
         | UBinaryOp Substract -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcs
         | UBinaryOp Multiply ->  execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) srcs
@@ -547,8 +547,6 @@ module CudaExecUnit =
 
     /// returns the execution units for tracing the result
     let execItemsForTrace compileEnv memAllocator trgt uexpr =
-        // need to copy to host and then call trace function when done
-
         [Trace (uexpr, trgt)]
 
 

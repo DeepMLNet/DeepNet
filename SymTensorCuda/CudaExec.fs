@@ -422,9 +422,9 @@ module CudaExprWorkspaceTypes =
 
                 // CUBLAS 
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
-                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
-                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
+                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>     
+                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>    
+                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>
                     let m = a.GetRowsForOp execEnv aOp
                     let n = b.GetColumnsForOp execEnv bOp
                     let k = a.GetColumnsForOp execEnv aOp

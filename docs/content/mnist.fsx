@@ -1,6 +1,9 @@
 (*** hide ***)
 #load "../../DeepNet.fsx"
 
+SymTensor.Compiler.Cuda.Debug.Timing <- true
+SymTensor.Compiler.Cuda.Debug.MemUsage <- true
+
 (**
 Learning MNIST
 ==============
