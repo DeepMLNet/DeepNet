@@ -230,7 +230,7 @@ A slice range can be one of the following.
 
 All slice range operators can be combined arbitrarily.
 
-The reader should note that the result of selecting a single element using the slicing operator, e.g. $a.[1,1]$, is a *tensor* of dimension zero sharing the same memory as `a`.
+The reader should note that the result of selecting a single element using the slicing operator, e.g. `a.[1,1]`, is a *tensor* of dimension zero sharing the same memory as `a`.
 
 
 Shape operations
