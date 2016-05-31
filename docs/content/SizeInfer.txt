@@ -1,0 +1,11 @@
+Deep.Net can infer most the values for most size symbols by itself when provided with example values for variables.
+The `mb.UseTmplVal` method of the model builder takes a symbolic variable and the corresponding example tensor as argument.
+It matches the (symbolic) shape of the specified variable with the (numeric) shape of the tensor and infers the values of the occurring size symbols.
+The contents of the tensor are not important, only its shape is inspected.
+If a size symbol was inferred to another size previously, an error will be raised. 
+
+Here, the symbolic variable `input` of shape $\mathrm{nBatch} \times \mathrm{nInput}$ is matched to the numeric tensor `mnist.TrnImgsFlat.T` of shape $60000 \times 784$.
+Hence `nInput` is inferred to 784, `nBatch` to 60000 and `nTarget` to 10.
+
+We still need to specify `nHidden` manually, as it does not occur in any variable.
+We use the `mb.SetSize` method of the model builder that takes a symbolic size and the corresponding numeric value for it.

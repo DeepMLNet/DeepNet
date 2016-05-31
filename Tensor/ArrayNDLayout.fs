@@ -124,7 +124,7 @@ module ArrayNDLayout =
     let inline padRight a =
         {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
 
-    /// broadcast the given dimensionto the given size
+    /// broadcast the given dimension to the given size
     let inline broadcastDim dim size a =
         if size < 0 then invalidArg "size" "size must be positive"
         match (shape a).[dim] with

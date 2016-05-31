@@ -248,7 +248,7 @@ module DatasetTypes =
 
  
 
-    /// A training/validation/test partioning of a dataset.
+    /// A training/validation/test partitioning of a dataset.
     [<StructuredFormatDisplay("{Pretty}")>]
     type TrnValTst<'S> = 
         { Trn:    Dataset<'S>

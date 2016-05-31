@@ -177,7 +177,7 @@ module ExecUnit =
             memAllocs <- mem :: memAllocs
             MemAlloc mem
 
-        // evaluation requestion
+        // evaluation request
         let mutable evalRequests : EvalReqT list = []
         let mutable evalRequestIdCnt = 0
         let submitEvalRequest expr multiplicity storage onCompletion =

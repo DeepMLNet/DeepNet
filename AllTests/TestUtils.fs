@@ -12,9 +12,9 @@ open Datasets
 open Optimizers
 
 
-let post device x =
-    if device = DevCuda then ArrayNDCuda.toDev x :> ArrayNDT<'T>
-    else x :> ArrayNDT<'T>
+let post device (x: ArrayNDT<'T>) =
+    if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> ArrayNDT<'T>
+    else x 
     
 let compareTraces func dump =
     printfn "Evaluating on CUDA device..."

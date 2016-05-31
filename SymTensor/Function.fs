@@ -190,14 +190,14 @@ module Func =
         let tryCompile compileEnv failIfImpossible = 
             let failIfImpossible = failIfImpossible || not compileEnv.CanDelay
 
-            // substitute symbol sizes into expressions and convert to unified expressons
+            // substitute symbol sizes into expressions and convert to unified expressions
             let uexprs, vars, sizeAvail = 
                 baseExprGens 
                 |> List.map (fun gen -> gen compileEnv.SymSizes) 
                 |> List.unzip3
             let neededVars = Set.unionMany vars            
 
-            // check that all necessary symbol sizes are avilable
+            // check that all necessary symbol sizes are available
             let allSizesAvail = sizeAvail |> List.forall id
             if failIfImpossible && not allSizesAvail then
                 failwith "cannot compile expression because not all symbolic sizes could be resolved"
@@ -210,7 +210,7 @@ module Func =
                 |> Map.ofSeq
             let compileEnv = {compileEnv with VarLocs=varLocs}
 
-            // check that all neccessary variable locations are avilable
+            // check that all necessary variable locations are available
             let allKnownLocs = 
                 varLocs
                 |> Map.toSeq
@@ -258,7 +258,7 @@ module Func =
 
             res
 
-        // If all size symbols and variable storage locations are known, then we can immedietly compile
+        // If all size symbols and variable storage locations are known, then we can immediately compile
         // the expression. Otherwise we have to wait for a VarEnv to infer the missing sizes and locations.
         match tryCompile baseCompileEnv false with
         | Some compileRes -> performEval compileRes

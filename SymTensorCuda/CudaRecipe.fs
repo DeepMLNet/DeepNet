@@ -348,7 +348,7 @@ module CudaRecipe =
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
         let timeForStreams = sw.Elapsed
 
-        // generate CUDA calls for execution and initializaton
+        // generate CUDA calls for execution and initialization
         let sw = Stopwatch.StartNew()
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
@@ -360,17 +360,23 @@ module CudaRecipe =
             else allocCalls
         let timeForCalls = sw.Elapsed
 
-        #if TIMING
-        printfn "Time for building CUDA recipe:"
-        printfn "Execution units:        %A" timeForExecUnits
-        printfn "Stream generation:      %A" timeForStreams
-        printfn "Call generation:        %A" timeForCalls
-        #endif
+        // diagnostic output
+        if Debug.Timing then
+            printfn "Time for building CUDA recipe:"
+            printfn "Execution units:        %A" timeForExecUnits
+            printfn "Stream generation:      %A" timeForStreams
+            printfn "Call generation:        %A" timeForCalls
+        if Debug.MemUsage then
+            let memUsage = memAllocs |> List.sumBy (fun ma -> ma.ByteSize)
+            printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
 
-        {KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache;
-         CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache;
-         InitCalls = initCalls;
-         DisposeCalls = disposeCalls;
-         ExecCalls = execCalls;}
+
+        {
+            KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
+            CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache
+            InitCalls = initCalls
+            DisposeCalls = disposeCalls
+            ExecCalls = execCalls
+        }
 
 

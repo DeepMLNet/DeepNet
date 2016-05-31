@@ -51,6 +51,8 @@ module HDF5Types =
     /// A HDF5 file.
     type HDF5 (path: string, mode: Mode) = 
         
+        let mutable disposed = false
+
         let fileHnd =
             match mode with
             | HDF5Read -> 
@@ -70,10 +72,18 @@ module HDF5Types =
         /// opens a HDF5 file for reading
         new (path: string) = new HDF5 (path, HDF5Read)
 
-        interface IDisposable with
-            member this.Dispose () =
+        /// closes the HDF5 file
+        member this.Dispose () = 
+            if not disposed then             
                 if fileHnd >= 0 then
                     H5F.close fileHnd |> check |> ignore
+                disposed <- true
+
+        interface IDisposable with
+            member this.Dispose () = this.Dispose ()
+
+        override this.Finalize () =
+            this.Dispose ()
                     
         /// opens the specified HDF5 file for reading
         static member OpenRead  path = new HDF5 (path, HDF5Read)
@@ -84,6 +94,8 @@ module HDF5Types =
 
         /// Write data array using specified name and shape.
         member this.Write (name: string, data: 'T array, shape: int list) =
+            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
+
             if mode <> HDF5Overwrite then
                 failwithf "HDF5 file %s is opened for reading" path
             checkShape data shape
@@ -102,6 +114,10 @@ module HDF5Types =
 
         /// Read data array using specified name. Returns tuple of data and shape.
         member this.Read<'T> (name: string) =            
+            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
+
+            if H5L.exists (fileHnd, name) <= 0 then
+                failwithf "HDF5 dataset %s does not exist in file %s" name path
             let dataHnd = H5D.``open`` (fileHnd, name) |> check
             let typeHnd = H5D.get_type dataHnd |> check
             let shapeHnd = H5D.get_space (dataHnd) |> check

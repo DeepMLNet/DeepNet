@@ -320,10 +320,14 @@ module CudaExprWorkspaceTypes =
                 | CudaCallT.MemAlloc mem -> 
                     let typeSize = Marshal.SizeOf (TypeName.getType mem.TypeName)
                     let elements = if mem.Elements > 0 then mem.Elements else 1
-                    execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
+                    try
+                        execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
+                    with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory ->
+                        failwithf "Out of CUDA memory while allocating %d bytes" (elements * typeSize)
                 | CudaCallT.MemFree mem ->
-                    execEnv.InternalMem.[mem].Dispose()
-                    execEnv.InternalMem.Remove(mem) |> ignore
+                    if execEnv.InternalMem.ContainsKey mem then
+                        execEnv.InternalMem.[mem].Dispose()
+                        execEnv.InternalMem.Remove(mem) |> ignore
 
                 // memory operations
                 | MemcpyAsync (dst, src, strm) ->
@@ -363,8 +367,9 @@ module CudaExprWorkspaceTypes =
                         execEnv.Stream.Add(strm, new CudaStream(flags))
                 | StreamDestory strm ->
                     if not Debug.DisableStreams then
-                        execEnv.Stream.[strm].Dispose()
-                        execEnv.Stream.Remove(strm) |> ignore
+                        if execEnv.Stream.ContainsKey strm then
+                            execEnv.Stream.[strm].Dispose()
+                            execEnv.Stream.Remove(strm) |> ignore
                 | StreamWaitEvent (strm, evnt) ->
                     if not Debug.DisableStreams then
                         execEnv.Stream.[strm].WaitEvent(execEnv.Event.[evnt].Event)
@@ -373,9 +378,9 @@ module CudaExprWorkspaceTypes =
                 | EventCreate (evnt, flags) ->
                     execEnv.Event.Add(evnt, new CudaEvent(flags))
                 | EventDestory evnt ->
-                    // WORKAROUND: disposing events currently causes a CUDA access violation
-                    execEnv.Event.[evnt].Dispose()
-                    execEnv.Event.Remove(evnt) |> ignore
+                    if execEnv.Event.ContainsKey evnt then
+                        execEnv.Event.[evnt].Dispose()
+                        execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
                     execEnv.Event.[evnt].Record(getStream strm)
                 | EventSynchronize evnt ->
@@ -417,9 +422,9 @@ module CudaExprWorkspaceTypes =
 
                 // CUBLAS 
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
-                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
-                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>            
+                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>     
+                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>    
+                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>
                     let m = a.GetRowsForOp execEnv aOp
                     let n = b.GetColumnsForOp execEnv bOp
                     let k = a.GetColumnsForOp execEnv aOp
@@ -456,6 +461,8 @@ module CudaExprWorkspaceTypes =
                     // disposed yet
                     CudaSup.context.PushContext ()
                     CudaSup.context.GetDeviceInfo() |> ignore
+
+                    // cleanup CUDA resources
                     execCalls recipe.DisposeCalls
                     Compile.unloadCudaCode krnlModHndl
                     CudaSup.context.PopContext ()

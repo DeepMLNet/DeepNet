@@ -1,5 +1,7 @@
 ﻿namespace SymTensor
 
+open System.Runtime.InteropServices
+
 open ShapeSpec
 
 
@@ -16,15 +18,19 @@ module TypeName =
     let getType (TypeName tn) =
         System.Type.GetType(tn)
 
-    /// gets the TypeName assoicated with the given type
+    /// gets the size of the represented type in bytes
+    let size tn =
+        Marshal.SizeOf (getType tn)
+
+    /// gets the TypeName associated with the given type
     let ofType<'T> =
         TypeName (typeof<'T>.AssemblyQualifiedName)
 
-    /// gets the TypeName assoicated with the given System.Type object
+    /// gets the TypeName associated with the given System.Type object
     let ofTypeInst (t: System.Type) =
         TypeName t.AssemblyQualifiedName
 
-    /// gets the TypeName assoicated with the given System.Type object
+    /// gets the TypeName associated with the given System.Type object
     let ofObject (o: obj) =
         ofTypeInst (o.GetType())
 

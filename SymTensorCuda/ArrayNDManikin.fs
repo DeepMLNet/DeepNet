@@ -11,12 +11,14 @@ open SymTensor
 module ArrayNDManikinTypes = 
     open ArrayND
 
-    /// represents a memory allocation execlusively for this expression (used for temporary results)
+    /// represents a memory allocation exclusively for this expression (used for temporary results)
     type MemAllocManikinT = {
         Id:             int; 
         TypeName:       TypeNameT; 
         Elements:       int;
-    }
+    } with
+        member this.ByteSize =
+            this.Elements * TypeName.size this.TypeName
 
     /// Represents memory. 
     /// Memory can either be internal to this expression or external (passed in variable at runtime).
@@ -75,40 +77,40 @@ module ArrayNDManikin =
     open ArrayND
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with contiguous layout
-    let inline newC memAllocator typ shape = 
+    let newC memAllocator typ shape = 
         let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout
-    let inline newF memAllocator typ shape = 
+    let newF memAllocator typ shape = 
         let layout = ArrayNDLayout.newF shape
         ArrayNDManikinT (layout, 
                          (memAllocator typ (ArrayNDLayout.nElems layout)))
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
-    let inline externalC storage shape =
+    let externalC storage shape =
         let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, storage) 
 
     /// storage
-    let inline storage (ary: ArrayNDManikinT) =
+    let storage (ary: ArrayNDManikinT) =
         ary.Storage
 
     /// used data type name
-    let inline typeName (ary: ArrayNDManikinT) =
+    let typeName (ary: ArrayNDManikinT) =
         ary.TypeName
 
     /// size of the used data type 
-    let inline typeSize ary =
-        ary |> typeName |> TypeName.getType |> Marshal.SizeOf
+    let typeSize ary =
+        ary |> typeName |> TypeName.size
 
     /// offset in bytes
-    let inline offsetInBytes ary =
+    let offsetInBytes ary =
         (typeSize ary) * (ArrayND.offset ary)
 
     /// size in bytes 
-    let inline sizeInBytes ary =
+    let sizeInBytes ary =
         (typeSize ary) * (ArrayND.nElems ary)
 
         

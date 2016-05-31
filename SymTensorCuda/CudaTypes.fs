@@ -28,6 +28,12 @@ module Debug =
     [<Literal>]
     let DebugCompile = false
 
+    /// prints timing information during CUDA function compilation
+    let mutable Timing = false
+
+    /// prints CUDA memory usage during CUDA function compilation
+    let mutable MemUsage = false
+
 
 [<AutoOpen>]
 module Types =

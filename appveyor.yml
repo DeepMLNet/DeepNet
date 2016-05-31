@@ -88,6 +88,8 @@
     only:
       - 0.2
       
+  version: 0.2.0.{build}     
+      
   environment:
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
