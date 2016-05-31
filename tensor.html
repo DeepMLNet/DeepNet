@@ -308,7 +308,7 @@ A slice range can be one of the following.</p>
 <li>The special identifier <code>Fill</code>. It fills any dimensions not specified (if any) with an asterisk <code>*</code>. For example <code>b.[0, Fill, 2]</code> is equivalent to <code>b.[0, *, *, 4]</code> and results into a two-dimensional view into tensor <code>b</code>.</li>
 </ul>
 <p>All slice range operators can be combined arbitrarily.</p>
-<p>The reader should note that the result of selecting a single element using the slicing operator, e.g. <span class="math">\(a.[1,1]\)</span>, is a <em>tensor</em> of dimension zero sharing the same memory as <code>a</code>.</p>
+<p>The reader should note that the result of selecting a single element using the slicing operator, e.g. <code>a.[1,1]</code>, is a <em>tensor</em> of dimension zero sharing the same memory as <code>a</code>.</p>
 <h2><a name="Shape-operations" class="anchor" href="#Shape-operations">Shape operations</a></h2>
 <h3><a name="Getting-the-shape" class="anchor" href="#Getting-the-shape">Getting the shape</a></h3>
 <p>The shape of a tensor can be accessed using the function <code>ArrayND.shape</code> or using the <code>Shape</code> property.
