@@ -4,9 +4,6 @@ open System
 open System.Diagnostics
 open Microsoft.FSharp.Reflection
 
-open Basics
-open ArrayNDNS
-
 
 [<AutoOpen>]
 module RecorderTypes =
