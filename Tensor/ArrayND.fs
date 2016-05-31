@@ -134,7 +134,7 @@ module ArrayND =
         /// Both ArrayNDTs must be of same shape.
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
-            // slow elementwise fallback copy
+            // slow element-wise fallback copy
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
@@ -383,7 +383,7 @@ module ArrayND =
     /// sequence of all elements of a ArrayND
     let inline allElems a = allIdx a |> Seq.map (fun i -> get i a)
 
-    /// true if the ArrayND is continguous
+    /// true if the ArrayND is contiguous
     let inline isC a = layout a |> ArrayNDLayout.isC
 
     /// true if the ArrayND is in Fortran order
@@ -429,22 +429,22 @@ module ArrayND =
     let inline copyTo (source: #ArrayNDT<'T>) (dest: #ArrayNDT<'T>) =
         source.CopyTo dest
 
-    /// Returns a continguous copy of the given ArrayND.
+    /// Returns a contiguous copy of the given ArrayND.
     let inline copy source =
         let dest = newCOfSameType (shape source) source
         copyTo source dest
         dest
 
-    /// Returns a continguous copy of the given IArrayNDT.
+    /// Returns a contiguous copy of the given IArrayNDT.
     let inline copyUntyped (source: 'T when 'T :> IArrayNDT) =
         source.Copy() :?> 'T
 
-    /// If the ArrayND is not continguous, returns a continguous copy; otherwise
+    /// If the ArrayND is not contiguous, returns a contiguous copy; otherwise
     /// the given ArrayND is returned unchanged.
     let inline ensureC a =
         if isC a then a else copy a
 
-    /// makes a contiguous copy of ary if it is not contiguous and with zero offset
+    /// makes a contiguous copy of the given tensor if it is not contiguous and with zero offset
     let inline ensureCAndOffsetFree a = 
         if isC a && offset a = 0 then a else copy a 
 
@@ -456,7 +456,7 @@ module ArrayND =
     let inline padRight a =
         relayout (ArrayNDLayout.padRight (layout a)) a
 
-    /// broadcast the given dimensionto the given size
+    /// broadcast the given dimension to the given size
     let inline broadcastDim dim size a =
         relayout (ArrayNDLayout.broadcastDim dim size (layout a)) a        
 
@@ -508,7 +508,7 @@ module ArrayND =
     let inline reorderAxes (newOrder: int list) a =
         relayout (ArrayNDLayout.reorderAxes newOrder (layout a)) a
 
-    /// creates a subview of an ArrayND
+    /// creates a view of an ArrayND
     let inline view ranges a =
         relayout (ArrayNDLayout.view ranges (layout a)) a        
 
@@ -559,20 +559,20 @@ module ArrayND =
         | _ -> invalidArg "a" "need a quadratic matrix"
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // elementwise operations
+    // element-wise operations
     ////////////////////////////////////////////////////////////////////////////////////////////////   
    
-    /// Applies the given function elementwise to the given ArrayND and 
+    /// Applies the given function element-wise to the given ArrayND and 
     /// stores the result in a new ArrayND.
     let inline map (f: 'T -> 'T) (a: 'A when 'A :> ArrayNDT<'T>) =
         a.Map f :?> 'A
 
-    /// Applies the given function elementwise to the given ArrayND and 
+    /// Applies the given function element-wise to the given ArrayND and 
     /// stores the result in a new ArrayND.
     let inline mapTC (f: 'T -> 'R) (a: #ArrayNDT<'T>) =
         a.Map f
 
-    /// Applies the given function elementwise to the given ArrayND inplace.
+    /// Applies the given function element-wise to the given ArrayND inplace.
     let inline mapInplace f (a: #ArrayNDT<'T>) =
         a.MapInplace f
 
@@ -592,17 +592,17 @@ module ArrayND =
         for idx in allIdx a do
             a.[idx] <- f idx
             
-    /// Applies the given binary function elementwise to the two given ArrayNDs 
+    /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
     let inline map2 f (a: 'A when 'A :> ArrayNDT<'T>) (b: 'A) =
         a.Map2 f b :?> 'A
 
-    /// Applies the given binary function elementwise to the two given ArrayNDs 
+    /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
     let inline map2TC (f: 'T -> 'T -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         a.Map2 f b 
 
-    /// Applies the given binary function elementwise to the two given ArrayNDs 
+    /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
     let inline map2Inplace f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         let a, b = broadcastToSame a b
@@ -713,7 +713,7 @@ module ArrayND =
 
     type ArrayNDT<'T> with    
 
-        // elementwise unary
+        // element-wise unary
         static member (~+)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~+) (~+) (~+) (unsp) a
         static member (~-)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~-) (~-) (~-) (unsp) a
         static member Abs       (a: #ArrayNDT<'T>) = typedMap (unsp) abs abs abs (unsp) a
@@ -736,10 +736,10 @@ module ArrayND =
         static member Round     (a: #ArrayNDT<'T>) = typedMap (unsp) round round (unsp) (unsp) a
         static member Truncate  (a: #ArrayNDT<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) a
 
-        // elementwise unary logic
+        // element-wise unary logic
         static member (~~~~)    (a: #ArrayNDT<bool>) = map not a
 
-        // elementwise binary
+        // element-wise binary
         static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (+) (+) (+) (+) a b
         static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (-) (-) (-) (-) a b
         static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (*) (*) (*) (*) a b
@@ -747,17 +747,17 @@ module ArrayND =
         static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (%) (%) (%) (%) a b
         static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) a b
 
-        // elementwise binary logic
+        // element-wise binary logic
         static member (&&&&) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (&&) a b
         static member (||||) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (||) a b
 
-        // elementwise binary comparision
+        // element-wise binary comparison
         static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) a b
         static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) a b
         static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) a b
         static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a b
 
-        // elementwise binary with scalars
+        // element-wise binary with scalars
         static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
         static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
         static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
@@ -804,11 +804,11 @@ module ArrayND =
         let value = allElems a |> Seq.fold (+) ArrayNDT<'T>.Zero         
         scalarOfType value a
 
-    /// elementwise sum
+    /// element-wise sum
     let sum (a: #ArrayNDT<'T>) =
         typedApply (unsp) sumImpl sumImpl sumImpl sumImpl a 
 
-    /// elementwise sum over given axis
+    /// element-wise sum over given axis
     let sumAxis dim a = 
         axisReduce sum dim a
     
@@ -816,11 +816,11 @@ module ArrayND =
         let value = allElems a |> Seq.fold (*) ArrayNDT<'T>.One
         scalarOfType value a
 
-    /// elementwise product
+    /// element-wise product
     let product (a: #ArrayNDT<'T>) =
         typedApply (unsp) productImpl productImpl productImpl productImpl a 
 
-    /// elementwise product over given axis
+    /// element-wise product over given axis
     let productAxis dim a = 
         axisReduce product dim a
 
