@@ -3,7 +3,7 @@
 
 (**
 
-Model components
+Model Components
 ================
 
 As you start building more complex machine learning models, it becomes beneficial to build the model from small, reusable components.
