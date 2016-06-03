@@ -305,8 +305,8 @@ We will show its use in a later chapter.
 
 (**
 
-Conclusion
-----------
+Summary
+-------
 In this introductory example we showed how to define symbolic sizes and build a two-layer neural network with a softmax output layer and cross-entropy loss using elementary mathematical operators.
 Training was performed on the MNIST dataset using a simple training loop.
 

@@ -278,7 +278,7 @@ Now, we can define the expressions for the latent values, the reconstruction and
         |> MyFirstPerceptron.pred pars.InLayer
         |> MyFirstPerceptron.pred pars.OutLayer
 
-    let loss pars inputs = 
+    let loss pars input = 
         input
         |> reconst pars
         |> LossLayer.loss LossLayer.MSE input
@@ -293,28 +293,28 @@ Finally, let us instantiate our simple autoencoder with 100 latent units and tra
 let mb2 = ModelBuilder<single> "AutoEncoderModel"
 
 // define symbolic sizes
-let nBatch2  = mb2.Size "nBatch"
-let nInput2  = mb2.Size "nInput"
-let nLatent2 = mb2.Size "nLatent"
+let nBatch2  = mb2.Size "nBatch2"
+let nInput2  = mb2.Size "nInput2"
+let nLatent2 = mb2.Size "nLatent2"
 
 // define model parameters
 let ae = 
     MyFirstAutoencoder.pars (mb2.Module "Autoencoder") {NInOut=nInput2; NLatent=nLatent2}
 
 // instantiate model
-mb2.SetSize nInput mnist.TrnImgsFlat.Shape.[1]
+mb2.SetSize nInput2 mnist.TrnImgsFlat.Shape.[1]
 mb2.SetSize nLatent2 100
 let mi2 = mb2.Instantiate DevCuda
 
 // loss function
 let input2 = mb2.Var "Input"  [nBatch2; nInput2]
 let loss2 = MyFirstAutoencoder.loss ae input2.T
-let lossFn2 = mi.Func loss2 |> arg input2 
+let lossFn2 = mi2.Func loss2 |> arg input2 
 
 // optimization function
 let opt2 = Optimizers.GradientDescent (loss2, mi2.ParameterVector, DevCuda)
 let optCfg2 = { Optimizers.GradientDescent.Step=1e-1f }
-let optFn2 = mi.Func opt2.Minimize |> opt.Use |> arg input2 
+let optFn2 = mi2.Func opt2.Minimize |> opt2.Use |> arg input2 
 
 // initializes parameters and train
 mi2.InitPars 123
@@ -326,6 +326,24 @@ for itr = 0 to 1000 do
 
 (**
 This should produce output similar to
+
+    Reconstruction error after     0 iterations: 0.1139
+    Reconstruction error after    50 iterations: 0.1124
+    Reconstruction error after   100 iterations: 0.1105    
+    ...
+    Reconstruction error after  1000 iterations: 0.0641
+
+**Note:** Training of the autoencoder seems to be slow with the current version of Deep.Net. We are investigating the reasons for this and plan to deploy optimizations that will make training faster.
+
+
+Summary
+-------
+
+Model components provide a way to construct a model out of small building blocks.
+Predefined models are located in `Models` namespace.
+Component use and definition in Deep.Net is not constrained by a fixed interface but naming and signature conventions exist.
+The model builder supports the use of components through the `mb.Module` function that creates a subordinated model builder with a distinct namespace to avoid name clashes between components.
+A component can also contain further components; thus more complex components can be constructed out of simple ones.
 
 
 *)
