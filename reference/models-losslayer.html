@@ -43,6 +43,8 @@
   <span>Namespace: Models</span><br />
 </p>
 <div class="xmldoc">
+<p>A layer that calculates the loss between predictions and targets using a difference metric.</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -57,7 +59,9 @@
           <td class="type-name">
             <a href="models-losslayer-measures.html">Measures</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Difference metrics.</p>
+
+</td>
         </tr>
     </tbody>
   </table>
@@ -81,11 +85,18 @@
                           <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L15-15" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L27-27" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Returns an expression for the loss given the loss measure <code>lm</code>, the predictions
+<code>pred</code> and the target values <code>target</code>.
+If the multi-class cross entropy loss measure is used then
+pred.[cls, smpl] must be the predicted probability that the sample
+belong to class cls and target.[cls, smpl] must be 1 if the sample
+actually belongs to class cls and 0 otherwise.</p>
+
+
         </td>
       </tr>
     </tbody>

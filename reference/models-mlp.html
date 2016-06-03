@@ -43,6 +43,9 @@
   <span>Namespace: Models</span><br />
 </p>
 <div class="xmldoc">
+<p>A neural network (multi-layer perceptron) of multiple
+NeuralLayers and one LossLayer on top.</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -57,13 +60,17 @@
           <td class="type-name">
             <a href="models-mlp-hyperpars.html">HyperPars</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>MLP hyper-parameters.</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="models-mlp-pars-1.html">Pars<'T></a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>MLP parameters.</p>
+
+</td>
         </tr>
     </tbody>
   </table>
@@ -83,33 +90,41 @@
             loss pars input target
           </code>
           <div class="tip" id="240">
-            <strong>Signature:</strong> pars:Pars&lt;&#39;?77576&gt; -&gt; input:ExprT&lt;&#39;?77576&gt; -&gt; target:ExprT&lt;&#39;?77576&gt; -&gt; ExprT&lt;&#39;?77576&gt;<br />
-                          <strong>Type parameters:</strong> '?77576          </div>
+            <strong>Signature:</strong> pars:Pars&lt;&#39;?102108&gt; -&gt; input:ExprT&lt;&#39;?102108&gt; -&gt; target:ExprT&lt;&#39;?102108&gt; -&gt; ExprT&lt;&#39;?102108&gt;<br />
+                          <strong>Type parameters:</strong> '?102108          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L93-93" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L150-150" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Returns an expression for the loss of the
+neural network with parameters <code>pars</code> given the input <code>input</code> and
+target values <code>target</code>.</p>
+
+
         </td>
       </tr>
       <tr>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '241', 241)" onmouseover="showTip(event, '241', 241)">
-            pars mc hp
+            pars mb hp
           </code>
           <div class="tip" id="241">
-            <strong>Signature:</strong> mc:ModelBuilder&lt;&#39;?77572&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;?77572&gt;<br />
-                          <strong>Type parameters:</strong> '?77572          </div>
+            <strong>Signature:</strong> mb:ModelBuilder&lt;&#39;?102104&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;?102104&gt;<br />
+                          <strong>Type parameters:</strong> '?102104          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L82-82" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L134-134" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Creates the parameters for the neural network in the supplied
+model builder <code>mb</code> using the hyper-parameters <code>hp</code>.
+See <code>NeuralLayer.pars</code> for documentation about the initialization.</p>
+
+
         </td>
       </tr>
       <tr>
@@ -123,11 +138,14 @@
                           <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L89-89" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L143-143" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Returns an expression for the output (predictions) of the
+neural network with parameters <code>pars</code> given the input <code>input</code>.</p>
+
+
         </td>
       </tr>
     </tbody>

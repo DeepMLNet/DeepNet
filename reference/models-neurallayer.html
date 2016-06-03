@@ -43,6 +43,8 @@
   <span>Namespace: Models</span><br />
 </p>
 <div class="xmldoc">
+<p>A layer of neurons (perceptrons).</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -57,19 +59,25 @@
           <td class="type-name">
             <a href="models-neurallayer-hyperpars.html">HyperPars</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Neural layer hyper-parameters.</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="models-neurallayer-pars-1.html">Pars<'T></a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Neural layer parameters.</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="models-neurallayer-transferfuncs.html">TransferFuncs</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Transfer (activation) functions.</p>
+
+</td>
         </tr>
     </tbody>
   </table>
@@ -86,18 +94,25 @@
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '243', 243)" onmouseover="showTip(event, '243', 243)">
-            pars mc hp
+            pars mb hp
           </code>
           <div class="tip" id="243">
-            <strong>Signature:</strong> mc:ModelBuilder&lt;&#39;?77527&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;?77527&gt;<br />
-                          <strong>Type parameters:</strong> '?77527          </div>
+            <strong>Signature:</strong> mb:ModelBuilder&lt;&#39;?102059&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;?102059&gt;<br />
+                          <strong>Type parameters:</strong> '?102059          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L57-57" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L93-93" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Creates the parameters for the neural-layer in the supplied
+model builder <code>mb</code> using the hyper-parameters <code>hp</code>.
+The weights are initialized using random numbers from a uniform
+distribution with support [-r, r] where
+r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
+The biases are initialized to zero.</p>
+
+
         </td>
       </tr>
       <tr>
@@ -107,15 +122,20 @@
             pred pars input
           </code>
           <div class="tip" id="244">
-            <strong>Signature:</strong> pars:Pars&lt;&#39;?77529&gt; -&gt; input:ExprT&lt;&#39;?77529&gt; -&gt; ExprT&lt;&#39;?77529&gt;<br />
-                          <strong>Type parameters:</strong> '?77529          </div>
+            <strong>Signature:</strong> pars:Pars&lt;&#39;?102061&gt; -&gt; input:ExprT&lt;&#39;?102061&gt; -&gt; ExprT&lt;&#39;?102061&gt;<br />
+                          <strong>Type parameters:</strong> '?102061          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L63-63" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L103-103" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Returns an expression for the output (predictions) of the
+neural layer with parameters <code>pars</code> given the input <code>input</code>.
+If the soft-max transfer function is used, the normalization
+is performed over axis 0.</p>
+
+
         </td>
       </tr>
     </tbody>

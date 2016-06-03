@@ -43,12 +43,13 @@ In Deep.Net, a model component can contain other model components; for example a
 <p>In this document we will describe how to build a simple layer of neurons and how to instantiate it in your model.</p>
 <h2><a name="Defining-a-model-component" class="anchor" href="#Defining-a-model-component">Defining a model component</a></h2>
 <p>A model component corresponds to an F# module that contains conventionally named types and functions.
-We will call our example component <code>Perceptron</code>.</p>
+We will call our example component <code>MyFirstPerceptron</code>.</p>
 <p>We will build a component for a single layer of neurons.
-Our neural layer will compute the function <span class="math">\(f(\mathbf{x}) = \sigma ( W \mathbf{x} + \mathbf{b} )\)</span> where <span class="math">\(\sigma\)</span> can be either <span class="math">\(\mathrm{tanh}\)</span> or the identity function <span class="math">\(\mathrm{id}\)</span>. <span class="math">\(W\)</span> is the weight matrix and <span class="math">\(\mathbf{b}\)</span> is the bias vector.</p>
+Our neural layer will compute the function <span class="math">\(f(\mathbf{x}) = \mathbf{\sigma} ( W \mathbf{x} + \mathbf{b} )\)</span> where <span class="math">\(\mathbf{\sigma}\)</span> can be either element-wise <span class="math">\(\mathrm{tanh}\)</span> or the soft-max function <span class="math">\(\mathbf{\sigma}(\mathbf{x})_i = \exp(x_i) / \sum_{i'} \exp(x_i')\)</span>.
+<span class="math">\(W\)</span> is the weight matrix and <span class="math">\(\mathbf{b}\)</span> is the bias vector.</p>
 <p>Consequently our component has two parameters (a parameter is a quantity that changes during model training): <span class="math">\(W\)</span> and <span class="math">\(\mathbf{b}\)</span>.
 These two parameters give rise to two integer hyper-parameters (a hyper-parameter is fixed a model definition and does not change during training): the number of inputs <code>NInput</code> (number of columns in <span class="math">\(W\)</span>) and the number of outputs <code>NOutput</code> (number of rows in <span class="math">\(W\)</span>).
-Furthermore we have the transfer function as a third, discrete hyper-parameter <code>TransferFunc</code> that can either be <code>Tanh</code> or <code>Identity</code>.
+Furthermore we have the transfer function as a third, discrete hyper-parameter <code>TransferFunc</code> that can either be <code>Tanh</code> or <code>SoftMax</code>.
 Let us define record types for the parameters and hyper-parameters.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
 <span class="l"> 2: </span>
@@ -72,22 +73,22 @@ Let us define record types for the parameters and hyper-parameters.</p>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">open</span> <span class="i">ArrayNDNS</span>; <span class="k">open</span> <span class="i">SymTensor</span>
 
-<span class="k">module</span> <span onmouseout="hideTip(event, 'fs1', 1)" onmouseover="showTip(event, 'fs1', 1)" class="t">Perceptron</span> <span class="o">=</span> 
+<span class="k">module</span> <span class="t">MyFirstPerceptron</span> <span class="o">=</span> 
 
-    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs2', 2)" onmouseover="showTip(event, 'fs2', 2)" class="t">TransferFuncs</span> <span class="o">=</span>
-        | <span onmouseout="hideTip(event, 'fs3', 3)" onmouseover="showTip(event, 'fs3', 3)" class="p">Tanh</span>
-        | <span onmouseout="hideTip(event, 'fs4', 4)" onmouseover="showTip(event, 'fs4', 4)" class="p">Identity</span>
+    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs1', 1)" onmouseover="showTip(event, 'fs1', 1)" class="t">TransferFuncs</span> <span class="o">=</span>
+        | <span onmouseout="hideTip(event, 'fs2', 2)" onmouseover="showTip(event, 'fs2', 2)" class="p">Tanh</span>
+        | <span onmouseout="hideTip(event, 'fs3', 3)" onmouseover="showTip(event, 'fs3', 3)" class="p">SoftMax</span>
 
-    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs5', 5)" onmouseover="showTip(event, 'fs5', 5)" class="t">HyperPars</span> <span class="o">=</span> {
-        <span onmouseout="hideTip(event, 'fs6', 6)" onmouseover="showTip(event, 'fs6', 6)" class="i">NInput</span><span class="o">:</span>         <span class="i">SizeSpecT</span>
-        <span onmouseout="hideTip(event, 'fs7', 7)" onmouseover="showTip(event, 'fs7', 7)" class="i">NOutput</span><span class="o">:</span>        <span class="i">SizeSpecT</span>
-        <span onmouseout="hideTip(event, 'fs8', 8)" onmouseover="showTip(event, 'fs8', 8)" class="i">TransferFunc</span><span class="o">:</span>   <span onmouseout="hideTip(event, 'fs2', 9)" onmouseover="showTip(event, 'fs2', 9)" class="t">TransferFuncs</span>
+    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs4', 4)" onmouseover="showTip(event, 'fs4', 4)" class="t">HyperPars</span> <span class="o">=</span> {
+        <span onmouseout="hideTip(event, 'fs5', 5)" onmouseover="showTip(event, 'fs5', 5)" class="i">NInput</span><span class="o">:</span>         <span class="i">SizeSpecT</span>
+        <span onmouseout="hideTip(event, 'fs6', 6)" onmouseover="showTip(event, 'fs6', 6)" class="i">NOutput</span><span class="o">:</span>        <span class="i">SizeSpecT</span>
+        <span onmouseout="hideTip(event, 'fs7', 7)" onmouseover="showTip(event, 'fs7', 7)" class="i">TransferFunc</span><span class="o">:</span>   <span onmouseout="hideTip(event, 'fs1', 8)" onmouseover="showTip(event, 'fs1', 8)" class="t">TransferFuncs</span>
     }
 
-    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs9', 10)" onmouseover="showTip(event, 'fs9', 10)" class="t">Pars</span> <span class="o">=</span> {
-        <span onmouseout="hideTip(event, 'fs10', 11)" onmouseover="showTip(event, 'fs10', 11)" class="i">Weights</span><span class="o">:</span>        <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs11', 12)" onmouseover="showTip(event, 'fs11', 12)" class="i">single</span><span class="o">&gt;</span> <span onmouseout="hideTip(event, 'fs12', 13)" onmouseover="showTip(event, 'fs12', 13)" class="t">ref</span>
-        <span onmouseout="hideTip(event, 'fs13', 14)" onmouseover="showTip(event, 'fs13', 14)" class="i">Bias</span><span class="o">:</span>           <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs11', 15)" onmouseover="showTip(event, 'fs11', 15)" class="i">single</span><span class="o">&gt;</span> <span onmouseout="hideTip(event, 'fs12', 16)" onmouseover="showTip(event, 'fs12', 16)" class="t">ref</span>
-        <span onmouseout="hideTip(event, 'fs14', 17)" onmouseover="showTip(event, 'fs14', 17)" class="i">HyperPars</span><span class="o">:</span>      <span onmouseout="hideTip(event, 'fs14', 18)" onmouseover="showTip(event, 'fs14', 18)" class="t">HyperPars</span>
+    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs8', 9)" onmouseover="showTip(event, 'fs8', 9)" class="t">Pars</span> <span class="o">=</span> {
+        <span onmouseout="hideTip(event, 'fs9', 10)" onmouseover="showTip(event, 'fs9', 10)" class="i">Weights</span><span class="o">:</span>        <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 11)" onmouseover="showTip(event, 'fs10', 11)" class="i">single</span><span class="o">&gt;</span> <span onmouseout="hideTip(event, 'fs11', 12)" onmouseover="showTip(event, 'fs11', 12)" class="t">ref</span>
+        <span onmouseout="hideTip(event, 'fs12', 13)" onmouseover="showTip(event, 'fs12', 13)" class="i">Bias</span><span class="o">:</span>           <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 14)" onmouseover="showTip(event, 'fs10', 14)" class="i">single</span><span class="o">&gt;</span> <span onmouseout="hideTip(event, 'fs11', 15)" onmouseover="showTip(event, 'fs11', 15)" class="t">ref</span>
+        <span onmouseout="hideTip(event, 'fs13', 16)" onmouseover="showTip(event, 'fs13', 16)" class="i">HyperPars</span><span class="o">:</span>      <span onmouseout="hideTip(event, 'fs13', 17)" onmouseover="showTip(event, 'fs13', 17)" class="t">HyperPars</span>
     }
 </code></pre></td>
 </tr>
@@ -119,13 +120,13 @@ We will see the reason for that in a few lines further below.</p>
 <span class="l">7: </span>
 <span class="l">8: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span class="k">internal</span> <span onmouseout="hideTip(event, 'fs15', 19)" onmouseover="showTip(event, 'fs15', 19)" class="f">initBias</span> (<span onmouseout="hideTip(event, 'fs16', 20)" onmouseover="showTip(event, 'fs16', 20)" class="i">seed</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs17', 21)" onmouseover="showTip(event, 'fs17', 21)" class="t">int</span>) (<span onmouseout="hideTip(event, 'fs18', 22)" onmouseover="showTip(event, 'fs18', 22)" class="i">shp</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs17', 23)" onmouseover="showTip(event, 'fs17', 23)" class="t">int</span> <span onmouseout="hideTip(event, 'fs19', 24)" onmouseover="showTip(event, 'fs19', 24)" class="t">list</span>) <span class="o">:</span> <span class="i">ArrayNDHostT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs11', 25)" onmouseover="showTip(event, 'fs11', 25)" class="i">single</span><span class="o">&gt;</span> <span class="o">=</span>
-        <span class="i">ArrayNDHost</span><span class="o">.</span><span class="i">zeros</span> <span onmouseout="hideTip(event, 'fs18', 26)" onmouseover="showTip(event, 'fs18', 26)" class="i">shp</span>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span class="k">internal</span> <span onmouseout="hideTip(event, 'fs14', 18)" onmouseover="showTip(event, 'fs14', 18)" class="f">initBias</span> (<span onmouseout="hideTip(event, 'fs15', 19)" onmouseover="showTip(event, 'fs15', 19)" class="i">seed</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs16', 20)" onmouseover="showTip(event, 'fs16', 20)" class="t">int</span>) (<span onmouseout="hideTip(event, 'fs17', 21)" onmouseover="showTip(event, 'fs17', 21)" class="i">shp</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs16', 22)" onmouseover="showTip(event, 'fs16', 22)" class="t">int</span> <span onmouseout="hideTip(event, 'fs18', 23)" onmouseover="showTip(event, 'fs18', 23)" class="t">list</span>) <span class="o">:</span> <span class="i">ArrayNDHostT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 24)" onmouseover="showTip(event, 'fs10', 24)" class="i">single</span><span class="o">&gt;</span> <span class="o">=</span>
+        <span class="i">ArrayNDHost</span><span class="o">.</span><span class="i">zeros</span> <span onmouseout="hideTip(event, 'fs17', 25)" onmouseover="showTip(event, 'fs17', 25)" class="i">shp</span>
 
-    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs20', 27)" onmouseover="showTip(event, 'fs20', 27)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs21', 28)" onmouseover="showTip(event, 'fs21', 28)" class="i">mb</span><span class="o">:</span> <span class="i">ModelBuilder</span><span class="o">&lt;</span>_<span class="o">&gt;</span>) (<span onmouseout="hideTip(event, 'fs22', 29)" onmouseover="showTip(event, 'fs22', 29)" class="i">hp</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs5', 30)" onmouseover="showTip(event, 'fs5', 30)" class="t">HyperPars</span>) <span class="o">=</span> {
-        <span class="i">Weights</span>   <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 31)" onmouseover="showTip(event, 'fs21', 31)" class="i">mb</span><span class="o">.</span><span class="i">Param</span> (<span class="s">&quot;Weights&quot;</span>, [<span onmouseout="hideTip(event, 'fs22', 32)" onmouseover="showTip(event, 'fs22', 32)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs7', 33)" onmouseover="showTip(event, 'fs7', 33)" class="i">NOutput</span>; <span onmouseout="hideTip(event, 'fs22', 34)" onmouseover="showTip(event, 'fs22', 34)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs6', 35)" onmouseover="showTip(event, 'fs6', 35)" class="i">NInput</span>])
-        <span class="i">Bias</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 36)" onmouseover="showTip(event, 'fs21', 36)" class="i">mb</span><span class="o">.</span><span class="i">Param</span> (<span class="s">&quot;Bias&quot;</span>,    [<span onmouseout="hideTip(event, 'fs22', 37)" onmouseover="showTip(event, 'fs22', 37)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs7', 38)" onmouseover="showTip(event, 'fs7', 38)" class="i">NOutput</span>], <span onmouseout="hideTip(event, 'fs15', 39)" onmouseover="showTip(event, 'fs15', 39)" class="i">initBias</span>)
-        <span onmouseout="hideTip(event, 'fs5', 40)" onmouseover="showTip(event, 'fs5', 40)" class="i">HyperPars</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs22', 41)" onmouseover="showTip(event, 'fs22', 41)" class="i">hp</span>
+    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs19', 26)" onmouseover="showTip(event, 'fs19', 26)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs20', 27)" onmouseover="showTip(event, 'fs20', 27)" class="i">mb</span><span class="o">:</span> <span class="i">ModelBuilder</span><span class="o">&lt;</span>_<span class="o">&gt;</span>) (<span onmouseout="hideTip(event, 'fs21', 28)" onmouseover="showTip(event, 'fs21', 28)" class="i">hp</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs4', 29)" onmouseover="showTip(event, 'fs4', 29)" class="t">HyperPars</span>) <span class="o">=</span> {
+        <span class="i">Weights</span>   <span class="o">=</span> <span onmouseout="hideTip(event, 'fs20', 30)" onmouseover="showTip(event, 'fs20', 30)" class="i">mb</span><span class="o">.</span><span class="i">Param</span> (<span class="s">&quot;Weights&quot;</span>, [<span onmouseout="hideTip(event, 'fs21', 31)" onmouseover="showTip(event, 'fs21', 31)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs6', 32)" onmouseover="showTip(event, 'fs6', 32)" class="i">NOutput</span>; <span onmouseout="hideTip(event, 'fs21', 33)" onmouseover="showTip(event, 'fs21', 33)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs5', 34)" onmouseover="showTip(event, 'fs5', 34)" class="i">NInput</span>])
+        <span class="i">Bias</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs20', 35)" onmouseover="showTip(event, 'fs20', 35)" class="i">mb</span><span class="o">.</span><span class="i">Param</span> (<span class="s">&quot;Bias&quot;</span>,    [<span onmouseout="hideTip(event, 'fs21', 36)" onmouseover="showTip(event, 'fs21', 36)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs6', 37)" onmouseover="showTip(event, 'fs6', 37)" class="i">NOutput</span>], <span onmouseout="hideTip(event, 'fs14', 38)" onmouseover="showTip(event, 'fs14', 38)" class="i">initBias</span>)
+        <span onmouseout="hideTip(event, 'fs4', 39)" onmouseover="showTip(event, 'fs4', 39)" class="i">HyperPars</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 40)" onmouseover="showTip(event, 'fs21', 40)" class="i">hp</span>
     }
 </code></pre></td>
 </tr>
@@ -136,7 +137,7 @@ It construct a parameter record and populates the weights and bias with paramete
 A custom initialization function takes two arguments: a random seed and a list of integers representing the shape of the instantiated parameter tensor.
 It should return the initialization value of appropriate shape for the parameter.
 Here, we initialize the bias with zero and thus return a zero tensor of the requested shape.
-If no custom initializer is specified, the parameter is initialized using random numbers from a uniform distribution with support <span class="math">\(\[ TODO \]\)</span>.</p>
+If no custom initializer is specified, the parameter is initialized using random numbers from a uniform distribution with support <span class="math">\([-0.01, 0.01]\)</span>.</p>
 <p>We also store a reference to the hyper-parameters in our parameter record to save ourselves the trouble of passing the hyper-parameter record to functions that require both the parameter record and the hyper-parameter record.</p>
 <p>Now, we can define the function that returns the expression for the output of the perceptron component.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
@@ -145,47 +146,425 @@ If no custom initializer is specified, the parameter is initialized using random
 <span class="l">4: </span>
 <span class="l">5: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs23', 42)" onmouseover="showTip(event, 'fs23', 42)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs24', 43)" onmouseover="showTip(event, 'fs24', 43)" class="i">pars</span> <span onmouseout="hideTip(event, 'fs25', 44)" onmouseover="showTip(event, 'fs25', 44)" class="i">input</span> <span class="o">=</span>
-        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs26', 45)" onmouseover="showTip(event, 'fs26', 45)" class="i">activation</span> <span class="o">=</span> <span class="o">!</span><span onmouseout="hideTip(event, 'fs24', 46)" onmouseover="showTip(event, 'fs24', 46)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs10', 47)" onmouseover="showTip(event, 'fs10', 47)" class="i">Weights</span> <span class="o">.</span><span class="o">*</span> <span onmouseout="hideTip(event, 'fs25', 48)" onmouseover="showTip(event, 'fs25', 48)" class="i">input</span> <span class="o">+</span> <span class="o">!</span><span onmouseout="hideTip(event, 'fs24', 49)" onmouseover="showTip(event, 'fs24', 49)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs13', 50)" onmouseover="showTip(event, 'fs13', 50)" class="i">Bias</span>
-        <span class="k">match</span> <span onmouseout="hideTip(event, 'fs24', 51)" onmouseover="showTip(event, 'fs24', 51)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs27', 52)" onmouseover="showTip(event, 'fs27', 52)" class="i">HyperPars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs8', 53)" onmouseover="showTip(event, 'fs8', 53)" class="i">TransferFunc</span> <span class="k">with</span>
-        | <span onmouseout="hideTip(event, 'fs3', 54)" onmouseover="showTip(event, 'fs3', 54)" class="p">Tanh</span>     <span class="k">-&gt;</span> <span onmouseout="hideTip(event, 'fs28', 55)" onmouseover="showTip(event, 'fs28', 55)" class="f">tanh</span> <span onmouseout="hideTip(event, 'fs26', 56)" onmouseover="showTip(event, 'fs26', 56)" class="i">activation</span>
-        | <span onmouseout="hideTip(event, 'fs4', 57)" onmouseover="showTip(event, 'fs4', 57)" class="p">Identity</span> <span class="k">-&gt;</span> <span onmouseout="hideTip(event, 'fs26', 58)" onmouseover="showTip(event, 'fs26', 58)" class="i">activation</span>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs22', 41)" onmouseover="showTip(event, 'fs22', 41)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs23', 42)" onmouseover="showTip(event, 'fs23', 42)" class="i">pars</span> <span onmouseout="hideTip(event, 'fs24', 43)" onmouseover="showTip(event, 'fs24', 43)" class="i">input</span> <span class="o">=</span>
+        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs25', 44)" onmouseover="showTip(event, 'fs25', 44)" class="i">activation</span> <span class="o">=</span> <span class="o">!</span><span onmouseout="hideTip(event, 'fs23', 45)" onmouseover="showTip(event, 'fs23', 45)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs9', 46)" onmouseover="showTip(event, 'fs9', 46)" class="i">Weights</span> <span class="o">.</span><span class="o">*</span> <span onmouseout="hideTip(event, 'fs24', 47)" onmouseover="showTip(event, 'fs24', 47)" class="i">input</span> <span class="o">+</span> <span class="o">!</span><span onmouseout="hideTip(event, 'fs23', 48)" onmouseover="showTip(event, 'fs23', 48)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs12', 49)" onmouseover="showTip(event, 'fs12', 49)" class="i">Bias</span>
+        <span class="k">match</span> <span onmouseout="hideTip(event, 'fs23', 50)" onmouseover="showTip(event, 'fs23', 50)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs26', 51)" onmouseover="showTip(event, 'fs26', 51)" class="i">HyperPars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs7', 52)" onmouseover="showTip(event, 'fs7', 52)" class="i">TransferFunc</span> <span class="k">with</span>
+        | <span onmouseout="hideTip(event, 'fs2', 53)" onmouseover="showTip(event, 'fs2', 53)" class="p">Tanh</span>     <span class="k">-&gt;</span> <span onmouseout="hideTip(event, 'fs27', 54)" onmouseover="showTip(event, 'fs27', 54)" class="f">tanh</span> <span onmouseout="hideTip(event, 'fs25', 55)" onmouseover="showTip(event, 'fs25', 55)" class="i">activation</span>
+        | <span onmouseout="hideTip(event, 'fs3', 56)" onmouseover="showTip(event, 'fs3', 56)" class="p">SoftMax</span>  <span class="k">-&gt;</span> <span onmouseout="hideTip(event, 'fs28', 57)" onmouseover="showTip(event, 'fs28', 57)" class="f">exp</span> <span onmouseout="hideTip(event, 'fs25', 58)" onmouseover="showTip(event, 'fs25', 58)" class="i">activation</span> <span class="o">/</span> <span class="i">Expr</span><span class="o">.</span><span class="i">sumKeepingAxis</span> <span class="n">0</span> (<span onmouseout="hideTip(event, 'fs28', 59)" onmouseover="showTip(event, 'fs28', 59)" class="i">exp</span> <span onmouseout="hideTip(event, 'fs25', 60)" onmouseover="showTip(event, 'fs25', 60)" class="i">activation</span>)
 </code></pre></td>
 </tr>
 </table>
 <p>The function computes the activation using the formula specified above and then applies the transfer function specified in the hyper-parameters.
+The normalization of the soft-max activation function is performed over the left-most axis.
 The <code>!</code> operator is used to dereference the reference cells in the parameter record.</p>
 <p>This concludes the definition of our model component.</p>
+<h2><a name="Predefined-model-components" class="anchor" href="#Predefined-model-components">Predefined model components</a></h2>
+<p>The <code>Models</code> namespace of Deep.Net contains the following model components:</p>
+<ul>
+<li><strong>LinearRegression</strong>. A linear predictor.</li>
+<li><strong>NeuralLayer</strong>. A layer of neurons, with weights, bias and a transfer function.</li>
+<li><strong>LossLayer</strong>. A layer that calculates the loss between predictions and target values using a difference  metric (for example the mean-squared-error or cross entropy).</li>
+<li><strong>MLP</strong>. A multi-layer neural network with a loss layer on top.</li>
+</ul>
 <h2><a name="Using-a-model-component" class="anchor" href="#Using-a-model-component">Using a model component</a></h2>
+<p>Let us rebuild the hand-crafted model described in the chapter <a href="mnist.html">Learning MNIST</a> using the <code>MyFirstPerceptron</code> component and the <code>LossLayer</code> component from Deep.Net.
+As before the model will consist of one hidden layer of neurons with a tanh transfer function and an output layer with a soft-max transfer function.</p>
+<p>As in the referred chapter, we first load the MNIST dataset and declare symbolic sizes for the model.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+<span class="l">7: </span>
+<span class="l">8: </span>
+<span class="l">9: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs29', 61)" onmouseover="showTip(event, 'fs29', 61)" class="i">mnist</span> <span class="o">=</span> <span class="i">Datasets</span><span class="o">.</span><span class="i">Mnist</span><span class="o">.</span><span class="i">load</span> (<span class="k">__SOURCE_DIRECTORY__</span> <span class="o">+</span> <span class="s">&quot;../../../Data/MNIST&quot;</span>)
+            <span class="o">|&gt;</span> <span class="i">Datasets</span><span class="o">.</span><span class="i">Mnist</span><span class="o">.</span><span class="i">toCuda</span>
 
-<div class="tip" id="fs1">module Perceptron<br /><br />from Blocks</div>
-<div class="tip" id="fs2">type TransferFuncs =<br />&#160;&#160;| Tanh<br />&#160;&#160;| Identity<br /><br />Full name: Blocks.Perceptron.TransferFuncs</div>
-<div class="tip" id="fs3">union case TransferFuncs.Tanh: TransferFuncs</div>
-<div class="tip" id="fs4">union case TransferFuncs.Identity: TransferFuncs</div>
-<div class="tip" id="fs5">type HyperPars =<br />&#160;&#160;{NInput: obj;<br />&#160;&#160;&#160;NOutput: obj;<br />&#160;&#160;&#160;TransferFunc: TransferFuncs;}<br /><br />Full name: Blocks.Perceptron.HyperPars</div>
-<div class="tip" id="fs6">HyperPars.NInput: obj</div>
-<div class="tip" id="fs7">HyperPars.NOutput: obj</div>
-<div class="tip" id="fs8">HyperPars.TransferFunc: TransferFuncs</div>
-<div class="tip" id="fs9">type Pars =<br />&#160;&#160;{Weights: obj;<br />&#160;&#160;&#160;Bias: obj;<br />&#160;&#160;&#160;HyperPars: HyperPars;}<br /><br />Full name: Blocks.Perceptron.Pars</div>
-<div class="tip" id="fs10">Pars.Weights: obj</div>
-<div class="tip" id="fs11">Multiple items<br />val single : value:&#39;T -&gt; single (requires member op_Explicit)<br /><br />Full name: Microsoft.FSharp.Core.ExtraTopLevelOperators.single<br /><br />--------------------<br />type single = System.Single<br /><br />Full name: Microsoft.FSharp.Core.single</div>
-<div class="tip" id="fs12">Multiple items<br />val ref : value:&#39;T -&gt; &#39;T ref<br /><br />Full name: Microsoft.FSharp.Core.Operators.ref<br /><br />--------------------<br />type &#39;T ref = Ref&lt;&#39;T&gt;<br /><br />Full name: Microsoft.FSharp.Core.ref&lt;_&gt;</div>
-<div class="tip" id="fs13">Pars.Bias: obj</div>
-<div class="tip" id="fs14">Multiple items<br />Pars.HyperPars: HyperPars<br /><br />--------------------<br />type HyperPars =<br />&#160;&#160;{NInput: obj;<br />&#160;&#160;&#160;NOutput: obj;<br />&#160;&#160;&#160;TransferFunc: TransferFuncs;}<br /><br />Full name: Blocks.Perceptron.HyperPars</div>
-<div class="tip" id="fs15">val internal initBias : seed:int -&gt; shp:int list -&gt; &#39;a<br /><br />Full name: Blocks.Perceptron.initBias</div>
-<div class="tip" id="fs16">val seed : int</div>
-<div class="tip" id="fs17">Multiple items<br />val int : value:&#39;T -&gt; int (requires member op_Explicit)<br /><br />Full name: Microsoft.FSharp.Core.Operators.int<br /><br />--------------------<br />type int = int32<br /><br />Full name: Microsoft.FSharp.Core.int<br /><br />--------------------<br />type int&lt;&#39;Measure&gt; = int<br /><br />Full name: Microsoft.FSharp.Core.int&lt;_&gt;</div>
-<div class="tip" id="fs18">val shp : int list</div>
-<div class="tip" id="fs19">type &#39;T list = List&lt;&#39;T&gt;<br /><br />Full name: Microsoft.FSharp.Collections.list&lt;_&gt;</div>
-<div class="tip" id="fs20">val pars : mb:&#39;a -&gt; hp:HyperPars -&gt; Pars<br /><br />Full name: Blocks.Perceptron.pars</div>
-<div class="tip" id="fs21">val mb : &#39;a</div>
-<div class="tip" id="fs22">val hp : HyperPars</div>
-<div class="tip" id="fs23">val pred : pars:Pars -&gt; input:obj -&gt; float<br /><br />Full name: Blocks.Perceptron.pred</div>
-<div class="tip" id="fs24">val pars : Pars</div>
-<div class="tip" id="fs25">val input : obj</div>
-<div class="tip" id="fs26">val activation : float</div>
-<div class="tip" id="fs27">Pars.HyperPars: HyperPars</div>
-<div class="tip" id="fs28">val tanh : value:&#39;T -&gt; &#39;T (requires member Tanh)<br /><br />Full name: Microsoft.FSharp.Core.Operators.tanh</div>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs30', 62)" onmouseover="showTip(event, 'fs30', 62)" class="i">mb</span> <span class="o">=</span> <span class="i">ModelBuilder</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 63)" onmouseover="showTip(event, 'fs10', 63)" class="i">single</span><span class="o">&gt;</span> <span class="s">&quot;NeuralNetModel&quot;</span>
+
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs31', 64)" onmouseover="showTip(event, 'fs31', 64)" class="i">nBatch</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 65)" onmouseover="showTip(event, 'fs30', 65)" class="i">mb</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nBatch&quot;</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs32', 66)" onmouseover="showTip(event, 'fs32', 66)" class="i">nInput</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 67)" onmouseover="showTip(event, 'fs30', 67)" class="i">mb</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nInput&quot;</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs33', 68)" onmouseover="showTip(event, 'fs33', 68)" class="i">nClass</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 69)" onmouseover="showTip(event, 'fs30', 69)" class="i">mb</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nClass&quot;</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs34', 70)" onmouseover="showTip(event, 'fs34', 70)" class="i">nHidden</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 71)" onmouseover="showTip(event, 'fs30', 71)" class="i">mb</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nHidden&quot;</span>
+</code></pre></td>
+</tr>
+</table>
+<p>Then we instantiate the parameters of our components.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs35', 72)" onmouseover="showTip(event, 'fs35', 72)" class="i">lyr1</span> <span class="o">=</span> 
+    <span onmouseout="hideTip(event, 'fs36', 73)" onmouseover="showTip(event, 'fs36', 73)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs37', 74)" onmouseover="showTip(event, 'fs37', 74)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs30', 75)" onmouseover="showTip(event, 'fs30', 75)" class="i">mb</span><span class="o">.</span><span class="i">Module</span> <span class="s">&quot;lyr1&quot;</span>) 
+        {<span class="i">NInput</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs32', 76)" onmouseover="showTip(event, 'fs32', 76)" class="i">nInput</span>; <span class="i">NOutput</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs34', 77)" onmouseover="showTip(event, 'fs34', 77)" class="i">nHidden</span>; <span class="i">TransferFunc</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs36', 78)" onmouseover="showTip(event, 'fs36', 78)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs38', 79)" onmouseover="showTip(event, 'fs38', 79)" class="p">Tanh</span>}
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs39', 80)" onmouseover="showTip(event, 'fs39', 80)" class="i">lyr2</span> <span class="o">=</span>
+    <span onmouseout="hideTip(event, 'fs36', 81)" onmouseover="showTip(event, 'fs36', 81)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs37', 82)" onmouseover="showTip(event, 'fs37', 82)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs30', 83)" onmouseover="showTip(event, 'fs30', 83)" class="i">mb</span><span class="o">.</span><span class="i">Module</span> <span class="s">&quot;lyr2&quot;</span>)
+        {<span class="i">NInput</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs34', 84)" onmouseover="showTip(event, 'fs34', 84)" class="i">nHidden</span>; <span class="i">NOutput</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs33', 85)" onmouseover="showTip(event, 'fs33', 85)" class="i">nClass</span>; <span class="i">TransferFunc</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs36', 86)" onmouseover="showTip(event, 'fs36', 86)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs40', 87)" onmouseover="showTip(event, 'fs40', 87)" class="p">SoftMax</span>}
+</code></pre></td>
+</tr>
+</table>
+<p>We used the <code>mb.Module</code> method of the model builder to create a new, subordinated model builder for the  components.
+The <code>mb.Module</code> function takes one argument that specifies an identifier for the subordinated model builder.
+The name of the current model builder is combined using a dot with the specified identifier to construct the name of the subordinated model builder.
+In this example <code>mb</code> has the name <code>NeuralNetModel</code> and we specified the identifier <code>lyr1</code> when calling <code>mb.Module</code>.
+Hence, the subordinate model builder will have the name <code>NeuralNetModel.lyr1</code>.</p>
+<p>The <code>mb.Param</code> method combines the name of the model builder with the specified identifier to construct the full parameter name.
+Thus the weights parameter of <code>lyr1</code> will have the full name <code>NeuralNetModel.lyr1.Weights</code> and the biases will be <code>NeuralNetModel.lyr1.Bias</code>.
+This automatic parameter name construction allows multiple, independent instantiations of components without name clashes.</p>
+<p>We continue with variable definitions and model instantiation.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+<span class="l">7: </span>
+<span class="l">8: </span>
+<span class="l">9: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs41', 88)" onmouseover="showTip(event, 'fs41', 88)" class="i">input</span>  <span class="o">:</span> <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 89)" onmouseover="showTip(event, 'fs10', 89)" class="i">single</span><span class="o">&gt;</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 90)" onmouseover="showTip(event, 'fs30', 90)" class="i">mb</span><span class="o">.</span><span class="i">Var</span> <span class="s">&quot;Input&quot;</span>  [<span onmouseout="hideTip(event, 'fs31', 91)" onmouseover="showTip(event, 'fs31', 91)" class="i">nBatch</span>; <span onmouseout="hideTip(event, 'fs32', 92)" onmouseover="showTip(event, 'fs32', 92)" class="i">nInput</span>]
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs42', 93)" onmouseover="showTip(event, 'fs42', 93)" class="i">target</span> <span class="o">:</span> <span class="i">ExprT</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 94)" onmouseover="showTip(event, 'fs10', 94)" class="i">single</span><span class="o">&gt;</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 95)" onmouseover="showTip(event, 'fs30', 95)" class="i">mb</span><span class="o">.</span><span class="i">Var</span> <span class="s">&quot;Target&quot;</span> [<span onmouseout="hideTip(event, 'fs31', 96)" onmouseover="showTip(event, 'fs31', 96)" class="i">nBatch</span>; <span onmouseout="hideTip(event, 'fs33', 97)" onmouseover="showTip(event, 'fs33', 97)" class="i">nClass</span>]
+
+<span onmouseout="hideTip(event, 'fs30', 98)" onmouseover="showTip(event, 'fs30', 98)" class="i">mb</span><span class="o">.</span><span class="i">SetSize</span> <span onmouseout="hideTip(event, 'fs32', 99)" onmouseover="showTip(event, 'fs32', 99)" class="i">nInput</span> <span onmouseout="hideTip(event, 'fs29', 100)" onmouseover="showTip(event, 'fs29', 100)" class="i">mnist</span><span class="o">.</span><span class="i">TrnImgsFlat</span><span class="o">.</span><span class="i">Shape</span><span class="o">.</span>[<span class="n">1</span>]
+<span onmouseout="hideTip(event, 'fs30', 101)" onmouseover="showTip(event, 'fs30', 101)" class="i">mb</span><span class="o">.</span><span class="i">SetSize</span> <span onmouseout="hideTip(event, 'fs33', 102)" onmouseover="showTip(event, 'fs33', 102)" class="i">nClass</span> <span onmouseout="hideTip(event, 'fs29', 103)" onmouseover="showTip(event, 'fs29', 103)" class="i">mnist</span><span class="o">.</span><span class="i">TrnLbls</span><span class="o">.</span><span class="i">Shape</span><span class="o">.</span>[<span class="n">1</span>]
+<span onmouseout="hideTip(event, 'fs30', 104)" onmouseover="showTip(event, 'fs30', 104)" class="i">mb</span><span class="o">.</span><span class="i">SetSize</span> <span onmouseout="hideTip(event, 'fs34', 105)" onmouseover="showTip(event, 'fs34', 105)" class="i">nHidden</span> <span class="n">100</span>
+
+<span class="k">open</span> <span class="i">SymTensor</span><span class="o">.</span><span class="i">Compiler</span><span class="o">.</span><span class="i">Cuda</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs43', 106)" onmouseover="showTip(event, 'fs43', 106)" class="i">mi</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs30', 107)" onmouseover="showTip(event, 'fs30', 107)" class="i">mb</span><span class="o">.</span><span class="i">Instantiate</span> <span class="i">DevCuda</span>
+</code></pre></td>
+</tr>
+</table>
+<p>Next, we use the components to generate the model's expressions.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs44', 108)" onmouseover="showTip(event, 'fs44', 108)" class="i">hiddenVal</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 109)" onmouseover="showTip(event, 'fs36', 109)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs45', 110)" onmouseover="showTip(event, 'fs45', 110)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs35', 111)" onmouseover="showTip(event, 'fs35', 111)" class="i">lyr1</span> <span onmouseout="hideTip(event, 'fs41', 112)" onmouseover="showTip(event, 'fs41', 112)" class="i">input</span><span class="o">.</span><span class="i">T</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs46', 113)" onmouseover="showTip(event, 'fs46', 113)" class="i">classProb</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 114)" onmouseover="showTip(event, 'fs36', 114)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs45', 115)" onmouseover="showTip(event, 'fs45', 115)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs39', 116)" onmouseover="showTip(event, 'fs39', 116)" class="i">lyr2</span> <span onmouseout="hideTip(event, 'fs44', 117)" onmouseover="showTip(event, 'fs44', 117)" class="i">hiddenVal</span>
+</code></pre></td>
+</tr>
+</table>
+<p>And the <code>LossLayer</code> from Deep.Net to generate an expression for the loss.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">open</span> <span class="i">Models</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs47', 118)" onmouseover="showTip(event, 'fs47', 118)" class="i">loss</span> <span class="o">=</span> <span class="i">LossLayer</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs47', 119)" onmouseover="showTip(event, 'fs47', 119)" class="i">loss</span> <span class="i">LossLayer</span><span class="o">.</span><span class="i">CrossEntropy</span> <span onmouseout="hideTip(event, 'fs46', 120)" onmouseover="showTip(event, 'fs46', 120)" class="i">classProb</span> <span onmouseout="hideTip(event, 'fs42', 121)" onmouseover="showTip(event, 'fs42', 121)" class="i">target</span><span class="o">.</span><span class="i">T</span>
+</code></pre></td>
+</tr>
+</table>
+<p>We can now precede to compile our model's expressions into functions and train it using the gradient descent optimizer for a fixed number of iterations.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs48', 122)" onmouseover="showTip(event, 'fs48', 122)" class="i">opt</span> <span class="o">=</span> <span class="i">Optimizers</span><span class="o">.</span><span class="i">GradientDescent</span> (<span onmouseout="hideTip(event, 'fs47', 123)" onmouseover="showTip(event, 'fs47', 123)" class="i">loss</span>, <span onmouseout="hideTip(event, 'fs43', 124)" onmouseover="showTip(event, 'fs43', 124)" class="i">mi</span><span class="o">.</span><span class="i">ParameterVector</span>, <span class="i">DevCuda</span>)
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs49', 125)" onmouseover="showTip(event, 'fs49', 125)" class="i">optCfg</span> <span class="o">=</span> { <span class="i">Optimizers</span><span class="o">.</span><span class="i">GradientDescent</span><span class="o">.</span><span class="i">Step</span><span class="o">=</span><span class="n">1e-1f</span> }
+
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs50', 126)" onmouseover="showTip(event, 'fs50', 126)" class="f">lossFn</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs43', 127)" onmouseover="showTip(event, 'fs43', 127)" class="i">mi</span><span class="o">.</span><span class="i">Func</span> <span onmouseout="hideTip(event, 'fs47', 128)" onmouseover="showTip(event, 'fs47', 128)" class="i">loss</span> <span class="o">|&gt;</span> <span class="i">arg2</span> <span onmouseout="hideTip(event, 'fs41', 129)" onmouseover="showTip(event, 'fs41', 129)" class="i">input</span> <span onmouseout="hideTip(event, 'fs42', 130)" onmouseover="showTip(event, 'fs42', 130)" class="i">target</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs51', 131)" onmouseover="showTip(event, 'fs51', 131)" class="f">optFn</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs43', 132)" onmouseover="showTip(event, 'fs43', 132)" class="i">mi</span><span class="o">.</span><span class="i">Func</span> <span onmouseout="hideTip(event, 'fs48', 133)" onmouseover="showTip(event, 'fs48', 133)" class="i">opt</span><span class="o">.</span><span class="i">Minimize</span> <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs48', 134)" onmouseover="showTip(event, 'fs48', 134)" class="i">opt</span><span class="o">.</span><span class="i">Use</span> <span class="o">|&gt;</span> <span class="i">arg2</span> <span onmouseout="hideTip(event, 'fs41', 135)" onmouseover="showTip(event, 'fs41', 135)" class="i">input</span> <span onmouseout="hideTip(event, 'fs42', 136)" onmouseover="showTip(event, 'fs42', 136)" class="i">target</span>
+
+<span class="k">for</span> <span onmouseout="hideTip(event, 'fs52', 137)" onmouseover="showTip(event, 'fs52', 137)" class="i">itr</span> <span class="o">=</span> <span class="n">0</span> <span class="k">to</span> <span class="n">1000</span> <span class="k">do</span>
+    <span onmouseout="hideTip(event, 'fs51', 138)" onmouseover="showTip(event, 'fs51', 138)" class="f">optFn</span> <span onmouseout="hideTip(event, 'fs29', 139)" onmouseover="showTip(event, 'fs29', 139)" class="i">mnist</span><span class="o">.</span><span class="i">TrnImgsFlat</span> <span onmouseout="hideTip(event, 'fs29', 140)" onmouseover="showTip(event, 'fs29', 140)" class="i">mnist</span><span class="o">.</span><span class="i">TrnLbls</span> <span onmouseout="hideTip(event, 'fs49', 141)" onmouseover="showTip(event, 'fs49', 141)" class="i">optCfg</span> <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs53', 142)" onmouseover="showTip(event, 'fs53', 142)" class="f">ignore</span>
+    <span class="k">if</span> <span onmouseout="hideTip(event, 'fs52', 143)" onmouseover="showTip(event, 'fs52', 143)" class="i">itr</span> <span class="o">%</span> <span class="n">50</span> <span class="o">=</span> <span class="n">0</span> <span class="k">then</span>
+        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs54', 144)" onmouseover="showTip(event, 'fs54', 144)" class="i">l</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs50', 145)" onmouseover="showTip(event, 'fs50', 145)" class="f">lossFn</span> <span onmouseout="hideTip(event, 'fs29', 146)" onmouseover="showTip(event, 'fs29', 146)" class="i">mnist</span><span class="o">.</span><span class="i">TstImgsFlat</span> <span onmouseout="hideTip(event, 'fs29', 147)" onmouseover="showTip(event, 'fs29', 147)" class="i">mnist</span><span class="o">.</span><span class="i">TstLbls</span> <span class="o">|&gt;</span> <span class="i">ArrayND</span><span class="o">.</span><span class="i">value</span>
+        <span onmouseout="hideTip(event, 'fs55', 148)" onmouseover="showTip(event, 'fs55', 148)" class="f">printfn</span> <span class="s">&quot;Test loss after </span><span class="pf">%5d</span><span class="s"> iterations: </span><span class="pf">%.4f</span><span class="s">&quot;</span> <span onmouseout="hideTip(event, 'fs52', 149)" onmouseover="showTip(event, 'fs52', 149)" class="i">itr</span> <span onmouseout="hideTip(event, 'fs54', 150)" onmouseover="showTip(event, 'fs54', 150)" class="i">l</span>
+</code></pre></td>
+</tr>
+</table>
+<p>This should produce output similar to</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="i">Test</span> <span class="i">loss</span> <span class="i">after</span>     <span class="n">0</span> <span class="i">iterations</span><span class="o">:</span> <span class="n">2.3013</span>
+<span class="i">Test</span> <span class="i">loss</span> <span class="i">after</span>    <span class="n">50</span> <span class="i">iterations</span><span class="o">:</span> <span class="n">1.9930</span>
+<span class="i">Test</span> <span class="i">loss</span> <span class="i">after</span>   <span class="n">100</span> <span class="i">iterations</span><span class="o">:</span> <span class="n">1.0479</span>
+<span class="o">..</span><span class="o">.</span>
+<span class="i">Test</span> <span class="i">loss</span> <span class="i">after</span>  <span class="n">1000</span> <span class="i">iterations</span><span class="o">:</span> <span class="n">0.2701</span>
+</code></pre></td>
+</tr>
+</table>
+<h2><a name="Nesting-model-components" class="anchor" href="#Nesting-model-components">Nesting model components</a></h2>
+<p>Model components can be nested.
+This means that a component can contain one more other components.
+For illustration, let us define an autoencoder component using our <code>MyFirstPerceptron</code> component.</p>
+<p>We begin by defining the hyper-parameters and parameter.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">module</span> <span class="t">MyFirstAutoencoder</span> <span class="o">=</span>
+
+    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs56', 151)" onmouseover="showTip(event, 'fs56', 151)" class="t">HyperPars</span> <span class="o">=</span> {
+        <span onmouseout="hideTip(event, 'fs57', 152)" onmouseover="showTip(event, 'fs57', 152)" class="i">NInOut</span><span class="o">:</span>         <span class="i">SizeSpecT</span>
+        <span onmouseout="hideTip(event, 'fs58', 153)" onmouseover="showTip(event, 'fs58', 153)" class="i">NLatent</span><span class="o">:</span>        <span class="i">SizeSpecT</span>
+    }
+
+    <span class="k">type</span> <span onmouseout="hideTip(event, 'fs59', 154)" onmouseover="showTip(event, 'fs59', 154)" class="t">Pars</span> <span class="o">=</span> {
+        <span onmouseout="hideTip(event, 'fs60', 155)" onmouseover="showTip(event, 'fs60', 155)" class="i">InLayer</span><span class="o">:</span>        <span onmouseout="hideTip(event, 'fs36', 156)" onmouseover="showTip(event, 'fs36', 156)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs8', 157)" onmouseover="showTip(event, 'fs8', 157)" class="t">Pars</span>
+        <span onmouseout="hideTip(event, 'fs61', 158)" onmouseover="showTip(event, 'fs61', 158)" class="i">OutLayer</span><span class="o">:</span>       <span onmouseout="hideTip(event, 'fs36', 159)" onmouseover="showTip(event, 'fs36', 159)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs8', 160)" onmouseover="showTip(event, 'fs8', 160)" class="t">Pars</span>
+        <span onmouseout="hideTip(event, 'fs62', 161)" onmouseover="showTip(event, 'fs62', 161)" class="i">HyperPars</span><span class="o">:</span>      <span onmouseout="hideTip(event, 'fs62', 162)" onmouseover="showTip(event, 'fs62', 162)" class="t">HyperPars</span>
+    }
+</code></pre></td>
+</tr>
+</table>
+<p>The hyper-parameters consists of the number of inputs and output and the number of neurons that constitute the latent representation.
+The parameters are made up of the parameters of the input layer and the parameters of the output layer; thus we just reuse the existing record type from the <code>MyFirstPerceptron</code> component.</p>
+<p>Next, we define the <code>pars</code> function that instantiates a parameter record for this component.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs63', 163)" onmouseover="showTip(event, 'fs63', 163)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs20', 164)" onmouseover="showTip(event, 'fs20', 164)" class="i">mb</span><span class="o">:</span> <span class="i">ModelBuilder</span><span class="o">&lt;</span>_<span class="o">&gt;</span>) (<span onmouseout="hideTip(event, 'fs21', 165)" onmouseover="showTip(event, 'fs21', 165)" class="i">hp</span><span class="o">:</span> <span onmouseout="hideTip(event, 'fs56', 166)" onmouseover="showTip(event, 'fs56', 166)" class="t">HyperPars</span>) <span class="o">=</span> 
+        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs64', 167)" onmouseover="showTip(event, 'fs64', 167)" class="i">hpInLayer</span> <span class="o">:</span> <span onmouseout="hideTip(event, 'fs36', 168)" onmouseover="showTip(event, 'fs36', 168)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs4', 169)" onmouseover="showTip(event, 'fs4', 169)" class="t">HyperPars</span> <span class="o">=</span> {
+            <span class="i">NInput</span>       <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 170)" onmouseover="showTip(event, 'fs21', 170)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs57', 171)" onmouseover="showTip(event, 'fs57', 171)" class="i">NInOut</span>
+            <span class="i">NOutput</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 172)" onmouseover="showTip(event, 'fs21', 172)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs58', 173)" onmouseover="showTip(event, 'fs58', 173)" class="i">NLatent</span>
+            <span class="i">TransferFunc</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 174)" onmouseover="showTip(event, 'fs36', 174)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs38', 175)" onmouseover="showTip(event, 'fs38', 175)" class="p">Tanh</span>
+        }
+        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs65', 176)" onmouseover="showTip(event, 'fs65', 176)" class="i">hpOutLayer</span> <span class="o">:</span> <span onmouseout="hideTip(event, 'fs36', 177)" onmouseover="showTip(event, 'fs36', 177)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs4', 178)" onmouseover="showTip(event, 'fs4', 178)" class="t">HyperPars</span> <span class="o">=</span> {
+            <span class="i">NInput</span>       <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 179)" onmouseover="showTip(event, 'fs21', 179)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs58', 180)" onmouseover="showTip(event, 'fs58', 180)" class="i">NLatent</span>
+            <span class="i">NOutput</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 181)" onmouseover="showTip(event, 'fs21', 181)" class="i">hp</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs57', 182)" onmouseover="showTip(event, 'fs57', 182)" class="i">NInOut</span>
+            <span class="i">TransferFunc</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 183)" onmouseover="showTip(event, 'fs36', 183)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs38', 184)" onmouseover="showTip(event, 'fs38', 184)" class="p">Tanh</span>
+        }
+
+        {
+            <span class="i">InLayer</span>   <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 185)" onmouseover="showTip(event, 'fs36', 185)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs37', 186)" onmouseover="showTip(event, 'fs37', 186)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs20', 187)" onmouseover="showTip(event, 'fs20', 187)" class="i">mb</span><span class="o">.</span><span class="i">Module</span> <span class="s">&quot;InLayer&quot;</span>) <span onmouseout="hideTip(event, 'fs64', 188)" onmouseover="showTip(event, 'fs64', 188)" class="i">hpInLayer</span>
+            <span class="i">OutLayer</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs36', 189)" onmouseover="showTip(event, 'fs36', 189)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs37', 190)" onmouseover="showTip(event, 'fs37', 190)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs20', 191)" onmouseover="showTip(event, 'fs20', 191)" class="i">mb</span><span class="o">.</span><span class="i">Module</span> <span class="s">&quot;OutLayer&quot;</span>) <span onmouseout="hideTip(event, 'fs65', 192)" onmouseover="showTip(event, 'fs65', 192)" class="i">hpOutLayer</span>
+            <span onmouseout="hideTip(event, 'fs56', 193)" onmouseover="showTip(event, 'fs56', 193)" class="i">HyperPars</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs21', 194)" onmouseover="showTip(event, 'fs21', 194)" class="i">hp</span>
+        }
+</code></pre></td>
+</tr>
+</table>
+<p>The function computer the hyper-parameters for the input and output layer and calls the <code>MyFirstPerceptron.pars</code> function to instantiate the parameter records for the two employed perceptrons.</p>
+<p>Now, we can define the expressions for the latent values, the reconstruction and the reconstruction error.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp">    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs66', 195)" onmouseover="showTip(event, 'fs66', 195)" class="f">latent</span> <span onmouseout="hideTip(event, 'fs23', 196)" onmouseover="showTip(event, 'fs23', 196)" class="i">pars</span> <span onmouseout="hideTip(event, 'fs24', 197)" onmouseover="showTip(event, 'fs24', 197)" class="i">input</span> <span class="o">=</span> 
+        <span onmouseout="hideTip(event, 'fs24', 198)" onmouseover="showTip(event, 'fs24', 198)" class="i">input</span>
+        <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs36', 199)" onmouseover="showTip(event, 'fs36', 199)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs45', 200)" onmouseover="showTip(event, 'fs45', 200)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs23', 201)" onmouseover="showTip(event, 'fs23', 201)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs60', 202)" onmouseover="showTip(event, 'fs60', 202)" class="i">InLayer</span>
+
+    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs67', 203)" onmouseover="showTip(event, 'fs67', 203)" class="f">reconst</span> <span onmouseout="hideTip(event, 'fs23', 204)" onmouseover="showTip(event, 'fs23', 204)" class="i">pars</span> <span onmouseout="hideTip(event, 'fs24', 205)" onmouseover="showTip(event, 'fs24', 205)" class="i">input</span> <span class="o">=</span>
+        <span onmouseout="hideTip(event, 'fs24', 206)" onmouseover="showTip(event, 'fs24', 206)" class="i">input</span>
+        <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs36', 207)" onmouseover="showTip(event, 'fs36', 207)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs45', 208)" onmouseover="showTip(event, 'fs45', 208)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs23', 209)" onmouseover="showTip(event, 'fs23', 209)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs60', 210)" onmouseover="showTip(event, 'fs60', 210)" class="i">InLayer</span>
+        <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs36', 211)" onmouseover="showTip(event, 'fs36', 211)" class="t">MyFirstPerceptron</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs45', 212)" onmouseover="showTip(event, 'fs45', 212)" class="f">pred</span> <span onmouseout="hideTip(event, 'fs23', 213)" onmouseover="showTip(event, 'fs23', 213)" class="i">pars</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs61', 214)" onmouseover="showTip(event, 'fs61', 214)" class="i">OutLayer</span>
+
+    <span class="k">let</span> <span onmouseout="hideTip(event, 'fs68', 215)" onmouseover="showTip(event, 'fs68', 215)" class="f">loss</span> <span onmouseout="hideTip(event, 'fs23', 216)" onmouseover="showTip(event, 'fs23', 216)" class="i">pars</span> <span onmouseout="hideTip(event, 'fs69', 217)" onmouseover="showTip(event, 'fs69', 217)" class="i">inputs</span> <span class="o">=</span> 
+        <span onmouseout="hideTip(event, 'fs41', 218)" onmouseover="showTip(event, 'fs41', 218)" class="i">input</span>
+        <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs67', 219)" onmouseover="showTip(event, 'fs67', 219)" class="f">reconst</span> <span onmouseout="hideTip(event, 'fs23', 220)" onmouseover="showTip(event, 'fs23', 220)" class="i">pars</span>
+        <span class="o">|&gt;</span> <span class="i">LossLayer</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs47', 221)" onmouseover="showTip(event, 'fs47', 221)" class="i">loss</span> <span class="i">LossLayer</span><span class="o">.</span><span class="i">MSE</span> <span onmouseout="hideTip(event, 'fs41', 222)" onmouseover="showTip(event, 'fs41', 222)" class="i">input</span>
+</code></pre></td>
+</tr>
+</table>
+<p>This concludes the definition of the autoencoder model.
+As you have seen, it is straightforward to create more complex components by combining existing components.</p>
+<p>Finally, let us instantiate our simple autoencoder with 100 latent units and train it on MNIST.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+<span class="l">14: </span>
+<span class="l">15: </span>
+<span class="l">16: </span>
+<span class="l">17: </span>
+<span class="l">18: </span>
+<span class="l">19: </span>
+<span class="l">20: </span>
+<span class="l">21: </span>
+<span class="l">22: </span>
+<span class="l">23: </span>
+<span class="l">24: </span>
+<span class="l">25: </span>
+<span class="l">26: </span>
+<span class="l">27: </span>
+<span class="l">28: </span>
+<span class="l">29: </span>
+<span class="l">30: </span>
+<span class="l">31: </span>
+<span class="l">32: </span>
+<span class="l">33: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs70', 223)" onmouseover="showTip(event, 'fs70', 223)" class="i">mb2</span> <span class="o">=</span> <span class="i">ModelBuilder</span><span class="o">&lt;</span><span onmouseout="hideTip(event, 'fs10', 224)" onmouseover="showTip(event, 'fs10', 224)" class="i">single</span><span class="o">&gt;</span> <span class="s">&quot;AutoEncoderModel&quot;</span>
+
+<span class="c">// define symbolic sizes</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs71', 225)" onmouseover="showTip(event, 'fs71', 225)" class="i">nBatch2</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs70', 226)" onmouseover="showTip(event, 'fs70', 226)" class="i">mb2</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nBatch&quot;</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs72', 227)" onmouseover="showTip(event, 'fs72', 227)" class="i">nInput2</span>  <span class="o">=</span> <span onmouseout="hideTip(event, 'fs70', 228)" onmouseover="showTip(event, 'fs70', 228)" class="i">mb2</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nInput&quot;</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs73', 229)" onmouseover="showTip(event, 'fs73', 229)" class="i">nLatent2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs70', 230)" onmouseover="showTip(event, 'fs70', 230)" class="i">mb2</span><span class="o">.</span><span class="i">Size</span> <span class="s">&quot;nLatent&quot;</span>
+
+<span class="c">// define model parameters</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs74', 231)" onmouseover="showTip(event, 'fs74', 231)" class="i">ae</span> <span class="o">=</span> 
+    <span onmouseout="hideTip(event, 'fs75', 232)" onmouseover="showTip(event, 'fs75', 232)" class="t">MyFirstAutoencoder</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs76', 233)" onmouseover="showTip(event, 'fs76', 233)" class="f">pars</span> (<span onmouseout="hideTip(event, 'fs70', 234)" onmouseover="showTip(event, 'fs70', 234)" class="i">mb2</span><span class="o">.</span><span class="i">Module</span> <span class="s">&quot;Autoencoder&quot;</span>) {<span class="i">NInOut</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs72', 235)" onmouseover="showTip(event, 'fs72', 235)" class="i">nInput2</span>; <span class="i">NLatent</span><span class="o">=</span><span onmouseout="hideTip(event, 'fs73', 236)" onmouseover="showTip(event, 'fs73', 236)" class="i">nLatent2</span>}
+
+<span class="c">// instantiate model</span>
+<span onmouseout="hideTip(event, 'fs70', 237)" onmouseover="showTip(event, 'fs70', 237)" class="i">mb2</span><span class="o">.</span><span class="i">SetSize</span> <span onmouseout="hideTip(event, 'fs32', 238)" onmouseover="showTip(event, 'fs32', 238)" class="i">nInput</span> <span onmouseout="hideTip(event, 'fs29', 239)" onmouseover="showTip(event, 'fs29', 239)" class="i">mnist</span><span class="o">.</span><span class="i">TrnImgsFlat</span><span class="o">.</span><span class="i">Shape</span><span class="o">.</span>[<span class="n">1</span>]
+<span onmouseout="hideTip(event, 'fs70', 240)" onmouseover="showTip(event, 'fs70', 240)" class="i">mb2</span><span class="o">.</span><span class="i">SetSize</span> <span onmouseout="hideTip(event, 'fs73', 241)" onmouseover="showTip(event, 'fs73', 241)" class="i">nLatent2</span> <span class="n">100</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs77', 242)" onmouseover="showTip(event, 'fs77', 242)" class="i">mi2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs70', 243)" onmouseover="showTip(event, 'fs70', 243)" class="i">mb2</span><span class="o">.</span><span class="i">Instantiate</span> <span class="i">DevCuda</span>
+
+<span class="c">// loss function</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs78', 244)" onmouseover="showTip(event, 'fs78', 244)" class="i">input2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs70', 245)" onmouseover="showTip(event, 'fs70', 245)" class="i">mb2</span><span class="o">.</span><span class="i">Var</span> <span class="s">&quot;Input&quot;</span>  [<span onmouseout="hideTip(event, 'fs71', 246)" onmouseover="showTip(event, 'fs71', 246)" class="i">nBatch2</span>; <span onmouseout="hideTip(event, 'fs72', 247)" onmouseover="showTip(event, 'fs72', 247)" class="i">nInput2</span>]
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs79', 248)" onmouseover="showTip(event, 'fs79', 248)" class="i">loss2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs75', 249)" onmouseover="showTip(event, 'fs75', 249)" class="t">MyFirstAutoencoder</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs80', 250)" onmouseover="showTip(event, 'fs80', 250)" class="f">loss</span> <span onmouseout="hideTip(event, 'fs74', 251)" onmouseover="showTip(event, 'fs74', 251)" class="i">ae</span> <span onmouseout="hideTip(event, 'fs78', 252)" onmouseover="showTip(event, 'fs78', 252)" class="i">input2</span><span class="o">.</span><span class="i">T</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs81', 253)" onmouseover="showTip(event, 'fs81', 253)" class="f">lossFn2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs43', 254)" onmouseover="showTip(event, 'fs43', 254)" class="i">mi</span><span class="o">.</span><span class="i">Func</span> <span onmouseout="hideTip(event, 'fs79', 255)" onmouseover="showTip(event, 'fs79', 255)" class="i">loss2</span> <span class="o">|&gt;</span> <span class="i">arg</span> <span onmouseout="hideTip(event, 'fs78', 256)" onmouseover="showTip(event, 'fs78', 256)" class="i">input2</span> 
+
+<span class="c">// optimization function</span>
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs82', 257)" onmouseover="showTip(event, 'fs82', 257)" class="i">opt2</span> <span class="o">=</span> <span class="i">Optimizers</span><span class="o">.</span><span class="i">GradientDescent</span> (<span onmouseout="hideTip(event, 'fs79', 258)" onmouseover="showTip(event, 'fs79', 258)" class="i">loss2</span>, <span onmouseout="hideTip(event, 'fs77', 259)" onmouseover="showTip(event, 'fs77', 259)" class="i">mi2</span><span class="o">.</span><span class="i">ParameterVector</span>, <span class="i">DevCuda</span>)
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs83', 260)" onmouseover="showTip(event, 'fs83', 260)" class="i">optCfg2</span> <span class="o">=</span> { <span class="i">Optimizers</span><span class="o">.</span><span class="i">GradientDescent</span><span class="o">.</span><span class="i">Step</span><span class="o">=</span><span class="n">1e-1f</span> }
+<span class="k">let</span> <span onmouseout="hideTip(event, 'fs84', 261)" onmouseover="showTip(event, 'fs84', 261)" class="f">optFn2</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs43', 262)" onmouseover="showTip(event, 'fs43', 262)" class="i">mi</span><span class="o">.</span><span class="i">Func</span> <span onmouseout="hideTip(event, 'fs82', 263)" onmouseover="showTip(event, 'fs82', 263)" class="i">opt2</span><span class="o">.</span><span class="i">Minimize</span> <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs48', 264)" onmouseover="showTip(event, 'fs48', 264)" class="i">opt</span><span class="o">.</span><span class="i">Use</span> <span class="o">|&gt;</span> <span class="i">arg</span> <span onmouseout="hideTip(event, 'fs78', 265)" onmouseover="showTip(event, 'fs78', 265)" class="i">input2</span> 
+
+<span class="c">// initializes parameters and train</span>
+<span onmouseout="hideTip(event, 'fs77', 266)" onmouseover="showTip(event, 'fs77', 266)" class="i">mi2</span><span class="o">.</span><span class="i">InitPars</span> <span class="n">123</span>
+<span class="k">for</span> <span onmouseout="hideTip(event, 'fs52', 267)" onmouseover="showTip(event, 'fs52', 267)" class="i">itr</span> <span class="o">=</span> <span class="n">0</span> <span class="k">to</span> <span class="n">1000</span> <span class="k">do</span>
+    <span onmouseout="hideTip(event, 'fs84', 268)" onmouseover="showTip(event, 'fs84', 268)" class="f">optFn2</span> <span onmouseout="hideTip(event, 'fs29', 269)" onmouseover="showTip(event, 'fs29', 269)" class="i">mnist</span><span class="o">.</span><span class="i">TrnImgsFlat</span> <span onmouseout="hideTip(event, 'fs83', 270)" onmouseover="showTip(event, 'fs83', 270)" class="i">optCfg2</span> <span class="o">|&gt;</span> <span onmouseout="hideTip(event, 'fs53', 271)" onmouseover="showTip(event, 'fs53', 271)" class="f">ignore</span>
+    <span class="k">if</span> <span onmouseout="hideTip(event, 'fs52', 272)" onmouseover="showTip(event, 'fs52', 272)" class="i">itr</span> <span class="o">%</span> <span class="n">50</span> <span class="o">=</span> <span class="n">0</span> <span class="k">then</span>
+        <span class="k">let</span> <span onmouseout="hideTip(event, 'fs54', 273)" onmouseover="showTip(event, 'fs54', 273)" class="i">l</span> <span class="o">=</span> <span onmouseout="hideTip(event, 'fs81', 274)" onmouseover="showTip(event, 'fs81', 274)" class="f">lossFn2</span> <span onmouseout="hideTip(event, 'fs29', 275)" onmouseover="showTip(event, 'fs29', 275)" class="i">mnist</span><span class="o">.</span><span class="i">TstImgsFlat</span> <span class="o">|&gt;</span> <span class="i">ArrayND</span><span class="o">.</span><span class="i">value</span>
+        <span onmouseout="hideTip(event, 'fs55', 276)" onmouseover="showTip(event, 'fs55', 276)" class="f">printfn</span> <span class="s">&quot;Reconstruction error after </span><span class="pf">%5d</span><span class="s"> iterations: </span><span class="pf">%.4f</span><span class="s">&quot;</span> <span onmouseout="hideTip(event, 'fs52', 277)" onmouseover="showTip(event, 'fs52', 277)" class="i">itr</span> <span onmouseout="hideTip(event, 'fs54', 278)" onmouseover="showTip(event, 'fs54', 278)" class="i">l</span>
+</code></pre></td>
+</tr>
+</table>
+<p>This should produce output similar to</p>
+
+<div class="tip" id="fs1">type TransferFuncs =<br />&#160;&#160;| Tanh<br />&#160;&#160;| SoftMax<br /><br />Full name: Blocks.MyFirstPerceptron.TransferFuncs</div>
+<div class="tip" id="fs2">union case TransferFuncs.Tanh: TransferFuncs</div>
+<div class="tip" id="fs3">union case TransferFuncs.SoftMax: TransferFuncs</div>
+<div class="tip" id="fs4">type HyperPars =<br />&#160;&#160;{NInput: obj;<br />&#160;&#160;&#160;NOutput: obj;<br />&#160;&#160;&#160;TransferFunc: TransferFuncs;}<br /><br />Full name: Blocks.MyFirstPerceptron.HyperPars</div>
+<div class="tip" id="fs5">HyperPars.NInput: obj</div>
+<div class="tip" id="fs6">HyperPars.NOutput: obj</div>
+<div class="tip" id="fs7">HyperPars.TransferFunc: TransferFuncs</div>
+<div class="tip" id="fs8">type Pars =<br />&#160;&#160;{Weights: obj;<br />&#160;&#160;&#160;Bias: obj;<br />&#160;&#160;&#160;HyperPars: HyperPars;}<br /><br />Full name: Blocks.MyFirstPerceptron.Pars</div>
+<div class="tip" id="fs9">Pars.Weights: obj</div>
+<div class="tip" id="fs10">Multiple items<br />val single : value:&#39;T -&gt; single (requires member op_Explicit)<br /><br />Full name: Microsoft.FSharp.Core.ExtraTopLevelOperators.single<br /><br />--------------------<br />type single = System.Single<br /><br />Full name: Microsoft.FSharp.Core.single</div>
+<div class="tip" id="fs11">Multiple items<br />val ref : value:&#39;T -&gt; &#39;T ref<br /><br />Full name: Microsoft.FSharp.Core.Operators.ref<br /><br />--------------------<br />type &#39;T ref = Ref&lt;&#39;T&gt;<br /><br />Full name: Microsoft.FSharp.Core.ref&lt;_&gt;</div>
+<div class="tip" id="fs12">Pars.Bias: obj</div>
+<div class="tip" id="fs13">Multiple items<br />Pars.HyperPars: HyperPars<br /><br />--------------------<br />type HyperPars =<br />&#160;&#160;{NInput: obj;<br />&#160;&#160;&#160;NOutput: obj;<br />&#160;&#160;&#160;TransferFunc: TransferFuncs;}<br /><br />Full name: Blocks.MyFirstPerceptron.HyperPars</div>
+<div class="tip" id="fs14">val internal initBias : seed:int -&gt; shp:int list -&gt; &#39;a<br /><br />Full name: Blocks.MyFirstPerceptron.initBias</div>
+<div class="tip" id="fs15">val seed : int</div>
+<div class="tip" id="fs16">Multiple items<br />val int : value:&#39;T -&gt; int (requires member op_Explicit)<br /><br />Full name: Microsoft.FSharp.Core.Operators.int<br /><br />--------------------<br />type int = int32<br /><br />Full name: Microsoft.FSharp.Core.int<br /><br />--------------------<br />type int&lt;&#39;Measure&gt; = int<br /><br />Full name: Microsoft.FSharp.Core.int&lt;_&gt;</div>
+<div class="tip" id="fs17">val shp : int list</div>
+<div class="tip" id="fs18">type &#39;T list = List&lt;&#39;T&gt;<br /><br />Full name: Microsoft.FSharp.Collections.list&lt;_&gt;</div>
+<div class="tip" id="fs19">val pars : mb:&#39;a -&gt; hp:HyperPars -&gt; Pars<br /><br />Full name: Blocks.MyFirstPerceptron.pars</div>
+<div class="tip" id="fs20">val mb : &#39;a</div>
+<div class="tip" id="fs21">val hp : HyperPars</div>
+<div class="tip" id="fs22">val pred : pars:Pars -&gt; input:obj -&gt; obj<br /><br />Full name: Blocks.MyFirstPerceptron.pred</div>
+<div class="tip" id="fs23">val pars : Pars</div>
+<div class="tip" id="fs24">val input : obj</div>
+<div class="tip" id="fs25">val activation : obj</div>
+<div class="tip" id="fs26">Pars.HyperPars: HyperPars</div>
+<div class="tip" id="fs27">val tanh : value:&#39;T -&gt; &#39;T (requires member Tanh)<br /><br />Full name: Microsoft.FSharp.Core.Operators.tanh</div>
+<div class="tip" id="fs28">val exp : value:&#39;T -&gt; &#39;T (requires member Exp)<br /><br />Full name: Microsoft.FSharp.Core.Operators.exp</div>
+<div class="tip" id="fs29">val mnist : obj<br /><br />Full name: Blocks.mnist</div>
+<div class="tip" id="fs30">val mb : obj<br /><br />Full name: Blocks.mb</div>
+<div class="tip" id="fs31">val nBatch : obj<br /><br />Full name: Blocks.nBatch</div>
+<div class="tip" id="fs32">val nInput : obj<br /><br />Full name: Blocks.nInput</div>
+<div class="tip" id="fs33">val nClass : obj<br /><br />Full name: Blocks.nClass</div>
+<div class="tip" id="fs34">val nHidden : obj<br /><br />Full name: Blocks.nHidden</div>
+<div class="tip" id="fs35">val lyr1 : MyFirstPerceptron.Pars<br /><br />Full name: Blocks.lyr1</div>
+<div class="tip" id="fs36">module MyFirstPerceptron<br /><br />from Blocks</div>
+<div class="tip" id="fs37">val pars : mb:&#39;a -&gt; hp:MyFirstPerceptron.HyperPars -&gt; MyFirstPerceptron.Pars<br /><br />Full name: Blocks.MyFirstPerceptron.pars</div>
+<div class="tip" id="fs38">union case MyFirstPerceptron.TransferFuncs.Tanh: MyFirstPerceptron.TransferFuncs</div>
+<div class="tip" id="fs39">val lyr2 : MyFirstPerceptron.Pars<br /><br />Full name: Blocks.lyr2</div>
+<div class="tip" id="fs40">union case MyFirstPerceptron.TransferFuncs.SoftMax: MyFirstPerceptron.TransferFuncs</div>
+<div class="tip" id="fs41">val input : obj<br /><br />Full name: Blocks.input</div>
+<div class="tip" id="fs42">val target : obj<br /><br />Full name: Blocks.target</div>
+<div class="tip" id="fs43">val mi : obj<br /><br />Full name: Blocks.mi</div>
+<div class="tip" id="fs44">val hiddenVal : obj<br /><br />Full name: Blocks.hiddenVal</div>
+<div class="tip" id="fs45">val pred : pars:MyFirstPerceptron.Pars -&gt; input:obj -&gt; obj<br /><br />Full name: Blocks.MyFirstPerceptron.pred</div>
+<div class="tip" id="fs46">val classProb : obj<br /><br />Full name: Blocks.classProb</div>
+<div class="tip" id="fs47">val loss : obj<br /><br />Full name: Blocks.loss</div>
+<div class="tip" id="fs48">val opt : obj<br /><br />Full name: Blocks.opt</div>
+<div class="tip" id="fs49">val optCfg : obj<br /><br />Full name: Blocks.optCfg</div>
+<div class="tip" id="fs50">val lossFn : (obj -&gt; obj -&gt; obj)<br /><br />Full name: Blocks.lossFn</div>
+<div class="tip" id="fs51">val optFn : (obj -&gt; obj -&gt; obj -&gt; obj)<br /><br />Full name: Blocks.optFn</div>
+<div class="tip" id="fs52">val itr : int</div>
+<div class="tip" id="fs53">val ignore : value:&#39;T -&gt; unit<br /><br />Full name: Microsoft.FSharp.Core.Operators.ignore</div>
+<div class="tip" id="fs54">val l : float</div>
+<div class="tip" id="fs55">val printfn : format:Printf.TextWriterFormat&lt;&#39;T&gt; -&gt; &#39;T<br /><br />Full name: Microsoft.FSharp.Core.ExtraTopLevelOperators.printfn</div>
+<div class="tip" id="fs56">type HyperPars =<br />&#160;&#160;{NInOut: obj;<br />&#160;&#160;&#160;NLatent: obj;}<br /><br />Full name: Blocks.MyFirstAutoencoder.HyperPars</div>
+<div class="tip" id="fs57">HyperPars.NInOut: obj</div>
+<div class="tip" id="fs58">HyperPars.NLatent: obj</div>
+<div class="tip" id="fs59">type Pars =<br />&#160;&#160;{InLayer: Pars;<br />&#160;&#160;&#160;OutLayer: Pars;<br />&#160;&#160;&#160;HyperPars: HyperPars;}<br /><br />Full name: Blocks.MyFirstAutoencoder.Pars</div>
+<div class="tip" id="fs60">Pars.InLayer: MyFirstPerceptron.Pars</div>
+<div class="tip" id="fs61">Pars.OutLayer: MyFirstPerceptron.Pars</div>
+<div class="tip" id="fs62">Multiple items<br />Pars.HyperPars: HyperPars<br /><br />--------------------<br />type HyperPars =<br />&#160;&#160;{NInOut: obj;<br />&#160;&#160;&#160;NLatent: obj;}<br /><br />Full name: Blocks.MyFirstAutoencoder.HyperPars</div>
+<div class="tip" id="fs63">val pars : mb:&#39;a -&gt; hp:HyperPars -&gt; Pars<br /><br />Full name: Blocks.MyFirstAutoencoder.pars</div>
+<div class="tip" id="fs64">val hpInLayer : MyFirstPerceptron.HyperPars</div>
+<div class="tip" id="fs65">val hpOutLayer : MyFirstPerceptron.HyperPars</div>
+<div class="tip" id="fs66">val latent : pars:Pars -&gt; input:obj -&gt; obj<br /><br />Full name: Blocks.MyFirstAutoencoder.latent</div>
+<div class="tip" id="fs67">val reconst : pars:Pars -&gt; input:obj -&gt; obj<br /><br />Full name: Blocks.MyFirstAutoencoder.reconst</div>
+<div class="tip" id="fs68">val loss : pars:Pars -&gt; inputs:&#39;a -&gt; &#39;b<br /><br />Full name: Blocks.MyFirstAutoencoder.loss</div>
+<div class="tip" id="fs69">val inputs : &#39;a</div>
+<div class="tip" id="fs70">val mb2 : obj<br /><br />Full name: Blocks.mb2</div>
+<div class="tip" id="fs71">val nBatch2 : obj<br /><br />Full name: Blocks.nBatch2</div>
+<div class="tip" id="fs72">val nInput2 : obj<br /><br />Full name: Blocks.nInput2</div>
+<div class="tip" id="fs73">val nLatent2 : obj<br /><br />Full name: Blocks.nLatent2</div>
+<div class="tip" id="fs74">val ae : MyFirstAutoencoder.Pars<br /><br />Full name: Blocks.ae</div>
+<div class="tip" id="fs75">module MyFirstAutoencoder<br /><br />from Blocks</div>
+<div class="tip" id="fs76">val pars : mb:&#39;a -&gt; hp:MyFirstAutoencoder.HyperPars -&gt; MyFirstAutoencoder.Pars<br /><br />Full name: Blocks.MyFirstAutoencoder.pars</div>
+<div class="tip" id="fs77">val mi2 : obj<br /><br />Full name: Blocks.mi2</div>
+<div class="tip" id="fs78">val input2 : obj<br /><br />Full name: Blocks.input2</div>
+<div class="tip" id="fs79">val loss2 : obj<br /><br />Full name: Blocks.loss2</div>
+<div class="tip" id="fs80">val loss : pars:MyFirstAutoencoder.Pars -&gt; inputs:&#39;a -&gt; &#39;b<br /><br />Full name: Blocks.MyFirstAutoencoder.loss</div>
+<div class="tip" id="fs81">val lossFn2 : (obj -&gt; obj)<br /><br />Full name: Blocks.lossFn2</div>
+<div class="tip" id="fs82">val opt2 : obj<br /><br />Full name: Blocks.opt2</div>
+<div class="tip" id="fs83">val optCfg2 : obj<br /><br />Full name: Blocks.optCfg2</div>
+<div class="tip" id="fs84">val optFn2 : (obj -&gt; obj -&gt; obj)<br /><br />Full name: Blocks.optFn2</div>
 
         </div>
         <div class="span3">
