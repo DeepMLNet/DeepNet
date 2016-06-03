@@ -100,7 +100,7 @@ module VarEnv =
 [<AutoOpen>]
 module EnvTypes =
 
-    /// Information neccessary to evaluate an expression.
+    /// Information necessary to evaluate an expression.
     /// Currently this just holds the variable values, but may contain further information in the future.
     type EvalEnvT = {
         VarEnv:             VarEnvT; 
