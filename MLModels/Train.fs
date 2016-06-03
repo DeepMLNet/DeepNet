@@ -12,7 +12,7 @@ open SymTensor
 open Optimizers
 
 
-/// Training history functions.
+/// Training history module.
 module TrainingLog =
 
     type Entry = {
@@ -63,7 +63,7 @@ module TrainingLog =
     let removeToIter iter (log: Log<_>) =
         {log with History = log.History |> List.skipWhile (fun {Iter=i} -> i > iter)}
 
-/// Training functions.
+/// Generic training module.
 module Train =
 
     /// Training termination criterium
@@ -81,7 +81,7 @@ module Train =
         Seed:                           int
         /// batch size
         BatchSize:                      int
-        /// number of interations between evaluation of the loss
+        /// number of iterations between evaluation of the loss
         LossRecordInterval:             int
         /// termination criterium
         Termination:                    TerminationCriterium
