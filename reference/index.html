@@ -283,28 +283,63 @@ for fast data transfers with GPU device.</p>
     </div>
   <h2>Datasets Namespace</h2>
     <div>
-      <table class="table table-bordered module-list">
+      <table class="table table-bordered type-list">
+    <thead>
+      <tr><td>Type</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td class="type-name">
+            <a href="datasets-dataset-1.html">Dataset<'S></a>
+          </td>
+          <td class="xmldoc"><p>A dataset of a record type 'S containing ArrayNDT<_> data variables.
+The first dimension of each record field is the sample.
+All record fields must contain the same number of samples.
+The default constructor expects a list of ArrayNDTs corresponding to the fields
+in 'S. The first dimension must be the sample index.
+To construct a Dataset<_> from a sequence of samples use the
+Dataset<_>.FromSamples method.</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="datasets-mnistrawt.html">MnistRawT</a>
+          </td>
+          <td class="xmldoc"><p>Raw MNIST dataset</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="datasets-mnistt.html">MnistT</a>
+          </td>
+          <td class="xmldoc"><p>One or more MNIST sample(s).</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="datasets-trnvaltst-1.html">TrnValTst<'S></a>
+          </td>
+          <td class="xmldoc"><p>A training/validation/test partitioning of a dataset.</p>
+
+</td>
+        </tr>
+    </tbody>
+  </table>
+  <table class="table table-bordered module-list">
     <thead>
       <tr><td>Module</td><td>Description</td></tr>
     </thead>
     <tbody>
         <tr>
           <td class="module-name">
-            <a href="datasets-datasettypes.html">DatasetTypes</a>
-          </td>
-          <td class="xmldoc"></td>
-        </tr>
-        <tr>
-          <td class="module-name">
             <a href="datasets-mnist.html">Mnist</a>
           </td>
-          <td class="xmldoc"></td>
-        </tr>
-        <tr>
-          <td class="module-name">
-            <a href="datasets-mnisttypes.html">MnistTypes</a>
-          </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Module containing functions to load the MNIST dataset.</p>
+
+</td>
         </tr>
     </tbody>
   </table>
@@ -360,7 +395,7 @@ NeuralLayers and one LossLayer on top.</p>
           <td class="module-name">
             <a href="models-train.html">Train</a>
           </td>
-          <td class="xmldoc"><p>Training functions.</p>
+          <td class="xmldoc"><p>Generic training module.</p>
 
 </td>
         </tr>
@@ -368,7 +403,7 @@ NeuralLayers and one LossLayer on top.</p>
           <td class="module-name">
             <a href="models-traininglog.html">TrainingLog</a>
           </td>
-          <td class="xmldoc"><p>Training history functions.</p>
+          <td class="xmldoc"><p>Training history module.</p>
 
 </td>
         </tr>
@@ -881,9 +916,11 @@ NeuralLayers and one LossLayer on top.</p>
             
             <li class="nav-header">Getting started</li>
             <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
-            <li><a href="http://www.deepml.net/mnist.html">Learning MNIST</a></li>
+            <li><a href="http://www.deepml.net/mnist.html">Model Definition</a></li>
             <li><a href="http://www.deepml.net/blocks.html">Model Components</a></li>
             <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Generic Training</a></li>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>

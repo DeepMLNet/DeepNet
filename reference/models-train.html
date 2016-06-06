@@ -43,7 +43,7 @@
   <span>Namespace: Models</span><br />
 </p>
 <div class="xmldoc">
-<p>Training functions.</p>
+<p>Generic training module.</p>
 
 </div>
 
@@ -109,10 +109,10 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '245', 245)" onmouseover="showTip(event, '245', 245)">
+          <code onmouseout="hideTip(event, '244', 244)" onmouseover="showTip(event, '244', 244)">
             defaultCfg 
           </code>
-          <div class="tip" id="245">
+          <div class="tip" id="244">
             <strong>Signature:</strong> Cfg<br />
                       </div>
         </td>
@@ -129,10 +129,10 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '246', 246)" onmouseover="showTip(event, '246', 246)">
+          <code onmouseout="hideTip(event, '245', 245)" onmouseover="showTip(event, '245', 245)">
             train trainable dataset cfg
           </code>
-          <div class="tip" id="246">
+          <div class="tip" id="245">
             <strong>Signature:</strong> trainable:ITrainable&lt;&#39;Smpl,&#39;T&gt; -&gt; dataset:TrnValTst&lt;&#39;Smpl&gt; -&gt; cfg:Cfg -&gt; TrainingResult<br />
                           <strong>Type parameters:</strong> 'Smpl, 'T          </div>
         </td>
@@ -150,10 +150,10 @@ Returns the training history.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '247', 247)" onmouseover="showTip(event, '247', 247)">
+          <code onmouseout="hideTip(event, '246', 246)" onmouseover="showTip(event, '246', 246)">
             trainableFromLossExpr (...)
           </code>
-          <div class="tip" id="247">
+          <div class="tip" id="246">
             <strong>Signature:</strong> modelInstance:ModelInstance&lt;&#39;T&gt; -&gt; loss:ExprT&lt;&#39;T&gt; -&gt; varEnvBuilder:(&#39;Smpl -&gt; VarEnvT) -&gt; optimizer:IOptimizer&lt;&#39;T,&#39;OptCfg,&#39;OptState&gt; -&gt; optCfg:&#39;OptCfg -&gt; ITrainable&lt;&#39;Smpl,&#39;T&gt;<br />
                           <strong>Type parameters:</strong> 'T, 'Smpl, 'OptCfg, 'OptState          </div>
         </td>
@@ -183,9 +183,11 @@ Returns the training history.</p>
             
             <li class="nav-header">Getting started</li>
             <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
-            <li><a href="http://www.deepml.net/mnist.html">Learning MNIST</a></li>
+            <li><a href="http://www.deepml.net/mnist.html">Model Definition</a></li>
             <li><a href="http://www.deepml.net/blocks.html">Model Components</a></li>
             <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Generic Training</a></li>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>

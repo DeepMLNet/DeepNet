@@ -43,6 +43,8 @@
   <span>Namespace: Datasets</span><br />
 </p>
 <div class="xmldoc">
+<p>Module containing functions to load the MNIST dataset.</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -57,54 +59,43 @@
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '228', 228)" onmouseover="showTip(event, '228', 228)">
-            load directory
+            load directory valRatio
           </code>
           <div class="tip" id="228">
-            <strong>Signature:</strong> directory:string -&gt; MnistT<br />
+            <strong>Signature:</strong> directory:string -&gt; valRatio:float&lt;MeasureOne&gt; -&gt; TrnValTst&lt;MnistT&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L103-103" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L135-135" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Loads the MNIST dataset and splits the original training set into
+a training and validation set using the ratio <code>valRatio</code> (between 0 and 1)
+for the validation set.</p>
+
+
         </td>
       </tr>
       <tr>
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '229', 229)" onmouseover="showTip(event, '229', 229)">
-            TestDataset 
+            loadRaw directory
           </code>
           <div class="tip" id="229">
-            <strong>Signature:</strong> bool<br />
+            <strong>Signature:</strong> directory:string -&gt; MnistRawT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L35-35" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L112-112" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
+          <p>Loads the MNIST dataset and returns it as type MnistRawT.
+Use only if you need raw access to the MNIST data.</p>
 
-          <code onmouseout="hideTip(event, '230', 230)" onmouseover="showTip(event, '230', 230)">
-            toCuda mnist
-          </code>
-          <div class="tip" id="230">
-            <strong>Signature:</strong> mnist:MnistT -&gt; MnistT<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L127-127" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
+
         </td>
       </tr>
     </tbody>
@@ -123,9 +114,11 @@
             
             <li class="nav-header">Getting started</li>
             <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
-            <li><a href="http://www.deepml.net/mnist.html">Learning MNIST</a></li>
+            <li><a href="http://www.deepml.net/mnist.html">Model Definition</a></li>
             <li><a href="http://www.deepml.net/blocks.html">Model Components</a></li>
             <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Generic Training</a></li>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>

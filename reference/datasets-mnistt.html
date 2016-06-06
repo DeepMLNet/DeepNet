@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
-    <title>DatasetTypes - Deep.Net</title>
+    <title>MnistT - Deep.Net</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta name="description" content=""/>
     <meta name="author" content="Deep.Net developers"/>
@@ -38,44 +38,64 @@
 
 
 
-<h1>DatasetTypes</h1>
+<h1>MnistT</h1>
 <p>
   <span>Namespace: Datasets</span><br />
 </p>
 <div class="xmldoc">
-</div>
+<p>One or more MNIST sample(s).</p>
 
-<!-- Render nested types and modules, if there are any -->
-  <h2>Nested types and modules</h2>
-  <div>
-      <table class="table table-bordered type-list">
+</div>
+  <h3>Record Fields</h3>
+  <table class="table table-bordered member-list">
     <thead>
-      <tr><td>Type</td><td>Description</td></tr>
+      <tr><td>Record Field</td><td>Description</td></tr>
     </thead>
     <tbody>
-        <tr>
-          <td class="type-name">
-            <a href="datasets-datasettypes-dataset-1.html">Dataset<'S></a>
-          </td>
-          <td class="xmldoc"><p>A dataset of a record type 'S containing ArrayNDHostT<_> data variables.
-The last dimension of each record field is the sample.
-All record fields must contain the same number of samples.</p>
+      <tr>
+        <td class="member-name">
 
-</td>
-        </tr>
-        <tr>
-          <td class="type-name">
-            <a href="datasets-datasettypes-trnvaltst-1.html">TrnValTst<'S></a>
-          </td>
-          <td class="xmldoc"><p>A training/validation/test partitioning of a dataset.</p>
+          <code onmouseout="hideTip(event, '804', 804)" onmouseover="showTip(event, '804', 804)">
+            Img
+          </code>
+          <div class="tip" id="804">
+            <strong>Signature:</strong> ArrayNDT&lt;single&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L34-34" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Flat training image.
+Shape is [784] for a single sample and [n, 784] for n samples.</p>
 
-</td>
-        </tr>
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '805', 805)" onmouseover="showTip(event, '805', 805)">
+            Lbl
+          </code>
+          <div class="tip" id="805">
+            <strong>Signature:</strong> ArrayNDT&lt;single&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/MNIST.fs#L37-37" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>One-hot label.
+Shape is [10] for a single sample and [n, 10] for n samples.</p>
+
+
+        </td>
+      </tr>
     </tbody>
   </table>
-
-  </div>
-
 
         </div>
         <div class="span3">
@@ -90,9 +110,11 @@ All record fields must contain the same number of samples.</p>
             
             <li class="nav-header">Getting started</li>
             <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
-            <li><a href="http://www.deepml.net/mnist.html">Learning MNIST</a></li>
+            <li><a href="http://www.deepml.net/mnist.html">Model Definition</a></li>
             <li><a href="http://www.deepml.net/blocks.html">Model Components</a></li>
             <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Generic Training</a></li>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
