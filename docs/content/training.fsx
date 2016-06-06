@@ -3,13 +3,21 @@
 
 (**
 
-Generic Training and Dataset Handling
-=====================================
+Generic Training 
+================
 
-Deep.Net provides a powerful generic function to train your model and generic dataset storage and handling.
-Together they provide the following features:
-
-  * TODO
+Deep.Net provides a powerful generic function to train your model.
+Together with the [dataset handler](dataset.html) it provides the following functionality:
+  
+  * initialization of the model's parameters
+  * mini-batch training
+  * logging of losses on the training, validation and test sets
+  * automatic scheduling of the learning rate 
+  * termination of training when
+    * a desired validation loss is reached
+    * a set number of iterations have been performed
+    * there is no loss improvement on the validation set within a set number of iterations
+  * checkpointing allows the training state to be saved to disk and training to be restarted afterwards (useful when running on non-reliable hardware or on a compute cluster that pauses jobs or moves them around on the cluster's nodes)
 
 
 ### Example models
@@ -22,9 +30,10 @@ open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
+open Datasets
 
-let mnist = Datasets.Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST")
-            |> Datasets.Mnist.toCuda
+let mnist = Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST") 0.1
+            |> TrnValTst.ToCuda
 
 let mb = ModelBuilder<single> "NeuralNetModel"
 
@@ -46,8 +55,8 @@ let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
 let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
 // instantiate model
-mb.SetSize nInput mnist.TrnImgsFlat.Shape.[1]
-mb.SetSize nClass mnist.TrnLbls.Shape.[1]
+mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]
+mb.SetSize nClass mnist.Trn.[0].Lbl.Shape.[0]
 mb.SetSize nHidden 100
 let mi = mb.Instantiate DevCuda
 

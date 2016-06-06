@@ -28,8 +28,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="MNIST.fs" />
     <Compile Include="Dataset.fs" />
+    <Compile Include="MNIST.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj">

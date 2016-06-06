@@ -65,7 +65,7 @@ let getMnist device samples =
         | Some samples -> x.[*, 0..samples-1]
         | None -> x
 
-    let mnist = Mnist.load mnistPath
+    let mnist = Mnist.loadRaw mnistPath
     let tstImgs =  
         mnist.TstImgs
         |> ArrayND.reorderAxes [2; 0; 1] 

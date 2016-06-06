@@ -8,31 +8,41 @@ open Basics
 open ArrayNDNS
 
 
-[<AutoOpen>]
-module MnistTypes =
+/// Raw MNIST dataset
+type MnistRawT = {
+    /// 2d training images of shape [60000; 28; 28]
+    TrnImgs:      ArrayNDT<single>
+    /// one-hot training labels of shape [60000; 10]
+    TrnLbls:      ArrayNDT<single>
 
-    /// MNIST dataset
-    type MnistT = {
-        /// 2d training images of shape [60000; 28; 28]
-        TrnImgs:      ArrayNDT<single>
-        /// flat training images of shape [60000; 784]
-        TrnImgsFlat:  ArrayNDT<single>
-        /// one-hot training labels of shape [60000; 10]
-        TrnLbls:      ArrayNDT<single>
+    /// 2d test images of shape [10000; 28; 28]
+    TstImgs:      ArrayNDT<single>
+    /// one-hot test labels of shape [10000; 10]
+    TstLbls:      ArrayNDT<single>   
+} with 
+    /// copies this dataset to the CUDA GPU
+    member this.ToCuda () =
+        {TrnImgs = this.TrnImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TrnLbls = this.TrnLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TstImgs = this.TstImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+         TstLbls = this.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
 
-        /// 2d test images of shape [10000; 28; 28]
-        TstImgs:      ArrayNDT<single>
-        /// flat test images of shape [10000; 784]
-        TstImgsFlat:  ArrayNDT<single>
-        /// one-hot test labels of shape [10000; 10]
-        TstLbls:      ArrayNDT<single>   
-    }
+/// One or more MNIST sample(s).
+type MnistT = {
+    /// Flat training image.
+    /// Shape is [784] for a single sample and [n, 784] for n samples.
+    Img:    ArrayNDT<single>
+    /// One-hot label.
+    /// Shape is [10] for a single sample and [n, 10] for n samples.
+    Lbl:    ArrayNDT<single>
+} 
 
 
+/// Module containing functions to load the MNIST dataset.
 module Mnist = 
 
     [<Literal>]
-    let TestDataset = false
+    let private TestDataset = false
 
     let private assemble dataSeq =
         let data = List.ofSeq dataSeq
@@ -86,7 +96,7 @@ module Mnist =
         let labelSeq, imageSeq = sampleSeq labelPath imagePath |> Seq.toList |> List.unzip
         assemble labelSeq, assemble imageSeq    
 
-    let private loadRaw directory =
+    let private doLoadRaw directory =
         let trnLbls, trnImgs = 
             dataset (Path.Combine (directory, "train-labels-idx1-ubyte.gz")) 
                     (Path.Combine (directory, "train-images-idx3-ubyte.gz"))
@@ -94,40 +104,50 @@ module Mnist =
             dataset (Path.Combine (directory, "t10k-labels-idx1-ubyte.gz")) 
                     (Path.Combine (directory, "t10k-images-idx3-ubyte.gz"))
     
-        let trnImgsFlat = trnImgs |> ArrayND.reshape [trnImgs.Shape.[0]; -1]
-        let tstImgsFlat = tstImgs |> ArrayND.reshape [tstImgs.Shape.[0]; -1]
+        {TrnImgs = trnImgs; TrnLbls = trnLbls
+         TstImgs = tstImgs; TstLbls = tstLbls}
 
-        {TrnImgs = trnImgs; TrnImgsFlat = trnImgsFlat; TrnLbls = trnLbls;
-         TstImgs = tstImgs; TstImgsFlat = tstImgsFlat; TstLbls = tstLbls;}
-
-    let load directory =
+    /// Loads the MNIST dataset and returns it as type MnistRawT.
+    /// Use only if you need raw access to the MNIST data.
+    let loadRaw directory =
         let testStr = if TestDataset then "-Test" else ""
         let hdfPath = Path.Combine (directory, sprintf "MNIST%s.h5" testStr)
         if File.Exists hdfPath then
             use hdf = new HDF5 (hdfPath, HDF5Read)
             {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; 
-             TrnImgsFlat = ArrayNDHDF.read hdf "TrnImgsFlat"; 
              TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
              TstImgs = ArrayNDHDF.read hdf "TstImgs"; 
-             TstImgsFlat = ArrayNDHDF.read hdf "TstImgsFlat"; 
              TstLbls = ArrayNDHDF.read hdf "TstLbls";}
         else
             printf "Converting MNIST to HDF5..."
-            let mnist = loadRaw directory
+            let mnist = doLoadRaw directory
             use hdf = new HDF5 (hdfPath, HDF5Overwrite)
             ArrayNDHDF.write hdf "TrnImgs" (mnist.TrnImgs :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TrnImgsFlat" (mnist.TrnImgsFlat :?> ArrayNDHostT<single>)
             ArrayNDHDF.write hdf "TrnLbls" (mnist.TrnLbls :?> ArrayNDHostT<single>)
             ArrayNDHDF.write hdf "TstImgs" (mnist.TstImgs :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TstImgsFlat" (mnist.TstImgsFlat :?> ArrayNDHostT<single>)
             ArrayNDHDF.write hdf "TstLbls" (mnist.TstLbls :?> ArrayNDHostT<single>)
             printfn "Done."
             mnist
 
-    let toCuda mnist =
-        {TrnImgs = mnist.TrnImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TrnImgsFlat = mnist.TrnImgsFlat :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TrnLbls = mnist.TrnLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstImgs = mnist.TstImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstImgsFlat = mnist.TstImgsFlat :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstLbls = mnist.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
+    /// Loads the MNIST dataset and splits the original training set into
+    /// a training and validation set using the ratio `valRatio` (between 0 and 1)
+    /// for the validation set.
+    let load directory valRatio =
+        if not (valRatio <= 0.0 && valRatio <= 1.0) then
+            invalidArg "valRatio" "valRatio must be between 0.0 and 1.0"
+        
+        let raw = loadRaw directory
+        let trnImgsFlat = raw.TrnImgs |> ArrayND.reshape [raw.TrnImgs.Shape.[0]; -1]
+        let tstImgsFlat = raw.TstImgs |> ArrayND.reshape [raw.TstImgs.Shape.[0]; -1]
+
+        let orgTrn = Dataset<MnistT> [trnImgsFlat; raw.TrnLbls]
+        let trn, vali =
+            match orgTrn.Partition [1. - valRatio; valRatio] with
+            | [trn; vali] -> trn, vali
+            | _ -> failwith "impossible"
+        let tst = Dataset<MnistT> [tstImgsFlat; raw.TstLbls]
+
+        {Trn=trn; Val=vali; Tst=tst}
+
+
+
