@@ -133,7 +133,7 @@ module Mnist =
     /// a training and validation set using the ratio `valRatio` (between 0 and 1)
     /// for the validation set.
     let load directory valRatio =
-        if not (valRatio <= 0.0 && valRatio <= 1.0) then
+        if not (0.0 <= valRatio && valRatio <= 1.0) then
             invalidArg "valRatio" "valRatio must be between 0.0 and 1.0"
         
         let raw = loadRaw directory

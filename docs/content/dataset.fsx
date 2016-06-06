@@ -251,6 +251,14 @@ The `Dataset<'S>.Load` function loads a saved dataset.
 The TrnValTst type provides the same methods.
 
 
+Dataset loaders
+===============
+
+Currently Deep.Net provides the following loaders for common datasets.
+
+  * **MNIST**. Use the `Mnist.load` function. It takes two parameters; the first is the path to the MNIST dataset (containing the files `t10k-images-idx3-ubyte.gz, t10k-labels-idx1-ubyte.gz, train-images-idx3-ubyte.gz, train-labels-idx1-ubyte.gz`) and the second is the desired ratio of the validation set to the training set (for example 0.1).
+
+
 Summary
 =======
 
