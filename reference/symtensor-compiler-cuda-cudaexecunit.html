@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>CudaExecUnit - Deep.Net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content=""/>
+    <meta name="author" content="Deep.Net developers"/>
+
+    <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet"/>
+
+    <link type="text/css" rel="stylesheet" href="http://www.deepml.net/content/style.css" />
+    <script type="text/javascript" src="http://www.deepml.net/content/tips.js"></script>
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <![endif]-->
+
+    <script type="text/javascript" async
+              src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://github.com/DeepMLNet/DeepNet">github page</a></li>
+        </ul>
+        <h3 class="muted"><a href="http://www.deepml.net/index.html">Deep.Net</a></h3>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="span9" id="main">
+          
+
+
+
+<h1>CudaExecUnit</h1>
+<p>
+  <span>Namespace: SymTensor.Compiler.Cuda</span><br />
+</p>
+<div class="xmldoc">
+</div>
+
+<!-- Render nested types and modules, if there are any -->
+
+  <h3>Functions and values</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Function or value</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '475', 475)" onmouseover="showTip(event, '475', 475)">
+            blasArg memAllocator manikin
+          </code>
+          <div class="tip" id="475">
+            <strong>Signature:</strong> memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; manikin:ArrayNDManikinT -&gt; ArrayNDManikinT * BlasTransposeOpT * CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L370-370" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>BLAS input argument passing, so that orientation is preserved</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '476', 476)" onmouseover="showTip(event, '476', 476)">
+            blasTarget manikin
+          </code>
+          <div class="tip" id="476">
+            <strong>Signature:</strong> manikin:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L383-383" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>BLAS target argument passing, so that orientation is preserved</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '477', 477)" onmouseover="showTip(event, '477', 477)">
+            copyExecItems trgt src
+          </code>
+          <div class="tip" id="477">
+            <strong>Signature:</strong> trgt:ArrayNDManikinT -&gt; src:ArrayNDManikinT -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L363-363" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>generates ExecItems to copy srcView to trgtView</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '478', 478)" onmouseover="showTip(event, '478', 478)">
+            cppTemplateInstantiation tmpl args
+          </code>
+          <div class="tip" id="478">
+            <strong>Signature:</strong> tmpl:string -&gt; args:string list -&gt; string<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L259-259" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>returns the C++ template instantiation code for the given template and argument list</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '479', 479)" onmouseover="showTip(event, '479', 479)">
+            dynamicSubtensorTmplAndIdx (...)
+          </code>
+          <div class="tip" id="479">
+            <strong>Signature:</strong> bas:ArrayNDManikinT -&gt; rngs:UExprRngsSpecT -&gt; rngManikins:ArrayNDManikinT list -&gt; ArrayNDArgTmpl * ArrayNDSDArgTmpl * CPPArrayTmpl&lt;IntPtr&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L287-287" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '480', 480)" onmouseover="showTip(event, '480', 480)">
+            elemwiseFuncnameAndArgs (...)
+          </code>
+          <div class="tip" id="480">
+            <strong>Signature:</strong> trgt:ArrayNDManikinT -&gt; cOp:&#39;?164057 -&gt; srcViews:&#39;?164058 list -&gt; string * ICudaArgTmpl list<br />
+                          <strong>Type parameters:</strong> '?164057, '?164058          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L264-264" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>function name of element-wise wrapper and its arguments for the given target, operation and sources</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '481', 481)" onmouseover="showTip(event, '481', 481)">
+            execItemsForCFunc tmplTmpls argTmpls
+          </code>
+          <div class="tip" id="481">
+            <strong>Signature:</strong> tmplTmpls:ICudaArgTmpl list -&gt; argTmpls:ICudaArgTmpl list -&gt; CudaExecItemT list<br />
+                          <strong>Type parameters:</strong> 'FuncDelegate          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L345-345" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>generate ExecItems to call a C++ template function</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '482', 482)" onmouseover="showTip(event, '482', 482)">
+            execItemsForCopyFromDynamicSubtensor (...)
+          </code>
+          <div class="tip" id="482">
+            <strong>Signature:</strong> trgt:ArrayNDManikinT -&gt; src:ArrayNDManikinT -&gt; rngs:UExprRngsSpecT -&gt; rngManikins:ArrayNDManikinT list -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L311-311" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '483', 483)" onmouseover="showTip(event, '483', 483)">
+            execItemsForCopyToDynamicSubtensor (...)
+          </code>
+          <div class="tip" id="483">
+            <strong>Signature:</strong> trgt:ArrayNDManikinT -&gt; rngs:UExprRngsSpecT -&gt; rngManikins:ArrayNDManikinT list -&gt; src:ArrayNDManikinT -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L327-327" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '484', 484)" onmouseover="showTip(event, '484', 484)">
+            execItemsForElemwise trgt cOp srcViews
+          </code>
+          <div class="tip" id="484">
+            <strong>Signature:</strong> trgt:ArrayNDManikinT -&gt; cOp:&#39;?164060 -&gt; srcViews:&#39;?164061 list -&gt; CudaExecItemT list<br />
+                          <strong>Type parameters:</strong> '?164060, '?164061          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L278-278" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>execution items for an element-wise operation</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '485', 485)" onmouseover="showTip(event, '485', 485)">
+            execItemsForKernel (...)
+          </code>
+          <div class="tip" id="485">
+            <strong>Signature:</strong> cppFuncName:string -&gt; tmplTmpls:ICudaArgTmpl list -&gt; argTmpls:ICudaArgTmpl list -&gt; (int * int * int) -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L236-236" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>execution item to lunch the given kernel template function</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '486', 486)" onmouseover="showTip(event, '486', 486)">
+            execItemsForOp (...)
+          </code>
+          <div class="tip" id="486">
+            <strong>Signature:</strong> compileEnv:CudaCompileEnvT -&gt; memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; trgt:ArrayNDManikinT -&gt; op:UOpT -&gt; srcs:ArrayNDManikinT list -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L412-412" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>returns the execution units for the specified op</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '487', 487)" onmouseover="showTip(event, '487', 487)">
+            execItemsForSum memAllocator trgt src
+          </code>
+          <div class="tip" id="487">
+            <strong>Signature:</strong> memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; trgt:ArrayNDManikinT -&gt; src:ArrayNDManikinT -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L388-388" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '488', 488)" onmouseover="showTip(event, '488', 488)">
+            execItemsForSumAxis (...)
+          </code>
+          <div class="tip" id="488">
+            <strong>Signature:</strong> memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; ax:int -&gt; trgt:ArrayNDManikinT -&gt; src:ArrayNDManikinT -&gt; CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L397-397" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '489', 489)" onmouseover="showTip(event, '489', 489)">
+            execItemsForTrace (...)
+          </code>
+          <div class="tip" id="489">
+            <strong>Signature:</strong> compileEnv:&#39;?164076 -&gt; memAllocator:&#39;?164077 -&gt; trgt:ArrayNDManikinT -&gt; uexpr:UExprT -&gt; CudaExecItemT list<br />
+                          <strong>Type parameters:</strong> '?164076, '?164077          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L549-549" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>returns the execution units for tracing the result</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '490', 490)" onmouseover="showTip(event, '490', 490)">
+            exprToCudaExecUnits compileEnv
+          </code>
+          <div class="tip" id="490">
+            <strong>Signature:</strong> compileEnv:CudaCompileEnvT -&gt; UExprT -&gt; ExecUnitT&lt;CudaExecItemT&gt; list * EvalResultT option * MemAllocManikinT list * CudaExecItemT list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L554-554" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>generates CUDA execution units that will evaluate the given unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '491', 491)" onmouseover="showTip(event, '491', 491)">
+            srcReqsGivenTrgt (...)
+          </code>
+          <div class="tip" id="491">
+            <strong>Signature:</strong> cudaEnv:CudaCompileEnvT -&gt; trgtShape:&#39;?164051 -&gt; reqView:ArrayNDManikinT option -&gt; op:UOpT -&gt; srcShapes:int list list -&gt; ArrayNDManikinT option list<br />
+                          <strong>Type parameters:</strong> '?164051          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L37-37" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Computes desired source views given desired target view.
+There is no guarantee that the desired source views will be used.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '492', 492)" onmouseover="showTip(event, '492', 492)">
+            trgtGivenSrc (...)
+          </code>
+          <div class="tip" id="492">
+            <strong>Signature:</strong> compileEnv:CudaCompileEnvT -&gt; memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; typ:TypeNameT -&gt; trgtShape:NShapeSpecT -&gt; req:ArrayNDManikinT option -&gt; op:UOpT -&gt; srcs:ArrayNDManikinT list -&gt; srcShared:bool list -&gt; ArrayNDManikinT * bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L123-123" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>computes the definitive target view of an op given its source views</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '493', 493)" onmouseover="showTip(event, '493', 493)">
+            warmupExecItemsForOp (...)
+          </code>
+          <div class="tip" id="493">
+            <strong>Signature:</strong> compileEnv:&#39;?164074 -&gt; memAllocator:(TypeNameT -&gt; int -&gt; MemManikinT) -&gt; trgt:ArrayNDManikinT -&gt; op:UOpT -&gt; srcs:ArrayNDManikinT list -&gt; CudaExecItemT list<br />
+                          <strong>Type parameters:</strong> '?164074          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L535-535" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>returns the execution units for the specified op</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '494', 494)" onmouseover="showTip(event, '494', 494)">
+            workDimForElemwise trgt hetero
+          </code>
+          <div class="tip" id="494">
+            <strong>Signature:</strong> trgt:IArrayNDT -&gt; hetero:bool -&gt; int * int * int<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaExecUnits.fs#L246-246" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>returns the CUDA work dimensions for an element-wise operation</p>
+
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+        </div>
+        <div class="span3">
+          <!-- <img src="http://www.deepml.net/img/logo.png" alt="Deep.Net logo" style="width:150px;margin:10px" /> -->  
+          <ul class="nav nav-list" id="menu" style="margin-top: 20px;">
+            <li class="nav-header">Deep.Net</li>
+            <li><a href="http://www.deepml.net/index.html">Home page</a></li>
+            <li class="divider"></li>
+            <li><a href="http://nuget.org/packages/DeepNet">Get Library via NuGet</a></li>
+            <li><a href="http://github.com/DeepMLNet/DeepNet">Source Code on GitHub</a></li>
+            <li><a href="http://www.deepml.net/release-notes.html">Release Notes</a></li>
+            
+            <li class="nav-header">Getting started</li>
+            <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
+            <li><a href="http://www.deepml.net/mnist.html">Model Definition</a></li>
+            <li><a href="http://www.deepml.net/blocks.html">Model Components</a></li>
+            <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Generic Training</a></li>
+
+            <li class="nav-header">Documentation</li>
+            <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <a href="http://github.com/DeepMLNet/DeepNet"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"/></a>
+  </body>
+  </html>
