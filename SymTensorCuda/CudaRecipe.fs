@@ -336,20 +336,24 @@ module CudaRecipe =
 
     /// builds a CUDA recipe for the given unified expression
     let build compileEnv expr =
-        let tmplInstCache = {Insts=[]; Code=[]}
+        if Debug.TraceCompile then printfn "Start of compilation..."
 
         // generate execution units from unified expression
+        if Debug.TraceCompile then printfn "Generating execution units..."
         let sw = Stopwatch.StartNew()
         let execUnits, exprRes, memAllocs, warmup = CudaExecUnit.exprToCudaExecUnits compileEnv expr
         let timeForExecUnits = sw.Elapsed
 
         // map execution units to streams
+        if Debug.TraceCompile then printfn "Generating streams..."
         let sw = Stopwatch.StartNew()
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
         let timeForStreams = sw.Elapsed
 
         // generate CUDA calls for execution and initialization
+        if Debug.TraceCompile then printfn "Generating calls..."
         let sw = Stopwatch.StartNew()
+        let tmplInstCache = {Insts=[]; Code=[]}
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
             generateAllocAndDispose memAllocs (List.length streams) eventObjCnt
@@ -361,6 +365,7 @@ module CudaRecipe =
         let timeForCalls = sw.Elapsed
 
         // diagnostic output
+        if Debug.TraceCompile then printfn "Compilation done."
         if Debug.Timing then
             printfn "Time for building CUDA recipe:"
             printfn "Execution units:        %A" timeForExecUnits

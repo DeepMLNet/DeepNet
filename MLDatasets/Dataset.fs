@@ -140,7 +140,8 @@ type Dataset<'S> (fieldStorages: IArrayNDT list) =
                 yield this.[start .. stop]  
                     
             // last batch 
-            yield this.[lastBatchStart ..]
+            if lastBatchStart < nSamples then
+                yield this.[lastBatchStart ..]
         }          
 
     /// template batch

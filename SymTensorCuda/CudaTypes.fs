@@ -34,6 +34,9 @@ module Debug =
     /// prints CUDA memory usage during CUDA function compilation
     let mutable MemUsage = false
 
+    /// prints each compile step during compilation
+    let mutable TraceCompile = false
+
 
 [<AutoOpen>]
 module Types =
