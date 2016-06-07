@@ -4,7 +4,7 @@ open Models
 open Datasets
 open Optimizers
 
-let mnist = Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST") 0.1
+let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
             |> TrnValTst.ToCuda
 
 let mb = ModelBuilder<single> "NeuralNetModel"
