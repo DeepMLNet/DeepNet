@@ -61,10 +61,8 @@ termination of training when
 <span class="l">3: </span>
 <span class="l">4: </span>
 <span class="l">5: </span>
-<span class="l">6: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">open</span> <span class="i">ArrayNDNS</span>
-<span class="k">open</span> <span class="i">SymTensor</span>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">open</span> <span class="i">SymTensor</span>
 <span class="k">open</span> <span class="i">SymTensor</span><span class="o">.</span><span class="i">Compiler</span><span class="o">.</span><span class="i">Cuda</span>
 <span class="k">open</span> <span class="i">Models</span>
 <span class="k">open</span> <span class="i">Datasets</span>
@@ -200,16 +198,77 @@ First, we need to define a function that creates a variable environment from a s
 <p>We are now ready to construct the trainable.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
 <span class="l">2: </span>
-<span class="l">3: </span>
 </pre></td>
 <td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs17', 54)" onmouseover="showTip(event, 'fs17', 54)" class="i">trainable</span> <span class="o">=</span>
     <span class="i">Train</span><span class="o">.</span><span class="i">trainableFromLossExpr</span> <span onmouseout="hideTip(event, 'fs11', 55)" onmouseover="showTip(event, 'fs11', 55)" class="i">mi</span> <span onmouseout="hideTip(event, 'fs12', 56)" onmouseover="showTip(event, 'fs12', 56)" class="i">loss</span> <span onmouseout="hideTip(event, 'fs15', 57)" onmouseover="showTip(event, 'fs15', 57)" class="i">smplVarEnv</span> <span onmouseout="hideTip(event, 'fs13', 58)" onmouseover="showTip(event, 'fs13', 58)" class="i">opt</span> <span onmouseout="hideTip(event, 'fs14', 59)" onmouseover="showTip(event, 'fs14', 59)" class="i">optCfg</span>
-      
 </code></pre></td>
 </tr>
 </table>
+<h2><a name="Training-configuration" class="anchor" href="#Training-configuration">Training configuration</a></h2>
 <p>Next, we need to specify the training configuration using the <code>Train.Cfg</code> record type.
 For illustration purposes we write down the whole record instance; in practice you would copy <code>Train.defaultCfg</code> and change fields as necessary.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
+<span class="l"> 2: </span>
+<span class="l"> 3: </span>
+<span class="l"> 4: </span>
+<span class="l"> 5: </span>
+<span class="l"> 6: </span>
+<span class="l"> 7: </span>
+<span class="l"> 8: </span>
+<span class="l"> 9: </span>
+<span class="l">10: </span>
+<span class="l">11: </span>
+<span class="l">12: </span>
+<span class="l">13: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs18', 60)" onmouseover="showTip(event, 'fs18', 60)" class="i">trainCfg</span> <span class="o">:</span> <span class="i">Train</span><span class="o">.</span><span class="i">Cfg</span> <span class="o">=</span> {    
+    <span class="i">Seed</span>               <span class="o">=</span> <span class="n">100</span>   
+    <span class="i">BatchSize</span>          <span class="o">=</span> <span class="n">10000</span> 
+    <span class="i">LossRecordInterval</span> <span class="o">=</span> <span class="n">10</span>                                   
+    <span class="i">Termination</span>        <span class="o">=</span> <span class="i">Train</span><span class="o">.</span><span class="i">ItersWithoutImprovement</span> <span class="n">100</span>
+    <span class="i">MinImprovement</span>     <span class="o">=</span> <span class="n">1e-7</span>  
+    <span class="i">TargetLoss</span>         <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 61)" onmouseover="showTip(event, 'fs19', 61)" class="i">None</span>  
+    <span class="i">MinIters</span>           <span class="o">=</span> <span onmouseout="hideTip(event, 'fs20', 62)" onmouseover="showTip(event, 'fs20', 62)" class="i">Some</span> <span class="n">100</span> 
+    <span class="i">MaxIters</span>           <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 63)" onmouseover="showTip(event, 'fs19', 63)" class="i">None</span>  
+    <span class="i">LearningRates</span>      <span class="o">=</span> [<span class="n">1e-3</span>; <span class="n">1e-4</span>; <span class="n">1e-5</span>]                               
+    <span class="i">CheckpointDir</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 64)" onmouseover="showTip(event, 'fs19', 64)" class="i">None</span>  
+    <span class="i">DiscardCheckpoint</span>  <span class="o">=</span> <span class="k">false</span> 
+} 
+</code></pre></td>
+</tr>
+</table>
+<p>The meaning of the fields is as follows.</p>
+<ul>
+<li><strong>Seed</strong> is the random seed for model parameter initialization.</li>
+<li><strong>BatchSize</strong> is the size of mini-batches used for training and evaluating the losses.</li>
+<li><strong>LossRecordInterval</strong> is the number of iterations to perform between evaluating the loss on the validation and test sets.</li>
+<li>
+<strong>Termination</strong> is the termination criterium and can have the following values:
+<ul>
+<li><code>Train.ItersWithImprovements cnt</code> to stop training after <code>cnt</code> iteraitons without improvement.</li>
+<li><code>Train.IterGain gain</code> to train for <span class="math">\(\mathrm{gain} \cdot \mathrm{bestIter}\)</span> iterations where <span class="math">\(\mathrm{bestIter}\)</span> is the best iteration. Usually one would use <span class="math">\(\mathrm{gain} \approx 2.0\)</span>.</li>
+<li><code>Train.Forever</code> disables the termination criterium.</li>
+</ul>
+</li>
+<li><strong>MinImprovement</strong> is the minimum loss change to count as improvement and should be a small number.</li>
+<li><strong>TargetLoss</strong> can be used to specify a target validation loss that stops training when achieved. Use <code>Some loss</code> or <code>None</code>.</li>
+<li><strong>MinIters</strong> can be the minimum number of training iterations to perform in the form <code>Some iters</code>, or <code>None</code>.</li>
+<li><strong>MaxIters</strong> can be a hard limit on the training iterations in the form <code>Some iters</code>, or <code>None</code>.</li>
+<li><strong>LearningRates</strong> is a list of learning rates to use. Training starts with the first element and moves to the next one, when the termination criterium (specified by the field Termination) is triggered.</li>
+<li><strong>CheckpointDir</strong> may specify a directory in the form <code>Some dir</code>. (see checkpoint section for details)</li>
+<li><strong>DiscardCheckpoint</strong> prohibits loading of a checkpoint if it is <code>true</code>.</li>
+</ul>
+<h2><a name="Performing-the-training" class="anchor" href="#Performing-the-training">Performing the training</a></h2>
+<p>Now training can be performed by calling the <code>Train.train</code> function.
+It takes three arguments: a trainable, the dataset to use and the training configuration.
+The dataset was already loaded above.</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs21', 65)" onmouseover="showTip(event, 'fs21', 65)" class="i">result</span> <span class="o">=</span> <span class="i">Train</span><span class="o">.</span><span class="i">train</span> <span onmouseout="hideTip(event, 'fs17', 66)" onmouseover="showTip(event, 'fs17', 66)" class="i">trainable</span> <span onmouseout="hideTip(event, 'fs1', 67)" onmouseover="showTip(event, 'fs1', 67)" class="i">mnist</span> <span onmouseout="hideTip(event, 'fs18', 68)" onmouseover="showTip(event, 'fs18', 68)" class="i">trainCfg</span>
+</code></pre></td>
+</tr>
+</table>
+<p>This will produce output similar to</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l"> 1: </span>
 <span class="l"> 2: </span>
 <span class="l"> 3: </span>
@@ -233,44 +292,111 @@ For illustration purposes we write down the whole record instance; in practice y
 <span class="l">21: </span>
 <span class="l">22: </span>
 <span class="l">23: </span>
+<span class="l">24: </span>
+<span class="l">25: </span>
+<span class="l">26: </span>
+<span class="l">27: </span>
+<span class="l">28: </span>
+<span class="l">29: </span>
+<span class="l">30: </span>
+<span class="l">31: </span>
+<span class="l">32: </span>
+<span class="l">33: </span>
+<span class="l">34: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="k">let</span> <span onmouseout="hideTip(event, 'fs18', 60)" onmouseover="showTip(event, 'fs18', 60)" class="i">trainCfg</span> <span class="o">:</span> <span class="i">Train</span><span class="o">.</span><span class="i">Cfg</span> <span class="o">=</span> {    
-    <span class="i">Seed</span>               <span class="o">=</span> <span class="n">100</span>   <span class="c">// Seed for initialization.</span>
-    <span class="i">BatchSize</span>          <span class="o">=</span> <span class="n">10000</span> <span class="c">// Mini-batch size.    </span>
-    <span class="i">LossRecordInterval</span> <span class="o">=</span> <span class="n">10</span>    <span class="c">// Number of iterations between </span>
-                               <span class="c">// evaluation of the loss.</span>
-    <span class="i">Termination</span>        <span class="o">=</span> <span class="i">Train</span><span class="o">.</span><span class="i">ItersWithoutImprovement</span> <span class="n">100</span>
-                               <span class="c">// Terminate after 100 iterations </span>
-                               <span class="c">// without improvement on the </span>
-                               <span class="c">// validation set.</span>
-    <span class="i">MinImprovement</span>     <span class="o">=</span> <span class="n">1e-7</span>  <span class="c">// Minimum loss change to count</span>
-                               <span class="c">// as improvement.</span>
-    <span class="i">TargetLoss</span>         <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 61)" onmouseover="showTip(event, 'fs19', 61)" class="i">None</span>  <span class="c">// No target loss; thus continue</span>
-                               <span class="c">// until no improvement</span>
-    <span class="i">MinIters</span>           <span class="o">=</span> <span onmouseout="hideTip(event, 'fs20', 62)" onmouseover="showTip(event, 'fs20', 62)" class="i">Some</span> <span class="n">100</span> <span class="c">// Train for at least 100 </span>
-                               <span class="c">// iterations.</span>
-    <span class="i">MaxIters</span>           <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 63)" onmouseover="showTip(event, 'fs19', 63)" class="i">None</span>  <span class="c">// No hard limit on number of iterations.</span>
-    <span class="i">LearningRates</span>      <span class="o">=</span> [<span class="n">1e-3</span>; <span class="n">1e-4</span>; <span class="n">1e-5</span>]
-                               <span class="c">// Start with learning rate 1e-3, then</span>
-                               <span class="c">// change to 1e-4 when no improvement,</span>
-                               <span class="c">// then to 1e-5.</span>
-    <span class="i">CheckpointDir</span>      <span class="o">=</span> <span onmouseout="hideTip(event, 'fs19', 64)" onmouseover="showTip(event, 'fs19', 64)" class="i">None</span>  <span class="c">// No checkpoints.</span>
-    <span class="i">DiscardCheckpoint</span>  <span class="o">=</span> <span class="k">false</span> <span class="c">// No checkpoints.</span>
-} 
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="i">Initializing</span> <span class="i">model</span> <span class="i">parameters</span> <span class="k">for</span> <span class="i">training</span>
+<span class="i">Training</span> <span class="k">with</span> <span class="i">Dataset</span> (<span class="n">54000</span> <span class="i">training</span>, <span class="n">6000</span> <span class="i">validation</span>, <span class="n">10000</span> <span class="i">test</span> <span class="i">Datasets</span><span class="o">.</span><span class="i">MnistTs</span>)
+<span class="i">Using</span> <span class="i">learning</span> <span class="i">rate</span> <span class="n">0.001</span>
+    <span class="n">10</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.5739</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.4652</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.5173</span>
+    <span class="n">20</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.3686</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.3210</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.3583</span>
+   <span class="o">..</span><span class="o">.</span>
+   <span class="n">380</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0155</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1083</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1114</span>
+   <span class="n">390</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0146</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1113</span>
+   <span class="n">400</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0137</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="n">410</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0129</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="n">420</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0121</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1083</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1113</span>
+   <span class="n">430</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0114</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1083</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1113</span>
+   <span class="n">440</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0108</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1084</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1114</span>
+   <span class="n">450</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0102</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1085</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1115</span>
+   <span class="n">460</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0096</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1086</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1116</span>
+   <span class="n">470</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0091</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1087</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1118</span>
+   <span class="n">480</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0086</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1089</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1120</span>
+   <span class="n">490</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0081</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1090</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1121</span>
+   <span class="n">500</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0077</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1092</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1123</span>
+   <span class="n">510</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0073</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1093</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1125</span>
+<span class="i">Trained</span> <span class="k">for</span> <span class="n">110</span> <span class="i">iterations</span> <span class="i">without</span> <span class="i">improvement</span>
+<span class="i">Using</span> <span class="i">learning</span> <span class="i">rate</span> <span class="n">0.0001</span>
+   <span class="n">410</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0135</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="n">420</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0134</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="o">..</span><span class="o">.</span>
+   <span class="n">510</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0123</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1083</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1113</span>
+<span class="i">Trained</span> <span class="k">for</span> <span class="n">110</span> <span class="i">iterations</span> <span class="i">without</span> <span class="i">improvement</span>
+<span class="i">Using</span> <span class="i">learning</span> <span class="i">rate</span> <span class="n">1e-05</span>
+   <span class="n">410</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0136</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="n">420</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0136</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+   <span class="o">..</span><span class="o">.</span>
+   <span class="n">510</span><span class="o">:</span>  <span class="i">trn</span><span class="o">=</span> <span class="n">0.0134</span>  <span class="k">val</span><span class="o">=</span> <span class="n">0.1082</span>  <span class="i">tst</span><span class="o">=</span> <span class="n">0.1112</span>
+<span class="i">Trained</span> <span class="k">for</span> <span class="n">110</span> <span class="i">iterations</span> <span class="i">without</span> <span class="i">improvement</span>
+<span class="i">Training</span> <span class="i">completed</span> <span class="i">after</span> <span class="n">400</span> <span class="i">iterations</span> <span class="k">in</span> <span class="n">00</span><span class="o">:</span><span class="n">30</span><span class="o">:</span><span class="n">07.6179551</span> <span class="i">because</span> <span class="i">NoImprovement</span>
 </code></pre></td>
 </tr>
 </table>
-<p>Now training can be performed by calling the <code>Train.train</code> function.
-It takes three arguments: a trainable, the dataset to use and the training configuration.
-The dataset was already loaded above.</p>
+<p>While training is executed you can press the <code>q</code> key to stop training immediately and the <code>d</code> key to switch to the next learning rate specified in the configuration.</p>
+<p>During training the parameters that produce the best validation loss are saved each time the losses are evaluated (as set by the <code>LossRecordInterval</code> field in the training configuration).
+When the validation loss does not improve for the set number of iterations (field <code>Termination</code> in the training configuration), the best parameters are restored and the next learning rate (field <code>LearningRates</code>) from the configuration is used.
+This explains why the iteration count resets by 100 steps, each time the loss stops improving.</p>
+<p>The best validation lost is achieved around iteration 400, then the model starts to overfit.
+Decreasing the learning rate does not help in this case, thus training is terminated after exhausting the list of learning rates.</p>
+<h2><a name="Training-result-and-log" class="anchor" href="#Training-result-and-log">Training result and log</a></h2>
+<p>The return value of <code>Train.train</code> is a record of type <code>TrainingResult</code> that contains the training results and the training log.</p>
 <table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
 </pre></td>
-<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="i">Train</span><span class="o">.</span><span class="i">train</span> <span onmouseout="hideTip(event, 'fs17', 65)" onmouseover="showTip(event, 'fs17', 65)" class="i">trainable</span> <span onmouseout="hideTip(event, 'fs1', 66)" onmouseover="showTip(event, 'fs1', 66)" class="i">mnist</span> <span onmouseout="hideTip(event, 'fs18', 67)" onmouseover="showTip(event, 'fs18', 67)" class="i">trainCfg</span>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span onmouseout="hideTip(event, 'fs22', 69)" onmouseover="showTip(event, 'fs22', 69)" class="f">printfn</span> <span class="s">&quot;Termination reason is </span><span class="pf">%A</span><span class="s"> after </span><span class="pf">%A</span><span class="s">&quot;</span> <span onmouseout="hideTip(event, 'fs21', 70)" onmouseover="showTip(event, 'fs21', 70)" class="i">result</span><span class="o">.</span><span class="i">TerminationReason</span> <span onmouseout="hideTip(event, 'fs21', 71)" onmouseover="showTip(event, 'fs21', 71)" class="i">result</span><span class="o">.</span><span class="i">Duration</span>
+<span onmouseout="hideTip(event, 'fs22', 72)" onmouseover="showTip(event, 'fs22', 72)" class="f">printfn</span> <span class="s">&quot;The best iteration is </span><span class="e">\n</span><span class="s"></span><span class="pf">%A</span><span class="s">&quot;</span> <span onmouseout="hideTip(event, 'fs21', 73)" onmouseover="showTip(event, 'fs21', 73)" class="i">result</span><span class="o">.</span><span class="i">Best</span>
+<span onmouseout="hideTip(event, 'fs22', 74)" onmouseover="showTip(event, 'fs22', 74)" class="f">printfn</span> <span class="s">&quot;The training log consists of </span><span class="pf">%d</span><span class="s"> entries.&quot;</span> (<span onmouseout="hideTip(event, 'fs23', 75)" onmouseover="showTip(event, 'fs23', 75)" class="t">List</span><span class="o">.</span><span onmouseout="hideTip(event, 'fs24', 76)" onmouseover="showTip(event, 'fs24', 76)" class="f">length</span> <span onmouseout="hideTip(event, 'fs21', 77)" onmouseover="showTip(event, 'fs21', 77)" class="i">result</span><span class="o">.</span><span class="i">History</span>)
 </code></pre></td>
 </tr>
 </table>
-<p>This will produce output similar to</p>
+<p>This prints</p>
+<table class="pre"><tr><td class="lines"><pre class="fssnip"><span class="l">1: </span>
+<span class="l">2: </span>
+<span class="l">3: </span>
+<span class="l">4: </span>
+<span class="l">5: </span>
+<span class="l">6: </span>
+<span class="l">7: </span>
+<span class="l">8: </span>
+</pre></td>
+<td class="snippet"><pre class="fssnip highlighted"><code lang="fsharp"><span class="i">Termination</span> <span class="i">reason</span> <span class="i">is</span> <span class="i">NoImprovement</span> <span class="i">after</span> <span class="n">00</span><span class="o">:</span><span class="n">29</span><span class="o">:</span><span class="n">28.1679299</span>
+<span class="i">The</span> <span class="i">best</span> <span class="i">iteration</span> <span class="i">is</span> 
+{<span class="i">Iter</span> <span class="o">=</span> <span class="n">400</span>;
+ <span class="i">TrnLoss</span> <span class="o">=</span> <span class="n">0.01370835087</span>;
+ <span class="i">ValLoss</span> <span class="o">=</span> <span class="n">0.1082176194</span>;
+ <span class="i">TstLoss</span> <span class="o">=</span> <span class="n">0.1112449616</span>;
+ <span class="i">LearningRate</span> <span class="o">=</span> <span class="n">0.001</span>;}
+<span class="i">The</span> <span class="i">training</span> <span onmouseout="hideTip(event, 'fs25', 78)" onmouseover="showTip(event, 'fs25', 78)" class="i">log</span> <span class="i">consists</span> <span class="k">of</span> <span class="n">51</span> <span class="i">entries</span><span class="o">.</span>
+</code></pre></td>
+</tr>
+</table>
+<p>It is possible to save the training result as a JSON file by calling <code>result.Save</code>.
+This is useful when you use software or scripts to gather and analyze the results of multiple experiments.</p>
+<h2><a name="Checkpointing" class="anchor" href="#Checkpointing">Checkpointing</a></h2>
+<p>Checkpoint allows to training process to be interrupted and resumed later.
+To enable checkpoint support, set the <code>CheckpointDir</code> of the configuration record to some suitable directory.
+This directory has to be unique for each process.</p>
+<p>When checkpoint support is enabled, the training functions traps <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms682541(v=vs.85).aspx">the CTRL+C and CTRL+BREAK signals</a>.
+When such a signal is received, the training state (including the model parameters) is stored in the specified directory and the process is terminated with exit code 10.
+In this case, the training function does not return to the user code.</p>
+<p>When the program is executed again and the training function is called, it checks for a valid checkpoint.
+If one is found, it is loaded and training resumes where it was interrupted.</p>
+<p>To discard an existing checkpoint (for example if training or models parameters were changed), set <code>DiscardCheckpoint</code> to true.
+This will delete any existing checkpoints from disk and restart training from the beginning.</p>
 <h1><a name="Summary" class="anchor" href="#Summary">Summary</a></h1>
+<p>With the generic training function you can train any model that has a loss expression.
+The main effort is to write a small wrapper function that maps a training sample to a variable environment.
+Various termination criteria, common in machine learning, are implemented.</p>
 
 <div class="tip" id="fs1">val mnist : obj<br /><br />Full name: Training.mnist</div>
 <div class="tip" id="fs2">val mb : obj<br /><br />Full name: Training.mb</div>
@@ -292,6 +418,11 @@ The dataset was already loaded above.</p>
 <div class="tip" id="fs18">val trainCfg : obj<br /><br />Full name: Training.trainCfg</div>
 <div class="tip" id="fs19">union case Option.None: Option&lt;&#39;T&gt;</div>
 <div class="tip" id="fs20">union case Option.Some: Value: &#39;T -&gt; Option&lt;&#39;T&gt;</div>
+<div class="tip" id="fs21">val result : obj<br /><br />Full name: Training.result</div>
+<div class="tip" id="fs22">val printfn : format:Printf.TextWriterFormat&lt;&#39;T&gt; -&gt; &#39;T<br /><br />Full name: Microsoft.FSharp.Core.ExtraTopLevelOperators.printfn</div>
+<div class="tip" id="fs23">Multiple items<br />module List<br /><br />from Microsoft.FSharp.Collections<br /><br />--------------------<br />type List&lt;&#39;T&gt; =<br />&#160;&#160;| ( [] )<br />&#160;&#160;| ( :: ) of Head: &#39;T * Tail: &#39;T list<br />&#160;&#160;interface IEnumerable<br />&#160;&#160;interface IEnumerable&lt;&#39;T&gt;<br />&#160;&#160;member GetSlice : startIndex:int option * endIndex:int option -&gt; &#39;T list<br />&#160;&#160;member Head : &#39;T<br />&#160;&#160;member IsEmpty : bool<br />&#160;&#160;member Item : index:int -&gt; &#39;T with get<br />&#160;&#160;member Length : int<br />&#160;&#160;member Tail : &#39;T list<br />&#160;&#160;static member Cons : head:&#39;T * tail:&#39;T list -&gt; &#39;T list<br />&#160;&#160;static member Empty : &#39;T list<br /><br />Full name: Microsoft.FSharp.Collections.List&lt;_&gt;</div>
+<div class="tip" id="fs24">val length : list:&#39;T list -&gt; int<br /><br />Full name: Microsoft.FSharp.Collections.List.length</div>
+<div class="tip" id="fs25">val log : value:&#39;T -&gt; &#39;T (requires member Log)<br /><br />Full name: Microsoft.FSharp.Core.Operators.log</div>
 
         </div>
         <div class="span3">
