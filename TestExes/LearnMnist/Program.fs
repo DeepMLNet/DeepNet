@@ -4,6 +4,12 @@ open Models
 open Datasets
 open Optimizers
 
+open Microsoft.VisualStudio.Profiler
+
+//DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
+DataCollection.StopProfile (ProfileLevel.Process, DataCollection.CurrentId) |> ignore
+//DataCollection.StopProfile (ProfileLevel.Thread, DataCollection.CurrentId) |> ignore
+
 let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
             |> TrnValTst.ToCuda
 
@@ -63,8 +69,13 @@ let trainCfg : Train.Cfg = {
 
 
 
-Debug.Timing <- true
-Debug.TraceCompile <- true
+//Debug.Timing <- true
+//Debug.TraceCompile <- true
+
+//DataCollection.StartProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
+//DataCollection.StartProfile (ProfileLevel.Process, DataCollection.CurrentId) |> ignore
+//DataCollection.StartProfile (ProfileLevel.Thread, DataCollection.CurrentId) |> ignore
+
 
 let result = Train.train trainable mnist trainCfg
 

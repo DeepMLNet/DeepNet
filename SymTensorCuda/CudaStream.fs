@@ -135,7 +135,7 @@ module CudaStreamSeq =
             let rec tryFindReuseable (candEmitter: ExecUnitT<'e>) =               
                 match eventOfUnit |> Map.tryFind candEmitter.Id with
                 | Some candEvt when
-                    // An event "candEvt" emitted by "candEmitter" is reuseable by "eu", if ...
+                    // An event "candEvt" emitted by "candEmitter" is reusable by "eu", if ...
                     // 1. eu depends on all dependants of the event emitter and 
                     coll.DependantsOf candEmitter
                     |> Seq.forall (fun depOfEmitter -> coll.IsSuccessorOf eu depOfEmitter)
@@ -162,12 +162,12 @@ module CudaStreamSeq =
             // find an execution unit that has all dependencies satisfied
             let eu = execUnitsToProcess |> List.find dependsSatisfied
 
-            /// all streams that are reuseable below the units we depend on            
+            /// all streams that are reusable below the units we depend on            
             let availStreams =
                 coll.DependsOn eu 
                 |> Seq.collect (availableStreamsBelowExecUnit (Map.empty |> Map.add eu.Id Seq.empty))
                 |> Seq.cache
-            /// all streams of the units we directly depend on, that are reuseable below the units we depend on            
+            /// all streams of the units we directly depend on, that are reusable below the units we depend on            
             let streamTakeOverCands = 
                 eu.DependsOn 
                 |> Seq.map (fun pId -> streamOfUnit.[pId]) 
@@ -195,7 +195,7 @@ module CudaStreamSeq =
                     // wait on already emitted event, if possible
                     WaitOnEvent evt |> emitToStream euStream
                 | None ->
-                    // assign an event (either new or reuseable) to the last ExecUnit of the ending stream
+                    // assign an event (either new or reusable) to the last ExecUnit of the ending stream
                     let evtObjId = findAvailableEventObjectIdFor (coll.ById endingUnitId)
                     let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); EmittingExecUnitId=endingUnitId}
                     eventOfUnit <- eventOfUnit |> Map.add endingUnitId evt
@@ -220,6 +220,10 @@ module CudaStreamSeq =
                 WaitOnRerunEvent evtPh |> emitToStream euStream
                 // add ourselves to the list of event waiters of the ExecUnitTs we are allowed to rerun after
                 for rraId in eu.RerunAfter do
+                    if processedExecUnitIds.Contains rraId then
+                        failwithf "cannot add ExecUnit %d to rerun event waiters of ExecUnit %d because \
+                                   the second has been processed already" eu.Id rraId
+
                     match rerunEventWaiters |> Map.tryFind rraId with
                     | Some waiters -> waiters.Add evtPh
                     | None ->

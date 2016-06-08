@@ -1,6 +1,7 @@
 ﻿namespace SymTensor.Compiler
 
 open System
+open System.Diagnostics
 open System.Collections.Generic
 
 open Basics
@@ -57,6 +58,8 @@ module ExecUnit =
     /// a collection of ExecUnits
     type Collection<'e> (eus: ExecUnitT<'e> seq) =
         
+        let eus = eus |> List.ofSeq
+
         let byIdMap =
             eus
             |> Seq.map (fun eu -> eu.Id, eu)
@@ -98,6 +101,9 @@ module ExecUnit =
                 | _ -> ()
             build         
             
+
+        /// list of all execution unit contained in this collection
+        member this.ExecUnits = eus
 
         /// execution unit by id
         member this.ById id = byIdMap.[id]
@@ -148,10 +154,281 @@ module ExecUnit =
             else Seq.empty
 
 
+        /// Walks all ExecUnits contained in this collection calling processFn for each.
+        /// The order is so that each execution unit is visited after all the nodes it 
+        /// depends on have been visited.
+        member this.WalkByDeps (processFn: (ExecUnitT<'e> -> HashSet<ExecUnitIdT> -> unit))  =          
+         
+            // create list of all ExecUnits that have no predecessors
+            let nodesWithoutPredecessors = 
+                this.ExecUnits
+                |> List.filter (fun eu -> this.DependsOn eu |> Seq.isEmpty)
+                |> List.map (fun eu -> eu.Id)
+
+            // initialize queues of ExecUnits to process with list of nodes that have no predecessors
+            let toProcess = Queue nodesWithoutPredecessors
+
+            // set of nodes that were already processed
+            let processed = HashSet<ExecUnitIdT> ()
+
+            while toProcess.Count > 0 do
+                let eu = toProcess.Dequeue () |> this.ById
+
+                // To process an ExecUnit we must already have processed all ExecUnits it depends on.
+                // If this is not the case, it can be dequeued safely, because it will be added at a later 
+                // time by one of the ExecUnits it depends on and that is yet to be processed.
+                let canProcess =
+                    this.DependsOn eu
+                    |> Seq.forall (fun dep -> processed.Contains dep.Id)
+
+                if canProcess && not (processed.Contains eu.Id) then
+                    // process ExecUnit
+                    processFn eu processed
+
+                    // mark as processed
+                    processed.Add eu.Id |> ignore
+
+                    // add all our direct dependants to the to-process queue
+                    for child in this.DependantsOf eu do
+                        toProcess.Enqueue child.Id
+
+            assert (processed.Count = this.ExecUnits.Length)
+
+
+    /// Builds a map that for every storage contains a set of the ids of the ExecUnits
+    /// that will access it last during execution.
+    let buildLastStorageAccess (coll: Collection<'e>) : Map<MemManikinT, Set<ExecUnitIdT>> =
+                
+        // map of last storage access taking into account the key ExecUnit and its predecessors
+        let lastStorageAccessInOrAbove = 
+            Dictionary<ExecUnitIdT, Dictionary<MemManikinT, HashSet<ExecUnitIdT>>> ()
+
+        // Visit each ExecUnit eu so that, all ExecUnits that eu depends on are visited before
+        // eu is visited.
+        coll.WalkByDeps (fun eu processed -> 
+
+            // all storages that eu is accessing directly
+            let euStorages = 
+                eu.Manikins
+                |> List.map (fun m -> m.Storage)
+                |> Set.ofList
+
+            // build last storage access taking into account eu and its predecessors
+            let lsa = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
+
+            // for all storages that eu is accessing, it is the sole last storage accessor
+            for storage in euStorages do
+                lsa.[storage] <- HashSet<_> (Seq.singleton eu.Id)
+
+            // the last accessors of the *other* storages are the joint last storage accessors of
+            // eu's parents
+            for parent in coll.DependsOn eu do
+                for KeyValue (storage, lastAccessors) in lastStorageAccessInOrAbove.[parent.Id] do
+                    if not (euStorages.Contains storage) then
+                        if not (lsa.ContainsKey storage) then
+                            lsa.[storage] <- HashSet<ExecUnitIdT> ()
+                        lsa.[storage].UnionWith lastAccessors
+                        
+            // store 
+            lastStorageAccessInOrAbove.[eu.Id] <- lsa
+
+            // For all of the nodes we depend on, check if all nodes that depend on them have
+            // been processed. If yes, then remove information about the parents because it
+            // is no longer needed.
+            for parent in coll.DependsOn eu do
+                let allChildrenProcessed = 
+                    coll.DependantsOf parent 
+                    |> Seq.forall (fun child -> processed.Contains child.Id || eu.Id = child.Id)
+                if allChildrenProcessed then 
+                    lastStorageAccessInOrAbove.Remove parent.Id |> ignore
+        )
+
+        // In the end, lastStorageAccessInOrAbove must contain one element and this
+        // element must be the (bottom-most) ExecUnit without any dependants.
+        let lastEu = lastStorageAccessInOrAbove.Keys |> Seq.exactlyOne |> coll.ById
+        assert (coll.DependantsOf lastEu |> Seq.isEmpty)
+        let lastStorageAccess = lastStorageAccessInOrAbove.[lastEu.Id]
+
+        // convert result into F# immutable Map and List
+        seq { 
+            for KeyValue (storage, lastAccessors) in lastStorageAccess do
+                yield storage, Set.ofSeq lastAccessors            
+        } |> Map.ofSeq
+
+
+    /// Builds the rerun-after dependencies for the ExecUnits.
+    let buildRerunAfter execUnits = 
+        // build ExecUnit collection
+        let coll = Collection execUnits
+            
+        // For every storage lastStorageAccess contains a set of the ids of the ExecUnits
+        // that will access it last during execution.
+        let lastStorageAccess = buildLastStorageAccess coll
+       
+        // For each ExecUnit this contains a set of units we have to wait upon before 
+        // being allowed to rerun.
+        let rerunAfter = Dictionary<ExecUnitIdT, HashSet<ExecUnitIdT>> ()
+
+        // For each ExecUnit this contains a set of units we are running after.
+        let combinedRerunningAfter = Dictionary<ExecUnitIdT, HashSet<ExecUnitIdT>> ()
+
+        // Visit each ExecUnit eu so that, all ExecUnits that eu depends on are visited before
+        // eu is visited.
+        coll.WalkByDeps (fun eu processed -> 
+            
+            // In the current situation, eu reruns after the ExecUnits it depends on
+            // and all ExecUnits its parents are rerunning after.
+            let euCombinedRerunningAfter = HashSet<ExecUnitIdT> ()
+            for parent in coll.DependsOn eu do
+                euCombinedRerunningAfter.Add parent.Id |> ignore
+                euCombinedRerunningAfter.UnionWith combinedRerunningAfter.[parent.Id] |> ignore
+
+            // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
+            let euMustRerunAfter = seq {
+                // For each of our storages:
+                for m in eu.Manikins do
+                    // We may only run again after each last node in every tree branch that 
+                    // accesses the storage has been executed.
+                    yield! lastStorageAccess.[m.Storage]
+
+                // If this execution unit is a variable read:
+                match eu.Expr with
+                | UExpr(ULeafOp (Var readVs), _, _, _) ->
+                    // Find all StoreToVars to the same variable operations.
+                    // We may only run again, after the previous variable write has been completed.
+                    let stvs = coll.StoresToVar readVs                               
+                    yield! stvs |> Seq.map (fun stv -> stv.Id)
+                | _ -> ()
+            }
+
+            // Find all rerun-after ExecUnits that are missing so far.
+            let euRerunAfter = HashSet<ExecUnitIdT> ()
+            for mraEuId in euMustRerunAfter do
+                if not (euCombinedRerunningAfter.Contains mraEuId) then
+                    // mraEu is missing, we need to add it to eu's rerun-after list.
+                    euRerunAfter.Add mraEuId |> ignore
+
+                    // By rerunning after mraEu, we are also rerunning after all successors of it.
+                    // Thus we add them to euCombinedRerunningAfter.
+                    let rec addExecUnitAndSuccessors (eu: ExecUnitT<_>) =
+                        euCombinedRerunningAfter.Add eu.Id |> ignore
+
+                        for dep in coll.DependantsOf eu do
+                            // Recurse over dependants, but skip those that are in 
+                            // euCombinedRerunningAfter, because then their successors must be 
+                            // present already in euCombinedRerunningAfter.
+                            if not (euCombinedRerunningAfter.Contains dep.Id) then
+                                addExecUnitAndSuccessors dep
+
+                    addExecUnitAndSuccessors (coll.ById mraEuId)
+
+            // store
+            rerunAfter.[eu.Id] <- euRerunAfter
+            combinedRerunningAfter.[eu.Id] <- euCombinedRerunningAfter
+
+            // For all of the nodes we depend on, check if all nodes that depend on them have
+            // been processed. If yes, then remove information about the parents because it
+            // is no longer needed.
+            for parent in coll.DependsOn eu do
+                let allChildrenProcessed = 
+                    coll.DependantsOf parent 
+                    |> Seq.forall (fun child -> processed.Contains child.Id || eu.Id = child.Id)
+                if allChildrenProcessed then 
+                    combinedRerunningAfter.Remove parent.Id |> ignore
+        )
+
+        // update ExecUnits
+        coll.SortedByDep
+        |> List.map (fun eu -> {eu with RerunAfter=rerunAfter.[eu.Id] |> Seq.toList})
+             
+
+#if FALSE
+    /// Builds the rerun-after dependencies for the ExecUnits.
+    let buildRerunAfterOld execUnits (exprRes: EvalResultT option) = 
+        let coll = Collection execUnits
+        let execUnits = coll.SortedByDep
+        let lastEu = 
+            execUnits 
+            |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)           
+        let emptyRerunAfter =
+            seq {for eu in execUnits -> eu.Id, []} |> Map.ofSeq
+        let rerunAfterBuild =            
+            (emptyRerunAfter, execUnits)
+            ||> List.fold (fun (rerunAfterSoFar: Map<ExecUnitIdT, ExecUnitIdT list>) eu ->
+
+                // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
+                let rerunAfter = seq {
+                    // For each storage:
+                    for m in eu.Manikins do
+                        // Starting from the result, find the last node in each tree branch that accesses the storage.
+                        // We may only run again, after these ExecUnits have finished.
+                        yield! coll.LastStorageAccess m.Storage lastEu 
+
+                    // If this execution unit is a variable read:
+                    match eu.Expr with
+                    | UExpr(ULeafOp (Var readVs), _, _, _) ->
+                        // Find all StoreToVars to the same variable operations.
+                        // We may only run again, after the previous variable write has been completed.
+                        yield! coll.StoresToVar readVs
+                    | _ -> ()
+                }
+
+                let allPredecessorsOfEu = coll.AllPredecessorsOf eu |> Seq.cache
+
+                /// Rerun after ExecUnits of this eu and all its predecessors
+                let rerunAfterInclPredecessors =
+                    allPredecessorsOfEu
+                    |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
+                    |> Seq.concat
+                    |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
+                    |> Set.ofSeq
+
+                /// true if eu reruns after b. (either by having b in its RerunAfter list or by 
+                /// having a predecessor that has b in its RerunAfter list)
+                let rerunsAfter (b: ExecUnitT<'e>) = 
+                    if rerunAfterSoFar.[eu.Id] |> List.contains b.Id then true
+                    else
+                        allPredecessorsOfEu
+                        |> Seq.exists (fun peu -> rerunAfterSoFar.[peu.Id] |> List.contains b.Id)
+
+                // Filter redundant RerunAfter dependencies.
+                let rerunAfterFiltered =
+                    rerunAfter
+                    |> Seq.filter (fun ra ->
+                        // We can omit a node from our RerunAfter list, if
+                        // - we depend on the node, because then we are run afterwards anyway,
+                        let euDependsOnRa = allPredecessorsOfEu |> Seq.contains ra
+                        // - any of our predecessors has the node already in their RerunAfter list.
+                        let euDependsOnNodeRerunningAfterRa = rerunsAfter ra 
+                        // - we, or any of our predecessors, have a successor of the node already in our RerunAfter list.
+                        let successorsOfRaIds =
+                            coll.AllSuccessorsOf ra 
+                            |> Seq.map (fun eu -> eu.Id)
+                            |> Set.ofSeq
+                        let euRerunsAfterSuccessorOfRa =
+                            Set.intersect rerunAfterInclPredecessors successorsOfRaIds
+                            |> Set.isEmpty
+                            |> not
+                        // combine
+                        not (euDependsOnRa || euDependsOnNodeRerunningAfterRa || euRerunsAfterSuccessorOfRa)
+                    )
+                                        
+                rerunAfterSoFar |> Map.add eu.Id (rerunAfterFiltered |> Seq.map (fun eu -> eu.Id) |> Seq.toList)
+            )
+
+        execUnits
+        |> List.map (fun eu -> {eu with RerunAfter=rerunAfterBuild.[eu.Id]})
+#endif
+
+
     /// generates execution units that will evaluate the given unified expression
     let exprToExecUnits gen (expr: UExprT) =
+
         // number of occurrences of subexpressions
+        let sw = Stopwatch.StartNew()
         let exprOccurrences = UExpr.subExprOccurrences expr
+        if SymTensor.Compiler.Cuda.Debug.Timing then
+            printfn "Building SubExprOccurrences took %A" sw.Elapsed
 
         // calculates the numeric shape
         let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval 
@@ -291,6 +568,7 @@ module ExecUnit =
             processEvalRequest ()
 
         // post-process execUnits
+        if Compiler.Cuda.Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
         let execUnits =
             execUnits
             |> List.map (fun eu ->
@@ -319,83 +597,16 @@ module ExecUnit =
                 | _ -> eu
             )
 
+        //Microsoft.VisualStudio.Profiler.DataCollection.StartProfile (Microsoft.VisualStudio.Profiler.ProfileLevel.Process, Microsoft.VisualStudio.Profiler.DataCollection.CurrentId) |> ignore
+
         #if !DISABLE_RERUN_AFTER
-
         // Build RerunAfter dependencies.
-        let coll = Collection execUnits
-        let execUnits = coll.SortedByDep
-        let lastEu = 
-            execUnits 
-            |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)           
-        let emptyRerunAfter =
-            seq {for eu in execUnits -> eu.Id, []} |> Map.ofSeq
-        let rerunAfterBuild =            
-            (emptyRerunAfter, execUnits)
-            ||> List.fold (fun (rerunAfterSoFar: Map<ExecUnitIdT, ExecUnitIdT list>) eu ->
-
-                let allPredecessorsOfEu = coll.AllPredecessorsOf eu |> Seq.cache
-
-                /// true if eu reruns after b. (either by having b in its RerunAfter list or by 
-                /// having a predecessor that has b in its RerunAfter list)
-                let rerunsAfter (b: ExecUnitT<'e>) = 
-                    if rerunAfterSoFar.[eu.Id] |> List.contains b.Id then true
-                    else
-                        allPredecessorsOfEu
-                        |> Seq.exists (fun peu -> rerunAfterSoFar.[peu.Id] |> List.contains b.Id)
-
-                // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
-                let rerunAfter = seq {
-                    // For each storage:
-                    for m in eu.Manikins do
-                        // Starting from the result, find the last node in each tree branch that accesses the storage.
-                        // We may only run again, after these ExecUnits have finished.
-                        yield! coll.LastStorageAccess m.Storage lastEu 
-
-                    // If this execution unit is a variable read:
-                    match eu.Expr with
-                    | UExpr(ULeafOp (Var readVs), _, _, _) ->
-                        // Find all StoreToVars to the same variable operations.
-                        // We may only run again, after the previous variable write has been completed.
-                        yield! coll.StoresToVar readVs
-                    | _ -> ()
-                }
-
-                /// Rerun after ExecUnits of this eu and all its predecessors
-                let rerunAfterInclPredecessors =
-                    allPredecessorsOfEu
-                    |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
-                    |> Seq.concat
-                    |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
-                    |> Set.ofSeq
-
-                // Filter redundant RerunAfter dependencies.
-                let rerunAfterFiltered =
-                    rerunAfter
-                    |> Seq.filter (fun ra ->
-                        // We can omit a node from our RerunAfter list, if
-                        // - we depend on the node, because then we are run afterwards anyway,
-                        let euDependsOnRa = allPredecessorsOfEu |> Seq.contains ra
-                        // - any of our predecessors has the node already in their RerunAfter list.
-                        let euDependsOnNodeRerunningAfterRa = rerunsAfter ra 
-                        // - we, or any of our predecessors, have a successor of the node already in our RerunAfter list.
-                        let successorsOfRaIds =
-                            coll.AllSuccessorsOf ra 
-                            |> Seq.map (fun eu -> eu.Id)
-                            |> Set.ofSeq
-                        let euRerunsAfterSuccessorOfRa =
-                            Set.intersect rerunAfterInclPredecessors successorsOfRaIds
-                            |> Set.isEmpty
-                            |> not
-                        // combine
-                        not (euDependsOnRa || euDependsOnNodeRerunningAfterRa || euRerunsAfterSuccessorOfRa)
-                    )
-                                        
-                rerunAfterSoFar |> Map.add eu.Id (rerunAfterFiltered |> Seq.map (fun eu -> eu.Id) |> Seq.toList)
-            )
-        let execUnits =
-            execUnits
-            |> List.map (fun eu -> {eu with RerunAfter=rerunAfterBuild.[eu.Id]})
-
+        if Compiler.Cuda.Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
+        let sw = Stopwatch.StartNew()
+        //let execUnits = buildRerunAfterOld execUnits exprRes
+        let execUnits = buildRerunAfter execUnits 
+        if Compiler.Cuda.Debug.Timing then
+            printfn "Building RerunAfter dependencies took %A" sw.Elapsed
         #endif // !DISABLE_RERUN_AFTER
 
         execUnits, exprRes, memAllocs, warmupItems
