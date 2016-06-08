@@ -256,7 +256,7 @@ Dataset loaders
 
 Currently Deep.Net provides the following loaders for common datasets.
 
-  * **MNIST**. Use the `Mnist.load` function. It takes two parameters; the first is the path to the MNIST dataset (containing the files `t10k-images-idx3-ubyte.gz, t10k-labels-idx1-ubyte.gz, train-images-idx3-ubyte.gz, train-labels-idx1-ubyte.gz`) and the second is the desired ratio of the validation set to the training set (for example 0.1).
+  * **MNIST**. Use the `Mnist.load` function. It takes two parameters; the first is the path to the MNIST dataset (containing the files `t10k-images-idx3-ubyte.gz, t10k-labels-idx1-ubyte.gz, train-images-idx3-ubyte.gz, train-labels-idx1-ubyte.gz`) and the second is the desired ratio of the validation set to the training set (for example 0.166 if you want 50 000 training samples and 10 000 validation samples). The sample type `MnistT` contains two fields: `Img` for the flattened images and `Lbl` for the images in one-hot encoding.
 
 
 Summary
@@ -264,5 +264,6 @@ Summary
 
 The `Dataset<'S>` type provides a convenient way to work with datasets.
 Type-safety is provided by preserving the user-specified sample type `'S` when accessing individual or multiple samples.
+The dataset handler is used by the [generic training function](training.html).
 
 *)

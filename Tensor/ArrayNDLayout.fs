@@ -239,18 +239,19 @@ module ArrayNDLayout =
                     {ra with Offset = ra.Offset + i*str;
                              Stride = ra.Stride;
                              Shape = ra.Shape} 
-                | Rng(startOpt, stopOpt) ->
-                    let start = match startOpt with
-                                | Some start -> start
-                                | None -> 0
-                    let stop = match stopOpt with
-                                | Some stop -> stop
-                                | None -> shp - 1
-                    checkElementRange false shp start
+                | Rng(start, stop) ->
+                    let start = defaultArg start 0
+                    let stop = defaultArg stop (shp - 1)
+                    if start = stop + 1 then
+                        // allow slices starting at the element past the last 
+                        // element and are empty
+                        checkElementRange true shp start
+                    else
+                        checkElementRange false shp start
                     checkElementRange true shp stop
                     {ra with Offset = ra.Offset + start*str;
-                             Shape = (stop + 1 - start)::ra.Shape;
-                             Stride = str::ra.Stride} 
+                                Shape = (stop + 1 - start)::ra.Shape;
+                                Stride = str::ra.Stride} 
                 | RngAllFill | RngNewAxis -> failwith "impossible"
             | RngNewAxis::rRanges, _, _ ->
                 let ra = recView rRanges a

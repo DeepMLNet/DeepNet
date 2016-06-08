@@ -5,40 +5,65 @@
 //SymTensor.Compiler.Cuda.Debug.MemUsage <- true
 
 (**
-Learning MNIST
-==============
+Defining a Simple Model using Expressions
+=========================================
 
-In this example we will show how to learn MNIST classification using a two-layer feed-forward network.
+In this example we will show how to learn [MNIST handwritten digit classification](http://yann.lecun.com/exdb/mnist/) using a two-layer feed-forward network.
+As an introductory example, the model will be defined using basic mathematical expressions only to explain their use.
+Deep.Net also allows to build model from components (for example a multi-layer perceptron) which is usually more understandable and more code efficient.
+This technique will be explained in the [Model Components](components.html) chapter.
 
-You can run this example by executing `FsiAnyCPU.exe docs\content\mnist.fsx` after cloning the Deep.Net repository.
+You can run this example by executing `FsiAnyCPU.exe docs\content\model.fsx` after cloning the Deep.Net repository.
 You can move your mouse over any symbol in the code samples to see the full signature.
 A [quick introduction to F# signatures](https://fsharpforfunandprofit.com/posts/function-signatures/) might be helpful.
 
 ### Namespaces
-The `ArrayNDNS` namespace houses the numeric tensor functionality.
+The `ArrayNDNS` namespace houses the [numeric tensor functionality](tensor.html).
 `SymTensor` houses the symbolic expression library.
 `SymTensor.Compiler.Cuda` provides compilation of symbolic expressions to functions that are executed on a CUDA GPU.
+The `Datasets` namespace provides dataset loading and handling functions.
 
 *)
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
+open Datasets
 
 (**
 
 Loading MNIST
 -------------
 
-We use the Mnist module from the Datasets library to load the MNIST dataset.
+Deep.Net provides the `Dataset` type for simple and efficient handling of datasets. 
+In this chapter we skip over the usage details and refer to the [Dataset Handling](dataset.html) chapter for further information.
+
+We use the Mnist module from the Datasets library to load the [MNIST handwritten digits dataset](http://yann.lecun.com/exdb/mnist/) consisting of a training set of 60 000 sample and a test set of 10 000 sample.
+Each sample consists of $28 \times 28$ pixels and an associated integer class label between 0 and 9.
 *)
 
-let mnist = Datasets.Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST")
-            |> Datasets.Mnist.toCuda
+let mnist = Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST") 0.0
+            |> TrnValTst.ToCuda
+
+printfn "MNIST training set: images have shape %A and labels have shape %A" 
+    mnist.Trn.All.Img.Shape mnist.Trn.All.Lbl.Shape
+printfn "MNIST test set:     images have shape %A and labels have shape %A" 
+    mnist.Tst.All.Img.Shape mnist.Tst.All.Lbl.Shape
 
 (**
-`Mnist.load` loads the MNIST dataset from the specified directory and `Mnist.toCuda` transfers the whole dataset to the GPU.
+This prints
 
-`mnist.TrnImgsFlat` is an array of shape $60000 \times 784$ that contains the training images and `mnist.TrnLabels` is an array of shape $60000 \times 10$ containing the corresponding labels in one-hot encoding, i.e. `mnist.TrnLbls.[[n; c]] = 1` when the n-th training sample if of class (digit) c.
+    MNIST training set: images have shape [60000; 784] and labels have shape [60000; 10]
+    MNIST test set:     images have shape [10000; 784] and labels have shape [10000; 10]
+
+`Mnist.load` loads the MNIST dataset from the specified directory.
+The second parameter specifies the ratio of training samples to put into the validation set.
+Since we do not use a validation set in this sample, we set it to zero.
+The `TrnValTst.toCuda` transfers the whole dataset to the GPU.
+
+`mnist.Trn` contains the training set and `mnist.Tst` contains the test set.
+All training samples of a particular partition can be accessed using the `.All` property; e.g. `mnist.Trn.All` contains all training samples.
+
+Hence `mnist.Trn.All.Img` is an array of shape $60000 \times 784$ that contains the flattened training images and `mnist.Trn.All.Lbl` is an array of shape $60000 \times 10$ containing the corresponding labels in one-hot encoding, i.e. `mnist.Trn.All.Lbl.[[n; c]] = 1` when the n-th training sample if of class (digit) c.
 
 
 Defining the model
@@ -114,12 +139,12 @@ Since storage space allocation requires numeric values for the shape of the para
 We use the `mb.SetSize` method of the model builder that takes a symbolic size and the corresponding numeric value.
 *)
 
-mb.SetSize nInput mnist.TrnImgsFlat.Shape.[1]
-mb.SetSize nClass mnist.TrnLbls.Shape.[1]
+mb.SetSize nInput mnist.Trn.All.Img.Shape.[1]
+mb.SetSize nClass mnist.Trn.All.Lbl.Shape.[1]
 mb.SetSize nHidden 100
 
 (**
-The number of inputs and classes are set from the corresponding shapes of the loaded dataset and `nHidden` is set to 100.
+The number of inputs and classes are set from the corresponding shapes of the MNIST dataset and `nHidden` is set to 100.
 Consequently we have a model with 784 input neurons, 100 hidden neurons and 10 output neurons.
 
 Since all model sizes are defined and all parameters have been declared, we can now instantiate the model using the `mb.Instantiate` method of the model builder.
@@ -217,7 +242,7 @@ Testing the model
 We can now test our work so far by calculating the loss of the *untrained* model on the MNIST test set.
 *)
 
-let tstLossUntrained = lossFn mnist.TstImgsFlat mnist.TstLbls
+let tstLossUntrained = lossFn mnist.Tst.All.Img mnist.Tst.All.Lbl
                        |> ArrayND.value
 printfn "Test loss (untrained): %.4f" tstLossUntrained
 
@@ -281,9 +306,9 @@ We are now ready to train and evaluate our model using a simple training loop.
 *)
 
 for itr = 0 to 1000 do
-    optFn mnist.TrnImgsFlat mnist.TrnLbls optCfg |> ignore
+    optFn mnist.Trn.All.Img mnist.Trn.All.Lbl optCfg |> ignore
     if itr % 50 = 0 then
-        let l = lossFn mnist.TstImgsFlat mnist.TstLbls |> ArrayND.value
+        let l = lossFn mnist.Tst.All.Img mnist.Tst.All.Lbl |> ArrayND.value
         printfn "Test loss after %5d iterations: %.4f" itr l
 
 (**
@@ -310,6 +335,6 @@ Summary
 In this introductory example we showed how to define symbolic sizes and build a two-layer neural network with a softmax output layer and cross-entropy loss using elementary mathematical operators.
 Training was performed on the MNIST dataset using a simple training loop.
 
-In the following sections, we will show how to assemble models from predefined blocks (such as neural layers and loss layers) and use a Deep.Net provided, configurable training loop.
+In the following sections, we will show how to assemble models from [components](components.html) (such as neural layers and loss layers) and use a Deep.Net provided, configurable [training function](training.html).
 
 *)

@@ -11,7 +11,7 @@ For example it makes sense to define a generic [multilayer perceptron](https://e
 In Deep.Net, a model component can contain other model components; for example an autoencoder component could be built using two multi-layer perceptron components.
 
 In this document we will describe how to build a simple layer of neurons and how to instantiate it in your model.
-
+You can run this example by executing `FsiAnyCPU.exe docs\content\components.fsx` after cloning the Deep.Net repository.
 
 Defining a model component
 --------------------------
@@ -28,7 +28,9 @@ These two parameters give rise to two integer hyper-parameters (a hyper-paramete
 Furthermore we have the transfer function as a third, discrete hyper-parameter `TransferFunc` that can either be `Tanh` or `SoftMax`.
 Let us define record types for the parameters and hyper-parameters.
 *)
-open ArrayNDNS; open SymTensor
+open ArrayNDNS
+open SymTensor
+open Datasets
 
 module MyFirstPerceptron = 
 
@@ -131,8 +133,8 @@ As before the model will consist of one hidden layer of neurons with a tanh tran
 As in the referred chapter, we first load the MNIST dataset and declare symbolic sizes for the model.
 *)
 
-let mnist = Datasets.Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST")
-            |> Datasets.Mnist.toCuda
+let mnist = Mnist.load (__SOURCE_DIRECTORY__ + "../../../Data/MNIST") 0.0
+            |> TrnValTst.ToCuda
 
 let mb = ModelBuilder<single> "NeuralNetModel"
 
@@ -140,15 +142,18 @@ let nBatch  = mb.Size "nBatch"
 let nInput  = mb.Size "nInput"
 let nClass  = mb.Size "nClass"
 let nHidden = mb.Size "nHidden"
+
 (**
 Then we instantiate the parameters of our components.
 *)
+
 let lyr1 = 
     MyFirstPerceptron.pars (mb.Module "lyr1") 
         {NInput=nInput; NOutput=nHidden; TransferFunc=MyFirstPerceptron.Tanh}
 let lyr2 =
     MyFirstPerceptron.pars (mb.Module "lyr2")
         {NInput=nHidden; NOutput=nClass; TransferFunc=MyFirstPerceptron.SoftMax}
+
 (**
 We used the `mb.Module` method of the model builder to create a new, subordinated model builder for the  components.
 The `mb.Module` function takes one argument that specifies an identifier for the subordinated model builder.
@@ -162,11 +167,12 @@ This automatic parameter name construction allows multiple, independent instanti
 
 We continue with variable definitions and model instantiation.
 *)
+
 let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
 let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
-mb.SetSize nInput mnist.TrnImgsFlat.Shape.[1]
-mb.SetSize nClass mnist.TrnLbls.Shape.[1]
+mb.SetSize nInput mnist.Trn.All.Img.Shape.[1]
+mb.SetSize nClass mnist.Trn.All.Lbl.Shape.[1]
 mb.SetSize nHidden 100
 
 open SymTensor.Compiler.Cuda
@@ -197,13 +203,12 @@ let lossFn = mi.Func loss |> arg2 input target
 let optFn = mi.Func opt.Minimize |> opt.Use |> arg2 input target
 
 for itr = 0 to 1000 do
-    optFn mnist.TrnImgsFlat mnist.TrnLbls optCfg |> ignore
+    optFn mnist.Trn.All.Img mnist.Trn.All.Lbl optCfg |> ignore
     if itr % 50 = 0 then
-        let l = lossFn mnist.TstImgsFlat mnist.TstLbls |> ArrayND.value
+        let l = lossFn mnist.Tst.All.Img mnist.Tst.All.Lbl |> ArrayND.value
         printfn "Test loss after %5d iterations: %.4f" itr l
 
 (**
-
 This should produce output similar to
 
     Test loss after     0 iterations: 2.3013
@@ -211,7 +216,6 @@ This should produce output similar to
     Test loss after   100 iterations: 1.0479
     ...
     Test loss after  1000 iterations: 0.2701
-
 *)
 
 (**
@@ -302,7 +306,7 @@ let ae =
     MyFirstAutoencoder.pars (mb2.Module "Autoencoder") {NInOut=nInput2; NLatent=nLatent2}
 
 // instantiate model
-mb2.SetSize nInput2 mnist.TrnImgsFlat.Shape.[1]
+mb2.SetSize nInput2 mnist.Trn.All.Img.Shape.[1]
 mb2.SetSize nLatent2 100
 let mi2 = mb2.Instantiate DevCuda
 
@@ -319,9 +323,9 @@ let optFn2 = mi2.Func opt2.Minimize |> opt2.Use |> arg input2
 // initializes parameters and train
 mi2.InitPars 123
 for itr = 0 to 1000 do
-    optFn2 mnist.TrnImgsFlat optCfg2 |> ignore
+    optFn2 mnist.Trn.All.Img optCfg2 |> ignore
     if itr % 50 = 0 then
-        let l = lossFn2 mnist.TstImgsFlat |> ArrayND.value
+        let l = lossFn2 mnist.Tst.All.Img |> ArrayND.value
         printfn "Reconstruction error after %5d iterations: %.4f" itr l
 
 (**
