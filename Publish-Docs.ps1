@@ -6,9 +6,9 @@ git clone -b gh-pages https://github.com/DeepMLNet/DeepNet.git . 2>$null
 rm -Recurse *
 popd
 
-$ErrorActionPreference = "Stop"
+#$ErrorActionPreference = "Stop"
 .\Generate-Docs.ps1
-$ErrorActionPreference = "Continue"
+#$ErrorActionPreference = "Continue"
 cp -Recurse docs\output\* $doctemp\
 
 pushd $doctemp

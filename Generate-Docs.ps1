@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+# $ErrorActionPreference = "Stop"
 
 .\dist\nuget.exe install FSharp.Formatting -outputdirectory packages -Verbosity quiet -ExcludeVersion
 .\dist\nuget.exe install FAKE -outputdirectory packages -Verbosity quiet -ExcludeVersion
