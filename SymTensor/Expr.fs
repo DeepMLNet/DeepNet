@@ -595,19 +595,19 @@ module Expr =
         a |> meanAxis ax |> insertBroadcastAxis ax
 
     /// identity matrix of given size
-    let identity size = Leaf(Identity(size)) |> check
+    let identity<'T> size : ExprT<'T> = Leaf(Identity(size)) |> check
 
     /// zero tensor of given shape
-    let zeros ss = Leaf(Zeros(ss)) |> check
+    let zeros<'T> ss : ExprT<'T> = Leaf(Zeros(ss)) |> check
 
     /// zero matrix of given size
-    let zeroMatrix rows cols = zeros (ShapeSpec.matrix rows cols)
+    let zeroMatrix<'T> rows cols : ExprT<'T> = zeros (ShapeSpec.matrix rows cols)
 
     /// zero tensor with same shape as given tensor
-    let zerosLike a = Leaf(Zeros(shapeOf a)) |> check
+    let zerosLike (a: ExprT<'T>) : ExprT<'T> = Leaf(Zeros(shapeOf a)) |> check
 
     /// variable of given name and shape
-    let var name (ss: ShapeSpecT) = Leaf(Var(VarSpec.ofNameAndShape name ss)) 
+    let var<'T> name (ss: ShapeSpecT) : ExprT<'T> = Leaf(Var(VarSpec.ofNameAndShape name ss)) 
 
     /// annotated expression
     let annotate ano a = Unary(Annotated(ano), a) |> check

@@ -209,7 +209,7 @@ module ModelContextTypes =
                 subMC
 
         /// Creates and returns a model variable.
-        member this.Var (name: string) (shape: ShapeSpecT) =
+        member this.Var<'V> (name: string) (shape: ShapeSpecT) : ExprT<'V> =
             let v = Expr.var (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v :> IVarSpec)
             v

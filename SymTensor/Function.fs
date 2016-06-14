@@ -316,8 +316,8 @@ module FuncTypes =
 
     let arg3 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) (vs2: ExprT<'T2>) f =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
-            VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f
-            
+            VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
+
     let addArg (vs: ExprT<'T>) f =
         fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
             f (ve |> VarEnv.add vs value)
