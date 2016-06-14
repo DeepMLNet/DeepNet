@@ -60,8 +60,8 @@
             copyIntoDev dst src
           </code>
           <div class="tip" id="94">
-            <strong>Signature:</strong> dst:ArrayNDCudaT&lt;&#39;?178883&gt; -&gt; src:ArrayNDHostT&lt;&#39;?178883&gt; -&gt; unit<br />
-                          <strong>Type parameters:</strong> '?178883          </div>
+            <strong>Signature:</strong> dst:ArrayNDCudaT&lt;&#39;?178882&gt; -&gt; src:ArrayNDHostT&lt;&#39;?178882&gt; -&gt; unit<br />
+                          <strong>Type parameters:</strong> '?178882          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L231-231" class="github-link">
@@ -81,8 +81,8 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             copyIntoHost dst src
           </code>
           <div class="tip" id="95">
-            <strong>Signature:</strong> dst:ArrayNDHostT&lt;&#39;?178888&gt; -&gt; src:ArrayNDCudaT&lt;&#39;?178888&gt; -&gt; unit<br />
-                          <strong>Type parameters:</strong> '?178888          </div>
+            <strong>Signature:</strong> dst:ArrayNDHostT&lt;&#39;?178887&gt; -&gt; src:ArrayNDCudaT&lt;&#39;?178887&gt; -&gt; unit<br />
+                          <strong>Type parameters:</strong> '?178887          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L244-244" class="github-link">
@@ -122,17 +122,15 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             identity size
           </code>
           <div class="tip" id="97">
-            <strong>Signature:</strong> size:int -&gt; ArrayNDCudaT&lt;&#39;?178881&gt;<br />
-                          <strong>Type parameters:</strong> '?178881          </div>
+            <strong>Signature:</strong> size:int -&gt; ArrayNDCudaT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L224-224" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>ArrayNDCudaT identity matrix</p>
-
-
+          
         </td>
       </tr>
       <tr>
@@ -142,17 +140,15 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             newC shp
           </code>
           <div class="tip" id="98">
-            <strong>Signature:</strong> shp:int list -&gt; ArrayNDCudaT&lt;&#39;?178871&gt;<br />
-                          <strong>Type parameters:</strong> '?178871          </div>
+            <strong>Signature:</strong> shp:int list -&gt; ArrayNDCudaT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L200-200" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape</p>
-
-
+          
         </td>
       </tr>
       <tr>
@@ -162,17 +158,15 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             newF shp
           </code>
           <div class="tip" id="99">
-            <strong>Signature:</strong> shp:int list -&gt; ArrayNDCudaT&lt;&#39;?178873&gt;<br />
-                          <strong>Type parameters:</strong> '?178873          </div>
+            <strong>Signature:</strong> shp:int list -&gt; ArrayNDCudaT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L204-204" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape</p>
-
-
+          
         </td>
       </tr>
       <tr>
@@ -202,17 +196,15 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             ones shape
           </code>
           <div class="tip" id="101">
-            <strong>Signature:</strong> shape:int list -&gt; ArrayNDCudaT&lt;&#39;?178879&gt;<br />
-                          <strong>Type parameters:</strong> '?178879          </div>
+            <strong>Signature:</strong> shape:int list -&gt; ArrayNDCudaT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L218-218" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>ArrayNDCudaT of given shape filled with ones.</p>
-
-
+          
         </td>
       </tr>
       <tr>
@@ -222,8 +214,8 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             scalar value
           </code>
           <div class="tip" id="102">
-            <strong>Signature:</strong> value:&#39;?178875 -&gt; ArrayNDCudaT&lt;&#39;?178875&gt;<br />
-                          <strong>Type parameters:</strong> '?178875          </div>
+            <strong>Signature:</strong> value:&#39;?178874 -&gt; ArrayNDCudaT&lt;&#39;?178874&gt;<br />
+                          <strong>Type parameters:</strong> '?178874          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L208-208" class="github-link">
@@ -242,8 +234,8 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             toDev src
           </code>
           <div class="tip" id="103">
-            <strong>Signature:</strong> src:ArrayNDHostT&lt;&#39;?178885&gt; -&gt; ArrayNDCudaT&lt;&#39;?178885&gt;<br />
-                          <strong>Type parameters:</strong> '?178885          </div>
+            <strong>Signature:</strong> src:ArrayNDHostT&lt;&#39;?178884&gt; -&gt; ArrayNDCudaT&lt;&#39;?178884&gt;<br />
+                          <strong>Type parameters:</strong> '?178884          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L234-234" class="github-link">
@@ -282,8 +274,8 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             toHost src
           </code>
           <div class="tip" id="105">
-            <strong>Signature:</strong> src:ArrayNDCudaT&lt;&#39;?178890&gt; -&gt; ArrayNDHostT&lt;&#39;?178890&gt;<br />
-                          <strong>Type parameters:</strong> '?178890          </div>
+            <strong>Signature:</strong> src:ArrayNDCudaT&lt;&#39;?178889&gt; -&gt; ArrayNDHostT&lt;&#39;?178889&gt;<br />
+                          <strong>Type parameters:</strong> '?178889          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L247-247" class="github-link">
@@ -322,17 +314,15 @@ Both must of same shape. dst must also be contiguous and with offset zero.</p>
             zeros shape
           </code>
           <div class="tip" id="107">
-            <strong>Signature:</strong> shape:int list -&gt; ArrayNDCudaT&lt;&#39;?178877&gt;<br />
-                          <strong>Type parameters:</strong> '?178877          </div>
+            <strong>Signature:</strong> shape:int list -&gt; ArrayNDCudaT&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
             <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/ArrayNDCuda.fs#L214-214" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>ArrayNDCudaT of given shape filled with zeros.</p>
-
-
+          
         </td>
       </tr>
     </tbody>
