@@ -306,15 +306,18 @@ module Func =
 [<AutoOpen>]
 module FuncTypes = 
 
-    let arg (vs0: ExprT<'T0>) f =
+    type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
+    let arg1 (vs0: ExprT<'T0>) f : Arg1Func<_, _> =
         fun (val0: ArrayNDT<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
-    let arg2 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) f =
+    type Arg2Func<'T0, 'T1, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> 'TR
+    let arg2 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) f : Arg2Func<_, _, _> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
-    let arg3 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) (vs2: ExprT<'T2>) f =
+    type Arg3Func<'T0, 'T1, 'T2, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> 'TR
+    let arg3 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) (vs2: ExprT<'T2>) f : Arg3Func<_, _, _, _> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
 
