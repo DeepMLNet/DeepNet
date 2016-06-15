@@ -183,9 +183,12 @@ module SizeSpecTypes =
     [<StructuredFormatDisplay ("{PrettyString}")>]
     [<StructuralEquality; StructuralComparison>]
     type SizeSpecT =
-        | Base of BaseSizeT               // fixed size or symbol
-        | Broadcast                       // size 1 and broadcastable
-        | Multinom of SizeMultinomT       // product of fixed sizes and symbols
+        /// fixed size or symbol
+        | Base of BaseSizeT               
+        /// size 1 and broadcastable
+        | Broadcast                       
+        /// product of fixed sizes and symbols
+        | Multinom of SizeMultinomT       
 
         /// simplify size specification
         static member Simplify (ss: SizeSpecT) =
@@ -469,14 +472,22 @@ module ShapeSpec =
 [<AutoOpen>]
 module RangeSpecTypes =
 
-    /// symbolic/dynamic range specification for one dimension
+    /// Symbolic/dynamic range specification for one dimension.
+    /// 'Dyn will be instantiated with ExprT.
     type RangeSpecT<'Dyn> = 
         // ranges with symbolic size (length)
+        /// symbolic (known at expression compile time) element
         | RSSymElem            of SizeSpecT                           
-        | RSDynElem            of 'Dyn                                
+        /// dynamic (computed by another expression) element
+        | RSDynElem            of 'Dyn       
+        /// symbolic (known at expression compile time) range                         
         | RSSymStartSymEnd     of (SizeSpecT option) * (SizeSpecT option)
+        /// range with dynamic (computed by another expression) start element and 
+        /// symbolic (known at expression compile time) length
         | RSDynStartSymSize    of 'Dyn * SizeSpecT                    
-        | RSNewAxis                                                   
+        /// new axis of size one
+        | RSNewAxis             
+        /// fill remaining elements (if any) with RSAll                                      
         | RSAllFill                                                   
         //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
         //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
