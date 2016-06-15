@@ -2,9 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
-    <title>SizeSymbol - Deep.Net</title>
+    <title>Architecture
+</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <meta name="description" content=""/>
+    <meta name="description" content="Deep.Net machine learning framework"/>
     <meta name="author" content="Deep.Net developers"/>
 
     <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
@@ -35,44 +36,37 @@
       <div class="row">
         <div class="span9" id="main">
           
+<h1><a name="Architecture" class="anchor" href="#Architecture">Architecture</a></h1>
+<p>The following diagram shows a bird's eye view of Deep.Net's architecture.</p>
+<p><img src="img/Architecture.png" alt="Architecture diagram" /></p>
+<h1><a name="Shapes-and-sizes" class="anchor" href="#Shapes-and-sizes">Shapes and sizes</a></h1>
+<p>Deep.Net uses symbolic sizes and shapes to verify the correctness of expressions while they are being defined.
+For this purpose it contains types that allow basic algebraic operations on symbols.
+Code for that functionality is located in <code>SymTensor/SymShape.fs</code>.</p>
+<h2><a name="Size-specification" class="anchor" href="#Size-specification">Size specification</a></h2>
+<p>The size of each dimension of a symbolic tensor is represented by the type <code>SizeSpecT</code>.
+A size specification can either be a numeric size (for example <code>3</code>), a symbolic size variable (for example <code>n</code>) or a polynomial in symbolic size variables (for example <code>3 * n**2 + 2 * m</code>).
+Size specifications support and are closed under the operations <code>+</code>, <code>-</code>, <code>*</code> and <code>Pow</code> (with an integer exponent).
+They can be compared using the operators <code>%=</code> (equal) or <code>.=</code> (equal ignoring broadcastability).
+Supporting functions are located in the module <code>SizeSpec</code>.</p>
+<p>The supporting polynomial algebra is implemented by <code>SizeProductT</code> and <code>SizeMultinomT</code>.</p>
+<h2><a name="Shape-specification" class="anchor" href="#Shape-specification">Shape specification</a></h2>
+<p>A shape specification <code>ShapeSpecT</code> is a list of size specifications <code>SizeSpecT</code>.
+Some supporting functions are located in the module <code>ShapeSpec</code>.</p>
+<h2><a name="Range-specification" class="anchor" href="#Range-specification">Range specification</a></h2>
+<p>Symbolic ranges (for selecting elements from and slicing tensors) are provided by the type <code>RangeSpecT</code>.
+Tensors can be sliced using symbolic sizes <code>SizeSpecT</code> or dynamic values, i.e. the range can depend on the result of another expression.
+At the moment, however, the length of the range must be a symbolic size known at model compile time.</p>
+<h3><a name="Simple-range-specification" class="anchor" href="#Simple-range-specification">Simple range specification</a></h3>
+<p>During expression compilation, range specifications are transformed into simple range specification <code>SimpleRangeSpecT</code>.</p>
+<h1><a name="Symbolic-expressions" class="anchor" href="#Symbolic-expressions">Symbolic expressions</a></h1>
+<p>TODO</p>
+<h2><a name="Expression-validation" class="anchor" href="#Expression-validation">Expression validation</a></h2>
+<h1><a name="Automatic-differentiation" class="anchor" href="#Automatic-differentiation">Automatic differentiation</a></h1>
+<p>TODO</p>
+<h1><a name="Compilation-pipeline" class="anchor" href="#Compilation-pipeline">Compilation pipeline</a></h1>
+<p>TODO</p>
 
-
-
-<h1>SizeSymbol</h1>
-<p>
-  <span>Namespace: SymTensor</span><br />
-</p>
-<div class="xmldoc">
-</div>
-
-<!-- Render nested types and modules, if there are any -->
-
-  <h3>Functions and values</h3>
-  <table class="table table-bordered member-list">
-    <thead>
-      <tr><td>Function or value</td><td>Description</td></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '385', 385)" onmouseover="showTip(event, '385', 385)">
-            name sym
-          </code>
-          <div class="tip" id="385">
-            <strong>Signature:</strong> sym:SizeSymbolT -&gt; string<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L27-27" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-    </tbody>
-  </table>
 
         </div>
         <div class="span3">
