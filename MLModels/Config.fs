@@ -18,7 +18,7 @@ module Config =
         let allArgs = Array.append argv [|"--noninteractive"
                                           "--quiet"
                                           "--lib:" + Util.assemblyDirectory
-                                          "--reference:Models.dll"
+                                          "--reference:MLModels.dll"
                                           "--reference:SymTensor.dll"
                                           "--define:CONFIG"
                                           |]        
