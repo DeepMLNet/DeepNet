@@ -197,31 +197,31 @@ module ArrayNDCudaTypes =
 module ArrayNDCuda = 
 
     /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
-    let inline newC shp =
-        ArrayNDCudaT<_>.NewC shp
+    let newC<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> shp : ArrayNDCudaT<'T> =
+        ArrayNDCudaT<'T>.NewC shp
 
     /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
-    let inline newF shp =
+    let newF<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> shp : ArrayNDCudaT<'T> =
         ArrayNDCudaT<_>.NewF shp
 
     /// ArrayNDCudaT with zero dimensions (scalar) and given value
-    let inline scalar value =
+    let scalar value =
         let a = newC [] 
         ArrayND.set [] value a
         a
 
     /// ArrayNDCudaT of given shape filled with zeros.
-    let inline zeros shape =
+    let zeros<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> shape : ArrayNDCudaT<'T> =
         newC shape
 
     /// ArrayNDCudaT of given shape filled with ones.
-    let inline ones shape =
+    let ones<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> shape : ArrayNDCudaT<'T> =
         let a = newC shape
         ArrayND.fillWithOnes a
         a
 
     /// ArrayNDCudaT identity matrix
-    let inline identity size =
+    let identity<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> size : ArrayNDCudaT<'T> =
         let a = zeros [size; size]
         ArrayND.fillDiagonalWithOnes a
         a

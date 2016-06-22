@@ -242,6 +242,10 @@ module Train =
         let valBatches = dataset.Val.Batches cfg.BatchSize
         let tstBatches = dataset.Tst.Batches cfg.BatchSize
 
+        if Seq.isEmpty trnBatches then failwith "the training set is empty"
+        if Seq.isEmpty valBatches then failwith "the validation set is empty"
+        if Seq.isEmpty tstBatches then failwith "the test set is empty"
+
         // initialize model parameters
         printfn "Initializing model parameters for training"
         trainable.InitModel cfg.Seed

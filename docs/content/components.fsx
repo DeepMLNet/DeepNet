@@ -313,12 +313,12 @@ let mi2 = mb2.Instantiate DevCuda
 // loss function
 let input2 = mb2.Var "Input"  [nBatch2; nInput2]
 let loss2 = MyFirstAutoencoder.loss ae input2.T
-let lossFn2 = mi2.Func loss2 |> arg input2 
+let lossFn2 = mi2.Func loss2 |> arg1 input2 
 
 // optimization function
 let opt2 = Optimizers.GradientDescent (loss2, mi2.ParameterVector, DevCuda)
 let optCfg2 = { Optimizers.GradientDescent.Step=1e-1f }
-let optFn2 = mi2.Func opt2.Minimize |> opt2.Use |> arg input2 
+let optFn2 = mi2.Func opt2.Minimize |> opt2.Use |> arg1 input2 
 
 // initializes parameters and train
 mi2.InitPars 123

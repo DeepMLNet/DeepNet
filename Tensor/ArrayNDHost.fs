@@ -165,39 +165,39 @@ module ArrayNDHost =
         Activator.CreateInstance (t, [|box layout|]) :?> IArrayNDHostT
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
-    let inline newC<'T> shp =
+    let newC<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newC shp) 
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given type and shape 
-    let inline newCOfType typ shp =
+    let newCOfType typ shp =
         newOfType typ (ArrayNDLayout.newC shp)
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
-    let inline newF<'T> shp =
+    let newF<'T> shp =
         ArrayNDHostT<'T>(ArrayNDLayout.newF shp) 
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given type and shape
-    let inline newFOfType typ shp =
+    let newFOfType typ shp =
         newOfType typ (ArrayNDLayout.newF shp)
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
-    let inline scalar value =
+    let scalar value =
         let a = newC [] 
         ArrayND.set [] value a
         a
 
     /// ArrayNDHostT of given shape filled with zeros.
-    let inline zeros shape =
+    let zeros<'T> shape : ArrayNDHostT<'T> =
         newC shape
 
     /// ArrayNDHostT of given shape filled with ones.
-    let inline ones shape =
+    let ones<'T> shape : ArrayNDHostT<'T> =
         let a = newC shape
         ArrayND.fillWithOnes a
         a
 
     /// ArrayNDHostT identity matrix
-    let inline identity size =
+    let identity<'T> size : ArrayNDHostT<'T> =
         let a = zeros [size; size]
         ArrayND.fillDiagonalWithOnes a
         a
