@@ -985,6 +985,44 @@ module ArrayND =
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
+    // concatenation
+    ////////////////////////////////////////////////////////////////////////////////////////////////         
+
+    /// Concatenates the list of tensors in the given axis.
+    let concat dim (arys: #ArrayNDT<'T> list) =
+        if List.isEmpty arys then
+            invalidArg "arys" "cannot concatenate empty list of tensors"
+
+        // check for compatibility
+        let shp = List.head arys |> shape
+        if not (0 <= dim && dim < shp.Length) then
+            failwithf "concatenation axis %d is out of range for shape %A" dim shp
+        for aryIdx, ary in List.indexed arys do
+            if List.without dim ary.Shape <> List.without dim shp then
+                failwithf "concatentation element with index %d with shape %A must \
+                    be equal to shape %A of the first element, except in the concatenation axis %d" 
+                    aryIdx ary.Shape shp dim
+
+        // calculate shape of concatenated tensors
+        let totalSize = arys |> List.sumBy (fun ary -> ary.Shape.[dim])
+        let concatShape = shp |> List.set dim totalSize
+
+        // copy tensors into concatenated tensor
+        let cc = List.head arys |> newCOfSameType concatShape
+        let mutable pos = 0
+        for ary in arys do
+            let aryLen = ary.Shape.[dim]
+            if aryLen > 0 then
+                let ccRng = 
+                    List.init shp.Length (fun idx ->
+                        if idx = dim then Rng (Some pos, Some (pos + aryLen - 1))
+                        else RngAll)
+                cc.[ccRng] <- ary
+                pos <- pos + aryLen
+
+        cc
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
     // pretty printing
     ////////////////////////////////////////////////////////////////////////////////////////////////         
     
