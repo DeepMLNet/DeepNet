@@ -53,10 +53,14 @@ module Config =
 
         // set paths for configuration file consumption
         cfgDir <- path |> Path.GetFullPath |> Path.GetDirectoryName
-        let rec findBaseDir dir =
-            if Directory.Exists (Path.Combine (dir, "Cfg")) then Path.GetFullPath dir
-            else findBaseDir (Path.Combine (dir, ".."))
-        baseDir <- findBaseDir cfgDir
+        let rec findBaseDir dir iters =
+            if iters > 100 then
+                printfn "Cannot find base directory. Using current directory as base directory."
+                Directory.GetCurrentDirectory()
+            else
+                if Directory.Exists (Path.Combine (dir, "Cfg")) then Path.GetFullPath dir
+                else findBaseDir (Path.Combine (dir, "..")) (iters+1)
+        baseDir <- findBaseDir cfgDir 0
 
         // evaluate configuration script
         try 
