@@ -92,6 +92,52 @@ module HDF5Types =
         /// If the file already exists it will be overwritten.
         static member OpenWrite path = new HDF5 (path, HDF5Overwrite)
 
+        /// Splits a HDF5 path string into a list.
+        static member private SplitPath (path: string) =
+            path.Split('/') |> List.ofArray
+
+        /// Combines a list of groups into a HDF5 path string.
+        static member private CombinePath (dirs: string list) =
+            String.concat "/" dirs
+            
+        /// Checks whether an object (array or group) with the given name exists.
+        member this.Exists (name: string) =
+            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
+            let rec exists prefix dirs =
+                match dirs with
+                | [] -> true
+                | dir::dirs ->
+                    let nextPrefix = prefix @ [dir]
+                    if H5L.exists (fileHnd, HDF5.CombinePath nextPrefix) |> check <= 0 then false
+                    else
+                        exists nextPrefix dirs
+            exists [] (HDF5.SplitPath name) 
+
+        /// Creates the given group path. All necessary parent groups are created automatically.
+        /// If the group with the given path already exists, nothing happens.
+        member this.CreateGroups (path: string) =
+            let rec create prefix dirs =
+                match dirs with
+                | [] -> ()
+                | dir::dirs ->
+                    let nextPrefix = prefix @ [dir]
+                    let nextPrefixPath = HDF5.CombinePath nextPrefix
+                    if not (this.Exists nextPrefixPath) then
+                        let groupHnd = H5G.create(fileHnd, nextPrefixPath) |> check 
+                        H5G.close groupHnd |> check |> ignore
+                    create nextPrefix dirs
+            create [] (HDF5.SplitPath path)                
+
+        /// Create all necessary parent groups for the given path.
+        member private this.CreateParentGroups (path: string) =
+            match HDF5.SplitPath path with
+            | [] -> ()
+            | [_] -> ()
+            | pl ->
+                pl.[0 .. pl.Length-2]
+                |> HDF5.CombinePath
+                |> this.CreateGroups
+
         /// Write data array using specified name and shape.
         member this.Write (name: string, data: 'T array, shape: int list) =
             if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
@@ -99,6 +145,7 @@ module HDF5Types =
             if mode <> HDF5Overwrite then
                 failwithf "HDF5 file %s is opened for reading" path
             checkShape data shape
+            this.CreateParentGroups name
             
             let typeHnd = H5T.copy hdfType<'T> |> check
             let shapeHnd = H5S.create_simple (List.length shape, hdfShape shape, hdfShape shape) |> check
@@ -116,7 +163,7 @@ module HDF5Types =
         member this.Read<'T> (name: string) =            
             if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
 
-            if H5L.exists (fileHnd, name) <= 0 then
+            if not (this.Exists name) then
                 failwithf "HDF5 dataset %s does not exist in file %s" name path
             let dataHnd = H5D.``open`` (fileHnd, name) |> check
             let typeHnd = H5D.get_type dataHnd |> check
