@@ -470,6 +470,11 @@ module ArrayND =
         let la, lb = ArrayNDLayout.broadcastToSame (layout a) (layout b)
         relayout la a, relayout lb b
 
+    /// broadcasts to have the same size in the given dimensions
+    let inline broadcastToSameInDims dims a b =
+        let la, lb = ArrayNDLayout.broadcastToSameInDims dims (layout a) (layout b)
+        relayout la a, relayout lb b
+
     /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape shp a =
         relayout (ArrayNDLayout.broadcastToShape shp (layout a)) a
@@ -864,7 +869,7 @@ module ArrayND =
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
-    /// dot product implementation between vec*vec, mat*vec, mat*mat
+    /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         let inline matrixDot a b =
             let nI = (shape a).[0]
@@ -880,6 +885,22 @@ module ArrayND =
                     set [i; k] v c
             c
 
+        let inline batchedMatrixDot (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+            let a, b = broadcastToSameInDims [0..nDims a - 3] a b
+            let aRows, aCols = (shape a).[nDims a - 2], (shape a).[nDims a - 1]
+            let bRows, bCols = (shape b).[nDims b - 2], (shape b).[nDims b - 1]
+            if aCols <> bRows then
+                failwithf "cannot compute batched dot product between arrays of shapes %A and %A" 
+                    (shape a) (shape b)                
+            let smplShape = (shape a).[0 .. nDims a - 3]
+            let nSmpls = List.fold (*) 1 smplShape
+            let a = reshape [nSmpls; aRows; aCols] a
+            let b = reshape [nSmpls; bRows; bCols] b
+            let c = newCOfSameType [nSmpls; aRows; bCols] a
+            for smpl = 0 to nSmpls - 1 do
+                c.[smpl, *, *] <- matrixDot a.[smpl, *, *] b.[smpl, *, *]
+            c |> reshape (smplShape @ [aRows; bCols])         
+
         match nDims a, nDims b with
             | 1, 1 when shape a = shape b -> 
                 map2 (*) a b |> sum
@@ -887,6 +908,12 @@ module ArrayND =
                 matrixDot a (padRight b) |> view [RngAll; RngElem 0] 
             | 2, 2 when (shape a).[1] = (shape b).[0] ->
                 matrixDot a b
+            | na, nb when na > 2 && na = nb+1 && (shape a).[na-1] = (shape b).[nb-1] ->
+                // batched mat*vec
+                (batchedMatrixDot a (padRight b)).[Fill, 0]
+            | na, nb when na > 2 && na = nb && (shape a).[na-2..] = (shape b).[nb-2..] ->
+                // batched mat*mat
+                batchedMatrixDot a b
             | _ -> 
                 failwithf "cannot compute dot product between arrays of shapes %A and %A" 
                     (shape a) (shape b)
@@ -895,7 +922,7 @@ module ArrayND =
         /// dot product
         static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl a b
 
-    /// dot product between vec*vec, mat*vec, mat*mat
+    /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dot a b =
         a .* b
 

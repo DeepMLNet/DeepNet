@@ -137,16 +137,33 @@ module ArrayNDLayout =
         elif nDims b < nDims a then padToSame a (padLeft b)
         else a, b
 
-    /// broadcasts to have the same size
-    let inline broadcastToSame ain bin =
-        let mutable a, b = padToSame ain bin
-        for d = 0 to (nDims a) - 1 do
+    /// cannot broadcast to same shape
+    exception CannotBroadcast of string
+
+    /// broadcasts to have the same size in the given dimensions
+    let broadcastToSameInDims dims ain bin =
+        let mutable a, b = ain, bin
+        for d in dims do
+            if not (d < nDims a && d < nDims b) then
+                sprintf "cannot broadcast shapes %A and %A in non-existant dimension %d" 
+                    (shape ain) (shape bin) d |> CannotBroadcast |> raise                    
             match (shape a).[d], (shape b).[d] with
             | al, bl when al = bl -> ()
             | al, bl when al = 1 -> a <- broadcastDim d bl a
             | al, bl when bl = 1 -> b <- broadcastDim d al b
-            | _ -> failwithf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
-        a, b
+            | _ -> 
+                sprintf "cannot broadcast shapes %A and %A to same size in dimensions %A" 
+                    (shape ain) (shape bin) dims |> CannotBroadcast |> raise
+        a, b       
+
+    /// broadcasts to have the same size
+    let inline broadcastToSame ain bin =
+        let mutable a, b = padToSame ain bin
+        try
+            broadcastToSameInDims [0..nDims a - 1] a b
+        with CannotBroadcast _ ->
+            sprintf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
+            |> CannotBroadcast |> raise
 
     /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape bs ain =
