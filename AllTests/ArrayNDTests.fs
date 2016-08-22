@@ -51,3 +51,32 @@ let ``Pretty printing works`` () =
     printfn "3x4 one matrix:       \n%A" (ArrayNDHost.ones [3; 4] :> ArrayNDT<float>)
     printfn "6 zero vector:        \n%A" (ArrayNDHost.zeros [6] :> ArrayNDT<float>)
     printfn "5x5 identity matrix:  \n%A" (ArrayNDHost.identity 5 :> ArrayNDT<float>)
+
+[<Fact>]
+let ``Batched matrix-matrix dot product`` () =
+    let N, M = 2, 3
+    let rng = System.Random(123)
+    let a = rng.UniformArrayND (-3., 3.) [N; M; 4; 3]
+    let b = rng.UniformArrayND (-1., 1.) [N; M; 3; 2]
+    let c = a .* b
+
+    let cr = ArrayNDHost.zeros<float> [N; M; 4; 2]
+    for n = 0 to N - 1 do
+        for m = 0 to M - 1 do
+            cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
+    ArrayND.almostEqual c cr |> ArrayND.value |> Assert.True
+    
+[<Fact>]
+let ``Batched matrix-vector dot product`` () =
+    let N, M = 2, 3
+    let rng = System.Random(123)
+    let a = rng.UniformArrayND (-3., 3.) [N; M; 4; 3]
+    let b = rng.UniformArrayND (-1., 1.) [N; M; 3]
+    let c = a .* b
+
+    let cr = ArrayNDHost.zeros<float> [N; M; 4]
+    for n = 0 to N - 1 do
+        for m = 0 to M - 1 do
+            cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
+    ArrayND.almostEqual c cr |> ArrayND.value |> Assert.True
+    
