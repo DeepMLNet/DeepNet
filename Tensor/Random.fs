@@ -27,5 +27,12 @@ module RandomExtensions =
         member this.SeqSingle (minValue: single, maxValue: single) =
             this.SeqDouble (double minValue, double maxValue) |> Seq.map single
         
-
+        /// Samples each element of an ArrayND of shape shp from a uniform distribution
+        /// between minValue and maxValue.
+        member this.UniformArrayND (minValue: 'T, maxValue: 'T) shp =
+            let minValue, maxValue = conv<float> minValue, conv<float> maxValue
+            this.SeqDouble() 
+            |> Seq.map (fun x -> x * (maxValue - minValue) + minValue |> conv<'T>)
+            |> ArrayNDNS.ArrayNDHost.ofSeqWithShape shp
+            
 

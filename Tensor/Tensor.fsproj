@@ -59,7 +59,6 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
-    <Compile Include="Random.fs" />
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="FastLayout.fs" />
     <Compile Include="ArrayND.fs" />
@@ -69,6 +68,7 @@
     <Compile Include="HDF5.fs" />
     <Compile Include="ArrayNDHDF.fs" />
     <Compile Include="NumpyFiles.fs" />
+    <Compile Include="Random.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
     <None Include="build\Tensor.targets">
