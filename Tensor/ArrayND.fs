@@ -788,6 +788,12 @@ module ArrayND =
     let inline signt (a: #ArrayNDT<'T>) =
         ArrayNDT<'T>.SignT a 
 
+    /// Elementwise check if two arrays have same (within machine precision) values.
+    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        let aTol = conv<'T> 1e-8
+        let rTol = conv<'T> 1e-5
+        abs (a - b) <<<< aTol + rTol * abs b
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
@@ -869,6 +875,16 @@ module ArrayND =
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
+    /// Returns true if two arrays have same (within machine precision) values in all elements.
+    /// If arrays have different shape, then false is returned.
+    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        if a.Shape = b.Shape then
+            isClose a b |> all
+        else 
+            let res = newCOfType [] a
+            set [] false res
+            res
+
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         let inline matrixDot a b =
@@ -911,7 +927,7 @@ module ArrayND =
             | na, nb when na > 2 && na = nb+1 && (shape a).[na-1] = (shape b).[nb-1] ->
                 // batched mat*vec
                 (batchedMatrixDot a (padRight b)).[Fill, 0]
-            | na, nb when na > 2 && na = nb && (shape a).[na-2..] = (shape b).[nb-2..] ->
+            | na, nb when na > 2 && na = nb && (shape a).[na-1] = (shape b).[nb-2] ->
                 // batched mat*mat
                 batchedMatrixDot a b
             | _ -> 
