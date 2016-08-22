@@ -133,6 +133,8 @@ module CudaEvalTypes =
                                         member this.Name = "Cuda"
                                         member this.Compile env exprs = CudaEval.cudaEvaluator env exprs }
             member this.DefaultLoc = LocDev
+            member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
+
     }
 
 

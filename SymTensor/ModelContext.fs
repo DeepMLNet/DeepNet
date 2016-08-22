@@ -24,6 +24,7 @@ module ModelContextTypes =
         abstract member ToHost:         ArrayNDT<'T> -> ArrayNDHostT<'T>
         abstract member Compiler:       IUExprCompiler
         abstract member DefaultLoc:     ArrayLocT
+        abstract member DefaultFactory: IUExprCompiler * CompileEnvT
 
     /// Evaluates the model on the host.
     let DevHost = { 
@@ -35,6 +36,7 @@ module ModelContextTypes =
                                             member this.Name = "Host"
                                             member this.Compile env exprs = onHost env exprs }
             member this.DefaultLoc =    LocHost
+            member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
     }
 
     /// A set of symbolic variables forming a set of parameters for a model.

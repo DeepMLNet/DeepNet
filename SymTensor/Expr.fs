@@ -305,10 +305,9 @@ module Expr =
         | Binary (Dot, a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                | 1, 1 -> ShapeSpec.scalar
-                | 2, 1 -> ShapeSpec.vector sa.[0]
-                | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
-                | _ -> failwith "invalid expression"
+            | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+            | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
+            | _ -> failwithf "invalid dot product shapes: %A, %A" sa sb
         | Binary (TensorProduct, a, b) -> 
             let sa, sb = shapeOf a, shapeOf b
             List.map2 (*) sa sb
@@ -380,6 +379,7 @@ module Expr =
                 | Dot -> 
                     match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                     | 2, 2 -> sa.[1] .= sb.[0] 
+                    | na, nb when na = nb -> sa.[na-1] .= sb.[nb-2]
                     | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
                 | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
                     failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
@@ -631,6 +631,17 @@ module Expr =
                 let bm = b |> reshape (ShapeSpec.padRight sb)
                 Binary(Dot, a, bm) |> reshape [sa.[0]]
             | 2, 2 -> Binary(Dot, a, b)
+            | na, nb when na = nb -> 
+                let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
+                let ba = a |> broadcastIfNecessary bsa
+                let bb = b |> broadcastIfNecessary bsb    
+                Binary(Dot, ba, bb)
+            | na, nb when na = nb + 1 ->
+                let psb = ShapeSpec.padRight sb
+                let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
+                let ba = a |> broadcastIfNecessary bsa
+                let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
+                Binary(Dot, ba, bb) |> reshape bsa.[0 .. na-2]
             | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
         |> check
 

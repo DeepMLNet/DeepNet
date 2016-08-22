@@ -416,17 +416,22 @@ module ShapeSpec =
             | Broadcast -> List.set dim size sa
             | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
-    let broadcastToSame mustEqual saIn sbIn =
+    let broadcastToSameInDims dims mustEqual saIn sbIn =
         let mutable sa, sb = saIn, sbIn
-        if nDim sa <> nDim sb then 
-            failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
-        for d = 0 to (nDim sa) - 1 do
+        for d in dims do
+            if not (d < nDim sa && d < nDim sb) then
+                failwithf "cannot broadcast shapes %A and %A to same size in non-existant dimension %d" sa sb d
             match sa.[d], sb.[d] with
                 | al, bl when al = Broadcast -> sa <- broadcast sa d bl
                 | al, bl when bl = Broadcast -> sb <- broadcast sb d al
                 | al, bl when (if mustEqual then al = bl else true) -> ()        
                 | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
+
+    let broadcastToSame mustEqual sa sb =
+        if nDim sa <> nDim sb then 
+            failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
+        broadcastToSameInDims [0 .. (nDim sa - 1)] mustEqual sa sb
 
     let enableBroadcast dim (sa: ShapeSpecT) =
         match sa.[dim] with

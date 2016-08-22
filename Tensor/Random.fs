@@ -1,5 +1,6 @@
-﻿namespace Basics
+﻿namespace ArrayNDNS
 
+open Basics
 open System
 
 

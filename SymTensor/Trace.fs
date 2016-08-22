@@ -29,6 +29,7 @@ module Trace =
         ExprEvals:      ResizeArray<ExprEvaluation>
     }
 
+
     let private activeTraceSession = new ThreadLocal<TraceSession option>()
     let private activeExprEval = new ThreadLocal<ExprEvaluation option>()
 
@@ -42,6 +43,40 @@ module Trace =
         | Some ts -> true
         | None -> false
 
+    let private endSession () =
+        let ts = 
+            match activeTraceSession.Value with
+            | Some ts -> ts
+            | None -> failwith "no trace has been started"
+        if activeExprEval.Value.IsSome then
+            failwith "trace session cannot end while expression is being evaluated"
+
+        activeTraceSession.Value <- None
+        ts.End <- Some DateTime.Now
+        ts
+
+    let private abortSession () =
+        activeExprEval.Value <- None
+        activeTraceSession.Value <- None
+
+    type TraceSessionHandle internal (ts: TraceSession) =       
+        let mutable ended = false
+
+        let abort () =
+            if not ended then
+                ended <- true
+                abortSession ()
+
+        member this.End () =
+            if ended then
+                failwithf "Trace session %s already finished" ts.Name
+            ended <- true
+            endSession ()
+
+        interface IDisposable with
+            member this.Dispose () = abort ()
+        override this.Finalize() = abort ()
+
     let startSession name = 
         match activeTraceSession.Value with
         | Some ts -> failwithf "trace session %s already active" ts.Name
@@ -54,18 +89,7 @@ module Trace =
             ExprEvals   = ResizeArray<ExprEvaluation>()
         }
         activeTraceSession.Value <- Some ts
-
-    let endSession () =
-        let ts = 
-            match activeTraceSession.Value with
-            | Some ts -> ts
-            | None -> failwith "no trace has been started"
-        if activeExprEval.Value.IsSome then
-            failwith "trace session cannot end while expression is being evaluated"
-
-        activeTraceSession.Value <- None
-        ts.End <- Some DateTime.Now
-        ts
+        new TraceSessionHandle(ts)
 
     let inline private getActiveExpr () = 
         match activeExprEval.Value with
