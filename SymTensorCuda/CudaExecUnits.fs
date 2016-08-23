@@ -26,15 +26,24 @@ module CudaExecUnitTypes =
         | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  
                       single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                       single * BlasTransposedMatrixTmpl
+        | BlasGemmBatched of BlasTransposeOpT * BlasTransposeOpT *  
+                      single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
+                      single * BlasTransposedMatrixBatchTmpl
+        // pointer array creation for CUBLAS batch calls
+        | BlasInitPointerArray of BlasTransposedMatrixBatchTmpl
         // misc
         | Trace of UExprT * ArrayNDManikinT
 
 
 module CudaExecUnit =
+    open ManagedCuda.BasicTypes
 
     /// Computes desired source views given desired target view.
     /// There is no guarantee that the desired source views will be used.
-    let srcReqsGivenTrgt cudaEnv trgtShape reqView op srcShapes =
+    let srcReqs cudaEnv {TargetShape=trgtShape
+                         TargetRequest=reqView
+                         Op=op
+                         SrcShapes=srcShapes} =
         let nSrcs = List.length srcShapes
 
         // requests all sources to use separate storage
@@ -120,8 +129,14 @@ module CudaExecUnit =
 
 
     /// computes the definitive target view of an op given its source views
-    let trgtGivenSrc compileEnv memAllocator (typ: TypeNameT) (trgtShape: NShapeSpecT) (req: ArrayNDManikinT option) 
-                     (op: UOpT) (srcs: ArrayNDManikinT list) (srcShared: bool list)  =
+    let trgtGivenSrcs compileEnv {MemAllocator=memAllocator
+                                  TargetType=typ
+                                  TargetShape=trgtShape
+                                  TargetRequest=req
+                                  Op=op
+                                  Srcs=srcsAndShared} =
+
+        let srcs, srcShared = List.unzip srcsAndShared
 
         // new allocated target
         let newTrgt () =
@@ -135,9 +150,9 @@ module CudaExecUnit =
              
         let outplaceBlasTrgt () = 
             match req with
-            | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) &&
-                           ArrayND.isBlasTargetable rv -> rv, false
-            | _ -> ArrayNDManikin.newF memAllocator typ trgtShape, false
+            | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
+                           not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
+            | _ -> ArrayNDManikin.newBlasTarget memAllocator typ trgtShape, false
 
         // target that reuses a srcView, if it may be overwritten
         let inplaceOvrwrtTrgt () =
@@ -232,7 +247,7 @@ module CudaExecUnit =
             else outplaceTrgt ()
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
    
-    /// execution item to lunch the given kernel template function
+    /// execution item to launch the given kernel template function
     let execItemsForKernel cppFuncName tmplTmpls argTmpls workDim = 
         let cFuncTmpl =
             {FuncName=cppFuncName;
@@ -366,22 +381,27 @@ module CudaExecUnit =
                 (ArrayND.nElems trgt) (ArrayND.nElems src)
         execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
-    /// BLAS input argument passing, so that orientation is preserved
+    /// BLAS input argument passing, so that orientation is preserved.
+    /// Can return copy items if deemed necessary.
     let blasArg memAllocator (manikin: ArrayNDManikinT) =
-        match (ArrayND.stride manikin) with
+        if ArrayND.nDims manikin < 2 then
+            failwith "need at least 2-dimensional array for BLAS argument"
+        let st = ArrayND.stride manikin
+        match st.[st.Length-2 ..] with
         | [_; 1] -> manikin, BlasTranspose, []
         | [1; _] -> ArrayND.transpose manikin, BlasId, []
-        | [_; _] -> 
+        | _ -> 
             // need to copy
-            let tmpView = ArrayNDManikin.newC memAllocator 
-                                                       (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
+            let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
             let copyOps = copyExecItems tmpView manikin
             tmpView, BlasTranspose, copyOps
-        | _ -> failwith "need 2-dimensional array for BLAS argument"
 
     /// BLAS target argument passing, so that orientation is preserved
     let blasTarget (manikin: ArrayNDManikinT) =
-        match (ArrayND.stride manikin) with
+        if ArrayND.nDims manikin < 2 then
+            failwith "need at least 2-dimensional array for BLAS target"
+        let st = ArrayND.stride manikin
+        match st.[st.Length-2 ..] with
         | [1; _] -> ArrayND.transpose manikin
         | _ -> failwith "cannot use specified view as BLAS target"
 
@@ -390,9 +410,9 @@ module CudaExecUnit =
         // void sum(TTarget &trgt, TSrc &src, 
         //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
         let tmpSize = ArrayNDManikin.sizeInBytes src
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize           
+        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev       
         execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl src;
-                                        ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+                                      ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
 
     let execItemsForSumAxis memAllocator ax trgt src =
         // we need to swap axes so that the axes the summation is performed over comes last
@@ -404,12 +424,16 @@ module CudaExecUnit =
         // void sumLastAxis(TTarget &trgt, TSrc &src, 
         //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
         let tmpSize = ArrayNDManikin.sizeInBytes srcAdj
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize
+        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev
         execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
                                                 ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
 
     /// returns the execution units for the specified op
-    let execItemsForOp compileEnv memAllocator trgt op srcs =
+    let execItemsForOp compileEnv {MemAllocator=memAllocator
+                                   Target=trgt
+                                   Op=op
+                                   Srcs=srcs
+                                   SubmitInitItems=submitInit} =
         match op with 
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
@@ -505,11 +529,38 @@ module CudaExecUnit =
             let aView, aOp, aCopyItems = blasArg memAllocator srcs.[0]
             let bView, bOp, bCopyItems = blasArg memAllocator srcs.[1]
             let tView = blasTarget trgt
-            let blasItems = [BlasGemm(aOp, bOp, 1.0f, 
-                                      BlasTransposedMatrixTmpl(aView), 
-                                      BlasTransposedMatrixTmpl(bView),
-                                      0.0f, BlasTransposedMatrixTmpl(tView))]
+        
+            let blasItems =    
+                match aView.NDims with
+                | 0 | 1 -> failwith "BLAS matrix must be at least two dimensional" 
+                | 2 -> // single matrix multiplication
+                    [BlasGemm(aOp, bOp, 1.0f, 
+                              BlasTransposedMatrixTmpl(aView), 
+                              BlasTransposedMatrixTmpl(bView),
+                              0.0f, BlasTransposedMatrixTmpl(tView))]
+                | _ -> // batched matrix multiplication
+                    // allocate memory for pointer arrays and create argument templates
+                    let aTmpl = BlasTransposedMatrixBatchTmpl(aView, memAllocator)   
+                    let bTmpl = BlasTransposedMatrixBatchTmpl(bView, memAllocator)   
+                    let tTmpl = BlasTransposedMatrixBatchTmpl(tView, memAllocator)   
+
+                    // set pointer array values either during initialization (for allocated arrays)
+                    // or runtime (for variable arrays)
+                    let initOrExec (tmpl: BlasTransposedMatrixBatchTmpl) (initItems, execItems) =
+                        match tmpl.Manikin.Storage with
+                        | MemAlloc _ -> initItems @ [BlasInitPointerArray tmpl], execItems
+                        | MemExternal _ -> initItems, execItems @ [BlasInitPointerArray tmpl]
+                    let initItems, execItems =
+                        ([], [])
+                        |> initOrExec aTmpl
+                        |> initOrExec bTmpl
+                        |> initOrExec tTmpl
+
+                    submitInit initItems
+                    execItems @ [BlasGemmBatched(aOp, bOp, 1.0f, aTmpl, bTmpl, 0.0f, tTmpl)]
+
             aCopyItems @ bCopyItems @ blasItems
+
         | UBinaryOp TensorProduct -> [] // TODO
 
         // nary
@@ -529,24 +580,11 @@ module CudaExecUnit =
             copyItems @ setItems
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
-         
-         
-    /// returns the execution units for the specified op
-    let warmupExecItemsForOp compileEnv memAllocator trgt op (srcs: ArrayNDManikinT list) =
-        let warmupManikin (manikin: ArrayNDManikinT) =
-            match manikin.Storage with
-            | MemAlloc _ -> manikin
-            | _ -> ArrayNDManikin.newC memAllocator 
-                                                (ArrayNDManikin.typeName manikin) 
-                                                (ArrayNDLayout.shape manikin.Layout) 
-
-        match op with 
-        | UUnaryOp Sum -> execItemsForSum memAllocator (warmupManikin trgt) (warmupManikin srcs.[0])
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax (warmupManikin trgt) (warmupManikin srcs.[0])
-        | _ -> []
-
+                
     /// returns the execution units for tracing the result
-    let execItemsForTrace compileEnv memAllocator trgt uexpr =
+    let traceItemsForExpr compileEnv {MemAllocator=memAllocator
+                                      Target=trgt
+                                      Expr=uexpr} =
         [Trace (uexpr, trgt)]
 
 
@@ -554,10 +592,9 @@ module CudaExecUnit =
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
         ExecUnit.exprToExecUnits {
             ExecItemsForOp=execItemsForOp compileEnv
-            WarmupExecItemsForOp=warmupExecItemsForOp compileEnv
-            ExecItemsForTrace=execItemsForTrace compileEnv
-            TrgtGivenSrc=trgtGivenSrc compileEnv
-            SrcReqsGivenTrgt=srcReqsGivenTrgt compileEnv
+            TraceItemsForExpr=traceItemsForExpr compileEnv
+            TrgtGivenSrcs=trgtGivenSrcs compileEnv
+            SrcReqs=srcReqs compileEnv
         } 
 
 

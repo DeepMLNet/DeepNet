@@ -1,0 +1,1 @@
+<Playlist Version="1.0"><Add Test="OpTests.Trace compare: matrix-vector dot" /><Add Test="OpTests.Trace compare: batched matrix-matrix dot" /><Add Test="OpTests.Trace compare: matrix-matrix dot" /></Playlist>

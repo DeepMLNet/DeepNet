@@ -42,24 +42,29 @@ module CudaRecipeTypes =
         | CublasSgemm       of CudaBlas.Operation * CudaBlas.Operation *
                                single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                                single * BlasTransposedMatrixTmpl * StreamT
+        | CublasSgemmBatched of CudaBlas.Operation * CudaBlas.Operation *
+                               single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
+                               single * BlasTransposedMatrixBatchTmpl * StreamT
+        // pointer array creation for CUBLAS batch calls
+        | CublasInitPointerArray of BlasTransposedMatrixBatchTmpl * StreamT
         // misc
         | Trace             of UExprT * ArrayNDManikinT
 
 
     /// function instantiation state
     type TmplInstCacheT = {
-        mutable Insts: (TmplInstT * string) list;
-        mutable Code:  (TmplInstT * string) list;
+        mutable Insts: (TmplInstT * string) list
+        mutable Code:  (TmplInstT * string) list
     } 
 
 
     /// CUDA execution recipe
     type CudaRecipeT = {
-        KernelCode:         string;
-        CPPCode:            string;
-        InitCalls:          CudaCallT list;
-        DisposeCalls:       CudaCallT list;
-        ExecCalls:          CudaCallT list;
+        KernelCode:         string
+        CPPCode:            string
+        InitCalls:          CudaCallT list
+        DisposeCalls:       CudaCallT list
+        ExecCalls:          CudaCallT list
     }
 
 
@@ -110,9 +115,6 @@ module TmplInstCache =
 
 
 module CudaRecipe =
-
-    [<Literal>]
-    let EnableWarmup = false
 
     let commonIncludes = ["Utils.cuh"; "NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
     let kernelModuleIncludes = commonIncludes
@@ -172,8 +174,14 @@ module CudaRecipe =
             [MemsetD32Async(trgt, single value, strm)]      
         | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
             [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                            aFac, a, b, trgtFac, trgt, strm)]    
-        | CudaExecItemT.Trace (expr, res) -> [Trace (expr, res)]
+                         aFac, a, b, trgtFac, trgt, strm)]   
+        | BlasGemmBatched(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
+            [CublasSgemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
+                                aFac, a, b, trgtFac, trgt, strm)]   
+        | BlasInitPointerArray(aryTmpl) ->
+            [CublasInitPointerArray(aryTmpl, strm)]
+        | CudaExecItemT.Trace (expr, res) -> 
+            [Trace (expr, res)]
 
     /// generates a sequence of CUDA calls from streams
     let generateCalls streams cache =    
@@ -267,25 +275,7 @@ module CudaRecipe =
                     let streamCallHistory = strmIdToProcess :: streamCallHistory
 
                     // generate CUDA call template
-                    let calls = 
-                        match cmd with
-                        | LaunchKernel(ti, workDim, args) -> 
-                            [LaunchCKernel(TmplInstCache.instCPPTmplFunc ti cache, workDim, 0, strmIdToProcess, args)]
-                        | CudaExecItemT.CallCFunc(ti, dlgte, args) ->
-                            [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strmIdToProcess, args)]
-                        | MemcpyDtoD(src, trgt) -> 
-                            [MemcpyAsync(trgt, src, strmIdToProcess)]
-                        | MemcpyHtoD(hostSrc, trgt) -> 
-                            [MemcpyHtoDAsync(trgt, hostSrc, strmIdToProcess)]
-                        | MemcpyDtoH(src, hostTrgt) ->
-                            [MemcpyDtoHAsync(hostTrgt, src, strmIdToProcess)]   
-                        | Memset(value, trgt) ->                        
-                            [MemsetD32Async(trgt, single value, strmIdToProcess)]      
-                        | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
-                            [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                                         aFac, a, b, trgtFac, trgt, strmIdToProcess)]  
-                        | CudaExecItemT.Trace(uexpr, res) ->
-                            [Trace(uexpr, res)]    
+                    let calls = callsForExecItem cmd cache strmIdToProcess
 
                     calls @ generate streamCallHistory activeEvents remainingStreams
                 | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 
@@ -328,11 +318,10 @@ module CudaRecipe =
 
         memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
 
-    /// generate warmup CUDA calls
-    let generateWarmup warmupItems cache =
-        seq { for cmd in warmupItems do
-                  yield! callsForExecItem cmd cache 0 }
-        |> Seq.toList
+    /// generate initalization CUDA calls
+    let generateInitCalls initItems cache =
+        [for cmd in initItems do
+            yield! callsForExecItem cmd cache 0]
 
     /// builds a CUDA recipe for the given unified expression
     let build compileEnv expr =
@@ -341,13 +330,13 @@ module CudaRecipe =
         // generate execution units from unified expression
         if Debug.TraceCompile then printfn "Generating execution units..."
         let sw = Stopwatch.StartNew()
-        let execUnits, exprRes, memAllocs, warmup = CudaExecUnit.exprToCudaExecUnits compileEnv expr
+        let euData = CudaExecUnit.exprToCudaExecUnits compileEnv expr
         let timeForExecUnits = sw.Elapsed
 
         // map execution units to streams
         if Debug.TraceCompile then printfn "Generating streams..."
         let sw = Stopwatch.StartNew()
-        let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams execUnits
+        let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams euData.ExecUnits
         let timeForStreams = sw.Elapsed
 
         // generate CUDA calls for execution and initialization
@@ -356,12 +345,9 @@ module CudaRecipe =
         let tmplInstCache = {Insts=[]; Code=[]}
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
-            generateAllocAndDispose memAllocs (List.length streams) eventObjCnt
-        let warmupCalls = 
-            generateWarmup warmup tmplInstCache
+            generateAllocAndDispose euData.MemAllocs (List.length streams) eventObjCnt
         let initCalls =
-            if EnableWarmup then allocCalls @ warmupCalls
-            else allocCalls
+            allocCalls @ generateInitCalls euData.InitItems tmplInstCache
         let timeForCalls = sw.Elapsed
 
         // diagnostic output
@@ -372,7 +358,7 @@ module CudaRecipe =
             printfn "Stream generation:      %A" timeForStreams
             printfn "Call generation:        %A" timeForCalls
         if Debug.MemUsage then
-            let memUsage = memAllocs |> List.sumBy (fun ma -> ma.ByteSize)
+            let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)
             printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
 
 

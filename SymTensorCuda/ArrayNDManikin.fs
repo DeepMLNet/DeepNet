@@ -11,11 +11,19 @@ open SymTensor
 module ArrayNDManikinTypes = 
     open ArrayND
 
+    /// memory allocation type
+    type MemAllocKindT =
+        /// device memory allocation
+        | MemAllocDev
+        /// registered host memory allocation
+        | MemAllocRegHost
+
     /// represents a memory allocation exclusively for this expression (used for temporary results)
     type MemAllocManikinT = {
-        Id:             int; 
-        TypeName:       TypeNameT; 
-        Elements:       int;
+        Id:             int
+        TypeName:       TypeNameT
+        Elements:       int
+        Kind:           MemAllocKindT
     } with
         member this.ByteSize =
             this.Elements * TypeName.size this.TypeName
@@ -79,14 +87,31 @@ module ArrayNDManikin =
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with contiguous layout
     let newC memAllocator typ shape = 
         let layout = ArrayNDLayout.newC shape
-        ArrayNDManikinT (layout, 
-                         (memAllocator typ (ArrayNDLayout.nElems layout)))
+        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout
     let newF memAllocator typ shape = 
         let layout = ArrayNDLayout.newF shape
-        ArrayNDManikinT (layout, 
-                         (memAllocator typ (ArrayNDLayout.nElems layout)))
+        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+
+    /// create a new MemoryManikinT and a new ArrayNDManikinT with layout suitable for being a BLAS target
+    let newBlasTarget memAllocator typ shape = 
+        let nd = List.length shape
+        let smplShp = shape.[0..nd-3]
+        let matRows, matCols = shape.[nd-2], shape.[nd-1]
+        let matElems = matRows * matCols
+        let rec smplStride (shp: int list) =
+            match shp with
+            | [] -> []
+            | [l] -> [matElems]
+            | l::(lp::lrest) ->
+                match smplStride (lp::lrest) with 
+                | sp::srest -> (lp*sp)::sp::srest
+                | [] -> failwith "unexpected"           
+        let stride = smplStride smplShp @ [1; matRows]
+        
+        let layout = {Shape=shape; Stride=stride; Offset=0}
+        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
     let externalC storage shape =
@@ -109,8 +134,18 @@ module ArrayNDManikin =
     let offsetInBytes ary =
         (typeSize ary) * (ArrayND.offset ary)
 
+    /// address of given element in bytes (relative to start of array)
+    let addrInBytes idx ary =
+        (typeSize ary) * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
+
     /// size in bytes 
     let sizeInBytes ary =
         (typeSize ary) * (ArrayND.nElems ary)
+
+    /// True if array can be target of BLAS operation.
+    let canBeBlasTarget ary =
+        let nd = ArrayND.nDims ary
+        nd >= 2 && (ArrayND.stride ary).[nd-2] = 1
+            
 
         

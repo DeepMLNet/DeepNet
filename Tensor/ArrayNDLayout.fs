@@ -58,17 +58,19 @@ module ArrayNDLayout =
     /// number of elements 
     let inline nElems a = List.fold (*) 1 (shape a)
 
+    /// a sequence of indicies enumerating all elements of the array with the given shape
+    let rec allIdxOfShape shp = seq {
+        match shp with
+        | l::ls ->
+            for i=0 to l - 1 do
+                for is in allIdxOfShape ls do
+                    yield i::is
+        | [] -> yield []
+    } 
+
     /// sequence of all indices 
     let inline allIdx a =
-        let rec generate shp = seq {
-            match shp with
-            | l::ls ->
-                for i=0 to l - 1 do
-                    for is in generate ls do
-                        yield i::is
-            | [] -> yield []
-        } 
-        generate (shape a)
+        allIdxOfShape (shape a)
 
     /// all indices of the given dimension
     let inline allIdxOfDim dim a =
@@ -219,10 +221,12 @@ module ArrayNDLayout =
         {a with Shape=shp |> List.set ax1 shp.[ax2] |> List.set ax2 shp.[ax1]; 
                 Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1];}
 
-    /// transposes the given layout of a matrix
+    /// Transposes the given layout of a matrix.
+    /// If the array has more then two dimensions, the last two axes are swapped.
     let inline transpose a =
-        if nDims a <> 2 then failwithf "cannot transpose non-matrix of shape %A" (shape a)
-        swapDim 0 1 a
+        let nd = nDims a
+        if nd < 2 then failwithf "cannot transpose non-matrix of shape %A" (shape a)
+        swapDim (nd-2) (nd-1) a
 
     /// reorders the axes as specified
     let inline reorderAxes (newOrder: int list) a =

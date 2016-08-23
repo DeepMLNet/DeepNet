@@ -242,11 +242,12 @@ module CudaExprWorkspaceTypes =
 
         /// execution environment
         let execEnv = {
-            Stream = new Dictionary<StreamT, CudaStream>();
-            Event = new Dictionary<EventObjectT, CudaEvent>();
-            InternalMem = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>();
-            ExternalVar = Map.empty;
-            HostVar = Map.empty;
+            Stream = new Dictionary<StreamT, CudaStream>()
+            Event = new Dictionary<EventObjectT, CudaEvent>()
+            InternalMem = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>()
+            RegHostMem = new Dictionary<MemAllocManikinT, RegHostMemT>()
+            ExternalVar = Map.empty
+            HostVar = Map.empty
         }
 
         /// all kernel calls
@@ -320,14 +321,28 @@ module CudaExprWorkspaceTypes =
                 | CudaCallT.MemAlloc mem -> 
                     let typeSize = Marshal.SizeOf (TypeName.getType mem.TypeName)
                     let elements = if mem.Elements > 0 then mem.Elements else 1
-                    try
-                        execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
-                    with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory ->
-                        failwithf "Out of CUDA memory while allocating %d bytes" (elements * typeSize)
+                    match mem.Kind with
+                    | MemAllocDev ->
+                        try
+                            execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
+                        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory ->
+                            failwithf "Out of CUDA memory while allocating %d bytes" (elements * typeSize)
+                    | MemAllocRegHost ->
+                        let sizeInBytes = elements * typeSize
+                        let ptr = Marshal.AllocHGlobal sizeInBytes
+                        let cudaRegMem = new CudaRegisteredHostMemory<byte> (ptr, SizeT sizeInBytes)
+                        execEnv.RegHostMem.Add(mem, {Ptr=ptr; CudaRegHostMem=cudaRegMem})
                 | CudaCallT.MemFree mem ->
-                    if execEnv.InternalMem.ContainsKey mem then
-                        execEnv.InternalMem.[mem].Dispose()
-                        execEnv.InternalMem.Remove(mem) |> ignore
+                    match mem.Kind with
+                    | MemAllocDev ->
+                        if execEnv.InternalMem.ContainsKey mem then
+                            execEnv.InternalMem.[mem].Dispose()
+                            execEnv.InternalMem.Remove mem |> ignore
+                    | MemAllocRegHost ->
+                        if execEnv.RegHostMem.ContainsKey mem then
+                            execEnv.RegHostMem.[mem].CudaRegHostMem.Dispose()
+                            Marshal.FreeHGlobal execEnv.RegHostMem.[mem].Ptr
+                            execEnv.RegHostMem.Remove mem |> ignore
 
                 // memory operations
                 | MemcpyAsync (dst, src, strm) ->
@@ -422,9 +437,9 @@ module CudaExprWorkspaceTypes =
 
                 // CUBLAS 
                 | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    let aVar = (a :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>     
-                    let bVar = (b :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>    
-                    let trgtVar = (trgt :> ICudaArgTmpl).GetArg execEnv (getStream strm) :?> CudaDeviceVariable<single>
+                    use aVar = a.GetVar execEnv
+                    use bVar = b.GetVar execEnv
+                    use trgtVar = trgt.GetVar execEnv
                     let m = a.GetRowsForOp execEnv aOp
                     let n = b.GetColumnsForOp execEnv bOp
                     let k = a.GetColumnsForOp execEnv aOp
@@ -432,7 +447,35 @@ module CudaExprWorkspaceTypes =
                     let ldB = b.GetLeadingDimension execEnv
                     let ldTrgt = trgt.GetLeadingDimension execEnv
                     CudaSup.blas.Stream <- getStream strm
+
+                    let trgtManikin = trgt.Manikin
+                    printfn "Target: shape: %A  stride: %A" trgtManikin.Shape (ArrayND.stride trgtManikin)
+                    printfn "size in bytes: %d" (int trgtVar.SizeInBytes)
+
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
+
+                | CublasSgemmBatched (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    use bAry = b.GetPointerArrayDevice execEnv
+                    use trgtAry = trgt.GetPointerArrayDevice execEnv                    
+                    let m = a.GetRowsForOp execEnv aOp
+                    let n = b.GetColumnsForOp execEnv bOp
+                    let k = a.GetColumnsForOp execEnv aOp
+                    let ldA = a.GetLeadingDimension execEnv
+                    let ldB = b.GetLeadingDimension execEnv
+                    let ldTrgt = trgt.GetLeadingDimension execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GemmBatched(aOp, bOp, m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, trgtAry, ldTrgt, a.NSamples)
+
+                | CublasInitPointerArray (aryTmpl, strm) ->
+                    let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
+                    let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
+                    for n = 0 to ptrAryValues.Length - 1 do
+                        Marshal.StructureToPtr (ptrAryValues.[n], 
+                                                ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
+
+                    use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
+                    ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
 
                 // misc
                 | Trace (uexpr, res) ->

@@ -40,18 +40,55 @@ module ExecUnitsTypes =
         OnCompletion:   EvalResultT -> unit
     }
 
-    /// generator function record
-    type ExecUnitsGeneratorT<'e> = {ExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
-                                                    ArrayNDManikinT list -> 'e list;
-                                    WarmupExecItemsForOp: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> UOpT -> 
-                                                          ArrayNDManikinT list -> 'e list;
-                                    ExecItemsForTrace: (TypeNameT -> int -> MemManikinT) -> ArrayNDManikinT -> 
-                                                       UExprT -> 'e list;
-                                    TrgtGivenSrc: (TypeNameT -> int -> MemManikinT) -> TypeNameT -> NShapeSpecT -> 
-                                                  ArrayNDManikinT option -> UOpT -> ArrayNDManikinT list -> bool list -> 
-                                                  ArrayNDManikinT * bool;
-                                    SrcReqsGivenTrgt: NShapeSpecT -> ArrayNDManikinT option -> UOpT -> NShapeSpecT list -> 
-                                                      ArrayNDManikinT option list;}
+    type MemAllocatorT = TypeNameT -> int -> MemAllocKindT -> MemManikinT
+
+    type ExecItemsForOpArgs<'e> = {
+        MemAllocator:       MemAllocatorT
+        Target:             ArrayNDManikinT
+        Op:                 UOpT
+        Srcs:               ArrayNDManikinT list
+        SubmitInitItems:    'e list -> unit
+    }
+
+    type TraceItemsForExprArgs = {
+        MemAllocator:       MemAllocatorT
+        Target:             ArrayNDManikinT
+        Expr:               UExprT
+    }
+
+    type TrgtGivenSrcsArgs = {
+        MemAllocator:       MemAllocatorT
+        TargetType:         TypeNameT
+        TargetShape:        NShapeSpecT
+        TargetRequest:      ArrayNDManikinT option
+        Op:                 UOpT
+        Srcs:               (ArrayNDManikinT * bool) list    
+    }
+
+    type SrcReqsArgs = {
+        TargetShape:        NShapeSpecT
+        TargetRequest:      ArrayNDManikinT option
+        Op:                 UOpT
+        SrcShapes:          NShapeSpecT list 
+    }
+
+    /// record containing functions called by the ExecUnitT generator
+    type ExecUnitsGeneratorT<'e> = {
+        ExecItemsForOp:         ExecItemsForOpArgs<'e> -> 'e list
+        TraceItemsForExpr:      TraceItemsForExprArgs -> 'e list
+        TrgtGivenSrcs:          TrgtGivenSrcsArgs -> ArrayNDManikinT * bool
+        SrcReqs:                SrcReqsArgs -> ArrayNDManikinT option list
+    }
+
+    /// generated ExecUnits for an expression
+    type ExecUnitsForExprT<'e> = {
+        Expr:           UExprT
+        ExecUnits:      ExecUnitT<'e> list
+        Result:         EvalResultT
+        MemAllocs:      MemAllocManikinT list
+        InitItems:      'e list
+    }
+
 
 module ExecUnit =
 
@@ -197,7 +234,7 @@ module ExecUnit =
 
     /// Builds a map that for every storage contains a set of the ids of the ExecUnits
     /// that will access it last during execution.
-    let buildLastStorageAccess (coll: Collection<'e>) : Map<MemManikinT, Set<ExecUnitIdT>> =
+    let private buildLastStorageAccess (coll: Collection<'e>) : Map<MemManikinT, Set<ExecUnitIdT>> =
                 
         // map of last storage access taking into account the key ExecUnit and its predecessors
         let lastStorageAccessInOrAbove = 
@@ -257,7 +294,7 @@ module ExecUnit =
 
 
     /// Builds the rerun-after dependencies for the ExecUnits.
-    let buildRerunAfter execUnits = 
+    let private buildRerunAfter execUnits = 
         // build ExecUnit collection
         let coll = Collection execUnits
             
@@ -342,87 +379,8 @@ module ExecUnit =
         |> List.map (fun eu -> {eu with RerunAfter=rerunAfter.[eu.Id] |> Seq.toList})
              
 
-#if FALSE
-    /// Builds the rerun-after dependencies for the ExecUnits.
-    let buildRerunAfterOld execUnits (exprRes: EvalResultT option) = 
-        let coll = Collection execUnits
-        let execUnits = coll.SortedByDep
-        let lastEu = 
-            execUnits 
-            |> List.find (fun eu -> eu.Id = exprRes.Value.ExecUnitId)           
-        let emptyRerunAfter =
-            seq {for eu in execUnits -> eu.Id, []} |> Map.ofSeq
-        let rerunAfterBuild =            
-            (emptyRerunAfter, execUnits)
-            ||> List.fold (fun (rerunAfterSoFar: Map<ExecUnitIdT, ExecUnitIdT list>) eu ->
-
-                // An ExecUnit may not be rerun while the storage it uses is still in use by the previous invocation.
-                let rerunAfter = seq {
-                    // For each storage:
-                    for m in eu.Manikins do
-                        // Starting from the result, find the last node in each tree branch that accesses the storage.
-                        // We may only run again, after these ExecUnits have finished.
-                        yield! coll.LastStorageAccess m.Storage lastEu 
-
-                    // If this execution unit is a variable read:
-                    match eu.Expr with
-                    | UExpr(ULeafOp (Var readVs), _, _, _) ->
-                        // Find all StoreToVars to the same variable operations.
-                        // We may only run again, after the previous variable write has been completed.
-                        yield! coll.StoresToVar readVs
-                    | _ -> ()
-                }
-
-                let allPredecessorsOfEu = coll.AllPredecessorsOf eu |> Seq.cache
-
-                /// Rerun after ExecUnits of this eu and all its predecessors
-                let rerunAfterInclPredecessors =
-                    allPredecessorsOfEu
-                    |> Seq.map (fun peu -> rerunAfterSoFar.[peu.Id])
-                    |> Seq.concat
-                    |> Seq.append (rerunAfter |> Seq.map (fun eu -> eu.Id))
-                    |> Set.ofSeq
-
-                /// true if eu reruns after b. (either by having b in its RerunAfter list or by 
-                /// having a predecessor that has b in its RerunAfter list)
-                let rerunsAfter (b: ExecUnitT<'e>) = 
-                    if rerunAfterSoFar.[eu.Id] |> List.contains b.Id then true
-                    else
-                        allPredecessorsOfEu
-                        |> Seq.exists (fun peu -> rerunAfterSoFar.[peu.Id] |> List.contains b.Id)
-
-                // Filter redundant RerunAfter dependencies.
-                let rerunAfterFiltered =
-                    rerunAfter
-                    |> Seq.filter (fun ra ->
-                        // We can omit a node from our RerunAfter list, if
-                        // - we depend on the node, because then we are run afterwards anyway,
-                        let euDependsOnRa = allPredecessorsOfEu |> Seq.contains ra
-                        // - any of our predecessors has the node already in their RerunAfter list.
-                        let euDependsOnNodeRerunningAfterRa = rerunsAfter ra 
-                        // - we, or any of our predecessors, have a successor of the node already in our RerunAfter list.
-                        let successorsOfRaIds =
-                            coll.AllSuccessorsOf ra 
-                            |> Seq.map (fun eu -> eu.Id)
-                            |> Set.ofSeq
-                        let euRerunsAfterSuccessorOfRa =
-                            Set.intersect rerunAfterInclPredecessors successorsOfRaIds
-                            |> Set.isEmpty
-                            |> not
-                        // combine
-                        not (euDependsOnRa || euDependsOnNodeRerunningAfterRa || euRerunsAfterSuccessorOfRa)
-                    )
-                                        
-                rerunAfterSoFar |> Map.add eu.Id (rerunAfterFiltered |> Seq.map (fun eu -> eu.Id) |> Seq.toList)
-            )
-
-        execUnits
-        |> List.map (fun eu -> {eu with RerunAfter=rerunAfterBuild.[eu.Id]})
-#endif
-
-
     /// generates execution units that will evaluate the given unified expression
-    let exprToExecUnits gen (expr: UExprT) =
+    let exprToExecUnits (gen: ExecUnitsGeneratorT<'e>) (expr: UExprT) : ExecUnitsForExprT<'e> =
 
         // number of occurrences of subexpressions
         let sw = Stopwatch.StartNew()
@@ -442,15 +400,15 @@ module ExecUnit =
         let submitExecUnit eu =
             execUnits <- eu :: execUnits
 
-        let mutable warmupItems = []
-        let submitWarmupItems wi =
-            warmupItems <- wi @ warmupItems
+        let mutable initItems = []
+        let submitInitItems ii =
+            initItems <- ii @ initItems
 
         // storage space
         let mutable memAllocIdCnt = 0
         let mutable memAllocs = []
-        let newMemory typ elements = 
-            let mem = {Id=(List.length memAllocs); TypeName=typ; Elements=elements}
+        let newMemory typ elements kind = 
+            let mem = {Id=List.length memAllocs; TypeName=typ; Elements=elements; Kind=kind}
             memAllocs <- mem :: memAllocs
             MemAlloc mem
 
@@ -521,14 +479,26 @@ module ExecUnit =
                                 |> List.map (fun s -> subres.[s].Manikin, subres.[s].Shared, subres.[s].ExecUnitId) 
                                 |> List.unzip3
                             let trgtView, trgtShared =
-                                gen.TrgtGivenSrc newMemory typ (numShapeOf erqExpr) erqTarget op srcViews srcShared
+                                gen.TrgtGivenSrcs {MemAllocator=newMemory
+                                                   TargetType=typ
+                                                   TargetShape=numShapeOf erqExpr
+                                                   TargetRequest=erqTarget
+                                                   Op=op
+                                                   Srcs=List.zip srcViews srcShared}
                             let trgtShared = trgtShared || erqResultShared
 
                             // generate execution items
                             let items = 
-                                gen.ExecItemsForOp newMemory trgtView op srcViews  @
-                                if Trace.isActive () then gen.ExecItemsForTrace newMemory trgtView erqExpr
-                                else []
+                                gen.ExecItemsForOp {MemAllocator=newMemory
+                                                    Target=trgtView
+                                                    Op=op
+                                                    Srcs=srcViews
+                                                    SubmitInitItems=submitInitItems}
+                                @ if Trace.isActive () then 
+                                    gen.TraceItemsForExpr {MemAllocator=newMemory
+                                                           Target=trgtView
+                                                           Expr=erqExpr}
+                                  else []
 
                             // emit execution unit 
                             let eu = {
@@ -540,17 +510,17 @@ module ExecUnit =
                                 RerunAfter = []
                             }                                    
                             submitExecUnit eu
-
-                            // handle warmup items
-                            submitWarmupItems (gen.WarmupExecItemsForOp newMemory trgtView op srcViews)
-                            
+                           
                             completeEvalRequest {ExecUnitId=eu.Id; Manikin=trgtView; Shared=trgtShared}
 
                     // submit eval requests from sources
                     if List.isEmpty srcs then onMaybeCompleted ()
                     else
                         let srcReqStorages = 
-                            gen.SrcReqsGivenTrgt (numShapeOf erqExpr) erqTarget op (List.map numShapeOf srcs)                    
+                            gen.SrcReqs {TargetShape=numShapeOf erqExpr
+                                         TargetRequest=erqTarget
+                                         Op=op
+                                         SrcShapes=List.map numShapeOf srcs}
                         for src, srcReqStorage in List.zip srcs srcReqStorages do
                             submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
                                 subreqResults <- subreqResults |> Map.add src (Some res)
@@ -609,6 +579,12 @@ module ExecUnit =
             printfn "Building RerunAfter dependencies took %A" sw.Elapsed
         #endif // !DISABLE_RERUN_AFTER
 
-        execUnits, exprRes, memAllocs, warmupItems
+        {
+            Expr = expr
+            ExecUnits = execUnits
+            Result = exprRes.Value
+            MemAllocs = memAllocs
+            InitItems = initItems
+        }
 
 

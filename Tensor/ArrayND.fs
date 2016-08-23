@@ -392,10 +392,6 @@ module ArrayND =
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
 
-    /// true if ArrayND can be target of a BLAS operation
-    let inline isBlasTargetable a =
-        (nDims a = 2) && (isF a)
-
     /// true if a and b have at least one element in common
     let inline overlapping a b = 
         false // TODO
@@ -505,7 +501,8 @@ module ArrayND =
     let inline swapDim ax1 ax2 a =
         relayout (ArrayNDLayout.swapDim ax1 ax2 (layout a)) a
 
-    /// transposes the given matrix
+    /// Transposes the given matrix.
+    /// If the array has more then two dimensions, the last two axes are swapped.
     let inline transpose a =
         relayout (ArrayNDLayout.transpose (layout a)) a
 

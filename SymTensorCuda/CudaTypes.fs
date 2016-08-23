@@ -63,13 +63,19 @@ module Types =
         EmittingExecUnitId: int;
     }
 
+    type RegHostMemT = {
+        Ptr:                    nativeint
+        CudaRegHostMem:         CudaRegisteredHostMemory<byte>
+    }
+
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
-        Stream:                 Dictionary<StreamT, CudaStream>;
-        Event:                  Dictionary<EventObjectT, CudaEvent>;
-        InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>;
-        mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>;
-        mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>;
+        Stream:                 Dictionary<StreamT, CudaStream>
+        Event:                  Dictionary<EventObjectT, CudaEvent>
+        InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>
+        RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
+        mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
+        mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
     }
     
     /// CUDA device memory range
@@ -107,15 +113,25 @@ module Types =
 
 module CudaExecEnv = 
 
-    /// gets device memory and offset in bytes for an internal allocation or external reference
-    let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
-        match manikin.Storage with
+    /// Gets allocated host memory.
+    let getHostRegMem (env: CudaExecEnvT) (memManikin: MemManikinT) = 
+        match memManikin with
+        | MemAlloc im -> env.RegHostMem.[im]
+        | _ -> failwithf "memory manikin %A was supposed to be an allocation" memManikin
+
+    /// Gets device memory and offset in bytes for an internal allocation or external reference.
+    let getDevMem (env: CudaExecEnvT) (memManikin: MemManikinT) =
+        match memManikin with
         | MemAlloc im -> env.InternalMem.[im], 0
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
             if ArrayND.isC ev then 
                 ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
             else failwithf "external variable %A was expected to be contiguous" vs
+
+    /// gets device memory and offset in bytes for an internal allocation or external reference
+    let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+        getDevMem env manikin.Storage
 
     /// gets host memory for an external reference
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -128,7 +144,6 @@ module CudaExecEnv =
                 failwithf "host variable %A was expected to be contiguous \
                            with zero offset" vs
         | _ -> failwithf "host variable must be of type ExternalMem" 
-
 
     /// gets an IArrayNDCudaT in device memory for the specified manikin
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -252,6 +267,11 @@ module ArgTemplates =
             member this.CPPTypeName = "size_t"
             member this.GetArg env strm = box (nativeint value) 
 
+//    type CUdeviceptrArrayArgTmpl (MemManikinT) =
+//        interface ICudaArgTmpl with
+//            member this.CPPTypeName = "CUdeviceptr **"
+//            member this.GetArg env strm = box (nativeint value) 
+
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "CUstream"
@@ -296,6 +316,8 @@ module ArgTemplates =
             | [_; _] -> ()
             | _ -> failwith "ArrayND for use with BLAS must be 2-dimensional"         
 
+        member this.Manikin = manikin
+
         member this.GetLeadingDimension env =
             (ArrayND.stride manikin).[0] 
 
@@ -319,14 +341,88 @@ module ArgTemplates =
             | CudaBlas.Operation.ConjugateTranspose -> this.GetColumns env
             | _ -> failwithf "unknown CudaBlas.Operation %A" op
 
+        member this.GetVar env =
+            let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin
+            let offset = memOffset + ArrayNDManikin.offsetInBytes manikin
+            new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offset), 
+                                            devVar.SizeInBytes - offset)
+
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float"
-            member this.GetArg env strm = 
-                let devVar, offset = CudaExecEnv.getDevMemForManikin env manikin
-                // need to adjust by offset
-                let offsetTotal = offset + ArrayNDManikin.offsetInBytes manikin
-                new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offsetTotal), 
-                                               devVar.SizeInBytes - offsetTotal) :> obj
+            member this.GetArg env strm = this.GetVar env |> box
+
+    /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "(float *)[]".
+    /// All but the last two dimensions are exposed as batches.
+    type BlasTransposedMatrixBatchTmpl (manikin:         ArrayNDManikinT, 
+                                        ptrAryDevMem:    MemManikinT,
+                                        ptrAryHostMem:   MemManikinT) =
+
+        let nDims = ArrayND.nDims manikin
+        let rowDim = nDims - 2
+        let colDim = nDims - 1
+        let batchShp = manikin.Shape.[0 .. nDims-3]
+        let nSmpls = batchShp |> List.fold (*) 1      
+
+        do
+            if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
+                failwith "CUBLAS currently requires single values"
+            if nDims < 3 then
+                failwith "Batched ArrayND for BLAS requires 3 or more dimensions"
+            let stride = ArrayND.stride manikin
+            match stride.[nDims-2 ..] with
+            | [0; _] -> failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
+            | [_; n] when n <> 1 -> failwithf "ArrayND for use with BLAS must be continguous in last dimension but has stride %d" n
+            | _ -> ()
+            
+        new (manikin: ArrayNDManikinT, memAllocator: MemAllocatorT) =
+            let nSmpls = manikin.Shape.[0 .. manikin.NDims-3] |> List.fold (*) 1      
+            let ptrAryDevMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocDev
+            let ptrAryHostMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocRegHost
+            BlasTransposedMatrixBatchTmpl(manikin, ptrAryDevMem, ptrAryHostMem)        
+
+        member this.NSamples = nSmpls
+
+        member this.Manikin = manikin
+
+        member this.GetLeadingDimension env =
+            (ArrayND.stride manikin).[rowDim] 
+
+        member this.GetColumns env =
+            (ArrayND.shape manikin).[rowDim]
+
+        member this.GetRows env =
+            (ArrayND.shape manikin).[colDim]
+
+        member this.GetColumnsForOp env op =
+            match op with 
+            | CudaBlas.Operation.NonTranspose -> this.GetColumns env
+            | CudaBlas.Operation.Transpose 
+            | CudaBlas.Operation.ConjugateTranspose -> this.GetRows env
+            | _ -> failwithf "unknown CudaBlas.Operation %A" op
+
+        member this.GetRowsForOp env op =
+            match op with 
+            | CudaBlas.Operation.NonTranspose -> this.GetRows env
+            | CudaBlas.Operation.Transpose 
+            | CudaBlas.Operation.ConjugateTranspose -> this.GetColumns env
+            | _ -> failwithf "unknown CudaBlas.Operation %A" op
+
+        member this.GetPointerArrayValues env = 
+            let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
+            [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
+                let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0; 0]) manikin
+                yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
+            
+        member this.GetPointerArrayDevice env = 
+            let devVar, _ = CudaExecEnv.getDevMem env ptrAryDevMem
+            new CudaDeviceVariable<CUdeviceptr> (devVar.DevicePointer, devVar.SizeInBytes) 
+
+        member this.GetPointerArrayHost env = 
+            CudaExecEnv.getHostRegMem env ptrAryHostMem
+
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "float *" 
+            member this.GetArg env strm = this.GetPointerArrayDevice env |> box
 
 
     [<Struct>]
