@@ -145,7 +145,14 @@ module ArrayNDManikin =
     /// True if array can be target of BLAS operation.
     let canBeBlasTarget ary =
         let nd = ArrayND.nDims ary
-        nd >= 2 && (ArrayND.stride ary).[nd-2] = 1
+        if nd >= 2 then
+            let st = ArrayND.stride ary
+            let shp = ArrayND.shape ary
+            match st.[nd-2 ..] with
+            | [1; ld] when ld >= 1 && ld >= shp.[nd-2] -> true
+            | _ -> false
+        else false
+
             
 
         

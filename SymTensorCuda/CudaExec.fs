@@ -447,17 +447,6 @@ module CudaExprWorkspaceTypes =
                     let ldB = b.GetLeadingDimension execEnv
                     let ldTrgt = trgt.GetLeadingDimension execEnv
                     CudaSup.blas.Stream <- getStream strm
-
-                    let aManikin = a.Manikin
-                    printfn "a: shape: %A  stride: %A   bytes: %d   ld: %d" 
-                        aManikin.Shape (ArrayND.stride aManikin) (int aVar.SizeInBytes) ldA
-                    let bManikin = b.Manikin
-                    printfn "b: shape: %A  stride: %A   bytes: %d   ld: %d" 
-                        bManikin.Shape (ArrayND.stride bManikin) (int bVar.SizeInBytes) ldB
-                    let trgtManikin = trgt.Manikin
-                    printfn "Target: shape: %A  stride: %A   bytes: %d   ld: %d" 
-                        trgtManikin.Shape (ArrayND.stride trgtManikin) (int trgtVar.SizeInBytes) ldTrgt
-
                     CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
 
                 | CublasSgemmBatched (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   

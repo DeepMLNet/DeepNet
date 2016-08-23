@@ -398,12 +398,10 @@ module CudaExecUnit =
 
     /// BLAS target argument passing, so that orientation is preserved
     let blasTarget (manikin: ArrayNDManikinT) =
-        if ArrayND.nDims manikin < 2 then
-            failwith "need at least 2-dimensional array for BLAS target"
-        let st = ArrayND.stride manikin
-        match st.[st.Length-2 ..] with
-        | [1; _] -> ArrayND.transpose manikin
-        | _ -> failwith "cannot use specified view as BLAS target"
+        if not (ArrayNDManikin.canBeBlasTarget manikin) then
+            failwithf "cannot use specified view with shape %A and stride %A as BLAS target" 
+                manikin.Shape (ArrayND.stride manikin)
+        ArrayND.transpose manikin
 
     let execItemsForSum memAllocator trgt src =
         // C++ signature:
