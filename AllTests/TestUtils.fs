@@ -50,7 +50,10 @@ let randomEval shps exprFn (dev: IDevice) =
     let vars = 
         [for idx, shp in List.indexed shps do
             let name = sprintf "v%d" idx
-            let sshp = shp |> List.map SizeSpec.fix
+            let sshp = 
+                shp 
+                |> List.map (function | -1 -> SizeSpec.broadcastable
+                                      | s -> SizeSpec.fix s)
             yield Expr.var name sshp]
     let expr = exprFn vars
     let fn = Func.make dev.DefaultFactory expr
@@ -58,6 +61,7 @@ let randomEval shps exprFn (dev: IDevice) =
     let varEnv = 
         (VarEnv.empty, List.zip vars shps)
         ||> List.fold (fun varEnv (var, shp) ->
+            let shp = shp |> List.map (function | -1 -> 1  | s -> s)
             let value = rng.UniformArrayND (-1.0f, 1.0f) shp |> dev.ToDev
             varEnv |> VarEnv.add var value
         )

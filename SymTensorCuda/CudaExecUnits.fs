@@ -535,8 +535,9 @@ module CudaExecUnit =
                     [BlasGemm(aOp, bOp, 1.0f, 
                               BlasTransposedMatrixTmpl(aView), 
                               BlasTransposedMatrixTmpl(bView),
-                              0.0f, BlasTransposedMatrixTmpl(tView))]
+                              0.0f, BlasTransposedMatrixTmpl(tView))]                
                 | _ -> // batched matrix multiplication
+
                     // allocate memory for pointer arrays and create argument templates
                     let aTmpl = BlasTransposedMatrixBatchTmpl(aView, memAllocator)   
                     let bTmpl = BlasTransposedMatrixBatchTmpl(bView, memAllocator)   

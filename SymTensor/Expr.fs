@@ -1,6 +1,7 @@
 ﻿namespace SymTensor
 
 open System.Collections.Generic
+open Microsoft.FSharp.Reflection
 
 open Basics
 open ArrayNDNS
@@ -338,8 +339,11 @@ module Expr =
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT<'T>) =
         if not (checkedExprs.Contains expr) then
+            let mutable shapesBeingChecked = []
+            let mutable opBeingChecked = ""
             let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
-                if not (ssa .= ssb) then failwithf "%A <> %A" ssa ssb
+                if not (ssa .= ssb) then 
+                    failwithf "%s is incompatiables with shapes %A" opBeingChecked shapesBeingChecked
             let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
                 List.iter2 (.=) sa sb
 
@@ -349,6 +353,9 @@ module Expr =
             | Unary (op, a) ->
                 checkExpr a
                 let sa = shapeOf a
+                shapesBeingChecked <- [sa]
+                opBeingChecked <- sprintf "%A" op
+
                 match op with
                 | SumAxis(ax) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
                     failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
@@ -373,13 +380,18 @@ module Expr =
                 checkExpr a
                 checkExpr b
                 let sa, sb = shapeOf a, shapeOf b
+                shapesBeingChecked <- [sa; sb]
+                opBeingChecked <- sprintf "%A" op
+
                 match op with
                 | BinaryElemwiseOp ->
                     sa ..= sb 
                 | Dot -> 
                     match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
                     | 2, 2 -> sa.[1] .= sb.[0] 
-                    | na, nb when na = nb -> sa.[na-1] .= sb.[nb-2]
+                    | na, nb when na = nb -> 
+                        sa.[na-1] .= sb.[nb-2]
+                        for n = 0 to na - 3 do sa.[n] .= sb.[n]
                     | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
                 | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
                     failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
@@ -388,6 +400,9 @@ module Expr =
             | Nary (op, es) ->
                 es |> List.iter checkExpr
                 let ss = es |> List.map shapeOf
+                shapesBeingChecked <- ss
+                opBeingChecked <- sprintf "%A" op
+
                 match op with
                 | _ -> ()
 

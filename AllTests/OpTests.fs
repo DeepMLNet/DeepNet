@@ -31,6 +31,14 @@ let ``Trace compare: matrix-vector dot`` () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: batched matrix-matrix dot`` () =   
-    requireEqualTracesWithRandomData [[5; 6; 3]; [5; 3; 2]] (fun [a; b] ->
+    requireEqualTracesWithRandomData [[7; 5; 6; 3]; [7; 5; 3; 2]] (fun [a; b] ->
+        a .* b
+    )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: batched matrix-matrix dot with broadcasting`` () =   
+    requireEqualTracesWithRandomData [[7; 5; 6; 3]; [7; -1; 3; 2]] (fun [a; b] ->
         a .* b
     )
