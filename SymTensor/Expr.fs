@@ -91,8 +91,12 @@ module Expr =
         | DoBroadcast of ShapeSpecT       
         /// swaps two dimensions of a tensor
         | SwapDim of int * int          
-        // subtensor 
+        /// subtensor 
         | Subtensor of ExprRngsSpecT
+        /// extract diagonal along given axes
+        | Diag of int * int
+        /// build diagonal matrix along given axes
+        | DiagMat of int * int
 
         // ==== variable storage ====
         /// variable write
@@ -288,7 +292,9 @@ module Expr =
                  match sr with
                  | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
                  | SRSDynStartSymSize (_, size) -> size)
-                    
+        | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
+        | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
+
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
         | Unary(Annotated(_), a) -> shapeOf a
@@ -374,6 +380,19 @@ module Expr =
                     failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
                 | StoreToVar vs ->
                     sa ..= (VarSpec.shape vs)
+                | Diag(ax1, ax2) ->
+                    if not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) then
+                        failwithf "cannot extract diagonal from non-existant axis %d or %d of array with shape %A" 
+                            ax1 ax2 sa
+                    if not (ax1 < ax2) then 
+                        failwith "first axis for extracting diagonal must come before second axis"
+                    sa.[ax1] .= sa.[ax2]
+                | DiagMat(ax1, ax2) ->
+                    if not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 <= ShapeSpec.nDim sa) then
+                        failwithf "cannot build diagonal over non-existant axis %d or %d of array with shape %A" 
+                            ax1 ax2 sa
+                    if not (ax1 < ax2) then 
+                        failwith "first axis for building diagonal matrix must come before second axis"
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -792,8 +811,47 @@ module Expr =
         member this.Item 
             with get ([<System.ParamArray>] allArgs: obj []) = 
                 this.GetSlice (allArgs)
-                      
+                   
+    /// Extracts the diagonal along the given axes.
+    let diagAxis ax1 ax2 a = 
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        Unary(Diag (ax1, ax2), a) |> check
+                             
+    /// Extracts the diagonal of a matrix.
+    /// If the expression has more than two dimensions, the diagonals
+    /// are extracted along the last two dimensions.
+    let diag a = 
+        let nd = shapeOf a |> ShapeSpec.nDim
+        if nd < 2 then failwith "need at least a matrix to extract diagonal"
+        diagAxis (nd-2) (nd-1) a
 
+    /// Creates a diagonal matrix by duplicating the given dimension.
+    let diagMatAxis ax1 ax2 a = 
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        Unary(DiagMat (ax1, ax2), a) |> check
+
+    /// Creates a matrix with the given vector on its diagonal. 
+    /// All other elements are zeros.
+    /// If the input has more than one dimension, the operation is
+    /// performed batch-wise on the last dimension.
+    let diagMat a =
+        let nd = shapeOf a |> ShapeSpec.nDim
+        if nd < 1 then failwith "need at least a vector to create diagonal matrix"
+        diagMatAxis (nd-1) nd a
+
+    /// Computes the traces along the given axes.
+    let traceAxis ax1 ax2 a =
+        let tax = if ax1 < ax2 then ax1 else ax1 + 1
+        a |> diagAxis ax1 ax2 |> sumAxis tax
+
+    /// Computes the trace of a matrix.
+    /// If the input has more than two dimensions, the traces
+    /// along the last two dimensions are returned.
+    let trace a =
+        let nd = shapeOf a |> ShapeSpec.nDim
+        if nd < 2 then
+            failwith "need at least a two dimensional array for trace"      
+        traceAxis (nd-2) (nd-1) a
 
 
 

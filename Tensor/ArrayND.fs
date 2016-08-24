@@ -1042,25 +1042,29 @@ module ArrayND =
             failwithf "need at least a two dimensional array for diagonal but got shape %A" a.Shape
         diagAxis (a.NDims-2) (a.NDims-1) a
 
-    /// Duplicates the given axis and fills the corresponding diagonal
-    /// with the elements of the original axis.
-    let diagMatAxis ax0 (a: #ArrayNDT<'T>) =
-        checkAxis ax0 a
-        let dShp = 
-            [for ax, s in List.indexed a.Shape do
-                yield s
-                if ax = ax0 then yield s]
+    /// Creates a new array of same shape but with ax2 inserted.
+    /// The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
+    /// The other elements are set to zero.
+    let diagMatAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+        if ax1 = ax2 then failwithf "axes to use for diagonal must be different"
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        checkAxis ax1 a
+        if not (0 <= ax2 && ax2 <= a.NDims) then
+            failwithf "cannot insert axis at position %d into array of shape %A" ax2 a.Shape
+        let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
         let d = newCOfSameType dShp a
-        let dDiag = diagAxis ax0 (ax0+1) d
+        let dDiag = diagAxis ax1 ax2 d
         dDiag.[Fill] <- a
         d
 
     /// Creates a new matrix that has the specified diagonal.
     /// All other elements are zero.
+    /// If the specified array has more than one dimension, the operation is
+    /// performed batch-wise on the last dimension.
     let diagMat (a: #ArrayNDT<'T>) =
         if a.NDims < 1 then
             failwithf "need at leat a one-dimensional array to create a diagonal matrix"
-        diagMatAxis (a.NDims-1) a
+        diagMatAxis (a.NDims-1) a.NDims a
 
     /// Computes the traces along the given axes.
     let traceAxis ax1 ax2 (a: #ArrayNDT<'T>) =

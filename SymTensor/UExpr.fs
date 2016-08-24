@@ -58,6 +58,8 @@ module UExprTypes =
         | Reshape of ShapeSpecT         
         | DoBroadcast of ShapeSpecT       
         | SwapDim of int * int       
+        | Diag of int * int
+        | DiagMat of int * int
         | StoreToVar of UVarSpecT
         | Annotated of Annotation       
 
@@ -211,6 +213,8 @@ module UExpr =
         | Unary (Expr.Reshape ss, a)    -> unary (Reshape ss) a
         | Unary (Expr.DoBroadcast ss, a)-> unary (DoBroadcast ss) a
         | Unary (Expr.SwapDim (ax1, ax2), a) -> unary (SwapDim (ax1, ax2)) a
+        | Unary (Expr.Diag (ax1, ax2), a) -> unary (Diag (ax1, ax2)) a
+        | Unary (Expr.DiagMat (ax1, ax2), a)  -> unary (DiagMat (ax1, ax2)) a
         | Unary (Expr.Subtensor sr, a)  ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
@@ -279,6 +283,8 @@ module UExpr =
         | UUnaryOp (Reshape ss)             -> unary (Expr.Reshape ss)
         | UUnaryOp (DoBroadcast ss)         -> unary (Expr.DoBroadcast ss)
         | UUnaryOp (SwapDim (ax1, ax2))     -> unary (Expr.SwapDim (ax1, ax2))
+        | UUnaryOp (Diag (ax1, ax2))        -> unary (Expr.Diag (ax1, ax2))
+        | UUnaryOp (DiagMat (ax1, ax2))     -> unary (Expr.DiagMat (ax1, ax2))
         | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (UVarSpec.toVarSpec vs))
         | UUnaryOp (Annotated ano)          -> unary (Expr.Annotated ano)
 
