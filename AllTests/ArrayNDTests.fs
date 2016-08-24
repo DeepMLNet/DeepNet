@@ -109,3 +109,19 @@ let ``Batched build and extract diagonal`` () =
     let vv = ArrayND.diag dm
     ArrayND.almostEqual v vv |> ArrayND.value |> Assert.True
 
+
+[<Fact>]
+let ``Batched trace`` () =
+    let v = [[1; 2; 3]; [4; 5; 6]] |> ArrayNDHost.ofList2D
+    let dm = ArrayND.diagMat v
+    
+    let tr = ArrayND.trace dm
+    let trv = ArrayND.sumAxis 1 v
+
+    printfn "v=\n%A" v
+    printfn "trace(diag(v))=%A" tr
+    printfn "sum(v)=%A" trv
+
+    ArrayND.almostEqual tr trv |> ArrayND.value |> Assert.True
+
+

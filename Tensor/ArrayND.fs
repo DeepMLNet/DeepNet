@@ -759,7 +759,9 @@ module ArrayND =
         // element-wise binary comparison
         static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) a b
         static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) a b
+        static member (<<==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) a b
         static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) a b
+        static member (>>==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) a b
         static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a b
 
         // element-wise binary with scalars
@@ -792,7 +794,7 @@ module ArrayND =
     let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         let aTol = conv<'T> 1e-8
         let rTol = conv<'T> 1e-5
-        abs (a - b) <<<< aTol + rTol * abs b
+        abs (a - b) <<== aTol + rTol * abs b
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
@@ -870,7 +872,7 @@ module ArrayND =
     let any a =
         let value = allElems a |> Seq.fold (||) false
         scalarOfType value a
-
+     
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
@@ -1059,6 +1061,19 @@ module ArrayND =
         if a.NDims < 1 then
             failwithf "need at leat a one-dimensional array to create a diagonal matrix"
         diagMatAxis (a.NDims-1) a
+
+    /// Computes the traces along the given axes.
+    let traceAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+        let tax = if ax1 < ax2 then ax1 else ax1 - 1
+        a |> diagAxis ax1 ax2 |> sumAxis tax
+
+    /// Computes the trace of a matrix.
+    /// If the specified tensor has more than two dimensions, the traces
+    /// along the last two dimensions are returned.
+    let trace (a: #ArrayNDT<'T>) =
+        if a.NDims < 2 then
+            failwithf "need at least a two dimensional array for trace but got shape %A" a.Shape
+        traceAxis (a.NDims-2) (a.NDims-1) a
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

@@ -246,6 +246,10 @@ module ArrayNDHost =
     let ofList (data: 'T list) =
         data |> Array.ofList |> ofArray
 
+    /// Creates a two-dimensional ArrayNDT using the specified list of lists.       
+    let ofList2D (data: 'T list list) =
+        data |> array2D |> ofArray2D
+
     /// Creates an Array from the data in this ArrayNDT. The data is copied.
     let toArray (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
