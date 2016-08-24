@@ -374,6 +374,9 @@ module ArrayND =
     /// offset in elements
     let inline offset a = layout a |> ArrayNDLayout.offset
 
+    /// checks that the given axis is valid
+    let inline checkAxis ax a = layout a |> ArrayNDLayout.checkAxis ax
+
     /// sequence of all indices 
     let inline allIdx a = layout a |> ArrayNDLayout.allIdx
 
@@ -1023,6 +1026,40 @@ module ArrayND =
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
+
+    /// Returns a view of the diagonal along the given axes.
+    /// The diagonal replaces the first axis and the second axis is removed.
+    let diagAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+        relayout (ArrayNDLayout.diagAxis ax1 ax2 a.Layout) a
+
+    /// Returns a view of the diagonal of a matrix as a vector.
+    /// If the specified tensor has more than two dimensions, the diagonals
+    /// along the last two dimensions are returned.
+    let diag (a: #ArrayNDT<'T>) =
+        if a.NDims < 2 then
+            failwithf "need at least a two dimensional array for diagonal but got shape %A" a.Shape
+        diagAxis (a.NDims-2) (a.NDims-1) a
+
+    /// Duplicates the given axis and fills the corresponding diagonal
+    /// with the elements of the original axis.
+    let diagMatAxis ax0 (a: #ArrayNDT<'T>) =
+        checkAxis ax0 a
+        let dShp = 
+            [for ax, s in List.indexed a.Shape do
+                yield s
+                if ax = ax0 then yield s]
+        let d = newCOfSameType dShp a
+        let dDiag = diagAxis ax0 (ax0+1) d
+        dDiag.[Fill] <- a
+        d
+
+    /// Creates a new matrix that has the specified diagonal.
+    /// All other elements are zero.
+    let diagMat (a: #ArrayNDT<'T>) =
+        if a.NDims < 1 then
+            failwithf "need at leat a one-dimensional array to create a diagonal matrix"
+        diagMatAxis (a.NDims-1) a
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // concatenation

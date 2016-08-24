@@ -58,6 +58,11 @@ module ArrayNDLayout =
     /// number of elements 
     let inline nElems a = List.fold (*) 1 (shape a)
 
+    /// checks that the given axis is valid 
+    let inline checkAxis ax a =
+        if not (0 <= ax && ax < nDims a) then
+            failwithf "axis %d out of range for array with shape %A" ax a.Shape
+
     /// a sequence of indicies enumerating all elements of the array with the given shape
     let rec allIdxOfShape shp = seq {
         match shp with
@@ -301,3 +306,24 @@ module ArrayNDLayout =
             | [] -> yield [], []
         } 
         generate (shape a) dim  
+
+
+    /// Creates a layout that extracts the diagonal along the given axes.
+    /// The first axis is replaced with the diagonal and the second axis is removed.
+    let diagAxis ax1 ax2 a =
+        checkAxis ax1 a
+        checkAxis ax2 a
+        if ax1 = ax2 then failwithf "axes to use for diagonal must be different"
+        if a.Shape.[ax1] <> a.Shape.[ax2] then
+            failwithf "array must have same dimensions along axis %d and %d to extract diagonal \
+                       but it has shape %A" ax1 ax2 a.Shape
+              
+        let newShape, newStride = 
+            [for ax, (sh, st) in List.indexed (List.zip a.Shape a.Stride) do
+                match ax with
+                | _ when ax=ax1 -> yield sh, a.Stride.[ax1] + a.Stride.[ax2]
+                | _ when ax=ax2 -> ()
+                | _ -> yield sh, st
+            ] |> List.unzip                
+        {a with Shape=newShape; Stride=newStride}
+

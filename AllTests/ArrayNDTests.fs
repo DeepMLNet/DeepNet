@@ -80,3 +80,32 @@ let ``Batched matrix-vector dot product`` () =
             cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
     ArrayND.almostEqual c cr |> ArrayND.value |> Assert.True
     
+
+[<Fact>]
+let ``Build and extract diagonal`` () =
+    let N = 3
+    let rng = System.Random 123
+    let v = rng.UniformArrayND (-1., 1.) [N]
+    let dm = ArrayND.diagMat v
+    
+    printfn "v=%A" v
+    printfn "diag(v)=\n%A" dm
+
+    let vv = ArrayND.diag dm
+    ArrayND.almostEqual v vv |> ArrayND.value |> Assert.True
+
+
+[<Fact>]
+let ``Batched build and extract diagonal`` () =
+    let S1, S2 = 2, 3
+    let N = 4
+    let rng = System.Random 123
+    let v = rng.UniformArrayND (-1., 1.) [S1; S2; N]
+    let dm = ArrayND.diagMat v
+    
+    printfn "v=\n%A" v
+    printfn "diag(v)=\n%A" dm
+
+    let vv = ArrayND.diag dm
+    ArrayND.almostEqual v vv |> ArrayND.value |> Assert.True
+
