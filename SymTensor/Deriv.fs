@@ -116,10 +116,14 @@ module Deriv =
                 /// Jacobian of y = m .* x wrt x
                 let mxWrtX (m: ExprT<'T>) x y dy =
                     let xShp, yShp, dyShp = shapeOf x, shapeOf y, shapeOf dy
+                    let nd = ShapeSpec.nDim xShp
+                    let batchShp = xShp.[0..nd-3]
+                    let batchElems = ShapeSpec.nElem batchShp
+                    let xSmplShp, ySmplShp = xShp.[nd-2..], yShp.[nd-2..]
                     let funElems = dyShp.[0]
-                    let dyMat = dy |> swapDim 0 1 |> reshape [yShp.[0]; yShp.[1] * funElems]
+                    let dyMat = dy |> swapDim 0 1 |> reshape (batchShp @ [ySmplShp.[0]; ySmplShp.[1] * funElems])
                     let dxMat = m.T .* dyMat
-                    let dx = dxMat |> reshape [xShp.[0] * xShp.[1]; funElems] |> swapDim 1 0
+                    let dx = dxMat |> reshape [batchElems * xSmplShp.[0] * xSmplShp.[1]; funElems] |> swapDim 1 0
                     dx
 
                 // Jacobian wrt b
@@ -127,9 +131,10 @@ module Deriv =
 
                 // calculate Jacobian wrt a by transposing expression and resulting Jacobian
                 let aShp = shapeOf a
-                let egT = egExpanded |> swapDim 1 2 |> collapse
+                let nd = ShapeSpec.nDim aShp
+                let egT = egExpanded |> swapDim (nd-1) nd |> collapse
                 let daT = mxWrtX (b.T) (a.T) (expr.T) egT
-                let da = daT |> reshape [funElems; aShp.[1]; aShp.[0]] |> swapDim 1 2 |> collapse
+                let da = daT |> reshape [funElems; aShp.[1]; aShp.[0]] |> swapDim (nd-1) nd |> collapse
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"

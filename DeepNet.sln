@@ -30,6 +30,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		DeepNet.fsx = DeepNet.fsx
 		Performance1.psess = Performance1.psess
 		README.md = README.md
+		TestSettings.testsettings = TestSettings.testsettings
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "4. Tests", "4. Tests", "{6F81CFAC-7D2C-4540-BC4E-4392262AFBAB}"

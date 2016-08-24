@@ -513,10 +513,12 @@ module Expr =
     /// swaps two dimensions of a tensor
     let swapDim ax1 ax2 a = Unary(SwapDim(ax1, ax2), a) |> check
 
-    /// transpose matrix
+    /// Transpose matrix.
+    /// If the input has more than two dimensions, the last two axes are transposed.
     let transpose a =
-        if shapeOf a |> ShapeSpec.nDim <> 2 then invalidArg "a" "need matrix to transpose"
-        swapDim 0 1 a
+        let nd = shapeOf a |> ShapeSpec.nDim
+        if nd < 2 then invalidArg "a" "need at least a matrix to transpose"
+        swapDim (nd-2) (nd-1) a
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     let constructElementwise op a b =
