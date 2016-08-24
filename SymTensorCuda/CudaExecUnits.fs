@@ -95,6 +95,9 @@ module CudaExecUnit =
             match reqView with
             | Some rv -> [Some (ArrayND.swapDim ax1 ax2 rv)]
             | _ -> noSrcReqs
+        | UUnaryOp (Diag _) -> noSrcReqs
+        | UUnaryOp (DiagMat _) -> noSrcReqs
+
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match cudaEnv.VarStorLoc |> Map.find vs with
@@ -214,6 +217,9 @@ module CudaExecUnit =
             ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
         | UUnaryOp (SwapDim (ax1, ax2)) ->
             ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
+        | UUnaryOp (Diag (ax1, ax2)) ->
+            ArrayND.diagAxis ax1 ax2 srcs.[0], srcShared.[0]
+        | UUnaryOp (DiagMat (ax1, ax2)) -> outplaceTrgt ()
         // variable access
         | UUnaryOp (StoreToVar _) -> 
             // output of StoreToVar is empty 
@@ -482,6 +488,12 @@ module CudaExecUnit =
             else []
         | UUnaryOp (DoBroadcast _) -> []
         | UUnaryOp (SwapDim _) -> []
+        | UUnaryOp (Diag _) -> []
+        | UUnaryOp (DiagMat (ax1, ax2)) ->
+            let trgtDiag = ArrayND.diagAxis ax1 ax2 trgt
+            let zeroItems = execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
+            let copyItems = copyExecItems trgtDiag srcs.[0]
+            zeroItems @ copyItems
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             let varShp, varType = ArrayND.shape srcs.[0], srcs.[0].TypeName
