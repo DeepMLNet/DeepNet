@@ -871,6 +871,8 @@ module Expr =
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
     /// along the last two dimensions are returned.
+    /// The inverse of a singular matrix is undefinied.
+    /// No error is raised in that case.
     let invert a =
         Unary(Invert, a) |> check
 
