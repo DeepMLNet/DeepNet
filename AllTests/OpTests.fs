@@ -1,13 +1,11 @@
 ﻿module OpTests
+#nowarn "25"
 
 open Xunit
 open FsUnit.Xunit
 
 open ArrayNDNS
-#nowarn "25"
-
 open SymTensor
-
 open TestUtils
 
 
