@@ -1,4 +1,8 @@
-DGEMM
-DDOT
-DGETRF
+cblas_sgemm
 cblas_dgemm
+
+LAPACKE_sgetrf
+LAPACKE_dgetrf
+
+LAPACKE_sgetri
+LAPACKE_dgetri

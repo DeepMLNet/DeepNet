@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
+    <Compile Include="MKL.fs" />
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="FastLayout.fs" />
     <Compile Include="ArrayND.fs" />
@@ -88,6 +89,10 @@
     </None>
     <None Include="build\zlib.dll">
       <Link>zlib.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\MKL\tensor_mkl.dll">
+      <Link>tensor_mkl.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
