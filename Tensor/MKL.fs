@@ -13,21 +13,21 @@ module MKL =
 
     [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
     extern lapack_int LAPACKE_sgetrf (int matrix_layout, lapack_int m, lapack_int n, 
-                                      [<In; Out>] single[] a, lapack_int lda, 
+                                      nativeint a, lapack_int lda, 
                                       [<Out>] lapack_int[] ipiv)
 
     [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
     extern lapack_int LAPACKE_dgetrf (int matrix_layout, lapack_int m, lapack_int n, 
-                                      [<In; Out>] double[] a, lapack_int lda, 
+                                      nativeint a, lapack_int lda, 
                                       [<Out>] lapack_int[] ipiv)
 
 
     [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
     extern lapack_int LAPACKE_sgetri (int matrix_layout, lapack_int n, 
-                                      [<In; Out>] single[] a, lapack_int lda, 
+                                      nativeint a, lapack_int lda, 
                                       [<In>] lapack_int[] ipiv)
 
     [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
     extern lapack_int LAPACKE_dgetri (int matrix_layout, lapack_int n, 
-                                      [<In; Out>] double[] a, lapack_int lda, 
+                                      nativeint a, lapack_int lda, 
                                       [<In>] lapack_int[] ipiv)

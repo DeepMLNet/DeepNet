@@ -78,7 +78,8 @@ module ArrayNDManikinTypes =
             sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
                 dims cppDataType dims shapeStr dims        
 
-
+        override this.Invert () = 
+            failwith "ArrayNDManikin does not store data"
 
 
 module ArrayNDManikin =

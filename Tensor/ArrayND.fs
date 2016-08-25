@@ -201,6 +201,9 @@ module ArrayND =
             this.Map2Impl f other res
             res
 
+        /// invert the matrix
+        abstract Invert : unit -> ArrayNDT<'T>
+
         // enumerator interfaces
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
@@ -1079,6 +1082,11 @@ module ArrayND =
             failwithf "need at least a two dimensional array for trace but got shape %A" a.Shape
         traceAxis (a.NDims-2) (a.NDims-1) a
 
+    /// Returns the inverse of the given matrix.
+    /// If the specified tensor has more than two dimensions, the matrices
+    /// consisting of the last two dimensions are inverted.
+    let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
+        a.Invert () :?> 'A
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // concatenation

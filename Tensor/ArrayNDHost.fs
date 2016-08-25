@@ -6,6 +6,7 @@ open System.Collections.Generic
 
 open Basics
 open ArrayND
+open MKL
 
 
 [<AutoOpen>]
@@ -19,6 +20,27 @@ module ArrayNDHostTypes =
         interface IDisposable with
             member this.Dispose() = gcHnd.Free()
 
+    /// Information for calling BLAS/LAPACK routines.
+    type private BlasInfo (memory: PinnedMemoryT,
+                           offset: nativeint,
+                           rows:   int,
+                           cols:   int,
+                           ld:     int) =
+
+        member this.Ptr  : nativeint  = memory.Ptr + offset
+        member this.Rows : lapack_int = int64 rows
+        member this.Cols : lapack_int = int64 cols
+        member this.Ld   : lapack_int = int64 ld
+
+        interface IDisposable with
+            member this.Dispose() = (memory :> IDisposable).Dispose()
+
+    /// Call BLAS/LAPACK function depending on data type.
+    let private blasTypeChoose<'T, 'R> (singleFn: unit -> 'R) (doubleFn: unit -> 'R) : 'R =
+        match typeof<'T> with
+        | t when t = typeof<single> -> singleFn () 
+        | t when t = typeof<double> -> doubleFn () 
+        | t -> failwithf "unsupported data type for BLAS operation: %A" t
 
     type IArrayNDHostT =
         inherit IArrayNDT
@@ -155,6 +177,59 @@ module ArrayNDHostTypes =
         static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDHostT<bool>
         static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDHostT<bool>
         static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDHostT<bool>
+
+        /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS
+        /// (in column-major order).
+        member private this.GetTransposedBlas () =
+            if this.NDims <> 2 then failwithf "require a matrix but got shape %A" this.Shape
+            if not (this.Shape.[0] > 0 && this.Shape.[1] > 0) then 
+                failwithf "require a non-empty matrix but got shape %A" this.Shape
+            let str = stride this
+            if str.[0] >= 1 && str.[0] >= this.Shape.[1] && str.[1] = 1 then
+                new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof<'T>),
+                              this.Shape.[1], this.Shape.[0], str.[0])
+            else
+                (ArrayND.copy this).GetTransposedBlas ()
+               
+        /// Computes the matrix inverse.    
+        override this.Invert () =
+            let nd = this.NDims
+            if nd < 2 then 
+                failwithf "require at least a two-dimensional tensor \
+                           for matrix inversion but got %A" this.Shape
+            if this.Shape.[nd-2] <> this.Shape.[nd-1] then
+                failwithf "cannot invert non-square matrix of shape %A" this.Shape
+            let batchShp = this.Shape.[0 .. nd-3]
+
+            let inv = ArrayND.copy this
+
+            // iterate over all batch dimensions
+            for batchIdx in ArrayNDLayout.allIdxOfShape batchShp do
+                let batchRng = batchIdx |> List.map RngElem
+                let rng = batchRng @ [RngAll; RngAll]                  
+                let aAry = inv.[rng]
+
+                // compute LU factorization
+                use a = aAry.GetTransposedBlas ()
+                let ipiv : lapack_int[] = Array.zeroCreate aAry.Shape.[0]
+                let info =
+                    blasTypeChoose<'T, lapack_int> 
+                        (fun () -> LAPACKE_sgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
+                        (fun () -> LAPACKE_dgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
+                if info < 0L then failwithf "LAPACK argument error %d" info
+                if info > 0L then failwithf "cannot invert singular matrix" 
+
+                // compute matrix inverse
+                let info =
+                    blasTypeChoose<'T, lapack_int>
+                        (fun () -> LAPACKE_sgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
+                        (fun () -> LAPACKE_dgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
+                if info < 0L then failwithf "LAPACK argument error %d" info
+                if info > 0L then failwithf "cannot invert singular matrix" 
+
+            inv :> ArrayNDT<'T>
+
+
 
 module ArrayNDHost = 
 

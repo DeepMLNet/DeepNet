@@ -125,3 +125,45 @@ let ``Batched trace`` () =
     ArrayND.almostEqual tr trv |> ArrayND.value |> Assert.True
 
 
+
+[<Fact>]
+let ``Invert diagonal matrix`` () =
+    let v = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList
+
+    let dm = ArrayND.diagMat v
+    let dmInv = ArrayND.invert dm
+    let dmInvInv = ArrayND.invert dmInv
+
+    printfn "dm=\n%A" dm
+    printfn "dm^-1=\n%A" dmInv
+    printfn "dm^-1^-1=\n%A" dmInvInv
+
+    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+
+[<Fact>]
+let ``Invert random matrix`` () =
+    let rng = System.Random 123
+
+    let dm = rng.UniformArrayND (-1.0, 1.0) [4; 4]
+    let dmInv = ArrayND.invert dm
+    let dmInvInv = ArrayND.invert dmInv
+
+    printfn "dm=\n%A" dm
+    printfn "dm^-1=\n%A" dmInv
+    printfn "dm^-1^-1=\n%A" dmInvInv
+
+    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+
+[<Fact>]
+let ``Batch invert random matrices`` () =
+    let rng = System.Random 123
+
+    let dm = rng.UniformArrayND (-1.0, 1.0) [2; 4; 3; 3]
+    let dmInv = ArrayND.invert dm
+    let dmInvInv = ArrayND.invert dmInv
+
+    printfn "dm=\n%A" dm
+    printfn "dm^-1=\n%A" dmInv
+    printfn "dm^-1^-1=\n%A" dmInvInv
+
+    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
