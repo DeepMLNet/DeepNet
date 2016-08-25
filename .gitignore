@@ -216,3 +216,5 @@ ModelManifest.xml
 /Data/MNIST/MNIST.h5
 /docs/output
 /DeepNet.VC.db
+
+/MKL/build/
