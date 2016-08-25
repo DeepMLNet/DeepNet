@@ -43,8 +43,13 @@ module CudaRecipeTypes =
                                single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                                single * BlasTransposedMatrixTmpl * StreamT
         | CublasSgemmBatched of CudaBlas.Operation * CudaBlas.Operation *
-                               single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
-                               single * BlasTransposedMatrixBatchTmpl * StreamT
+                                single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
+                                single * BlasTransposedMatrixBatchTmpl * StreamT
+        // LAPACK
+        | CublasGetrfBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl * 
+                                BlasIntArrayTmpl * StreamT
+        | CublasGetriBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl *
+                                BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl * StreamT
         // pointer array creation for CUBLAS batch calls
         | CublasInitPointerArray of BlasTransposedMatrixBatchTmpl * StreamT
         // misc
@@ -178,8 +183,12 @@ module CudaRecipe =
         | BlasGemmBatched(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
             [CublasSgemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
                                 aFac, a, b, trgtFac, trgt, strm)]   
+        | BlasGetrfBatched(a, pivot, info) ->
+            [CublasGetrfBatched (a, pivot, info, strm)]
+        | BlasGetriBatched(a, pivot, trgt, info) ->
+            [CublasGetriBatched (a, pivot, trgt, info, strm)]
         | BlasInitPointerArray(aryTmpl) ->
-            [CublasInitPointerArray(aryTmpl, strm)]
+            [CublasInitPointerArray (aryTmpl, strm)]
         | CudaExecItemT.Trace (expr, res) -> 
             [Trace (expr, res)]
 

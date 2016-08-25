@@ -453,14 +453,34 @@ module CudaExprWorkspaceTypes =
                     use aAry = a.GetPointerArrayDevice execEnv
                     use bAry = b.GetPointerArrayDevice execEnv
                     use trgtAry = trgt.GetPointerArrayDevice execEnv                    
-                    let m = a.GetRowsForOp execEnv aOp
-                    let n = b.GetColumnsForOp execEnv bOp
-                    let k = a.GetColumnsForOp execEnv aOp
-                    let ldA = a.GetLeadingDimension execEnv
-                    let ldB = b.GetLeadingDimension execEnv
-                    let ldTrgt = trgt.GetLeadingDimension execEnv
+                    let m = a.GetRowsForOp aOp
+                    let n = b.GetColumnsForOp bOp
+                    let k = a.GetColumnsForOp aOp
+                    let ldA = a.LeadingDimension 
+                    let ldB = b.LeadingDimension 
+                    let ldTrgt = trgt.LeadingDimension 
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp, bOp, m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, trgtAry, ldTrgt, a.NSamples)
+
+                | CublasGetrfBatched (a, pivot, info, strm) ->
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    let n = a.Rows 
+                    let ldA = a.LeadingDimension 
+                    let pVar = pivot.GetVar execEnv
+                    let infoVar = pivot.GetVar execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, a.NSamples)
+
+                | CublasGetriBatched (a, pivot, trgt, info, strm) ->
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    let n = a.Rows 
+                    let ldA = a.LeadingDimension 
+                    let pVar = pivot.GetVar execEnv
+                    let trgtAry = trgt.GetPointerArrayDevice execEnv
+                    let ldC = trgt.LeadingDimension 
+                    let infoVar = pivot.GetVar execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, a.NSamples)
 
                 | CublasInitPointerArray (aryTmpl, strm) ->
                     let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
@@ -474,7 +494,20 @@ module CudaExprWorkspaceTypes =
 
                 // misc
                 | Trace (uexpr, res) ->
-                    CudaSup.context.Synchronize ()
+                    try
+                        CudaSup.context.Synchronize ()
+                    with :? CudaException as ex ->
+                        printfn "CUDA exception during trace: %A" ex
+                        match previousCall with
+                        | Some pc -> printfn "Last call was %A" pc
+                        | None -> ()
+
+                        let crashTraceFile = "crash_trace.txt"
+                        use tw = File.CreateText crashTraceFile
+                        Trace.dumpActiveTrace tw
+                        printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
+                        reraise()
+
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                     let resHost = resDev.ToHost()
                     let msg = sprintf "previous call: %A" previousCall

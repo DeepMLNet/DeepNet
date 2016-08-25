@@ -366,8 +366,8 @@ module ArgTemplates =
         do
             if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
                 failwith "CUBLAS currently requires single values"
-            if nDims < 3 then
-                failwith "Batched ArrayND for BLAS requires 3 or more dimensions"
+            if nDims < 2 then
+                failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
             let stride = ArrayND.stride manikin
             match stride.[nDims-2 ..] with
             | [0; _] -> failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
@@ -381,30 +381,23 @@ module ArgTemplates =
             BlasTransposedMatrixBatchTmpl(manikin, ptrAryDevMem, ptrAryHostMem)        
 
         member this.NSamples = nSmpls
-
         member this.Manikin = manikin
+        member this.LeadingDimension = (ArrayND.stride manikin).[rowDim] 
+        member this.Columns = (ArrayND.shape manikin).[rowDim]
+        member this.Rows = (ArrayND.shape manikin).[colDim]
 
-        member this.GetLeadingDimension env =
-            (ArrayND.stride manikin).[rowDim] 
-
-        member this.GetColumns env =
-            (ArrayND.shape manikin).[rowDim]
-
-        member this.GetRows env =
-            (ArrayND.shape manikin).[colDim]
-
-        member this.GetColumnsForOp env op =
+        member this.GetColumnsForOp op =
             match op with 
-            | CudaBlas.Operation.NonTranspose -> this.GetColumns env
+            | CudaBlas.Operation.NonTranspose -> this.Columns 
             | CudaBlas.Operation.Transpose 
-            | CudaBlas.Operation.ConjugateTranspose -> this.GetRows env
+            | CudaBlas.Operation.ConjugateTranspose -> this.Rows 
             | _ -> failwithf "unknown CudaBlas.Operation %A" op
 
-        member this.GetRowsForOp env op =
+        member this.GetRowsForOp op =
             match op with 
-            | CudaBlas.Operation.NonTranspose -> this.GetRows env
+            | CudaBlas.Operation.NonTranspose -> this.Rows 
             | CudaBlas.Operation.Transpose 
-            | CudaBlas.Operation.ConjugateTranspose -> this.GetColumns env
+            | CudaBlas.Operation.ConjugateTranspose -> this.Columns 
             | _ -> failwithf "unknown CudaBlas.Operation %A" op
 
         member this.GetPointerArrayValues env = 
@@ -423,6 +416,18 @@ module ArgTemplates =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float *" 
             member this.GetArg env strm = this.GetPointerArrayDevice env |> box
+
+
+    /// BLAS int array. For example it is used for pivot and info arrays of CUDA LAPACK routines.
+    type BlasIntArrayTmpl (mem: MemManikinT) =
+
+        new (size: int, memAllocator: MemAllocatorT) = 
+            let mem = memAllocator TypeName.ofType<int> size MemAllocDev
+            BlasIntArrayTmpl mem
+
+        member this.GetVar env =
+            let devVar, _ = CudaExecEnv.getDevMem env mem
+            new CudaDeviceVariable<int> (devVar.DevicePointer, devVar.SizeInBytes)
 
 
     [<Struct>]

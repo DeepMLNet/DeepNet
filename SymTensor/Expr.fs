@@ -78,6 +78,14 @@ module Expr =
         | Round
         | Truncate
 
+        // ==== tensor operations ====
+        /// extract diagonal along given axes
+        | Diag of int * int
+        /// build diagonal matrix along given axes
+        | DiagMat of int * int
+        /// matrix inverse
+        | Invert
+
         // ==== reductions ====
         /// summation of all elements
         | Sum                           
@@ -93,10 +101,6 @@ module Expr =
         | SwapDim of int * int          
         /// subtensor 
         | Subtensor of ExprRngsSpecT
-        /// extract diagonal along given axes
-        | Diag of int * int
-        /// build diagonal matrix along given axes
-        | DiagMat of int * int
 
         // ==== variable storage ====
         /// variable write
@@ -278,6 +282,11 @@ module Expr =
         | Unary (Truncate, a)
             -> shapeOf a
 
+        // tensor operations
+        | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
+        | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
+        | Unary(Invert, a) -> shapeOf a
+
         // reductions
         | Unary(Sum, _) -> ShapeSpec.scalar
         | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
@@ -292,8 +301,6 @@ module Expr =
                  match sr with
                  | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
                  | SRSDynStartSymSize (_, size) -> size)
-        | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
-        | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
@@ -359,16 +366,17 @@ module Expr =
             | Unary (op, a) ->
                 checkExpr a
                 let sa = shapeOf a
+                let nda = ShapeSpec.nDim sa
                 shapesBeingChecked <- [sa]
                 opBeingChecked <- sprintf "%A" op
 
                 match op with
-                | SumAxis(ax) when not (0 <= ax && ax < ShapeSpec.nDim sa) ->
+                | SumAxis(ax) when not (0 <= ax && ax < nda) ->
                     failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
                     (ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss) 
                 | DoBroadcast(ss) -> 
-                    if ShapeSpec.nDim ss <> ShapeSpec.nDim sa then
+                    if ShapeSpec.nDim ss <> nda then
                         failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
                             sa ss
                     for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
@@ -376,29 +384,34 @@ module Expr =
                         | SizeSpecT.Broadcast, _ -> ()
                         | ssa, ssb -> ssa .= ssb
                 | SwapDim(ax1, ax2) when 
-                        not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) ->
+                        not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 < nda) ->
                     failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
                 | StoreToVar vs ->
                     sa ..= (VarSpec.shape vs)
                 | Diag(ax1, ax2) ->
-                    if not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 < ShapeSpec.nDim sa) then
+                    if not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 < nda) then
                         failwithf "cannot extract diagonal from non-existant axis %d or %d of array with shape %A" 
                             ax1 ax2 sa
                     if not (ax1 < ax2) then 
                         failwith "first axis for extracting diagonal must come before second axis"
                     sa.[ax1] .= sa.[ax2]
                 | DiagMat(ax1, ax2) ->
-                    if not (0 <= ax1 && ax1 < ShapeSpec.nDim sa && 0 <= ax2 && ax2 <= ShapeSpec.nDim sa) then
+                    if not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 <= nda) then
                         failwithf "cannot build diagonal over non-existant axis %d or %d of array with shape %A" 
                             ax1 ax2 sa
                     if not (ax1 < ax2) then 
                         failwith "first axis for building diagonal matrix must come before second axis"
+                | Invert ->
+                    if nda < 2 then
+                        failwithf "need at least a matrix to invert but got shape %A" sa
+                    sa.[nda-2] .= sa.[nda-1]
                 | _ -> ()
 
             | Binary (op, a, b) ->
                 checkExpr a
                 checkExpr b
                 let sa, sb = shapeOf a, shapeOf b
+                let nda, ndb = ShapeSpec.nDim sa, ShapeSpec.nDim sb
                 shapesBeingChecked <- [sa; sb]
                 opBeingChecked <- sprintf "%A" op
 
@@ -406,13 +419,13 @@ module Expr =
                 | BinaryElemwiseOp ->
                     sa ..= sb 
                 | Dot -> 
-                    match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+                    match nda, ndb with
                     | 2, 2 -> sa.[1] .= sb.[0] 
                     | na, nb when na = nb -> 
                         sa.[na-1] .= sb.[nb-2]
                         for n = 0 to na - 3 do sa.[n] .= sb.[n]
                     | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
-                | TensorProduct when ShapeSpec.nDim sa <> ShapeSpec.nDim sb ->
+                | TensorProduct when nda <> ndb ->
                     failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
                 | _ -> ()
 
@@ -854,6 +867,12 @@ module Expr =
         if nd < 2 then
             failwith "need at least a two dimensional array for trace"      
         traceAxis (nd-2) (nd-1) a
+
+    /// Computes the inverse of a matrix.
+    /// If the input has more than two dimensions, the inverses
+    /// along the last two dimensions are returned.
+    let invert a =
+        Unary(Invert, a) |> check
 
 
 

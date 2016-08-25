@@ -46,7 +46,7 @@ module ExecUnitsTypes =
         MemAllocator:       MemAllocatorT
         Target:             ArrayNDManikinT
         Op:                 UOpT
-        Srcs:               ArrayNDManikinT list
+        Srcs:               (ArrayNDManikinT * bool) list
         SubmitInitItems:    'e list -> unit
     }
 
@@ -492,7 +492,7 @@ module ExecUnit =
                                 gen.ExecItemsForOp {MemAllocator=newMemory
                                                     Target=trgtView
                                                     Op=op
-                                                    Srcs=srcViews
+                                                    Srcs=List.zip srcViews srcShared
                                                     SubmitInitItems=submitInitItems}
                                 @ if Trace.isActive () then 
                                     gen.TraceItemsForExpr {MemAllocator=newMemory

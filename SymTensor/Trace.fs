@@ -184,7 +184,11 @@ module Trace =
         let out fmt = fprintfn file fmt
         out "Trace session %s" trace.Name
         out "Start: %A" trace.Start
-        out "End:   %A" trace.End.Value
+        let endStr =
+            match trace.End with
+            | Some e -> sprintf "%A" e
+            | None -> "in progress"
+        out "End:   %s" endStr
         out ""
 
         for exprEval in trace.ExprEvals do
@@ -192,7 +196,11 @@ module Trace =
             out "Id:       %d" exprEval.Id
             out "Compiler: %s" exprEval.Compiler
             out "Start:    %A" exprEval.Start
-            out "End:      %A" exprEval.End.Value
+            let endStr =
+                match exprEval.End with
+                | Some e -> sprintf "%A" e
+                | None -> "in progress"
+            out "End:      %s" endStr
             out ""
             out "==== Begin of trace ===="
             out ""
@@ -209,5 +217,6 @@ module Trace =
             out "==== End of trace ===="
             out ""
 
-
+    let dumpActiveTrace file =
+        getActiveTraceSession () |> dump file
 

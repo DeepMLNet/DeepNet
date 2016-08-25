@@ -55,3 +55,24 @@ let ``Trace compare: batched extract diagonal`` () =
         Expr.diag a
     )
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: matrix inverse`` () =
+    requireEqualTracesWithRandomData [[3; 3]] (fun [a] ->
+        Expr.invert a
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: transposed matrix inverse`` () =
+    requireEqualTracesWithRandomData [[5; 5]] (fun [a] ->
+        Expr.invert a.T
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: batched matrix inverse`` () =
+    requireEqualTracesWithRandomData [[7; 3; 4; 4]] (fun [a] ->
+        Expr.invert a
+    )
+

@@ -56,13 +56,14 @@ module HostEval =
                     | Floor -> floor av
                     | Round -> round av
                     | Truncate -> truncate av
+                    | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
+                    | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
+                    | Invert -> ArrayND.invert av
                     | Sum -> ArrayND.sum av
                     | SumAxis ax -> ArrayND.sumAxis ax av
                     | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                     | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                     | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
-                    | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
-                    | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
                     | Subtensor sr -> av.[rngEval sr]
                     | StoreToVar vs -> 
                         // TODO: stage variable write to avoid overwrite of used variables

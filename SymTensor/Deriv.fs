@@ -65,9 +65,10 @@ module Deriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
-            | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
+            | Invert -> -expr.T .* egExpanded .* expr.T |> reverseDiffStep a
+            | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
 
             | Subtensor srs ->
                 let agExpanded : ExprT<'T> = Expr.zeros (funElems :: (shapeOf a))

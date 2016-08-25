@@ -53,13 +53,14 @@ module UExprTypes =
         | Floor
         | Round
         | Truncate                   
+        | Diag of int * int
+        | DiagMat of int * int
+        | Invert
         | Sum                           
         | SumAxis of int                
         | Reshape of ShapeSpecT         
         | DoBroadcast of ShapeSpecT       
         | SwapDim of int * int       
-        | Diag of int * int
-        | DiagMat of int * int
         | StoreToVar of UVarSpecT
         | Annotated of Annotation       
 
@@ -208,13 +209,14 @@ module UExpr =
         | Unary (Expr.Floor, a)         -> unary Floor a
         | Unary (Expr.Round, a)         -> unary Round a
         | Unary (Expr.Truncate, a)      -> unary Truncate a
+        | Unary (Expr.Diag (ax1, ax2), a) -> unary (Diag (ax1, ax2)) a
+        | Unary (Expr.DiagMat (ax1, ax2), a)  -> unary (DiagMat (ax1, ax2)) a
+        | Unary (Expr.Invert, a)        -> unary Invert a
         | Unary (Expr.Sum, a)           -> unary Sum a
         | Unary (Expr.SumAxis ax, a)    -> unary (SumAxis ax) a
         | Unary (Expr.Reshape ss, a)    -> unary (Reshape ss) a
         | Unary (Expr.DoBroadcast ss, a)-> unary (DoBroadcast ss) a
         | Unary (Expr.SwapDim (ax1, ax2), a) -> unary (SwapDim (ax1, ax2)) a
-        | Unary (Expr.Diag (ax1, ax2), a) -> unary (Diag (ax1, ax2)) a
-        | Unary (Expr.DiagMat (ax1, ax2), a)  -> unary (DiagMat (ax1, ax2)) a
         | Unary (Expr.Subtensor sr, a)  ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
@@ -278,13 +280,14 @@ module UExpr =
         | UUnaryOp Floor                    -> unary Expr.Floor
         | UUnaryOp Round                    -> unary Expr.Round
         | UUnaryOp Truncate                 -> unary Expr.Truncate
+        | UUnaryOp (Diag (ax1, ax2))        -> unary (Expr.Diag (ax1, ax2))
+        | UUnaryOp (DiagMat (ax1, ax2))     -> unary (Expr.DiagMat (ax1, ax2))
+        | UUnaryOp Invert                   -> unary Expr.Invert
         | UUnaryOp Sum                      -> unary Expr.Sum                           
         | UUnaryOp (SumAxis a)              -> unary (Expr.SumAxis a)            
         | UUnaryOp (Reshape ss)             -> unary (Expr.Reshape ss)
         | UUnaryOp (DoBroadcast ss)         -> unary (Expr.DoBroadcast ss)
         | UUnaryOp (SwapDim (ax1, ax2))     -> unary (Expr.SwapDim (ax1, ax2))
-        | UUnaryOp (Diag (ax1, ax2))        -> unary (Expr.Diag (ax1, ax2))
-        | UUnaryOp (DiagMat (ax1, ax2))     -> unary (Expr.DiagMat (ax1, ax2))
         | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (UVarSpec.toVarSpec vs))
         | UUnaryOp (Annotated ano)          -> unary (Expr.Annotated ano)
 

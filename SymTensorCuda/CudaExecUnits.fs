@@ -27,8 +27,14 @@ module CudaExecUnitTypes =
                       single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
                       single * BlasTransposedMatrixTmpl
         | BlasGemmBatched of BlasTransposeOpT * BlasTransposeOpT *  
-                      single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
-                      single * BlasTransposedMatrixBatchTmpl
+                             single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
+                             single * BlasTransposedMatrixBatchTmpl
+        // LAPACK calls
+        | BlasGetrfBatched of BlasTransposedMatrixBatchTmpl * 
+                              BlasIntArrayTmpl * BlasIntArrayTmpl
+        | BlasGetriBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl *
+                              BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl
+                              
         // pointer array creation for CUBLAS batch calls
         | BlasInitPointerArray of BlasTransposedMatrixBatchTmpl
         // misc
@@ -37,6 +43,24 @@ module CudaExecUnitTypes =
 
 module CudaExecUnit =
     open ManagedCuda.BasicTypes
+
+    /// The operation the blasArg will perform.
+    type BlasArgOperation =
+        /// no operation
+        | BlasArgId
+        /// in-place transposition
+        | BlasArgTranspose
+        /// copy into temporary array of row-major layot
+        /// (no transposition occurs)
+        | BlasArgCopy
+
+    /// Returns the operation that blasArg will perform.
+    let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
+        let st = ArrayND.stride manikin
+        match st.[st.Length-2 ..] with
+        | [_; 1] when not (shared && willOverwrite) -> BlasArgId
+        | [1; _] when not (shared && willOverwrite) -> BlasArgTranspose
+        | _ -> BlasArgCopy
 
     /// Computes desired source views given desired target view.
     /// There is no guarantee that the desired source views will be used.
@@ -80,7 +104,11 @@ module CudaExecUnit =
         | UUnaryOp Ceil -> inplaceFirstSrcReq
         | UUnaryOp Floor -> inplaceFirstSrcReq
         | UUnaryOp Round -> inplaceFirstSrcReq
-        | UUnaryOp Truncate -> inplaceFirstSrcReq        
+        | UUnaryOp Truncate -> inplaceFirstSrcReq      
+        // tensor ops
+        | UUnaryOp (Diag _) -> noSrcReqs
+        | UUnaryOp (DiagMat _) -> noSrcReqs
+        | UUnaryOp Invert -> noSrcReqs          
         // reductions
         | UUnaryOp Sum -> noSrcReqs
         | UUnaryOp (SumAxis _) -> noSrcReqs
@@ -95,8 +123,6 @@ module CudaExecUnit =
             match reqView with
             | Some rv -> [Some (ArrayND.swapDim ax1 ax2 rv)]
             | _ -> noSrcReqs
-        | UUnaryOp (Diag _) -> noSrcReqs
-        | UUnaryOp (DiagMat _) -> noSrcReqs
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
@@ -151,11 +177,19 @@ module CudaExecUnit =
             | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
             | _ -> newTrgt () 
              
+        // target that shares no elements with any srcView and can be used for BLAS
         let outplaceBlasTrgt () = 
             match req with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
                            not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
             | _ -> ArrayNDManikin.newBlasTarget memAllocator typ trgtShape, false
+
+        // target that shares no elements with any srcView and the transpose of which can be used for BLAS
+        let outplaceTransposedBlasTrgt () = 
+            match req with
+            | Some rv when ArrayNDManikin.canBeBlasTarget rv.T && 
+                           not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
+            | _ -> ArrayNDManikin.newC memAllocator typ trgtShape, false  
 
         // target that reuses a srcView, if it may be overwritten
         let inplaceOvrwrtTrgt () =
@@ -204,6 +238,17 @@ module CudaExecUnit =
         | UUnaryOp Floor -> inplaceOvrwrtTrgt ()
         | UUnaryOp Round -> inplaceOvrwrtTrgt ()
         | UUnaryOp Truncate -> inplaceOvrwrtTrgt ()    
+        // tensor ops
+        | UUnaryOp (Diag (ax1, ax2)) ->
+            ArrayND.diagAxis ax1 ax2 srcs.[0], srcShared.[0]
+        | UUnaryOp (DiagMat (ax1, ax2)) -> outplaceTrgt ()
+        | UUnaryOp Invert -> 
+            // If source will be transposed, then target will also be transposed.
+            // Thus, in this case, we must request an array the transpose of which 
+            // can be used as a BLAS target.
+            match blasArgOperation srcs.[0] srcShared.[0] true with
+            | BlasArgTranspose -> outplaceBlasTrgt ()
+            | _ -> outplaceTransposedBlasTrgt ()
         // reductions
         | UUnaryOp Sum -> outplaceTrgt ()
         | UUnaryOp (SumAxis _) -> outplaceTrgt ()
@@ -217,9 +262,6 @@ module CudaExecUnit =
             ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
         | UUnaryOp (SwapDim (ax1, ax2)) ->
             ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
-        | UUnaryOp (Diag (ax1, ax2)) ->
-            ArrayND.diagAxis ax1 ax2 srcs.[0], srcShared.[0]
-        | UUnaryOp (DiagMat (ax1, ax2)) -> outplaceTrgt ()
         // variable access
         | UUnaryOp (StoreToVar _) -> 
             // output of StoreToVar is empty 
@@ -387,23 +429,35 @@ module CudaExecUnit =
                 (ArrayND.nElems trgt) (ArrayND.nElems src)
         execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
+    /// If all batch dimensions (all dimensions but the last two) of the array are of
+    /// size one, a view of the last two dimensions is returned.
+    /// Otherwise the original array is returned.
+    let trimUnitaryBatchedBlasDims (manikin: ArrayNDManikinT) =
+        let nd = manikin.NDims
+        if nd > 2 then
+            let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1)
+            if isUnitary then
+                manikin |> ArrayND.reshapeView manikin.Shape.[nd-2..]
+            else manikin
+        else manikin           
+
     /// BLAS input argument passing, so that orientation is preserved.
     /// Can return copy items if deemed necessary.
-    let blasArg memAllocator (manikin: ArrayNDManikinT) =
+    let blasArg memAllocator (manikin: ArrayNDManikinT) shared willOverwrite =
+        let manikin = trimUnitaryBatchedBlasDims manikin
         if ArrayND.nDims manikin < 2 then
             failwith "need at least 2-dimensional array for BLAS argument"
-        let st = ArrayND.stride manikin
-        match st.[st.Length-2 ..] with
-        | [_; 1] -> manikin, BlasTranspose, []
-        | [1; _] -> ArrayND.transpose manikin, BlasId, []
-        | _ -> 
-            // need to copy
+        match blasArgOperation manikin shared willOverwrite with
+        | BlasArgId        -> manikin, BlasTranspose, [], shared
+        | BlasArgTranspose -> ArrayND.transpose manikin, BlasId, [], shared
+        | BlasArgCopy -> 
             let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
             let copyOps = copyExecItems tmpView manikin
-            tmpView, BlasTranspose, copyOps
+            tmpView, BlasTranspose, copyOps, false
 
     /// BLAS target argument passing, so that orientation is preserved
     let blasTarget (manikin: ArrayNDManikinT) =
+        let manikin = trimUnitaryBatchedBlasDims manikin
         if not (ArrayNDManikin.canBeBlasTarget manikin) then
             failwithf "cannot use specified view with shape %A and stride %A as BLAS target" 
                 manikin.Shape (ArrayND.stride manikin)
@@ -436,8 +490,17 @@ module CudaExecUnit =
     let execItemsForOp compileEnv {MemAllocator=memAllocator
                                    Target=trgt
                                    Op=op
-                                   Srcs=srcs
+                                   Srcs=srcsAndShared
                                    SubmitInitItems=submitInit} =
+        let srcs, srcShared = List.unzip srcsAndShared
+
+        // set pointer array values either during initialization (for allocated arrays)
+        // or runtime (for variable arrays)
+        let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
+            match tmpl.Manikin.Storage with
+            | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
+            | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
+
         match op with 
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
@@ -482,18 +545,47 @@ module CudaExecUnit =
         | UUnaryOp Sum -> execItemsForSum memAllocator trgt srcs.[0]
         | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax trgt srcs.[0]
 
-        // shape operations
-        | UUnaryOp (Reshape _) ->
-            if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
-            else []
-        | UUnaryOp (DoBroadcast _) -> []
-        | UUnaryOp (SwapDim _) -> []
+        // tensor ops
         | UUnaryOp (Diag _) -> []
         | UUnaryOp (DiagMat (ax1, ax2)) ->
             let trgtDiag = ArrayND.diagAxis ax1 ax2 trgt
             let zeroItems = execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
             let copyItems = copyExecItems trgtDiag srcs.[0]
             zeroItems @ copyItems
+        | UUnaryOp Invert ->
+            let aView, _, aCopyItems, _ = blasArg memAllocator srcs.[0] srcShared.[0] true
+
+            let tView =
+                // If the source is transposed by us then the target must be transposed by us 
+                // as well to preserve orientation. The blasTarget function always transposes.
+                match blasArgOperation srcs.[0] srcShared.[0] true with
+                | BlasArgTranspose -> blasTarget trgt
+                | _ -> blasTarget (ArrayND.transpose trgt)
+
+            // allocate variables and initialize pointer arrays
+            let aArg = BlasTransposedMatrixBatchTmpl (aView, memAllocator)
+            let tArg = BlasTransposedMatrixBatchTmpl (tView, memAllocator)
+            let pivot = BlasIntArrayTmpl (aArg.Rows * aArg.NSamples, memAllocator)
+            let info = BlasIntArrayTmpl (aArg.NSamples, memAllocator)
+            let ptrAryItems =
+                []
+                |> appendPointerArrayItems aArg
+                |> appendPointerArrayItems tArg
+
+            // Perform LU decomposition in-place in b.
+            let luItems = [BlasGetrfBatched (aArg, pivot, info)]
+
+            // Perform matrix inversion from b into t.
+            let invItems = [BlasGetriBatched (aArg, pivot, tArg, info)]
+
+            aCopyItems @ ptrAryItems @ luItems @ invItems
+
+        // shape operations
+        | UUnaryOp (Reshape _) ->
+            if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
+            else []
+        | UUnaryOp (DoBroadcast _) -> []
+        | UUnaryOp (SwapDim _) -> []
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             let varShp, varType = ArrayND.shape srcs.[0], srcs.[0].TypeName
@@ -536,8 +628,8 @@ module CudaExecUnit =
         | UBinaryOp Power ->     execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t",     false)) srcs
         // matrix/tensor operations
         | UBinaryOp Dot -> 
-            let aView, aOp, aCopyItems = blasArg memAllocator srcs.[0]
-            let bView, bOp, bCopyItems = blasArg memAllocator srcs.[1]
+            let aView, aOp, aCopyItems, aShared = blasArg memAllocator srcs.[0] srcShared.[0] false
+            let bView, bOp, bCopyItems, bShared = blasArg memAllocator srcs.[1] srcShared.[1] false
             let tView = blasTarget trgt
         
             let blasItems =    
@@ -555,19 +647,12 @@ module CudaExecUnit =
                     let bTmpl = BlasTransposedMatrixBatchTmpl(bView, memAllocator)   
                     let tTmpl = BlasTransposedMatrixBatchTmpl(tView, memAllocator)   
 
-                    // set pointer array values either during initialization (for allocated arrays)
-                    // or runtime (for variable arrays)
-                    let initOrExec (tmpl: BlasTransposedMatrixBatchTmpl) (initItems, execItems) =
-                        match tmpl.Manikin.Storage with
-                        | MemAlloc _ -> initItems @ [BlasInitPointerArray tmpl], execItems
-                        | MemExternal _ -> initItems, execItems @ [BlasInitPointerArray tmpl]
-                    let initItems, execItems =
-                        ([], [])
-                        |> initOrExec aTmpl
-                        |> initOrExec bTmpl
-                        |> initOrExec tTmpl
+                    let execItems =
+                        []
+                        |> appendPointerArrayItems aTmpl
+                        |> appendPointerArrayItems bTmpl
+                        |> appendPointerArrayItems tTmpl
 
-                    submitInit initItems
                     execItems @ [BlasGemmBatched(aOp, bOp, 1.0f, aTmpl, bTmpl, 0.0f, tTmpl)]
 
             aCopyItems @ bCopyItems @ blasItems
