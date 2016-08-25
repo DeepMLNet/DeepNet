@@ -28,6 +28,9 @@ module ArrayNDTypes =
     let unsupLoc loc =
         failwithf "location %A is unsupported for this operation" loc
 
+    /// singular matrix encountered
+    exception SingularMatrixError of string
+
     /// ArrayND of any type
     type IArrayNDT =
         abstract Layout:            ArrayNDLayoutT

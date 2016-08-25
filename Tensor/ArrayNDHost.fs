@@ -217,7 +217,7 @@ module ArrayNDHostTypes =
                         (fun () -> LAPACKE_sgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
                         (fun () -> LAPACKE_dgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
                 if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then failwithf "cannot invert singular matrix" 
+                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
                 // compute matrix inverse
                 let info =
@@ -225,7 +225,7 @@ module ArrayNDHostTypes =
                         (fun () -> LAPACKE_sgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
                         (fun () -> LAPACKE_dgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
                 if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then failwithf "cannot invert singular matrix" 
+                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
             inv :> ArrayNDT<'T>
 

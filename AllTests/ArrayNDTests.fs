@@ -167,3 +167,12 @@ let ``Batch invert random matrices`` () =
     printfn "dm^-1^-1=\n%A" dmInvInv
 
     ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+
+
+[<Fact>]
+let ``Invert singular matrix`` () =
+    let dm = ArrayNDHost.ofList2D [[1.0; 0.0; 0.0]
+                                   [1.0; 2.0; 0.0]
+                                   [1.0; 0.0; 0.0]]
+
+    shouldFail (fun () -> ArrayND.invert dm |> ignore)

@@ -6,6 +6,7 @@ open FsUnit.Xunit
 
 open ArrayNDNS
 open SymTensor
+open SymTensor.Compiler.Cuda
 open TestUtils
 
 
@@ -75,4 +76,19 @@ let ``Trace compare: batched matrix inverse`` () =
     requireEqualTracesWithRandomData [[7; 3; 4; 4]] (fun [a] ->
         Expr.invert a
     )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Singular matrix inverse`` () =
+    let a = Expr.var "a" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let expr = Expr.invert a
+    let fn = Func.make DevCuda.DefaultFactory expr |> arg1 a
+    let av = ArrayNDCuda.zeros<single> [3; 3]
+    let iav = fn av
+    printfn "a=\n%A" av
+    printfn "a^-1=\n%A" iav
+
+    
+
+
 
