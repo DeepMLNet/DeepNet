@@ -65,21 +65,30 @@ module CudaExecUnit =
     /// Computes desired source views given desired target view.
     /// There is no guarantee that the desired source views will be used.
     let srcReqs cudaEnv {TargetShape=trgtShape
-                         TargetRequest=reqView
+                         TargetRequest=reqChViews
                          Op=op
-                         SrcShapes=srcShapes} =
+                         SrcShapes=srcShapes} : ChannelReqsT list =
         let nSrcs = List.length srcShapes
 
-        // requests all sources to use separate storage
-        let noSrcReqs =
-            List.replicate nSrcs None
+        /// Creates a channel request for the default channel.
+        let defaultChReq view : ChannelReqsT =
+            Map [defaultChannelId, view] 
 
-        // requests the first source to be evaluated into our target view
+        /// The view request for the default channel of the target.
+        let targetDefChReq = reqChViews.[defaultChannelId]
+
+        /// Requests the default channel of all sources without
+        /// a storage requests.
+        let defaultSrcWithNoViewReq =
+            List.replicate nSrcs (defaultChReq None)
+
+        /// Requests the default channel of the first source to be evaluated 
+        /// into our requested target view of the the default channel.
         let inplaceFirstSrcReq =
             match nSrcs with
             | 0 -> []
-            | 1 -> [reqView]
-            | _ -> reqView :: List.replicate (nSrcs-1) None
+            | 1 -> [defaultChReq targetDefChReq]
+            | _ -> defaultChReq targetDefChReq :: List.replicate (nSrcs-1) (defaultChReq None)
 
         match op with
         | ULeafOp _ -> []
@@ -106,23 +115,23 @@ module CudaExecUnit =
         | UUnaryOp Round -> inplaceFirstSrcReq
         | UUnaryOp Truncate -> inplaceFirstSrcReq      
         // tensor ops
-        | UUnaryOp (Diag _) -> noSrcReqs
-        | UUnaryOp (DiagMat _) -> noSrcReqs
-        | UUnaryOp Invert -> noSrcReqs          
+        | UUnaryOp (Diag _) -> defaultSrcWithNoViewReq
+        | UUnaryOp (DiagMat _) -> defaultSrcWithNoViewReq
+        | UUnaryOp Invert -> defaultSrcWithNoViewReq          
         // reductions
-        | UUnaryOp Sum -> noSrcReqs
-        | UUnaryOp (SumAxis _) -> noSrcReqs
+        | UUnaryOp Sum -> defaultSrcWithNoViewReq
+        | UUnaryOp (SumAxis _) -> defaultSrcWithNoViewReq
         // shape operations
         | UUnaryOp (Reshape _) ->        
-            match reqView with
+            match targetDefChReq with
             | Some rv when ArrayND.isC rv ->
-                [Some (ArrayND.reshapeView srcShapes.[0] rv)]
-            | _ -> noSrcReqs
-        | UUnaryOp (DoBroadcast _) -> noSrcReqs
+                [defaultChReq (Some (ArrayND.reshapeView srcShapes.[0] rv))]
+            | _ -> defaultSrcWithNoViewReq
+        | UUnaryOp (DoBroadcast _) -> defaultSrcWithNoViewReq
         | UUnaryOp (SwapDim (ax1, ax2)) ->
-            match reqView with
-            | Some rv -> [Some (ArrayND.swapDim ax1 ax2 rv)]
-            | _ -> noSrcReqs
+            match targetDefChReq with
+            | Some rv -> [defaultChReq (Some (ArrayND.swapDim ax1 ax2 rv))]
+            | _ -> defaultSrcWithNoViewReq
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
@@ -130,8 +139,8 @@ module CudaExecUnit =
             | LocDev -> 
                 // request to store directly into external var
                 // we assume that all device input vars are continguous
-                [Some (ArrayNDManikin.externalC (MemExternal vs) srcShapes.[0])]
-            | LocHost -> noSrcReqs
+                [defaultChReq (Some (ArrayNDManikin.externalC (MemExternal vs) srcShapes.[0]))]
+            | LocHost -> defaultSrcWithNoViewReq
             | loc -> unsupLoc loc
         // misc
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
@@ -144,12 +153,12 @@ module CudaExecUnit =
         | UBinaryOp Modulo -> inplaceFirstSrcReq
         | UBinaryOp Power -> inplaceFirstSrcReq
         // matrix/tensor operations
-        | UBinaryOp Dot -> noSrcReqs
-        | UBinaryOp TensorProduct -> noSrcReqs     
+        | UBinaryOp Dot -> defaultSrcWithNoViewReq
+        | UBinaryOp TensorProduct -> defaultSrcWithNoViewReq     
 
         // nary
-        | UNaryOp Discard -> noSrcReqs
-        | UNaryOp (Subtensor _) -> noSrcReqs
+        | UNaryOp Discard -> defaultSrcWithNoViewReq
+        | UNaryOp (Subtensor _) -> defaultSrcWithNoViewReq
         | UNaryOp (SetSubtensor _) -> 
             // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
@@ -159,46 +168,65 @@ module CudaExecUnit =
 
     /// computes the definitive target view of an op given its source views
     let trgtGivenSrcs compileEnv {MemAllocator=memAllocator
-                                  TargetType=typ
-                                  TargetShape=trgtShape
-                                  TargetRequest=req
+                                  TargetRequest=reqChViews
                                   Op=op
-                                  Srcs=srcsAndShared} =
+                                  Metadata={TargetType=typ
+                                            TargetNShape=trgtShape}
+                                  Srcs=srcs} =
 
-        let srcs, srcShared = List.unzip srcsAndShared
+        /// Default channels of all sources.
+        let srcsDefaultCh, srcsDefaultChShared =
+            srcs
+            |> List.map (fun srcChs -> srcChs.[defaultChannelId])
+            |> List.unzip
 
-        // new allocated target
-        let newTrgt () =
-            ArrayNDManikin.newC memAllocator typ trgtShape, false        
+        /// The view request for the default channel of the target.
+        let targetDefChReq = reqChViews.[defaultChannelId]
 
-        // target that shares no elements with any srcView 
-        let outplaceTrgt () =
-            match req with
-            | Some rv when not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> newTrgt () 
+        /// Target for default channel.
+        let defaultChTrgt view shared : ChannelManikinsAndSharedT =
+            Map [defaultChannelId, (view, shared)] 
+
+        // New allocated target for default channel.
+        let newDefaultChTrgt () = 
+            defaultChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false        
+
+        /// True if specified manikin overlaps with any channel of any source.
+        let overlappingWithAnySrc (rv: ArrayNDManikinT) =
+            srcs
+            |> List.exists (Map.exists (fun ch (view, shared) -> ArrayND.overlapping rv view))
+
+        /// default channel target that shares no elements with any srcView 
+        let defaultChOutplaceTrgt () =
+            match targetDefChReq with
+            | Some rv when not (overlappingWithAnySrc rv) -> defaultChTrgt rv false
+            | _ -> newDefaultChTrgt () 
              
-        // target that shares no elements with any srcView and can be used for BLAS
-        let outplaceBlasTrgt () = 
-            match req with
+        /// default channel target that shares no elements with any srcView and can be used for BLAS
+        let defaultChOutplaceBlasTrgt () = 
+            match targetDefChReq with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
-                           not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> ArrayNDManikin.newBlasTarget memAllocator typ trgtShape, false
+                           not (overlappingWithAnySrc rv) -> defaultChTrgt rv false
+            | _ -> 
+                defaultChTrgt (ArrayNDManikin.newBlasTarget memAllocator typ trgtShape) false
 
-        // target that shares no elements with any srcView and the transpose of which can be used for BLAS
-        let outplaceTransposedBlasTrgt () = 
-            match req with
+        /// default channel target that shares no elements with any srcView and the transpose of which can be used for BLAS
+        let defaultChOutplaceTransposedBlasTrgt () = 
+            match targetDefChReq with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv.T && 
-                           not (List.exists (ArrayND.overlapping rv) srcs) -> rv, false
-            | _ -> ArrayNDManikin.newC memAllocator typ trgtShape, false  
+                           not (overlappingWithAnySrc rv) -> defaultChTrgt rv false
+            | _ -> 
+                defaultChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false  
 
-        // target that reuses a srcView, if it may be overwritten
-        let inplaceOvrwrtTrgt () =
-            match List.zip srcs srcShared 
-                  |> List.tryFind (fun (src, shared) ->
-                                       not (ArrayND.isBroadcasted src) && 
-                                       not shared) with
-            | Some (src, _) -> src, false
-            | None -> outplaceTrgt ()     
+        /// Default channel target that reuses the default channel of a srcView, 
+        /// if it may be overwritten. Otherwise uses defaultChOutplaceTrgt.
+        let defaultChInplaceOvrwrtTrgt () : ChannelManikinsAndSharedT =
+            match srcs 
+                  |> List.tryFind (fun srcChs ->
+                                    let view, shared = srcChs.[defaultChannelId] 
+                                    not (ArrayND.isBroadcasted view) && not shared) with
+            | Some srcChs -> Map [defaultChannelId, srcChs.[defaultChannelId]]
+            | None -> defaultChOutplaceTrgt ()     
 
         match op with
         // variable access
@@ -206,93 +234,94 @@ module CudaExecUnit =
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
                 // we assume that all device input vars are contiguous
-                ArrayNDManikin.externalC (MemExternal vs) trgtShape, true
+                defaultChTrgt (ArrayNDManikin.externalC (MemExternal vs) trgtShape) true
             | LocHost ->
                 // will transfer variable from host to device during execution
                 // need contiguous memory for that
-                match req with
-                | Some rv when ArrayND.isC rv -> rv, false
-                | _ -> ArrayNDManikin.newC memAllocator typ trgtShape, false    
+                match targetDefChReq with
+                | Some rv when ArrayND.isC rv -> defaultChTrgt rv false
+                | _ -> defaultChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false    
             | loc -> unsupLoc loc                    
         // tensor creation
-        | ULeafOp _ -> outplaceTrgt ()      
+        | ULeafOp _ -> defaultChOutplaceTrgt ()      
 
         // unary element-wise
-        | UUnaryOp Negate -> inplaceOvrwrtTrgt ()                       
-        | UUnaryOp Abs -> inplaceOvrwrtTrgt ()
-        | UUnaryOp SignT -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Log -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Log10 -> inplaceOvrwrtTrgt ()                          
-        | UUnaryOp Exp -> inplaceOvrwrtTrgt ()                           
-        | UUnaryOp Sin -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Cos -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Tan -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Asin -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Acos -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Atan -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Sinh -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Cosh -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Tanh -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Sqrt -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Ceil -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Floor -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Round -> inplaceOvrwrtTrgt ()
-        | UUnaryOp Truncate -> inplaceOvrwrtTrgt ()    
+        | UUnaryOp Negate -> defaultChInplaceOvrwrtTrgt ()                       
+        | UUnaryOp Abs -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp SignT -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Log -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Log10 -> defaultChInplaceOvrwrtTrgt ()                          
+        | UUnaryOp Exp -> defaultChInplaceOvrwrtTrgt ()                           
+        | UUnaryOp Sin -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Cos -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Tan -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Asin -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Acos -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Atan -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Sinh -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Cosh -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Tanh -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Sqrt -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Ceil -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Floor -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Round -> defaultChInplaceOvrwrtTrgt ()
+        | UUnaryOp Truncate -> defaultChInplaceOvrwrtTrgt ()    
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
-            ArrayND.diagAxis ax1 ax2 srcs.[0], srcShared.[0]
-        | UUnaryOp (DiagMat (ax1, ax2)) -> outplaceTrgt ()
+            defaultChTrgt (ArrayND.diagAxis ax1 ax2 srcsDefaultCh.[0]) srcsDefaultChShared.[0]
+        | UUnaryOp (DiagMat (ax1, ax2)) -> defaultChOutplaceTrgt ()
         | UUnaryOp Invert -> 
             // If source will be transposed, then target will also be transposed.
             // Thus, in this case, we must request an array the transpose of which 
             // can be used as a BLAS target.
-            match blasArgOperation srcs.[0] srcShared.[0] true with
-            | BlasArgTranspose -> outplaceBlasTrgt ()
-            | _ -> outplaceTransposedBlasTrgt ()
+            match blasArgOperation srcsDefaultCh.[0] srcsDefaultChShared.[0] true with
+            | BlasArgTranspose -> defaultChOutplaceBlasTrgt ()
+            | _ -> defaultChOutplaceTransposedBlasTrgt ()
         // reductions
-        | UUnaryOp Sum -> outplaceTrgt ()
-        | UUnaryOp (SumAxis _) -> outplaceTrgt ()
+        | UUnaryOp Sum -> defaultChOutplaceTrgt ()
+        | UUnaryOp (SumAxis _) -> defaultChOutplaceTrgt ()
         // shape operations
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
-            if ArrayND.isC srcs.[0] then
-                ArrayND.reshapeView trgtShape srcs.[0], srcShared.[0] 
-            else outplaceTrgt () // will copy
+            if ArrayND.isC srcsDefaultCh.[0] then
+                defaultChTrgt (ArrayND.reshapeView trgtShape srcsDefaultCh.[0]) srcsDefaultChShared.[0] 
+            else defaultChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
-            ArrayND.broadcastToShape trgtShape srcs.[0], srcShared.[0]
+            defaultChTrgt (ArrayND.broadcastToShape trgtShape srcsDefaultCh.[0]) srcsDefaultChShared.[0]
         | UUnaryOp (SwapDim (ax1, ax2)) ->
-            ArrayND.swapDim ax1 ax2 srcs.[0], srcShared.[0]
+            defaultChTrgt (ArrayND.swapDim ax1 ax2 srcsDefaultCh.[0]) srcsDefaultChShared.[0]
         // variable access
         | UUnaryOp (StoreToVar _) -> 
             // output of StoreToVar is empty 
-            newTrgt ()
+            newDefaultChTrgt ()
         // misc
-        | UUnaryOp (Annotated _) -> srcs.[0], srcShared.[0]
+        | UUnaryOp (Annotated _) -> defaultChTrgt srcsDefaultCh.[0] srcsDefaultChShared.[0]
 
         // binary element-wise
-        | UBinaryOp Add -> inplaceOvrwrtTrgt ()
-        | UBinaryOp Substract -> inplaceOvrwrtTrgt ()
-        | UBinaryOp Multiply -> inplaceOvrwrtTrgt ()
-        | UBinaryOp Divide -> inplaceOvrwrtTrgt ()
-        | UBinaryOp Modulo -> inplaceOvrwrtTrgt ()
-        | UBinaryOp Power -> inplaceOvrwrtTrgt ()
+        | UBinaryOp Add -> defaultChInplaceOvrwrtTrgt ()
+        | UBinaryOp Substract -> defaultChInplaceOvrwrtTrgt ()
+        | UBinaryOp Multiply -> defaultChInplaceOvrwrtTrgt ()
+        | UBinaryOp Divide -> defaultChInplaceOvrwrtTrgt ()
+        | UBinaryOp Modulo -> defaultChInplaceOvrwrtTrgt ()
+        | UBinaryOp Power -> defaultChInplaceOvrwrtTrgt ()
         // matrix/tensor operations
-        | UBinaryOp Dot -> outplaceBlasTrgt ()
-        | UBinaryOp TensorProduct -> outplaceTrgt ()
+        | UBinaryOp Dot -> defaultChOutplaceBlasTrgt ()
+        | UBinaryOp TensorProduct -> defaultChOutplaceTrgt ()
 
         // nary
-        | UNaryOp Discard -> outplaceTrgt ()
+        | UNaryOp Discard -> defaultChOutplaceTrgt ()
         | UNaryOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
                 // dynamic sub-tensors will be copied out of the src
-                outplaceTrgt ()
+                defaultChOutplaceTrgt ()
             else
                 // symbolic sub-tensors use a view of the src 
-                let rng = SimpleRangesSpec.eval (fun _ -> failwith "is static") srs
-                srcs.[0].[rng] :?> ArrayNDManikinT, srcShared.[0]
+                let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
+                defaultChTrgt (srcsDefaultCh.[0].[rng] :?> ArrayNDManikinT) srcsDefaultChShared.[0]
         | UNaryOp (SetSubtensor _) ->
-            if not (srcShared.[0]) then srcs.[0], false
-            else outplaceTrgt ()
+            if not (srcsDefaultChShared.[0]) then 
+                defaultChTrgt srcsDefaultCh.[0] false
+            else defaultChOutplaceTrgt ()
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
    
     /// execution item to launch the given kernel template function
@@ -488,12 +517,21 @@ module CudaExecUnit =
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv {MemAllocator=memAllocator
-                                   Target=trgt
+                                   Target=trgtChs
                                    Op=op
+                                   Metadata=metadata
                                    Srcs=srcsAndShared
                                    SubmitInitItems=submitInit} =
-        let srcs, srcShared = List.unzip srcsAndShared
 
+        /// Default channel of target.
+        let defaultChTrgt = trgtChs.[defaultChannelId]
+
+        /// Default channels of all sources.
+        let srcsDefaultCh, srcsDefaultChShared =
+            srcsAndShared
+            |> List.map (fun srcChs -> srcChs.[defaultChannelId])
+            |> List.unzip
+    
         // set pointer array values either during initialization (for allocated arrays)
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
@@ -503,64 +541,64 @@ module CudaExecUnit =
 
         match op with 
         // tensor creation
-        | ULeafOp (Identity _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
-        | ULeafOp (Zeros _) -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
-        | ULeafOp (ScalarConst f) -> execItemsForElemwise trgt (ConstEOpArgTmpl f) [] 
+        | ULeafOp (Identity _) -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
+        | ULeafOp (Zeros _) -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
+        | ULeafOp (ScalarConst f) -> execItemsForElemwise defaultChTrgt (ConstEOpArgTmpl f) [] 
         | ULeafOp (SizeValue sv) -> 
-            let value = Convert.ChangeType(SizeSpec.eval sv, trgt.DataType)
-            let opType = typedefof<ConstEOpArgTmpl<_>>.MakeGenericType(trgt.DataType)
+            let value = Convert.ChangeType(SizeSpec.eval sv, defaultChTrgt.DataType)
+            let opType = typedefof<ConstEOpArgTmpl<_>>.MakeGenericType(defaultChTrgt.DataType)
             let op = Activator.CreateInstance(opType, value) :?> ICudaOpAndArgTmpl 
-            execItemsForElemwise trgt op [] 
+            execItemsForElemwise defaultChTrgt op [] 
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev -> []
             | LocHost -> 
                 // we assume that host variable has continguous stride and zero offset
-                let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape trgt)
-                [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(trgt))]       
+                let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape defaultChTrgt)
+                [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(defaultChTrgt))]       
             | loc -> unsupLoc loc
         // unary element-wise
-        | UUnaryOp Negate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcs
-        | UUnaryOp Abs -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcs
-        | UUnaryOp SignT -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SignTEOp_t", false)) srcs
-        | UUnaryOp Log -> execItemsForElemwise trgt (NoArgEOpArgTmpl("LogEOp_t", false)) srcs
-        | UUnaryOp Log10 -> execItemsForElemwise trgt (NoArgEOpArgTmpl("Log10EOp_t", false)) srcs
-        | UUnaryOp Exp -> execItemsForElemwise trgt (NoArgEOpArgTmpl("ExpEOp_t", false)) srcs
-        | UUnaryOp Sin -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SinEOp_t", false)) srcs
-        | UUnaryOp Cos -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CosEOp_t", false)) srcs
-        | UUnaryOp Tan -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TanEOp_t", false)) srcs
-        | UUnaryOp Asin -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AsinEOp_t", false)) srcs
-        | UUnaryOp Acos -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AcosEOp_t", false)) srcs
-        | UUnaryOp Atan -> execItemsForElemwise trgt (NoArgEOpArgTmpl("AtanEOp_t", false)) srcs
-        | UUnaryOp Sinh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SinhEOp_t", false)) srcs
-        | UUnaryOp Cosh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CoshEOp_t", false)) srcs
-        | UUnaryOp Tanh -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TanhEOp_t", false)) srcs
-        | UUnaryOp Sqrt -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SqrtEOp_t", false)) srcs
-        | UUnaryOp Ceil -> execItemsForElemwise trgt (NoArgEOpArgTmpl("CeilEOp_t", false)) srcs
-        | UUnaryOp Floor -> execItemsForElemwise trgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcs
-        | UUnaryOp Round -> execItemsForElemwise trgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcs
-        | UUnaryOp Truncate -> execItemsForElemwise trgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcs
+        | UUnaryOp Negate -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Abs -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcsDefaultCh
+        | UUnaryOp SignT -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("SignTEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Log -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("LogEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Log10 -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("Log10EOp_t", false)) srcsDefaultCh
+        | UUnaryOp Exp -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("ExpEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Sin -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("SinEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Cos -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("CosEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Tan -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("TanEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Asin -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("AsinEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Acos -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("AcosEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Atan -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("AtanEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Sinh -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("SinhEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Cosh -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("CoshEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Tanh -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("TanhEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Sqrt -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("SqrtEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Ceil -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("CeilEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Floor -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Round -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcsDefaultCh
+        | UUnaryOp Truncate -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDefaultCh
         // reductions
-        | UUnaryOp Sum -> execItemsForSum memAllocator trgt srcs.[0]
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax trgt srcs.[0]
+        | UUnaryOp Sum -> execItemsForSum memAllocator defaultChTrgt srcsDefaultCh.[0]
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax defaultChTrgt srcsDefaultCh.[0]
 
         // tensor ops
         | UUnaryOp (Diag _) -> []
         | UUnaryOp (DiagMat (ax1, ax2)) ->
-            let trgtDiag = ArrayND.diagAxis ax1 ax2 trgt
-            let zeroItems = execItemsForElemwise trgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
-            let copyItems = copyExecItems trgtDiag srcs.[0]
+            let trgtDiag = ArrayND.diagAxis ax1 ax2 defaultChTrgt
+            let zeroItems = execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
+            let copyItems = copyExecItems trgtDiag srcsDefaultCh.[0]
             zeroItems @ copyItems
         | UUnaryOp Invert ->
-            let aView, _, aCopyItems, _ = blasArg memAllocator srcs.[0] srcShared.[0] true
+            let aView, _, aCopyItems, _ = blasArg memAllocator srcsDefaultCh.[0] srcsDefaultChShared.[0] true
 
             let tView =
                 // If the source is transposed by us then the target must be transposed by us 
                 // as well to preserve orientation. The blasTarget function always transposes.
-                match blasArgOperation srcs.[0] srcShared.[0] true with
-                | BlasArgTranspose -> blasTarget trgt
-                | _ -> blasTarget (ArrayND.transpose trgt)
+                match blasArgOperation srcsDefaultCh.[0] srcsDefaultChShared.[0] true with
+                | BlasArgTranspose -> blasTarget defaultChTrgt
+                | _ -> blasTarget (ArrayND.transpose defaultChTrgt)
 
             // allocate variables and initialize pointer arrays
             let aArg = BlasTransposedMatrixBatchTmpl (aView, memAllocator)
@@ -582,16 +620,18 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->
-            if trgt <> srcs.[0] then copyExecItems trgt srcs.[0]
+            if defaultChTrgt <> srcsDefaultCh.[0] then 
+                copyExecItems defaultChTrgt srcsDefaultCh.[0]
             else []
         | UUnaryOp (DoBroadcast _) -> []
         | UUnaryOp (SwapDim _) -> []
         // variable access
         | UUnaryOp (StoreToVar vs) ->
-            let varShp, varType = ArrayND.shape srcs.[0], srcs.[0].TypeName
+            let varShp, varType = 
+                ArrayND.shape srcsDefaultCh.[0], srcsDefaultCh.[0].TypeName
 
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev when srcs.[0].Storage = (MemExternal vs) ->
+            | LocDev when srcsDefaultCh.[0].Storage = (MemExternal vs) ->
                 // Source was evaluated directly into the variable storage.
                 // No copy necessary.
                 []
@@ -600,16 +640,16 @@ module CudaExecUnit =
                 // Therefore we need to copy into the variable.
                 // We assume that all device vars are continguous.
                 let dv = ArrayNDManikin.externalC (MemExternal vs) varShp
-                copyExecItems dv srcs.[0]
+                copyExecItems dv srcsDefaultCh.[0]
             | LocHost ->            
                 let copyItems, memcpySrc = 
-                    if ArrayND.isC srcs.[0] then 
+                    if ArrayND.isC srcsDefaultCh.[0] then 
                         // Source is contiguous. Can directly copy to host.
-                        [], srcs.[0]
+                        [], srcsDefaultCh.[0]
                     else
                         // Need to copy to temporary contiguous storage first.
                         let tmp = ArrayNDManikin.newC memAllocator varType varShp
-                        copyExecItems tmp srcs.[0], tmp
+                        copyExecItems tmp srcsDefaultCh.[0], tmp
 
                 // We assume that all host vars are continguous.
                 // trgtView has contingous stride
@@ -620,17 +660,17 @@ module CudaExecUnit =
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise
-        | UBinaryOp Add ->       execItemsForElemwise trgt (NoArgEOpArgTmpl("AddEOp_t",       false)) srcs
-        | UBinaryOp Substract -> execItemsForElemwise trgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcs
-        | UBinaryOp Multiply ->  execItemsForElemwise trgt (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) srcs
-        | UBinaryOp Divide ->    execItemsForElemwise trgt (NoArgEOpArgTmpl("DivideEOp_t",    false)) srcs
-        | UBinaryOp Modulo ->    execItemsForElemwise trgt (NoArgEOpArgTmpl("ModuloEOp_t",    false)) srcs
-        | UBinaryOp Power ->     execItemsForElemwise trgt (NoArgEOpArgTmpl("PowerEOp_t",     false)) srcs
+        | UBinaryOp Add ->       execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("AddEOp_t",       false)) srcsDefaultCh
+        | UBinaryOp Substract -> execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcsDefaultCh
+        | UBinaryOp Multiply ->  execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) srcsDefaultCh
+        | UBinaryOp Divide ->    execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("DivideEOp_t",    false)) srcsDefaultCh
+        | UBinaryOp Modulo ->    execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("ModuloEOp_t",    false)) srcsDefaultCh
+        | UBinaryOp Power ->     execItemsForElemwise defaultChTrgt (NoArgEOpArgTmpl("PowerEOp_t",     false)) srcsDefaultCh
         // matrix/tensor operations
         | UBinaryOp Dot -> 
-            let aView, aOp, aCopyItems, aShared = blasArg memAllocator srcs.[0] srcShared.[0] false
-            let bView, bOp, bCopyItems, bShared = blasArg memAllocator srcs.[1] srcShared.[1] false
-            let tView = blasTarget trgt
+            let aView, aOp, aCopyItems, aShared = blasArg memAllocator srcsDefaultCh.[0] srcsDefaultChShared.[0] false
+            let bView, bOp, bCopyItems, bShared = blasArg memAllocator srcsDefaultCh.[1] srcsDefaultChShared.[1] false
+            let tView = blasTarget defaultChTrgt
         
             let blasItems =    
                 match aView.NDims with
@@ -664,24 +704,30 @@ module CudaExecUnit =
         | UNaryOp (Subtensor srs) ->
             if SimpleRangesSpec.isDynamic srs then 
                 // copy dynamic subtensor out of the src
-                execItemsForCopyFromDynamicSubtensor trgt srcs.[0] srs (List.tail srcs)
+                execItemsForCopyFromDynamicSubtensor defaultChTrgt 
+                    srcsDefaultCh.[0] srs (List.tail srcsDefaultCh)
             else [] // symbolic subtensor uses a slice of the src view
         | UNaryOp (SetSubtensor srs) ->
             // copy "a" if necessary
             let copyItems = 
-                if trgt <> srcs.[0] then copyExecItems trgt srcs.[0] else []
+                if defaultChTrgt <> srcsDefaultCh.[0] then 
+                    copyExecItems defaultChTrgt srcsDefaultCh.[0] else []
             // copy "b" into a
             let setItems =
-                execItemsForCopyToDynamicSubtensor trgt srs (List.skip 2 srcs) srcs.[1]
+                execItemsForCopyToDynamicSubtensor defaultChTrgt srs 
+                    (List.skip 2 srcsDefaultCh) srcsDefaultCh.[1]
             copyItems @ setItems
         | UNaryOp (ExtensionOp eop) -> failwith "not implemented yet"
 
                 
     /// returns the execution units for tracing the result
     let traceItemsForExpr compileEnv {MemAllocator=memAllocator
-                                      Target=trgt
+                                      Target=trgtChs
                                       Expr=uexpr} =
-        [Trace (uexpr, trgt)]
+        /// Default channel of target.
+        let defaultChTrgt = trgtChs.[defaultChannelId]
+
+        [Trace (uexpr, defaultChTrgt)]
 
 
     /// generates CUDA execution units that will evaluate the given unified expression

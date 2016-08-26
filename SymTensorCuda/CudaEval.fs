@@ -17,7 +17,7 @@ module CudaEval =
         // add storage op for results
         let transferUExprs, resVars, resAllocators = 
             uexprs
-            |> List.mapi (fun i (UExpr (_, tn, shp, _) as uexpr) ->
+            |> List.mapi (fun i (UExpr (_, _, {TargetType=tn; TargetShape=shp}) as uexpr) ->
                 let nshp = ShapeSpec.eval shp
                 let layout = ArrayNDLayout.newC nshp
 
@@ -35,7 +35,9 @@ module CudaEval =
                     let resVar = UVarSpec.ofNameShapeAndTypeName resVarName shp tn                     
 
                     // insert StoreToVar op in expression
-                    UExpr (UUnaryOp (StoreToVar resVar), tn, shp, [uexpr]), Some resVar, resAllocator
+                    (UExpr (UUnaryOp (StoreToVar resVar), [uexpr], 
+                            {TargetType=tn; TargetShape=shp; TargetNShape=nshp}), 
+                     Some resVar, resAllocator)
                 else
                     // no data needs to be transferred back
                     uexpr, None, resAllocator)
@@ -52,10 +54,16 @@ module CudaEval =
         /// unified expression containing all expressions to evaluate
         let mergedUexpr =
             match transferUExprs with
-            | [] -> UExpr (UNaryOp Discard, TypeName.ofType<int>, ShapeSpec.emptyVector, [])
+            | [] -> UExpr (UNaryOp Discard, [], 
+                           {TargetType=TypeName.ofType<int>
+                            TargetShape=ShapeSpec.emptyVector
+                            TargetNShape=[0]})
             | [uexpr] -> uexpr
-            | UExpr (_, tn, _, _) :: _ ->
-                UExpr (UNaryOp Discard, tn, ShapeSpec.emptyVector, transferUExprs)                       
+            | UExpr (_, _, {TargetType=tn}) :: _ ->
+                UExpr (UNaryOp Discard, transferUExprs, 
+                       {TargetType=tn
+                        TargetShape=ShapeSpec.emptyVector
+                        TargetNShape=[0]})                       
 
         // build variable locations
         let varLocs = Map.join compileEnv.VarLocs resVarLocs

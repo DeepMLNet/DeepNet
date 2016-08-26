@@ -92,6 +92,7 @@ module UExprTypes =
     type UMetadata = {
         TargetType:     TypeNameT
         TargetShape:    ShapeSpecT
+        TargetNShape:   NShapeSpecT
     }
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)
@@ -182,11 +183,12 @@ module UExpr =
     let rec toUExpr (expr: ExprT<'T>) =
         let tn = TypeName typeof<'T>.AssemblyQualifiedName
         let shp = Expr.shapeOf expr
+        let nshp = ShapeSpec.eval shp
 
-        let leaf uop        = UExpr (ULeafOp uop, [], {TargetType=tn; TargetShape=shp})
-        let unary uop a     = UExpr (UUnaryOp uop, [toUExpr a], {TargetType=tn; TargetShape=shp})
-        let binary uop a b  = UExpr (UBinaryOp uop, [toUExpr a; toUExpr b], {TargetType=tn; TargetShape=shp})
-        let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExpr, {TargetType=tn; TargetShape=shp})
+        let leaf uop        = UExpr (ULeafOp uop, [], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+        let unary uop a     = UExpr (UUnaryOp uop, [toUExpr a], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+        let binary uop a b  = UExpr (UBinaryOp uop, [toUExpr a; toUExpr b], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+        let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExpr, {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
 
         match expr with
         | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
@@ -226,7 +228,8 @@ module UExpr =
         | Unary (Expr.Subtensor sr, a)  ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
-            UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, {TargetType=tn; TargetShape=shp})
+            UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, 
+                  {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
         | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (UVarSpec.ofVarSpec vs)) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
@@ -241,7 +244,8 @@ module UExpr =
         | Binary (Expr.SetSubtensor sr, a, b) ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt 
-            UExpr(UNaryOp (SetSubtensor usr), toUExpr a :: toUExpr b :: dynUExprs, {TargetType=tn; TargetShape=shp})
+            UExpr(UNaryOp (SetSubtensor usr), toUExpr a :: toUExpr b :: dynUExprs, 
+                  {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
 
         | Nary (Expr.Discard, se)       -> nary Discard se
         | Nary (Expr.ExtensionOp eop, se) -> nary (ExtensionOp (eop :?> IUExtensionOp)) se
