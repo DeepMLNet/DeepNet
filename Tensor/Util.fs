@@ -56,7 +56,7 @@ module List =
 module Map = 
     /// adds all items from q to p
     let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
-        Map(Seq.concat [ (Map.toSeq p) ; (Map.toSeq q) ])    
+        Map(Seq.concat [(Map.toSeq p); (Map.toSeq q)])    
 
 module String =
 

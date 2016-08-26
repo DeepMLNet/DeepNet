@@ -16,27 +16,41 @@ module ExecUnitsTypes =
 
     /// a group of commands that must be executed sequentially
     type ExecUnitT<'e> = {
-        Id:           ExecUnitIdT; 
-        DependsOn:    ExecUnitIdT list; 
-        Items:        'e list; 
-        Expr:         UExprT;
-        Manikins:     ArrayNDManikinT list;
-        RerunAfter:   ExecUnitIdT list;
+        Id:           ExecUnitIdT 
+        DependsOn:    ExecUnitIdT list
+        Items:        'e list
+        Expr:         UExprT
+        Manikins:     ArrayNDManikinT list
+        RerunAfter:   ExecUnitIdT list
     }
+
+    /// a channel id
+    type ChannelIdT = string
+
+    /// id of default channel
+    let defaultChannelId = "#"
+
+    /// manikins representing the data in each channel
+    type ChannelManikinsT = Map<ChannelIdT, ArrayNDManikinT>
+
+    /// manikins representing the data in each channel and flag if it is shared
+    type ChannelManikinsAndSharedT = Map<ChannelIdT, ArrayNDManikinT * bool>
+
+    /// requests for manikins representing the data in each channel
+    type ChannelReqsT = Map<ChannelIdT, ArrayNDManikinT option>
 
     /// result of an evaluation request
     type EvalResultT = {
-        ExecUnitId:     ExecUnitIdT; 
-        Manikin:        ArrayNDManikinT; 
-        Shared:         bool;
+        ExecUnitId:     ExecUnitIdT 
+        Channels:       ChannelManikinsAndSharedT
     }
 
     /// an evaluation request
     type EvalReqT = {
-        Id:             int; 
-        Expr:           UExprT; 
-        Multiplicity:   int; 
-        ReqManikin:     ArrayNDManikinT option; 
+        Id:             int 
+        Expr:           UExprT
+        Multiplicity:   int
+        ChannelReqs:    ChannelReqsT
         OnCompletion:   EvalResultT -> unit
     }
 
@@ -44,30 +58,30 @@ module ExecUnitsTypes =
 
     type ExecItemsForOpArgs<'e> = {
         MemAllocator:       MemAllocatorT
-        Target:             ArrayNDManikinT
+        Target:             ChannelManikinsT
         Op:                 UOpT
-        Srcs:               (ArrayNDManikinT * bool) list
+        Metadata:           UMetadata
+        Srcs:               ChannelManikinsAndSharedT list
         SubmitInitItems:    'e list -> unit
     }
 
     type TraceItemsForExprArgs = {
         MemAllocator:       MemAllocatorT
-        Target:             ArrayNDManikinT
+        Target:             ChannelManikinsT
         Expr:               UExprT
     }
 
     type TrgtGivenSrcsArgs = {
         MemAllocator:       MemAllocatorT
-        TargetType:         TypeNameT
-        TargetShape:        NShapeSpecT
-        TargetRequest:      ArrayNDManikinT option
+        TargetRequest:      ChannelReqsT
         Op:                 UOpT
-        Srcs:               (ArrayNDManikinT * bool) list    
+        Metadata:           UMetadata
+        Srcs:               ChannelManikinsAndSharedT list    
     }
 
     type SrcReqsArgs = {
         TargetShape:        NShapeSpecT
-        TargetRequest:      ArrayNDManikinT option
+        TargetRequest:      ChannelReqsT
         Op:                 UOpT
         SrcShapes:          NShapeSpecT list 
     }
@@ -76,8 +90,8 @@ module ExecUnitsTypes =
     type ExecUnitsGeneratorT<'e> = {
         ExecItemsForOp:         ExecItemsForOpArgs<'e> -> 'e list
         TraceItemsForExpr:      TraceItemsForExprArgs -> 'e list
-        TrgtGivenSrcs:          TrgtGivenSrcsArgs -> ArrayNDManikinT * bool
-        SrcReqs:                SrcReqsArgs -> ArrayNDManikinT option list
+        TrgtGivenSrcs:          TrgtGivenSrcsArgs -> ChannelManikinsAndSharedT
+        SrcReqs:                SrcReqsArgs -> ChannelReqsT list
     }
 
     /// generated ExecUnits for an expression
@@ -132,7 +146,7 @@ module ExecUnit =
             let build = Dictionary<UVarSpecT, List<ExecUnitT<_>>> ()
             for eu in eus do
                 match eu.Expr with
-                | UExpr(UUnaryOp (StoreToVar vs), _, _, _) ->
+                | UExpr(UUnaryOp (StoreToVar vs), _, _) ->
                     if not (build.ContainsKey vs) then build.[vs] <- List ()
                     build.[vs].Add eu
                 | _ -> ()
@@ -330,7 +344,7 @@ module ExecUnit =
 
                 // If this execution unit is a variable read:
                 match eu.Expr with
-                | UExpr(ULeafOp (Var readVs), _, _, _) ->
+                | UExpr(ULeafOp (Var readVs), _, _) ->
                     // Find all StoreToVars to the same variable operations.
                     // We may only run again, after the previous variable write has been completed.
                     let stvs = coll.StoresToVar readVs                               
@@ -405,7 +419,6 @@ module ExecUnit =
             initItems <- ii @ initItems
 
         // storage space
-        let mutable memAllocIdCnt = 0
         let mutable memAllocs = []
         let newMemory typ elements kind = 
             let mem = {Id=List.length memAllocs; TypeName=typ; Elements=elements; Kind=kind}
@@ -414,124 +427,140 @@ module ExecUnit =
 
         // evaluation request
         let mutable evalRequests : EvalReqT list = []
-        let mutable evalRequestIdCnt = 0
         let submitEvalRequest expr multiplicity storage onCompletion =
-            evalRequestIdCnt <- evalRequestIdCnt + 1
-            evalRequests <- {Id=evalRequestIdCnt; Expr=expr; Multiplicity=multiplicity; 
-                             ReqManikin=storage; OnCompletion=onCompletion} :: evalRequests
+            evalRequests <- {Id=List.length evalRequests; Expr=expr; Multiplicity=multiplicity; 
+                             ChannelReqs=storage; OnCompletion=onCompletion} :: evalRequests
 
         // evaluated requests
         let mutable evaluatedExprs : Map<UExprT, EvalResultT> = Map.empty
 
+        /// stores the evaluation result and executes Afterwards functions of the requestor
+        let completeEvalRequest (erq: EvalReqT) result =
+            evaluatedExprs <- evaluatedExprs |> Map.add erq.Expr result
+            erq.OnCompletion result
+
+        /// removes an eval request        
+        let removeEvalRequest (erqToRemove: EvalReqT) =
+            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToRemove.Id)
+
         /// takes an evaluation request from the evaluation request queue and processes it
         let processEvalRequest () =   
-            // find a request to process and target storage
-            let erqToProcess, erqTarget, erqResult, erqMultiplicity, erqRequestors =
-                // First, look if there are any expressions which are already computed.
-                match evalRequests |> List.tryFind (fun erq -> evaluatedExprs |> Map.containsKey erq.Expr) with
-                | Some computedErq -> computedErq, 
-                                      Some evaluatedExprs.[computedErq.Expr].Manikin, 
-                                      Some evaluatedExprs.[computedErq.Expr],
-                                      0, 0
-                | None ->
-                    // if none, look if there is a group of request for the same expression whose requestors are all known.
-                    let erqsByExpr = evalRequests |> List.groupBy (fun erq -> erq.Expr)                              
-                    let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> 
-                        rs |> List.sumBy (fun r -> r.Multiplicity) = exprOccurrences expr)
-                    let multiplicity = erqsForExpr |> List.sumBy (fun r -> r.Multiplicity)
-                    let requestors = erqsForExpr |> List.length
 
-                    // If a request from the group has a specified storage target, process it first.
-                    match List.tryFind (fun erq -> erq.ReqManikin <> None) erqsForExpr with
-                    | Some erqWithStorage -> 
-                        erqWithStorage, erqWithStorage.ReqManikin, None, multiplicity, requestors
-                    | None -> 
-                        // Otherwise process any (the first) request from the group.
-                        erqsForExpr.[0], None, None, multiplicity, requestors
-        
-            /// true, if result is processed by multiple requestors
-            let erqResultShared = erqRequestors > 1
-
-            /// stores the evaluation result and executes Afterwards functions of the requestor
-            let completeEvalRequest result =
-                evaluatedExprs <- evaluatedExprs |> Map.add erqToProcess.Expr result
-                erqToProcess.OnCompletion result
-
-            match erqResult with
-            | Some result ->
-                // expr is already evaluated
-                completeEvalRequest result
+            // First, look if there are any expressions which are already computed.
+            match evalRequests |> List.tryFind (fun erq -> evaluatedExprs |> Map.containsKey erq.Expr) with
+            | Some computedErq -> 
+                // If the result is already computed, the request can be completed immediately. 
+                completeEvalRequest computedErq evaluatedExprs.[computedErq.Expr]
+                removeEvalRequest computedErq
             | None ->
+                // Otherwise, look if there is a group of request for the same 
+                // expression whose requestors are all known.
+                let erqsByExpr = evalRequests |> List.groupBy (fun erq -> erq.Expr)                              
+                let _, erqsForExpr = erqsByExpr |> List.find (fun (expr, rs) -> 
+                    rs |> List.sumBy (fun r -> r.Multiplicity) = exprOccurrences expr)
+
+                // calculate how many requests are there and extract expression
+                let erqMultiplicity = erqsForExpr |> List.sumBy (fun r -> r.Multiplicity)
+                let erqRequestors = erqsForExpr |> List.length
+                let erqResultShared = erqRequestors > 1
+                let erqExpr = erqsForExpr.Head.Expr
+
+                // combine channel storage requets
+                let erqsForExprByReqs = 
+                    erqsForExpr
+                    |> List.sortByDescending (fun erq ->
+                        erq.ChannelReqs |> Map.toSeq |> Seq.filter (fun (_, cr) -> cr.IsSome) |> Seq.length)
+                let erqChannelReqs : ChannelReqsT =
+                    (Map.empty, erqsForExprByReqs)
+                    ||> List.fold (fun reqsSoFar erq -> 
+                        (reqsSoFar, erq.ChannelReqs)
+                        ||> Map.fold (fun reqsSoFar channel req ->
+                            match reqsSoFar |> Map.tryFind channel with
+                            | Some (Some prvReq) -> reqsSoFar
+                            | Some None | None -> reqsSoFar |> Map.add channel req))
+                  
                 // emit exec unit to evaluate expression
-                match erqToProcess.Expr with
-                | UExpr(op, typ, shp, srcs) as erqExpr ->
-                    let nSrc = List.length srcs
-                    let mutable subreqResults : Map<UExprT, EvalResultT option> = Map.empty
+                let (UExpr(op, srcs, metadata)) = erqExpr
+                let mutable subreqResults : Map<UExprT, EvalResultT option> = Map.empty
 
-                    let onMaybeCompleted () =
-                        if List.forall (fun s -> Map.containsKey s subreqResults) srcs then  
-                            // continuation, when eval requests for all sources have been processed                     
-                            let subres = Map.map (fun k v -> Option.get v) subreqResults
+                let onMaybeCompleted () =
+                    if List.forall (fun s -> Map.containsKey s subreqResults) srcs then  
+                        // continuation, when eval requests for all sources have been processed                     
+                        let subres = Map.map (fun k v -> Option.get v) subreqResults
 
-                            // determine our definitive target storage
-                            let srcViews, srcShared, srcExeUnitIds = 
-                                srcs 
-                                |> List.map (fun s -> subres.[s].Manikin, subres.[s].Shared, subres.[s].ExecUnitId) 
-                                |> List.unzip3
-                            let trgtView, trgtShared =
-                                gen.TrgtGivenSrcs {MemAllocator=newMemory
-                                                   TargetType=typ
-                                                   TargetShape=numShapeOf erqExpr
-                                                   TargetRequest=erqTarget
-                                                   Op=op
-                                                   Srcs=List.zip srcViews srcShared}
-                            let trgtShared = trgtShared || erqResultShared
+                        // determine our definitive target storage
+                        let srcChannelsAndShared, srcExeUnitIds = 
+                            srcs 
+                            |> List.map (fun s -> subres.[s].Channels, subres.[s].ExecUnitId) 
+                            |> List.unzip
+                        let trgtChannelsAndShared =
+                            gen.TrgtGivenSrcs {MemAllocator=newMemory
+                                               TargetRequest=erqChannelReqs
+                                               Op=op
+                                               Metadata=metadata
+                                               Srcs=srcChannelsAndShared}
+                            |> Map.map (fun ch (manikin, shared) -> 
+                                            manikin, shared || erqResultShared)
 
-                            // generate execution items
-                            let items = 
-                                gen.ExecItemsForOp {MemAllocator=newMemory
-                                                    Target=trgtView
-                                                    Op=op
-                                                    Srcs=List.zip srcViews srcShared
-                                                    SubmitInitItems=submitInitItems}
-                                @ if Trace.isActive () then 
-                                    gen.TraceItemsForExpr {MemAllocator=newMemory
-                                                           Target=trgtView
-                                                           Expr=erqExpr}
-                                  else []
+                        // build channel lists
+                        let extractChannels (chsAndShared: ChannelManikinsAndSharedT) : ChannelManikinsT = 
+                            chsAndShared |> Map.map (fun ch (manikin, shared) -> manikin) 
 
-                            // emit execution unit 
-                            let eu = {
-                                Id         = newExecUnitId()
-                                Items      = items
-                                DependsOn  = srcExeUnitIds
-                                Expr       = erqExpr
-                                Manikins   = trgtView :: srcViews
-                                RerunAfter = []
-                            }                                    
-                            submitExecUnit eu
+                        // generate execution items
+                        let items = 
+                            gen.ExecItemsForOp {MemAllocator=newMemory
+                                                Target=extractChannels trgtChannelsAndShared
+                                                Op=op
+                                                Metadata=metadata
+                                                Srcs=srcChannelsAndShared
+                                                SubmitInitItems=submitInitItems}
+                            @ if Trace.isActive () then 
+                                gen.TraceItemsForExpr {MemAllocator=newMemory
+                                                       Target=extractChannels trgtChannelsAndShared
+                                                       Expr=erqExpr}
+                                else []
+
+                        // extract manikin from all channels
+                        let srcManikins = 
+                            srcChannelsAndShared
+                            |> List.map (extractChannels >> Map.toList >> List.map snd)
+                            |> List.concat
+                        let trgtManikins = 
+                            trgtChannelsAndShared |> extractChannels |> Map.toList |> List.map snd                        
+
+                        // emit execution unit 
+                        let eu = {
+                            Id         = newExecUnitId()
+                            Items      = items
+                            DependsOn  = srcExeUnitIds
+                            Expr       = erqExpr
+                            Manikins   = trgtManikins @ srcManikins
+                            RerunAfter = []
+                        }                                    
+                        submitExecUnit eu
                            
-                            completeEvalRequest {ExecUnitId=eu.Id; Manikin=trgtView; Shared=trgtShared}
+                        completeEvalRequest erqsForExpr.Head {ExecUnitId=eu.Id; Channels=trgtChannelsAndShared}
 
-                    // submit eval requests from sources
-                    if List.isEmpty srcs then onMaybeCompleted ()
-                    else
-                        let srcReqStorages = 
-                            gen.SrcReqs {TargetShape=numShapeOf erqExpr
-                                         TargetRequest=erqTarget
-                                         Op=op
-                                         SrcShapes=List.map numShapeOf srcs}
-                        for src, srcReqStorage in List.zip srcs srcReqStorages do
-                            submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
-                                subreqResults <- subreqResults |> Map.add src (Some res)
-                                onMaybeCompleted())     
+                // submit eval requests from sources
+                if List.isEmpty srcs then onMaybeCompleted ()
+                else
+                    let srcReqStorages = 
+                        gen.SrcReqs {TargetShape=numShapeOf erqExpr
+                                     TargetRequest=erqChannelReqs
+                                     Op=op
+                                     SrcShapes=List.map numShapeOf srcs}
+                    for src, srcReqStorage in List.zip srcs srcReqStorages do
+                        submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
+                            subreqResults <- subreqResults |> Map.add src (Some res)
+                            onMaybeCompleted())     
 
-            // remove eval request        
-            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToProcess.Id)
+                // remove eval request        
+                removeEvalRequest erqsForExpr.Head
 
         // create initial evaluation request
         let mutable exprRes = None
-        submitEvalRequest expr 1 None (fun res -> exprRes <- Some res)
+        let trgtReq = Map.empty |> Map.add defaultChannelId None
+        submitEvalRequest expr 1 trgtReq (fun res -> exprRes <- Some res)
 
         // processing loop
         while not (List.isEmpty evalRequests) do
@@ -543,7 +572,7 @@ module ExecUnit =
             execUnits
             |> List.map (fun eu ->
                 match eu.Expr with
-                | UExpr(UUnaryOp (StoreToVar storeVs), _, _, _) ->
+                | UExpr(UUnaryOp (StoreToVar storeVs), _, _) ->
                     // For every StoreToVar operation:
                     // Find all EUs that read from the variable's memory.
                     let varMem = MemExternal storeVs
@@ -552,7 +581,7 @@ module ExecUnit =
                         |> List.filter (fun ceu ->
                             let readsVar = 
                                 match ceu.Expr with
-                                | UExpr(ULeafOp (Var readVs), _, _, _) when readVs = storeVs -> true
+                                | UExpr(ULeafOp (Var readVs), _, _) when readVs = storeVs -> true
                                 | _ -> false
                             let accessesMemory = 
                                 ceu.Manikins 

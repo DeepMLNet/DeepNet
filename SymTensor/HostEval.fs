@@ -107,7 +107,7 @@ module HostEval =
             eval evalEnv expr :> IArrayNDT
 
     /// evaluates a unified expression
-    let evalUExpr (evalEnv: EvalEnvT) (UExpr (_, tn, _, _) as uexpr) =
+    let evalUExpr (evalEnv: EvalEnvT) (UExpr (_, _, {TargetType=tn}) as uexpr) =
         let expr = UExpr.toExpr uexpr
         let gm = 
             typeof<EvalT>.GetMethod ("Eval", 

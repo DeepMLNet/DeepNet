@@ -88,17 +88,23 @@ module UExprTypes =
         | UBinaryOp of UBinaryOpT
         | UNaryOp of UNaryOpT
 
+    /// metadata for an unified expression
+    type UMetadata = {
+        TargetType:     TypeNameT
+        TargetShape:    ShapeSpecT
+    }
+
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)
     [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{PrettyString}")>]
     type UExprT = 
-        | UExpr of UOpT * TypeNameT * ShapeSpecT * (UExprT list)
+        | UExpr of UOpT * (UExprT list) * UMetadata
 
         member this.PrettyString =
             match this with
-            | UExpr (ULeafOp uop, tn, ss, subs) -> sprintf "%A" uop 
-            | UExpr (UUnaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs.[0]
-            | UExpr (UBinaryOp uop, tn, ss, subs) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
-            | UExpr (UNaryOp uop, tn, ss, subs) -> sprintf "%A (%A)" uop subs
+            | UExpr (ULeafOp uop, subs, _) -> sprintf "%A" uop 
+            | UExpr (UUnaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs.[0]
+            | UExpr (UBinaryOp uop, subs, _) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
+            | UExpr (UNaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs
 
 
 module UVarSpec =
@@ -177,10 +183,10 @@ module UExpr =
         let tn = TypeName typeof<'T>.AssemblyQualifiedName
         let shp = Expr.shapeOf expr
 
-        let leaf uop        = UExpr (ULeafOp uop, tn, shp, [])
-        let unary uop a     = UExpr (UUnaryOp uop, tn, shp, [toUExpr a])
-        let binary uop a b  = UExpr (UBinaryOp uop, tn, shp, [toUExpr a; toUExpr b])
-        let nary uop se     = UExpr (UNaryOp uop, tn, shp, se |> List.map toUExpr)
+        let leaf uop        = UExpr (ULeafOp uop, [], {TargetType=tn; TargetShape=shp})
+        let unary uop a     = UExpr (UUnaryOp uop, [toUExpr a], {TargetType=tn; TargetShape=shp})
+        let binary uop a b  = UExpr (UBinaryOp uop, [toUExpr a; toUExpr b], {TargetType=tn; TargetShape=shp})
+        let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExpr, {TargetType=tn; TargetShape=shp})
 
         match expr with
         | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
@@ -220,7 +226,7 @@ module UExpr =
         | Unary (Expr.Subtensor sr, a)  ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
-            UExpr(UNaryOp (Subtensor usr), tn, shp, toUExpr a :: dynUExprs)
+            UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, {TargetType=tn; TargetShape=shp})
         | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (UVarSpec.ofVarSpec vs)) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
@@ -235,7 +241,7 @@ module UExpr =
         | Binary (Expr.SetSubtensor sr, a, b) ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt 
-            UExpr(UNaryOp (SetSubtensor usr), tn, shp, toUExpr a :: toUExpr b :: dynUExprs)
+            UExpr(UNaryOp (SetSubtensor usr), toUExpr a :: toUExpr b :: dynUExprs, {TargetType=tn; TargetShape=shp})
 
         | Nary (Expr.Discard, se)       -> nary Discard se
         | Nary (Expr.ExtensionOp eop, se) -> nary (ExtensionOp (eop :?> IUExtensionOp)) se
@@ -244,7 +250,7 @@ module UExpr =
         toUExpr expr
 
     /// converts a unified expression to an expression of (known) type
-    let rec toExprOfType (UExpr (uop, tn, ss, subUExprs) as uexpr) : ExprT<'T> =
+    let rec toExprOfType (UExpr (uop, subUExprs, {TargetType=tn; TargetShape=shp}) as uexpr) : ExprT<'T> =
         if TypeName.ofType<'T> <> tn then
             failwith "UExpr type does not match"
 
@@ -317,7 +323,7 @@ module UExpr =
             toExprOfType uexpr
 
     /// converts a unified expression to an expression of the correct type
-    let toExpr (UExpr (_, tn, _, _) as uexpr) =
+    let toExpr (UExpr (_, _, {TargetType=tn}) as uexpr) =
         let gm = typeof<ToExprOfTypeT>.GetMethod ("ToExprOfType", 
                                                   BindingFlags.NonPublic ||| 
                                                   BindingFlags.Public ||| 
@@ -326,20 +332,16 @@ module UExpr =
         m.Invoke(null, [| uexpr |])
 
     /// the op of the given unified expression
-    let inline opOf uexpr =
-        match uexpr with UExpr(op, typ, shp, se) -> op
+    let inline opOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = op
 
     /// the type of the given unified expression
-    let inline typeOf uexpr =
-        match uexpr with UExpr(op, TypeName tn, shp, se) -> System.Type.GetType(tn)
+    let inline typeOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = TypeName.getType tn
 
     /// the type of the given unified expression
-    let inline typenameOf uexpr =
-        match uexpr with UExpr(op, typ, shp, se) -> typ
+    let inline typenameOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = tn
 
     /// the shape of the given unified expression
-    let inline shapeOf uexpr = 
-        match uexpr with UExpr(op, typ, shp, se) -> shp
+    let inline shapeOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = shp
 
     /// counts how many times subExpr occurs in unified expression uexpr
     let subExprOccurrences uexpr =
@@ -351,7 +353,7 @@ module UExpr =
                 cnt.[expr] <- 1
 
             match expr with
-            | UExpr (_, _, _, srcs) ->
+            | UExpr (_, srcs, _) ->
                 for src in srcs do
                     build src
         build uexpr
