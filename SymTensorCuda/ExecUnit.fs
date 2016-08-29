@@ -427,21 +427,21 @@ module ExecUnit =
 
         // evaluation request
         let mutable evalRequests : EvalReqT list = []
+        let mutable evalReqCnt = 0
+        let mutable evaluatedExprs : Map<UExprT, EvalResultT> = Map.empty
         let submitEvalRequest expr multiplicity storage onCompletion =
-            evalRequests <- {Id=List.length evalRequests; Expr=expr; Multiplicity=multiplicity; 
+            evalReqCnt <- evalReqCnt + 1
+            evalRequests <- {Id=evalReqCnt; Expr=expr; Multiplicity=multiplicity; 
                              ChannelReqs=storage; OnCompletion=onCompletion} :: evalRequests
 
-        // evaluated requests
-        let mutable evaluatedExprs : Map<UExprT, EvalResultT> = Map.empty
+        /// removes an eval request        
+        let removeEvalRequest (erqToRemove: EvalReqT) =
+            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToRemove.Id)
 
         /// stores the evaluation result and executes Afterwards functions of the requestor
         let completeEvalRequest (erq: EvalReqT) result =
             evaluatedExprs <- evaluatedExprs |> Map.add erq.Expr result
             erq.OnCompletion result
-
-        /// removes an eval request        
-        let removeEvalRequest (erqToRemove: EvalReqT) =
-            evalRequests <- evalRequests |> List.filter (fun erq -> erq.Id <> erqToRemove.Id)
 
         /// takes an evaluation request from the evaluation request queue and processes it
         let processEvalRequest () =   
@@ -602,7 +602,6 @@ module ExecUnit =
         // Build RerunAfter dependencies.
         if Compiler.Cuda.Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
         let sw = Stopwatch.StartNew()
-        //let execUnits = buildRerunAfterOld execUnits exprRes
         let execUnits = buildRerunAfter execUnits 
         if Compiler.Cuda.Debug.Timing then
             printfn "Building RerunAfter dependencies took %A" sw.Elapsed
