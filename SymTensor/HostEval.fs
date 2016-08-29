@@ -107,7 +107,8 @@ module HostEval =
         static member Eval<'T> (evalEnv: EvalEnvT, expr: ExprT<'T>) : IArrayNDT =
             eval evalEnv expr :> IArrayNDT
 
-    /// evaluates a unified expression
+    /// Evaluates a unified expression.
+    /// This is done by evaluating the generating expression.
     let evalUExpr (evalEnv: EvalEnvT) (UExpr (_, _, {TargetType=tn}) as uexpr) =
         let expr = UExpr.toExpr uexpr
         let gm = 
@@ -118,7 +119,8 @@ module HostEval =
         let m = gm.MakeGenericMethod ([| TypeName.getType tn |])
         m.Invoke(null, [| evalEnv; expr |]) :?> IArrayNDT
         
-    /// evaluates all unified expressions
+    /// Evaluates the specified unified expressions.
+    /// This is done by evaluating the generating expressions.
     let evalUExprs (evalEnv: EvalEnvT) (uexprs: UExprT list) =
         List.map (evalUExpr evalEnv) uexprs
 
