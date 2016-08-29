@@ -141,7 +141,9 @@ module Expr =
         | ExtensionOp of IOp<'T>
    
      
-    /// An operation in an expression.
+    /// A mathematical operation in an expression.
+    /// This models a mathematical function or operator that takes one or more tensors
+    /// and returns one tensor.
     and IOp<'T> =
         inherit System.IComparable
         inherit System.IComparable<'T>
@@ -178,6 +180,12 @@ module Expr =
         /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
         /// you return w.r.t. that argument must have NxM elements.
         abstract Deriv: dOp:ExprT<'T> -> args:ExprT<'T> list -> ExprT<'T> list
+
+        /// Should evaluate the numerical value of this op given the numerical values of its arguments.
+        /// This evaluation should be done on the host using the simplest means possible and is used
+        /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
+        /// implementations. This method may be omitted when no verification will be done.
+        abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
 
 
     /// a type conversion op

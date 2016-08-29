@@ -91,7 +91,7 @@ module HostEval =
                     let esv = List.map doEval es
                     match op with 
                     | Discard -> ArrayNDHost.zeros [0]
-                    | ExtensionOp eop -> failwith "not implemented"
+                    | ExtensionOp eop -> eop.EvalSimple esv
 
             if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) res
