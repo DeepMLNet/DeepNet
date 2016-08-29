@@ -21,11 +21,6 @@ module CudaRecipeTypes =
         // memory mangement
         | MemAlloc          of MemAllocManikinT
         | MemFree           of MemAllocManikinT
-        // memory operations
-        | MemcpyAsync       of IDevMemRngTmpl * IDevMemRngTmpl * StreamT
-        | MemcpyHtoDAsync   of IDevMemRngTmpl * IHostMemRngTmpl * StreamT
-        | MemcpyDtoHAsync   of IHostMemRngTmpl * IDevMemRngTmpl * StreamT
-        | MemsetD32Async    of IDevMemRngTmpl * single * StreamT
         // stream management
         | StreamCreate      of StreamT * BasicTypes.CUStreamFlags
         | StreamDestory     of StreamT
@@ -39,22 +34,10 @@ module CudaRecipeTypes =
         | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | CallCFunc         of string * System.Type * StreamT * (ICudaArgTmpl list)
-        // CUBLAS
-        | CublasSgemm       of CudaBlas.Operation * CudaBlas.Operation *
-                               single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
-                               single * BlasTransposedMatrixTmpl * StreamT
-        | CublasSgemmBatched of CudaBlas.Operation * CudaBlas.Operation *
-                                single * BlasTransposedMatrixBatchTmpl * BlasTransposedMatrixBatchTmpl * 
-                                single * BlasTransposedMatrixBatchTmpl * StreamT
-        // LAPACK
-        | CublasGetrfBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl * 
-                                BlasIntArrayTmpl * StreamT
-        | CublasGetriBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl *
-                                BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl * StreamT
-        // pointer array creation for CUBLAS batch calls
-        | CublasInitPointerArray of BlasTransposedMatrixBatchTmpl * StreamT
-        // misc
+        // tracing
         | Trace             of UExprT * ArrayNDManikinT
+        // execution item
+        | ExecItem          of CudaExecItemT * StreamT
 
 
     /// function instantiation state
@@ -170,28 +153,9 @@ module CudaRecipe =
             [LaunchCKernel(TmplInstCache.instCPPTmplFunc ti cache, workDim, 0, strm, args)]
         | CudaExecItemT.CallCFunc(ti, dlgte, args) ->
             [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strm, args)]
-        | MemcpyDtoD(src, trgt) -> 
-            [MemcpyAsync(trgt, src, strm)]
-        | MemcpyHtoD(hostSrc, trgt) -> 
-            [MemcpyHtoDAsync(trgt, hostSrc, strm)]
-        | MemcpyDtoH(src, hostTrgt) ->
-            [MemcpyDtoHAsync(hostTrgt, src, strm)]   
-        | Memset(value, trgt) ->                        
-            [MemsetD32Async(trgt, single value, strm)]      
-        | BlasGemm(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
-            [CublasSgemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                         aFac, a, b, trgtFac, trgt, strm)]   
-        | BlasGemmBatched(aOp, bOp, aFac, a, b, trgtFac, trgt) ->                        
-            [CublasSgemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation,
-                                aFac, a, b, trgtFac, trgt, strm)]   
-        | BlasGetrfBatched(a, pivot, info) ->
-            [CublasGetrfBatched (a, pivot, info, strm)]
-        | BlasGetriBatched(a, pivot, trgt, info) ->
-            [CublasGetriBatched (a, pivot, trgt, info, strm)]
-        | BlasInitPointerArray(aryTmpl) ->
-            [CublasInitPointerArray (aryTmpl, strm)]
         | CudaExecItemT.Trace (expr, res) -> 
             [Trace (expr, res)]
+        | cmd -> [ExecItem (cmd, strm)]
 
     /// generates a sequence of CUDA calls from streams
     let generateCalls streams cache =    

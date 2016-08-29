@@ -105,6 +105,5 @@ module UExprTypes =
     /// An operation in an unified expression.
     and IUOp =
         inherit System.IComparable
-        //abstract Arity: ArityT with get        
 
 

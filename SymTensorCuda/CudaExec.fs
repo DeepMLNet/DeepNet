@@ -344,38 +344,6 @@ module CudaExprWorkspaceTypes =
                             Marshal.FreeHGlobal execEnv.RegHostMem.[mem].Ptr
                             execEnv.RegHostMem.Remove mem |> ignore
 
-                // memory operations
-                | MemcpyAsync (dst, src, strm) ->
-                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
-                    dstCudaVar.AsyncCopyToDevice(srcCudaVar, 
-                                                 SizeT(srcOffset), 
-                                                 SizeT(dstOffset), 
-                                                 SizeT(length), 
-                                                 getStream strm)
-                | MemcpyHtoDAsync (dst, src, strm) ->
-                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {HostMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
-                    use srcOffsetVar = new CudaRegisteredHostMemory<byte>(srcCudaVar.PinnedHostPointer + (nativeint srcOffset), 
-                                                                          BasicTypes.SizeT(length))
-                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
-                                                                    BasicTypes.SizeT(length))
-                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, getStream strm)
-                | MemcpyDtoHAsync (dst, src, strm) ->
-                    let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
-                    use srcOffsetVar = new CudaDeviceVariable<byte>(srcCudaVar.DevicePointer + (BasicTypes.SizeT srcOffset), 
-                                                                    BasicTypes.SizeT(length))
-                    use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
-                                                                          BasicTypes.SizeT(length))
-                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
-                | MemsetD32Async (dst, value, strm) ->
-                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
-                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
-                                                                    BasicTypes.SizeT(length))
-                    let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
-                    dstOffsetVar.MemsetAsync(intval, getStream strm)
-
                 // stream management
                 | StreamCreate (strm, flags) ->
                     if not Debug.DisableStreams then
@@ -420,8 +388,7 @@ module CudaExprWorkspaceTypes =
                     if Debug.DisableStreams then
                         kernels.[krnl].Run(argArray) |> ignore
                     else
-                        kernels.[krnl].RunAsync(getStream strm, argArray)
-                    
+                        kernels.[krnl].RunAsync(getStream strm, argArray)                   
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
                 | CudaCallT.CallCFunc (name, _, strm, argTmpls) ->
@@ -435,64 +402,7 @@ module CudaExprWorkspaceTypes =
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
 
-                // CUBLAS 
-                | CublasSgemm (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    use aVar = a.GetVar execEnv
-                    use bVar = b.GetVar execEnv
-                    use trgtVar = trgt.GetVar execEnv
-                    let m = a.GetRowsForOp execEnv aOp
-                    let n = b.GetColumnsForOp execEnv bOp
-                    let k = a.GetColumnsForOp execEnv aOp
-                    let ldA = a.GetLeadingDimension execEnv
-                    let ldB = b.GetLeadingDimension execEnv
-                    let ldTrgt = trgt.GetLeadingDimension execEnv
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.Gemm(aOp, bOp, m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, trgtVar, ldTrgt)
-
-                | CublasSgemmBatched (aOp, bOp, aFac, a, b, trgtFac, trgt, strm) ->   
-                    use aAry = a.GetPointerArrayDevice execEnv
-                    use bAry = b.GetPointerArrayDevice execEnv
-                    use trgtAry = trgt.GetPointerArrayDevice execEnv                    
-                    let m = a.GetRowsForOp aOp
-                    let n = b.GetColumnsForOp bOp
-                    let k = a.GetColumnsForOp aOp
-                    let ldA = a.LeadingDimension 
-                    let ldB = b.LeadingDimension 
-                    let ldTrgt = trgt.LeadingDimension 
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GemmBatched(aOp, bOp, m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, trgtAry, ldTrgt, a.NSamples)
-
-                | CublasGetrfBatched (a, pivot, info, strm) ->
-                    use aAry = a.GetPointerArrayDevice execEnv
-                    let n = a.Rows 
-                    let ldA = a.LeadingDimension 
-                    let pVar = pivot.GetVar execEnv
-                    let infoVar = pivot.GetVar execEnv
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, a.NSamples)
-
-                | CublasGetriBatched (a, pivot, trgt, info, strm) ->
-                    use aAry = a.GetPointerArrayDevice execEnv
-                    let n = a.Rows 
-                    let ldA = a.LeadingDimension 
-                    let pVar = pivot.GetVar execEnv
-                    let trgtAry = trgt.GetPointerArrayDevice execEnv
-                    let ldC = trgt.LeadingDimension 
-                    let infoVar = pivot.GetVar execEnv
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, a.NSamples)
-
-                | CublasInitPointerArray (aryTmpl, strm) ->
-                    let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
-                    let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
-                    for n = 0 to ptrAryValues.Length - 1 do
-                        Marshal.StructureToPtr (ptrAryValues.[n], 
-                                                ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
-
-                    use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
-                    ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
-
-                // misc
+                // trace
                 | Trace (uexpr, res) ->
                     try
                         CudaSup.context.Synchronize ()
@@ -512,6 +422,110 @@ module CudaExprWorkspaceTypes =
                     let resHost = resDev.ToHost()
                     let msg = sprintf "previous call: %A" previousCall
                     Trace.exprEvaledWithMsg uexpr resHost msg
+
+                // ======================= ExecItems execution ===================================================
+
+                | ExecItem (CudaExecItemT.LaunchKernel _, _)
+                | ExecItem (CudaExecItemT.CallCFunc _, _)
+                | ExecItem (CudaExecItemT.Trace _, _)
+                    -> failwith "these ExecItems must be translated to CudaExecItems"
+
+                // memory operations
+                | ExecItem (MemcpyDtoD (src, dst), strm) ->
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    dstCudaVar.AsyncCopyToDevice(srcCudaVar, 
+                                                 SizeT(srcOffset), 
+                                                 SizeT(dstOffset), 
+                                                 SizeT(length), 
+                                                 getStream strm)
+                | ExecItem (MemcpyHtoD (src, dst), strm) ->
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {HostMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    use srcOffsetVar = new CudaRegisteredHostMemory<byte>(srcCudaVar.PinnedHostPointer + (nativeint srcOffset), 
+                                                                          BasicTypes.SizeT(length))
+                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                    BasicTypes.SizeT(length))
+                    srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, getStream strm)
+                | ExecItem (MemcpyDtoH (src, dst), strm) ->
+                    let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
+                    use srcOffsetVar = new CudaDeviceVariable<byte>(srcCudaVar.DevicePointer + (BasicTypes.SizeT srcOffset), 
+                                                                    BasicTypes.SizeT(length))
+                    use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
+                                                                          BasicTypes.SizeT(length))
+                    dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
+                | ExecItem (Memset (value, dst), strm) ->
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                    BasicTypes.SizeT(length))
+                    let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
+                    dstOffsetVar.MemsetAsync(intval, getStream strm)
+
+                // CUBLAS 
+                | ExecItem (BlasGemm (aOp, bOp, aFac, a, b, trgtFac, trgt), strm) ->   
+                    use aVar = a.GetVar execEnv
+                    use bVar = b.GetVar execEnv
+                    use trgtVar = trgt.GetVar execEnv
+                    let m = a.GetRowsForOp execEnv aOp.CudaBlasOperation
+                    let n = b.GetColumnsForOp execEnv bOp.CudaBlasOperation
+                    let k = a.GetColumnsForOp execEnv aOp.CudaBlasOperation
+                    let ldA = a.GetLeadingDimension execEnv
+                    let ldB = b.GetLeadingDimension execEnv
+                    let ldTrgt = trgt.GetLeadingDimension execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.Gemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
+                                      m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, 
+                                      trgtVar, ldTrgt)
+
+                | ExecItem (BlasGemmBatched (aOp, bOp, aFac, a, b, trgtFac, trgt), strm) ->   
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    use bAry = b.GetPointerArrayDevice execEnv
+                    use trgtAry = trgt.GetPointerArrayDevice execEnv                    
+                    let m = a.GetRowsForOp aOp.CudaBlasOperation
+                    let n = b.GetColumnsForOp bOp.CudaBlasOperation
+                    let k = a.GetColumnsForOp aOp.CudaBlasOperation
+                    let ldA = a.LeadingDimension 
+                    let ldB = b.LeadingDimension 
+                    let ldTrgt = trgt.LeadingDimension 
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
+                                             m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, 
+                                             trgtAry, ldTrgt, a.NSamples)
+
+                | ExecItem (BlasGetrfBatched (a, pivot, info), strm) ->
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    let n = a.Rows 
+                    let ldA = a.LeadingDimension 
+                    let pVar = pivot.GetVar execEnv
+                    let infoVar = pivot.GetVar execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, a.NSamples)
+
+                | ExecItem (BlasGetriBatched (a, pivot, trgt, info), strm) ->
+                    use aAry = a.GetPointerArrayDevice execEnv
+                    let n = a.Rows 
+                    let ldA = a.LeadingDimension 
+                    let pVar = pivot.GetVar execEnv
+                    let trgtAry = trgt.GetPointerArrayDevice execEnv
+                    let ldC = trgt.LeadingDimension 
+                    let infoVar = pivot.GetVar execEnv
+                    CudaSup.blas.Stream <- getStream strm
+                    CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, 
+                                                a.NSamples)
+
+                | ExecItem (BlasInitPointerArray (aryTmpl), strm) ->
+                    let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
+                    let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
+                    for n = 0 to ptrAryValues.Length - 1 do
+                        Marshal.StructureToPtr (ptrAryValues.[n], 
+                                                ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
+
+                    use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
+                    ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+
+                | ExecItem (ExtensionExecItem eei, strm) ->
+                    eei.Execute execEnv strm
 
                 previousCall <- Some call
 

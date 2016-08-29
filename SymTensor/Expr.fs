@@ -169,8 +169,7 @@ module Expr =
         /// Should create a unified expression from the given expression.
         /// This op is always the root of the passed expression.
         /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
-        /// with the corresponding Uop. It will automatically generate the corresponding
-        /// unified expression.
+        /// with the corresponding Uop. It will generate the apropriate unified expression.
         abstract ToUExpr: expr:ExprT<'T> -> makeOneUop:(UExprTypes.IUOp -> UExprTypes.UExprT) -> UExprTypes.UExprT
 
         /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.

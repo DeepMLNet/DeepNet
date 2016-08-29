@@ -30,7 +30,7 @@ module ExecUnitsTypes =
     type ChannelIdT = string
 
     /// id of default channel
-    let defaultChannelId = "#"
+    let dfltChId = "#"
 
     /// manikins representing the data in each channel
     type ChannelManikinsT = Map<ChannelIdT, ArrayNDManikinT>
@@ -561,7 +561,7 @@ module ExecUnit =
 
         // create initial evaluation request
         let mutable exprRes = None
-        let trgtReq = Map.empty |> Map.add defaultChannelId None
+        let trgtReq = Map.empty |> Map.add dfltChId None
         submitEvalRequest expr 1 trgtReq (fun res -> exprRes <- Some res)
 
         // processing loop
