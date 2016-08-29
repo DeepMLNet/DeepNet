@@ -95,6 +95,10 @@
       <Link>tensor_mkl.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\MKL\LIBIOMP5MD.DLL">
+      <Link>LIBIOMP5MD.DLL</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
