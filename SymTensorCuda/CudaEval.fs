@@ -37,7 +37,7 @@ module CudaEval =
 
                     // insert StoreToVar op in expression
                     (UExpr (UUnaryOp (StoreToVar resVar), [uexpr], 
-                            {TargetType=tn; TargetShape=shp; TargetNShape=nshp}), 
+                            {TargetType=tn; TargetShape=shp; TargetNShape=nshp; Expr=None}), 
                      Some resVar, resAllocator)
                 else
                     // no data needs to be transferred back
@@ -58,13 +58,15 @@ module CudaEval =
             | [] -> UExpr (UNaryOp Discard, [], 
                            {TargetType=TypeName.ofType<int>
                             TargetShape=ShapeSpec.emptyVector
-                            TargetNShape=[0]})
+                            TargetNShape=[0]
+                            Expr=None})
             | [uexpr] -> uexpr
             | UExpr (_, _, {TargetType=tn}) :: _ ->
                 UExpr (UNaryOp Discard, transferUExprs, 
                        {TargetType=tn
                         TargetShape=ShapeSpec.emptyVector
-                        TargetNShape=[0]})                       
+                        TargetNShape=[0]
+                        Expr=None})                       
 
         // build variable locations
         let varLocs = Map.join compileEnv.VarLocs resVarLocs

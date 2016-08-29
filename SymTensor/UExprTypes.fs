@@ -80,9 +80,14 @@ module UExprTypes =
 
     /// metadata for an unified expression
     and UMetadata = {
+        /// the data type of the result of the generating expression
         TargetType:     TypeNameT
+        /// the symbolic shape of the result of the generating expression
         TargetShape:    ShapeSpecT
+        /// the numeric shape of the result of the generating expression
         TargetNShape:   NShapeSpecT
+        /// the generating expression, if created from one
+        Expr:           System.IComparable option
     }
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    

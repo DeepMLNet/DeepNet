@@ -79,14 +79,17 @@ module UExpr =
 
     /// converts an expression to a unified expression
     let rec toUExpr (expr: ExprT<'T>) =
-        let tn = TypeName typeof<'T>.AssemblyQualifiedName
-        let shp = Expr.shapeOf expr
-        let nshp = ShapeSpec.eval shp
+        let metadata = {
+            TargetType       = TypeName typeof<'T>.AssemblyQualifiedName 
+            TargetShape      = Expr.shapeOf expr
+            TargetNShape     = Expr.shapeOf expr |> ShapeSpec.eval
+            Expr             = Some (expr :> System.IComparable)
+        }
 
-        let leaf uop        = UExpr (ULeafOp uop, [], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
-        let unary uop a     = UExpr (UUnaryOp uop, [toUExpr a], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
-        let binary uop a b  = UExpr (UBinaryOp uop, [toUExpr a; toUExpr b], {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
-        let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExpr, {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+        let leaf uop        = UExpr (ULeafOp uop, [], metadata)
+        let unary uop a     = UExpr (UUnaryOp uop, [toUExpr a], metadata)
+        let binary uop a b  = UExpr (UBinaryOp uop, [toUExpr a; toUExpr b], metadata)
+        let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExpr, metadata)
 
         match expr with
         | Leaf (Expr.Identity ss)       -> leaf (Identity ss)
@@ -126,8 +129,7 @@ module UExpr =
         | Unary (Expr.Subtensor sr, a)  ->
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt               
-            UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, 
-                  {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+            UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, metadata)
         | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (UVarSpec.ofVarSpec vs)) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
@@ -143,7 +145,7 @@ module UExpr =
             let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
             let dynUExprs = dynExprs |> List.map toUExprForInt 
             UExpr(UNaryOp (SetSubtensor usr), toUExpr a :: toUExpr b :: dynUExprs, 
-                  {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
+                  metadata)
 
         | Nary (Expr.Discard, se)       -> nary Discard se
         | Nary (Expr.ExtensionOp eop, se) -> 
@@ -154,80 +156,22 @@ module UExpr =
     and private toUExprForInt (expr: ExprT<int>) =
         toUExpr expr
 
-    /// converts a unified expression to an expression of (known) type
-    let rec toExprOfType (UExpr (uop, subUExprs, {TargetType=tn; TargetShape=shp}) as uexpr) : ExprT<'T> =
+    /// Returns the generating expression of a unified expression.
+    /// Only works if the unified expression was created using the toUExpr function.
+    let toExprOfType (UExpr (uop, subUExprs, {TargetType=tn; Expr=exprOpt})) : ExprT<'T> =
         if TypeName.ofType<'T> <> tn then
             failwith "UExpr type does not match"
 
-        let leaf op    = Expr.Leaf op
-        let unary op   = Expr.Unary (op, toExprOfType subUExprs.[0])
-        let binary op  = Expr.Binary (op, toExprOfType subUExprs.[0], toExprOfType subUExprs.[1])
-        let nary op    = Expr.Nary (op, List.map toExprOfType subUExprs)
-
-        match uop with
-        | ULeafOp (Identity ss)             -> leaf (Expr.Identity ss)
-        | ULeafOp (Zeros ss)                -> leaf (Expr.Zeros ss)
-        | ULeafOp (ScalarConst v)           -> leaf (Expr.ScalarConst (box v :?> 'T))
-        | ULeafOp (SizeValue sv)            -> leaf (Expr.SizeValue sv)
-        | ULeafOp (Var vs)                  -> leaf (Expr.Var (UVarSpec.toVarSpec vs))
-
-        | UUnaryOp Negate                   -> unary Expr.Negate
-        | UUnaryOp Abs                      -> unary Expr.Abs
-        | UUnaryOp SignT                    -> unary Expr.SignT
-        | UUnaryOp Log                      -> unary Expr.Log
-        | UUnaryOp Log10                    -> unary Expr.Log10
-        | UUnaryOp Exp                      -> unary Expr.Exp                         
-        | UUnaryOp Sin                      -> unary Expr.Sin
-        | UUnaryOp Cos                      -> unary Expr.Cos
-        | UUnaryOp Tan                      -> unary Expr.Tan
-        | UUnaryOp Asin                     -> unary Expr.Asin
-        | UUnaryOp Acos                     -> unary Expr.Acos
-        | UUnaryOp Atan                     -> unary Expr.Atan
-        | UUnaryOp Sinh                     -> unary Expr.Sinh
-        | UUnaryOp Cosh                     -> unary Expr.Cosh
-        | UUnaryOp Tanh                     -> unary Expr.Tanh
-        | UUnaryOp Sqrt                     -> unary Expr.Sqrt
-        | UUnaryOp Ceil                     -> unary Expr.Ceil
-        | UUnaryOp Floor                    -> unary Expr.Floor
-        | UUnaryOp Round                    -> unary Expr.Round
-        | UUnaryOp Truncate                 -> unary Expr.Truncate
-        | UUnaryOp (Diag (ax1, ax2))        -> unary (Expr.Diag (ax1, ax2))
-        | UUnaryOp (DiagMat (ax1, ax2))     -> unary (Expr.DiagMat (ax1, ax2))
-        | UUnaryOp Invert                   -> unary Expr.Invert
-        | UUnaryOp Sum                      -> unary Expr.Sum                           
-        | UUnaryOp (SumAxis a)              -> unary (Expr.SumAxis a)            
-        | UUnaryOp (Reshape ss)             -> unary (Expr.Reshape ss)
-        | UUnaryOp (DoBroadcast ss)         -> unary (Expr.DoBroadcast ss)
-        | UUnaryOp (SwapDim (ax1, ax2))     -> unary (Expr.SwapDim (ax1, ax2))
-        | UUnaryOp (StoreToVar vs)          -> unary (Expr.StoreToVar (UVarSpec.toVarSpec vs))
-        | UUnaryOp (Annotated ano)          -> unary (Expr.Annotated ano)
-
-        | UBinaryOp Add                     -> binary Expr.Add                         
-        | UBinaryOp Substract               -> binary Expr.Substract                    
-        | UBinaryOp Multiply                -> binary Expr.Multiply                     
-        | UBinaryOp Divide                  -> binary Expr.Divide             
-        | UBinaryOp Modulo                  -> binary Expr.Modulo          
-        | UBinaryOp Power                   -> binary Expr.Power               
-        | UBinaryOp Dot                     -> binary Expr.Dot                   
-        | UBinaryOp TensorProduct           -> binary Expr.TensorProduct     
-            
-        | UNaryOp Discard                   -> nary Expr.Discard
-        | UNaryOp (Subtensor usr)           ->
-            let drs = subUExprs |> List.tail |> List.map toExprOfTypeInt
-            unary (Expr.Subtensor (UExprRngsSpec.toExprRngsSpec usr drs))
-        | UNaryOp (SetSubtensor usr)        ->
-            let drs = subUExprs |> List.skip 2 |>  List.map toExprOfTypeInt
-            binary (Expr.SetSubtensor (UExprRngsSpec.toExprRngsSpec usr drs))
-        | UNaryOp (ExtensionOp eop)         -> nary (Expr.ExtensionOp (eop :?> IOp<'T>))
-
-    and private toExprOfTypeInt uexpr : ExprT<int> =
-        toExprOfType uexpr
+        match exprOpt with 
+        | Some exprObj -> unbox exprObj 
+        | None -> failwith "UExpr was not created from an Expr"
 
     type private ToExprOfTypeT =
         static member ToExprOfType<'T> uexpr : ExprT<'T> =
             toExprOfType uexpr
 
-    /// converts a unified expression to an expression of the correct type
+    /// Converts a unified expression to an expression of the correct type.
+    /// Only works if the unified expression was created using the toUExpr function.
     let toExpr (UExpr (_, _, {TargetType=tn}) as uexpr) =
         let gm = typeof<ToExprOfTypeT>.GetMethod ("ToExprOfType", 
                                                   BindingFlags.NonPublic ||| 
