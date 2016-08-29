@@ -6,6 +6,7 @@ open System.Reflection
 open Basics
 open VarSpec
 open SizeSymbolTypes
+open UExprTypes
 open ArrayNDNS
 open ArrayNDNS.ArrayND
 

@@ -56,6 +56,7 @@
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
+    <Compile Include="UExprTypes.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />

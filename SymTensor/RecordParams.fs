@@ -6,6 +6,7 @@ open FSharp.Reflection
 
 open Basics
 open ArrayNDNS
+open UExprTypes
 
 type private VarRecordHelpers () =
     static member PublishLoc<'T when 'T: equality> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =

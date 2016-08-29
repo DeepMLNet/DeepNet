@@ -9,9 +9,9 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 open Basics
 open ArrayNDNS
-open Basics.Cuda
 open SymTensor
 open SymTensor.Compiler
+open UExprTypes
 open Basics.Cuda
 open DiskMap
 

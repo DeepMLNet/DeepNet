@@ -10,6 +10,7 @@ open Basics.Cuda
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
+open UExprTypes
 
 
 #nowarn "9"

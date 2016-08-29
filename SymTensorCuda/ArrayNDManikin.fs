@@ -5,6 +5,7 @@ open ManagedCuda
 open Basics
 open ArrayNDNS
 open SymTensor
+open UExprTypes
 
 
 [<AutoOpen>]

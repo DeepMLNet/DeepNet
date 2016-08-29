@@ -2,7 +2,7 @@
 
 open Basics
 open ArrayNDNS
-
+open UExprTypes
 
 [<AutoOpen>]
 module VarEnvTypes = 

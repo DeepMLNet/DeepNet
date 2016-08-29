@@ -7,6 +7,7 @@ open Basics
 open Basics.Cuda
 open SymTensor
 open SymTensor.Compiler
+open UExprTypes
 
 
 [<AutoOpen>]

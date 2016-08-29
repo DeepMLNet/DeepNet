@@ -3,109 +3,7 @@
 open System.Reflection
 open System.Collections.Generic
 open Expr
-
-
-
-[<AutoOpen>]
-module UExprTypes = 
-
-    /// unified variable specification
-    [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
-    type UVarSpecT = {
-        Name:      string; 
-        Shape:     ShapeSpecT;
-        TypeName:  TypeNameT;
-    }
-
-    // int holds the position of the subuexpr that has the dynamic value
-    type UExprRngSpecT = SimpleRangeSpecT<int>
-    type UExprRngsSpecT = SimpleRangesSpecT<int>
-
-    type IUExtensionOp =
-        inherit System.IComparable
-        abstract Arity: ArityT with get        
-
-    type ULeafOpT =
-        | Identity of SizeSpecT
-        | Zeros of ShapeSpecT                   
-        | ScalarConst of System.IComparable
-        | SizeValue of SizeSpecT
-        | Var of UVarSpecT
-
-    type UUnaryOpT =
-        | Negate                        
-        | Abs
-        | SignT
-        | Log
-        | Log10                           
-        | Exp                           
-        | Sin
-        | Cos
-        | Tan
-        | Asin
-        | Acos
-        | Atan
-        | Sinh
-        | Cosh
-        | Tanh
-        | Sqrt
-        | Ceil
-        | Floor
-        | Round
-        | Truncate                   
-        | Diag of int * int
-        | DiagMat of int * int
-        | Invert
-        | Sum                           
-        | SumAxis of int                
-        | Reshape of ShapeSpecT         
-        | DoBroadcast of ShapeSpecT       
-        | SwapDim of int * int       
-        | StoreToVar of UVarSpecT
-        | Annotated of Annotation       
-
-    type UBinaryOpT =
-        | Add                           
-        | Substract                     
-        | Multiply                      
-        | Divide       
-        | Modulo                 
-        | Power                         
-        | Dot                           
-        | TensorProduct                 
-
-    type UNaryOpT =
-        | Discard        
-        | Subtensor of UExprRngsSpecT 
-        | SetSubtensor of UExprRngsSpecT
-        | ExtensionOp of IUExtensionOp
-             
-
-    /// unified op of any arity and type
-    type UOpT =
-        | ULeafOp of ULeafOpT
-        | UUnaryOp of UUnaryOpT
-        | UBinaryOp of UBinaryOpT
-        | UNaryOp of UNaryOpT
-
-    /// metadata for an unified expression
-    type UMetadata = {
-        TargetType:     TypeNameT
-        TargetShape:    ShapeSpecT
-        TargetNShape:   NShapeSpecT
-    }
-
-    /// unified expression (combines all arities and types and ops cannot have expressions as parameters)
-    [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{PrettyString}")>]
-    type UExprT = 
-        | UExpr of UOpT * (UExprT list) * UMetadata
-
-        member this.PrettyString =
-            match this with
-            | UExpr (ULeafOp uop, subs, _) -> sprintf "%A" uop 
-            | UExpr (UUnaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs.[0]
-            | UExpr (UBinaryOp uop, subs, _) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
-            | UExpr (UNaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs
+open UExprTypes
 
 
 module UVarSpec =
@@ -248,7 +146,10 @@ module UExpr =
                   {TargetType=tn; TargetShape=shp; TargetNShape=nshp})
 
         | Nary (Expr.Discard, se)       -> nary Discard se
-        | Nary (Expr.ExtensionOp eop, se) -> nary (ExtensionOp (eop :?> IUExtensionOp)) se
+        | Nary (Expr.ExtensionOp eop, se) -> 
+            let makeOneUop uop = nary (ExtensionOp uop) se
+            eop.ToUExpr expr makeOneUop
+            
 
     and private toUExprForInt (expr: ExprT<int>) =
         toUExpr expr
@@ -317,7 +218,7 @@ module UExpr =
         | UNaryOp (SetSubtensor usr)        ->
             let drs = subUExprs |> List.skip 2 |>  List.map toExprOfTypeInt
             binary (Expr.SetSubtensor (UExprRngsSpec.toExprRngsSpec usr drs))
-        | UNaryOp (ExtensionOp eop)         -> nary (Expr.ExtensionOp (eop :?> IExtensionOp<'T>))
+        | UNaryOp (ExtensionOp eop)         -> nary (Expr.ExtensionOp (eop :?> IOp<'T>))
 
     and private toExprOfTypeInt uexpr : ExprT<int> =
         toExprOfType uexpr

@@ -13,6 +13,13 @@ module DerivTypes =
 module Deriv =
     open Expr
 
+    /// merges to derivative maps
+    let private merge (aGrads: DerivT<_>) (bGrads: DerivT<_>) : DerivT<_> =
+        (aGrads, bGrads)
+        ||> Map.fold (fun m v vg -> match Map.tryFind v m with
+                                    | Some ovg -> m |> Map.add v (vg + ovg)
+                                    | None -> m |> Map.add v vg) 
+
     /// reverse accumulation autodifferentiation of an expression
     let rec reverseDiffStep (expr: ExprT<'T>) (eg: ExprT<'T>) : DerivT<'T> =    
         let exprShp = shapeOf expr
@@ -33,6 +40,13 @@ module Deriv =
         let collapse g =
             let wrtElems = (shapeOf g).[1..] |> ShapeSpec.nElem
             g |> reshape [funElems; wrtElems]
+
+        /// total derivates given op's derivates
+        let totalDerivates es des =
+            (Map.empty, List.zip es des)
+            ||> List.fold (fun totGrad (e, de) ->
+                let eGrad = reverseDiffStep e de
+                merge totGrad eGrad)
 
         match expr with
         | Leaf(op) ->                  
@@ -94,15 +108,10 @@ module Deriv =
                 let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
                 bc |> collapse |> reverseDiffStep a
             | StoreToVar _ -> eg |> reverseDiffStep a
-            | Annotated ano -> eg |> reverseDiffStep a
+            | Annotated _ -> eg |> reverseDiffStep a
 
         | Binary(op, a, b) ->
-            let inline (.+) da db =   
-                let aGrads, bGrads = reverseDiffStep a da, reverseDiffStep b db         
-                Map.fold (fun m v vg -> match Map.tryFind v m with
-                                        | Some ovg -> m |> Map.add v (vg + ovg)
-                                        | None -> m |> Map.add v vg) 
-                    aGrads bGrads
+            let inline (.+) da db = totalDerivates [a; b] [da; db]
 
             match op with            
             | Add -> eg .+ eg
@@ -146,8 +155,8 @@ module Deriv =
 
         | Nary(op, es) ->
             match op with
-            | ExtensionOp eop -> failwith "not implemented yet"
-            | Discard -> failwith "cannot propagte gradient thorugh discard"
+            | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
+            | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
 
     /// reverse accumulation autodifferentiation of an expression

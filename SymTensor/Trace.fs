@@ -6,6 +6,7 @@ open System.Threading
 
 open ArrayNDNS
 open Basics
+open UExprTypes
 
 
 module Trace =

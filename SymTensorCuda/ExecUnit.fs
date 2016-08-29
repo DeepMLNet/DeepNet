@@ -7,6 +7,8 @@ open System.Collections.Generic
 open Basics
 open ArrayNDNS
 open SymTensor
+open UExprTypes
+
 
 [<AutoOpen>]
 module ExecUnitsTypes = 

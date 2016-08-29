@@ -5,8 +5,9 @@ open System.Reflection
 
 open Basics
 open ArrayNDNS
-
 open SymTensor
+open UExprTypes
+
 
 
 module CudaEval =

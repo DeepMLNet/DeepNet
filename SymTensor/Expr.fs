@@ -28,11 +28,6 @@ module Expr =
         | FixedArity of int
         | DynamicArity
 
-    /// annotation of an op
-    type Annotation =
-        /// text label
-        | Text of string      
-    
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT<'T> =
@@ -108,7 +103,7 @@ module Expr =
 
         // ==== misc ====
         /// annotation (no influence on value)
-        | Annotated of Annotation       
+        | Annotated of string       
 
     and ExprRngSpecT = SimpleRangeSpecT<ExprT<int>>
     and ExprRngsSpecT = SimpleRangesSpecT<ExprT<int>>
@@ -143,17 +138,47 @@ module Expr =
         /// evaluate all subexpressions but discard them
         | Discard        
         /// extension op
-        | ExtensionOp of IExtensionOp<'T>
+        | ExtensionOp of IOp<'T>
    
      
-    /// an extension op
-    and IExtensionOp<'T> =
+    /// An operation in an expression.
+    and IOp<'T> =
         inherit System.IComparable
         inherit System.IComparable<'T>
         inherit System.IEquatable<'T>
+       
+        /// Should return the shape of the result, given the shape of the arguments.
+        abstract Shape: argShapes: ShapeSpecT list -> ShapeSpecT      
+        
+        /// Should check if the shapes of the arguments are acceptable and,
+        /// if not, raise an exception.
+        abstract CheckArgs: argShapes: ShapeSpecT list -> unit      
 
-        /// the arity 
-        abstract Arity: ArityT with get                   
+        /// Should return the op with all symbolic sizes substituted using the specified
+        /// substitution table.
+        /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
+        abstract SubstSymSizes: symSizes: SymSizeEnvT -> IOp<'T>
+
+        /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
+        /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
+        /// return true on all sizes used in this op.
+        abstract CanEvalAllSymSizes: bool
+
+        /// Should create a unified expression from the given expression.
+        /// This op is always the root of the passed expression.
+        /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
+        /// with the corresponding Uop. It will automatically generate the corresponding
+        /// unified expression.
+        abstract ToUExpr: expr:ExprT<'T> -> makeOneUop:(UExprTypes.IUOp -> UExprTypes.UExprT) -> UExprTypes.UExprT
+
+        /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
+        /// The derivative is always an NxM matrix where N is the number of elements of the function
+        /// the derivative of which is being taken and M is the number of elements of the argument
+        /// w.r.t. which the derivative is being taken. 
+        /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
+        /// you return w.r.t. that argument must have NxM elements.
+        abstract Deriv: dOp:ExprT<'T> -> args:ExprT<'T> list -> ExprT<'T> list
+
 
     /// a type conversion op
     and [<StructuralComparison; StructuralEquality>] 
@@ -332,7 +357,7 @@ module Expr =
 
         // misc
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
-        | Nary(ExtensionOp _, _) -> failwith "not implemented"
+        | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
 
     /// number of elements 
     let nElems expr =
@@ -436,6 +461,7 @@ module Expr =
                 opBeingChecked <- sprintf "%A" op
 
                 match op with
+                | ExtensionOp eop -> eop.CheckArgs ss
                 | _ -> ()
 
             checkedExprs.Add expr |> ignore
@@ -463,6 +489,7 @@ module Expr =
         | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
+        | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
     /// true if all shapes in the expression can be evaluated to numeric shapes
@@ -484,6 +511,7 @@ module Expr =
             SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a && canEvalAllSymSizes b
         | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
 
+        | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall canEvalAllSymSizes es
         | Nary (op, es) -> List.forall canEvalAllSymSizes es
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
@@ -881,12 +909,11 @@ module Expr =
 [<AutoOpen>]
 module ExprTypes2 =
     type ArityT = Expr.ArityT
-    type Annotation = Expr.Annotation
     type LeafOpT<'T> = Expr.LeafOpT<'T>
     type UnaryOpT<'T> = Expr.UnaryOpT<'T>
     type BinaryOpT<'T> = Expr.BinaryOpT<'T>
     type NaryOpT<'T> = Expr.NaryOpT<'T>
-    type IExtensionOp<'T> = Expr.IExtensionOp<'T>
+    type IOp<'T> = Expr.IOp<'T>
     type ExprT<'T> = Expr.ExprT<'T>
 
 
