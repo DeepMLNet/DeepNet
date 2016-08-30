@@ -36,12 +36,11 @@ type SquaredExponentialCovarianceMatrixOp<'T> =
         member this.ToUExpr expr makeOneUop = 
             makeOneUop SquaredExponentialCovarianceMatrixUOp
 
-        member this.Deriv dOp args = failwith "not impl"
+        member this.Deriv dOp args = 
+            [Expr.Nary (Expr.ExtensionOp SquaredExponentialCovarianceMatrixWRTtrnXOp, args @ [dOp])
+             Expr.Nary (Expr.ExtensionOp SquaredExponentialCovarianceMatrixWRTtrnLOp, args @ [dOp])]
 
         member this.EvalSimple args =
-            //let trnXshp = args.[0].Shape
-            //let nGps, nTrnSmpls = trnXshp.[0], trnXshp.[1]          
-
             let trnX, lengthscale = args.[0], args.[1]
             let trnXAry = trnX |> ArrayNDHost.toArray2D
             let lengthscaleAry = lengthscale |> ArrayNDHost.toArray
@@ -57,6 +56,94 @@ type SquaredExponentialCovarianceMatrixOp<'T> =
             printfn "Result shape is %A" cm.Shape                
             cm
 
+
+and SquaredExponentialCovarianceMatrixWRTtrnXOp<'T> =
+    | SquaredExponentialCovarianceMatrixWRTtrnXOp
+    // sources: 0: trnX        [gp, trn_smpl]
+    //          1: lengthscale [gp]
+    //          2: dOp         [out, n_gps * n_trn_smpls * n_trn_smpls]
+    // result:                 [out, n_gps * n_trn_smpls]
+    interface IOp<'T> with
+        member this.Shape argShapes = 
+            let trnXshp = argShapes.[0]
+            let nGps, nTrnSmpls = trnXshp.[0], trnXshp.[1]
+            let nOut = argShapes.[2].[0]
+            [nOut; nGps * nTrnSmpls]
+
+        member this.CheckArgs argShapes = ()                   
+        member this.SubstSymSizes _ = this :> IOp<'T>        
+        member this.CanEvalAllSymSizes = true
+        
+        member this.ToUExpr expr makeOneUop = 
+            makeOneUop SquaredExponentialCovarianceMatrixUOp
+
+        member this.Deriv dOp args = failwith "not impl"
+
+        member this.EvalSimple args =
+            let trnX, lengthscale, dOpFlat = args.[0], args.[1], args.[2]
+            let nGps, nTrnSmpls = trnX.Shape.[0], trnX.Shape.[1]
+            let nOut = dOpFlat.Shape.[0]
+            let dOp = dOpFlat |> ArrayND.reshape [nOut; nGps; nTrnSmpls; nTrnSmpls]
+            
+            let trnXAry = trnX |> ArrayNDHost.toArray2D
+            let lengthscaleAry = lengthscale |> ArrayNDHost.toArray
+            let dOpAry = dOp |> ArrayNDHost.toArray4D 
+
+            MathInterface.link.PutFunction ("dKSEMatdX", 3)
+            MathInterface.link.Put (trnXAry, null)
+            MathInterface.link.Put (lengthscaleAry, null)
+            MathInterface.link.Put (dOpAry, null)
+            MathInterface.link.EndPacket ()
+            MathInterface.link.WaitForAnswer () |> ignore
+            let dXAry = MathInterface.link.GetArray (typeof<'T>, 3) :?> 'T[,,]
+
+            let dX = dXAry |> ArrayNDHost.ofArray3D
+            let dXflat = dX |> ArrayND.reshape [nOut; nGps * nTrnSmpls]
+            dXflat
+
+and SquaredExponentialCovarianceMatrixWRTtrnLOp<'T> =
+    | SquaredExponentialCovarianceMatrixWRTtrnLOp
+    // sources: 0: trnX        [gp, trn_smpl]
+    //          1: lengthscale [gp]
+    //          2: dOp         [out, n_gps * n_trn_smpls * n_trn_smpls]
+    // result:                 [out, n_gps]
+    interface IOp<'T> with
+        member this.Shape argShapes = 
+            let trnXshp = argShapes.[0]
+            let nGps, nTrnSmpls = trnXshp.[0], trnXshp.[1]
+            let nOut = argShapes.[2].[0]
+            [nOut; nGps]
+
+        member this.CheckArgs argShapes = ()                   
+        member this.SubstSymSizes _ = this :> IOp<'T>        
+        member this.CanEvalAllSymSizes = true
+        
+        member this.ToUExpr expr makeOneUop = 
+            makeOneUop SquaredExponentialCovarianceMatrixUOp
+
+        member this.Deriv dOp args = failwith "not impl"
+
+        member this.EvalSimple args =
+            let trnX, lengthscale, dOpFlat = args.[0], args.[1], args.[2]
+            let nGps, nTrnSmpls = trnX.Shape.[0], trnX.Shape.[1]
+            let nOut = dOpFlat.Shape.[0]
+            let dOp = dOpFlat |> ArrayND.reshape [nOut; nGps; nTrnSmpls; nTrnSmpls]
+            
+            let trnXAry = trnX |> ArrayNDHost.toArray2D
+            let lengthscaleAry = lengthscale |> ArrayNDHost.toArray
+            let dOpAry = dOp |> ArrayNDHost.toArray4D 
+
+            MathInterface.link.PutFunction ("dKSEMatdL", 3)
+            MathInterface.link.Put (trnXAry, null)
+            MathInterface.link.Put (lengthscaleAry, null)
+            MathInterface.link.Put (dOpAry, null)
+            MathInterface.link.EndPacket ()
+            MathInterface.link.WaitForAnswer () |> ignore
+            let dLAry = MathInterface.link.GetArray (typeof<'T>, 2) :?> 'T[,]
+
+            let dL = dLAry |> ArrayNDHost.ofArray2D
+            let dLflat = dL |> ArrayND.reshape [nOut; nGps]
+            dLflat
             
 
 let squaredExponentialCovarianceMatrix (trnX: ExprT<'T>) (lengthscale: ExprT<'T>) =
