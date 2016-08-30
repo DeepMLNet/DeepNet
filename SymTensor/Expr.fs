@@ -146,8 +146,9 @@ module Expr =
     /// and returns one tensor.
     and IOp<'T> =
         inherit System.IComparable
-        inherit System.IComparable<'T>
-        inherit System.IEquatable<'T>
+        //inherit System.IEquatable
+        //inherit System.IComparable<'T>
+        //inherit System.IEquatable<'T>
        
         /// Should return the shape of the result, given the shape of the arguments.
         abstract Shape: argShapes: ShapeSpecT list -> ShapeSpecT      

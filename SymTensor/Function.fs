@@ -169,18 +169,26 @@ module Func =
     /// of variable sizes and locations is printed.
     let printInstantiations = false
 
-    type private UExprGenT = SymSizeEnvT -> (UExprT * Set<UVarSpecT> * bool) 
+    //type private UExprGenT = SymSizeEnvT -> (UExprT * Set<UVarSpecT> * bool) 
 
-    let private uExprGen baseExpr symSizes =
+    type private UExprGenT = {
+        Generate:               SymSizeEnvT -> UExprT
+        UVarSpecsAndEvalable:   SymSizeEnvT -> Set<UVarSpecT> * bool       
+    }
+
+    let private uExprGenerate baseExpr symSizes =
+        baseExpr |> Expr.substSymSizes symSizes |> UExpr.toUExpr
+
+    let private uExprVarSpecsAndEvalable baseExpr symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes 
         let vars = Expr.extractVars expr |> Set.map UVarSpec.ofVarSpec
-        UExpr.toUExpr expr, vars, Expr.canEvalAllSymSizes expr
+        vars, Expr.canEvalAllSymSizes expr
 
     type private CompileResultT = {
-        Exprs:      UExprT list;
-        Eval:       CompiledUExprT;
-        NeededVars: Set<UVarSpecT>;
-        CompileEnv: CompileEnvT;
+        Exprs:      UExprT list
+        Eval:       CompiledUExprT
+        NeededVars: Set<UVarSpecT>
+        CompileEnv: CompileEnvT
     }
 
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) : (VarEnvT -> IArrayNDT list) =      
@@ -191,10 +199,10 @@ module Func =
             let failIfImpossible = failIfImpossible || not compileEnv.CanDelay
 
             // substitute symbol sizes into expressions and convert to unified expressions
-            let uexprs, vars, sizeAvail = 
+            let vars, sizeAvail = 
                 baseExprGens 
-                |> List.map (fun gen -> gen compileEnv.SymSizes) 
-                |> List.unzip3
+                |> List.map (fun gen -> gen.UVarSpecsAndEvalable compileEnv.SymSizes) 
+                |> List.unzip
             let neededVars = Set.unionMany vars            
 
             // check that all necessary symbol sizes are available
@@ -222,10 +230,13 @@ module Func =
                     (neededVars - allKnownLocs |> Set.toList)
 
             if allSizesAvail && allLocsAvail then 
+                let uexprs = 
+                    baseExprGens 
+                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes) 
                 Some {
-                    Exprs=uexprs; 
-                    CompileEnv=compileEnv;
-                    Eval=compiler.Compile compileEnv uexprs; 
+                    Exprs=uexprs
+                    CompileEnv=compileEnv
+                    Eval=compiler.Compile compileEnv uexprs
                     NeededVars=neededVars
                 }
             else None
@@ -283,20 +294,26 @@ module Func =
 
 
     /// makes a function that evaluates the given expression 
-    let make factory (expr0: ExprT<'T0>)  =   
-        let evalAll = evalWrapper factory [uExprGen expr0]        
+    let make factory (expr0: ExprT<'T0>)  =
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let evalAll = evalWrapper factory [expr0gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>
 
     let make2 factory (expr0: ExprT<'T0>) (expr1: ExprT<'T1>) =    
-        let evalAll = evalWrapper factory [uExprGen expr0; uExprGen expr1]        
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>
 
     let make3 factory (expr0: ExprT<'T0>) (expr1: ExprT<'T1>) (expr2: ExprT<'T2>) =    
-        let evalAll = evalWrapper factory [uExprGen expr0; uExprGen expr1; uExprGen expr2]        
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>
