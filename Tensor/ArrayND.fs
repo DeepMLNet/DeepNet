@@ -506,6 +506,10 @@ module ArrayND =
     let inline reshape shp a =
         reshapeView shp (ensureC a)
 
+    /// Flattens the array into a vector assuming a contiguous (row-major) memory layout.
+    let inline flatten a =
+        reshape [-1] a
+
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =
         relayout (ArrayNDLayout.swapDim ax1 ax2 (layout a)) a
