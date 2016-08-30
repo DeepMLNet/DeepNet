@@ -3,9 +3,7 @@ open SymTensor
 
 
 
-[<EntryPoint>]
-let main argv = 
-
+let testSquaredExponentialCovarianceMatrix () =
     let nGps = SizeSpec.symbol "nGps"
     let nTrnSmpls = SizeSpec.symbol "nTrnSmpls"
 
@@ -23,6 +21,15 @@ let main argv =
     printfn "trnXVal=\n%A" trnXVal
     printfn "lengthscaleVal=\n%A" lengthscaleVal
     printfn "cmVal=\n%A" cmVal
+
+
+
+[<EntryPoint>]
+let main argv = 
+    //MathInterface.doMathTest ()
+    //MathInterface.doMathTest2 ()
+
+    testSquaredExponentialCovarianceMatrix ()
 
     0
 

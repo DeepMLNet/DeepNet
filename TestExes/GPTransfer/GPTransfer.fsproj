@@ -48,12 +48,24 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="Wolfram.NETLink">
+      <HintPath>Wolfram.NETLink.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="MathInterface.fs" />
     <Compile Include="GPTransferOps.fs" />
     <Compile Include="Program.fs" />
+    <None Include="ml32i4.dll">
+      <Link>ml32i4.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="ml64i4.dll">
+      <Link>ml64i4.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
