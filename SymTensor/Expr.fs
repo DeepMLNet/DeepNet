@@ -922,7 +922,9 @@ module ExprTypes2 =
     type BinaryOpT<'T> = Expr.BinaryOpT<'T>
     type NaryOpT<'T> = Expr.NaryOpT<'T>
     type IOp<'T> = Expr.IOp<'T>
+    type IUOp = UExprTypes.IUOp
     type ExprT<'T> = Expr.ExprT<'T>
+    
 
 
 
