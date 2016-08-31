@@ -58,6 +58,12 @@ module Map =
     let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
         Map(Seq.concat [(Map.toSeq p); (Map.toSeq q)])    
 
+    /// Creates a map from a System.Collection.Generic.Dictionary<_,_>.
+    let ofDictionary dictionary = 
+        (dictionary :> seq<_>)
+        |> Seq.map (|KeyValue|)
+        |> Map.ofSeq
+
 module String =
 
     /// combines sequence of string with given seperator but returns empty if sequence is empty
