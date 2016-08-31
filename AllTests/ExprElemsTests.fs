@@ -142,10 +142,25 @@ let ``Eval and deriv: KSE`` () =
 
     let x = ElemExpr.argElem 0
     let l = ElemExpr.argElem 1
-    let kse = exp (- (x [gp; smpl1] - x [gp; smpl2])**2.0 / (2.0 * (l [gp])**2.0) )
+    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
 
     printfn "KSE:\n%A" kse
     printfn "dKSE / dx:\n%A" dKse.[0]
     printfn "dKSE / dl:\n%A" dKse.[1]
+
+
+    let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
+    let lVal = [0.5] |> ArrayNDHost.ofList
+    let kseVal = ElemExpr.eval kse [xVal; lVal] [1; 3; 3]
+
+    printfn "x=\n%A" xVal
+    printfn "l=\n%A" lVal
+    printfn "kse=\n%A" kseVal
+
+    let dKSe0Val = ElemExpr.eval kse [xVal; lVal; kseVal] [1; 3]
+    let dKSe1Val = ElemExpr.eval kse [xVal; lVal; kseVal] [1]
+    printfn "dkse / dx=\n%A" dKSe0Val
+    printfn "dkse / dl=\n%A" dKSe1Val
+
 
