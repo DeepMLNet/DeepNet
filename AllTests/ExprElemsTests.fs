@@ -10,7 +10,7 @@ open TestUtils
 
 
 [<Fact>]
-let ``Evaluating an element expression`` () =   
+let ``Eval: simple`` () =   
     // input  x[i, j]
     //        y[m, n]
     // output  [k]
@@ -37,7 +37,33 @@ let ``Evaluating an element expression`` () =
 
 
 [<Fact>]
-let ``Derivative of an element expression`` () =   
+let ``Eval: sum`` () =   
+    // input  x[i, j]
+    // output  [k]
+
+    printfn "======= Testing evaluation sum:"
+
+    let is = SizeSpec.fix 3
+    let js = SizeSpec.fix 3
+
+    let k = ElemExpr.idx 0   
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.sumIdx "l"
+    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
+
+    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
+    let xVal = xVal + ArrayNDHost.ones [3; 3]
+    let res = ElemExpr.eval expr [xVal] [xVal.Shape.[0]]
+
+    printfn "Expr:\n%A" expr
+    printfn "x=\n%A" xVal
+    printfn "result=\n%A" res
+
+    let expected = [8.0; 10.0; 12.0] |> ArrayNDHost.ofList
+    ArrayND.almostEqual res expected |> ArrayND.value |> should equal true
+
+[<Fact>]
+let ``Deriv: 1`` () =   
     // input  x[i, j]
     //        y[m, n]
     // output  [k]
@@ -58,7 +84,7 @@ let ``Derivative of an element expression`` () =
 
 
 [<Fact>]
-let ``Derivative of an element expression 2`` () =   
+let ``Deriv: 2`` () =   
     // input  x[i, j]
     //        y[m, n]
     // output  [k, l]
@@ -78,3 +104,48 @@ let ``Derivative of an element expression 2`` () =
     printfn "Expr:\n%A" expr
     printfn "dExpr / dx:\n%A" dExpr.[0]
     printfn "dExpr / dy:\n%A" dExpr.[1]
+
+
+[<Fact>]
+let ``Deriv: sum`` () =   
+    // input  x[i, j]
+    // output  [k]
+
+    printfn "======= Testing derivative sum:"
+
+    let is = SizeSpec.fix 3
+    let js = SizeSpec.fix 3
+
+    let k = ElemExpr.idx 0   
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.sumIdx "l"
+    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
+    let dExpr = ElemExprDeriv.buildDerivElemExpr expr [is] 1
+
+    printfn "Expr:\n%A" expr
+    printfn "dExpr/dx:\n%A" dExpr.[0]
+   
+
+[<Fact>]
+let ``Eval and deriv: KSE`` () =   
+    // input  x[gp, smpl]
+    //        l[gp]
+    // output cov[gp, smpl1, smpl2]
+
+    printfn "======= Testing KSE:"
+
+    let nGps = SizeSpec.symbol "nGps"
+    let nSmpls = SizeSpec.symbol "nSmpls"
+    let gp = ElemExpr.idx 0   
+    let smpl1 = ElemExpr.idx 1
+    let smpl2 = ElemExpr.idx 2
+
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.argElem 1
+    let kse = exp (- (x [gp; smpl1] - x [gp; smpl2])**2.0 / (2.0 * (l [gp])**2.0) )
+    let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
+
+    printfn "KSE:\n%A" kse
+    printfn "dKSE / dx:\n%A" dKse.[0]
+    printfn "dKSE / dl:\n%A" dKse.[1]
+

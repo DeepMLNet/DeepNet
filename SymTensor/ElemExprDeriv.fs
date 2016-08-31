@@ -64,8 +64,8 @@ module ElemExprDeriv =
             | Substract -> eg .+ (-eg)
             | Multiply -> (eg * b) .+ (a * eg)
             | Divide -> eg |> rds (a * b ** (-one()))
-            | Modulo -> eg .+ (-truncate (a / b))
-            | Power -> (b * a**(b - one())) .+ (a**b * log a)
+            | Modulo -> eg .+ (-truncate (a / b))    // TODO: FIXME
+            | Power -> (eg * b * a**(b - one())) .+ (eg * a**b * log a)
 
 
     let compute (expr: ElemExprT<'T>) : DerivT<'T> =
@@ -120,7 +120,7 @@ module ElemExprDeriv =
                             ||> List.foldBack (fun dimInfo derivSumSoFar ->
                                 match dimInfo with
                                 | SummingDim (sym, first, last) ->
-                                    ElemExpr.sum sym first last derivSumSoFar
+                                    Unary (Sum (sym, first, last), derivSumSoFar) 
                                 | FixedDim _ -> derivSumSoFar)
 
                         // apply constraints if necessary

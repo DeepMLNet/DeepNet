@@ -140,8 +140,15 @@ module ElemExpr =
         sprintf "SUM_%s" name 
         |> SizeSymbol.ofName
 
-    let sum sumSymbol first last expr =
-        Unary (Sum (sumSymbol, first, last), expr) 
+    let sumIdx name =
+        Base (Sym (sumSymbol name))
+
+    let sum idx first last expr =
+        match idx with
+        | Base (Sym (sumSym)) ->
+            Unary (Sum (sumSym, first, last), expr) 
+        | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
+
 
     /// expr if left = right, otherwise 0.
     let kroneckerIf left right expr =
