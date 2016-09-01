@@ -262,6 +262,29 @@ for dims = 0 to maxDims do
         for withIndexes in [true; false] do
             elementwiseWrapper ary withIndexes
 
+
+    let elementsWrapper ary =
+        let srcTmpl = 
+            {0 .. ary - 1} |> Seq.map (sprintf "typename TSrc%d") |> Seq.toList
+        let allTmpl = "typename TTarget" :: srcTmpl
+        wrt "template <typename TElementsOp, %s>" (allTmpl |> cw ", ")
+
+        let srcArgDecls =
+            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
+        let allArgDecls = "const TElementsOp &op" :: "TTarget &trgt" :: srcArgDecls
+        wrt "_dev void elements%dAry%dD(%s) {" ary dims (allArgDecls |> cw ", ")
+
+        elementwiseLoop true (fun dims ->      
+            let poses = ad |>> prn "pos%d" |> cw ", "
+            let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d" a) |> Seq.toList
+            let allArgs = "pos" :: sprintf "%d" dims :: srcArgs 
+            wrt "  trgt.element(%s) = op(%s);" poses (allArgs |> cw ", "))        
+        wrt "}"
+        wrt ""
+
+    for ary = 0 to maxArity do
+        elementsWrapper ary 
+
 let elementwiseHeterogenousLoop fBody =
     wrt "" 
     wrt "    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);" 

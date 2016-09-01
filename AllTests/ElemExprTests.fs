@@ -1,4 +1,4 @@
-﻿module ExprElemsTests
+﻿module ElemExprTests
 
 open Xunit
 open FsUnit.Xunit
@@ -165,6 +165,31 @@ let ``Eval and deriv: KSE`` () =
     printfn "dkse / dx=\n%A" dKSe0Val
     printfn "dkse / dl=\n%A" dKSe1Val
 
+
+
+[<Fact>]
+let ``Codegen: KSE`` () =  
+    printfn "======= Testing KSE codegen:"
+
+    let nGps = SizeSpec.fix 1
+    let nSmpls = SizeSpec.fix 3
+    let gp = ElemExpr.idx 0   
+    let smpl1 = ElemExpr.idx 1
+    let smpl2 = ElemExpr.idx 2
+
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.argElem 1
+    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
+    let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
+    let dKsedX, dKsedL = dKse.[0], dKse.[1]
+
+    let uKse = UElemExpr.toUElemExpr kse
+    let udKsedX, udKsedL = UElemExpr.toUElemExpr dKsedX, UElemExpr.toUElemExpr dKsedL
+    let kseCode = CudaElemExpr.generateFunctor "KSE" uKse 3 2
+    let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX (2+1) (2+1)
+    let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL (1+1) (2+1)
+
+    printfn "Code:\n%s%s%s" kseCode dKsedXCode dKsedLCode
 
 
 [<Fact>]
