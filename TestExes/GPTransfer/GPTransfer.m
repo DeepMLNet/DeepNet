@@ -27,6 +27,53 @@ Table[Sum[dLdKSE[[out,j,a,b]] dKSEdL[x[[j,a]],x[[j,b]],l[[j]]],{a,1,nSmpls},{b,1
 
 (* ::Input:: *)
 (**)
+(*lk[muy_,sigy_,x_,l_] := Sqrt[l^2/(l^2+sigy)]Exp[-((muy-x)^2/(2(l^2+sigy)))]*)
+(*lkVec[mu_,sig_,x_,l_] := Module[{nGps=Dimensions[x][[1]],nSmpls=Dimensions[x][[2]]},*)
+(*Table[EyKSE[mu[[gp]],sig[[gp,gp]],x[[gp,smpl]],l[[gp]]],{gp,1,nGps},{smpl,1,nSmpls}]]*)
+(**)
+(**)
+(*dlkdMuy:=Derivative[1,0,0,0][lk]*)
+(*dlkdSigy:=Derivative[0,1,0,0][lk]*)
+(*dlkdX :=Derivative[0,0,1,0][lk]*)
+(*dlkdL:=Derivative[0,0,0,1][lk]*)
+
+
+(* ::Input:: *)
+(*dlkVecdL[mu_,sig_,x_,l_,dldLkVec_] :=Module[{nGps=Dimensions[x][[1]],nSmpls=Dimensions[x][[2]],nOut=Dimensions[dldLkVec][[1]]},*)
+(*Table[Sum[dldLkVec[[out,j,a]]dlkdL[mu[[j]],sig[[j,j]],x[[j,a]],l[[j]]],{a,1,nSmpls}],{out,1,nOut},{j,1,nGps}]];*)
+(*dlkVecdMu[mu_,sig_,x_,l_,dldLkVec_] :=Module[{nGps=Dimensions[x][[1]],nSmpls=Dimensions[x][[2]],nOut=Dimensions[dldLkVec][[1]]},*)
+(*Table[Sum[dldLkVec[[out,j,a]]dlkdMuy[mu[[j]],sig[[j,j]],x[[j,a]],l[[j]]],{a,1,nSmpls}],{out,1,nOut},{j,1,nGps}]];*)
+(*dlkVecdSig[mu_,sig_,x_,l_,dldLkVec_] :=Module[{nGps=Dimensions[x][[1]],nSmpls=Dimensions[x][[2]],nOut=Dimensions[dldLkVec][[1]]},*)
+(*Table[Sum[dldLkVec[[out,j,a]]dlkdSigy[mu[[j]],sig[[j,j]],x[[j,a]],l[[j]]],{a,1,nSmpls}],{out,1,nOut},{j,1,nGps}]];*)
+(*dlkVecdX[mu_,sig_,x_,l_,dldLkVec_] :=Module[{nGps=Dimensions[x][[1]],nSmpls=Dimensions[x][[2]],nOut=Dimensions[dldLkVec][[1]]},*)
+(*Table[dldLkVec[[out,j,c]]dlkdX[mu[[j]],sig[[j,j]],x[[j,c]],l[[j]]],{out,1,nOut},{j,1,nGps},{c,1,nSmpls}]];*)
+(**)
+(**)
+(*dlkdX*)
+
+
+(* ::Input:: *)
+(**)
+
+
+(* ::Input:: *)
+(**)
+
+
+(* ::Input:: *)
+(**)
+
+
+(* ::Input:: *)
+(**)
+
+
+(* ::Input:: *)
+(**)
+
+
+(* ::Input:: *)
+(**)
 
 
 (* ::Input:: *)
@@ -66,3 +113,61 @@ Table[Sum[dLdKSE[[out,j,a,b]] dKSEdL[x[[j,a]],x[[j,b]],l[[j]]],{a,1,nSmpls},{b,1
 
 (* ::Input:: *)
 (*Derivative[1,0,0][KSE][1,2,3]*)
+
+
+(* ::Input:: *)
+(**)
+(*KSE*)
+
+
+(* ::Input:: *)
+(*KSEMat[trnSmpls,ls][[1]]//MatrixForm*)
+
+
+(* ::Input:: *)
+(*mus = {2.,1.7}*)
+
+
+(* ::Input:: *)
+(*sigs = {{.5,.42},{.2,.4}}*)
+
+
+(* ::Input:: *)
+(**)
+(*lk[2.,0.5,1.7,2.]*)
+
+
+(* ::Input:: *)
+(*lkVec[mus,sigs,trnSmpls,ls]*)
+
+
+(* ::Input:: *)
+(*dlkdMuy[2.,0.5,1.7,2.]*)
+
+
+(* ::Input:: *)
+(*dlkdX[2.,0.5,1.7,2.]*)
+
+
+(* ::InheritFromParent:: *)
+(**)
+(*dlkdL[2.,0.5,1.7,2.]*)
+
+
+(* ::Input:: *)
+(*dlkVecdL[mus,sigs,trnSmpls,ls,dlDKSEval]*)
+
+
+(* ::Input:: *)
+(**)
+(*dlkVecdMu[mus,sigs,trnSmpls,ls,dlDKSEval]*)
+
+
+(* ::Input:: *)
+(**)
+(*dlkVecdSig[mus,sigs,trnSmpls,ls,dlDKSEval]*)
+
+
+(* ::Input:: *)
+(**)
+(*dlkVecdX[mus,sigs,trnSmpls,ls,dlDKSEval]*)
