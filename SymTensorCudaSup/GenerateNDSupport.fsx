@@ -274,11 +274,11 @@ for dims = 0 to maxDims do
         let allArgDecls = "const TElementsOp &op" :: "TTarget &trgt" :: srcArgDecls
         wrt "_dev void elements%dAry%dD(%s) {" ary dims (allArgDecls |> cw ", ")
 
-        elementwiseLoop true (fun dims ->      
-            let poses = ad |>> prn "pos%d" |> cw ", "
+        elementwiseLoop false (fun dims ->      
+            let poses = ad |>> prn "pos%d" |> Seq.toList
             let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d" a) |> Seq.toList
-            let allArgs = "pos" :: sprintf "%d" dims :: srcArgs 
-            wrt "  trgt.element(%s) = op(%s);" poses (allArgs |> cw ", "))        
+            let opArgs = poses @ srcArgs 
+            wrt "  trgt.element(%s) = op(%s);" (poses |> cw ", ") (opArgs |> cw ", "))        
         wrt "}"
         wrt ""
 

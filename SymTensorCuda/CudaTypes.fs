@@ -454,14 +454,29 @@ module ArgTemplates =
 
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    /// elmentwise operation C++ structure with no fields
     type NoArgEOpArg = struct end
     
+    /// arg template for elmentwise op C++ structure 
     type NoArgEOpArgTmpl (cppTypeName: string, indexed: bool) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = cppTypeName
-            member this.GetArg env strm = NoArgEOpArg() :> obj
+            member this.GetArg env strm = NoArgEOpArg() |> box
         interface ICudaOp with
             member this.IsIndexed = indexed
+
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    /// elments operation C++ structure with no fields
+    type ElementsOpArg = struct end
+    
+    /// arg template for elements op C++ structure 
+    type ElementsOpArgTmpl (elemFunc: UElemExpr.UElemFuncT) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "xxx" // get from env
+            member this.GetArg env strm = ElementsOpArg() |> box
+        interface ICudaOp with
+            member this.IsIndexed = true
 
 
 [<AutoOpen>]

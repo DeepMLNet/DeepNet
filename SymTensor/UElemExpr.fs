@@ -59,6 +59,16 @@ module UElemExpr =
         | UElemExpr of UOpT * (UElemExprT list) * TypeNameT
 
 
+    /// element function
+    type UElemFuncT = {
+        /// element expression
+        Expr:       UElemExprT
+        /// number of dimensions of the result
+        NDims:      int
+        /// number of input arguments
+        NArgs:      int
+    }
+
     /// converts an element expression to a unified element expression
     let rec toUElemExpr (elemExpr: ElemExprT<'T>) =
         let tn = TypeName.ofType<'T>
@@ -102,3 +112,11 @@ module UElemExpr =
         | Binary (ElemExpr.Modulo, a, b)    -> binary Modulo a b          
         | Binary (ElemExpr.Power, a, b)     -> binary Power a b               
             
+
+    /// converts an element expression to a unified element function
+    let toUElemFunc elemExpr nDims nArgs =
+        {
+            Expr    = toUElemExpr elemExpr
+            NDims   = nDims
+            NArgs   = nArgs
+        }

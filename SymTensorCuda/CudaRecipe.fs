@@ -42,8 +42,10 @@ module CudaRecipeTypes =
 
     /// function instantiation state
     type TmplInstCacheT = {
-        mutable Insts: (TmplInstT * string) list
-        mutable Code:  (TmplInstT * string) list
+        mutable Insts:          (TmplInstT * string) list
+        mutable ElemFuncs:      Map<UElemExpr.UElemFuncT, string>
+        mutable ElemFuncCnt:    int
+        mutable Code:           (FuncDomainT * string) list
     } 
 
 
@@ -62,8 +64,8 @@ module TmplInstCache =
     /// gets the generated code for the specified domain
     let getCodeForDomain domain cache =
         cache.Code
-        |> List.fold (fun code (ti, tiCode) ->
-            if ti.Domain = domain then code + "\n" + tiCode
+        |> List.fold (fun code (tiDomain, tiCode) ->
+            if tiDomain = domain then code + "\n" + tiCode
             else code) ""
 
     /// instantiates a template C++ function with a unique C linkage function name and returns the C function name
@@ -98,9 +100,25 @@ module TmplInstCache =
                 + sprintf "  %s %s (%s);\n" retCmd instStr argCallStr
                 + sprintf "}\n"
                 + sprintf "\n"
-            cache.Code <- (ti, declStr)::cache.Code
+            cache.Code <- (ti.Domain, declStr) :: cache.Code
 
             cName
+
+    /// instantiates an element calculation functor
+    let instElemOp (elemFunc: UElemExpr.UElemFuncT) cache =
+        match cache.ElemFuncs |> Map.tryFind elemFunc with
+        | Some functorName -> functorName
+        | None ->
+            // generate functor name and add to cache
+            cache.ElemFuncCnt <- cache.ElemFuncCnt + 1
+            let functorName = sprintf "ElemFunc%dOp" cache.ElemFuncCnt
+            cache.ElemFuncs <- cache.ElemFuncs |> Map.add elemFunc functorName
+
+            // generate functor code
+            let functorCode = CudaElemExpr.generateFunctor functorName elemFunc
+            cache.Code <- (KernelFunc, functorCode) :: cache.Code
+
+            functorName
 
 
 module CudaRecipe =
@@ -316,7 +334,12 @@ module CudaRecipe =
         // generate CUDA calls for execution and initialization
         if Debug.TraceCompile then printfn "Generating calls..."
         let sw = Stopwatch.StartNew()
-        let tmplInstCache = {Insts=[]; Code=[]}
+        let tmplInstCache = {
+            Insts       = []
+            ElemFuncs   = Map.empty
+            ElemFuncCnt = 0
+            Code        = []
+        }
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
             generateAllocAndDispose euData.MemAllocs (List.length streams) eventObjCnt

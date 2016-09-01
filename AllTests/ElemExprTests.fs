@@ -183,11 +183,12 @@ let ``Codegen: KSE`` () =
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
     let dKsedX, dKsedL = dKse.[0], dKse.[1]
 
-    let uKse = UElemExpr.toUElemExpr kse
-    let udKsedX, udKsedL = UElemExpr.toUElemExpr dKsedX, UElemExpr.toUElemExpr dKsedL
-    let kseCode = CudaElemExpr.generateFunctor "KSE" uKse 3 2
-    let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX (2+1) (2+1)
-    let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL (1+1) (2+1)
+    let uKse = UElemExpr.toUElemFunc kse 3 2
+    let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1)
+    let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1)
+    let kseCode = CudaElemExpr.generateFunctor "KSE" uKse
+    let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX 
+    let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL 
 
     printfn "Code:\n%s%s%s" kseCode dKsedXCode dKsedLCode
 

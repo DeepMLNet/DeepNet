@@ -114,8 +114,8 @@ module CudaElemExpr =
             | Power -> sprintf "pow(%s, %s)" av bv
 
 
-    /// generates a functor that evaluates the ElemExpr
-    let generateFunctor name (expr: UElemExprT) nTrgtDims nArgs =
+    /// generates a functor that evaluates the UElemFuncT
+    let generateFunctor name {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} =
 
         let mutable varCount = 0
         let newVar () : VarNameT =

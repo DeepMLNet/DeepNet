@@ -147,27 +147,24 @@ _dev void elemwise2Ary0D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
 template <typename TElementsOp, typename TTarget>
 _dev void elements0Ary0D(const TElementsOp &op, TTarget &trgt) {
 
-    const size_t *pos = nullptr;
 
-  trgt.element() = op(pos, 0);
+  trgt.element() = op();
 
 }
 
 template <typename TElementsOp, typename TTarget, typename TSrc0>
 _dev void elements1Ary0D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0) {
 
-    const size_t *pos = nullptr;
 
-  trgt.element() = op(pos, 0, src0);
+  trgt.element() = op(src0);
 
 }
 
 template <typename TElementsOp, typename TTarget, typename TSrc0, typename TSrc1>
 _dev void elements2Ary0D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0, const TSrc1 &src1) {
 
-    const size_t *pos = nullptr;
 
-  trgt.element() = op(pos, 0, src0, src1);
+  trgt.element() = op(src0, src1);
 
 }
 
@@ -367,9 +364,8 @@ _dev void elements0Ary1D(const TElementsOp &op, TTarget &trgt) {
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
-    const size_t pos[] {pos0};
 
-  trgt.element(pos0) = op(pos, 1);
+  trgt.element(pos0) = op(pos0);
 
     }
     }
@@ -382,9 +378,8 @@ _dev void elements1Ary1D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
-    const size_t pos[] {pos0};
 
-  trgt.element(pos0) = op(pos, 1, src0);
+  trgt.element(pos0) = op(pos0, src0);
 
     }
     }
@@ -397,9 +392,8 @@ _dev void elements2Ary1D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
-    const size_t pos[] {pos0};
 
-  trgt.element(pos0) = op(pos, 1, src0, src1);
+  trgt.element(pos0) = op(pos0, src0, src1);
 
     }
     }
@@ -634,9 +628,8 @@ _dev void elements0Ary2D(const TElementsOp &op, TTarget &trgt) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1))) {
-    const size_t pos[] {pos0, pos1};
 
-  trgt.element(pos0, pos1) = op(pos, 2);
+  trgt.element(pos0, pos1) = op(pos0, pos1);
 
     }
     }
@@ -653,9 +646,8 @@ _dev void elements1Ary2D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1))) {
-    const size_t pos[] {pos0, pos1};
 
-  trgt.element(pos0, pos1) = op(pos, 2, src0);
+  trgt.element(pos0, pos1) = op(pos0, pos1, src0);
 
     }
     }
@@ -672,9 +664,8 @@ _dev void elements2Ary2D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1))) {
-    const size_t pos[] {pos0, pos1};
 
-  trgt.element(pos0, pos1) = op(pos, 2, src0, src1);
+  trgt.element(pos0, pos1) = op(pos0, pos1, src0, src1);
 
     }
     }
@@ -943,9 +934,8 @@ _dev void elements0Ary3D(const TElementsOp &op, TTarget &trgt) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2))) {
-    const size_t pos[] {pos0, pos1, pos2};
 
-  trgt.element(pos0, pos1, pos2) = op(pos, 3);
+  trgt.element(pos0, pos1, pos2) = op(pos0, pos1, pos2);
 
     }
     }
@@ -966,9 +956,8 @@ _dev void elements1Ary3D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2))) {
-    const size_t pos[] {pos0, pos1, pos2};
 
-  trgt.element(pos0, pos1, pos2) = op(pos, 3, src0);
+  trgt.element(pos0, pos1, pos2) = op(pos0, pos1, pos2, src0);
 
     }
     }
@@ -989,9 +978,8 @@ _dev void elements2Ary3D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2))) {
-    const size_t pos[] {pos0, pos1, pos2};
 
-  trgt.element(pos0, pos1, pos2) = op(pos, 3, src0, src1);
+  trgt.element(pos0, pos1, pos2) = op(pos0, pos1, pos2, src0, src1);
 
     }
     }
@@ -1309,9 +1297,8 @@ _dev void elements0Ary4D(const TElementsOp &op, TTarget &trgt) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3};
 
-  trgt.element(pos0, pos1, pos2, pos3) = op(pos, 4);
+  trgt.element(pos0, pos1, pos2, pos3) = op(pos0, pos1, pos2, pos3);
 
     }
     }
@@ -1338,9 +1325,8 @@ _dev void elements1Ary4D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3};
 
-  trgt.element(pos0, pos1, pos2, pos3) = op(pos, 4, src0);
+  trgt.element(pos0, pos1, pos2, pos3) = op(pos0, pos1, pos2, pos3, src0);
 
     }
     }
@@ -1367,9 +1353,8 @@ _dev void elements2Ary4D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3};
 
-  trgt.element(pos0, pos1, pos2, pos3) = op(pos, 4, src0, src1);
+  trgt.element(pos0, pos1, pos2, pos3) = op(pos0, pos1, pos2, pos3, src0, src1);
 
     }
     }
@@ -1714,9 +1699,8 @@ _dev void elements0Ary5D(const TElementsOp &op, TTarget &trgt) {
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3)) && (pos4 < trgt.shape(4))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
 
-  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5);
+  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos0, pos1, pos2, pos3, pos4);
 
     }
     }
@@ -1746,9 +1730,8 @@ _dev void elements1Ary5D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3)) && (pos4 < trgt.shape(4))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
 
-  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5, src0);
+  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos0, pos1, pos2, pos3, pos4, src0);
 
     }
     }
@@ -1778,9 +1761,8 @@ _dev void elements2Ary5D(const TElementsOp &op, TTarget &trgt, const TSrc0 &src0
     const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3)) && (pos4 < trgt.shape(4))) {
-    const size_t pos[] {pos0, pos1, pos2, pos3, pos4};
 
-  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos, 5, src0, src1);
+  trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos0, pos1, pos2, pos3, pos4, src0, src1);
 
     }
     }

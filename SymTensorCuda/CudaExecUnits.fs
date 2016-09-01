@@ -254,6 +254,7 @@ module CudaExecUnit =
             // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
             inplaceFirstSrcReq
+        | UNaryOp (Elements _) -> dfltSrcWithNoViewReq            
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
 
 
@@ -425,6 +426,7 @@ module CudaExecUnit =
             if not (srcsDfltChShared.[0]) then 
                 dfltChTrgt srcsDfltCh.[0] false
             else dfltChOutplaceTrgt ()
+        | UNaryOp (Elements _) -> dfltChOutplaceTrgt ()
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
    
@@ -439,7 +441,7 @@ module CudaExecUnit =
         }    
         [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
 
-    /// returns the CUDA work dimensions for an element-wise operation
+    /// returns the CUDA work dimensions for an element-wise or elements operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
         | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
@@ -450,7 +452,6 @@ module CudaExecUnit =
         | d ->
             let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
             ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
-
 
     /// returns the C++ template instantiation code for the given template and argument list
     let cppTemplateInstantiation tmpl args =
@@ -480,6 +481,24 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
+    /// function name of elements wrapper and its arguments for the given target, operation and sources
+    let elementsFuncnameAndArgs trgt cOp srcViews =
+        let args = 
+            (cOp :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            (List.map (fun v -> (ArrayNDArgTmpl v) :> ICudaArgTmpl) srcViews)
+
+        let nSrc = List.length srcViews
+        let dimsStr = sprintf "%dD" (ArrayND.nDims trgt)
+        let funcName = sprintf "elements%dAry%s" nSrc dimsStr 
+        funcName, args
+
+    /// execution items for an element-wise operation
+    let execItemsForElements trgt elemFunc srcViews =
+        let elemsOpTmpl = ElementsOpArgTmpl elemFunc
+        let funcName, args = elementsFuncnameAndArgs trgt elemsOpTmpl srcViews
+        let workDims = workDimForElemwise trgt false
+        execItemsForKernel funcName args args workDims
 
     let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =
         // Apply symbolic ranges to src, and leave dynamic axes unharmed.
@@ -830,6 +849,8 @@ module CudaExecUnit =
                 execItemsForCopyToDynamicSubtensor dfltChTrgt srs 
                     (List.skip 2 srcsDfltCh) srcsDfltCh.[1]
             copyItems @ setItems
+        | UNaryOp (Elements (_, elemFunc)) ->
+            execItemsForElements dfltChTrgt elemFunc srcsDfltCh
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 

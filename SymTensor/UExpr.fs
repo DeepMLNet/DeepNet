@@ -149,7 +149,9 @@ module UExpr =
 
         | Nary (Expr.Discard, se)       -> nary Discard se
         | Nary (Expr.Elements (resShape, elemExpr), se) ->
-            nary (Elements (resShape, UElemExpr.toUElemExpr elemExpr)) se
+            let nDims = ShapeSpec.nDim resShape
+            let nArgs = List.length se
+            nary (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
         | Nary (Expr.ExtensionOp eop, se) -> 
             let makeOneUop uop = nary (ExtensionOp uop) se
             eop.ToUExpr expr makeOneUop
