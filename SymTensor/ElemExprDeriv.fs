@@ -114,6 +114,8 @@ module ElemExprDeriv =
                             |> List.map (function
                                          | SummingDim (sym, _, _, _) -> Base (Sym sym)
                                          | FixedDim (ss, _) -> ss)
+                        let funcDimSym = SizeSymbol.ofName "F"
+                        let egIdxSyms = (Base (Sym funcDimSym)) :: egIdxSyms
 
                         // sum over dimensions for which it is necessary
                         let argExprSumed = 
@@ -129,6 +131,7 @@ module ElemExprDeriv =
                                     derivSumSoFar
                                     |> ElemExpr.substSymSizes (Map [oldSym, ss]))
 
+
                         // apply constraints if necessary
                         let argExpr =
                             (argExprSumed, sol.RightValues)
@@ -136,9 +139,12 @@ module ElemExprDeriv =
                                 ElemExpr.kroneckerIf (Base (Sym idxSym)) reqVal kroneckersSoFar
                             )
 
-                        // substitute index symbols "Dnnn" with result index symbols "Rnnn"
-                        let resSyms = [for d=0 to nArgDims-1 do yield idx d]
-                        let idxToResSyms = List.zip idxSyms resSyms |> Map.ofList
+                        // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
+                        let resSyms = [for d=1 to nArgDims do yield idx d]
+                        let idxToResSyms = 
+                            List.zip idxSyms resSyms 
+                            |> Map.ofList
+                            |> Map.add funcDimSym (idx 0)
                         yield ElemExpr.substSymSizes idxToResSyms argExpr
                 ]
 

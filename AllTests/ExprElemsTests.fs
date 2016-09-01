@@ -158,8 +158,10 @@ let ``Eval and deriv: KSE`` () =
     printfn "l=\n%A" lVal
     printfn "kse=\n%A" kseVal
 
-    let dKSe0Val = ElemExpr.eval dKse.[0] [xVal; lVal; kseVal] [1; 3]
-    let dKSe1Val = ElemExpr.eval dKse.[1] [xVal; lVal; kseVal] [1]
+    let dKseVal = kseVal |> ArrayND.reshape [1; 1; 3; 3]
+
+    let dKSe0Val = ElemExpr.eval dKse.[0] [xVal; lVal; dKseVal] [1; 1; 3]
+    let dKSe1Val = ElemExpr.eval dKse.[1] [xVal; lVal; dKseVal] [1; 1]
     printfn "dkse / dx=\n%A" dKSe0Val
     printfn "dkse / dl=\n%A" dKSe1Val
 
