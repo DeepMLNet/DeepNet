@@ -166,3 +166,46 @@ let ``Eval and deriv: KSE`` () =
     printfn "dkse / dl=\n%A" dKSe1Val
 
 
+
+[<Fact>]
+let ``Eval and deriv: KSE in Expr`` () =   
+    // input  x[gp, smpl]
+    //        l[gp]
+    // output cov[gp, smpl1, smpl2]
+
+    printfn "======= Testing KSE in Expr:"
+
+    let nGps = SizeSpec.symbol "nGps"
+    let nSmpls = SizeSpec.symbol "nSmpls"
+    let gp = ElemExpr.idx 0   
+    let smpl1 = ElemExpr.idx 1
+    let smpl2 = ElemExpr.idx 2
+
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.argElem 1
+    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
+
+    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var "lTensor" [nGps]
+    let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
+
+    let dKse = Deriv.compute kse
+    let dKsedX = dKse |> Deriv.ofVar xTensor
+    let dKsedL = dKse |> Deriv.ofVar lTensor
+
+    let kseFn = Func.make DevHost.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2 DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+
+    let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
+    let lVal = [0.5] |> ArrayNDHost.ofList
+
+    let kseVal = kseFn xVal lVal
+    let dKsedXVal, dKsedLVal = dKseFn xVal lVal
+
+    printfn "x=\n%A" xVal
+    printfn "l=\n%A" lVal
+    printfn "kse=\n%A" kseVal
+    printfn "dkse / dx=\n%A" dKsedXVal
+    printfn "dkse / dl=\n%A" dKsedLVal
+
+

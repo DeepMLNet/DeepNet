@@ -91,6 +91,10 @@ module HostEval =
                     let esv = List.map doEval es
                     match op with 
                     | Discard -> ArrayNDHost.zeros [0]
+                    | Elements (resShape, elemExpr) -> 
+                        let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
+                        let nResShape = shapeEval resShape
+                        ElemExpr.eval elemExpr esv nResShape                        
                     | ExtensionOp eop -> eop.EvalSimple esv
 
             if Trace.isActive () then

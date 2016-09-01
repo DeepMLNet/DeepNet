@@ -148,6 +148,8 @@ module UExpr =
                   metadata)
 
         | Nary (Expr.Discard, se)       -> nary Discard se
+        | Nary (Expr.Elements (resShape, elemExpr), se) ->
+            nary (Elements (resShape, elemExpr :> System.IComparable)) se
         | Nary (Expr.ExtensionOp eop, se) -> 
             let makeOneUop uop = nary (ExtensionOp uop) se
             eop.ToUExpr expr makeOneUop

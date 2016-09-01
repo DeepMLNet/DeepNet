@@ -69,6 +69,7 @@ module UExprTypes =
         | Discard        
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
+        | Elements of ShapeSpecT * System.IComparable
         | ExtensionOp of IUOp             
 
     /// unified op of any arity and type
