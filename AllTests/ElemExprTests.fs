@@ -330,7 +330,7 @@ let ``Trace compare: dKSE/dL`` () =
 
 
 [<Fact>]
-let ``Eval and derive: lkse()`` () =
+let ``Eval and derive: lkse`` () =
     //input     mu[gp]
     //          sigma[gp,gp]
     //          x[gp,smpl]
