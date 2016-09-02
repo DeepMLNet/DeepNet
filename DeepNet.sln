@@ -60,9 +60,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MathematicaInterface", "TestExes\MathematicaInterface\MathematicaInterface.fsproj", "{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}"
 EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
