@@ -137,10 +137,13 @@ module GPActivationLayer =
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
 
+        //L[smpl, gp, trn_smpl1, trn_smpl2]
+        let L = L nSmpls pars.HyperPars.NGPs pars.HyperPars.NTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
 
-
-
-
+        // ([gp,trn_mpl,trn_sample] - [trn_smpl,gp].*[gp,trn_Smpl]) * [smpl,gp,trn_smpl,trn_smpl] 
+        let var1 =  (Kk_inv - (Expr.transpose beta).*beta)|> Expr.padLeft |> (*) L |> Expr.diag  |> Expr.sum
+        let var2 = (Expr.transpose lk).*lk .* (Expr.transpose beta).* beta |> Expr.diag  |> Expr.sum
+        let var = 1.0f - var1 - var2
         pred_mean
 
 
