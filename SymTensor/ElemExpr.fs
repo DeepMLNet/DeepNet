@@ -4,7 +4,7 @@ open Basics
 open ArrayNDNS
 open ShapeSpec
 open VarSpec
-
+open System
 
 module ElemExpr =
 
@@ -361,7 +361,67 @@ module ElemExpr =
             |> Map.ofSeq
         expr |> substSymSizes dummySymVals |> canEval
 
-
+    let rec prittyPrint (expr: ElemExprT<'T>) =
+        match expr with
+        | Leaf (op) -> 
+            match op with
+            | Const v -> sprintf "%A" v
+            | SizeValue ss -> 
+                match ss with
+                | Base (Fixed c) -> sprintf "%d" c
+                | Base (Sym {Name = n}) -> sprintf "%s" n
+                | Broadcast -> sprintf "1"
+                | Multinom m -> sprintf "%s" m.PrettyString
+            | ArgElement ((Arg a),indxs ) -> sprintf "a%d%A" a (indxs |> List.map(fun ss -> (SizeValue ss)))
+        
+        | Unary (op, ee) ->
+            match op with
+            | Negate -> sprintf "-(%s)" (prittyPrint ee)
+            | Abs -> sprintf "|%s|" (prittyPrint ee)
+            | SignT -> sprintf "sgn(%s)" (prittyPrint ee)
+            | Log -> sprintf "log(%s)" (prittyPrint ee)
+            | Log10 -> sprintf "log10(%s)" (prittyPrint ee)
+            | Exp -> sprintf "exp(%s)" (prittyPrint ee)
+            | Sin -> sprintf "sin(%s)" (prittyPrint ee)
+            | Cos -> sprintf "cos(%s)" (prittyPrint ee)
+            | Tan -> sprintf "tan(%s)" (prittyPrint ee)
+            | Asin -> sprintf "asin(%s)" (prittyPrint ee)
+            | Acos -> sprintf "acos(%s)" (prittyPrint ee)
+            | Atan -> sprintf "atan(%s)" (prittyPrint ee)
+            | Sinh -> sprintf "sinh(%s)" (prittyPrint ee)
+            | Cosh -> sprintf "cosh(%s)" (prittyPrint ee)
+            | Tanh -> sprintf "tanh(%s)" (prittyPrint ee)
+            | Sqrt -> sprintf "%s(%s)" (String('\u221A',1)) (prittyPrint ee)
+            | Ceil -> sprintf "%s%s%s" (String('\u2308',1)) (prittyPrint ee) (String('\u2309',1))
+            | Floor -> sprintf "%s%s%s" (String('\u230A',1)) (prittyPrint ee) (String('\u230B',1))
+            | Round -> sprintf "round(%s)" (prittyPrint ee)
+            | Truncate -> sprintf "trunc(%s)" (prittyPrint ee)
+            | Sum ({Name = n}, first, last)-> 
+                sprintf "%s%s[%s..%s](%s)" (String('\u03A3',1)) n 
+                                       (prittyPrint (Leaf (SizeValue first))) (prittyPrint (Leaf (SizeValue last)))
+                                       (prittyPrint ee)
+            | KroneckerIf (left, right) ->
+                sprintf "%s[%s=%s](%s)" (String('\u03B4',1)) (prittyPrint (Leaf (SizeValue left))) 
+                                        (prittyPrint (Leaf (SizeValue right))) (prittyPrint ee)
+            | KroneckerRng (s, first, last) ->
+                sprintf "%s[%s%s%s %s %s%s%s](%s)"  (String('\u03B4',1)) 
+                                                    (prittyPrint (Leaf (SizeValue first)))
+                                                    (String('\u2264',1))
+                                                    (prittyPrint (Leaf (SizeValue s)))
+                                                    (String('\u2227',1))
+                                                    (prittyPrint (Leaf (SizeValue s)))
+                                                    (String('\u2264',1))
+                                                    (prittyPrint (Leaf (SizeValue last)))
+                                                    (prittyPrint ee)
+        | Binary(op, ee1, ee2) -> 
+            match op with
+            | Add -> sprintf "(%s + %s)" (prittyPrint ee1) (prittyPrint ee2)
+            | Substract -> sprintf "(%s - %s)" (prittyPrint ee1) (prittyPrint ee2)
+            | Multiply -> sprintf "%s * %s" (prittyPrint ee1) (prittyPrint ee2)
+            | Divide -> sprintf "(%s) / (%s)" (prittyPrint ee1) (prittyPrint ee2)
+            | Modulo -> sprintf "(%s) %% (%s)" (prittyPrint ee1) (prittyPrint ee2)
+            | Power -> sprintf "(%s)**(%s)" (prittyPrint ee1) (prittyPrint ee2)
+            //TODO: delete unnecessary brackets
 [<AutoOpen>]
 module ElemExprTypes =
     type ElemExprT<'T> = ElemExpr.ElemExprT<'T>
