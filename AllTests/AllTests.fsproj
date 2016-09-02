@@ -111,11 +111,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DeepNet\DeepNet.fsproj">
-      <Name>DeepNet</Name>
-      <Project>{7c53d1c7-8ed2-4e04-8f2d-cf0384c51f33}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\MLDatasets\MLDatasets.fsproj">
       <Name>MLDatasets</Name>
       <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
