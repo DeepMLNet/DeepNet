@@ -120,6 +120,8 @@ module GPActivationLayer =
         // Sigma: input covariance  [smpl, gp1, gp2]
 
         let nSmpls = (Expr.shapeOf mu).[0]
+        let nGps = pars.HyperPars.NGPs
+        let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk pars.HyperPars.NGPs pars.HyperPars.NTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
@@ -137,10 +139,31 @@ module GPActivationLayer =
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
 
-        //L[smpl, gp, trn_smpl1, trn_smpl2]
+        // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls pars.HyperPars.NGPs pars.HyperPars.NTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
 
-        // ([gp,trn_mpl,trn_sample] - [trn_smpl,gp].*[gp,trn_Smpl]) * [smpl,gp,trn_smpl,trn_smpl] 
+
+
+        
+
+        // betaBetaT = beta .* beta.T
+        // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
+        // is equivalent to: [gp, trn_smpl, 1*] * [gp, 1*, trn_smpl]
+        let betaBetaT = 
+            Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
+            Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
+
+        // lkLkT = lk .* lk.T
+        // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
+        // is equivalent to: [smpl, gp, trn_smpl, 1*] * [smpl, gp, 1*, trn_smpl]
+        let lkLkT =
+            Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
+            Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
+
+        // (Kk_inv - betaBetaT) .*  L
+        // [gp, trn_smpl] .* [smpl, gp, trn_smpl1, trn_smpl2]
+
+        // ([gp,trn_smpl,trn_smpl] - [trn_smpl,gp].*[gp,trn_Smpl]) * [smpl,gp,trn_smpl,trn_smpl] 
         let var1 =  (Kk_inv - (Expr.transpose beta).*beta)|> Expr.padLeft |> (*) L |> Expr.diag  |> Expr.sum
         let var2 = (Expr.transpose lk).*lk .* (Expr.transpose beta).* beta |> Expr.diag  |> Expr.sum
         let var = 1.0f - var1 - var2
