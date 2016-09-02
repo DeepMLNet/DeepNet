@@ -56,7 +56,7 @@
     <None Include="App.config" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="MathInterface.fs" />
-    <Compile Include="GPTransferOps.fs" />
+    <Compile Include="GPTransferModel.fs" />
     <Compile Include="Program.fs" />
     <None Include="ml32i4.dll">
       <Link>ml32i4.dll</Link>
