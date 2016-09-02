@@ -82,7 +82,7 @@ module GPActivationLayer =
         let l = ElemExpr.argElem 2
         let x = ElemExpr.argElem 3
 
-        let lk1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + (s [smpl; gp; gp])) )
+        let lk1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + s [smpl; gp; gp]) )
         let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])**2.0f / (2.0f * ((l [gp])**2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
 
@@ -90,8 +90,29 @@ module GPActivationLayer =
 
 
 
+    let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
+        // L element expression
+        // inputs  l[gp]
+        //         x[gp, trn_smpl]
+        //         m[smpl, gp]        -- mu
+        //         s[smpl, gp1, gp2]  -- Sigma
+        // output  L[smpl, gp, trn_smpl1, trn_smpl2]
+        let smpl = ElemExpr.idx 0
+        let gp = ElemExpr.idx 1
+        let trn_smpl1 = ElemExpr.idx 2
+        let trn_smpl2 = ElemExpr.idx 3
+        let m = ElemExpr.argElem 0
+        let s = ElemExpr.argElem 1
+        let l = ElemExpr.argElem 2
+        let x = ElemExpr.argElem 3
 
-        
+        let L1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp]) )
+        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])*2.0f + 2.0f * s [smpl; gp; gp])
+        let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f / (4.0f * (l [gp])**2.0f)
+        let L2 = exp (-L2a - L2b)
+        let L = L1 * L2
+
+        Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
 
     let pred pars mu sigma =
@@ -115,6 +136,8 @@ module GPActivationLayer =
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+
+
 
 
 
