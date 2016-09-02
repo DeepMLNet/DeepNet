@@ -73,8 +73,8 @@ module ElemExprDeriv =
 
 
     type private DerivDim =
-        | SummingDim of SizeSymbolT * SizeSpecT * SizeSpecT
-        | FixedDim of SizeSpecT
+        | SummingDim of SizeSymbolT * SizeSpecT * SizeSpecT * SizeSymbolT
+        | FixedDim of SizeSpecT * SizeSymbolT
 
     let buildDerivElemExpr (expr: ElemExprT<'T>) (exprShp: ShapeSpecT) nArgs =
         let nDims = ShapeSpec.nDim exprShp
@@ -88,7 +88,7 @@ module ElemExprDeriv =
             sprintf "__DERIV_%d" sumSymbolCnt |> ElemExpr.sumSymbol
 
         let argDerivExprs = [
-            for arg=0 to nArgs do
+            for arg=0 to nArgs-1 do
             
                 let argDerivs = allDerives |> Map.filter (fun (Arg n, _) _ -> n=arg)
                 let argExprs = [
@@ -103,25 +103,34 @@ module ElemExprDeriv =
                             for exprDim=0 to nDims-1 do
                                 let exprDimSym = ElemExpr.idxSymbol exprDim
                                 match sol.LeftValues |> Map.tryFind exprDimSym with
-                                | Some ss -> yield FixedDim ss
+                                | Some ss -> yield FixedDim (ss, exprDimSym)
                                 | None -> yield SummingDim (newSumSymbol(),
-                                                            SizeSpec.zero, exprShp.[exprDim])
+                                                            SizeSpec.zero, exprShp.[exprDim]-1,
+                                                            exprDimSym)
                         ]              
                         // build indices for eg
                         let egIdxSyms = 
                             egIdxDimInfo 
                             |> List.map (function
-                                         | SummingDim (sym, _, _) -> Base (Sym sym)
-                                         | FixedDim ss -> ss)
+                                         | SummingDim (sym, _, _, _) -> Base (Sym sym)
+                                         | FixedDim (ss, _) -> ss)
+                        let funcDimSym = SizeSymbol.ofName "F"
+                        let egIdxSyms = (Base (Sym funcDimSym)) :: egIdxSyms
 
                         // sum over dimensions for which it is necessary
                         let argExprSumed = 
                             (egIdxDimInfo, deriv * egElem egIdxSyms)
                             ||> List.foldBack (fun dimInfo derivSumSoFar ->
                                 match dimInfo with
-                                | SummingDim (sym, first, last) ->
-                                    Unary (Sum (sym, first, last), derivSumSoFar) 
-                                | FixedDim _ -> derivSumSoFar)
+                                | SummingDim (sym, first, last, oldSym) ->
+                                    let substSum = 
+                                        derivSumSoFar 
+                                        |> ElemExpr.substSymSizes (Map [oldSym, Base (Sym sym)]) 
+                                    Unary (Sum (sym, first, last), substSum) 
+                                | FixedDim (ss, oldSym) -> 
+                                    derivSumSoFar
+                                    |> ElemExpr.substSymSizes (Map [oldSym, ss]))
+
 
                         // apply constraints if necessary
                         let argExpr =
@@ -130,9 +139,12 @@ module ElemExprDeriv =
                                 ElemExpr.kroneckerIf (Base (Sym idxSym)) reqVal kroneckersSoFar
                             )
 
-                        // substitute index symbols "Dnnn" with result index symbols "Rnnn"
-                        let resSyms = [for d=0 to nArgDims-1 do yield Base (Sym (idxSymbol d))]
-                        let idxToResSyms = List.zip idxSyms resSyms |> Map.ofList
+                        // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
+                        let resSyms = [for d=1 to nArgDims do yield idx d]
+                        let idxToResSyms = 
+                            List.zip idxSyms resSyms 
+                            |> Map.ofList
+                            |> Map.add funcDimSym (idx 0)
                         yield ElemExpr.substSymSizes idxToResSyms argExpr
                 ]
 

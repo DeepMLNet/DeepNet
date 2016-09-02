@@ -63,6 +63,7 @@
     <Compile Include="ArrayNDManikin.fs" />
     <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
+    <Compile Include="CudaElemExpr.fs" />
     <Compile Include="CudaExecUnits.fs" />
     <Compile Include="CudaStream.fs" />
     <Compile Include="CudaRecipe.fs" />

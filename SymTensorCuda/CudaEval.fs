@@ -72,7 +72,10 @@ module CudaEval =
         let varLocs = Map.join compileEnv.VarLocs resVarLocs
 
         // compile expression and create workspace
-        let cudaCompileEnv = {VarStorLoc = varLocs}
+        let cudaCompileEnv = {
+            VarStorLoc       = varLocs
+            ElemFuncsOpNames = Map.empty    
+        }
         let rcpt = CudaRecipe.build cudaCompileEnv mergedUexpr
         let workspace = new CudaExprWorkspace (rcpt)
 
