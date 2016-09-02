@@ -339,8 +339,8 @@ let ``Eval and derive: lkse`` () =
 
     printfn "======= Testing lk:"
 
-    let nGps = SizeSpec.symbol "nGps"
-    let nSmpls = SizeSpec.symbol "nSmpls"
+    let nGps = SizeSpec.fix 2
+    let nSmpls = SizeSpec.fix 3
     let gp = ElemExpr.idx 0
     let smpl = ElemExpr.idx 1
 
@@ -369,10 +369,12 @@ let ``Eval and derive: lkse`` () =
     printfn "l=\n%A" lVal
     printfn "lkse=\n%A" lkseVal
 
-    let dlk0Val = ElemExpr.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;lkseVal] [2]
-    let dlk1Val = ElemExpr.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;lkseVal] [2;2]
-    let dlk2Val = ElemExpr.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;lkseVal] [2;3]
-    let dlk3Val = ElemExpr.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;lkseVal] [2]
+    let dlkseVal = lkseVal |> ArrayND.reshape [1; 2; 3]
+
+    let dlk0Val = ElemExpr.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
+    let dlk1Val = ElemExpr.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;2]
+    let dlk2Val = ElemExpr.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;3]
+    let dlk3Val = ElemExpr.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
     printfn "dlkse / dmu=\n%A" dlk0Val
     printfn "dlkse / dsigma=\n%A" dlk1Val
     printfn "dlkse / dx=\n%A" dlk2Val
