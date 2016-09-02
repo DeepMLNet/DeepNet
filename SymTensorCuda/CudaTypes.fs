@@ -35,7 +35,12 @@ module Types =
     }
 
     /// additional environment informations for CUDA
-    type CudaCompileEnvT = {VarStorLoc: Map<UVarSpecT, ArrayLocT>}
+    type CudaCompileEnvT = {
+        /// storage location of variables
+        VarStorLoc:                 Map<UVarSpecT, ArrayLocT>
+        /// op names for each elements function
+        mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
+    }
 
     /// function domain (kernel only or host code that may call kernels)
     type FuncDomainT =
@@ -471,9 +476,9 @@ module ArgTemplates =
     type ElementsOpArg = struct end
     
     /// arg template for elements op C++ structure 
-    type ElementsOpArgTmpl (elemFunc: UElemExpr.UElemFuncT) =
+    type ElementsOpArgTmpl (cppTypeName: string) =
         interface ICudaArgTmpl with
-            member this.CPPTypeName = "xxx" // get from env
+            member this.CPPTypeName = cppTypeName
             member this.GetArg env strm = ElementsOpArg() |> box
         interface ICudaOp with
             member this.IsIndexed = true

@@ -1,4 +1,5 @@
 ﻿module ElemExprTests
+#nowarn "25"
 
 open Xunit
 open FsUnit.Xunit
@@ -194,12 +195,12 @@ let ``Codegen: KSE`` () =
 
 
 [<Fact>]
-let ``Eval and deriv: KSE in Expr`` () =   
+let ``Eval and deriv: KSE in Expr on Host`` () =   
     // input  x[gp, smpl]
     //        l[gp]
     // output cov[gp, smpl1, smpl2]
 
-    printfn "======= Testing KSE in Expr:"
+    printfn "======= Testing KSE in Expr on Host:"
 
     let nGps = SizeSpec.symbol "nGps"
     let nSmpls = SizeSpec.symbol "nSmpls"
@@ -234,4 +235,95 @@ let ``Eval and deriv: KSE in Expr`` () =
     printfn "dkse / dx=\n%A" dKsedXVal
     printfn "dkse / dl=\n%A" dKsedLVal
 
+[<Fact>]
+let ``Eval and deriv: KSE in Expr on CUDA`` () =   
+    // input  x[gp, smpl]
+    //        l[gp]
+    // output cov[gp, smpl1, smpl2]
+
+    printfn "======= Testing KSE in Expr on CUDA:"
+
+    let nGps = SizeSpec.symbol "nGps"
+    let nSmpls = SizeSpec.symbol "nSmpls"
+    let gp = ElemExpr.idx 0   
+    let smpl1 = ElemExpr.idx 1
+    let smpl2 = ElemExpr.idx 2
+
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.argElem 1
+    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) )
+
+    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var "lTensor" [nGps]
+    let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
+
+    let dKse = Deriv.compute kse
+    let dKsedX = dKse |> Deriv.ofVar xTensor
+    let dKsedL = dKse |> Deriv.ofVar lTensor
+
+    let kseFn = Func.make DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2 DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+
+    let xVal = [[1.0f; 1.1f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
+    let lVal = [0.5f] |> ArrayNDHost.ofList |> ArrayNDCuda.toDev
+
+    let kseVal = kseFn xVal lVal
+    let dKsedXVal, dKsedLVal = dKseFn xVal lVal
+
+    printfn "x=\n%A" xVal
+    printfn "l=\n%A" lVal
+    printfn "kse=\n%A" kseVal
+    printfn "dkse / dx=\n%A" dKsedXVal
+    printfn "dkse / dl=\n%A" dKsedLVal
+
+
+let kseElemExpr () = 
+    // input  x[gp, smpl]
+    //        l[gp]
+    // output cov[gp, smpl1, smpl2]
+    let gp = ElemExpr.idx 0   
+    let smpl1 = ElemExpr.idx 1
+    let smpl2 = ElemExpr.idx 2
+    let x = ElemExpr.argElem 0
+    let l = ElemExpr.argElem 1
+    exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) )
+
+[<Fact>]
+let ``Trace compare: KSE`` () =    
+    let nGps = 2
+    let nSmpls = 3
+    requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
+        let elemExpr = kseElemExpr ()
+        let kse = 
+            Expr.elements [SizeSpec.fix nGps; SizeSpec.fix nSmpls; SizeSpec.fix nSmpls] 
+                elemExpr [xTensor; lTensor]
+        kse    
+    )
+
+
+[<Fact>]
+let ``Trace compare: dKSE/dX`` () =    
+    let nGps = 2
+    let nSmpls = 3
+    requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
+        let elemExpr = kseElemExpr ()
+        let kse = 
+            Expr.elements [SizeSpec.fix nGps; SizeSpec.fix nSmpls; SizeSpec.fix nSmpls] 
+                elemExpr [xTensor; lTensor]
+        let dKse = Deriv.compute kse
+        dKse |> Deriv.ofVar xTensor
+    )
+
+[<Fact>]
+let ``Trace compare: dKSE/dL`` () =    
+    let nGps = 2
+    let nSmpls = 3
+    requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
+        let elemExpr = kseElemExpr ()
+        let kse = 
+            Expr.elements [SizeSpec.fix nGps; SizeSpec.fix nSmpls; SizeSpec.fix nSmpls] 
+                elemExpr [xTensor; lTensor]
+        let dKse = Deriv.compute kse
+        dKse |> Deriv.ofVar lTensor
+    )
 

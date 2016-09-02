@@ -43,8 +43,6 @@ module CudaRecipeTypes =
     /// function instantiation state
     type TmplInstCacheT = {
         mutable Insts:          (TmplInstT * string) list
-        mutable ElemFuncs:      Map<UElemExpr.UElemFuncT, string>
-        mutable ElemFuncCnt:    int
         mutable Code:           (FuncDomainT * string) list
     } 
 
@@ -64,6 +62,7 @@ module TmplInstCache =
     /// gets the generated code for the specified domain
     let getCodeForDomain domain cache =
         cache.Code
+        |> List.rev
         |> List.fold (fun code (tiDomain, tiCode) ->
             if tiDomain = domain then code + "\n" + tiCode
             else code) ""
@@ -105,20 +104,10 @@ module TmplInstCache =
             cName
 
     /// instantiates an element calculation functor
-    let instElemOp (elemFunc: UElemExpr.UElemFuncT) cache =
-        match cache.ElemFuncs |> Map.tryFind elemFunc with
-        | Some functorName -> functorName
-        | None ->
-            // generate functor name and add to cache
-            cache.ElemFuncCnt <- cache.ElemFuncCnt + 1
-            let functorName = sprintf "ElemFunc%dOp" cache.ElemFuncCnt
-            cache.ElemFuncs <- cache.ElemFuncs |> Map.add elemFunc functorName
+    let instElemOp (elemFunc: UElemExpr.UElemFuncT) opName cache =
+        let functorCode = CudaElemExpr.generateFunctor opName elemFunc
+        cache.Code <- (KernelFunc, functorCode) :: cache.Code
 
-            // generate functor code
-            let functorCode = CudaElemExpr.generateFunctor functorName elemFunc
-            cache.Code <- (KernelFunc, functorCode) :: cache.Code
-
-            functorName
 
 
 module CudaRecipe =
@@ -331,15 +320,17 @@ module CudaRecipe =
         let streams, eventObjCnt = CudaStreamSeq.execUnitsToStreams euData.ExecUnits
         let timeForStreams = sw.Elapsed
 
+        /// generate ops
+        if Debug.TraceCompile then printfn "Generating ops..."
+        let sw = Stopwatch.StartNew()
+        let tmplInstCache = {Insts = []; Code = []}
+        for KeyValue (elemFunc, opName) in compileEnv.ElemFuncsOpNames do
+            tmplInstCache |> TmplInstCache.instElemOp elemFunc opName
+        let timeForOps = sw.Elapsed
+
         // generate CUDA calls for execution and initialization
         if Debug.TraceCompile then printfn "Generating calls..."
         let sw = Stopwatch.StartNew()
-        let tmplInstCache = {
-            Insts       = []
-            ElemFuncs   = Map.empty
-            ElemFuncCnt = 0
-            Code        = []
-        }
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
             generateAllocAndDispose euData.MemAllocs (List.length streams) eventObjCnt
@@ -353,6 +344,7 @@ module CudaRecipe =
             printfn "Time for building CUDA recipe:"
             printfn "Execution units:        %A" timeForExecUnits
             printfn "Stream generation:      %A" timeForStreams
+            printfn "Op generation:          %A" timeForOps
             printfn "Call generation:        %A" timeForCalls
         if Debug.MemUsage then
             let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)

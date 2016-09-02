@@ -494,9 +494,22 @@ module CudaExecUnit =
         funcName, args
 
     /// execution items for an element-wise operation
-    let execItemsForElements trgt elemFunc srcViews =
-        let elemsOpTmpl = ElementsOpArgTmpl elemFunc
-        let funcName, args = elementsFuncnameAndArgs trgt elemsOpTmpl srcViews
+    let execItemsForElements compileEnv trgt elemFunc srcViews =
+        let opName = 
+            match compileEnv.ElemFuncsOpNames |> Map.tryFind elemFunc with
+            | Some opName -> opName
+            | None ->
+                let id = compileEnv.ElemFuncsOpNames |> Map.toSeq |> Seq.length
+                let opName = sprintf "ElemFunc%dOp" id
+                compileEnv.ElemFuncsOpNames <- compileEnv.ElemFuncsOpNames |> Map.add elemFunc opName
+                opName
+        let opTmplArgs = 
+            srcViews
+            |> List.map (fun (manikin: ArrayNDManikinT) -> manikin.CPPType)
+            |> String.concat ", "
+        let opTypeName = sprintf "%s<%s>" opName opTmplArgs
+
+        let funcName, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews
         let workDims = workDimForElemwise trgt false
         execItemsForKernel funcName args args workDims
 
@@ -850,7 +863,7 @@ module CudaExecUnit =
                     (List.skip 2 srcsDfltCh) srcsDfltCh.[1]
             copyItems @ setItems
         | UNaryOp (Elements (_, elemFunc)) ->
-            execItemsForElements dfltChTrgt elemFunc srcsDfltCh
+            execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 
