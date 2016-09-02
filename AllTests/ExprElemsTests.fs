@@ -164,7 +164,7 @@ let ``Eval and deriv: KSE`` () =
     printfn "dkse / dl=\n%A" dKSe1Val
 
 [<Fact>]
-let ``Eval and derive: lk()`` () =
+let ``Eval and derive: lkse()`` () =
     //input     mu[gp]
     //          sigma[gp,gp]
     //          x[gp,smpl]
@@ -182,33 +182,33 @@ let ``Eval and derive: lk()`` () =
     let sigma = ElemExpr.argElem 1
     let x = ElemExpr.argElem 2
     let l = ElemExpr.argElem 3
-    let lk = sqrt( l[gp]**2.0 / (l[gp]**2.0 + sigma[gp;gp]) ) * exp(- ((mu[gp]- x[gp;smpl])**2.0) / (2.0 * (l[gp]**2.0 + sigma[gp;gp])) )
-    let dLk = ElemExprDeriv.buildDerivElemExpr lk [nGps;nSmpls] 4
+    let lkse = sqrt( l[gp]**2.0 / (l[gp]**2.0 + sigma[gp;gp]) ) * exp(- ((mu[gp]- x[gp;smpl])**2.0) / (2.0 * (l[gp]**2.0 + sigma[gp;gp])) )
+    let dLkse = ElemExprDeriv.buildDerivElemExpr lkse [nGps;nSmpls] 4
 
-    printfn "lk=\n%A" lk
-    printfn "dlk / dmu=\n%A" dLk.[0]
-    printfn "dlk / dSigma=\n%A" dLk.[1]
-    printfn "dlk / dx=\n%A" dLk.[2]
-    printfn "dlk / dl=\n%A" dLk.[3]
+    printfn "lk=\n%A" lkse
+    printfn "dlk / dmu=\n%A" dLkse.[0]
+    printfn "dlk / dSigma=\n%A" dLkse.[1]
+    printfn "dlk / dx=\n%A" dLkse.[2]
+    printfn "dlk / dl=\n%A" dLkse.[3]
 
     let xVal = [[1.0; 1.1; 2.0];[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5;0.6] |> ArrayNDHost.ofList
     let muVal = [1.0;0.5] |> ArrayNDHost.ofList
     let sigmaVal = [[0.4;0.2];[0.2;0.8]] |> ArrayNDHost.ofList2D
-    let lkVal = ElemExpr.eval lk [muVal;sigmaVal;xVal;lVal] [2;3]
+    let lkseVal = ElemExpr.eval lkse [muVal;sigmaVal;xVal;lVal] [2;3]
 
     printfn "mu=\n%A" muVal
     printfn "sigma=\n%A" sigmaVal
     printfn "x=\n%A" xVal
     printfn "l=\n%A" lVal
-    printfn "lk=\n%A" lkVal
+    printfn "lkse=\n%A" lkseVal
 
-    let dlk0Val = ElemExpr.eval dLk.[0] [muVal;sigmaVal;xVal;lVal;lkVal] [2]
-    let dlk1Val = ElemExpr.eval dLk.[1] [muVal;sigmaVal;xVal;lVal;lkVal] [2;2]
-    let dlk2Val = ElemExpr.eval dLk.[2] [muVal;sigmaVal;xVal;lVal;lkVal] [2;3]
-    let dlk3Val = ElemExpr.eval dLk.[3] [muVal;sigmaVal;xVal;lVal;lkVal] [2]
-    printfn "dlk / dmu=\n%A" dlk0Val
-    printfn "dlk / dsigma=\n%A" dlk1Val
-    printfn "dlk / dx=\n%A" dlk2Val
-    printfn "dlk / dl=\n%A" dlk3Val
+    let dlk0Val = ElemExpr.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;lkseVal] [2]
+    let dlk1Val = ElemExpr.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;lkseVal] [2;2]
+    let dlk2Val = ElemExpr.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;lkseVal] [2;3]
+    let dlk3Val = ElemExpr.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;lkseVal] [2]
+    printfn "dlkse / dmu=\n%A" dlk0Val
+    printfn "dlkse / dsigma=\n%A" dlk1Val
+    printfn "dlkse / dx=\n%A" dlk2Val
+    printfn "dlkse / dl=\n%A" dlk3Val
 
