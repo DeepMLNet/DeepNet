@@ -137,6 +137,8 @@ module Expr =
 
         /// evaluate all subexpressions but discard them
         | Discard        
+        /// elementwise calculated tensor
+        | Elements of ShapeSpecT * ElemExpr.ElemExprT<'T>
         /// extension op
         | ExtensionOp of IOp<'T>
    
@@ -365,6 +367,7 @@ module Expr =
 
         // misc
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
+        | Nary(Elements (resShape, elemExpr), _) -> resShape
         | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
 
     /// number of elements 
@@ -469,6 +472,7 @@ module Expr =
                 opBeingChecked <- sprintf "%A" op
 
                 match op with
+                | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
                 | ExtensionOp eop -> eop.CheckArgs ss
                 | _ -> ()
 
@@ -497,6 +501,8 @@ module Expr =
         | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
+        | Nary (Elements (trgtShp, elemExpr), es) -> 
+            Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
         | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
@@ -519,6 +525,10 @@ module Expr =
             SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a && canEvalAllSymSizes b
         | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
 
+        | Nary (Elements (trgtShp, elemExpr), es) -> 
+            ShapeSpec.canEval trgtShp && 
+            ElemExpr.canEvalAllSymSizes elemExpr && 
+            List.forall canEvalAllSymSizes es
         | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall canEvalAllSymSizes es
         | Nary (op, es) -> List.forall canEvalAllSymSizes es
 
@@ -911,6 +921,9 @@ module Expr =
     /// No error is raised in that case.
     let invert a =
         Unary(Invert, a) |> check
+
+    let elements trgtShp elemExpr args =
+        Nary (Elements (trgtShp, elemExpr), args) |> check
 
 
 

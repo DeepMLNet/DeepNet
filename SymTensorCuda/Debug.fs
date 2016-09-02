@@ -22,3 +22,6 @@ module Debug =
 
     /// prints each compile step during compilation
     let mutable TraceCompile = false
+
+    /// dumps kernel code before it is compiled
+    let mutable DumpCode = true

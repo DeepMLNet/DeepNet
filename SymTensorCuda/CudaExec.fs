@@ -81,10 +81,22 @@ module Compile =
     /// removes a compile directory
     let removeCompileDir compileDir =
         Directory.Delete(compileDir, true)       
+
+    /// code files writted so far
+    let mutable codeDumpCnt = 0
+
+    /// writes code to a file
+    let dumpCode code =
+        let filename = sprintf "mod%d.cu" codeDumpCnt
+        File.WriteAllText (filename, code)
+        printfn "Dumped code to %s" (Path.GetFullPath filename)
+        codeDumpCnt <- codeDumpCnt + 1
    
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
     let loadKernelCode modCode krnlNames =
+        if Debug.DumpCode then dumpCode modCode
+
         let compileDir, modPath, headerHashes = prepareCompileDir modCode
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)

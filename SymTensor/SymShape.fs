@@ -27,6 +27,9 @@ module SizeSymbol =
     let name sym =
         sym.Name
 
+    let ofName name =
+        {Name=name}
+
 
 //[<AutoOpen>]
 module SizeProductTypes = 
@@ -469,6 +472,43 @@ module ShapeSpec =
     /// evaluates shape to numeric shape
     let eval (sa: ShapeSpecT) : NShapeSpecT =
         List.map (SizeSpec.eval) sa
+
+    /// substitute the symbols into the ShapeSpec and simplifies it
+    let substSymbols symVals (sa: ShapeSpecT) : ShapeSpecT =
+        List.map (SizeSpec.substSymbols symVals) sa
+
+
+    type SolutionT = {
+        LeftValues:     Map<SizeSymbolT, SizeSpecT>
+        RightValues:    Map<SizeSymbolT, SizeSpecT>
+    }        
+
+    let solve (left: ShapeSpecT) (right: SizeSymbolT list) =
+        if left.Length <> right.Length then failwith "dimension mismatch"
+        if right |> Set.ofList |> Set.count <> right.Length then
+            failwith "symbols on the right must be unique"
+        
+        let leftValues = Dictionary<SizeSymbolT, SizeSpecT>()
+        let rightValues = Dictionary<SizeSymbolT, SizeSpecT>()
+
+        for l, r in List.zip left right do
+            match l with
+            | Base (Fixed _)
+            | Broadcast -> 
+                rightValues.Add (r, l)
+            | Base (Sym s) ->
+                if leftValues.ContainsKey s then
+                    let pv = leftValues.[s]
+                    rightValues.Add (r, pv)
+                else
+                    leftValues.Add (s, Base (Sym r))
+            | Multinom _ -> failwith "cannot solve with multinoms"
+                
+        {
+            LeftValues = leftValues |> Map.ofDictionary
+            RightValues = rightValues |> Map.ofDictionary
+        }
+                
 
 
 [<AutoOpen>]

@@ -119,7 +119,7 @@ module Deriv =
             | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
                           ((egExpanded * (padLeft a)) |> collapse)
             | Divide -> eg |> reverseDiffStep (a * b ** (-one()))
-            | Modulo -> eg .+ (padLeft (-truncate (a / b)) |> collapse)
+            | Modulo -> eg .+ (padLeft (-truncate (a / b)) |> collapse) // TODO: FIXME
             | Power -> (egExpanded * padLeft (b * a**(b - one())) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
             | Dot -> 
@@ -155,6 +155,15 @@ module Deriv =
 
         | Nary(op, es) ->
             match op with
+            | Elements (resShape, elemExpr) ->
+                let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape (es.Length)
+                let des = 
+                    List.zip es desElemExprs
+                    |> List.map (fun (e, deElemExpr) -> 
+                        let deShp = funElems :: (shapeOf e)
+                        let deArgs = es @ [egExpanded]
+                        Expr.elements deShp deElemExpr deArgs |> collapse)
+                totalDerivates es des
             | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
