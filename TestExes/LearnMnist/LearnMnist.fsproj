@@ -37,6 +37,60 @@
     <DocumentationFile>bin\Release\LearnMnist.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.VisualStudio.Profiler">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Microsoft Visual Studio 14.0\Team Tools\Performance Tools\x64\Microsoft.VisualStudio.Profiler.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Program.fs" />
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
+      <Name>DeepNet</Name>
+      <Project>{7c53d1c7-8ed2-4e04-8f2d-cf0384c51f33}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MLDatasets\MLDatasets.fsproj">
+      <Name>MLDatasets</Name>
+      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MLModels\MLModels.fsproj">
+      <Name>MLModels</Name>
+      <Project>{28168025-4211-4de2-bb66-b267378f74a7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MLOptimizers\MLOptimizers.fsproj">
+      <Name>MLOptimizers</Name>
+      <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\SymTensorCuda\SymTensorCuda.fsproj">
+      <Name>SymTensorCuda</Name>
+      <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\SymTensor\SymTensor.fsproj">
+      <Name>SymTensor</Name>
+      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Tensor\Tensor.fsproj">
+      <Name>Tensor</Name>
+      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
@@ -76,62 +130,6 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
-  <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Program.fs" />
-    <None Include="App.config" />
-    <Content Include="packages.config" />
-    <None Include="Microsoft.VisualStudio.Profiler.dll" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="Microsoft.VisualStudio.Profiler" />
-    <Reference Include="Microsoft.VisualStudio.Utilities">
-      <HintPath>..\..\packages\Microsoft.VisualStudio.Utilities.14.3.25407\lib\net45\Microsoft.VisualStudio.Utilities.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
-      <Name>DeepNet</Name>
-      <Project>{7c53d1c7-8ed2-4e04-8f2d-cf0384c51f33}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\MLDatasets\MLDatasets.fsproj">
-      <Name>MLDatasets</Name>
-      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\MLModels\MLModels.fsproj">
-      <Name>MLModels</Name>
-      <Project>{28168025-4211-4de2-bb66-b267378f74a7}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\MLOptimizers\MLOptimizers.fsproj">
-      <Name>MLOptimizers</Name>
-      <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\SymTensorCuda\SymTensorCuda.fsproj">
-      <Name>SymTensorCuda</Name>
-      <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\SymTensor\SymTensor.fsproj">
-      <Name>SymTensor</Name>
-      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Tensor\Tensor.fsproj">
-      <Name>Tensor</Name>
-      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
