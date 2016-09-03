@@ -788,7 +788,7 @@ module Expr =
             let stShp = shapeOf st
             Binary (SetSubtensor srs, t, Unary (Reshape stShp, b)) |> check
         | _ ->
-            failwith "the first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]"
+            invalidArg "a" "the first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]"
 
     type ExprT with
         // item / slicing
