@@ -141,11 +141,7 @@ module GPActivationLayer =
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls pars.HyperPars.NGPs pars.HyperPars.NTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-
-
-
-        
-
+     
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
         // is equivalent to: [gp, trn_smpl, 1*] * [gp, 1*, trn_smpl]
@@ -160,15 +156,20 @@ module GPActivationLayer =
             Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
 
-        // (Kk_inv - betaBetaT) .*  L
-        // [gp, trn_smpl] .* [smpl, gp, trn_smpl1, trn_smpl2]
+        // Tr( (Kk_inv - betaBetaT) .*  L )
+        // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
+        //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
+        let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
 
-        // ([gp,trn_smpl,trn_smpl] - [trn_smpl,gp].*[gp,trn_Smpl]) * [smpl,gp,trn_smpl,trn_smpl] 
-        let var1 =  (Kk_inv - (Expr.transpose beta).*beta)|> Expr.padLeft |> (*) L |> Expr.diag  |> Expr.sum
-        let var2 = (Expr.transpose lk).*lk .* (Expr.transpose beta).* beta |> Expr.diag  |> Expr.sum
-        let var = 1.0f - var1 - var2
-        pred_mean
+        // Tr( lkLkT .* betaBeta.T )
+        // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
+        //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
+        let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
 
+        let pred_var = 1.0f - var1 - var2
+
+
+        pred_mean, pred_var
 
 
 
