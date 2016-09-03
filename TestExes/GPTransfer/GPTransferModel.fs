@@ -4,7 +4,7 @@ open ArrayNDNS
 open SymTensor
 
 
-module GPActivationLayer =
+module MultiGPLayer =
 
     type HyperPars = {
         /// number of units, i.e. number of GPs
