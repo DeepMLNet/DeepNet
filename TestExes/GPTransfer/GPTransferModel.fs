@@ -137,7 +137,7 @@ module MultiGPLayer =
 
         let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
                    ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
         let e = exp(-eNom / eDnm)
         let Tnom = e * l[gp1] * l[gp2]
 
