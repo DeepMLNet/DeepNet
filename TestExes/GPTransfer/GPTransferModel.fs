@@ -63,7 +63,7 @@ module GPActivationLayer =
         let sigma = ElemExpr.argElem 2
         let kse =
             exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) ) +
-            ElemExpr.kroneckerIf trn_smpl1 trn_smpl2 (sigma [gp; trn_smpl1])
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (sigma [gp; trn_smpl1]) (ElemExpr.zero())
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
@@ -143,11 +143,27 @@ module GPActivationLayer =
 
         let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]**2.f
         let sq2Nom = s[smpl;gp1;gp2]**2.f - (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2])
-        let sq2Dnm = s[smpl;gp1;gp2]**2/f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
+        let sq2Dnm = s[smpl;gp1;gp2]**2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
         let T = Tnom / Tdnm
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
+
+
+    let setCovDiag nSmpls nGps cov var =
+        // replace covariance matrix diagonal by variance
+        // inputs  cov[smpl, gp1, gp2]
+        //         var[smpl, gp
+        // output  cov[smpl, gp1, gp2]
+        let smpl = ElemExpr.idx 0
+        let gp1 = ElemExpr.idx 1
+        let gp2 = ElemExpr.idx 2
+        let c = ElemExpr.argElem 0
+        let v = ElemExpr.argElem 1
+
+        let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
+        Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
+
 
     let pred pars mu sigma =
         // mu:    input mean        [smpl, gp]
@@ -213,14 +229,14 @@ module GPActivationLayer =
         // ==> [smpl, gp1, gp2]
         let bc = SizeSpec.broadcastable
         let one = SizeSpec.one
-        let pred_cov = 
+        let pred_cov_without_var = 
             (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
             (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
 
-        //Expr.setSubtensor
+        // replace diagonal in pred_cov_without_var by pred_var
+        let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
 
-
-        pred_mean, pred_var, pred_cov
+        pred_mean, pred_cov
 
 
 
