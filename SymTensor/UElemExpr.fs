@@ -39,7 +39,6 @@ module UElemExpr =
         | Round
         | Truncate
         | Sum of SizeSymbolT * SizeSpecT * SizeSpecT
-        | KroneckerIf of SizeSpecT * SizeSpecT
         | KroneckerRng of SizeSpecT * SizeSpecT * SizeSpecT
 
     and UBinaryOpT = 
@@ -49,6 +48,8 @@ module UElemExpr =
         | Divide                        
         | Modulo
         | Power        
+        | IfThenElse of SizeSpecT * SizeSpecT
+
         
     and UOpT =
         | ULeafOp of ULeafOpT
@@ -102,7 +103,6 @@ module UElemExpr =
         | Unary (ElemExpr.Round, a)         -> unary Round a
         | Unary (ElemExpr.Truncate, a)      -> unary Truncate a
         | Unary (ElemExpr.Sum (sym, first, last), a) -> unary (Sum (sym, first, last)) a
-        | Unary (ElemExpr.KroneckerIf (left, right), a) -> unary (KroneckerIf (left, right)) a
         | Unary (ElemExpr.KroneckerRng (s, first, last), a) -> unary (KroneckerRng (s, first, last)) a
 
         | Binary (ElemExpr.Add, a, b)       -> binary Add a b
@@ -110,7 +110,8 @@ module UElemExpr =
         | Binary (ElemExpr.Multiply, a, b)  -> binary Multiply a b                     
         | Binary (ElemExpr.Divide, a, b)    -> binary Divide a b             
         | Binary (ElemExpr.Modulo, a, b)    -> binary Modulo a b          
-        | Binary (ElemExpr.Power, a, b)     -> binary Power a b               
+        | Binary (ElemExpr.Power, a, b)     -> binary Power a b  
+        | Binary (ElemExpr.IfThenElse (left, right), a, b) -> binary (IfThenElse (left, right)) a b
             
 
     /// converts an element expression to a unified element function

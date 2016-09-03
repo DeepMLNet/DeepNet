@@ -97,8 +97,6 @@ module CudaElemExpr =
             | Round -> sprintf "round(%s)" av
             | Truncate -> sprintf "trunc(%s)" av
             | Sum _ -> failwith "not a simple value"
-            | KroneckerIf (left, right) -> 
-                sprintf "((%s) == (%s)) ? %s : 0" (ssCode left) (ssCode right) av 
             | KroneckerRng (s, first, last) ->
                 sprintf "((%s) <= (%s) && (%s) <= (%s)) ? %s : 0"
                     (ssCode first) (ssCode s) (ssCode s) (ssCode last) av
@@ -112,6 +110,9 @@ module CudaElemExpr =
             | Divide -> sprintf "%s / %s" av bv
             | Modulo -> sprintf "%s %% %s" av bv
             | Power -> sprintf "pow(%s, %s)" av bv
+            | IfThenElse (left, right) ->
+                sprintf "((%s) == (%s)) ? %s : %s" (ssCode left) (ssCode right) av bv
+
 
 
     /// generates a functor that evaluates the UElemFuncT

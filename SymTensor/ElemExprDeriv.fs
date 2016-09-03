@@ -52,7 +52,6 @@ module ElemExprDeriv =
             | Round -> Map.empty
             | Truncate -> Map.empty
             | Sum (sym, first, last) -> eg |> kroneckerRng (Base (Sym sym)) first last |> rds a
-            | KroneckerIf (left, right) -> eg |> kroneckerIf left right |> rds a
             | KroneckerRng (sym, first, last) -> eg |> kroneckerRng sym first last |> rds a                
 
         | Binary (op, a, b) ->
@@ -66,6 +65,8 @@ module ElemExprDeriv =
             | Divide -> eg |> rds (a * b ** (-one()))
             | Modulo -> eg .+ (-truncate (a / b))    // TODO: FIXME
             | Power -> (eg * b * a**(b - one())) .+ (eg * a**b * log a)
+            | IfThenElse (left, right) -> 
+                ifThenElse left right eg (zero()) .+ ifThenElse left right (zero()) eg 
 
 
     let compute (expr: ElemExprT<'T>) : DerivT<'T> =
@@ -136,8 +137,7 @@ module ElemExprDeriv =
                         let argExpr =
                             (argExprSumed, sol.RightValues)
                             ||> Map.fold (fun kroneckersSoFar idxSym reqVal ->
-                                ElemExpr.kroneckerIf (Base (Sym idxSym)) reqVal kroneckersSoFar
-                            )
+                                ElemExpr.ifThenElse (Base (Sym idxSym)) reqVal kroneckersSoFar (ElemExpr.zero()))
 
                         // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
                         let resSyms = [for d=1 to nArgDims do yield idx d]

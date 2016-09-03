@@ -41,7 +41,6 @@ module ElemExpr =
         | Round
         | Truncate
         | Sum of SizeSymbolT * SizeSpecT * SizeSpecT
-        | KroneckerIf of SizeSpecT * SizeSpecT
         | KroneckerRng of SizeSpecT * SizeSpecT * SizeSpecT
 
     and BinaryOpT<'T> = 
@@ -51,6 +50,7 @@ module ElemExpr =
         | Divide                        
         | Modulo
         | Power        
+        | IfThenElse of SizeSpecT * SizeSpecT
         
     and ElemExprT<'T> =
         | Leaf of LeafOpT<'T>
@@ -129,30 +129,38 @@ module ElemExpr =
     /// scalar 2 of appropriate type
     let inline two<'T> () = scalart<'T> 2
            
+    /// index symbol for given dimension of the result
     let idxSymbol dim =
         sprintf "R%d" dim
         |> SizeSymbol.ofName
 
+    /// index size of given dimension of the result
     let idx dim =
         Base (Sym (idxSymbol dim))
 
+    /// summation symbol of given name
     let sumSymbol name =
         sprintf "SUM_%s" name 
         |> SizeSymbol.ofName
 
+    /// summation index size of given name
     let sumIdx name =
         Base (Sym (sumSymbol name))
 
+    /// sum exprover given index (created by sumIdx) from first to last
     let sum idx first last expr =
         match idx with
         | Base (Sym (sumSym)) ->
             Unary (Sum (sumSym, first, last), expr) 
         | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
 
-
     /// expr if left = right, otherwise 0.
-    let kroneckerIf left right expr =
-        Unary (KroneckerIf (left, right), expr)
+//    let kroneckerIf left right expr =
+//        Unary (KroneckerIf (left, right), expr)
+
+    /// If left=right, then thenExpr else elseExpr.
+    let ifThenElse left right thenExpr elseExpr =
+        Binary (IfThenElse (left, right), thenExpr, elseExpr)
 
     /// expr if first <= sym <= last, otherwise 0.
     let kroneckerRng sym first last expr =
@@ -252,11 +260,6 @@ module ElemExpr =
                         let sumElem = 
                             doEval (symVals |> Map.add sym (SizeSpec.fix symVal)) a
                         typedApply2 (unsp) (+) (+) (+) (+) sumSoFar sumElem) 
-                | KroneckerIf (left, right) ->
-                    let leftVal = left |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let rightVal = right |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    if leftVal = rightVal then av ()
-                    else conv<'T> 0
                 | KroneckerRng (s, first, last) ->
                     let sVal = s |> SizeSpec.substSymbols symVals |> SizeSpec.eval
                     let firstVal = first |> SizeSpec.substSymbols symVals |> SizeSpec.eval
@@ -265,14 +268,19 @@ module ElemExpr =
                     else conv<'T> 0
 
             | Binary (op, a, b) ->
-                let av, bv = doEval symVals a, doEval symVals b
+                let av () = doEval symVals a
+                let bv () = doEval symVals b
                 match op with
-                | Add  ->       typedApply2 (unsp) (+) (+) (+) (+) av bv                 
-                | Substract ->  typedApply2 (unsp) (-) (-) (-) (-) av bv                
-                | Multiply ->   typedApply2 (unsp) (*) (*) (*) (*) av bv                      
-                | Divide ->     typedApply2 (unsp) (/) (/) (/) (/) av bv                        
-                | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) av bv
-                | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) av bv
+                | Add  ->       typedApply2 (unsp) (+) (+) (+) (+) (av()) (bv())                 
+                | Substract ->  typedApply2 (unsp) (-) (-) (-) (-) (av()) (bv())              
+                | Multiply ->   typedApply2 (unsp) (*) (*) (*) (*) (av()) (bv())                  
+                | Divide ->     typedApply2 (unsp) (/) (/) (/) (/) (av()) (bv())                    
+                | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) (av()) (bv())
+                | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (av()) (bv())
+                | IfThenElse (left, right) ->
+                    let leftVal = left |> SizeSpec.substSymbols symVals |> SizeSpec.eval
+                    let rightVal = right |> SizeSpec.substSymbols symVals |> SizeSpec.eval
+                    if leftVal = rightVal then av () else bv ()
 
         let initialSymVals =
             seq {for dim, idx in List.indexed idxs do yield (idxSymbol dim, idx)}
@@ -323,11 +331,11 @@ module ElemExpr =
 
         | Unary (Sum (sym, first, last), a) -> 
             Unary (Sum (sym, sSize first, sSize last), sSub a)
-        | Unary (KroneckerIf (left, right), a) ->
-            Unary (KroneckerIf (sSize left, sSize right), sSub a)
         | Unary (KroneckerRng (sym, first, last), a) ->
             Unary (KroneckerRng (sSize sym, sSize first, sSize last), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
+        | Binary (IfThenElse (left, right), a, b) ->
+            Binary (IfThenElse (sSize left, sSize right), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
     let canEvalAllSymSizes expr =
@@ -343,16 +351,16 @@ module ElemExpr =
                 SizeSpec.canEval first && 
                 SizeSpec.canEval last && 
                 canEval (a |> substSymSizes sumSymVals)
-            | Unary (KroneckerIf (left, right), a) ->
-                SizeSpec.canEval left && 
-                SizeSpec.canEval right &&
-                canEval a
             | Unary (KroneckerRng (sym, first, last), a) ->
                 SizeSpec.canEval sym && 
                 SizeSpec.canEval first && 
                 SizeSpec.canEval last &&
                 canEval a
             | Unary (op, a) -> canEval a
+            | Binary (IfThenElse (left, right), a, b) ->
+                SizeSpec.canEval left && 
+                SizeSpec.canEval right &&
+                canEval a && canEval b
             | Binary (op, a, b) -> canEval a && canEval b
 
         // replace output indices by ones before testing for evaluability
