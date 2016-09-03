@@ -57,9 +57,10 @@ module Program =
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
 
-        let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList
-        let inp_cov_val = [|[|[|1.0f; 0.0f|]
-                              [|0.0f; 0.0f|]|]|] 
+        let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList2D
+        let inp_cov_val =  Array3D.zeroCreate 1 2 2
+        inp_cov_val.[0,0,0] <- 1.0f
+        let inp_cov_val = inp_cov_val |> ArrayNDHost.ofArray3D
 
         pred_mean_cov_fn inp_mean_val inp_cov_val
 
@@ -70,6 +71,8 @@ module Program =
         //MathInterface.doMathTest2 ()
 
         //testSquaredExponentialCovarianceMatrix ()
+
+        testMultiGPLayer () |> ignore
 
         0
 
