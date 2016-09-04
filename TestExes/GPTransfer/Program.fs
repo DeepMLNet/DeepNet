@@ -57,12 +57,19 @@ module Program =
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
 
-        let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList2D
+        let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
         let inp_cov_val =  Array3D.zeroCreate 1 2 2
         inp_cov_val.[0,0,0] <- 1.0f
-        let inp_cov_val = inp_cov_val |> ArrayNDHost.ofArray3D
+        let inp_cov_val = inp_cov_val |> ArrayNDHost.ofArray3D |> ArrayNDCuda.toDev
 
-        pred_mean_cov_fn inp_mean_val inp_cov_val
+        let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
+
+        printfn "inp_mean=\n%A" inp_mean_val
+        printfn "inp_cov=\n%A" inp_cov_val
+        printfn ""
+        printfn "pred_mean=\n%A" pred_mean
+        printfn "pred_cov=\n%A" pred_cov
+
 
 
     [<EntryPoint>]

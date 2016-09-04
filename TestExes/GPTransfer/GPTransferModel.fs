@@ -226,12 +226,14 @@ module MultiGPLayer =
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         // beta[gp1, trn_smpl1].T .* T[gp1,gp2, trn_smpl1, trn_smpl2] .* beta[gp2, trn_smpl2]
         // [1*, gp1, 1*, 1, trn_smpl1] .* [smpl, gp1, gp2, trn_smpl1, trn_smpl2] .* [1*, 1*, gp2, trn_smpl2, 1]
-        // ==> [smpl, gp1, gp2]
+        // ==> [smpl, gp1, gp2, 1, 1]
         let bc = SizeSpec.broadcastable
         let one = SizeSpec.one
         let pred_cov_without_var = 
             (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
             (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
+        let pred_cov_without_var =
+            pred_cov_without_var |> Expr.reshape [nSmpls; nGps; nGps]
 
         // replace diagonal in pred_cov_without_var by pred_var
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
