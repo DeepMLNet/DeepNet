@@ -8,9 +8,11 @@ open VarSpec
 
 module ElemExpr =
 
+    /// argument 
     type ArgT =
     | Arg of int
 
+    /// element of an argument
     type ArgElementSpecT = ArgT * ShapeSpecT
     
 
@@ -52,15 +54,16 @@ module ElemExpr =
         | Power        
         | IfThenElse of SizeSpecT * SizeSpecT
         
+    /// an element expression
     and ElemExprT<'T> =
         | Leaf of LeafOpT<'T>
         | Unary of UnaryOpT<'T> * ElemExprT<'T>
         | Binary of BinaryOpT<'T> * ElemExprT<'T> * ElemExprT<'T>
         
-
+    /// a constant value
     let scalar a =
         Leaf (Const a)
-          
+              
     type ElemExprT<'T> with
 
         // elementwise unary
@@ -154,10 +157,6 @@ module ElemExpr =
             Unary (Sum (sumSym, first, last), expr) 
         | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
 
-    /// expr if left = right, otherwise 0.
-//    let kroneckerIf left right expr =
-//        Unary (KroneckerIf (left, right), expr)
-
     /// If left=right, then thenExpr else elseExpr.
     let ifThenElse left right thenExpr elseExpr =
         Binary (IfThenElse (left, right), thenExpr, elseExpr)
@@ -167,10 +166,35 @@ module ElemExpr =
         Unary (KroneckerRng (sym, first, last), expr)
 
     /// the element with index idx of the n-th argument
-    let argElem n idx =
-        Leaf (ArgElement (Arg n, idx))
+    let argElem pos idx =
+        Leaf (ArgElement (Arg pos, idx))
 
-    
+    type Argument1D (pos: int) =       
+        member this.Item with get (i0) = argElem pos [i0]
+    type Argument2D (pos: int) =       
+        member this.Item with get (i0, i1) = argElem pos [i0; i1]
+    type Argument3D (pos: int) =       
+        member this.Item with get (i0, i1, i2) = argElem pos [i0; i1; i2]
+    type Argument4D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3) = argElem pos [i0; i1; i2; i3]
+    type Argument5D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4) = argElem pos [i0; i1; i2; i3; i4]
+    type Argument6D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4, i5) = argElem pos [i0; i1; i2; i3; i4; i5]
+
+    /// 1-dimensional argument at given position
+    let arg1D pos = Argument1D pos
+    /// 2-dimensional argument at given position
+    let arg2D pos = Argument2D pos
+    /// 3-dimensional argument at given position
+    let arg3D pos = Argument3D pos
+    /// 4-dimensional argument at given position
+    let arg4D pos = Argument4D pos
+    /// 5-dimensional argument at given position
+    let arg5D pos = Argument5D pos
+    /// 6-dimensional argument at given position
+    let arg6D pos = Argument6D pos
+   
     let inline uncheckedApply (f: 'T -> 'T) (a: 'S) : 'S =
         let av = a |> box |> unbox
         f av |> box |> unbox
@@ -297,6 +321,7 @@ module ElemExpr =
             ArrayND.set idx ev res
         res
 
+    /// returns the required number of arguments of the element expression
     let rec requiredNumberOfArgs expr =
         match expr with
         | Leaf (ArgElement (Arg n, _)) -> 
@@ -309,16 +334,30 @@ module ElemExpr =
     
     /// checks if the arguments' shapes are compatible with the result shape        
     let checkArgShapes (expr: ElemExprT<'T>) (argShapes: ShapeSpecT list) (resShape: ShapeSpecT) =
+        // check number of arguments
         let nArgs = List.length argShapes
         let nReqArgs = requiredNumberOfArgs expr       
         if nReqArgs > nArgs then
             failwithf "the element expression requires at least %d arguments but only %d arguments were specified"
                 nReqArgs nArgs
 
-        // TODO
-        ()
+        // check dimensionality of arguments
+        let rec checkDims expr =
+            match expr with
+            | Leaf (ArgElement (Arg n, idx)) ->
+                let idxDim = ShapeSpec.nDim idx
+                let argDim = ShapeSpec.nDim argShapes.[n]
+                if idxDim <> argDim then
+                    failwithf 
+                        "the argument with zero-based index %d has %d dimensions but was used  \
+                         with %d dimensions in the element expression" n argDim idxDim
+            | Leaf _ -> ()
 
+            | Unary (_, a) -> checkDims a
+            | Binary (_, a, b) -> checkDims a; checkDims b
+        checkDims expr
 
+    /// substitutes the specified size symbols with their replacements 
     let rec substSymSizes symSizes expr = 
         let sSub = substSymSizes symSizes
         let sSize = SymSizeEnv.subst symSizes
@@ -338,6 +377,7 @@ module ElemExpr =
             Binary (IfThenElse (sSize left, sSize right), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
+    /// true if all size symbols can be evaluated to numeric values 
     let canEvalAllSymSizes expr =
         let rec canEval expr =  
             match expr with
