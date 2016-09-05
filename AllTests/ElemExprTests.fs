@@ -235,6 +235,7 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     printfn "dkse / dl=\n%A" dKsedLVal
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Eval and deriv: KSE in Expr on CUDA`` () =   
     // input  x[gp, smpl]
     //        l[gp]
@@ -288,6 +289,7 @@ let kseElemExpr () =
     exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) )
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Trace compare: KSE`` () =    
     let nGps = 2
     let nSmpls = 3
@@ -299,8 +301,8 @@ let ``Trace compare: KSE`` () =
         kse    
     )
 
-
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Trace compare: dKSE/dX`` () =    
     let nGps = 2
     let nSmpls = 3
@@ -314,6 +316,7 @@ let ``Trace compare: dKSE/dX`` () =
     )
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Trace compare: dKSE/dL`` () =    
     let nGps = 2
     let nSmpls = 3
