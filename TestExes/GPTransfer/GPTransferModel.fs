@@ -2,7 +2,7 @@
 
 open ArrayNDNS
 open SymTensor
-
+open System
 
 module MultiGPLayer =
 
@@ -12,6 +12,7 @@ module MultiGPLayer =
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
+
     }
 
     type Pars = {
@@ -28,8 +29,9 @@ module MultiGPLayer =
         HyperPars:          HyperPars
     }
 
+
     let internal initLengthscales seed (shp: int list) : ArrayNDHostT<'T> = 
-        ArrayNDHost.zeros shp
+         ArrayNDHost.zeros shp
 
     let internal initTrnX seed (shp: int list) : ArrayNDHostT<'T> = 
         ArrayNDHost.zeros shp
@@ -39,7 +41,6 @@ module MultiGPLayer =
 
     let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<'T> = 
         ArrayNDHost.zeros shp
-
 
     let pars (mb: ModelBuilder<_>) hp = {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               initLengthscales)

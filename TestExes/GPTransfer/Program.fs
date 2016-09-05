@@ -3,7 +3,7 @@
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
-
+open System
 
 module Program =
 
@@ -12,6 +12,26 @@ module Program =
         else x 
     
     let testMultiGPLayer device =
+        
+        let seed = 1
+        let rand = Random(seed)
+
+        let ngps = 3
+        let ntraining = 10
+        let ntest = 10
+
+        let lhost = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
+        let l = lhost |> ArrayNDCuda.toDev
+        let trn_xhost =  rand.UniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+
+
+        let trn_x = trn_xhost  |> ArrayNDCuda.toDev
+        let trn_thost = rand.UniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+        let trn_t = trn_thost  |> ArrayNDCuda.toDev
+        let trn_sigmahost = rand.UniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+        let trn_sigma = trn_sigmahost  |> ArrayNDCuda.toDev
+        
+        
         let mb = ModelBuilder<single> "Test"
 
         let nSmpls    = mb.Size "nSmpls"
@@ -20,12 +40,11 @@ module Program =
         
         let mgp = 
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
-
         let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nGPs]
         let inp_cov   : ExprT<single> = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
 
-        mb.SetSize nGPs      2
-        mb.SetSize nTrnSmpls 3
+        mb.SetSize nGPs      3
+        mb.SetSize nTrnSmpls 10
         let mi = mb.Instantiate device
 
         let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
@@ -33,26 +52,15 @@ module Program =
 
 
 
-        mi.ParameterStorage.[!mgp.Lengthscales] <- [1.0f; 1.0f] 
-                                                   |> ArrayNDHost.ofList
-                                                   |> post device
-        mi.ParameterStorage.[!mgp.TrnX] <- [[1.0f; 2.0f; 2.5f]
-                                            [4.1f; 4.3f; 4.4f]] 
-                                           |> ArrayNDHost.ofList2D
-                                           |> post device
-        mi.ParameterStorage.[!mgp.TrnT] <- [[1.0f; 2.0f; 2.5f]
-                                            [4.1f; 4.3f; 4.4f]] 
-                                           |> ArrayNDHost.ofList2D
-                                           |> post device
-        mi.ParameterStorage.[!mgp.TrnSigma] <- [[0.0f; 0.0f; 0.0f]
-                                                [0.0f; 0.0f; 0.0f]] 
-                                               |> ArrayNDHost.ofList2D
-                                               |> post device
 
-        let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList2D |> post device
-        let inp_cov_val =  Array3D.zeroCreate 1 2 2
-        //inp_cov_val.[0,0,0] <- 1.0f
-        let inp_cov_val = inp_cov_val |> ArrayNDHost.ofArray3D |> post device
+
+        for i in [0..9] do
+
+            let inp_meanhost = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
+            let inp_mean_val = inp_meanhost |> ArrayNDCuda.toDev
+
+            let inp_covhost =  rand.UniformArrayND (-5.0f ,5.0f) [1;ngps;ngps]
+            let inp_cov_val = inp_covhost |> ArrayNDCuda.toDev
 
         let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
 
