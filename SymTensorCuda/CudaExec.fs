@@ -414,32 +414,10 @@ module CudaExprWorkspaceTypes =
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
 
-                // trace
-                | Trace (uexpr, res) ->
-                    try
-                        CudaSup.context.Synchronize ()
-                    with :? CudaException as ex ->
-                        printfn "CUDA exception during trace: %A" ex
-                        match previousCall with
-                        | Some pc -> printfn "Last call was %A" pc
-                        | None -> ()
-
-                        let crashTraceFile = "crash_trace.txt"
-                        use tw = File.CreateText crashTraceFile
-                        Trace.dumpActiveTrace tw
-                        printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
-                        reraise()
-
-                    let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = resDev.ToHost()
-                    let msg = sprintf "previous call: %A" previousCall
-                    Trace.exprEvaledWithMsg uexpr resHost msg
-
                 // ======================= ExecItems execution ===================================================
 
                 | ExecItem (CudaExecItemT.LaunchKernel _, _)
                 | ExecItem (CudaExecItemT.CallCFunc _, _)
-                | ExecItem (CudaExecItemT.Trace _, _)
                     -> failwith "these ExecItems must be translated to CudaExecItems"
 
                 // memory operations
@@ -538,6 +516,33 @@ module CudaExprWorkspaceTypes =
 
                 | ExecItem (ExtensionExecItem eei, strm) ->
                     eei.Execute execEnv strm
+
+                | ExecItem (PrintWithMsg (msg, res), strm) ->
+                    CudaSup.context.Synchronize ()
+                    let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
+                    let resHost = resDev.ToHost()    
+                    printfn "%s=\n%A\n" msg resHost                
+
+                // trace
+                | ExecItem (Trace (uexpr, res), _) ->
+                    try
+                        CudaSup.context.Synchronize ()
+                    with :? CudaException as ex ->
+                        printfn "CUDA exception during trace: %A" ex
+                        match previousCall with
+                        | Some pc -> printfn "Last call was %A" pc
+                        | None -> ()
+
+                        let crashTraceFile = "crash_trace.txt"
+                        use tw = File.CreateText crashTraceFile
+                        Trace.dumpActiveTrace tw
+                        printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
+                        reraise()
+
+                    let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
+                    let resHost = resDev.ToHost()
+                    let msg = sprintf "previous call: %A" previousCall
+                    Trace.exprEvaledWithMsg uexpr resHost msg
 
                 previousCall <- Some call
 

@@ -46,6 +46,7 @@ module CudaExecUnitTypes =
         | ExtensionExecItem of ICudaExecItem
         // misc
         | Trace of UExprT * ArrayNDManikinT
+        | PrintWithMsg of string * ArrayNDManikinT
 
 
     type SrcReqsHelpersT = {
@@ -234,6 +235,7 @@ module CudaExecUnit =
             | LocHost -> dfltSrcWithNoViewReq
             | loc -> unsupLoc loc
         // misc
+        | UUnaryOp (Print _) -> inplaceFirstSrcReq
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
         // binary element-wise
@@ -399,6 +401,7 @@ module CudaExecUnit =
             // output of StoreToVar is empty 
             newDfltChTrgt ()
         // misc
+        | UUnaryOp (Print _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
         | UUnaryOp (Annotated _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
 
         // binary element-wise
@@ -802,6 +805,7 @@ module CudaExecUnit =
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | loc -> unsupLoc loc                              
         // misc
+        | UUnaryOp (Print msg) -> [PrintWithMsg (msg, srcsDfltCh.[0])]
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise

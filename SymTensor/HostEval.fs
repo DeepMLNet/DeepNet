@@ -70,6 +70,9 @@ module HostEval =
                         // TODO: stage variable write to avoid overwrite of used variables
                         ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv)
                         ArrayND.relayout ArrayNDLayout.emptyVector av
+                    | Print msg ->
+                        printfn "%s=\n%A\n" msg av
+                        av
                     | Annotated _-> av                
                 | Binary(op, a, b) ->
                     let av, bv = doEval a, doEval b  

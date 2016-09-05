@@ -131,6 +131,7 @@ module UExpr =
             let dynUExprs = dynExprs |> List.map toUExprForInt               
             UExpr(UNaryOp (Subtensor usr), toUExpr a :: dynUExprs, metadata)
         | Unary (Expr.StoreToVar vs, a) -> unary (StoreToVar (UVarSpec.ofVarSpec vs)) a
+        | Unary (Expr.Print msg, a)     -> unary (Print msg) a
         | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
 
         | Binary (Expr.Add, a, b)       -> binary Add a b

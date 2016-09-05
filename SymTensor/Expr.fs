@@ -102,6 +102,8 @@ module Expr =
         | StoreToVar of VarSpecT<'T>
 
         // ==== misc ====
+        /// prints the value together with the given string
+        | Print of string
         /// annotation (no influence on value)
         | Annotated of string       
 
@@ -339,6 +341,7 @@ module Expr =
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
+        | Unary(Print _, a) -> shapeOf a
         | Unary(Annotated(_), a) -> shapeOf a
 
         // binary elementwise
@@ -922,8 +925,14 @@ module Expr =
     let invert a =
         Unary(Invert, a) |> check
 
+    /// calculates a tensor elementwise using the given element expression and
+    /// result shape
     let elements trgtShp elemExpr args =
         Nary (Elements (trgtShp, elemExpr), args) |> check
+
+    /// print the result with the given message when evaluated
+    let print msg a =
+        Unary (Print msg, a) |> check
 
 
 
