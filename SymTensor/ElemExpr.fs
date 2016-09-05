@@ -421,6 +421,9 @@ module ElemExpr =
             | Divide -> sprintf "(%s) / (%s)" (prittyPrint ee1) (prittyPrint ee2)
             | Modulo -> sprintf "(%s) %% (%s)" (prittyPrint ee1) (prittyPrint ee2)
             | Power -> sprintf "(%s)**(%s)" (prittyPrint ee1) (prittyPrint ee2)
+//            | IfThenElse (left,right)-> sprintf "if[%s=%s]: (%s) else (%s)"  (prittyPrint (Leaf (SizeValue left))) 
+//                                                                             (prittyPrint (Leaf (SizeValue right)))
+//                                                                             (prittyPrint ee1) (prittyPrint ee2)
             //TODO: delete unnecessary brackets
 [<AutoOpen>]
 module ElemExprTypes =
