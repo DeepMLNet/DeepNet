@@ -352,16 +352,10 @@ let ``Eval and derive: lkse`` () =
     let dLkse = ElemExprDeriv.buildDerivElemExpr lkse [nGps;nSmpls] 4
 
     printfn "lk=\n%A" lkse
-    printfn "lk=\n%s" (ElemExpr.prittyPrint lkse)
     printfn "dlk / dmu=\n%A" dLkse.[0]
-    printfn "dlk / dmu=\n%s" (ElemExpr.prittyPrint dLkse.[0])
     printfn "dlk / dSigma=\n%A" dLkse.[1]
-    printfn "dlk / dSigma=\n%s" (ElemExpr.prittyPrint dLkse.[1])
     printfn "dlk / dx=\n%A" dLkse.[2]
-    printfn "dlk / dx=\n%s" (ElemExpr.prittyPrint dLkse.[2])
     printfn "dlk / dl=\n%A" dLkse.[3]
-    printfn "dlk / dl=\n%s" (ElemExpr.prittyPrint dLkse.[3])
-
 
     let xVal = [[1.0; 1.1; 2.0];[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5;0.6] |> ArrayNDHost.ofList
