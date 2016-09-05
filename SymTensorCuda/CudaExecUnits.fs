@@ -141,10 +141,10 @@ module CudaExecUnit =
 
     /// Returns the operation that blasArg will perform.
     let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
-        let st = ArrayND.stride manikin
-        match st.[st.Length-2 ..] with
-        | [_; 1] when not (shared && willOverwrite) -> BlasArgId
-        | [1; _] when not (shared && willOverwrite) -> BlasArgTranspose
+        let st, shp = ArrayND.stride manikin, ArrayND.shape manikin
+        match st.[st.Length-2 ..], shp.[st.Length-2 ..] with
+        | [m; 1], [ms; ns] when m >= max 1 ns && not (shared && willOverwrite) -> BlasArgId
+        | [1; n], [ms; ns] when n >= max 1 ms && not (shared && willOverwrite) -> BlasArgTranspose
         | _ -> BlasArgCopy
 
 

@@ -302,6 +302,29 @@ module ArgTemplates =
                  OffsetInBytes = ArrayNDManikin.offsetInBytes manikin;
                  LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}      
 
+    /// checks that the specified manikin is usable with BLAS
+    let checkBlasManikin isBatch manikin =
+        let nDims = ArrayND.nDims manikin
+        match isBatch with
+        | true when nDims < 2 -> failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
+        | false when nDims <> 2 -> failwith "ArrayND for use with BLAS must be 2-dimensional" 
+        | _ -> ()
+
+        if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
+            failwith "CUBLAS currently requires single values"
+
+        let stride, shape = ArrayND.stride manikin, ArrayND.shape manikin
+        match stride.[nDims-2 ..], shape.[nDims-2 ..] with
+        | [0; _], _ -> 
+            failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
+        | [m; _], [_; ms] when m < ms -> 
+            failwithf "ArrayND for use with BLAS must have leading stride >= last dimension \
+                       but has shape %A and stride %A" shape stride
+        | [_; n], _ when n <> 1 -> 
+            failwithf "ArrayND for use with BLAS must be continguous in last dimension \
+                       but has shape %A and stride stride %A" shape stride
+        | _ , _-> ()
+
     /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "float *"
     type BlasTransposedMatrixTmpl (manikin: ArrayNDManikinT) =
         // All CUBLAS calls use Fortran matrices. This means:
@@ -313,14 +336,7 @@ module ArgTemplates =
         // CUBLAS leading dim = Stride.[0] >= 1 (no broadcasting)
         // Stride.[1] must be 1.
 
-        do
-            if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
-                failwith "CUBLAS currently requires single values"
-            match ArrayND.stride manikin with
-            | [0; _] -> failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
-            | [_; n] when n <> 1 -> failwithf "ArrayND for use with BLAS must be continguous in last dimension but has stride %d" n
-            | [_; _] -> ()
-            | _ -> failwith "ArrayND for use with BLAS must be 2-dimensional"         
+        do checkBlasManikin false manikin       
 
         member this.Manikin = manikin
 
@@ -369,16 +385,7 @@ module ArgTemplates =
         let batchShp = manikin.Shape.[0 .. nDims-3]
         let nSmpls = batchShp |> List.fold (*) 1      
 
-        do
-            if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
-                failwith "CUBLAS currently requires single values"
-            if nDims < 2 then
-                failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
-            let stride = ArrayND.stride manikin
-            match stride.[nDims-2 ..] with
-            | [0; _] -> failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
-            | [_; n] when n <> 1 -> failwithf "ArrayND for use with BLAS must be continguous in last dimension but has stride %d" n
-            | _ -> ()
+        do checkBlasManikin true manikin   
             
         new (manikin: ArrayNDManikinT, memAllocator: MemAllocatorT) =
             let nSmpls = manikin.Shape.[0 .. manikin.NDims-3] |> List.fold (*) 1      
