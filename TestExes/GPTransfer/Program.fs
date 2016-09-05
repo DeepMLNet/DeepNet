@@ -24,6 +24,8 @@ module Program =
         mb.SetSize nTrnSmpls 3
         let mi = mb.Instantiate DevCuda
 
+        printfn "%A" mi.ParameterStorage.[!mgp.TrnX]
+
         let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
 
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov

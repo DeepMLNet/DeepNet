@@ -9,7 +9,7 @@ open ArrayNDNS
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLoc<'T when 'T: equality> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
+    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT

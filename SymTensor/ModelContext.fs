@@ -41,7 +41,7 @@ module ModelContextTypes =
 
     /// A set of symbolic variables forming a set of parameters for a model.
     [<StructuredFormatDisplay("{Pretty}")>]
-    type ParameterSetT<'T when 'T: equality> 
+    type ParameterSetT<'T when 'T: equality and 'T: comparison> 
             (name:           string, 
              parameters:     VarSpecT<'T> seq) =
 
@@ -69,6 +69,13 @@ module ModelContextTypes =
             |> List.zip pars
             |> Map.ofList
 
+        /// mapping from parameter expression to parameter variable
+        let parameterOfExpr =
+            parameterVars
+            |> Map.toSeq
+            |> Seq.map (fun (var, expr) -> expr, var)
+            |> Map.ofSeq
+
         member this.Parameters = pars
         member this.Shapes = shapes
         member this.StartIdxs = startIdxs
@@ -90,12 +97,17 @@ module ModelContextTypes =
                 printfn "Warning: ParameterSet %s does not occur in expression for differentiation." name
                 Expr.zeroMatrix 
                     (Expr.shapeOf expr |> ShapeSpec.nElem) 
-                    (Expr.shapeOf this.Flat |> ShapeSpec.nElem)
-                
+                    (Expr.shapeOf this.Flat |> ShapeSpec.nElem)                
 
         /// variable for a given parameter
         member this.Item
             with get (par: VarSpecT<'T>) = parameterVars.[par]
+
+        /// returns the parameter for the given variable (in expression form) 
+        member this.ParameterOf expr = 
+            match parameterOfExpr |> Map.tryFind expr with
+            | Some var -> var
+            | None -> failwith "this ParameterSet does not contain a variable for the specified expression"
 
         /// substitutes this ParameterSet into the given expression
         member this.Subst expr =
@@ -112,7 +124,7 @@ module ModelContextTypes =
 
 
     /// Actual values for variables in a ParameterSet.
-    type ParameterStorageT<'T when 'T: equality> 
+    type ParameterStorageT<'T when 'T: equality and 'T: comparison> 
             (parameterSet:    ParameterSetT<'T>,
              symSizes:        SymSizeEnvT,
              device:          IDevice) =
@@ -145,6 +157,11 @@ module ModelContextTypes =
             with get (par: VarSpecT<'T>) = parameterVals.[par]
             and set (par: VarSpecT<'T>) value = parameterVals.[par].[Fill] <- value
 
+        /// value for a given parameter
+        member this.Item
+            with get (par: ExprT<'T>) = this.[parameterSet.ParameterOf par]
+            and set (par: ExprT<'T>) value = this.[parameterSet.ParameterOf par] <- value
+
         /// Uses the values of this ParameterStorageT for the the corresponding
         /// ParameterSetT in the given variable environment.
         member this.Use varEnv =
@@ -167,7 +184,8 @@ module ModelContextTypes =
 
     /// A model builder.
     [<StructuredFormatDisplay("{PrettyString}")>]
-    type ModelBuilder<'T when 'T: equality> (context:       string,
+    type ModelBuilder<'T when 'T: equality and 'T: comparison> 
+                                            (context:       string,
                                              isSubModule:   bool) =
 
         let mutable subMBs = Map.empty
@@ -332,7 +350,8 @@ module ModelContextTypes =
 
 
     /// A model with numeric sizes for all size symbols and allocated parameter storage.
-    and ModelInstance<'T when 'T: equality> (context:         string,
+    and ModelInstance<'T when 'T: equality and 'T: comparison> 
+                                            (context:         string,
                                              parameters:      Map<VarSpecT<'T>, ParameterInfo<'T>>,
                                              device:          IDevice,                                             
                                              compileEnv:      CompileEnvT) =
