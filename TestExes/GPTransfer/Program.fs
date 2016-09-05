@@ -24,6 +24,10 @@ module Program =
         mb.SetSize nTrnSmpls 3
         let mi = mb.Instantiate DevCuda
 
+        mi.ParameterStorage.[!mgp.Lengthscales] <- [1.0f; 1.0f] 
+                                                   |> ArrayNDHost.ofList
+                                                   |> ArrayNDCuda.toDev
+
         mi.ParameterStorage.[!mgp.TrnX] <- [[1.0f; 2.0f; 2.5f]
                                             [4.1f; 4.3f; 4.4f]] 
                                            |> ArrayNDHost.ofList2D
@@ -46,11 +50,12 @@ module Program =
 
         let inp_mean_val = [[1.0f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
         let inp_cov_val =  Array3D.zeroCreate 1 2 2
-        inp_cov_val.[0,0,0] <- 1.0f
+        //inp_cov_val.[0,0,0] <- 1.0f
         let inp_cov_val = inp_cov_val |> ArrayNDHost.ofArray3D |> ArrayNDCuda.toDev
 
         let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
 
+        printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
         printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
         printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
         printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
