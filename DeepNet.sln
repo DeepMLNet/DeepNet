@@ -57,6 +57,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "LearnMnist", "TestExes\Lear
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GPTransfer", "TestExes\GPTransfer\GPTransfer.fsproj", "{1DF45C82-0128-48DB-A107-C606024176BF}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MathematicaInterface", "TestExes\MathematicaInterface\MathematicaInterface.fsproj", "{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}"
+EndProject
 Global
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true
@@ -144,6 +146,14 @@ Global
 		{1DF45C82-0128-48DB-A107-C606024176BF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1DF45C82-0128-48DB-A107-C606024176BF}.Release|x64.ActiveCfg = Release|x64
 		{1DF45C82-0128-48DB-A107-C606024176BF}.Release|x64.Build.0 = Release|x64
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Debug|x64.ActiveCfg = Debug|x64
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Debug|x64.Build.0 = Debug|x64
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Release|x64.ActiveCfg = Release|Any CPU
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -161,5 +171,6 @@ Global
 		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33} = {69798A19-ECB9-414E-AD43-8350B6C17203}
 		{5D72A46C-A4CF-4A66-8EE2-CB381FFC7F73} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 		{1DF45C82-0128-48DB-A107-C606024176BF} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
+		{2BA4BCF9-5163-4BBE-B052-569990AFC8C2} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 	EndGlobalSection
 EndGlobal

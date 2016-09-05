@@ -2,11 +2,10 @@
 
 open Wolfram.NETLink
 
-let mfilePath = @"C:\Local\surban\dev\Deep\DeepNet\TestExes\GPTransfer\GPTransfer.m"
+let mfilePath = @"C:\Local\surban\dev\Deep\DeepNet\TestExes\MathematicaInterface\GPTransfer.m"
 
 let mathArgs = [| @"-linkname"
-                  @"C:\Program Files\Wolfram Research\Mathematica\11.0\math.exe -mathlink"  |]
-                  //@"C:\Program Files\Wolfram Research\Mathematica\11.0\MathKernel.exe -mathlink"  |]
+                  @"C:\Program Files\Wolfram Research\Mathematica\11.0\MathKernel.exe -mathlink"  |]
 
 // connect to Mathematica
 let link = MathLinkFactory.CreateKernelLink mathArgs

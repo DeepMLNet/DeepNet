@@ -1,4 +1,4 @@
-﻿namespace GPTransfer.AssemblyInfo
+﻿namespace MathematicaInterface.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,11 +7,11 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("GPTransfer")>]
+[<assembly: AssemblyTitle("MathematicaInterface")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("Deep.Net Developers")>]
-[<assembly: AssemblyProduct("GPTransfer")>]
+[<assembly: AssemblyProduct("MathematicaInterface")>]
 [<assembly: AssemblyCopyright("Copyright © Deep.Net Developers 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
@@ -22,7 +22,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("1df45c82-0128-48db-a107-c606024176bf")>]
+[<assembly: Guid("2ba4bcf9-5163-4bbe-b052-569990afc8c2")>]
 
 // Version information for an assembly consists of the following four values:
 // 

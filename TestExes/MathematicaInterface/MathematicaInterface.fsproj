@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>1df45c82-0128-48db-a107-c606024176bf</ProjectGuid>
+    <ProjectGuid>2ba4bcf9-5163-4bbe-b052-569990afc8c2</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>GPTransfer</RootNamespace>
-    <AssemblyName>GPTransfer</AssemblyName>
+    <RootNamespace>MathematicaInterface</RootNamespace>
+    <AssemblyName>MathematicaInterface</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>GPTransfer</Name>
+    <Name>MathematicaInterface</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,7 +23,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>bin\Debug\GPTransfer.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\MathematicaInterface.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -34,7 +34,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>bin\Release\GPTransfer.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\MathematicaInterface.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
@@ -48,12 +48,24 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="Wolfram.NETLink">
+      <HintPath>Wolfram.NETLink.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="GPTransferModel.fs" />
+    <Compile Include="MathInterface.fs" />
+    <Compile Include="GPTransferOps.fs" />
     <Compile Include="Program.fs" />
+    <None Include="App.config" />
+    <None Include="ml32i4.dll">
+      <Link>ml32i4.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="ml64i4.dll">
+      <Link>ml64i4.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
@@ -103,7 +115,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\GPTransfer.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\MathematicaInterface.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
@@ -114,7 +126,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\GPTransfer.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\MathematicaInterface.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
