@@ -260,6 +260,7 @@ module CudaExprWorkspaceTypes =
             RegHostMem = new Dictionary<MemAllocManikinT, RegHostMemT>()
             ExternalVar = Map.empty
             HostVar = Map.empty
+            TextureObject = new Dictionary<TextureObjectT, CudaTexObject>()
         }
 
         /// all kernel calls
@@ -380,6 +381,18 @@ module CudaExprWorkspaceTypes =
                     execEnv.Event.[evnt].Record(getStream strm)
                 | EventSynchronize evnt ->
                     execEnv.Event.[evnt].Synchronize()
+
+                // texture object management
+                | TextureCreate (tex, data, texDsc) ->
+                    let devVar, offset = CudaExecEnv.getDevMemForManikin execEnv data
+                    use devVarFloat = new CudaDeviceVariable<single>(devVar.DevicePointer, devVar.SizeInBytes)
+                    let resDsc = CudaResourceDesc (devVarFloat)
+                    let texObj = new CudaTexObject (resDsc, texDsc)
+                    execEnv.TextureObject.[tex] <- texObj
+                | TextureDestroy tex -> 
+                    if execEnv.TextureObject.ContainsKey tex then
+                        execEnv.TextureObject.[tex].Dispose()
+                        execEnv.TextureObject.Remove(tex) |> ignore
 
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->

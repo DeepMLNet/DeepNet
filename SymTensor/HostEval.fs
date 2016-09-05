@@ -17,6 +17,21 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
+    let private doInterpolate1D (ip: Interpolator1DT<'T>) (a: ArrayNDHostT<'T>) : ArrayNDHostT<'T> =
+        let tbl = Expr.interpolators1D.[ip] :?> ArrayNDT<'T>
+        a |> ArrayND.map (fun x ->
+            let pos = (conv<float> x - conv<float> ip.MinValue) / conv<float> ip.Resolution
+            let posLeft = floor pos 
+            let fac = pos - posLeft
+            let idx = int posLeft
+
+            match idx with
+            | _ when idx < 0 -> 
+
+            (1.0 - fac) * conv<float> tbl.[[idx]] + fac * conv<float> tbl.[[idx+1]]
+            |> conv<'T>
+        )
+
     /// evaluate expression to numeric array 
     let rec eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
         let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<_>
@@ -57,6 +72,7 @@ module HostEval =
                     | Floor -> floor av
                     | Round -> round av
                     | Truncate -> truncate av
+                    | Interpolate1D ip -> doInterpolate1D ip av
                     | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
                     | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
                     | Invert -> ArrayND.invert av

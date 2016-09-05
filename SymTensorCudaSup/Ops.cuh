@@ -3,6 +3,12 @@
 #include "Utils.cuh"
 
 
+// dummy functions for IntelliSense
+#ifndef __CUDACC__ 
+template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
+#endif
+
+
 struct DiagonalOneIEOp_t {
 	_dev float operator() (const size_t *pos, const size_t dims) const {
 		if (dims == 0) {
@@ -39,12 +45,28 @@ struct ConstEOp_t
 };
 
 
+
 struct ZerosEOp_t
 {
 	_dev float operator() () const
 	{
 		return 0.0f;
 	}
+};
+
+
+struct Interpolate1DEOp_t
+{
+	_devonly float operator() (float a) const 
+	{
+		float idx = (a - minValue) / resolution + 0.5f;
+		return tex1D<float>(data, idx);
+	}
+
+	cudaTextureObject_t data;
+	float minValue;
+	float maxValue;
+	float resolution;
 };
 
 

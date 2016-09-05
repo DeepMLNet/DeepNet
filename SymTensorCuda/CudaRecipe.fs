@@ -30,6 +30,9 @@ module CudaRecipeTypes =
         | EventDestory      of EventObjectT
         | EventRecord       of EventObjectT * StreamT
         | EventSynchronize  of EventObjectT
+        // texture object management
+        | TextureCreate     of TextureObjectT * ArrayNDManikinT * BasicTypes.CudaTextureDescriptor
+        | TextureDestroy    of TextureObjectT
         // execution control
         | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)

@@ -28,6 +28,25 @@ module Expr =
         | FixedArity of int
         | DynamicArity
 
+    type IInterpolator = 
+        inherit System.IComparable
+
+    type InterpolationModeT =
+        | Clamp
+        | Mirror
+
+    type Interpolator1DT<'T> = 
+        {
+            Id:         int
+            MinValue:   'T
+            MaxValue:   'T
+            Resolution: 'T
+            Mode:       InterpolationModeT
+        } 
+        
+        interface IInterpolator 
+        
+
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT<'T> =
@@ -72,6 +91,7 @@ module Expr =
         | Floor
         | Round
         | Truncate
+        | Interpolate1D of Interpolator1DT<'T>
 
         // ==== tensor operations ====
         /// extract diagonal along given axes
@@ -315,6 +335,7 @@ module Expr =
         | Unary (Floor, a)
         | Unary (Round, a)
         | Unary (Truncate, a)
+        | Unary (Interpolate1D _, a)
             -> shapeOf a
 
         // tensor operations
@@ -441,6 +462,8 @@ module Expr =
                     if nda < 2 then
                         failwithf "need at least a matrix to invert but got shape %A" sa
                     sa.[nda-2] .= sa.[nda-1]
+                | Interpolate1D {Resolution=res} when conv<float> res <= 0.0 ->
+                    failwithf "resolution of interpolation must be positive"
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -925,6 +948,22 @@ module Expr =
     let elements trgtShp elemExpr args =
         Nary (Elements (trgtShp, elemExpr), args) |> check
 
+
+    let interpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
+
+    let createInterpolator1D (data: ArrayNDT<'T>) (minValue: 'T) 
+                             (maxValue: 'T) (resolution: 'T) =
+        let ip = {
+            Id = interpolators1D.Count
+            MinValue = minValue
+            MaxValue = maxValue
+            Resolution = resolution
+        }
+        interpolators1D.Add (ip, data)
+        ip
+
+    let interpolate1D interpolator a =
+        Unary (Interpolate1D interpolator, a) |> check
 
 
 [<AutoOpen>]

@@ -74,6 +74,9 @@ module Types =
         CudaRegHostMem:         CudaRegisteredHostMemory<byte>
     }
 
+    /// a CUDA texture object
+    type TextureObjectT = int
+
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
         Stream:                 Dictionary<StreamT, CudaStream>
@@ -82,6 +85,7 @@ module Types =
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
         mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
         mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
+        TextureObject:          Dictionary<TextureObjectT, CudaTexObject>
     }
     
     /// CUDA device memory range
@@ -456,6 +460,41 @@ module ArgTemplates =
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl
+
+
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    /// 1d interpolation op C++ structure
+    type Interpolate1DEOpArg<'T when 'T: struct> =
+        val Data: CUtexObject
+        val MinValue: 'T
+        val MaxValue: 'T
+        val Resolution: 'T
+
+        new (data, minValue, maxValue, resolution) = 
+            {Data=data; MinValue=minValue; MaxValue=maxValue; Resolution=resolution}
+
+
+    type Interpolate1DEOpArgTmpl<'T> (data: TextureObjectT,
+                                      minValue: 'T, 
+                                      maxValue: 'T,
+                                      resolution: 'T) =
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "Interpolate1DEOp_t"
+            member this.GetArg env strm = 
+                match typeof<'T> with
+                | t when t = typeof<single> -> 
+                    Interpolate1DEOpArg<single> (env.TextureObject.[data].TexObject, 
+                                                 minValue |> box |> unbox, 
+                                                 maxValue |> box |> unbox, 
+                                                 resolution |> box |> unbox)
+                    |> box
+                | t -> failwithf "unsupported type for interpolate: %A" t
+        interface ICudaOp with
+            member this.IsIndexed = false
+        interface ICudaOpAndArgTmpl
+
+
 
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
