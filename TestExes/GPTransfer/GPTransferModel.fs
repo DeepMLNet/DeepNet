@@ -177,7 +177,7 @@ module MultiGPLayer =
         let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
         let Kk = Kk |> Expr.print "Kk"
         let Kk_inv = Expr.invert Kk
-        let Kk_inv = Kk |> Expr.print "Kk_inv"
+        let Kk_inv = Kk_inv |> Expr.print "Kk_inv"
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let lk = lk |> Expr.print "lk"
