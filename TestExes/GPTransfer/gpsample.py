@@ -221,10 +221,10 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
     for g in range(n_gps):
         mean[g] = np.dot(E_K_tst_trn[g,:], tgt[g, :])
 
-    print "K_trn_trn=\n", K_trn_trn
-    print "K_trn_trn_inv=\n", K_trn_trn_inv
-    print "E_K_tst_trn=\n", E_K_tst_trn
-    print "tgt=\n", tgt
+    print "Kk=\n", K_trn_trn
+    print "Kk_inv=\n", K_trn_trn_inv
+    print "lk=\n", E_K_tst_trn
+    print "beta=\n", tgt
 
 
     # calculate covariance
@@ -415,11 +415,15 @@ def test_gp_uncertain_regression():
 
 
 def test_multi_gp_uncertain_regression():
+    print "\n"
+    print "test_multi_gp_uncertain_regression ============================================"
+    print "\n"
+
     np.random.seed(1)
 
     n_sampling = 2000
     n_training = 30
-    n_test = 10
+    n_test = 1
     n_gps = 3
     trn_l = 2.0
     l = [1.0, 1.5, 2.0]
@@ -432,7 +436,7 @@ def test_multi_gp_uncertain_regression():
     #hf2 = h5py.File('trnx.h5')
     for gp in range(n_gps):
         # sample training points from a GP prior
-        trn_x[gp, :] = np.random.uniform(-10., 10., n_training)
+        trn_x[gp, :] = np.random.uniform(-5., 5., n_training)
         trn_x[gp, :] = np.sort(trn_x[gp, :])
         trn_mean, trn_cov = gp_prior(trn_x[gp, :], zero_fn, make_cov_se(1.0, trn_l))
         assert np.min(np.linalg.eigvals(trn_cov)) > -1e-5
@@ -440,7 +444,12 @@ def test_multi_gp_uncertain_regression():
         trn_sigma[gp, :] = np.zeros(n_training)
         # plt.plot(trn_x, trn_y, '-xk')
         # plt.show()
-
+    print "trn_x = "
+    print trn_x
+    print "\n"
+    print "trn_x = "
+    print trn_x
+    print "\n"
     #hf.create_dataset("trn_x1",data = trn_x)
     #hf2.create_dataset("trn_x",data = trn_x,dtype=float )
     #hf.create_dataset("trn_y",data = trn_y)
@@ -477,6 +486,9 @@ def test_multi_gp_uncertain_regression():
 
 def file_test_multi_gp_uncertain_regression():
     
+    print "\n"
+    print "file_test_multi_gp_uncertain_regression ============================================"
+    print "\n"
     h5train = h5py.File("bin/Debug/TrainData.h5",'r')
     h5test = h5py.File("bin/Debug/TestData.h5",'r')
     np.random.seed(1)
@@ -484,12 +496,22 @@ def file_test_multi_gp_uncertain_regression():
     n_sampling = 2000
 
     l = h5train.get("Lengthscale")
-    cov_fn = dict(type='SE', l=l[0])
+    l = l[0]
+    print "l = "
+    print l
+    print "\n"
+    cov_fn = dict(type='SE', l=l)
 
     trn_x = np.asarray(h5train.get("Trn_X"),dtype = float)
     trn_x = trn_x[0]
+    print "trn_x = "
+    print trn_x
+    print "\n"
     trn_y = np.asarray(h5train.get("Trn_T") ,dtype = float)
     trn_y = trn_y[0]
+    print "trn_y = "
+    print trn_y
+    print "\n"
     trn_sigma = np.asarray(h5train.get("Trn_Sigma"),dtype = float)
     trn_sigma = trn_sigma[0]
 
@@ -501,7 +523,7 @@ def file_test_multi_gp_uncertain_regression():
 
     n_training = trn_x.shape[1]
     n_test = tst_mus.shape[0]
-    n_gps = l.shape[1]
+    n_gps = l.shape[0]
 
     print "n_training = %d\n"%(n_training)
     print "n_test = %d\n"%(n_test)
