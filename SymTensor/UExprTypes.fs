@@ -1,6 +1,23 @@
 ﻿namespace SymTensor
 
 
+[<AutoOpen>]
+module ExprTypes0 =
+    /// extrapolation behaviour
+    type OutsideInterpolatorRangeT =
+        /// zero outside interpolation range
+        | Zero
+        /// clamp to nearest value outside interpolation range
+        | Nearest
+
+    /// interpolation mode
+    type InterpolationModeT =
+        /// linear interpolation
+        | InterpolateLinearaly
+        /// interpolate to the table element left of the argument
+        | InterpolateToLeft
+
+
 //[<AutoOpen>]
 module UExprTypes = 
 
@@ -19,6 +36,12 @@ module UExprTypes =
     /// non-generic interface for Interpolator1D
     type IInterpolator1D = 
         inherit System.IComparable
+
+        abstract MinArg: single
+        abstract MaxArg: single
+        abstract Resolution: single
+        abstract Mode: InterpolationModeT
+        abstract Outside: OutsideInterpolatorRangeT
 
     type ULeafOpT =
         | Identity of SizeSpecT

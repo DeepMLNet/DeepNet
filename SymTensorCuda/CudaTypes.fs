@@ -34,12 +34,22 @@ module Types =
         Offset: int
     }
 
+    /// a CUDA texture object
+    type TextureObjectT = {
+        Contents:                  ArrayNDManikinT
+        Descriptor:                BasicTypes.CudaTextureDescriptor
+    }
+
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// storage location of variables
         VarStorLoc:                 Map<UVarSpecT, ArrayLocT>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
+        /// texture objects
+        TextureObjects:             ResizeArray<TextureObjectT>
+        /// textures for interpolator
+        InterpolatorTextures:       Dictionary<IInterpolator1D, TextureObjectT>
     }
 
     /// function domain (kernel only or host code that may call kernels)
@@ -73,9 +83,6 @@ module Types =
         Ptr:                    nativeint
         CudaRegHostMem:         CudaRegisteredHostMemory<byte>
     }
-
-    /// a CUDA texture object
-    type TextureObjectT = int
 
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
@@ -119,6 +126,16 @@ module Types =
         member this.CPPFuncName = cppFuncName
 
 
+module CudaCompileEnv =
+
+    /// creates a new texture object
+    let newTextureObject env contents descriptor =
+        let texObj = {
+            Contents   = contents
+            Descriptor = descriptor
+        }
+        env.TextureObjects.Add texObj
+        texObj
 
 
 module CudaExecEnv = 
@@ -472,31 +489,40 @@ module ArgTemplates =
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
     /// 1d interpolation op C++ structure
-    type Interpolate1DEOpArg<'T when 'T: struct> =
+    type Interpolate1DEOpArg =
         val Data: CUtexObject
-        val MinValue: 'T
-        val MaxValue: 'T
-        val Resolution: 'T
+        val MinArg: single
+        val MaxArg: single
+        val Resolution: single
 
-        new (data, minValue, maxValue, resolution) = 
-            {Data=data; MinValue=minValue; MaxValue=maxValue; Resolution=resolution}
+        new (data, minArg, maxArg, resolution) = 
+            {Data=data; MinArg=minArg; MaxArg=maxArg; Resolution=resolution}
 
 
-    type Interpolate1DEOpArgTmpl<'T> (data: TextureObjectT,
-                                      minValue: 'T, 
-                                      maxValue: 'T,
-                                      resolution: 'T) =
+    type Interpolate1DEOpArgTmpl (ip:           IInterpolator1D,
+                                  compileEnv:   CudaCompileEnvT) =
+
+        let tbl = Expr.getInterpolatorTable1D ip :> IArrayNDCudaT
+        
+        ArrayNDManikinT()
+        tbl.Storage
+
+        let texture, needInit =
+            if compileEnv.InterpolatorTextures.ContainsKey ip then
+                compileEnv.InterpolatorTextures.[ip], false
+            else
+                let t = CudaCompileEnv.newTextureObject compileEnv
+                compileEnv.InterpolatorTextures.Add (ip, t)
+                t, true
+
+        member this.NeedInit = needInit
+
         interface ICudaArgTmpl with
             member this.CPPTypeName = "Interpolate1DEOp_t"
             member this.GetArg env strm = 
-                match typeof<'T> with
-                | t when t = typeof<single> -> 
-                    Interpolate1DEOpArg<single> (env.TextureObject.[data].TexObject, 
-                                                 minValue |> box |> unbox, 
-                                                 maxValue |> box |> unbox, 
-                                                 resolution |> box |> unbox)
-                    |> box
-                | t -> failwithf "unsupported type for interpolate: %A" t
+                Interpolate1DEOpArg (env.TextureObject.[texture].TexObject, 
+                                     ip.MinArg, ip.MaxArg, ip.Resolution)
+                |> box
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl

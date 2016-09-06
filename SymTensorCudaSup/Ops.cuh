@@ -59,13 +59,13 @@ struct Interpolate1DEOp_t
 {
 	_devonly float operator() (float a) const 
 	{
-		float idx = (a - minValue) / resolution + 0.5f;
+		float idx = (a - minArg) / resolution + 0.5f;
 		return tex1D<float>(data, idx);
 	}
 
 	cudaTextureObject_t data;
-	float minValue;
-	float maxValue;
+	float minArg;
+	float maxArg;
 	float resolution;
 };
 

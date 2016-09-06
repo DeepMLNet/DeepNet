@@ -9,22 +9,6 @@ open ShapeSpec
 open VarSpec
 
 
-[<AutoOpen>]
-module ExprTypes =
-    /// extrapolation behaviour
-    type OutsideInterpolatorRangeT =
-        /// zero outside interpolation range
-        | Zero
-        /// clamp to nearest value outside interpolation range
-        | Nearest
-
-    /// interpolation mode
-    type InterpolationModeT =
-        /// linear interpolation
-        | InterpolateLinearaly
-        /// interpolate to the table element left of the argument
-        | InterpolateToLeft
-
 /// expression module
 module Expr =
     open ArrayND
@@ -46,7 +30,7 @@ module Expr =
         | DynamicArity
 
     /// non-generic interface for Interpolator1D
-    type IInterpolator = UExprTypes.IInterpolator1D
+    type IInterpolator1D = UExprTypes.IInterpolator1D
 
     /// one dimensional linear interpoator
     type Interpolator1DT<'T> = 
@@ -57,6 +41,8 @@ module Expr =
             MinArg:     'T
             /// maximum argument value
             MaxArg:     'T
+            /// resolution
+            Resolution: float
             /// interpolation behaviour
             Mode:       InterpolationModeT
             /// extrapolation behaviour
@@ -64,7 +50,13 @@ module Expr =
             /// interpolator for derivative
             Derivative: Interpolator1DT<'T> option
         }        
-        interface IInterpolator         
+        
+        interface IInterpolator1D with
+            member this.MinArg = conv<single> this.MinArg
+            member this.MaxArg = conv<single> this.MaxArg
+            member this.Resolution = single this.Resolution
+            member this.Mode = this.Mode
+            member this.Outside = this.Outside
 
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
@@ -977,37 +969,35 @@ module Expr =
         Unary (Print msg, a) |> check
 
     /// interpolator tables
-    let private tablesOfInterpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
+    let private tablesOfInterpolators1D = new Dictionary<IInterpolator1D, IArrayNDT>()
 
     /// interpolator derivatives
-    let private derivativeOfInterpolators1D = new Dictionary<IInterpolator, IInterpolator>()
+    let private derivativeOfInterpolators1D = new Dictionary<IInterpolator1D, IInterpolator1D>()
 
     /// Creates a one-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
-    let createInterpolator1D (table: ArrayNDT<'T>) (minArg: 'T) (maxArg: 'T) 
+    let createInterpolator1D (tbl: ArrayNDT<'T>) (minArg: 'T) (maxArg: 'T) 
                              (mode: InterpolationModeT) (outside: OutsideInterpolatorRangeT)
                              (derivative: Interpolator1DT<'T> option) =
-        if table.NDims <> 1 then failwith "interpolation table must be one-dimensional"
-        if table.NElems < 2 then failwith "interpolation table must contain at least 2 entries"
+        if tbl.NDims <> 1 then failwith "interpolation table must be one-dimensional"
+        if tbl.NElems < 2 then failwith "interpolation table must contain at least 2 entries"
         let ip = {
             Id = tablesOfInterpolators1D.Count
             MinArg = minArg
             MaxArg = maxArg
+            Resolution = (conv<float> maxArg - conv<float> minArg) / float (tbl.NElems - 1)           
             Mode = mode
             Outside = outside
             Derivative = derivative
         }
         lock tablesOfInterpolators1D 
-            (fun () -> tablesOfInterpolators1D.Add (ip, table))        
+            (fun () -> tablesOfInterpolators1D.Add (ip, tbl))        
         ip
 
     /// Gets the function value table for the specified one-dimensional interpolator.
     let getInterpolatorTable1D ip =
-        if tablesOfInterpolators1D.ContainsKey ip then 
-            let tbl = tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
-            let resolution = (conv<float> ip.MaxArg - conv<float> ip.MinArg) / float (tbl.NElems - 1)
-            tbl, resolution
+        if tablesOfInterpolators1D.ContainsKey ip then tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
         else failwithf "interpolator %A is unknown" ip
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
@@ -1019,11 +1009,11 @@ module Expr =
             if derivativeOfInterpolators1D.ContainsKey ip then 
                 derivativeOfInterpolators1D.[ip] :?> Interpolator1DT<'T>
             else
-                let tbl, resolution = getInterpolatorTable1D ip                 
+                let tbl = getInterpolatorTable1D ip                 
                 let diffTbl =
                     match ip.Mode with
                     | InterpolateLinearaly ->
-                        let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType (conv<'T> resolution) tbl
+                        let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType (conv<'T> ip.Resolution) tbl
                         let zero = ArrayND.zerosOfSameType [1] diffTbl
                         ArrayND.concat 0 [diffTbl; zero]
                     | InterpolateToLeft ->

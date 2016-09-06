@@ -206,6 +206,7 @@ module CudaExecUnit =
         | UUnaryOp Floor -> inplaceFirstSrcReq
         | UUnaryOp Round -> inplaceFirstSrcReq
         | UUnaryOp Truncate -> inplaceFirstSrcReq      
+        | UUnaryOp (Interpolate1D _) -> inplaceFirstSrcReq
         // tensor ops
         | UUnaryOp (Diag _) -> dfltSrcWithNoViewReq
         | UUnaryOp (DiagMat _) -> dfltSrcWithNoViewReq
@@ -371,7 +372,8 @@ module CudaExecUnit =
         | UUnaryOp Ceil -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Floor -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Round -> dfltChInplaceOvrwrtTrgt ()
-        | UUnaryOp Truncate -> dfltChInplaceOvrwrtTrgt ()    
+        | UUnaryOp Truncate -> dfltChInplaceOvrwrtTrgt ()   
+        | UUnaryOp (Interpolate1D _) -> dfltChInplaceOvrwrtTrgt ()    
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
             dfltChTrgt (ArrayND.diagAxis ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
@@ -727,6 +729,11 @@ module CudaExecUnit =
         | UUnaryOp Floor -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcsDfltCh
         | UUnaryOp Round -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcsDfltCh
         | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
+        | UUnaryOp (Interpolate1D ip) ->
+            let argTmpl = Interpolate1DEOpArgTmpl (ip, compileEnv)
+            if argTmpl.NeedInit then
+                submitInit [All]
+            execItemsForElemwise dfltChTrgt argTmpl srcsDfltCh
         // reductions
         | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
         | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]
