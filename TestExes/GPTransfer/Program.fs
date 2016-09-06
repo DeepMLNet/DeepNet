@@ -28,8 +28,7 @@ module Program =
     let testMultiGPLayer device =
 
         
-        let seed = 1
-        let rand = Random(seed)
+        let rand = Random()
 
         let ngps = 3
         let ntraining = 10
@@ -51,7 +50,6 @@ module Program =
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
         let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nGPs]
         let inp_cov   : ExprT<single> = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
-
         mb.SetSize nGPs      ngps
         mb.SetSize nTrnSmpls ntraining
         let mi = mb.Instantiate device
@@ -59,9 +57,23 @@ module Program =
         let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
+        
+        let randomSortedListOfLength (rand:Random) (minValue,maxValue) length =
+            [1..length] |> List.map (fun _ -> rand.NextDouble())
+            |> List.map (fun x -> (single x))
+            |> List.map (fun x -> x  * (maxValue - minValue) + minValue)
+            |> List.sort
+
+        let randomSortedLists (rand:Random) (minValue,maxValue) length = 
+            List.map (fun _ -> randomSortedListOfLength rand (minValue,maxValue) length)
+
+        let trn_x_host = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining |> ArrayNDHost.ofList2D
+        let trn_t_host = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining |> ArrayNDHost.ofList2D
+
         let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
-        let trn_x_host =  rand.UniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
-        let trn_t_host = rand.UniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+//        let trn_x_host =  rand.SortedUniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+//        let trn_t_host = rand.SortedUniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
+        
         let trn_sigma_host = ArrayNDHost.zeros<single> [ngps;ntraining]
 
         let trainInp = {
@@ -122,6 +134,7 @@ module Program =
 
         let testData = testList |> Dataset.FromSamples
         testData.Save("TestData.h5")
+
     [<EntryPoint>]
     let main argv = 
         TestUtils.evalHostCuda testMultiGPLayer

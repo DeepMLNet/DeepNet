@@ -663,7 +663,7 @@ if __name__ == '__main__':
     # demo_regression()
 
     #test_gp_uncertain_regression()
-    #test_multi_gp_uncertain_regression()
+    test_multi_gp_uncertain_regression()
     file_test_multi_gp_uncertain_regression()
 
     #debug_cuda()
