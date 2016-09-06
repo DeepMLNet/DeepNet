@@ -386,8 +386,13 @@ module CudaExprWorkspaceTypes =
                 // texture object management
                 | TextureCreate tex ->
                     let devVar, _ = CudaExecEnv.getDevMemForManikin execEnv tex.Contents
-                    use devVarFloat = new CudaDeviceVariable<single>(devVar.DevicePointer, devVar.SizeInBytes)
-                    let resDsc = CudaResourceDesc (devVarFloat)
+                    let devAry = new CudaArray1D(CUArrayFormat.Float, 
+                                                 SizeT tex.Contents.NElems, 
+                                                 CudaArray1DNumChannels.One)
+                    devAry.CopyFromDeviceToArray1D (devVar.DevicePointer, devVar.SizeInBytes, SizeT 0)
+                    let resDsc = CudaResourceDesc (devAry)
+                    //use devVarFloat = new CudaDeviceVariable<single>(devVar.DevicePointer, devVar.SizeInBytes)
+                    //let resDsc = CudaResourceDesc (devVarFloat)
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
                     printfn "created texture: %A" texObj.TexObject.Pointer
                     execEnv.TextureObject.[tex] <- texObj
