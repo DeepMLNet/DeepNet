@@ -356,6 +356,7 @@ def multi_gp_uncertain_regression_by_sampling(tst_mu, tst_Sigma, trn_x, trn_y, t
     # draw samples from tst
     # tst_x[smpl, gp]
     tst_x = np.zeros((n_samples, n_gps))
+
     for smpl in range(n_samples):
         tst_x[smpl, :] = np.random.multivariate_normal(tst_mu, tst_Sigma)
 
@@ -427,8 +428,8 @@ def test_multi_gp_uncertain_regression():
     trn_x = np.zeros((n_gps, n_training))
     trn_y = np.zeros((n_gps, n_training))
     trn_sigma = np.zeros((n_gps, n_training))
-    hf = h5py.File('MulitGpTest2.h5')
-    hf2 = h5py.File('trnx.h5')
+    #hf = h5py.File('MulitGpTest2.h5')
+    #hf2 = h5py.File('trnx.h5')
     for gp in range(n_gps):
         # sample training points from a GP prior
         trn_x[gp, :] = np.random.uniform(-10., 10., n_training)
@@ -440,11 +441,11 @@ def test_multi_gp_uncertain_regression():
         # plt.plot(trn_x, trn_y, '-xk')
         # plt.show()
 
-    hf.create_dataset("trn_x1",data = trn_x)
-    hf2.create_dataset("trn_x",data = trn_x,dtype=float)
-    hf.create_dataset("trn_y",data = trn_y)
-    hf.create_dataset("trn_sigma",data = trn_sigma)
-    hf.create_dataset("l",data = l)
+    #hf.create_dataset("trn_x1",data = trn_x)
+    #hf2.create_dataset("trn_x",data = trn_x,dtype=float )
+    #hf.create_dataset("trn_y",data = trn_y)
+    #hf.create_dataset("trn_sigma",data = trn_sigma)
+    #hf.create_dataset("l",data = l)
 
     # sample some test points
     for n in range(n_test):
@@ -452,17 +453,17 @@ def test_multi_gp_uncertain_regression():
         tst_cov = np.random.uniform(0., 2.0, size=(n_gps, n_gps))
         # make PSD
         tst_cov = np.dot(tst_cov.T, tst_cov)
-        hf.create_dataset("tst_mu%i"%(n),data = tst_mu)
-        hf.create_dataset("tst_cov%i"%(n),data = tst_cov)
+        #hf.create_dataset("tst_mu%i"%(n),data = tst_mu)
+        #hf.create_dataset("tst_cov%i"%(n),data = tst_cov)
 
         pred_mean, pred_cov = multi_gp_uncertain_regression(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn)
         sampling_mean, sampling_cov = \
             multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
                 
-        hf.create_dataset("pred_mean%i"%(n),data = pred_mean)
-        hf.create_dataset("pred_cov%i"%(n),data = pred_cov)
-        hf.create_dataset("sampling_mean%i"%(n),data = sampling_mean)
-        hf.create_dataset("sampling_cov%i"%(n),data = sampling_cov)
+        #hf.create_dataset("pred_mean%i"%(n),data = pred_mean)
+        #hf.create_dataset("pred_cov%i"%(n),data = pred_cov)
+        #hf.create_dataset("sampling_mean%i"%(n),data = sampling_mean)
+        #hf.create_dataset("sampling_cov%i"%(n),data = sampling_cov)
 
         print "predicted:"
         print "means=", pred_mean
@@ -474,7 +475,60 @@ def test_multi_gp_uncertain_regression():
         print
         print
 
+def file_test_multi_gp_uncertain_regression():
+    
+    h5train = h5py.File("bin/Debug/TrainData.h5",'r')
+    h5test = h5py.File("bin/Debug/TestData.h5",'r')
+    np.random.seed(1)
 
+    n_sampling = 2000
+
+    l = h5train.get("Lengthscale")
+    cov_fn = dict(type='SE', l=l[0])
+
+    trn_x = np.asarray(h5train.get("Trn_X"),dtype = float)
+    trn_x = trn_x[0]
+    trn_y = np.asarray(h5train.get("Trn_T") ,dtype = float)
+    trn_y = trn_y[0]
+    trn_sigma = np.asarray(h5train.get("Trn_Sigma"),dtype = float)
+    trn_sigma = trn_sigma[0]
+
+    tst_mus = np.asarray(h5test.get("In_Mean"),dtype = float)
+    tst_covs = np.asarray(h5test.get("In_Cov"),dtype = float)
+
+    file_pred_mus = np.asarray(h5test.get("Pred_Mean"),dtype = float)
+    file_pred_covs = np.asarray(h5test.get("Pred_Cov"),dtype = float)
+
+    n_training = trn_x.shape[1]
+    n_test = tst_mus.shape[0]
+    n_gps = l.shape[1]
+
+    print "n_training = %d\n"%(n_training)
+    print "n_test = %d\n"%(n_test)
+    print "n_gps = %d\n"%(n_gps)
+    # sample some test points
+    for n in range(n_test):
+        tst_mu = tst_mus[n][0]
+        tst_cov = tst_covs[n][0]
+
+        pred_mean, pred_cov = multi_gp_uncertain_regression(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn)
+        sampling_mean, sampling_cov = \
+            multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
+                
+
+        print "predicted:"
+        print "means=", pred_mean
+        print "cov=\n", pred_cov
+        print
+        print "sampled:"
+        print "means=", sampling_mean
+        print "cov=\n", sampling_cov
+        print
+        print "file predicted:"
+        print "means=", file_pred_mus[n][0]
+        print "cov=\n", file_pred_covs[n][0]
+        print
+        print
 
 def cov_id(x, y):
     return x * y
@@ -609,8 +663,8 @@ if __name__ == '__main__':
     # demo_regression()
 
     #test_gp_uncertain_regression()
-    
-    test_multi_gp_uncertain_regression()
+    #test_multi_gp_uncertain_regression()
+    file_test_multi_gp_uncertain_regression()
 
     #debug_cuda()
 
