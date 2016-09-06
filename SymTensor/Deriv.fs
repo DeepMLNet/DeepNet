@@ -79,6 +79,9 @@ module Deriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
+            | Interpolate1D ip -> 
+                let ipd = Expr.getDerivativeOfInterpolator1D ip
+                egExpanded * padLeft (Expr.interpolate1D ipd a) |> reverseDiffStep a
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Invert -> -expr.T .* egExpanded .* expr.T |> reverseDiffStep a

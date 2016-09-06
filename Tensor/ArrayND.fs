@@ -1095,6 +1095,23 @@ module ArrayND =
     let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
         a.Invert () :?> 'A
 
+    /// calculates the pairwise differences along the given axis
+    let diffAxis ax (a: #ArrayNDT<'T>) =
+        checkAxis ax a
+        let shftRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (Some 1, None)
+                else yield RngAll]
+        let cutRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2))
+                else yield RngAll]
+        a.[shftRng] - a.[cutRng]
+
+    /// calculates the pairwise differences along the last axis
+    let diff (a: #ArrayNDT<'T>) =
+        diffAxis (a.NDims-1) a
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // concatenation
     ////////////////////////////////////////////////////////////////////////////////////////////////         

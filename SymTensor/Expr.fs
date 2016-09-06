@@ -31,17 +31,13 @@ module Expr =
     type IInterpolator = 
         inherit System.IComparable
 
-    type InterpolationModeT =
-        | Clamp
-        | Mirror
-
     type Interpolator1DT<'T> = 
         {
             Id:         int
-            MinValue:   'T
-            MaxValue:   'T
+            MinArg:   'T
+            MaxArg:   'T
             Resolution: 'T
-            Mode:       InterpolationModeT
+            Derivative: Interpolator1DT<'T> option
         } 
         
         interface IInterpolator 
@@ -949,18 +945,40 @@ module Expr =
         Nary (Elements (trgtShp, elemExpr), args) |> check
 
 
-    let interpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
+    let private interpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
+    let private derivativeOfInterpolators1D = new Dictionary<IInterpolator, IInterpolator>()
 
-    let createInterpolator1D (data: ArrayNDT<'T>) (minValue: 'T) 
-                             (maxValue: 'T) (resolution: 'T) =
+    let createInterpolator1D (table: ArrayNDT<'T>) (minArg: 'T) 
+                             (maxArg: 'T) (resolution: 'T) derivative =
         let ip = {
             Id = interpolators1D.Count
-            MinValue = minValue
-            MaxValue = maxValue
+            MinArg = minArg
+            MaxArg = maxArg
             Resolution = resolution
+            Derivative = derivative
         }
-        interpolators1D.Add (ip, data)
+        interpolators1D.Add (ip, table)
         ip
+
+    let getInterpolatorData1D ip =
+        if interpolators1D.ContainsKey ip then interpolators1D.[ip] :?> ArrayNDT<'T>
+        else failwithf "interpolator %A was not created" ip
+
+    let getDerivativeOfInterpolator1D (ip: Interpolator1DT<'T>) =
+        match ip.Derivative with
+        | Some ipd -> ipd  // use provided derivative table
+        | None ->          // create derivative table by numeric differentiation
+            if derivativeOfInterpolators1D.ContainsKey ip then 
+                derivativeOfInterpolators1D.[ip] :?> Interpolator1DT<'T>
+            else
+                let tbl = getInterpolatorData1D ip 
+                let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType ip.Resolution tbl
+                let minArg = conv<float> ip.MinArg + 0.5 * conv<float> ip.Resolution |> conv<'T>
+                let maxArg = conv<float> ip.MaxArg - 0.5 * conv<float> ip.Resolution |> conv<'T>
+                if minArg >= maxArg then failwith "interpolation table is empty"
+                let ipd = createInterpolator1D diffTbl minArg maxArg ip.Resolution None
+                derivativeOfInterpolators1D.Add (ip, ipd)
+                ipd
 
     let interpolate1D interpolator a =
         Unary (Interpolate1D interpolator, a) |> check
