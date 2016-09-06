@@ -27,7 +27,7 @@ module HostEval =
 
             match idx with
             | _ when idx < 0 -> tbl.[[0]]
-            | _ when idx >= tbl.Shape.[0] -> tbl.[[tbl.Shape.[0] - 1]]
+            | _ when idx > tbl.Shape.[0] - 2 -> tbl.[[tbl.Shape.[0] - 1]]
             | _ ->
                 (1.0 - fac) * conv<float> tbl.[[idx]] + fac * conv<float> tbl.[[idx+1]]
                 |> conv<'T>
