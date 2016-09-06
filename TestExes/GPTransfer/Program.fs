@@ -31,8 +31,8 @@ module Program =
         let rand = Random()
 
         let ngps = 3
-        let ntraining = 10
-        let ntest = 10
+        let ntraining = 30
+        let ntest = 2
 
         let cov: ExprT<single> = Expr.var "cov" [SizeSpec.broadcastable;SizeSpec.symbol "nGPs"; SizeSpec.symbol "nGPs"]
         let psd = cov.* cov
@@ -57,7 +57,7 @@ module Program =
         let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
-        
+  
         let randomSortedListOfLength (rand:Random) (minValue,maxValue) length =
             [1..length] |> List.map (fun _ -> rand.NextDouble())
             |> List.map (fun x -> (single x))
@@ -66,9 +66,23 @@ module Program =
 
         let randomSortedLists (rand:Random) (minValue,maxValue) length = 
             List.map (fun _ -> randomSortedListOfLength rand (minValue,maxValue) length)
+        
 
-        let trn_x_host = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining |> ArrayNDHost.ofList2D
-        let trn_t_host = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining |> ArrayNDHost.ofList2D
+
+        let trn_x_list = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining 
+        let trn_x_host = trn_x_list |> ArrayNDHost.ofList2D
+
+        let randPolynomial (rand:Random) list = 
+            let fsng x = single x
+            let isng x = single x
+            let fact1 = fsng (rand.NextDouble())
+            let fact2 = fsng (rand.NextDouble())
+            let pow1 = isng (rand.Next(1,2))
+            let pow2 = isng (rand.Next(1,2))
+            list |> List.map (fun x ->   fact1 *x** pow1 - fact2 *x** pow2)
+
+        let trn_t_list = trn_x_list |> List.map(fun list -> randPolynomial rand list)
+        let trn_t_host = trn_t_list |> ArrayNDHost.ofList2D
 
         let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
 //        let trn_x_host =  rand.SortedUniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
@@ -82,7 +96,8 @@ module Program =
             Trn_T = trn_t_host;
             Trn_Sigma = trn_sigma_host}
         let trainData = [trainInp] |> Dataset.FromSamples
-        trainData.Save("TrainData.h5")
+        let trainFileName = sprintf "TrainData.h5"
+        trainData.Save(trainFileName)
 
         let ls_val = ls_host |> post device
         let trn_x_val = trn_x_host  |> post device
@@ -127,17 +142,20 @@ module Program =
 
             testInOut
         
+        printfn "Testing Multi GP Transfer Model"
         let testList = [1..ntest]
                        |> List.map (fun _-> randomTest () )
 
 
 
         let testData = testList |> Dataset.FromSamples
-        testData.Save("TestData.h5")
+        let testFileName = sprintf "TestData.h5"
+        testData.Save(testFileName)
 
     [<EntryPoint>]
     let main argv = 
-        TestUtils.evalHostCuda testMultiGPLayer
+        testMultiGPLayer DevHost
+        //TestUtils.evalHostCuda testMultiGPLayer
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore

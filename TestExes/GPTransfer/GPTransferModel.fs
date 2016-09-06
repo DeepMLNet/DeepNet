@@ -215,7 +215,7 @@ module MultiGPLayer =
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
-
+        
         // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
@@ -237,6 +237,14 @@ module MultiGPLayer =
         let pred_cov_without_var = 
             (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
             (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
+        
+        let meankmeanl = 
+            (Expr.reshape [nSmpls; nGps; bc] pred_mean) .*
+            (Expr.reshape [nSmpls; bc; nGps] pred_mean)
+        ///[smpl, gp1, gp2, 1, 1] - [smpl, gp1] .* [smpl, gp2]
+        let pred_cov_without_var = 
+            pred_cov_without_var -
+            (Expr.reshape [nSmpls; nGps; nGps;one;one] meankmeanl)
         let pred_cov_without_var =
             pred_cov_without_var |> Expr.reshape [nSmpls; nGps; nGps]
 
