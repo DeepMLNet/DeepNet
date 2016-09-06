@@ -7,7 +7,7 @@ open Basics
 open ArrayNDNS
 open SymTensor
 open UExprTypes
-
+open SymTensor.Compiler
 
 
 module CudaEval =
@@ -73,8 +73,11 @@ module CudaEval =
 
         // compile expression and create workspace
         let cudaCompileEnv = {
-            VarStorLoc       = varLocs
-            ElemFuncsOpNames = Map.empty    
+            VarStorLoc           = varLocs
+            ElemFuncsOpNames     = Map.empty    
+            TextureObjects       = ResizeArray<TextureObjectT>()
+            InterpolatorTextures = Dictionary<IInterpolator1D, TextureObjectT>()
+            ConstantValues       = Dictionary<MemConstManikinT, IArrayNDCudaT>()
         }
         let rcpt = CudaRecipe.build cudaCompileEnv mergedUexpr
         let workspace = new CudaExprWorkspace (rcpt)

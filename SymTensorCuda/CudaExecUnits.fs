@@ -679,6 +679,7 @@ module CudaExecUnit =
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
+            | MemConst _
             | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
             | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
 
@@ -729,11 +730,8 @@ module CudaExecUnit =
         | UUnaryOp Floor -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcsDfltCh
         | UUnaryOp Round -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcsDfltCh
         | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
-        | UUnaryOp (Interpolate1D ip) ->
-            let argTmpl = Interpolate1DEOpArgTmpl (ip, compileEnv)
-            if argTmpl.NeedInit then
-                submitInit [All]
-            execItemsForElemwise dfltChTrgt argTmpl srcsDfltCh
+        | UUnaryOp (Interpolate1D ip) -> 
+            execItemsForElemwise dfltChTrgt (Interpolate1DEOpArgTmpl (ip, compileEnv)) srcsDfltCh
         // reductions
         | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
         | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]

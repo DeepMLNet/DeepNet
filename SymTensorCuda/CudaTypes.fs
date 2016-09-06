@@ -50,6 +50,8 @@ module Types =
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator
         InterpolatorTextures:       Dictionary<IInterpolator1D, TextureObjectT>
+        /// values for constants
+        ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
     }
 
     /// function domain (kernel only or host code that may call kernels)
@@ -93,6 +95,7 @@ module Types =
         mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
         mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObject>
+        ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
     }
     
     /// CUDA device memory range
@@ -129,13 +132,23 @@ module Types =
 module CudaCompileEnv =
 
     /// creates a new texture object
-    let newTextureObject env contents descriptor =
+    let newTextureObject (env: CudaCompileEnvT) contents descriptor =
+        if not (ArrayND.isC contents && contents.Layout.Offset = 0) then
+            failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
             Contents   = contents
             Descriptor = descriptor
         }
         env.TextureObjects.Add texObj
         texObj
+
+    let newConstant (env: CudaCompileEnvT) (value: IArrayNDCudaT) =   
+        let mc : MemConstManikinT = {
+            Id = env.ConstantValues.Keys.Count
+            TypeName = TypeName.ofTypeInst value.DataType
+        }
+        env.ConstantValues.Add (mc, value)
+        ArrayNDManikinT (value.Layout, MemConst mc)
 
 
 module CudaExecEnv = 
@@ -155,6 +168,9 @@ module CudaExecEnv =
             if ArrayND.isC ev then 
                 ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
             else failwithf "external variable %A was expected to be contiguous" vs
+        | MemConst mc -> 
+            let ary = env.ConstantValues.[mc]
+            ary.Storage.ByteData, 0            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -287,6 +303,7 @@ module ArgTemplates =
                     match memManikin with
                     | MemAlloc im -> env.InternalMem.[im]
                     | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
+                    | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
 
     type SizeTArgTmpl (value: int) =
@@ -502,24 +519,41 @@ module ArgTemplates =
     type Interpolate1DEOpArgTmpl (ip:           IInterpolator1D,
                                   compileEnv:   CudaCompileEnvT) =
 
-        let tbl = Expr.getInterpolatorTable1D ip :> IArrayNDCudaT
+        let tbl = 
+            match Expr.getInterpolatorTable1DAsIArrayNDT ip with
+            | :? IArrayNDCudaT as tbl -> tbl
+            | _ -> failwith "interpolation table must be stored on CUDA device"
         
-        ArrayNDManikinT()
-        tbl.Storage
+        do if tbl.DataType <> typeof<single> then
+            failwith "interpolation on CUDA device is currently only supported for the single data type"
 
-        let texture, needInit =
+        let texture, needInit, tblCnst =
             if compileEnv.InterpolatorTextures.ContainsKey ip then
-                compileEnv.InterpolatorTextures.[ip], false
+                compileEnv.InterpolatorTextures.[ip], false, None
             else
-                let t = CudaCompileEnv.newTextureObject compileEnv
+                let tblCnst = CudaCompileEnv.newConstant compileEnv tbl
+                let adrMode =
+                    match ip.Outside with
+                    | Zero -> CUAddressMode.Border
+                    | Nearest -> CUAddressMode.Clamp
+                let filterMode =
+                    match ip.Mode with
+                    | InterpolateLinearaly -> CUFilterMode.Linear
+                    | InterpolateToLeft -> CUFilterMode.Point
+                let desc =
+                    CudaTextureDescriptor (adrMode, filterMode, CUTexRefSetFlags.None)
+                let t = CudaCompileEnv.newTextureObject compileEnv tblCnst desc
                 compileEnv.InterpolatorTextures.Add (ip, t)
-                t, true
+                t, true, Some tblCnst
 
         member this.NeedInit = needInit
 
         interface ICudaArgTmpl with
             member this.CPPTypeName = "Interpolate1DEOp_t"
             member this.GetArg env strm = 
+                printfn "data=%A" tbl
+                let tblCnstAry = CudaExecEnv.getArrayNDForManikin env tblCnst.Value
+                printfn "tblCnst=%A" tblCnstAry
                 Interpolate1DEOpArg (env.TextureObject.[texture].TexObject, 
                                      ip.MinArg, ip.MaxArg, ip.Resolution)
                 |> box

@@ -29,12 +29,18 @@ module ArrayNDManikinTypes =
         member this.ByteSize =
             this.Elements * TypeName.size this.TypeName
 
+    type MemConstManikinT = {
+        Id:             int
+        TypeName:       TypeNameT
+    }
+
     /// Represents memory. 
     /// Memory can either be internal to this expression or external (passed in variable at runtime).
     /// Memory can either be on the host or the accelerator.
     type MemManikinT =
         | MemAlloc of MemAllocManikinT
         | MemExternal of UVarSpecT
+        | MemConst of MemConstManikinT
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
@@ -49,6 +55,7 @@ module ArrayNDManikinTypes =
             match storage with
             | MemAlloc {TypeName=tn} -> tn
             | MemExternal vs -> vs.TypeName
+            | MemConst mc -> mc.TypeName
 
         override this.Item
             with get pos = failwith "ArrayNDManikin does not store data"

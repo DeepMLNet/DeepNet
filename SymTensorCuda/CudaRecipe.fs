@@ -5,6 +5,7 @@ open System.Diagnostics
 open ManagedCuda
 open Basics
 open Basics.Cuda
+open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
@@ -31,7 +32,7 @@ module CudaRecipeTypes =
         | EventRecord       of EventObjectT * StreamT
         | EventSynchronize  of EventObjectT
         // texture object management
-        | TextureCreate     of TextureObjectT * ArrayNDManikinT * BasicTypes.CudaTextureDescriptor
+        | TextureCreate     of TextureObjectT
         | TextureDestroy    of TextureObjectT
         // execution control
         | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
@@ -55,6 +56,7 @@ module CudaRecipeTypes =
         InitCalls:          CudaCallT list
         DisposeCalls:       CudaCallT list
         ExecCalls:          CudaCallT list
+        ConstantValues:     Map<MemConstManikinT, IArrayNDCudaT>
     }
 
 
@@ -268,7 +270,7 @@ module CudaRecipe =
         generate [] [] streams
 
     /// generates init and dispose calls for CUDA resources
-    let generateAllocAndDispose memAllocs streamCnt eventObjCnt =
+    let generateAllocAndDispose compileEnv memAllocs streamCnt eventObjCnt =
         let memAllocCalls = 
             memAllocs 
             |> List.map CudaCallT.MemAlloc
@@ -296,7 +298,17 @@ module CudaRecipe =
             |> Seq.map (fun evntId -> EventDestory(evntId))
             |> Seq.toList        
 
-        memAllocCalls @ streamAllocCalls @ eventAllocCalls, eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls
+        let textureAllocCalls =
+            compileEnv.TextureObjects
+            |> Seq.map TextureCreate
+            |> Seq.toList
+        let textureDisposeCalls = 
+            compileEnv.TextureObjects
+            |> Seq.map TextureDestroy
+            |> Seq.toList
+
+        memAllocCalls @ streamAllocCalls @ eventAllocCalls @ textureAllocCalls, 
+        eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls @ textureDisposeCalls
 
     /// generate initalization CUDA calls
     let generateInitCalls initItems cache =
@@ -332,7 +344,7 @@ module CudaRecipe =
         let sw = Stopwatch.StartNew()
         let execCalls = generateCalls streams tmplInstCache
         let allocCalls, disposeCalls = 
-            generateAllocAndDispose euData.MemAllocs (List.length streams) eventObjCnt
+            generateAllocAndDispose compileEnv euData.MemAllocs (List.length streams) eventObjCnt
         let initCalls =
             allocCalls @ generateInitCalls euData.InitItems tmplInstCache
         let timeForCalls = sw.Elapsed
@@ -351,11 +363,12 @@ module CudaRecipe =
 
 
         {
-            KernelCode = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
-            CPPCode = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache
-            InitCalls = initCalls
-            DisposeCalls = disposeCalls
-            ExecCalls = execCalls
+            KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
+            CPPCode        = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache
+            InitCalls      = initCalls
+            DisposeCalls   = disposeCalls
+            ExecCalls      = execCalls
+            ConstantValues = compileEnv.ConstantValues |> Map.ofDictionary
         }
 
 

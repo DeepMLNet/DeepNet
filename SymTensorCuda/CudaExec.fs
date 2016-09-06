@@ -254,13 +254,14 @@ module CudaExprWorkspaceTypes =
 
         /// execution environment
         let execEnv = {
-            Stream = new Dictionary<StreamT, CudaStream>()
-            Event = new Dictionary<EventObjectT, CudaEvent>()
-            InternalMem = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>()
-            RegHostMem = new Dictionary<MemAllocManikinT, RegHostMemT>()
-            ExternalVar = Map.empty
-            HostVar = Map.empty
-            TextureObject = new Dictionary<TextureObjectT, CudaTexObject>()
+            Stream         = new Dictionary<StreamT, CudaStream>()
+            Event          = new Dictionary<EventObjectT, CudaEvent>()
+            InternalMem    = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>()
+            RegHostMem     = new Dictionary<MemAllocManikinT, RegHostMemT>()
+            ExternalVar    = Map.empty
+            HostVar        = Map.empty
+            TextureObject  = new Dictionary<TextureObjectT, CudaTexObject>()
+            ConstantValues = recipe.ConstantValues
         }
 
         /// all kernel calls
@@ -383,13 +384,15 @@ module CudaExprWorkspaceTypes =
                     execEnv.Event.[evnt].Synchronize()
 
                 // texture object management
-                | TextureCreate (tex, data, texDsc) ->
-                    let devVar, offset = CudaExecEnv.getDevMemForManikin execEnv data
+                | TextureCreate tex ->
+                    let devVar, _ = CudaExecEnv.getDevMemForManikin execEnv tex.Contents
                     use devVarFloat = new CudaDeviceVariable<single>(devVar.DevicePointer, devVar.SizeInBytes)
                     let resDsc = CudaResourceDesc (devVarFloat)
-                    let texObj = new CudaTexObject (resDsc, texDsc)
+                    let texObj = new CudaTexObject (resDsc, tex.Descriptor)
+                    printfn "created texture: %A" texObj.TexObject.Pointer
                     execEnv.TextureObject.[tex] <- texObj
                 | TextureDestroy tex -> 
+                    printfn "Disposing texture"
                     if execEnv.TextureObject.ContainsKey tex then
                         execEnv.TextureObject.[tex].Dispose()
                         execEnv.TextureObject.Remove(tex) |> ignore

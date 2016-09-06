@@ -71,7 +71,10 @@ module Program =
 
     [<EntryPoint>]
     let main argv = 
-        TestUtils.evalHostCuda testMultiGPLayer
+
+        OpTests.``Interpolate1D: simple test on CUDA`` ()
+
+        //TestUtils.evalHostCuda testMultiGPLayer
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore

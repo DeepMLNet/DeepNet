@@ -996,9 +996,13 @@ module Expr =
         ip
 
     /// Gets the function value table for the specified one-dimensional interpolator.
-    let getInterpolatorTable1D ip =
-        if tablesOfInterpolators1D.ContainsKey ip then tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
+    let getInterpolatorTable1DAsIArrayNDT ip =
+        if tablesOfInterpolators1D.ContainsKey ip then tablesOfInterpolators1D.[ip] 
         else failwithf "interpolator %A is unknown" ip
+
+    /// Gets the function value table for the specified one-dimensional interpolator.
+    let getInterpolatorTable1D ip =
+        getInterpolatorTable1DAsIArrayNDT ip :?> ArrayNDT<'T>
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
