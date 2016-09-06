@@ -9,8 +9,24 @@ open ShapeSpec
 open VarSpec
 
 
-module Expr =
+[<AutoOpen>]
+module ExprTypes =
+    /// extrapolation behaviour
+    type OutsideInterpolatorRangeT =
+        /// zero outside interpolation range
+        | Zero
+        /// clamp to nearest value outside interpolation range
+        | Nearest
 
+    /// interpolation mode
+    type InterpolationModeT =
+        /// linear interpolation
+        | InterpolateLinearaly
+        /// interpolate to the table element left of the argument
+        | InterpolateToLeft
+
+/// expression module
+module Expr =
     open ArrayND
 
     /// boxes the contents of an option
@@ -41,9 +57,10 @@ module Expr =
             MinArg:     'T
             /// maximum argument value
             MaxArg:     'T
-            /// interpolation table resolution 
-            /// (i.e. argument value difference between neighbouring entries)
-            Resolution: 'T
+            /// interpolation behaviour
+            Mode:       InterpolationModeT
+            /// extrapolation behaviour
+            Outside:    OutsideInterpolatorRangeT
             /// interpolator for derivative
             Derivative: Interpolator1DT<'T> option
         }        
@@ -467,8 +484,8 @@ module Expr =
                     if nda < 2 then
                         failwithf "need at least a matrix to invert but got shape %A" sa
                     sa.[nda-2] .= sa.[nda-1]
-                | Interpolate1D {Resolution=res} when conv<float> res <= 0.0 ->
-                    failwithf "resolution of interpolation must be positive"
+                | Interpolate1D {MinArg=minArg; MaxArg=maxArg} when not (conv<float> minArg < conv<float> maxArg) ->
+                    failwithf "minArg of interpolator must be smaller than maxArg"
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -968,14 +985,17 @@ module Expr =
     /// Creates a one-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
-    let createInterpolator1D (table: ArrayNDT<'T>) (minArg: 'T) 
-                             (maxArg: 'T) (resolution: 'T) 
+    let createInterpolator1D (table: ArrayNDT<'T>) (minArg: 'T) (maxArg: 'T) 
+                             (mode: InterpolationModeT) (outside: OutsideInterpolatorRangeT)
                              (derivative: Interpolator1DT<'T> option) =
+        if table.NDims <> 1 then failwith "interpolation table must be one-dimensional"
+        if table.NElems < 2 then failwith "interpolation table must contain at least 2 entries"
         let ip = {
             Id = tablesOfInterpolators1D.Count
             MinArg = minArg
             MaxArg = maxArg
-            Resolution = resolution
+            Mode = mode
+            Outside = outside
             Derivative = derivative
         }
         lock tablesOfInterpolators1D 
@@ -984,7 +1004,10 @@ module Expr =
 
     /// Gets the function value table for the specified one-dimensional interpolator.
     let getInterpolatorTable1D ip =
-        if tablesOfInterpolators1D.ContainsKey ip then tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
+        if tablesOfInterpolators1D.ContainsKey ip then 
+            let tbl = tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
+            let resolution = (conv<float> ip.MaxArg - conv<float> ip.MinArg) / float (tbl.NElems - 1)
+            tbl, resolution
         else failwithf "interpolator %A is unknown" ip
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
@@ -996,12 +1019,16 @@ module Expr =
             if derivativeOfInterpolators1D.ContainsKey ip then 
                 derivativeOfInterpolators1D.[ip] :?> Interpolator1DT<'T>
             else
-                let tbl = getInterpolatorTable1D ip 
-                let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType ip.Resolution tbl
-                let minArg = conv<float> ip.MinArg + 0.5 * conv<float> ip.Resolution |> conv<'T>
-                let maxArg = conv<float> ip.MaxArg - 0.5 * conv<float> ip.Resolution |> conv<'T>
-                if minArg >= maxArg then failwith "interpolation table is empty"
-                let ipd = createInterpolator1D diffTbl minArg maxArg ip.Resolution None
+                let tbl, resolution = getInterpolatorTable1D ip                 
+                let diffTbl =
+                    match ip.Mode with
+                    | InterpolateLinearaly ->
+                        let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType (conv<'T> resolution) tbl
+                        let zero = ArrayND.zerosOfSameType [1] diffTbl
+                        ArrayND.concat 0 [diffTbl; zero]
+                    | InterpolateToLeft ->
+                        ArrayND.zerosLike tbl
+                let ipd = createInterpolator1D diffTbl ip.MinArg ip.MaxArg InterpolateToLeft Zero None
                 lock derivativeOfInterpolators1D
                     (fun () -> derivativeOfInterpolators1D.Add (ip, ipd))
                 ipd
@@ -1022,6 +1049,7 @@ module ExprTypes2 =
     type IOp<'T> = Expr.IOp<'T>
     type IUOp = UExprTypes.IUOp
     type ExprT<'T> = Expr.ExprT<'T>
+
     
 
 

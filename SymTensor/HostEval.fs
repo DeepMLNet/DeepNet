@@ -18,19 +18,21 @@ module HostEval =
     let mutable debug = false
 
     let private doInterpolate1D (ip: Interpolator1DT<'T>) (a: ArrayNDHostT<'T>) : ArrayNDHostT<'T> =
-        let tbl = Expr.getInterpolatorTable1D ip
+        let tbl, resolution = Expr.getInterpolatorTable1D ip
         a |> ArrayND.map (fun x ->
-            let pos = (conv<float> x - conv<float> ip.MinArg) / conv<float> ip.Resolution
+            let pos = (conv<float> x - conv<float> ip.MinArg) / conv<float> resolution
             let posLeft = floor pos 
             let fac = pos - posLeft
             let idx = int posLeft 
 
-            match idx with
-            | _ when idx < 0 -> tbl.[[0]]
-            | _ when idx > tbl.Shape.[0] - 2 -> tbl.[[tbl.Shape.[0] - 1]]
-            | _ ->
-                (1.0 - fac) * conv<float> tbl.[[idx]] + fac * conv<float> tbl.[[idx+1]]
-                |> conv<'T>
+            match idx, ip.Outside, ip.Mode with
+            | _, Nearest, _ when idx < 0 -> tbl.[[0]]
+            | _, Zero, _ when idx < 0 -> 0.0
+            | _, Nearest, _ when idx > tbl.Shape.[0] - 2 -> tbl.[[tbl.Shape.[0] - 1]]
+            | _, Zero, _ when idx > tbl.Shape.[0] - 2 -> 0.0
+            | _, _, InterpolateLinearaly -> (1.0 - fac) * conv<float> tbl.[[idx]] + fac * conv<float> tbl.[[idx+1]]
+            | _, _, InterpolateToLeft -> tbl.[[idx]]
+            |> conv<'T>
         )
 
     /// evaluate expression to numeric array 

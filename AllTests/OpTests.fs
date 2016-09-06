@@ -90,15 +90,13 @@ let ``Singular matrix inverse`` () =
 
 
 [<Fact>]
-let ``Interpolate1D: simple test`` () =    
-
+let ``Interpolate1D: simple test on host`` () =    
         let tbl = [1.0; 2.0; 3.0; 4.0; 5.0; 6.0]
                   |> ArrayNDHost.ofList
         let minVal = 1.0
         let maxVal = 6.0
-        let resolution = 1.0
 
-        let ip = Expr.createInterpolator1D tbl minVal maxVal resolution None
+        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
 
         let nSmpls = SizeSpec.symbol "nSmpls"
         let inp = Expr.var "inp" [nSmpls]
@@ -107,11 +105,48 @@ let ``Interpolate1D: simple test`` () =
 
         let inpVal = [-0.5; 0.9; 1.0; 1.5; 2.3; 5.9; 6.0; 6.5; 200.0]
                      |> ArrayNDHost.ofList
+        let expVal = [ 1.0; 1.0; 1.0; 1.5; 2.3; 5.9; 6.0; 6.0; 6.0]
+                     |> ArrayNDHost.ofList
         let resVal = fn inpVal
 
         printfn "tbl=\n%A" tbl
         printfn "inp=\n%A" inpVal
         printfn "res=\n%A" resVal
+
+        ArrayND.almostEqual resVal expVal |> ArrayND.value |> should equal true
+
+
+[<Fact>]
+let ``Interpolate1D: derivative test on host`` () =    
+        let tbl = [1.0; 2.0; 4.0; 7.0; 11.0; 16.0]
+                  |> ArrayNDHost.ofList
+        let minVal = 1.0
+        let maxVal = 6.0
+
+        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+
+        let nSmpls = SizeSpec.symbol "nSmpls"
+        let inp = Expr.var "inp" [nSmpls]
+        let expr = Expr.interpolate1D ip inp
+        let dexpr = Deriv.compute expr
+        let dinp = dexpr |> Deriv.ofVar inp
+        let fn = Func.make DevHost.DefaultFactory dinp |> arg1 inp
+
+        let inpVal = [-0.5; 0.9; 1.0; 1.5; 2.3; 5.9; 6.0; 6.5; 200.0]
+                     |> ArrayNDHost.ofList
+        let expVal = [ 0.0; 0.0; 1.0; 1.0; 2.0; 5.0; 0.0; 0.0; 0.0]
+                     |> ArrayNDHost.ofList |> ArrayND.diagMat
+        let resVal = fn inpVal
+
+        printfn "derivative:"
+        printfn "tbl=\n%A" tbl
+        printfn "inp=\n%A" inpVal
+        printfn "res=\n%A" resVal
+
+        ArrayND.almostEqual resVal expVal |> ArrayND.value |> should equal true
+
+
+
 
 
 
