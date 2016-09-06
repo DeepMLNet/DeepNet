@@ -216,7 +216,7 @@ module MultiGPLayer =
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
 
-        // Tr( lkLkT .* betaBeta.T )
+        // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace

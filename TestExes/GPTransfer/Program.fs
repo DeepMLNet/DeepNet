@@ -82,12 +82,15 @@ module Program =
         mi.ParameterStorage.[!mgp.TrnT] <- trn_t_val
         mi.ParameterStorage.[!mgp.TrnSigma] <- trn_sigma_val
 
+
+        ///generates random test inputs
         let randomTest () =
             let inp_meanhost = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
             let inp_mean_val = inp_meanhost |> post device
 
-            let inp_covhost =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
-            let inp_covhost = fPsd inp_covhost
+//            let inp_covhost =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
+//            let inp_covhost = fPsd inp_covhost
+            let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
             let inp_cov_val = inp_covhost |> post device
             
             
