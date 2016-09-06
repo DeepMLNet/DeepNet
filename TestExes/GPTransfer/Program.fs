@@ -27,6 +27,7 @@ module Program =
 
     let testMultiGPLayer device =
 
+        
         let seed = 1
         let rand = Random(seed)
 
@@ -34,10 +35,11 @@ module Program =
         let ntraining = 10
         let ntest = 10
 
-        let m: ExprT<single> = Expr.var "m" [SizeSpec.symbol "nTstSmpls";SizeSpec.symbol "nGPs"; SizeSpec.symbol "nGPs"]
-        let psd = m.* m
+        let cov: ExprT<single> = Expr.var "cov" [SizeSpec.broadcastable;SizeSpec.symbol "nGPs"; SizeSpec.symbol "nGPs"]
+        let psd = cov.* cov
         let cmplr = DevHost.Compiler, CompileEnv.empty
-        let makePsd = Func.make cmplr psd |> arg1 m
+        let fPsd = Func.make cmplr psd |> arg1 cov
+
 
         let mb = ModelBuilder<single> "Test"
 
@@ -85,28 +87,28 @@ module Program =
             let inp_mean_val = inp_meanhost |> post device
 
             let inp_covhost =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
-            let inp_covhost = makePsd inp_covhost
+            let inp_covhost = fPsd inp_covhost
             let inp_cov_val = inp_covhost |> post device
-
-
-        let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
-
+            
+            
+            let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
+            
             let testInOut = {
                 In_Mean = inp_meanhost;
                 In_Cov = inp_covhost;
                 Pred_Mean = pred_mean;
                 Pred_Cov = pred_cov}
 
-        printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
-        printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
-        printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
-        printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
-        printfn ""
-        printfn "inp_mean=\n%A" inp_mean_val
-        printfn "inp_cov=\n%A" inp_cov_val
-        printfn ""
-        printfn "pred_mean=\n%A" pred_mean
-        printfn "pred_cov=\n%A" pred_cov
+            printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
+            printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
+            printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
+            printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
+            printfn ""
+            printfn "inp_mean=\n%A" inp_mean_val
+            printfn "inp_cov=\n%A" inp_cov_val
+            printfn ""
+            printfn "pred_mean=\n%A" pred_mean
+            printfn "pred_cov=\n%A" pred_cov
 
             testInOut
         
