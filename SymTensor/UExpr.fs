@@ -118,6 +118,7 @@ module UExpr =
         | Unary (Expr.Floor, a)         -> unary Floor a
         | Unary (Expr.Round, a)         -> unary Round a
         | Unary (Expr.Truncate, a)      -> unary Truncate a
+        | Unary (Expr.Interpolate1D ip, a) -> unary (Interpolate1D ip) a
         | Unary (Expr.Diag (ax1, ax2), a) -> unary (Diag (ax1, ax2)) a
         | Unary (Expr.DiagMat (ax1, ax2), a)  -> unary (DiagMat (ax1, ax2)) a
         | Unary (Expr.Invert, a)        -> unary Invert a

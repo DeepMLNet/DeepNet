@@ -18,7 +18,7 @@ module HostEval =
     let mutable debug = false
 
     let private doInterpolate1D (ip: Interpolator1DT<'T>) (a: ArrayNDHostT<'T>) : ArrayNDHostT<'T> =
-        let tbl = Expr.getInterpolatorData1D ip
+        let tbl = Expr.getInterpolatorTable1D ip
         a |> ArrayND.map (fun x ->
             let pos = (conv<float> x - conv<float> ip.MinArg) / conv<float> ip.Resolution
             let posLeft = floor pos 

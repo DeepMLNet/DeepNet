@@ -13,6 +13,7 @@ module Expr =
 
     open ArrayND
 
+    /// boxes the contents of an option
     let inline boxOption (oo: #obj option) = 
         match oo with
         | Some o -> Some (o :> obj)
@@ -28,20 +29,25 @@ module Expr =
         | FixedArity of int
         | DynamicArity
 
-    type IInterpolator = 
-        inherit System.IComparable
+    /// non-generic interface for Interpolator1D
+    type IInterpolator = UExprTypes.IInterpolator1D
 
+    /// one dimensional linear interpoator
     type Interpolator1DT<'T> = 
         {
+            /// ID
             Id:         int
-            MinArg:   'T
-            MaxArg:   'T
+            /// minimum argument value
+            MinArg:     'T
+            /// maximum argument value
+            MaxArg:     'T
+            /// interpolation table resolution 
+            /// (i.e. argument value difference between neighbouring entries)
             Resolution: 'T
+            /// interpolator for derivative
             Derivative: Interpolator1DT<'T> option
-        } 
-        
-        interface IInterpolator 
-        
+        }        
+        interface IInterpolator         
 
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
@@ -953,26 +959,36 @@ module Expr =
     let print msg a =
         Unary (Print msg, a) |> check
 
+    /// interpolator tables
+    let private tablesOfInterpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
 
-    let private interpolators1D = new Dictionary<IInterpolator, IArrayNDT>()
+    /// interpolator derivatives
     let private derivativeOfInterpolators1D = new Dictionary<IInterpolator, IInterpolator>()
 
+    /// Creates a one-dimensional linear interpolator,
+    /// where table contains the equally spaced function values between minArg and maxArg.
+    /// Optionally, an interpolator for the derivative can be specified.
     let createInterpolator1D (table: ArrayNDT<'T>) (minArg: 'T) 
-                             (maxArg: 'T) (resolution: 'T) derivative =
+                             (maxArg: 'T) (resolution: 'T) 
+                             (derivative: Interpolator1DT<'T> option) =
         let ip = {
-            Id = interpolators1D.Count
+            Id = tablesOfInterpolators1D.Count
             MinArg = minArg
             MaxArg = maxArg
             Resolution = resolution
             Derivative = derivative
         }
-        interpolators1D.Add (ip, table)
+        lock tablesOfInterpolators1D 
+            (fun () -> tablesOfInterpolators1D.Add (ip, table))        
         ip
 
-    let getInterpolatorData1D ip =
-        if interpolators1D.ContainsKey ip then interpolators1D.[ip] :?> ArrayNDT<'T>
-        else failwithf "interpolator %A was not created" ip
+    /// Gets the function value table for the specified one-dimensional interpolator.
+    let getInterpolatorTable1D ip =
+        if tablesOfInterpolators1D.ContainsKey ip then tablesOfInterpolators1D.[ip] :?> ArrayNDT<'T>
+        else failwithf "interpolator %A is unknown" ip
 
+    /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
+    /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
     let getDerivativeOfInterpolator1D (ip: Interpolator1DT<'T>) =
         match ip.Derivative with
         | Some ipd -> ipd  // use provided derivative table
@@ -980,15 +996,18 @@ module Expr =
             if derivativeOfInterpolators1D.ContainsKey ip then 
                 derivativeOfInterpolators1D.[ip] :?> Interpolator1DT<'T>
             else
-                let tbl = getInterpolatorData1D ip 
+                let tbl = getInterpolatorTable1D ip 
                 let diffTbl = ArrayND.diff tbl / ArrayND.scalarOfType ip.Resolution tbl
                 let minArg = conv<float> ip.MinArg + 0.5 * conv<float> ip.Resolution |> conv<'T>
                 let maxArg = conv<float> ip.MaxArg - 0.5 * conv<float> ip.Resolution |> conv<'T>
                 if minArg >= maxArg then failwith "interpolation table is empty"
                 let ipd = createInterpolator1D diffTbl minArg maxArg ip.Resolution None
-                derivativeOfInterpolators1D.Add (ip, ipd)
+                lock derivativeOfInterpolators1D
+                    (fun () -> derivativeOfInterpolators1D.Add (ip, ipd))
                 ipd
 
+    /// Element-wise one-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the createInterpolator1D function.
     let interpolate1D interpolator a =
         Unary (Interpolate1D interpolator, a) |> check
 

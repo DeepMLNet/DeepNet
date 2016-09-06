@@ -88,7 +88,33 @@ let ``Singular matrix inverse`` () =
     printfn "a=\n%A" av
     printfn "a^-1=\n%A" iav
 
-    
+
+[<Fact>]
+let ``Interpolate1D: simple test`` () =    
+
+        let tbl = [1.0; 2.0; 3.0; 4.0; 5.0; 6.0]
+                  |> ArrayNDHost.ofList
+        let minVal = 1.0
+        let maxVal = 6.0
+        let resolution = 1.0
+
+        let ip = Expr.createInterpolator1D tbl minVal maxVal resolution None
+
+        let nSmpls = SizeSpec.symbol "nSmpls"
+        let inp = Expr.var "inp" [nSmpls]
+        let expr = Expr.interpolate1D ip inp
+        let fn = Func.make DevHost.DefaultFactory expr |> arg1 inp
+
+        let inpVal = [-0.5; 0.5; 0.9; 1.0; 1.5; 2.0; 2.3; 2.7; 5.9; 6.0; 6.5; 200.0]
+                     |> ArrayNDHost.ofList
+        let resVal = fn inpVal
+
+        printfn "tbl=\n%A" tbl
+        printfn "inp=\n%A" inpVal
+        printfn "res=\n%A" resVal
+
+
+
 
 
 

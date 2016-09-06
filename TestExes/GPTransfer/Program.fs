@@ -76,13 +76,6 @@ module Program =
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore
 
-        let dataArray = ArrayNDHost.zeros<single> [100]
-
-        let a = Expr.zeroMatrix (SizeSpec.fix 3) (SizeSpec.fix 3)
-
-        let abelIp = Expr.createInterpolator1D dataArray -1.0f 3.0f 0.1f
-        let abel = Expr.interpolate1D abelIp
-        let c = abel a
 
 
         0
