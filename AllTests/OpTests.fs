@@ -105,7 +105,7 @@ let ``Interpolate1D: simple test`` () =
         let expr = Expr.interpolate1D ip inp
         let fn = Func.make DevHost.DefaultFactory expr |> arg1 inp
 
-        let inpVal = [-0.5; 0.5; 0.9; 1.0; 1.5; 2.0; 2.3; 2.7; 5.9; 6.0; 6.5; 200.0]
+        let inpVal = [-0.5; 0.9; 1.0; 1.5; 2.3; 5.9; 6.0; 6.5; 200.0]
                      |> ArrayNDHost.ofList
         let resVal = fn inpVal
 
