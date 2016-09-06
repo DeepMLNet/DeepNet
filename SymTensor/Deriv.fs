@@ -111,6 +111,7 @@ module Deriv =
                 let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
                 bc |> collapse |> reverseDiffStep a
             | StoreToVar _ -> eg |> reverseDiffStep a
+            | Print _ -> eg |> reverseDiffStep a
             | Annotated _ -> eg |> reverseDiffStep a
 
         | Binary(op, a, b) ->

@@ -46,6 +46,7 @@ module CudaExecUnitTypes =
         | ExtensionExecItem of ICudaExecItem
         // misc
         | Trace of UExprT * ArrayNDManikinT
+        | PrintWithMsg of string * ArrayNDManikinT
 
 
     type SrcReqsHelpersT = {
@@ -141,10 +142,10 @@ module CudaExecUnit =
 
     /// Returns the operation that blasArg will perform.
     let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
-        let st = ArrayND.stride manikin
-        match st.[st.Length-2 ..] with
-        | [_; 1] when not (shared && willOverwrite) -> BlasArgId
-        | [1; _] when not (shared && willOverwrite) -> BlasArgTranspose
+        let st, shp = ArrayND.stride manikin, ArrayND.shape manikin
+        match st.[st.Length-2 ..], shp.[st.Length-2 ..] with
+        | [m; 1], [ms; ns] when m >= max 1 ns && not (shared && willOverwrite) -> BlasArgId
+        | [1; n], [ms; ns] when n >= max 1 ms && not (shared && willOverwrite) -> BlasArgTranspose
         | _ -> BlasArgCopy
 
 
@@ -234,6 +235,7 @@ module CudaExecUnit =
             | LocHost -> dfltSrcWithNoViewReq
             | loc -> unsupLoc loc
         // misc
+        | UUnaryOp (Print _) -> inplaceFirstSrcReq
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
         // binary element-wise
@@ -399,6 +401,7 @@ module CudaExecUnit =
             // output of StoreToVar is empty 
             newDfltChTrgt ()
         // misc
+        | UUnaryOp (Print _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
         | UUnaryOp (Annotated _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
 
         // binary element-wise
@@ -802,6 +805,7 @@ module CudaExecUnit =
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | loc -> unsupLoc loc                              
         // misc
+        | UUnaryOp (Print msg) -> [PrintWithMsg (msg, srcsDfltCh.[0])]
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise

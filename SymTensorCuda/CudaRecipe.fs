@@ -37,8 +37,6 @@ module CudaRecipeTypes =
         | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
         | CallCFunc         of string * System.Type * StreamT * (ICudaArgTmpl list)
-        // tracing
-        | Trace             of UExprT * ArrayNDManikinT
         // execution item
         | ExecItem          of CudaExecItemT * StreamT
 
@@ -163,8 +161,6 @@ module CudaRecipe =
             [LaunchCKernel(TmplInstCache.instCPPTmplFunc ti cache, workDim, 0, strm, args)]
         | CudaExecItemT.CallCFunc(ti, dlgte, args) ->
             [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strm, args)]
-        | CudaExecItemT.Trace (expr, res) -> 
-            [Trace (expr, res)]
         | cmd -> [ExecItem (cmd, strm)]
 
     /// generates a sequence of CUDA calls from streams

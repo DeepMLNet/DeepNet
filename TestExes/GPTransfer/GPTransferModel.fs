@@ -53,17 +53,17 @@ module MultiGPLayer =
         // Kse element expression
         // input  x[gp, trn_smpl]
         //        l[gp]
-        //        sigma[gp, trn_smpl]
+        //        s[gp, trn_smpl]
         // output cov[gp, trn_smpl1, trn_smpl2]
         let gp = ElemExpr.idx 0   
         let trn_smpl1 = ElemExpr.idx 1
         let trn_smpl2 = ElemExpr.idx 2
         let l = ElemExpr.argElem 0
         let x = ElemExpr.argElem 1
-        let sigma = ElemExpr.argElem 2
+        let s = ElemExpr.argElem 2
         let kse =
             exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) ) +
-            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (sigma [gp; trn_smpl1]) (ElemExpr.zero())
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1]) (ElemExpr.zero())
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
@@ -175,15 +175,19 @@ module MultiGPLayer =
 
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
+        let Kk = Kk |> Expr.print "Kk"
         let Kk_inv = Expr.invert Kk
+        let Kk_inv = Kk_inv |> Expr.print "Kk_inv"
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let lk = lk |> Expr.print "lk"
         // trnT [gp, trn_smpl]
         let trnT = pars.TrnT
 
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
         let beta = Kk_inv .* !trnT
+        let beta = beta |> Expr.print "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
