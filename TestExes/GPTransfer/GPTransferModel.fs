@@ -241,10 +241,10 @@ module MultiGPLayer =
         let meankmeanl = 
             (Expr.reshape [nSmpls; nGps; bc] pred_mean) .*
             (Expr.reshape [nSmpls; bc; nGps] pred_mean)
-        ///[smpl, gp1, gp2, 1, 1] - [smpl, gp1] .* [smpl, gp2]
-        let pred_cov_without_var = 
-            pred_cov_without_var -
-            (Expr.reshape [nSmpls; nGps; nGps;one;one] meankmeanl)
+//        ///[smpl, gp1, gp2, 1, 1] - [smpl, gp1] .* [smpl, gp2]
+//        let pred_cov_without_var = 
+//            pred_cov_without_var -
+//            (Expr.reshape [nSmpls; nGps; nGps;one;one] meankmeanl)
         let pred_cov_without_var =
             pred_cov_without_var |> Expr.reshape [nSmpls; nGps; nGps]
 

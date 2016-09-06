@@ -84,6 +84,9 @@ module Program =
         let trn_t_list = trn_x_list |> List.map(fun list -> randPolynomial rand list)
         let trn_t_host = trn_t_list |> ArrayNDHost.ofList2D
 
+        printfn "Trn_x =\n%A" trn_x_host
+        printfn"Trn_t =\n%A" trn_t_host
+
         let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
 //        let trn_x_host =  rand.SortedUniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
 //        let trn_t_host = rand.SortedUniformArrayND (-5.0f ,5.0f) [ngps;ntraining] 
@@ -154,8 +157,8 @@ module Program =
 
     [<EntryPoint>]
     let main argv = 
-        testMultiGPLayer DevHost
-        //TestUtils.evalHostCuda testMultiGPLayer
+        //testMultiGPLayer DevHost
+        TestUtils.evalHostCuda testMultiGPLayer
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore
