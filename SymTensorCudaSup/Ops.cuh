@@ -77,7 +77,7 @@ struct Interpolate2DEOp_t
 	{
 		float idx0 = (a0 - minArg0) / resolution0 + offset;
 		float idx1 = (a1 - minArg1) / resolution1 + offset;
-		return tex2D<float>(tbl, idx0, idx1);
+		return tex2D<float>(tbl, idx1, idx0);
 	}
 
 	cudaTextureObject_t tbl;
@@ -95,7 +95,7 @@ struct Interpolate3DEOp_t
 		float idx0 = (a0 - minArg0) / resolution0 + offset;
 		float idx1 = (a1 - minArg1) / resolution1 + offset;
 		float idx2 = (a2 - minArg2) / resolution2 + offset;
-		return tex3D<float>(tbl, idx0, idx1, idx2);
+		return tex3D<float>(tbl, idx2, idx1, idx0);
 	}
 
 	cudaTextureObject_t tbl;
