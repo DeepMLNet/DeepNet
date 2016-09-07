@@ -17,23 +17,36 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
-    let private doInterpolate1D (ip: Interpolator1DT<'T>) (a: ArrayNDHostT<'T>) : ArrayNDHostT<'T> =
-        let tbl = Expr.getInterpolatorTable1D ip
-        a |> ArrayND.map (fun x ->
-            let pos = (conv<float> x - conv<float> ip.MinArg) / ip.Resolution
-            let posLeft = floor pos 
-            let fac = pos - posLeft
-            let idx = int posLeft 
+    let private doInterpolate (ip: InterpolatorT<'T>) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
+        let tbl = Expr.getInterpolatorTable ip
 
-            match idx, ip.Outside, ip.Mode with
-            | _, Nearest, _ when idx < 0 -> tbl.[[0]]
-            | _, Zero, _ when idx < 0 -> 0.0
-            | _, Nearest, _ when idx > tbl.Shape.[0] - 2 -> tbl.[[tbl.Shape.[0] - 1]]
-            | _, Zero, _ when idx > tbl.Shape.[0] - 2 -> 0.0
-            | _, _, InterpolateLinearaly -> (1.0 - fac) * conv<float> tbl.[[idx]] + fac * conv<float> tbl.[[idx+1]]
-            | _, _, InterpolateToLeft -> tbl.[[idx]]
-            |> conv<'T>
-        )
+        /// returns interpolation in dimensions to the right of leftIdxs
+        let rec interpolateInDim (leftIdxs: int list) (x: float list) =
+            let d = leftIdxs.Length
+            if d = ip.NDims then
+                conv<float> tbl.[leftIdxs]
+            else 
+                let pos = (conv<float> x.[d] - conv<float> ip.MinArg.[d]) / ip.Resolution.[d]
+                let posLeft = floor pos 
+                let fac = pos - posLeft
+                let idx = int posLeft 
+                match idx, ip.Outside.[d], ip.Mode with
+                | _, Nearest, _ when idx < 0                 -> interpolateInDim (leftIdxs @ [0]) x
+                | _, Zero,    _ when idx < 0                 -> 0.0
+                | _, Nearest, _ when idx > tbl.Shape.[d] - 2 -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1]) x
+                | _, Zero,    _ when idx > tbl.Shape.[d] - 2 -> 0.0
+                | _, _, InterpolateLinearaly -> 
+                    let left = interpolateInDim (leftIdxs @ [idx]) x
+                    let right = interpolateInDim (leftIdxs @ [idx+1]) x
+                    (1.0 - fac) * left + fac * right
+                | _, _, InterpolateToLeft -> 
+                    interpolateInDim (leftIdxs @ [idx]) x
+
+        let res = ArrayND.zerosLike es.Head
+        for idx in ArrayND.allIdx res do
+            let x = es |> List.map (fun src -> conv<float> src.[idx])
+            res.[idx] <- interpolateInDim [] x |> conv<'T>
+        res
 
     /// evaluate expression to numeric array 
     let rec eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
@@ -75,7 +88,6 @@ module HostEval =
                     | Floor -> floor av
                     | Round -> round av
                     | Truncate -> truncate av
-                    | Interpolate1D ip -> doInterpolate1D ip av
                     | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
                     | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
                     | Invert -> ArrayND.invert av
@@ -116,7 +128,8 @@ module HostEval =
                     | Elements (resShape, elemExpr) -> 
                         let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
-                        ElemExpr.eval elemExpr esv nResShape                        
+                        ElemExpr.eval elemExpr esv nResShape    
+                    | Interpolate ip -> doInterpolate ip esv
                     | ExtensionOp eop -> eop.EvalSimple esv
 
             if Trace.isActive () then

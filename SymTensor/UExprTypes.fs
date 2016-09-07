@@ -33,15 +33,16 @@ module UExprTypes =
     type UExprRngSpecT = SimpleRangeSpecT<int>
     type UExprRngsSpecT = SimpleRangesSpecT<int>
 
-    /// non-generic interface for Interpolator1D
-    type IInterpolator1D = 
-        inherit System.IComparable
+    /// type-neutral interface for Interpolator1D
+    type IInterpolator = 
+        inherit System.IComparable 
 
-        abstract MinArg: single
-        abstract MaxArg: single
-        abstract Resolution: single
+        abstract MinArg: single list
+        abstract MaxArg: single list
+        abstract Resolution: single list
         abstract Mode: InterpolationModeT
-        abstract Outside: OutsideInterpolatorRangeT
+        abstract Outside: OutsideInterpolatorRangeT list
+        abstract NDims: int
 
     type ULeafOpT =
         | Identity of SizeSpecT
@@ -71,7 +72,6 @@ module UExprTypes =
         | Floor
         | Round
         | Truncate              
-        | Interpolate1D of IInterpolator1D  
         | Diag of int * int
         | DiagMat of int * int
         | Invert
@@ -99,6 +99,7 @@ module UExprTypes =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
         | Elements of ShapeSpecT * UElemExpr.UElemFuncT
+        | Interpolate of IInterpolator  
         | ExtensionOp of IUOp             
 
     /// unified op of any arity and type

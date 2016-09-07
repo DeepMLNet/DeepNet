@@ -79,12 +79,6 @@ module Deriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
-            | Interpolate1D ip -> 
-                match ip.Mode with
-                | InterpolateLinearaly ->
-                    let ipd = Expr.getDerivativeOfInterpolator1D ip
-                    egExpanded * padLeft (Expr.interpolate1D ipd a) |> reverseDiffStep a
-                | InterpolateToLeft -> Map.empty
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Invert -> -expr.T .* egExpanded .* expr.T |> reverseDiffStep a
@@ -171,6 +165,16 @@ module Deriv =
                         let deArgs = es @ [egExpanded]
                         Expr.elements deShp deElemExpr deArgs |> collapse)
                 totalDerivates es des
+            | Interpolate ip -> 
+                match ip.Mode with
+                | InterpolateLinearaly ->
+                    let des = 
+                        [for d=0 to es.Length-1 do
+                            let ipd = Expr.getDerivativeOfInterpolator d ip
+                            yield egExpanded * padLeft (Expr.interpolate ipd es)]
+                    totalDerivates es des
+                | InterpolateToLeft -> Map.empty
+
             | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 

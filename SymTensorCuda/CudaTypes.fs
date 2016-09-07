@@ -49,7 +49,7 @@ module Types =
         /// texture objects
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator
-        InterpolatorTextures:       Dictionary<IInterpolator1D, TextureObjectT>
+        InterpolatorTextures:       Dictionary<IInterpolator, TextureObjectT>
         /// values for constants
         ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
     }
@@ -512,45 +512,88 @@ module ArgTemplates =
         interface ICudaOpAndArgTmpl
 
 
+    /// 1d interpolation op C++ structure
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
-    /// 1d interpolation op C++ structure
     type Interpolate1DEOpArg =
-        val Data: CUtexObject
-        val MinArg: single
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
         val Offset: single
-        val Resolution: single
 
-        new (data, minArg, offset, resolution) = 
-            {Data=data; MinArg=minArg; Offset=offset; Resolution=resolution}
+        new (tbl, minArg0, resolution0, offset) = 
+            {Tbl=tbl; MinArg0=minArg0; Resolution0=resolution0; Offset=offset}
+
+    /// 2d interpolation op C++ structure
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type Interpolate2DEOpArg =
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
+        val MinArg1: single
+        val Resolution1: single
+        val Offset: single
+
+        new (tbl, minArg0, resolution0, minArg1, resolution1, offset) = 
+            {Tbl=tbl; 
+             MinArg0=minArg0; Resolution0=resolution0; 
+             MinArg1=minArg1; Resolution1=resolution1; 
+             Offset=offset}
+
+    /// 3d interpolation op C++ structure
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type Interpolate3DEOpArg =
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
+        val MinArg1: single
+        val Resolution1: single
+        val MinArg2: single
+        val Resolution2: single
+        val Offset: single
+
+        new (tbl, minArg0, resolution0, minArg1, resolution1, minArg2, resolution2, offset) = 
+            {Tbl=tbl; 
+             MinArg0=minArg0; Resolution0=resolution0; 
+             MinArg1=minArg1; Resolution1=resolution1; 
+             MinArg2=minArg2; Resolution2=resolution2;
+             Offset=offset}
 
 
-    type Interpolate1DEOpArgTmpl (ip:           IInterpolator1D,
-                                  compileEnv:   CudaCompileEnvT) =
+    type InterpolateEOpArgTmpl (ip:           IInterpolator,
+                                compileEnv:   CudaCompileEnvT) =
 
         let tbl = 
-            match Expr.getInterpolatorTable1DAsIArrayNDT ip with
+            match Expr.getInterpolatorTableAsIArrayNDT ip with
             | :? IArrayNDCudaT as tbl -> tbl
             | _ -> failwith "interpolation table must be stored on CUDA device"
-        
-        do if tbl.DataType <> typeof<single> then
-            failwith "interpolation on CUDA device is currently only supported for the single data type"
+    
+        do 
+            if ip.NDims > 3 then
+                failwith "interpolation on CUDA device is currently only supported for up to 3 dimensions"
+            if tbl.DataType <> typeof<single> then
+                failwith "interpolation on CUDA device is currently only supported for the single data type"
 
         let texture, needInit, tblCnst =
             if compileEnv.InterpolatorTextures.ContainsKey ip then
                 compileEnv.InterpolatorTextures.[ip], false, None
             else
                 let tblCnst = CudaCompileEnv.newConstant compileEnv tbl
-                let adrMode =
-                    match ip.Outside with
-                    | Zero -> CUAddressMode.Border
-                    | Nearest -> CUAddressMode.Clamp
+                let adrModeForDim dim =
+                    if dim >= ip.NDims then CUAddressMode.Border
+                    else 
+                        match ip.Outside.[dim] with
+                        | Zero -> CUAddressMode.Border
+                        | Nearest -> CUAddressMode.Clamp
                 let filterMode =
                     match ip.Mode with
                     | InterpolateLinearaly -> CUFilterMode.Linear
                     | InterpolateToLeft -> CUFilterMode.Point
                 let desc =
-                    CudaTextureDescriptor (adrMode, filterMode, CUTexRefSetFlags.None)
+                    CudaTextureDescriptor (adrModeForDim 0, adrModeForDim 1, adrModeForDim 2, 
+                                           filterMode, CUTexRefSetFlags.None)
                 let t = CudaCompileEnv.newTextureObject compileEnv tblCnst desc
                 compileEnv.InterpolatorTextures.Add (ip, t)
                 t, true, Some tblCnst
@@ -558,17 +601,37 @@ module ArgTemplates =
         member this.NeedInit = needInit
 
         interface ICudaArgTmpl with
-            member this.CPPTypeName = "Interpolate1DEOp_t"
+            member this.CPPTypeName = 
+                match ip.NDims with
+                | 1 -> "Interpolate1DEOp_t"
+                | 2 -> "Interpolate2DEOp_t"
+                | 3 -> "Interpolate3DEOp_t"
+                | _ -> failwith "unsupported"
             member this.GetArg env strm = 
-                let tblCnstAry = CudaExecEnv.getArrayNDForManikin env tblCnst.Value
                 let texObj = CudaExecEnv.getTextureObj env texture
                 let offset = 
                     match ip.Mode with
                     | InterpolateLinearaly -> 0.5f
                     | InterpolateToLeft -> 0.0f
-                Interpolate1DEOpArg (texObj.TexObject, 
-                                     ip.MinArg, offset, ip.Resolution)
-                |> box
+
+                match ip.NDims with
+                | 1 -> Interpolate1DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            offset)
+                       |> box
+                | 2 -> Interpolate2DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            offset)
+                       |> box
+                | 3 -> Interpolate3DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            ip.MinArg.[2], ip.Resolution.[2],
+                                            offset)
+                       |> box
+                | _ -> failwith "unsupported"
+
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl

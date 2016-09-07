@@ -412,11 +412,27 @@ module CudaExprWorkspaceTypes =
                                      SizeT ((ArrayND.stride tex.Contents).[0]) * sizeof<single>) 
                             devAry.CopyFromDeviceToThis (pdv)
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
+                        | 3 ->
+                            if (ArrayND.stride tex.Contents).[2] <> 1 then
+                                failwith "texture contents must be continuous in last dimension"
+                            if (ArrayND.stride tex.Contents).[0] <> 
+                               (ArrayND.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
+                                failwith "texture contents must be continuous in first dimension"
+                            let devAry = new CudaArray3D(CUArrayFormat.Float, 
+                                                         SizeT tex.Contents.Shape.[2],
+                                                         SizeT tex.Contents.Shape.[1],
+                                                         SizeT tex.Contents.Shape.[0], 
+                                                         CudaArray3DNumChannels.One,
+                                                         CUDAArray3DFlags.None)
+                            devAry.CopyFromDeviceToThis 
+                                (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof<single>),
+                                 SizeT sizeof<single>, 
+                                 SizeT ((ArrayND.stride tex.Contents).[1]) * sizeof<single>)
+                            (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | d -> failwithf "unsupported number of dimensions for texture: %d" d
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
                     execEnv.TextureObject.[tex] <- {TexObject=texObj; TexArray=devAry}
                 | TextureDestroy tex -> 
-                    printfn "Disposing texture"
                     if execEnv.TextureObject.ContainsKey tex then
                         execEnv.TextureObject.[tex].TexObject.Dispose()
                         execEnv.TextureObject.[tex].TexArray.Dispose()

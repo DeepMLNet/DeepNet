@@ -96,7 +96,7 @@ let ``Interpolate1D: simple test on host`` () =
         let minVal = 1.0
         let maxVal = 6.0
 
-        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+        let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
         let nSmpls = SizeSpec.symbol "nSmpls"
         let inp = Expr.var "inp" [nSmpls]
@@ -122,7 +122,7 @@ let ``Interpolate1D: simple test on CUDA`` () =
         let minVal = 1.0f
         let maxVal = 6.0f
 
-        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+        let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
         let nSmpls = SizeSpec.symbol "nSmpls"
         let inp = Expr.var "inp" [nSmpls]
@@ -150,7 +150,7 @@ let ``Interpolate1D: derivative test on host`` () =
         let minVal = 1.0
         let maxVal = 6.0
 
-        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+        let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
         let nSmpls = SizeSpec.symbol "nSmpls"
         let inp = Expr.var "inp" [nSmpls]
@@ -180,7 +180,7 @@ let ``Interpolate1D: derivative test on CUDA`` () =
         let minVal = 1.0f
         let maxVal = 6.0f
 
-        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+        let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
         let nSmpls = SizeSpec.symbol "nSmpls"
         let inp = Expr.var "inp" [nSmpls]

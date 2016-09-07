@@ -206,7 +206,6 @@ module CudaExecUnit =
         | UUnaryOp Floor -> inplaceFirstSrcReq
         | UUnaryOp Round -> inplaceFirstSrcReq
         | UUnaryOp Truncate -> inplaceFirstSrcReq      
-        | UUnaryOp (Interpolate1D _) -> inplaceFirstSrcReq
         // tensor ops
         | UUnaryOp (Diag _) -> dfltSrcWithNoViewReq
         | UUnaryOp (DiagMat _) -> dfltSrcWithNoViewReq
@@ -258,6 +257,7 @@ module CudaExecUnit =
             // in a temporary manikin and copied over to avoid race conditions.
             inplaceFirstSrcReq
         | UNaryOp (Elements _) -> dfltSrcWithNoViewReq            
+        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
 
 
@@ -373,7 +373,6 @@ module CudaExecUnit =
         | UUnaryOp Floor -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Round -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Truncate -> dfltChInplaceOvrwrtTrgt ()   
-        | UUnaryOp (Interpolate1D _) -> dfltChInplaceOvrwrtTrgt ()    
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
             dfltChTrgt (ArrayND.diagAxis ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
@@ -432,6 +431,7 @@ module CudaExecUnit =
                 dfltChTrgt srcsDfltCh.[0] false
             else dfltChOutplaceTrgt ()
         | UNaryOp (Elements _) -> dfltChOutplaceTrgt ()
+        | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()    
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
    
@@ -730,8 +730,6 @@ module CudaExecUnit =
         | UUnaryOp Floor -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcsDfltCh
         | UUnaryOp Round -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcsDfltCh
         | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
-        | UUnaryOp (Interpolate1D ip) -> 
-            execItemsForElemwise dfltChTrgt (Interpolate1DEOpArgTmpl (ip, compileEnv)) srcsDfltCh
         // reductions
         | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
         | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]
@@ -873,6 +871,8 @@ module CudaExecUnit =
             copyItems @ setItems
         | UNaryOp (Elements (_, elemFunc)) ->
             execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
+        | UNaryOp (Interpolate ip) -> 
+            execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 

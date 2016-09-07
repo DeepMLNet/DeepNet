@@ -76,7 +76,7 @@ module CudaEval =
             VarStorLoc           = varLocs
             ElemFuncsOpNames     = Map.empty    
             TextureObjects       = ResizeArray<TextureObjectT>()
-            InterpolatorTextures = Dictionary<IInterpolator1D, TextureObjectT>()
+            InterpolatorTextures = Dictionary<IInterpolator, TextureObjectT>()
             ConstantValues       = Dictionary<MemConstManikinT, IArrayNDCudaT>()
         }
         let rcpt = CudaRecipe.build cudaCompileEnv mergedUexpr

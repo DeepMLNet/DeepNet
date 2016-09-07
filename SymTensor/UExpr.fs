@@ -118,7 +118,6 @@ module UExpr =
         | Unary (Expr.Floor, a)         -> unary Floor a
         | Unary (Expr.Round, a)         -> unary Round a
         | Unary (Expr.Truncate, a)      -> unary Truncate a
-        | Unary (Expr.Interpolate1D ip, a) -> unary (Interpolate1D ip) a
         | Unary (Expr.Diag (ax1, ax2), a) -> unary (Diag (ax1, ax2)) a
         | Unary (Expr.DiagMat (ax1, ax2), a)  -> unary (DiagMat (ax1, ax2)) a
         | Unary (Expr.Invert, a)        -> unary Invert a
@@ -154,6 +153,7 @@ module UExpr =
             let nDims = ShapeSpec.nDim resShape
             let nArgs = List.length se
             nary (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
+        | Nary (Expr.Interpolate ip, se) -> nary (Interpolate ip) se
         | Nary (Expr.ExtensionOp eop, se) -> 
             let makeOneUop uop = nary (ExtensionOp uop) se
             eop.ToUExpr expr makeOneUop

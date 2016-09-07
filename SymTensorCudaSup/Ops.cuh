@@ -6,6 +6,8 @@
 // dummy functions for IntelliSense
 #ifndef __CUDACC__ 
 template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
+template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
+template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
 #endif
 
 
@@ -57,18 +59,56 @@ struct ZerosEOp_t
 
 struct Interpolate1DEOp_t
 {
-	_devonly float operator() (float a) const 
+	_devonly float operator() (float a0) const 
 	{
-		float idx = (a - minArg) / resolution + offset;
-		return tex1D<float>(data, idx);
+		float idx0 = (a0 - minArg0) / resolution0 + offset;
+		printf("minArg %f resolution %f offset %f\n", minArg0, resolution0, offset);
+		return tex1D<float>(tbl, 1);
+		//return tex1D<float>(tbl, idx0);
 	}
 
-	cudaTextureObject_t data;
-	float minArg;
+	cudaTextureObject_t tbl;
+	float minArg0;
+	float resolution0;
 	float offset;
-	float resolution;
 };
 
+struct Interpolate2DEOp_t
+{
+	_devonly float operator() (float a0, float a1) const 
+	{
+		float idx0 = (a0 - minArg0) / resolution0 + offset;
+		float idx1 = (a1 - minArg1) / resolution1 + offset;
+		return tex2D<float>(tbl, idx0, idx1);
+	}
+
+	cudaTextureObject_t tbl;
+	float minArg0;
+	float resolution0;
+	float minArg1;
+	float resolution1;
+	float offset;
+};
+
+struct Interpolate3DEOp_t
+{
+	_devonly float operator() (float a0, float a1, float a2) const 
+	{
+		float idx0 = (a0 - minArg0) / resolution0 + offset;
+		float idx1 = (a1 - minArg1) / resolution1 + offset;
+		float idx2 = (a2 - minArg2) / resolution2 + offset;
+		return tex3D<float>(tbl, idx0, idx1, idx2);
+	}
+
+	cudaTextureObject_t tbl;
+	float minArg0;
+	float resolution0;
+	float minArg1;
+	float resolution1;
+	float minArg2;
+	float resolution2;
+	float offset;
+};
 
 
 struct NegateEOp_t
