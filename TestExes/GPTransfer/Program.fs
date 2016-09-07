@@ -43,15 +43,6 @@ module Program =
     let fsng x = single x
     let isng x = single x
 
-    ///Generates a random single in the range (minValue,maxValue)
-    let randSingleInRange (rand:Random) (minValue,maxValue) =
-        let (imin,imax) = int minValue,int maxValue
-        if (imin >= imax - 1) then
-            failwith "range is too small"
-        let rand1 = fsng (rand.NextDouble())
-        let rand2 = isng(rand.Next(imin,imax-1))
-        rand1+rand2
-
     ///Generates a random polynomial of maximal power 2
     let randPolynomial (rand:Random) list = 
 
@@ -114,11 +105,11 @@ module Program =
         printfn "Trn_x =\n%A" trn_x_host
         printfn"Trn_t =\n%A" trn_t_host
 
-        ////lengthscale vectore hardcoded
-        //let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
+        //lengthscale vectore hardcoded
+        let ls_host = [1.0f; 0.1f; 0.01f] |> ArrayNDHost.ofList 
 
-        //random lengthscale vector
-        let ls_host = [1..ngps] |> List.map (fun x -> randSingleInRange rand (0.0, 2.0)) |> ArrayNDHost.ofList
+//        //random lengthscale vector
+//        let ls_host = rand.UniformArrayND (0.0f,2.0f) [ngps]
         
         //sigma vector hardcoded
         let trn_sigma_host = ArrayNDHost.zeros<single> [ngps;ntraining]
