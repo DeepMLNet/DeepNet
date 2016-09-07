@@ -581,8 +581,8 @@ module ArgTemplates =
                 compileEnv.InterpolatorTextures.[ip], false, None
             else
                 let tblCnst = CudaCompileEnv.newConstant compileEnv tbl
-                let adrModeForDim dim =
-                    if dim >= ip.NDims then CUAddressMode.Border
+                let rec adrModeForDim dim =
+                    if dim >= ip.NDims then adrModeForDim (dim - 1)
                     else 
                         match ip.Outside.[dim] with
                         | Zero -> CUAddressMode.Border

@@ -62,9 +62,7 @@ struct Interpolate1DEOp_t
 	_devonly float operator() (float a0) const 
 	{
 		float idx0 = (a0 - minArg0) / resolution0 + offset;
-		printf("minArg %f resolution %f offset %f\n", minArg0, resolution0, offset);
-		return tex1D<float>(tbl, 1);
-		//return tex1D<float>(tbl, idx0);
+		return tex1D<float>(tbl, idx0);
 	}
 
 	cudaTextureObject_t tbl;
