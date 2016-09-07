@@ -545,7 +545,7 @@ module CudaExprWorkspaceTypes =
                     let n = a.Rows 
                     let ldA = a.LeadingDimension 
                     let pVar = pivot.GetVar execEnv
-                    let infoVar = pivot.GetVar execEnv
+                    let infoVar = info.GetVar execEnv
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, a.NSamples)
 
@@ -556,7 +556,7 @@ module CudaExprWorkspaceTypes =
                     let pVar = pivot.GetVar execEnv
                     let trgtAry = trgt.GetPointerArrayDevice execEnv
                     let ldC = trgt.LeadingDimension 
-                    let infoVar = pivot.GetVar execEnv
+                    let infoVar = info.GetVar execEnv
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, 
                                                 a.NSamples)
@@ -579,6 +579,13 @@ module CudaExprWorkspaceTypes =
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                     let resHost = resDev.ToHost()    
                     printfn "%s=\n%A\n" msg resHost                
+
+                | ExecItem (DumpValue (name, res), strm) ->
+                    if Dump.isActive () then
+                        CudaSup.context.Synchronize ()
+                        let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
+                        let resHost = resDev.ToHost()    
+                        Dump.dumpValue name resHost
 
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->

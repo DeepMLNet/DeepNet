@@ -53,6 +53,7 @@
     <None Include="App.config" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="GPTransferModel.fs" />
+    <Compile Include="InvTest.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

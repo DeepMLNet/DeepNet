@@ -137,6 +137,8 @@ module Expr =
         // ==== misc ====
         /// prints the value together with the given string
         | Print of string
+        /// dumps the value into the given dataset in the active HDF5 dump file
+        | Dump of string
         /// annotation (no influence on value)
         | Annotated of string       
 
@@ -377,6 +379,7 @@ module Expr =
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
         | Unary(Print _, a) -> shapeOf a
+        | Unary(Dump _, a) -> shapeOf a
         | Unary(Annotated(_), a) -> shapeOf a
 
         // binary elementwise
@@ -987,6 +990,10 @@ module Expr =
     /// print the result with the given message when evaluated
     let print msg a =
         Unary (Print msg, a) |> check
+
+    /// dumps the result into the active dump session HDF5 file
+    let dump name a =
+        Unary (Dump name, a) |> check
 
     /// interpolator tables
     let private tablesOfInterpolators = new Dictionary<IInterpolator, IArrayNDT>()

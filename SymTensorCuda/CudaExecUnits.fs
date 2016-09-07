@@ -47,6 +47,7 @@ module CudaExecUnitTypes =
         // misc
         | Trace of UExprT * ArrayNDManikinT
         | PrintWithMsg of string * ArrayNDManikinT
+        | DumpValue of string * ArrayNDManikinT
 
 
     type SrcReqsHelpersT = {
@@ -236,6 +237,7 @@ module CudaExecUnit =
             | loc -> unsupLoc loc
         // misc
         | UUnaryOp (Print _) -> inplaceFirstSrcReq
+        | UUnaryOp (Dump _) -> inplaceFirstSrcReq
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
 
         // binary element-wise
@@ -403,6 +405,7 @@ module CudaExecUnit =
             newDfltChTrgt ()
         // misc
         | UUnaryOp (Print _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
+        | UUnaryOp (Dump _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
         | UUnaryOp (Annotated _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
 
         // binary element-wise
@@ -809,6 +812,7 @@ module CudaExecUnit =
             | loc -> unsupLoc loc                              
         // misc
         | UUnaryOp (Print msg) -> [PrintWithMsg (msg, srcsDfltCh.[0])]
+        | UUnaryOp (Dump name) -> [DumpValue (name, srcsDfltCh.[0])]
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise
