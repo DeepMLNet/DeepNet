@@ -139,7 +139,7 @@ let ``Interpolate1D: simple test on CUDA`` () =
         printfn "inp=\n%A" inpVal
         printfn "res=\n%A" resVal
 
-        ArrayND.almostEqual resVal expVal |> ArrayND.value |> should equal true
+        ArrayND.almostEqualWithTol 0.005f 1e-5f resVal expVal |> ArrayND.value |> should equal true
 
 
 
@@ -173,6 +173,34 @@ let ``Interpolate1D: derivative test on host`` () =
         ArrayND.almostEqual resVal expVal |> ArrayND.value |> should equal true
 
 
+[<Fact>]
+let ``Interpolate1D: derivative test on CUDA`` () =    
+        let tbl = [1.0f; 2.0f; 4.0f; 7.0f; 11.0f; 16.0f]
+                  |> ArrayNDHost.ofList |> ArrayNDCuda.toDev
+        let minVal = 1.0f
+        let maxVal = 6.0f
+
+        let ip = Expr.createInterpolator1D tbl minVal maxVal InterpolateLinearaly Nearest None
+
+        let nSmpls = SizeSpec.symbol "nSmpls"
+        let inp = Expr.var "inp" [nSmpls]
+        let expr = Expr.interpolate1D ip inp
+        let dexpr = Deriv.compute expr
+        let dinp = dexpr |> Deriv.ofVar inp
+        let fn = Func.make DevCuda.DefaultFactory dinp |> arg1 inp
+
+        let inpVal = [-0.5f; 0.9f; 1.0f; 1.5f; 2.3f; 5.9f; 6.0f; 6.5f; 200.0f]
+                     |> ArrayNDHost.ofList |> ArrayNDCuda.toDev
+        let expVal = [ 0.0f; 0.0f; 1.0f; 1.0f; 2.0f; 5.0f; 0.0f; 0.0f; 0.0f]
+                     |> ArrayNDHost.ofList |> ArrayND.diagMat |> ArrayNDCuda.toDev
+        let resVal = fn inpVal
+
+        printfn "derivative:"
+        printfn "tbl=\n%A" tbl
+        printfn "inp=\n%A" inpVal
+        printfn "res=\n%A" resVal
+
+        ArrayND.almostEqualWithTol 0.005f 1e-5f resVal expVal |> ArrayND.value |> should equal true
 
 
 

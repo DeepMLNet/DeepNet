@@ -86,6 +86,11 @@ module Types =
         CudaRegHostMem:         CudaRegisteredHostMemory<byte>
     }
 
+    type CudaTexObjectAndArray = {
+        TexObject:              CudaTexObject
+        TexArray:               IDisposable
+    }
+
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
         Stream:                 Dictionary<StreamT, CudaStream>
@@ -94,7 +99,7 @@ module Types =
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
         mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
         mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
-        TextureObject:          Dictionary<TextureObjectT, CudaTexObject>
+        TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
         ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
     }
     
@@ -193,6 +198,10 @@ module CudaExecEnv =
         let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
         ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ (manikin.Layout)
+
+    /// gets a CudaTexObject
+    let getTextureObj (env: CudaExecEnvT) (tex: TextureObjectT) =
+        env.TextureObject.[tex].TexObject
 
 
 [<AutoOpen>]
@@ -509,11 +518,11 @@ module ArgTemplates =
     type Interpolate1DEOpArg =
         val Data: CUtexObject
         val MinArg: single
-        val MaxArg: single
+        val Offset: single
         val Resolution: single
 
-        new (data, minArg, maxArg, resolution) = 
-            {Data=data; MinArg=minArg; MaxArg=maxArg; Resolution=resolution}
+        new (data, minArg, offset, resolution) = 
+            {Data=data; MinArg=minArg; Offset=offset; Resolution=resolution}
 
 
     type Interpolate1DEOpArgTmpl (ip:           IInterpolator1D,
@@ -551,11 +560,14 @@ module ArgTemplates =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "Interpolate1DEOp_t"
             member this.GetArg env strm = 
-                printfn "data=%A" tbl
                 let tblCnstAry = CudaExecEnv.getArrayNDForManikin env tblCnst.Value
-                printfn "tblCnst=%A" tblCnstAry
-                Interpolate1DEOpArg (env.TextureObject.[texture].TexObject, 
-                                     ip.MinArg, ip.MaxArg, ip.Resolution)
+                let texObj = CudaExecEnv.getTextureObj env texture
+                let offset = 
+                    match ip.Mode with
+                    | InterpolateLinearaly -> 0.5f
+                    | InterpolateToLeft -> 0.0f
+                Interpolate1DEOpArg (texObj.TexObject, 
+                                     ip.MinArg, offset, ip.Resolution)
                 |> box
         interface ICudaOp with
             member this.IsIndexed = false

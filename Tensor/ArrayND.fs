@@ -801,10 +801,12 @@ module ArrayND =
         ArrayNDT<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
-    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
-        let aTol = conv<'T> 1e-8
-        let rTol = conv<'T> 1e-5
+    let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         abs (a - b) <<== aTol + rTol * abs b
+
+    /// Elementwise check if two arrays have same (within machine precision) values.
+    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
@@ -887,15 +889,20 @@ module ArrayND =
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
-    /// Returns true if two arrays have same (within machine precision) values in all elements.
+    /// Returns true if two arrays have same (within specified precision) values in all elements.
     /// If arrays have different shape, then false is returned.
-    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline almostEqualWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         if a.Shape = b.Shape then
-            isClose a b |> all
+            isCloseWithTol aTol rTol a b |> all
         else 
             let res = newCOfType [] a
             set [] false res
             res
+
+    /// Returns true if two arrays have same (within machine precision) values in all elements.
+    /// If arrays have different shape, then false is returned.
+    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =

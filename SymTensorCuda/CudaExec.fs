@@ -260,7 +260,7 @@ module CudaExprWorkspaceTypes =
             RegHostMem     = new Dictionary<MemAllocManikinT, RegHostMemT>()
             ExternalVar    = Map.empty
             HostVar        = Map.empty
-            TextureObject  = new Dictionary<TextureObjectT, CudaTexObject>()
+            TextureObject  = new Dictionary<TextureObjectT, CudaTexObjectAndArray>()
             ConstantValues = recipe.ConstantValues
         }
 
@@ -386,20 +386,40 @@ module CudaExprWorkspaceTypes =
                 // texture object management
                 | TextureCreate tex ->
                     let devVar, _ = CudaExecEnv.getDevMemForManikin execEnv tex.Contents
-                    let devAry = new CudaArray1D(CUArrayFormat.Float, 
-                                                 SizeT tex.Contents.NElems, 
-                                                 CudaArray1DNumChannels.One)
-                    devAry.CopyFromDeviceToArray1D (devVar.DevicePointer, devVar.SizeInBytes, SizeT 0)
-                    let resDsc = CudaResourceDesc (devAry)
-                    //use devVarFloat = new CudaDeviceVariable<single>(devVar.DevicePointer, devVar.SizeInBytes)
-                    //let resDsc = CudaResourceDesc (devVarFloat)
+                    let devAry, resDsc =
+                        match tex.Contents.NDims with
+                        | 1 ->
+                            if (ArrayND.stride tex.Contents).[0] <> 1 then
+                                failwith "texture contents must be continuous"
+                            let nElems = tex.Contents.Shape.[0]
+                            let devAry = new CudaArray1D
+                                           (CUArrayFormat.Float, SizeT nElems, CudaArray1DNumChannels.One)
+                            devAry.CopyFromDeviceToArray1D 
+                                (devVar.DevicePointer, SizeT (nElems * sizeof<single>), 
+                                 SizeT (ArrayND.offset tex.Contents * sizeof<single>))
+                            (devAry :> System.IDisposable), CudaResourceDesc (devAry)
+                        | 2 ->
+                            if (ArrayND.stride tex.Contents).[1] <> 1 then
+                                failwith "texture contents must be continuous in last dimension"
+                            let devAry = new CudaArray2D(CUArrayFormat.Float, 
+                                                         SizeT tex.Contents.Shape.[1],
+                                                         SizeT tex.Contents.Shape.[0], 
+                                                         CudaArray2DNumChannels.One)
+                            use pdv = 
+                                new CudaPitchedDeviceVariable<single> 
+                                    (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof<single>), 
+                                     SizeT tex.Contents.Shape.[1], SizeT tex.Contents.Shape.[0], 
+                                     SizeT ((ArrayND.stride tex.Contents).[0]) * sizeof<single>) 
+                            devAry.CopyFromDeviceToThis (pdv)
+                            (devAry :> System.IDisposable), CudaResourceDesc (devAry)
+                        | d -> failwithf "unsupported number of dimensions for texture: %d" d
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
-                    printfn "created texture: %A" texObj.TexObject.Pointer
-                    execEnv.TextureObject.[tex] <- texObj
+                    execEnv.TextureObject.[tex] <- {TexObject=texObj; TexArray=devAry}
                 | TextureDestroy tex -> 
                     printfn "Disposing texture"
                     if execEnv.TextureObject.ContainsKey tex then
-                        execEnv.TextureObject.[tex].Dispose()
+                        execEnv.TextureObject.[tex].TexObject.Dispose()
+                        execEnv.TextureObject.[tex].TexArray.Dispose()
                         execEnv.TextureObject.Remove(tex) |> ignore
 
                 // execution control
