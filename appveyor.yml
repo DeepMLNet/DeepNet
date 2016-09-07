@@ -142,7 +142,7 @@
   shallow_clone: true
 
   environment:
-    VERSUFFIX: {branch}
+    VERSUFFIX: "{branch}"
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
