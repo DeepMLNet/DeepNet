@@ -177,16 +177,16 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
     :param cov_fn: dictionary of covaraince function information {'type': 'cov func name', ...}
     :return: (mean[gp], cov[gp, gp']) - predicted mean and covariance matrix
     """
-    tst_mu = np.asarray(tst_mu)
-    tst_Sigma = np.asarray(tst_Sigma)
-    trn_x = np.asarray(trn_x)
-    trn_y = np.asarray(trn_y)
-    trn_sigma = np.asarray(trn_sigma)
+    tst_mu = np.asarray(tst_mu, dtype=np.float32)
+    tst_Sigma = np.asarray(tst_Sigma, dtype=np.float32)
+    trn_x = np.asarray(trn_x, dtype=np.float32)
+    trn_y = np.asarray(trn_y, dtype=np.float32)
+    trn_sigma = np.asarray(trn_sigma, dtype=np.float32)
     n_gps = trn_x.shape[0]
     n_trn_samples = trn_x.shape[1]
 
     # build training covariance matrix
-    K_trn_trn = np.zeros((n_gps, n_trn_samples, n_trn_samples))
+    K_trn_trn = np.zeros((n_gps, n_trn_samples, n_trn_samples), dtype=np.float32)
     K_trn_trn_inv = np.zeros_like(K_trn_trn)
     for g in range(n_gps):
         if cov_fn['type'] == 'SE':
@@ -200,7 +200,7 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                     K_trn_trn[g, m, n] += trn_sigma[g, m] ** 2.0
         K_trn_trn_inv[g, :, :] = np.linalg.pinv(K_trn_trn[g, :, :])
     # build E[K(tst_x, trn_x_k)]
-    E_K_tst_trn = np.zeros((n_gps, n_trn_samples))
+    E_K_tst_trn = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
     for g in range(n_gps):
         for j in range(n_trn_samples):
             if cov_fn['type'] == 'SE':
@@ -211,12 +211,12 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                 E_K_tst_trn[g, j] = tst_mu * trn_x[j]
 
     # calcualte "targets"
-    tgt = np.zeros((n_gps, n_trn_samples))
+    tgt = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
     for g in range(n_gps):
         tgt[g, :] = np.dot(K_trn_trn_inv[g, :, :], trn_y[g, :])
 
     # calculate means
-    mean = np.zeros(n_gps)
+    mean = np.zeros(n_gps, dtype=np.float32)
     for g in range(n_gps):
         mean[g] = np.dot(E_K_tst_trn[g,:], tgt[g, :])
 
@@ -227,7 +227,7 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
 
 
     # calculate covariance
-    cov = np.zeros((n_gps, n_gps))
+    cov = np.zeros((n_gps, n_gps), dtype=np.float32)
     if cov_fn['type'] == 'SE':
         for g1 in range(n_gps):
             for g2 in range(n_gps):
@@ -236,7 +236,7 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
 
                 if g1 == g2:  # variance
                     # calculate matrix L
-                    L = np.zeros((n_trn_samples, n_trn_samples))
+                    L = np.zeros((n_trn_samples, n_trn_samples), dtype=np.float32)
                     for i in range(n_trn_samples):
                         for j in range(n_trn_samples):
                             L[i,j] = \
@@ -254,16 +254,16 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                         np.trace(np.dot(np.dot(lv, lv.T), np.dot(beta, beta.T)))
 
                 else:      # covariance
-                    T = np.zeros((n_trn_samples, n_trn_samples))
+                    T = np.zeros((n_trn_samples, n_trn_samples), dtype=np.float32)
                     for i in range(n_trn_samples):
                         for j in range(n_trn_samples):
-                            mu_s = np.asarray([trn_x[g1, i], trn_x[g2, j]])
+                            mu_s = np.asarray([trn_x[g1, i], trn_x[g2, j]], dtype=np.float32)
                             Sigma_s = np.asarray([[l1**2., 0.],
-                                                  [0,      l2**2.]])
+                                                  [0,      l2**2.]], dtype=np.float32)
 
-                            mu_y = np.asarray([tst_mu[g1], tst_mu[g2]])
+                            mu_y = np.asarray([tst_mu[g1], tst_mu[g2]], dtype=np.float32)
                             Sigma_y = np.asarray([[tst_Sigma[g1, g1], tst_Sigma[g1, g2]],
-                                                  [tst_Sigma[g2, g1], tst_Sigma[g2, g2]]])
+                                                  [tst_Sigma[g2, g1], tst_Sigma[g2, g2]]], dtype=np.float32)
 
                             # Sigma_sum_inv = pinv(Sigma_s + Sigma_y)
 
@@ -535,8 +535,9 @@ def file_test_multi_gp_uncertain_regression():
         tst_cov = tst_covs[n][0]
 
         pred_mean, pred_cov = multi_gp_uncertain_regression(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn)
-        #sampling_mean, sampling_cov = \
-        #    multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
+        print "pred_mean:", pred_mean.dtype, " pred_cov:", pred_cov.dtype
+        sampling_mean, sampling_cov = \
+            multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
         file_pred_mean = file_pred_mus[n][0]        
         file_pred_cov = file_pred_covs[n][0]
         absMeanErrors[n] = np.abs(file_pred_mean - pred_mean)  
@@ -545,10 +546,10 @@ def file_test_multi_gp_uncertain_regression():
         print "means=", pred_mean
         print "cov=\n", pred_cov
         print
-        #print "sampled:"
-        #print "means=", sampling_mean
-        #print "cov=\n", sampling_cov
-        #print
+        print "sampled:"
+        print "means=", sampling_mean
+        print "cov=\n", sampling_cov
+        print
         print "file predicted:"
         print "means=", file_pred_mean
         print "cov=\n", file_pred_cov

@@ -218,3 +218,5 @@ ModelManifest.xml
 /DeepNet.VC.db
 
 /MKL/build/
+/TestData.h5
+/TrainData.h5

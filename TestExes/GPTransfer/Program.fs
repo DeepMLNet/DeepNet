@@ -71,8 +71,8 @@ module Program =
         let rand = Random(1)
         //defining size parameters
         let ngps = 3
-        let ntraining = 30
-        let ntest = 10
+        let ntraining = 10
+        let ntest = 1
 
 
         //building the model
@@ -103,7 +103,7 @@ module Program =
         let trn_t_host = trn_t_list |> ArrayNDHost.ofList2D
 
         printfn "Trn_x =\n%A" trn_x_host
-        printfn"Trn_t =\n%A" trn_t_host
+        printfn "Trn_t =\n%A" trn_t_host
 
         //lengthscale vectore hardcoded
         let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
@@ -152,7 +152,7 @@ module Program =
             let inp_cov_val = inp_covhost |> post device
 
             //calculate predicted mean and variance
-        let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
+            let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
 
 
             //save inputs and predictions in sample datatype
@@ -163,24 +163,28 @@ module Program =
                 Pred_Cov = pred_cov}
 
             //print inputs and predictions
-        printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
-        printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
-        printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
-        printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
-        printfn ""
-        printfn "inp_mean=\n%A" inp_mean_val
-        printfn "inp_cov=\n%A" inp_cov_val
-        printfn ""
-        printfn "pred_mean=\n%A" pred_mean
-        printfn "pred_cov=\n%A" pred_cov
+            printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
+            printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
+            printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
+            printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
+            printfn ""
+            printfn "inp_mean=\n%A" inp_mean_val
+            printfn "inp_cov=\n%A" inp_cov_val
+            printfn ""
+            printfn "pred_mean=\n%A" pred_mean
+            printfn "pred_cov=\n%A" pred_cov
 
             //return sample of inputs and predictions
             testInOut
 
         //run ntest tests and save samples in dataset
+        Dump.start "dump.h5"
         printfn "Testing Multi GP Transfer Model"
         let testList = [1..ntest]
-                       |> List.map (fun _-> randomTest () )
+                       |> List.map (fun n-> 
+                            Dump.prefix <- sprintf "%d" n
+                            randomTest () )
+        Dump.stop ()
 
         let testData = testList |> Dataset.FromSamples
         let testFileName = sprintf "TestData.h5"
@@ -188,7 +192,7 @@ module Program =
 
     [<EntryPoint>]
     let main argv = 
-//        testMultiGPLayer DevHost
+        testMultiGPLayer DevHost
 //        let rand = Random(1)
         //[1..3] |> List.map (fun _ -> InvTest.randomTest rand 30 (0.8f,1.0f)) 
 //        [1..3] |> List.map (fun x -> InvTest.randomTest2 rand x 30 (0.8f,1.0f))

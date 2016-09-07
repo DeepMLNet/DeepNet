@@ -580,6 +580,13 @@ module CudaExprWorkspaceTypes =
                     let resHost = resDev.ToHost()    
                     printfn "%s=\n%A\n" msg resHost                
 
+                | ExecItem (DumpValue (name, res), strm) ->
+                    if Dump.isActive () then
+                        CudaSup.context.Synchronize ()
+                        let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
+                        let resHost = resDev.ToHost()    
+                        Dump.dumpValue name resHost
+
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->
                     try
