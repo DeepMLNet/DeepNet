@@ -4,6 +4,7 @@
       - master
 
   version: 0.2.0.{build}
+  shallow_clone: true  
 
   environment:
     VERSUFFIX: master
@@ -50,6 +51,7 @@
       - develop
 
   version: 0.2.0.{build}
+  shallow_clone: true  
       
   environment:
     VERSUFFIX: develop
@@ -89,6 +91,7 @@
       - 0.2
       
   version: 0.2.0.{build}     
+  shallow_clone: true  
       
   environment:
     access_token:
@@ -142,7 +145,7 @@
   shallow_clone: true
 
   environment:
-    VERSUFFIX: "{branch}"
+    VERSUFFIX: branch
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
