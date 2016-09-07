@@ -115,7 +115,7 @@ module MultiGPLayer =
         let x = ElemExpr.argElem 3
 
         let L1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp]) )
-        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])*2.0f + 2.0f * s [smpl; gp; gp])
+        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp])
         let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f / (4.0f * (l [gp])**2.0f)
         let L2 = exp (-L2a - L2b)
         let L = L1 * L2
@@ -154,7 +154,7 @@ module MultiGPLayer =
         let sq2Dnm = s[smpl;gp1;gp2]**2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
-        let T = Tnom / Tdnm
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero ()) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
@@ -207,6 +207,7 @@ module MultiGPLayer =
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let L = L |> Expr.dump "L"
      
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -214,6 +215,7 @@ module MultiGPLayer =
         let betaBetaT = 
             Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
+        let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
@@ -221,23 +223,28 @@ module MultiGPLayer =
         let lkLkT =
             Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
+        let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
+        let var1 = var1 |> Expr.dump "var1"
         
         // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
+        let var2 = var2 |> Expr.dump "var2"
 
         let pred_var = 1.0f - var1 - var2
+        let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         let T = T nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let T = T |> Expr.dump "T"
 
-        // calculate pred_cov = beta.T .* T .* beta
+        // calculate betaTbeta = beta.T .* T .* beta
         // beta[gp, trn_smpl]
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         // beta[gp1, trn_smpl1].T .* T[gp1,gp2, trn_smpl1, trn_smpl2] .* beta[gp2, trn_smpl2]
@@ -245,22 +252,30 @@ module MultiGPLayer =
         // ==> [smpl, gp1, gp2, 1, 1]
         let bc = SizeSpec.broadcastable
         let one = SizeSpec.one
-        let pred_cov_without_var = 
+        let betaTbeta = 
             (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
             (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
-        
-        let meankmeanl = 
-            (Expr.reshape [nSmpls; nGps; bc] pred_mean) .*
+
+        // [smpl, gp1, gp2, 1, 1] ==> [smpl, gp1, gp2]
+        let betaTbeta =
+            betaTbeta |> Expr.reshape [nSmpls; nGps; nGps]   
+        let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
+
+        // calculate m_k * m_l
+        // [smpl, gp1, 1*] * [smpl, 1*, gp2]
+        // ==> [smpl, gp1, gp2]
+        let mkml = 
+            (Expr.reshape [nSmpls; nGps; bc] pred_mean) *
             (Expr.reshape [nSmpls; bc; nGps] pred_mean)
-//        ///[smpl, gp1, gp2, 1, 1] - [smpl, gp1] .* [smpl, gp2]
-//        let pred_cov_without_var = 
-//            pred_cov_without_var -
-//            (Expr.reshape [nSmpls; nGps; nGps;one;one] meankmeanl)
-        let pred_cov_without_var =
-            pred_cov_without_var |> Expr.reshape [nSmpls; nGps; nGps]
+        let mkml = mkml |> Expr.dump "mkml"
+
+        /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
+        let pred_cov_without_var = betaTbeta - mkml
+        let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
+        let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         pred_mean, pred_cov
 

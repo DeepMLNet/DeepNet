@@ -217,11 +217,9 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
     dump_value("Kk", K_trn_trn)
     dump_value("Kk_inv", K_trn_trn_inv)
 
-    Kk_inv_Kk = np.zeros_like(K_trn_trn)
+    # print condition numbers
     for g in range(n_gps):
         print "cond for Kk of gp %d: %f" % (g, np.linalg.cond(K_trn_trn[g,:,:]))
-        Kk_inv_Kk[g,:,:] = np.dot(K_trn_trn_inv[g,:,:], K_trn_trn[g,:,:])
-    dump_value("Kk_inv_Kk", Kk_inv_Kk)
 
     # build E[K(tst_x, trn_x_k)]
     E_K_tst_trn = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
@@ -247,15 +245,12 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
         mean[g] = np.dot(E_K_tst_trn[g,:], tgt[g, :])
     dump_value_padded("pred_mean", mean)
 
-    print "Kk=\n", K_trn_trn
-    print "Kk_inv=\n", K_trn_trn_inv
-    print "lk=\n", E_K_tst_trn
-    print "beta=\n", tgt
-
-
     # calculate covariance
     cov = np.zeros((n_gps, n_gps), dtype=np.float32)
     if cov_fn['type'] == 'SE':
+        Ldump = np.zeros((n_gps, n_trn_samples, n_trn_samples), dtype=np.float32)
+        vardump = np.zeros((n_gps,), dtype=np.float32)
+        Tdump = np.zeros((n_gps, n_gps, n_trn_samples, n_trn_samples), dtype=np.float32)
         for g1 in range(n_gps):
             for g2 in range(n_gps):
                 l1 = cov_fn['l'][g1]
@@ -270,6 +265,7 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                                 np.sqrt(l1 ** 2. / (l1 ** 2. + 2. * tst_Sigma[g1, g1])) * \
                                 np.exp(-(tst_mu[g1] - (trn_x[g1, i] + trn_x[g1, j])/2.)**2. / (l1 ** 2. + 2. * tst_Sigma[g1, g1]) -
                                        (trn_x[g1, i] - trn_x[g1, j]) ** 2. / (4. * l1**2.))
+                    Ldump[g1,:,:] = L
 
                     # define beta and lv
                     beta = np.dot(K_trn_trn_inv[g1, :, :], trn_y[g1, :])[:, np.newaxis]
@@ -279,6 +275,7 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                     cov[g1, g1] = \
                         1. - np.trace(np.dot(K_trn_trn_inv[g1, :, :] - np.dot(beta, beta.T), L)) - \
                         np.trace(np.dot(np.dot(lv, lv.T), np.dot(beta, beta.T)))
+                    vardump[g1] = cov[g1, g1]
 
                 else:      # covariance
                     T = np.zeros((n_trn_samples, n_trn_samples), dtype=np.float32)
@@ -307,22 +304,26 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
 
                             T[i, j] = exp(S1 + S2 - Sn)
 
-                            if g1 == 0 and g2 == 1 and i == 0 and j == 0:
-                                print "mu_k=%f    mu_l=%f" % (tst_mu[g1], tst_mu[g2])
-                                print "Sigma_kk=%f    Sigma_kl=%f    Sigma_ll=%f" % \
-                                      (tst_Sigma[g1, g1], tst_Sigma[g1, g2], tst_Sigma[g2, g2])
-                                print "x_ki=%f     x_lj=%f" % (trn_x[g1, i], trn_x[g2, j])
-                                print "l_k=%f      l_l=%f" % (l1, l2)
-                                print "T[i,j]=%f" % T[i,j]
+                            #if g1 == 0 and g2 == 1 and i == 0 and j == 0:
+                            #    print "mu_k=%f    mu_l=%f" % (tst_mu[g1], tst_mu[g2])
+                            #    print "Sigma_kk=%f    Sigma_kl=%f    Sigma_ll=%f" % \
+                            #          (tst_Sigma[g1, g1], tst_Sigma[g1, g2], tst_Sigma[g2, g2])
+                            #    print "x_ki=%f     x_lj=%f" % (trn_x[g1, i], trn_x[g2, j])
+                            #    print "l_k=%f      l_l=%f" % (l1, l2)
+                            #    print "T[i,j]=%f" % T[i,j]
 
-                    if g1 == 0 and g2 == 1:
-                        print "T=\n", T
-
+                    #if g1 == 0 and g2 == 1:
+                    #    print "T=\n", T
+                    Tdump[g1, g2, :, :] = T
                     cov[g1, g2] = np.dot(trn_y[g1, :],
                                          np.dot(K_trn_trn_inv[g1, :, :],
                                                 np.dot(T,
                                                        np.dot(K_trn_trn_inv[g2, :, :],
                                                               trn_y[g2, :])))) - mean[g1] * mean[g2]
+        dump_value_padded("L", Ldump)
+        dump_value_padded("pred_var", vardump)
+        dump_value_padded("T", Tdump)
+        dump_value_padded("pred_cov", cov)
     elif cov_fn['type'] == 'ID':
         raise NotImplementedError()
 

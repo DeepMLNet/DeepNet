@@ -53,12 +53,8 @@ module Program =
         list |> List.map (fun x ->   fact1 *x** pow1 - fact2 *x** pow2)
    
    ///Turns a random matrix in the form of a covariance matrix into a Psd matrix. 
-    let fPsd c =        
-        let cov: ExprT<single> = Expr.var "cov" [SizeSpec.broadcastable;SizeSpec.symbol "nGPs"; SizeSpec.symbol "nGPs"]
-        let psd = cov.* cov
-        let cmplr = DevHost.Compiler, CompileEnv.empty
-        let funPsd = Func.make cmplr psd |> arg1 cov
-        funPsd c
+    let makePsd (c: ArrayNDT<_>) =        
+        c.T .* c
 
 
 
@@ -144,11 +140,13 @@ module Program =
             //generate random test inputs
             let inp_mean_host = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
             let inp_mean_val = inp_mean_host |> post device
-//
-//            let inp_cov_host =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
-//            let inp_covhost = fPsd inp_cov_host
-            let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
-//            let inp_covhost = ArrayNDHost.ones [1;ngps] |> diag
+
+            //let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
+            //let inp_covhost = 0.1f * ArrayNDHost.ones [1;ngps] |> ArrayND.diagMat
+
+            let inp_cov_host = rand.UniformArrayND (-2.0f, 2.0f) [1;ngps;ngps]
+            let inp_covhost = makePsd inp_cov_host
+
             let inp_cov_val = inp_covhost |> post device
 
             //calculate predicted mean and variance
@@ -192,7 +190,9 @@ module Program =
 
     [<EntryPoint>]
     let main argv = 
-        testMultiGPLayer DevHost
+        //testMultiGPLayer DevHost
+        testMultiGPLayer DevCuda
+
 //        let rand = Random(1)
         //[1..3] |> List.map (fun _ -> InvTest.randomTest rand 30 (0.8f,1.0f)) 
 //        [1..3] |> List.map (fun x -> InvTest.randomTest2 rand x 30 (0.8f,1.0f))
