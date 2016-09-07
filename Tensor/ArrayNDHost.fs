@@ -332,11 +332,6 @@ module ArrayNDHost =
     let ofList2D (data: 'T list list) =
         data |> array2D |> ofArray2D
 
-    /// Creates a one-dimensional ArrayNDT using the specified sequence sorted by it"s elements and shape.       
-    let ofSotredSeqWithShape (shape: int list) (data: 'T seq) =
-        let nElems = shape |> List.fold (*) 1
-        data |> Seq.take nElems |> Seq.toList |> List.sort |> ofList |> ArrayND.reshape shape
-
     /// Creates an Array from the data in this ArrayNDT. The data is copied.
     let toArray (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
