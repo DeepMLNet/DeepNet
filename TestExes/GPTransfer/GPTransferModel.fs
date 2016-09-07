@@ -50,6 +50,8 @@ module MultiGPLayer =
         HyperPars      = hp
     }
 
+    ///The covariance Matrices of the training vectors with themselves 
+    ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
         // Kse element expression
         // input  x[gp, trn_smpl]
@@ -68,6 +70,8 @@ module MultiGPLayer =
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
+    ///The covariance of training vectors and input vector 
+    ///by GP instances with squared exponential covariance.
     let lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // lk element expression
         // inputs  l[gp]
@@ -90,7 +94,7 @@ module MultiGPLayer =
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
 
 
-
+    ///Elementwise Matrix needed for calculation of the varance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // L element expression
         // inputs  l[gp]
@@ -115,7 +119,7 @@ module MultiGPLayer =
 
         Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
-
+    ///Elementwise Matrix needed for calculation of the covarance prediction.
     let T nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // T element expression
         // inputs  l[gp]
@@ -165,7 +169,7 @@ module MultiGPLayer =
         let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
         Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
 
-
+    ///Predicted mean and covariance from input mean and covariance.
     let pred pars mu sigma =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]

@@ -7,10 +7,12 @@ open System
 open Datasets
 
 module Program =
-
+    
+    ///Transfers Arrays to device (either Host or DevCuda)
     let post device (x: ArrayNDT<'T>) =
         if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> ArrayNDT<'T>
         else x 
+    
     ///Sampling type for Model training parameters.
     type trainData ={
         Lengthscale:    ArrayNDT<single>
@@ -41,7 +43,7 @@ module Program =
     let fsng x = single x
     let isng x = single x
 
-    //Generates a random single in the range (minValue,maxValue)
+    ///Generates a random single in the range (minValue,maxValue)
     let randSingleInRange (rand:Random) (minValue,maxValue) =
         let (imin,imax) = int minValue,int maxValue
         if (imin >= imax - 1) then
@@ -50,7 +52,7 @@ module Program =
         let rand2 = isng(rand.Next(imin,imax-1))
         rand1+rand2
 
-    //Generates a random polynomial of maximal power 2
+    ///Generates a random polynomial of maximal power 2
     let randPolynomial (rand:Random) list = 
 
         let fact1 = fsng (rand.NextDouble())
