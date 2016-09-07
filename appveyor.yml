@@ -138,7 +138,8 @@
  
 # all other branches: 
 -
-  version: 0.2.0.{build}
+  version: 0.2.0.{build}-{branch}
+  shallow_clone: true
 
   environment:
     VERSUFFIX: ci
