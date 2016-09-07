@@ -242,10 +242,15 @@ type Dataset<'S> (fieldStorages: IArrayNDT list) =
                 stor.[smpl, Fill] <- smplVal
             stor :> IArrayNDT            
 
+        #if false
         let fieldStorages = 
             seq { for fld=0 to nFields-1 do yield async { return fieldStorage ary.[*, fld] } }
             |> Async.Parallel |> Async.RunSynchronously
             |> Array.toList
+        #else
+        let fieldStorages = 
+            [for fld=0 to nFields-1 do yield fieldStorage ary.[*, fld]]
+        #endif
         Dataset<'S> fieldStorages
 
  

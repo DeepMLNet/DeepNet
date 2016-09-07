@@ -82,6 +82,7 @@ module UExprTypes =
         | SwapDim of int * int       
         | StoreToVar of UVarSpecT
         | Print of string
+        | Dump of string
         | Annotated of string       
 
     and UBinaryOpT =

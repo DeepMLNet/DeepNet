@@ -2,7 +2,7 @@
 
 open ArrayNDNS
 open SymTensor
-
+open System
 
 module MultiGPLayer =
 
@@ -12,6 +12,7 @@ module MultiGPLayer =
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
+
     }
 
     type Pars = {
@@ -28,8 +29,9 @@ module MultiGPLayer =
         HyperPars:          HyperPars
     }
 
+
     let internal initLengthscales seed (shp: int list) : ArrayNDHostT<'T> = 
-        ArrayNDHost.zeros shp
+         ArrayNDHost.zeros shp
 
     let internal initTrnX seed (shp: int list) : ArrayNDHostT<'T> = 
         ArrayNDHost.zeros shp
@@ -40,7 +42,6 @@ module MultiGPLayer =
     let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<'T> = 
         ArrayNDHost.zeros shp
 
-
     let pars (mb: ModelBuilder<_>) hp = {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               initLengthscales)
         TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], initTrnX)
@@ -49,6 +50,11 @@ module MultiGPLayer =
         HyperPars      = hp
     }
 
+    let pinv a =
+        a|> Expr.transpose |> Expr.dot a |> Expr.invert |> Expr.dot (Expr.transpose a)
+
+    ///The covariance Matrices of the training vectors with themselves 
+    ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
         // Kse element expression
         // input  x[gp, trn_smpl]
@@ -63,10 +69,12 @@ module MultiGPLayer =
         let s = ElemExpr.argElem 2
         let kse =
             exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) ) +
-            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1]) (ElemExpr.zero())
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] ** 2.0f) (ElemExpr.zero())
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
+    ///The covariance of training vectors and input vector 
+    ///by GP instances with squared exponential covariance.
     let lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // lk element expression
         // inputs  l[gp]
@@ -89,7 +97,7 @@ module MultiGPLayer =
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
 
 
-
+    ///Elementwise Matrix needed for calculation of the varance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // L element expression
         // inputs  l[gp]
@@ -107,14 +115,14 @@ module MultiGPLayer =
         let x = ElemExpr.argElem 3
 
         let L1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp]) )
-        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])*2.0f + 2.0f * s [smpl; gp; gp])
+        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp])
         let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f / (4.0f * (l [gp])**2.0f)
         let L2 = exp (-L2a - L2b)
         let L = L1 * L2
 
         Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
-
+    ///Elementwise Matrix needed for calculation of the covarance prediction.
     let T nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // T element expression
         // inputs  l[gp]
@@ -146,7 +154,7 @@ module MultiGPLayer =
         let sq2Dnm = s[smpl;gp1;gp2]**2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
-        let T = Tnom / Tdnm
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero ()) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
@@ -164,7 +172,7 @@ module MultiGPLayer =
         let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
         Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
 
-
+    ///Predicted mean and covariance from input mean and covariance.
     let pred pars mu sigma =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
@@ -175,26 +183,31 @@ module MultiGPLayer =
 
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
-        let Kk = Kk |> Expr.print "Kk"
+        let Kk = Kk |> Expr.dump "Kk"
         let Kk_inv = Expr.invert Kk
-        let Kk_inv = Kk_inv |> Expr.print "Kk_inv"
+        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
+        let Kk_pinv = pinv Kk
+        let Kk_pinv = Kk_pinv |> Expr.dump "Kk_pinv"
+//        let Kk_inv = Kk_pinv
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let lk = lk |> Expr.print "lk"
+        let lk = lk |> Expr.dump "lk"
         // trnT [gp, trn_smpl]
         let trnT = pars.TrnT
 
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
         let beta = Kk_inv .* !trnT
-        let beta = beta |> Expr.print "beta"
+        let beta = beta |> Expr.dump "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+        let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let L = L |> Expr.dump "L"
      
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -202,6 +215,7 @@ module MultiGPLayer =
         let betaBetaT = 
             Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
+        let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
@@ -209,23 +223,28 @@ module MultiGPLayer =
         let lkLkT =
             Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
+        let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
-
-        // Tr( lkLkT .* betaBeta.T )
+        let var1 = var1 |> Expr.dump "var1"
+        
+        // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
+        let var2 = var2 |> Expr.dump "var2"
 
         let pred_var = 1.0f - var1 - var2
+        let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         let T = T nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let T = T |> Expr.dump "T"
 
-        // calculate pred_cov = beta.T .* T .* beta
+        // calculate betaTbeta = beta.T .* T .* beta
         // beta[gp, trn_smpl]
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         // beta[gp1, trn_smpl1].T .* T[gp1,gp2, trn_smpl1, trn_smpl2] .* beta[gp2, trn_smpl2]
@@ -233,14 +252,30 @@ module MultiGPLayer =
         // ==> [smpl, gp1, gp2, 1, 1]
         let bc = SizeSpec.broadcastable
         let one = SizeSpec.one
-        let pred_cov_without_var = 
+        let betaTbeta = 
             (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
             (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
-        let pred_cov_without_var =
-            pred_cov_without_var |> Expr.reshape [nSmpls; nGps; nGps]
+
+        // [smpl, gp1, gp2, 1, 1] ==> [smpl, gp1, gp2]
+        let betaTbeta =
+            betaTbeta |> Expr.reshape [nSmpls; nGps; nGps]   
+        let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
+
+        // calculate m_k * m_l
+        // [smpl, gp1, 1*] * [smpl, 1*, gp2]
+        // ==> [smpl, gp1, gp2]
+        let mkml = 
+            (Expr.reshape [nSmpls; nGps; bc] pred_mean) *
+            (Expr.reshape [nSmpls; bc; nGps] pred_mean)
+        let mkml = mkml |> Expr.dump "mkml"
+
+        /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
+        let pred_cov_without_var = betaTbeta - mkml
+        let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
+        let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         pred_mean, pred_cov
 

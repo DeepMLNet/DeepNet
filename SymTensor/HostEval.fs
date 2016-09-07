@@ -104,6 +104,9 @@ module HostEval =
                     | Print msg ->
                         printfn "%s=\n%A\n" msg av
                         av
+                    | Dump name ->
+                        Dump.dumpValue name av
+                        av
                     | Annotated _-> av                
                 | Binary(op, a, b) ->
                     let av, bv = doEval a, doEval b  

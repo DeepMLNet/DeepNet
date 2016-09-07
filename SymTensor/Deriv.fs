@@ -109,6 +109,7 @@ module Deriv =
                 bc |> collapse |> reverseDiffStep a
             | StoreToVar _ -> eg |> reverseDiffStep a
             | Print _ -> eg |> reverseDiffStep a
+            | Dump _ -> eg |> reverseDiffStep a
             | Annotated _ -> eg |> reverseDiffStep a
 
         | Binary(op, a, b) ->
