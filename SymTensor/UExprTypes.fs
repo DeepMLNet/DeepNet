@@ -1,6 +1,23 @@
 ﻿namespace SymTensor
 
 
+[<AutoOpen>]
+module ExprTypes0 =
+    /// extrapolation behaviour
+    type OutsideInterpolatorRangeT =
+        /// zero outside interpolation range
+        | Zero
+        /// clamp to nearest value outside interpolation range
+        | Nearest
+
+    /// interpolation mode
+    type InterpolationModeT =
+        /// linear interpolation
+        | InterpolateLinearaly
+        /// interpolate to the table element left of the argument
+        | InterpolateToLeft
+
+
 //[<AutoOpen>]
 module UExprTypes = 
 
@@ -15,6 +32,17 @@ module UExprTypes =
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpecT<int>
     type UExprRngsSpecT = SimpleRangesSpecT<int>
+
+    /// type-neutral interface for Interpolator1D
+    type IInterpolator = 
+        inherit System.IComparable 
+
+        abstract MinArg: single list
+        abstract MaxArg: single list
+        abstract Resolution: single list
+        abstract Mode: InterpolationModeT
+        abstract Outside: OutsideInterpolatorRangeT list
+        abstract NDims: int
 
     type ULeafOpT =
         | Identity of SizeSpecT
@@ -43,7 +71,7 @@ module UExprTypes =
         | Ceil
         | Floor
         | Round
-        | Truncate                   
+        | Truncate              
         | Diag of int * int
         | DiagMat of int * int
         | Invert
@@ -71,6 +99,7 @@ module UExprTypes =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
         | Elements of ShapeSpecT * UElemExpr.UElemFuncT
+        | Interpolate of IInterpolator  
         | ExtensionOp of IUOp             
 
     /// unified op of any arity and type

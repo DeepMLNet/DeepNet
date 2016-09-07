@@ -7,7 +7,7 @@ open System
 open Datasets
 
 module Program =
-    
+
     ///Transfers Arrays to device (either Host or DevCuda)
     let post device (x: ArrayNDT<'T>) =
         if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> ArrayNDT<'T>
@@ -110,7 +110,7 @@ module Program =
 
 //        //random lengthscale vector
 //        let ls_host = rand.UniformArrayND (0.0f,2.0f) [ngps]
-        
+
         //sigma vector hardcoded
         let trn_sigma_host = ArrayNDHost.zeros<single> [ngps;ntraining]
 
@@ -150,10 +150,10 @@ module Program =
             let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
 //            let inp_covhost = ArrayNDHost.ones [1;ngps] |> diag
             let inp_cov_val = inp_covhost |> post device
-            
+
             //calculate predicted mean and variance
-            let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
-              
+        let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
+
 
             //save inputs and predictions in sample datatype
             let testInOut = {
@@ -163,16 +163,16 @@ module Program =
                 Pred_Cov = pred_cov}
 
             //print inputs and predictions
-            printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
-            printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
-            printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
-            printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
-            printfn ""
-            printfn "inp_mean=\n%A" inp_mean_val
-            printfn "inp_cov=\n%A" inp_cov_val
-            printfn ""
-            printfn "pred_mean=\n%A" pred_mean
-            printfn "pred_cov=\n%A" pred_cov
+        printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
+        printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
+        printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
+        printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
+        printfn ""
+        printfn "inp_mean=\n%A" inp_mean_val
+        printfn "inp_cov=\n%A" inp_cov_val
+        printfn ""
+        printfn "pred_mean=\n%A" pred_mean
+        printfn "pred_cov=\n%A" pred_cov
 
             //return sample of inputs and predictions
             testInOut
@@ -185,7 +185,7 @@ module Program =
         let testData = testList |> Dataset.FromSamples
         let testFileName = sprintf "TestData.h5"
         testData.Save(testFileName)
-        
+
     [<EntryPoint>]
     let main argv = 
 //        testMultiGPLayer DevHost
@@ -197,6 +197,8 @@ module Program =
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore
+
+
 
         0
 //

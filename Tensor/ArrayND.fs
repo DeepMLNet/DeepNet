@@ -801,10 +801,12 @@ module ArrayND =
         ArrayNDT<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
-    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
-        let aTol = conv<'T> 1e-8
-        let rTol = conv<'T> 1e-5
+    let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         abs (a - b) <<== aTol + rTol * abs b
+
+    /// Elementwise check if two arrays have same (within machine precision) values.
+    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
@@ -887,15 +889,20 @@ module ArrayND =
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
-    /// Returns true if two arrays have same (within machine precision) values in all elements.
+    /// Returns true if two arrays have same (within specified precision) values in all elements.
     /// If arrays have different shape, then false is returned.
-    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline almostEqualWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         if a.Shape = b.Shape then
-            isClose a b |> all
+            isCloseWithTol aTol rTol a b |> all
         else 
             let res = newCOfType [] a
             set [] false res
             res
+
+    /// Returns true if two arrays have same (within machine precision) values in all elements.
+    /// If arrays have different shape, then false is returned.
+    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
@@ -1094,6 +1101,23 @@ module ArrayND =
     /// consisting of the last two dimensions are inverted.
     let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
         a.Invert () :?> 'A
+
+    /// calculates the pairwise differences along the given axis
+    let diffAxis ax (a: #ArrayNDT<'T>) =
+        checkAxis ax a
+        let shftRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (Some 1, None)
+                else yield RngAll]
+        let cutRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2))
+                else yield RngAll]
+        a.[shftRng] - a.[cutRng]
+
+    /// calculates the pairwise differences along the last axis
+    let diff (a: #ArrayNDT<'T>) =
+        diffAxis (a.NDims-1) a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // concatenation

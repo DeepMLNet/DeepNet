@@ -34,12 +34,24 @@ module Types =
         Offset: int
     }
 
+    /// a CUDA texture object
+    type TextureObjectT = {
+        Contents:                  ArrayNDManikinT
+        Descriptor:                BasicTypes.CudaTextureDescriptor
+    }
+
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// storage location of variables
         VarStorLoc:                 Map<UVarSpecT, ArrayLocT>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
+        /// texture objects
+        TextureObjects:             ResizeArray<TextureObjectT>
+        /// textures for interpolator
+        InterpolatorTextures:       Dictionary<IInterpolator, TextureObjectT>
+        /// values for constants
+        ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
     }
 
     /// function domain (kernel only or host code that may call kernels)
@@ -74,6 +86,11 @@ module Types =
         CudaRegHostMem:         CudaRegisteredHostMemory<byte>
     }
 
+    type CudaTexObjectAndArray = {
+        TexObject:              CudaTexObject
+        TexArray:               IDisposable
+    }
+
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
         Stream:                 Dictionary<StreamT, CudaStream>
@@ -82,6 +99,8 @@ module Types =
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
         mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
         mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
+        TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
+        ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
     }
     
     /// CUDA device memory range
@@ -115,6 +134,26 @@ module Types =
         member this.CPPFuncName = cppFuncName
 
 
+module CudaCompileEnv =
+
+    /// creates a new texture object
+    let newTextureObject (env: CudaCompileEnvT) contents descriptor =
+        if not (ArrayND.isC contents && contents.Layout.Offset = 0) then
+            failwith "manikin for use with texture must be contiguous and offset free"
+        let texObj = {
+            Contents   = contents
+            Descriptor = descriptor
+        }
+        env.TextureObjects.Add texObj
+        texObj
+
+    let newConstant (env: CudaCompileEnvT) (value: IArrayNDCudaT) =   
+        let mc : MemConstManikinT = {
+            Id = env.ConstantValues.Keys.Count
+            TypeName = TypeName.ofTypeInst value.DataType
+        }
+        env.ConstantValues.Add (mc, value)
+        ArrayNDManikinT (value.Layout, MemConst mc)
 
 
 module CudaExecEnv = 
@@ -134,6 +173,9 @@ module CudaExecEnv =
             if ArrayND.isC ev then 
                 ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
             else failwithf "external variable %A was expected to be contiguous" vs
+        | MemConst mc -> 
+            let ary = env.ConstantValues.[mc]
+            ary.Storage.ByteData, 0            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -156,6 +198,10 @@ module CudaExecEnv =
         let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
         ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ (manikin.Layout)
+
+    /// gets a CudaTexObject
+    let getTextureObj (env: CudaExecEnvT) (tex: TextureObjectT) =
+        env.TextureObject.[tex].TexObject
 
 
 [<AutoOpen>]
@@ -266,6 +312,7 @@ module ArgTemplates =
                     match memManikin with
                     | MemAlloc im -> env.InternalMem.[im]
                     | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
+                    | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
 
     type SizeTArgTmpl (value: int) =
@@ -463,6 +510,133 @@ module ArgTemplates =
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl
+
+
+    /// 1d interpolation op C++ structure
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type Interpolate1DEOpArg =
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
+        val Offset: single
+
+        new (tbl, minArg0, resolution0, offset) = 
+            {Tbl=tbl; MinArg0=minArg0; Resolution0=resolution0; Offset=offset}
+
+    /// 2d interpolation op C++ structure
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type Interpolate2DEOpArg =
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
+        val MinArg1: single
+        val Resolution1: single
+        val Offset: single
+
+        new (tbl, minArg0, resolution0, minArg1, resolution1, offset) = 
+            {Tbl=tbl; 
+             MinArg0=minArg0; Resolution0=resolution0; 
+             MinArg1=minArg1; Resolution1=resolution1; 
+             Offset=offset}
+
+    /// 3d interpolation op C++ structure
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    type Interpolate3DEOpArg =
+        val Tbl: CUtexObject
+        val MinArg0: single
+        val Resolution0: single
+        val MinArg1: single
+        val Resolution1: single
+        val MinArg2: single
+        val Resolution2: single
+        val Offset: single
+
+        new (tbl, minArg0, resolution0, minArg1, resolution1, minArg2, resolution2, offset) = 
+            {Tbl=tbl; 
+             MinArg0=minArg0; Resolution0=resolution0; 
+             MinArg1=minArg1; Resolution1=resolution1; 
+             MinArg2=minArg2; Resolution2=resolution2;
+             Offset=offset}
+
+
+    type InterpolateEOpArgTmpl (ip:           IInterpolator,
+                                compileEnv:   CudaCompileEnvT) =
+
+        let tbl = 
+            match Expr.getInterpolatorTableAsIArrayNDT ip with
+            | :? IArrayNDCudaT as tbl -> tbl
+            | _ -> failwith "interpolation table must be stored on CUDA device"
+    
+        do 
+            if ip.NDims > 3 then
+                failwith "interpolation on CUDA device is currently only supported for up to 3 dimensions"
+            if tbl.DataType <> typeof<single> then
+                failwith "interpolation on CUDA device is currently only supported for the single data type"
+
+        let texture, needInit, tblCnst =
+            if compileEnv.InterpolatorTextures.ContainsKey ip then
+                compileEnv.InterpolatorTextures.[ip], false, None
+            else
+                let tblCnst = CudaCompileEnv.newConstant compileEnv tbl
+                let rec adrModeForDim dim =
+                    if dim >= ip.NDims then adrModeForDim (dim - 1)
+                    else 
+                        match ip.Outside.[dim] with
+                        | Zero -> CUAddressMode.Border
+                        | Nearest -> CUAddressMode.Clamp
+                let filterMode =
+                    match ip.Mode with
+                    | InterpolateLinearaly -> CUFilterMode.Linear
+                    | InterpolateToLeft -> CUFilterMode.Point
+                let desc =
+                    CudaTextureDescriptor (adrModeForDim 0, adrModeForDim 1, adrModeForDim 2, 
+                                           filterMode, CUTexRefSetFlags.None)
+                let t = CudaCompileEnv.newTextureObject compileEnv tblCnst desc
+                compileEnv.InterpolatorTextures.Add (ip, t)
+                t, true, Some tblCnst
+
+        member this.NeedInit = needInit
+
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = 
+                match ip.NDims with
+                | 1 -> "Interpolate1DEOp_t"
+                | 2 -> "Interpolate2DEOp_t"
+                | 3 -> "Interpolate3DEOp_t"
+                | _ -> failwith "unsupported"
+            member this.GetArg env strm = 
+                let texObj = CudaExecEnv.getTextureObj env texture
+                let offset = 
+                    match ip.Mode with
+                    | InterpolateLinearaly -> 0.5f
+                    | InterpolateToLeft -> 0.0f
+
+                match ip.NDims with
+                | 1 -> Interpolate1DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            offset)
+                       |> box
+                | 2 -> Interpolate2DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            offset)
+                       |> box
+                | 3 -> Interpolate3DEOpArg (texObj.TexObject, 
+                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            ip.MinArg.[2], ip.Resolution.[2],
+                                            offset)
+                       |> box
+                | _ -> failwith "unsupported"
+
+        interface ICudaOp with
+            member this.IsIndexed = false
+        interface ICudaOpAndArgTmpl
+
+
 
     [<Struct>]
     [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]

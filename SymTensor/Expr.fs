@@ -9,10 +9,11 @@ open ShapeSpec
 open VarSpec
 
 
+/// expression module
 module Expr =
-
     open ArrayND
 
+    /// boxes the contents of an option
     let inline boxOption (oo: #obj option) = 
         match oo with
         | Some o -> Some (o :> obj)
@@ -27,6 +28,38 @@ module Expr =
     type ArityT =
         | FixedArity of int
         | DynamicArity
+
+    /// non-generic interface for Interpolator
+    type IInterpolator = UExprTypes.IInterpolator
+
+    /// one dimensional linear interpoator
+    type InterpolatorT<'T> = 
+        {
+            /// ID
+            Id:         int
+            /// minimum argument value
+            MinArg:     'T list
+            /// maximum argument value
+            MaxArg:     'T list
+            /// resolution
+            Resolution: float list
+            /// interpolation behaviour
+            Mode:       InterpolationModeT
+            /// extrapolation behaviour
+            Outside:    OutsideInterpolatorRangeT list
+            /// interpolator for derivative
+            Derivative: InterpolatorT<'T> option
+        }        
+        
+        member this.NDims = List.length this.Resolution
+
+        interface IInterpolator with
+            member this.MinArg = List.map conv<single> this.MinArg
+            member this.MaxArg = List.map conv<single> this.MaxArg
+            member this.Resolution = List.map single this.Resolution
+            member this.Mode = this.Mode
+            member this.Outside = this.Outside
+            member this.NDims = this.NDims
 
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
@@ -141,6 +174,8 @@ module Expr =
         | Discard        
         /// elementwise calculated tensor
         | Elements of ShapeSpecT * ElemExpr.ElemExprT<'T>
+        /// elementwise interpolation
+        | Interpolate of InterpolatorT<'T>
         /// extension op
         | ExtensionOp of IOp<'T>
    
@@ -371,6 +406,7 @@ module Expr =
         // misc
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
         | Nary(Elements (resShape, elemExpr), _) -> resShape
+        | Nary(Interpolate _, es) -> shapeOf es.Head
         | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
 
     /// number of elements 
@@ -476,6 +512,24 @@ module Expr =
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
+                | Interpolate ip ->
+                    let nDims = ip.MinArg.Length
+                    if nDims < 1 then
+                        failwith "interpolator must be at least one-dimensional"
+                    if ip.MaxArg.Length <> nDims || ip.Outside.Length <> nDims || ip.Resolution.Length <> nDims then
+                        failwith "MinArg, MaxArg, Resolution and Outside have inconsistent lengths"
+                    if es.Length <> nDims then
+                        failwith "number of arguments does not match dimensionality of interpolator"
+                    if not ((ip.MinArg, ip.MaxArg) ||> List.forall2 (fun mi ma -> conv<float> mi < conv<float> ma)) then
+                        failwith "MinArg of interpolator must be smaller than MaxArg"
+                    if ip.Resolution |> List.exists ((>) 0.0) then
+                        failwith "Resolution of interpolator must be positive"
+                    match ip.Derivative with
+                    | Some d when d.NDims <> nDims ->
+                        failwith "Dimensionality of derivative interpolator must match dimensionality of interpolator"
+                    | _ -> ()
+                    for s in ss do 
+                        s ..= ss.Head
                 | ExtensionOp eop -> eop.CheckArgs ss
                 | _ -> ()
 
@@ -934,6 +988,98 @@ module Expr =
     let print msg a =
         Unary (Print msg, a) |> check
 
+    /// interpolator tables
+    let private tablesOfInterpolators = new Dictionary<IInterpolator, IArrayNDT>()
+
+    /// interpolator derivatives
+    let private derivativeOfInterpolators = new Dictionary<IInterpolator, IInterpolator>()
+
+    /// Creates an n-dimensional linear interpolator,
+    /// where table contains the equally spaced function values between minArg and maxArg.
+    /// Optionally, an interpolator for the derivative can be specified.
+    let createInterpolator (tbl: ArrayNDT<'T>) (minArg: 'T list) (maxArg: 'T list) 
+                           (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
+                           (derivative: InterpolatorT<'T> option) =
+        let nDims = minArg.Length
+        if maxArg.Length <> nDims || outside.Length <> nDims then
+            failwith "minArg, maxArg and outside have inconsistent lengths"
+        if tbl.NDims <> nDims then failwith "interpolation table has wrong number of dimensions"
+        if tbl.Shape |> List.exists (fun e -> e < 2) then failwith "interpolation table must contain at least 2 entries"
+        let ip = {
+            Id = tablesOfInterpolators.Count
+            MinArg = minArg
+            MaxArg = maxArg
+            Resolution = List.zip3 minArg maxArg tbl.Shape
+                         |> List.map (fun (min, max, nElems) -> 
+                             (conv<float> max - conv<float> min) / float (nElems - 1))
+            Mode = mode
+            Outside = outside
+            Derivative = derivative
+        }
+        lock tablesOfInterpolators
+            (fun () -> tablesOfInterpolators.Add (ip, tbl))        
+        ip
+
+    /// Gets the function value table for the specified one-dimensional interpolator.
+    let getInterpolatorTableAsIArrayNDT (ip: IInterpolator) =
+        if tablesOfInterpolators.ContainsKey ip then tablesOfInterpolators.[ip] 
+        else failwithf "interpolator %A is unknown" ip
+
+    /// Gets the function value table for the specified one-dimensional interpolator.
+    let getInterpolatorTable (ip: InterpolatorT<'T>) =
+        getInterpolatorTableAsIArrayNDT ip :?> ArrayNDT<'T>
+
+    /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
+    /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
+    let getDerivativeOfInterpolator derivDim (ip: InterpolatorT<'T>) =
+        if not (0 <= derivDim && derivDim < ip.NDims) then
+            invalidArg "derivDim" "derivative dimension out of range"
+
+        match ip.Derivative with
+        | Some ipd -> ipd  // use provided derivative table
+        | None ->          // create derivative table by numeric differentiation
+            if derivativeOfInterpolators.ContainsKey ip then 
+                derivativeOfInterpolators.[ip] :?> InterpolatorT<'T>
+            else
+                let tbl = getInterpolatorTable ip                 
+                let diffTbl =
+                    match ip.Mode with
+                    | InterpolateLinearaly ->
+                        let diffTbl = 
+                            ArrayND.diffAxis derivDim tbl / 
+                            ArrayND.scalarOfType (conv<'T> ip.Resolution.[derivDim]) tbl
+                        let zeroShp =
+                            [for d, s in List.indexed tbl.Shape do
+                                if d = derivDim then yield 1
+                                else yield s]
+                        let zero = ArrayND.zerosOfSameType zeroShp diffTbl
+                        ArrayND.concat derivDim [diffTbl; zero]
+                    | InterpolateToLeft ->
+                        ArrayND.zerosLike tbl
+                let outside =
+                    [for d, o in List.indexed ip.Outside do
+                        if d = derivDim then yield Zero
+                        else yield o]
+                let ipd = createInterpolator diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
+                lock derivativeOfInterpolators
+                    (fun () -> derivativeOfInterpolators.Add (ip, ipd))
+                ipd
+
+    /// Element-wise n-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the createInterpolator function.
+    let interpolate interpolator e =
+        Nary (Interpolate interpolator, e) |> check
+
+    /// Element-wise one-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the createInterpolator function.
+    let interpolate1D interpolator a =
+        interpolate interpolator [a]
+
+    /// Element-wise one-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the createInterpolator function.
+    let interpolate2D interpolator a b =
+        interpolate interpolator [a; b]
+
 
 
 [<AutoOpen>]
@@ -946,6 +1092,7 @@ module ExprTypes2 =
     type IOp<'T> = Expr.IOp<'T>
     type IUOp = UExprTypes.IUOp
     type ExprT<'T> = Expr.ExprT<'T>
+
     
 
 

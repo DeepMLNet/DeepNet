@@ -6,6 +6,7 @@
 #include <stdio.h>
 #endif
 
+
 #ifdef ENABLE_CALL_TRACE
 #define KERNEL_TRACE(msg)   \
 	{ if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && \
@@ -20,6 +21,7 @@
 
 
 #define _dev __host__ __device__ __forceinline__ 
+#define _devonly __device__ __forceinline__
 
 
 

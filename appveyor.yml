@@ -4,9 +4,10 @@
       - master
 
   version: 0.2.0.{build}
+  shallow_clone: true  
 
   environment:
-    VERSUFFIX: ci
+    VERSUFFIX: master
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
@@ -50,6 +51,7 @@
       - develop
 
   version: 0.2.0.{build}
+  shallow_clone: true  
       
   environment:
     VERSUFFIX: develop
@@ -89,6 +91,7 @@
       - 0.2
       
   version: 0.2.0.{build}     
+  shallow_clone: true  
       
   environment:
     access_token:
@@ -135,3 +138,41 @@
         secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
       artifact: /.*\.nupkg/
   
+ 
+# all other branches: 
+-
+  version: 0.2.0.{build}-{branch}
+  shallow_clone: true
+
+  environment:
+    VERSUFFIX: branch
+    access_token:
+      secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
+
+  install:
+    - cinst r.project
+
+  before_build:
+    - nuget restore DeepNet-CI.sln -Verbosity quiet
+
+  platform: x64
+  configuration: Release
+  build:
+    project: DeepNet-CI.sln
+    verbosity: minimal
+  
+  assembly_info:
+    patch: true
+    file: AssemblyInfo.*
+    assembly_version: "{version}"
+    assembly_file_version: "{version}"
+    assembly_informational_version: "{version}"  
+  
+  test:
+    categories:
+      except:
+        - Skip_CI
+
+  artifacts:
+    - path: dist\Release\*.nupkg
+

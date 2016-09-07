@@ -47,7 +47,8 @@ module Adam =
 module AdamTypes = 
     open Adam
 
-    type Adam<'T when 'T: equality> (loss:  ExprT<'T>,
+    type Adam<'T when 'T: equality and 'T: comparison> 
+                                    (loss:  ExprT<'T>,
                                      pars:  ExprT<'T>,
                                      dev:   IDevice) =
 

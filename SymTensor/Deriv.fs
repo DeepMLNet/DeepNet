@@ -165,6 +165,16 @@ module Deriv =
                         let deArgs = es @ [egExpanded]
                         Expr.elements deShp deElemExpr deArgs |> collapse)
                 totalDerivates es des
+            | Interpolate ip -> 
+                match ip.Mode with
+                | InterpolateLinearaly ->
+                    let des = 
+                        [for d=0 to es.Length-1 do
+                            let ipd = Expr.getDerivativeOfInterpolator d ip
+                            yield egExpanded * padLeft (Expr.interpolate ipd es)]
+                    totalDerivates es des
+                | InterpolateToLeft -> Map.empty
+
             | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 

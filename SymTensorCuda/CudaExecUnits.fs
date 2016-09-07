@@ -257,6 +257,7 @@ module CudaExecUnit =
             // in a temporary manikin and copied over to avoid race conditions.
             inplaceFirstSrcReq
         | UNaryOp (Elements _) -> dfltSrcWithNoViewReq            
+        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
 
 
@@ -371,7 +372,7 @@ module CudaExecUnit =
         | UUnaryOp Ceil -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Floor -> dfltChInplaceOvrwrtTrgt ()
         | UUnaryOp Round -> dfltChInplaceOvrwrtTrgt ()
-        | UUnaryOp Truncate -> dfltChInplaceOvrwrtTrgt ()    
+        | UUnaryOp Truncate -> dfltChInplaceOvrwrtTrgt ()   
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
             dfltChTrgt (ArrayND.diagAxis ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
@@ -430,6 +431,7 @@ module CudaExecUnit =
                 dfltChTrgt srcsDfltCh.[0] false
             else dfltChOutplaceTrgt ()
         | UNaryOp (Elements _) -> dfltChOutplaceTrgt ()
+        | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()    
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
    
@@ -677,6 +679,7 @@ module CudaExecUnit =
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
+            | MemConst _
             | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
             | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
 
@@ -868,6 +871,8 @@ module CudaExecUnit =
             copyItems @ setItems
         | UNaryOp (Elements (_, elemFunc)) ->
             execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
+        | UNaryOp (Interpolate ip) -> 
+            execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 
