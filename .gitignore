@@ -220,3 +220,4 @@ ModelManifest.xml
 /MKL/build/
 /TestData.h5
 /TrainData.h5
+/TestExes/GPTransfer/pydump.h5

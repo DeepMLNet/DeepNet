@@ -176,3 +176,18 @@ let ``Invert singular matrix`` () =
                                    [1.0; 0.0; 0.0]]
 
     shouldFail (fun () -> ArrayND.invert dm |> ignore)
+
+
+[<Fact>]
+let ``Invert Kk matrix`` () =
+    use hdf = HDF5.OpenRead "MatInv.h5"
+    let Kk : ArrayNDHostT<single> = ArrayNDHDF.read hdf "Kk"
+
+    let Kkinv = ArrayND.invert Kk   
+    let id = Kkinv .* Kk
+
+    printfn "Kk=\n%A" Kk
+    printfn "Kkinv=\n%A" Kkinv
+    printfn "id=\n%A" id
+
+

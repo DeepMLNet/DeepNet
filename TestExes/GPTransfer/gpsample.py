@@ -165,6 +165,21 @@ def gp_uncertain_regression(tst_mu, tst_var, trn_x, trn_y, trn_sigma, cov_fn):
     return mean, var
 
 
+dump_h5 = h5py.File("pydump.h5", 'w')
+dump_prefix = ""
+dumped_vals = []
+
+def dump_value(name, value):
+    dump_h5.require_group (dump_prefix)
+    fullname = dump_prefix + "/" + name
+    if fullname not in dumped_vals:        
+        dump_h5.create_dataset(fullname, data=value)
+        dumped_vals.append(fullname)
+
+def dump_value_padded(name, value):
+    dump_value(name, np.reshape(value, (1,) + value.shape))
+
+
 def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, cov_fn):
     """
     Performs one-dimensional Gaussian process regression with uncertain test inputs.
@@ -198,7 +213,9 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                 K_trn_trn[g, m, n] = cov_f(trn_x[g, m], trn_x[g, n])
                 if n == m:
                     K_trn_trn[g, m, n] += trn_sigma[g, m] ** 2.0
-        K_trn_trn_inv[g, :, :] = np.linalg.pinv(K_trn_trn[g, :, :])
+        K_trn_trn_inv[g, :, :] = np.linalg.inv(K_trn_trn[g, :, :])
+    dump_value("Kk", K_trn_trn)
+    dump_value("Kk_inv", K_trn_trn_inv)
     # build E[K(tst_x, trn_x_k)]
     E_K_tst_trn = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
     for g in range(n_gps):
@@ -209,16 +226,19 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                                     np.exp(-(tst_mu[g] - trn_x[g, j])**2. / (2. * (l ** 2. + tst_Sigma[g, g])))
             elif cov_fn['type'] == 'ID':
                 E_K_tst_trn[g, j] = tst_mu * trn_x[j]
+    dump_value_padded("lk", E_K_tst_trn)
 
     # calcualte "targets"
     tgt = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
     for g in range(n_gps):
         tgt[g, :] = np.dot(K_trn_trn_inv[g, :, :], trn_y[g, :])
+    dump_value("beta", tgt)
 
     # calculate means
     mean = np.zeros(n_gps, dtype=np.float32)
     for g in range(n_gps):
         mean[g] = np.dot(E_K_tst_trn[g,:], tgt[g, :])
+    dump_value_padded("pred_mean", mean)
 
     print "Kk=\n", K_trn_trn
     print "Kk_inv=\n", K_trn_trn_inv
@@ -484,7 +504,8 @@ def test_multi_gp_uncertain_regression():
         print
 
 def file_test_multi_gp_uncertain_regression():
-    
+    global dump_prefix    
+
     print "\n"
     print "file_test_multi_gp_uncertain_regression ============================================"
     print "\n"
@@ -534,10 +555,11 @@ def file_test_multi_gp_uncertain_regression():
         tst_mu = tst_mus[n][0]
         tst_cov = tst_covs[n][0]
 
+        dump_prefix = "%d" % (n+1)
         pred_mean, pred_cov = multi_gp_uncertain_regression(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn)
         print "pred_mean:", pred_mean.dtype, " pred_cov:", pred_cov.dtype
-        sampling_mean, sampling_cov = \
-            multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
+        #sampling_mean, sampling_cov = \
+        #    multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
         file_pred_mean = file_pred_mus[n][0]        
         file_pred_cov = file_pred_covs[n][0]
         absMeanErrors[n] = np.abs(file_pred_mean - pred_mean)  
@@ -546,10 +568,10 @@ def file_test_multi_gp_uncertain_regression():
         print "means=", pred_mean
         print "cov=\n", pred_cov
         print
-        print "sampled:"
-        print "means=", sampling_mean
-        print "cov=\n", sampling_cov
-        print
+        #print "sampled:"
+        #print "means=", sampling_mean
+        #print "cov=\n", sampling_cov
+        #print
         print "file predicted:"
         print "means=", file_pred_mean
         print "cov=\n", file_pred_cov

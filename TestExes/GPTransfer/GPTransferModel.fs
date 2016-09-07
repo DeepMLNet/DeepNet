@@ -203,6 +203,7 @@ module MultiGPLayer =
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+        let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
