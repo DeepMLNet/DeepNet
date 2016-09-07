@@ -6,7 +6,7 @@
   version: 0.2.0.{build}
 
   environment:
-    VERSUFFIX: ci
+    VERSUFFIX: master
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
@@ -142,7 +142,7 @@
   shallow_clone: true
 
   environment:
-    VERSUFFIX: ci
+    VERSUFFIX: {branch}
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
