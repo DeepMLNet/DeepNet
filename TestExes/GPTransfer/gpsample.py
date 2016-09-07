@@ -216,6 +216,13 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
         K_trn_trn_inv[g, :, :] = np.linalg.inv(K_trn_trn[g, :, :])
     dump_value("Kk", K_trn_trn)
     dump_value("Kk_inv", K_trn_trn_inv)
+
+    Kk_inv_Kk = np.zeros_like(K_trn_trn)
+    for g in range(n_gps):
+        print "cond for Kk of gp %d: %f" % (g, np.linalg.cond(K_trn_trn[g,:,:]))
+        Kk_inv_Kk[g,:,:] = np.dot(K_trn_trn_inv[g,:,:], K_trn_trn[g,:,:])
+    dump_value("Kk_inv_Kk", Kk_inv_Kk)
+
     # build E[K(tst_x, trn_x_k)]
     E_K_tst_trn = np.zeros((n_gps, n_trn_samples), dtype=np.float32)
     for g in range(n_gps):

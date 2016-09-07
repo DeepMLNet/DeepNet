@@ -112,7 +112,7 @@ module Program =
 //        let ls_host = rand.UniformArrayND (0.0f,2.0f) [ngps]
 
         //sigma vector hardcoded
-        let trn_sigma_host = ArrayNDHost.zeros<single> [ngps;ntraining]
+        let trn_sigma_host = (ArrayNDHost.ones<single> [ngps;ntraining]) * sqrt 0.1f
 
 
         //save train parameters

@@ -190,4 +190,11 @@ let ``Invert Kk matrix`` () =
     printfn "Kkinv=\n%A" Kkinv
     printfn "id=\n%A" id
 
+    let s = Kk.Shape.[0]
+    let n = Kk.Shape.[1]
 
+    let ids = ArrayND.concat 0 [for i=0 to s-1 do yield (ArrayNDHost.identity n).[NewAxis, *, *]]
+
+    let diff = id - ids
+    printfn "maxdiff: %f" (ArrayND.max diff |> ArrayND.value)
+    ArrayND.almostEqualWithTol 1e-5f 1e-5f id ids |> ArrayND.value |> Assert.True

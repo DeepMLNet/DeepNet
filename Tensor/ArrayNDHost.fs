@@ -180,7 +180,7 @@ module ArrayNDHostTypes =
 
         /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS
         /// (in column-major order).
-        member private this.GetTransposedBlas () =
+        member private this.GetTransposedBlas copyAllowed =
             if this.NDims <> 2 then failwithf "require a matrix but got shape %A" this.Shape
             if not (this.Shape.[0] > 0 && this.Shape.[1] > 0) then 
                 failwithf "require a non-empty matrix but got shape %A" this.Shape
@@ -189,7 +189,8 @@ module ArrayNDHostTypes =
                 new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof<'T>),
                               this.Shape.[1], this.Shape.[0], str.[0])
             else
-                (ArrayND.copy this).GetTransposedBlas ()
+                if copyAllowed then (ArrayND.copy this).GetTransposedBlas copyAllowed
+                else failwith "ArrayNDHost incompatible with BLAS but copying not allowed"
                
         /// Computes the matrix inverse.    
         override this.Invert () =
@@ -210,7 +211,7 @@ module ArrayNDHostTypes =
                 let aAry = inv.[rng]
 
                 // compute LU factorization
-                use a = aAry.GetTransposedBlas ()
+                use a = aAry.GetTransposedBlas false
                 let ipiv : lapack_int[] = Array.zeroCreate aAry.Shape.[0]
                 let info =
                     blasTypeChoose<'T, lapack_int> 
