@@ -199,7 +199,6 @@ def multi_gp_uncertain_regression(tst_mu, tst_Sigma, trn_x, trn_y, trn_sigma, co
                 if n == m:
                     K_trn_trn[g, m, n] += trn_sigma[g, m] ** 2.0
         K_trn_trn_inv[g, :, :] = np.linalg.pinv(K_trn_trn[g, :, :])
-
     # build E[K(tst_x, trn_x_k)]
     E_K_tst_trn = np.zeros((n_gps, n_trn_samples))
     for g in range(n_gps):
@@ -423,7 +422,7 @@ def test_multi_gp_uncertain_regression():
 
     n_sampling = 2000
     n_training = 30
-    n_test = 1
+    n_test = 2
     n_gps = 3
     trn_l = 2.0
     l = [1.0, 1.5, 2.0]
@@ -525,6 +524,8 @@ def file_test_multi_gp_uncertain_regression():
     n_test = tst_mus.shape[0]
     n_gps = l.shape[0]
 
+    absMeanErrors = np.zeros(shape=(n_test,n_gps))
+    absCovErrors = np.zeros(shape=(n_test,n_gps,n_gps))
     print "n_training = %d\n"%(n_training)
     print "n_test = %d\n"%(n_test)
     print "n_gps = %d\n"%(n_gps)
@@ -534,24 +535,46 @@ def file_test_multi_gp_uncertain_regression():
         tst_cov = tst_covs[n][0]
 
         pred_mean, pred_cov = multi_gp_uncertain_regression(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn)
-        sampling_mean, sampling_cov = \
-            multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
-                
-
+        #sampling_mean, sampling_cov = \
+        #    multi_gp_uncertain_regression_by_sampling(tst_mu, tst_cov, trn_x, trn_y, trn_sigma, cov_fn, n_sampling)
+        file_pred_mean = file_pred_mus[n][0]        
+        file_pred_cov = file_pred_covs[n][0]
+        absMeanErrors[n] = np.abs(file_pred_mean - pred_mean)  
+        absCovErrors[n] = np.abs(file_pred_cov - pred_cov)
         print "predicted:"
         print "means=", pred_mean
         print "cov=\n", pred_cov
         print
-        print "sampled:"
-        print "means=", sampling_mean
-        print "cov=\n", sampling_cov
-        print
+        #print "sampled:"
+        #print "means=", sampling_mean
+        #print "cov=\n", sampling_cov
+        #print
         print "file predicted:"
-        print "means=", file_pred_mus[n][0]
-        print "cov=\n", file_pred_covs[n][0]
+        print "means=", file_pred_mean
+        print "cov=\n", file_pred_cov
         print
         print
-
+    print    
+    print "All prediction mean errors:"
+    print absMeanErrors
+    print
+    print "Highest prediction mean error:"
+    print np.max(absMeanErrors, axis=0)
+    print
+    print "Mean prediction mean error:"
+    print np.mean(absMeanErrors,axis=0)
+    print
+    """
+    print "All prediction cov errors:"
+    print absCovErrors
+    print
+    """
+    print "Highest prediction cov error:"
+    print np.max(absCovErrors, axis=0)
+    print
+    print "Mean prediction cov error:"
+    print np.mean(absCovErrors,axis=0)
+    print
 def cov_id(x, y):
     return x * y
 
@@ -685,7 +708,7 @@ if __name__ == '__main__':
     # demo_regression()
 
     #test_gp_uncertain_regression()
-    test_multi_gp_uncertain_regression()
+    #test_multi_gp_uncertain_regression()
     file_test_multi_gp_uncertain_regression()
 
     #debug_cuda()

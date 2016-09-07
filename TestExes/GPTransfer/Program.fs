@@ -62,16 +62,17 @@ module Program =
 
 
 
+
     ///Tests multilayer GPs with random parameters and random inputs.
     ///Saves parameters and inputs in hdf5 files to compare with other implementations (especially gpsample.py).
     let testMultiGPLayer device =
 
         //initiating random number generator 
-        let rand = Random()
+        let rand = Random(1)
         //defining size parameters
         let ngps = 3
         let ntraining = 30
-        let ntest = 2
+        let ntest = 10
 
 
         //building the model
@@ -94,7 +95,6 @@ module Program =
         let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
-
         //creating random training vectors
         let trn_x_list = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining 
         let trn_x_host = trn_x_list |> ArrayNDHost.ofList2D
@@ -106,7 +106,7 @@ module Program =
         printfn"Trn_t =\n%A" trn_t_host
 
         //lengthscale vectore hardcoded
-        let ls_host = [1.0f; 0.1f; 0.01f] |> ArrayNDHost.ofList 
+        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
 
 //        //random lengthscale vector
 //        let ls_host = rand.UniformArrayND (0.0f,2.0f) [ngps]
@@ -142,20 +142,22 @@ module Program =
         let randomTest () =
 
             //generate random test inputs
-            let inp_meanhost = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
-            let inp_mean_val = inp_meanhost |> post device
-
-//            let inp_covhost =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
-//            let inp_covhost = fPsd inp_covhost
+            let inp_mean_host = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
+            let inp_mean_val = inp_mean_host |> post device
+//
+//            let inp_cov_host =  rand.UniformArrayND (0.0f ,2.0f) [1;ngps;ngps]
+//            let inp_covhost = fPsd inp_cov_host
             let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
+//            let inp_covhost = ArrayNDHost.ones [1;ngps] |> diag
             let inp_cov_val = inp_covhost |> post device
             
             //calculate predicted mean and variance
             let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
-            
+              
+
             //save inputs and predictions in sample datatype
             let testInOut = {
-                In_Mean = inp_meanhost;
+                In_Mean = inp_mean_host;
                 In_Cov = inp_covhost;
                 Pred_Mean = pred_mean;
                 Pred_Cov = pred_cov}
@@ -174,26 +176,28 @@ module Program =
 
             //return sample of inputs and predictions
             testInOut
-        
+
         //run ntest tests and save samples in dataset
         printfn "Testing Multi GP Transfer Model"
         let testList = [1..ntest]
                        |> List.map (fun _-> randomTest () )
 
-
-
         let testData = testList |> Dataset.FromSamples
         let testFileName = sprintf "TestData.h5"
         testData.Save(testFileName)
-
+        
     [<EntryPoint>]
     let main argv = 
-        //testMultiGPLayer DevHost
-        TestUtils.evalHostCuda testMultiGPLayer
+//        testMultiGPLayer DevHost
+//        let rand = Random(1)
+        //[1..3] |> List.map (fun _ -> InvTest.randomTest rand 30 (0.8f,1.0f)) 
+//        [1..3] |> List.map (fun x -> InvTest.randomTest2 rand x 30 (0.8f,1.0f))
+            
+//        TestUtils.evalHostCuda testMultiGPLayer
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
         //testMultiGPLayer DevHost |> ignore
 
         0
-
+//
 

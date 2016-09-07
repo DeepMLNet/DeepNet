@@ -50,6 +50,9 @@ module MultiGPLayer =
         HyperPars      = hp
     }
 
+    let pinv a =
+        a|> Expr.transpose |> Expr.dot a |> Expr.invert |> Expr.dot (Expr.transpose a)
+
     ///The covariance Matrices of the training vectors with themselves 
     ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
@@ -183,6 +186,9 @@ module MultiGPLayer =
         let Kk = Kk |> Expr.print "Kk"
         let Kk_inv = Expr.invert Kk
         let Kk_inv = Kk_inv |> Expr.print "Kk_inv"
+        let Kk_pinv = pinv Kk
+        let Kk_pinv = Kk_pinv |> Expr.print "Kk_pinv"
+//        let Kk_inv = Kk_pinv
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let lk = lk |> Expr.print "lk"
