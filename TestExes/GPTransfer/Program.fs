@@ -70,7 +70,6 @@ module Program =
         let ntraining = 10
         let ntest = 1
 
-
         //building the model
         let mb = ModelBuilder<single> "Test"
 
@@ -88,8 +87,11 @@ module Program =
         let mi = mb.Instantiate device
 
         //model outputs
-        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
-        let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
+        let pred_mean = MultiGPLayer.pred mgp inp_mean inp_cov
+        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
+
+//        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
+//        let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
         //creating random training vectors
         let trn_x_list = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining 
@@ -103,9 +105,8 @@ module Program =
 
         //lengthscale vectore hardcoded
         let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
-
 //        //random lengthscale vector
-//        let ls_host = rand.UniformArrayND (0.0f,2.0f) [ngps]
+//        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
 
         //sigma vector hardcoded
         let trn_sigma_host = (ArrayNDHost.ones<single> [ngps;ntraining]) * sqrt 0.1f
@@ -150,7 +151,7 @@ module Program =
             let inp_cov_val = inp_covhost |> post device
 
             //calculate predicted mean and variance
-            let pred_mean, pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
+            let pred_mean = pred_mean inp_mean_val inp_cov_val
 
 
             //save inputs and predictions in sample datatype
@@ -158,7 +159,7 @@ module Program =
                 In_Mean = inp_mean_host;
                 In_Cov = inp_covhost;
                 Pred_Mean = pred_mean;
-                Pred_Cov = pred_cov}
+                Pred_Cov = inp_covhost}
 
             //print inputs and predictions
             printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
@@ -170,7 +171,7 @@ module Program =
             printfn "inp_cov=\n%A" inp_cov_val
             printfn ""
             printfn "pred_mean=\n%A" pred_mean
-            printfn "pred_cov=\n%A" pred_cov
+//            printfn "pred_cov=\n%A" pred_cov
 
             //return sample of inputs and predictions
             testInOut

@@ -277,7 +277,7 @@ module MultiGPLayer =
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
         let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        pred_mean, pred_cov
+        pred_mean//, pred_cov
 
 
 
