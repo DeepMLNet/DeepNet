@@ -58,7 +58,6 @@ module Program =
 
 
 
-
     ///Tests multilayer GPs with random parameters and random inputs.
     ///Saves parameters and inputs in hdf5 files to compare with other implementations (especially gpsample.py).
     let testMultiGPLayer device =
@@ -188,16 +187,40 @@ module Program =
         let testData = testList |> Dataset.FromSamples
         let testFileName = sprintf "TestData.h5"
         testData.Save(testFileName)
+    
+    let testDatasetParser() =
+        let printData path sep tgt =
+            let data, dicts = DataParser.loadSingleDataset path tgt sep
+            let (inDict, trgDict) = dicts
+            printfn "Printing %s Dataset\n target:%A" path tgt
+            for smpl in data do
+                printfn "Sample: %A" smpl
+            printfn "InputDict:\n%A" inDict
+            printfn "TargetDict:\n%A" trgDict
 
+        let printAbloneData() =     
+            printfn "printing ablone data"
+            printData "abalone.data.txt" ',' [8] 
+
+        let printLetterRecognition() =
+            printfn "printing letter-ecognition data"
+            printData "letter-recognition.data.txt" ',' [0] 
+
+//        let printAutoMpg() =
+//            printfn "printing auto-mpg data"
+//            printData "auto-mpg.data.txt" ' ' [0] 
+//
+        printAbloneData()
+        printLetterRecognition()
+//        printAutoMpg()
+        
     [<EntryPoint>]
     let main argv = 
-        //testMultiGPLayer DevHost
-        testMultiGPLayer DevCuda
 
-//        let rand = Random(1)
-        //[1..3] |> List.map (fun _ -> InvTest.randomTest rand 30 (0.8f,1.0f)) 
-//        [1..3] |> List.map (fun x -> InvTest.randomTest2 rand x 30 (0.8f,1.0f))
-            
+        testDatasetParser()
+//        testMultiGPLayer DevHost
+//        testMultiGPLayer DevCuda
+   
 //        TestUtils.evalHostCuda testMultiGPLayer
         //TestUtils.compareTraces testMultiGPLayer false |> ignore
         //testMultiGPLayer DevCuda |> ignore
