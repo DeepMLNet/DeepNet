@@ -10,9 +10,9 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyTitle("SmoothADP")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
+[<assembly: AssemblyCompany("Sebastian Urban")>]
 [<assembly: AssemblyProduct("SmoothADP")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
+[<assembly: AssemblyCopyright("Copyright © Sebastian Urban 2016")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
