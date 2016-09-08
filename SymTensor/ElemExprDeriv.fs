@@ -72,6 +72,10 @@ module ElemExprDeriv =
     let compute (expr: ElemExprT<'T>) : DerivT<'T> =
         reverseDiffStep expr (one())
 
+    let ofArgElem (argElem: ElemExprT<'T>) (deriv: DerivT<'T>) =
+        match deriv |> Map.tryFind (ElemExpr.extractArg argElem) with
+        | Some da -> da
+        | None -> ElemExpr.zero ()
 
     type private DerivDim =
         | SummingDim of SizeSymbolT * SizeSpecT * SizeSpecT * SizeSymbolT
