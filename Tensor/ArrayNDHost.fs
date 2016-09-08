@@ -290,6 +290,12 @@ module ArrayNDHost =
         ArrayND.fillIndexed f a
         a   
 
+    /// Creates a new vector with linearly spaced values from start to (including) stop.
+    let inline linSpaced (start: 'T) (stop: 'T) (nElems: int) =
+        let a = newC<'T> [nElems]
+        ArrayND.fillLinSpaced start stop a
+        a          
+
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.
     let ofArray (data: 'T []) =

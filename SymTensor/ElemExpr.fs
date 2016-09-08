@@ -170,19 +170,21 @@ module ElemExpr =
     let argElem pos idx =
         Leaf (ArgElement (Arg pos, idx))
 
-    type Argument1D (pos: int) =       
-        member this.Item with get (i0) = argElem pos [i0]
-    type Argument2D (pos: int) =       
-        member this.Item with get (i0, i1) = argElem pos [i0; i1]
-    type Argument3D (pos: int) =       
-        member this.Item with get (i0, i1, i2) = argElem pos [i0; i1; i2]
-    type Argument4D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3) = argElem pos [i0; i1; i2; i3]
-    type Argument5D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4) = argElem pos [i0; i1; i2; i3; i4]
-    type Argument6D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4, i5) = argElem pos [i0; i1; i2; i3; i4; i5]
+    type Argument1D<'T> (pos: int) =       
+        member this.Item with get (i0) : ElemExprT<'T> = argElem pos [i0]
+    type Argument2D<'T> (pos: int) =       
+        member this.Item with get (i0, i1) : ElemExprT<'T> = argElem pos [i0; i1]
+    type Argument3D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2) : ElemExprT<'T> = argElem pos [i0; i1; i2]
+    type Argument4D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3]
+    type Argument5D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3; i4]
+    type Argument6D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3; i4; i5]
 
+    /// scalar argument at given position
+    let arg0D pos = argElem pos []
     /// 1-dimensional argument at given position
     let arg1D pos = Argument1D pos
     /// 2-dimensional argument at given position
@@ -195,6 +197,12 @@ module ElemExpr =
     let arg5D pos = Argument5D pos
     /// 6-dimensional argument at given position
     let arg6D pos = Argument6D pos
+
+    /// extract ArgElementSpec from element expression
+    let extractArg expr =
+        match expr with
+        | Leaf (ArgElement argSpec) -> argSpec
+        | _ -> failwith "the provided element expression is not an argument"
    
     let inline uncheckedApply (f: 'T -> 'T) (a: 'S) : 'S =
         let av = a |> box |> unbox

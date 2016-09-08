@@ -63,7 +63,7 @@ module ArrayND =
 
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
-    [<StructuredFormatDisplay("{PrettyString}")>]
+    [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
         /// layout
         member this.Layout = layout
@@ -607,6 +607,13 @@ module ArrayND =
         for idx in allIdx a do
             a.[idx] <- f idx
             
+    /// Fills the vector with linearly spaced values from start to (including) stop.
+    let inline fillLinSpaced (start: 'T) (stop: 'T) (a: #ArrayNDT<'T>) =
+        if a.NDims <> 1 then invalidArg "a" "tensor must be one dimensional"
+        if a.NElems < 2 then invalidArg "a" "tensor must have at least two elements"
+        let step = (stop - start) / conv<'T> (a.NElems - 1)
+        a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)
+
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
     let inline map2 f (a: 'A when 'A :> ArrayNDT<'T>) (b: 'A) =
@@ -1161,8 +1168,12 @@ module ArrayND =
     // pretty printing
     ////////////////////////////////////////////////////////////////////////////////////////////////         
     
-    let prettyString (a: ArrayNDT<'T>) =
-        let maxElems = 10
+    /// Pretty string containing maxElems elements per dimension.
+    /// If maxElems is zero, then the elements per dimension are unlimited.
+    let pretty maxElems (a: ArrayNDT<'T>) =
+        let maxElems =
+            if maxElems > 0 then maxElems
+            else Microsoft.FSharp.Core.int.MaxValue
 
         let rec prettyDim lineSpace a =
             let ls () = (shape a).[0]
@@ -1172,12 +1183,22 @@ module ArrayND =
                     prettyDim (lineSpace + " ") (view [RngElem i; RngAllFill] a)) 
                 |> Seq.toList                   
             let subStrs () = 
-                if ls() < maxElems then
+                if ls() <= maxElems then
                     subPrint (seq {0 .. ls() - 1})
                 else
-                    let leftIdx = seq {0 .. (maxElems / 2)}
-                    let rightIdx = seq {ls() - 1 - (maxElems / 2) + 2 .. (ls() - 1)}
-                    (subPrint leftIdx) @ ["..."] @ (subPrint rightIdx)
+                    let leftTo = maxElems / 2 - 1
+                    let remaining = maxElems - 1 - leftTo - 1
+                    let rightFrom = ls() - remaining
+                    let leftIdx = seq {0 .. leftTo}
+                    let rightIdx = seq {rightFrom .. (ls()-1)}
+                    let elipsis =
+                        match typeof<'T> with
+                        | t when t=typeof<single> -> "      ..."
+                        | t when t=typeof<double> -> "      ..."
+                        | t when t=typeof<int>    -> " ..."
+                        | t when t=typeof<byte>   -> "..."
+                        | _ -> "..."
+                    (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
 
             match nDims a with
             | 0 -> 
@@ -1194,7 +1215,10 @@ module ArrayND =
 
     type ArrayNDT<'T> with
         /// pretty contents string
-        member this.PrettyString = prettyString this
+        member this.Pretty = pretty 10 this
+
+        /// full contents string
+        member this.Full = pretty 0 this
 
 
 [<AutoOpen>]
