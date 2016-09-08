@@ -12,10 +12,8 @@ module DataParser =
     
     ///Loads a dataSet and saves the lines in a string array
     let stringsToDataStr separator (inStr:string)=
-//        let split = inStr.Split [|',';' '|]
         let split = inStr.Split [|separator|]
         split
-//    let minInnerListLength (inp:'a[][]) outerLength =
         
     ///Generates a 2D array from an array of arrays
     let MultiArray (inp:'a[][]) = 
@@ -34,32 +32,48 @@ module DataParser =
         let colNum = Array2D.length2 strAry
         let numAry = Array2D.create rowNum colNum 0.0
         let dictionarys = Array.create colNum None
+        //iterate through all columns
         for c= 0 to colNum-1 do
+            //check if the elements are number
+            //TODO: can not yet handle symbols for missing data
             let m = Regex.Match( strAry.[0,c], "((\d+.\d+)|(\d+)|(\d+.))")
             if m.Success then
+                //cast all elements of column to float
                 for r = 0 to rowNum - 1 do
                     numAry.[r,c] <- float strAry.[r,c]
             else
+                //replace all strings with a class index
+                //create a dictionary that maps the strings to int values
                 let dict = (Dictionary<string,int>())
                 let mutable count = 0
                 for r = 0 to rowNum - 1 do
                     let s = strAry.[r,c]
+                    //check if string is already in dictionary
                     let suc,numval = dict.TryGetValue s
                     if suc then
+                        //replace string with class index
                         numAry.[r,c] <-float numval
                     else
+                        //add to dictionary with new class index
                         numAry.[r,c] <-float count
                         dict.Add(s, count)
                         count <- count + 1
                 dictionarys.[c] <- Some dict
         numAry, dictionarys
 
-    
+    ///Reads a file and returns a 2D-array of floats
     let fileToNumArray path separator= 
         let txtArys = File.ReadAllLines path
         let strArys = txtArys |> Array.map (stringsToDataStr separator) |> MultiArray
         strArys |> strToNumArys
    
+    ///Reads a file and returns data as nd Arrays
+    ///In:      path: locaton of the file
+    ///         tgt: indices of columns that should be contained in the target array
+    ///         seperator: character that seperates the columns in the file
+    ///Out:     outList (ArrayNDHostT<float>*ArrayNDHostT<float>)
+    ///             samples containing input and target values
+    ///         (xDict,yDict) Array of Dictionary option for each column in input and training data
     let fileToData path (tgt: list<int>) separator =
         let numAry, dictAry = fileToNumArray path separator
         let sampleNum = Array2D.length1 numAry
