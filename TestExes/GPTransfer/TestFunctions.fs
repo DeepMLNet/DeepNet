@@ -197,19 +197,25 @@ module TestFunctions =
 
 
 
-        let printAbloneData() =     
+        let printAbloneData8() =     
             printfn "printing ablone data"
             printData "abalone.data.txt" [8] ',' 
+        let printAbloneData0() =     
+            printfn "printing ablone data"
+            printData "abalone.data.txt" [0] ',' 
 
-        let printLetterRecognition() =
-            printfn "printing letter-recognition data"
-            printData "letter-recognition.data.txt" [0] ',' 
+
+//        let printLetterRecognition() =
+//            printfn "printing letter-recognition data"
+//            printData "letter-recognition.data.txt" [0] ',' 
 
 //        let printAutoMpg() =
 //            printfn "printing auto-mpg data"
 //            printData "auto-mpg.data.txt" ' ' [0] 
 //
-        printAbloneData()
-        printLetterRecognition()
+        printAbloneData8()
+        printAbloneData0()
+
+//        printLetterRecognition()
 //        printAutoMpg()
 

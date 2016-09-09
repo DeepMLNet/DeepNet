@@ -169,14 +169,22 @@ module DataParser =
     
 
     type floatSample ={
-        Input:  ArrayNDHostT<float>;
-        Target: ArrayNDHostT<float>
-        }
+        Input:  ArrayNDT<float>;
+        Target: ArrayNDT<float>
+        } with
+            /// copies this dataset to the CUDA GPU
+            member this.toCuda () =
+                {Input = this.Input :?> ArrayNDHostT<float> |> ArrayNDCuda.toDev;
+                Target = this.Target :?> ArrayNDHostT<float> |> ArrayNDCuda.toDev}
 
     type singleSample ={
-        InputS:  ArrayNDHostT<single>;
-        TargetS: ArrayNDHostT<single>
-        }
+        InputS:  ArrayNDT<single>;
+        TargetS: ArrayNDT<single>
+        } with
+            /// copies this dataset to the CUDA GPU
+            member this.ToCuda () =
+                {InputS = this.InputS :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
+                 TargetS = this.TargetS :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
     
     ///Loads a file and returns a dataset of floats and two lists of dictionarrys that match non numeric values to class indices
     ///all columns of the file with indices in tgt are target values, the rest are input values
