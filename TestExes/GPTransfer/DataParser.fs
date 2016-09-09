@@ -44,20 +44,20 @@ module DataParser =
             else
                 //replace all strings with a class index
                 //create a dictionary that maps the strings to int values
-                let dict = (Dictionary<string,int>())
-                let mutable count = 0
+                let dict = (Dictionary<string,float>())
+                let mutable count = 0.0
                 for r = 0 to rowNum - 1 do
                     let s = strAry.[r,c]
                     //check if string is already in dictionary
                     let suc,numval = dict.TryGetValue s
                     if suc then
                         //replace string with class index
-                        numAry.[r,c] <-float numval
+                        numAry.[r,c] <- numval
                     else
                         //add to dictionary with new class index
-                        numAry.[r,c] <-float count
+                        numAry.[r,c] <- count
                         dict.Add(s, count)
-                        count <- count + 1
+                        count <- count + 1.0
                 dictionarys.[c] <- Some dict
         numAry, dictionarys
 
@@ -66,7 +66,54 @@ module DataParser =
         let txtArys = File.ReadAllLines path
         let strArys = txtArys |> Array.map (stringsToDataStr separator) |> MultiArray
         strArys |> strToNumArys
-   
+    
+    let deleteArrayIdx idx (ary:'a[]) =
+        let length = Array.length ary
+        if length - 1 > idx then
+            if idx > 0 then
+                Array.append ary.[..(idx - 1)] ary.[(idx + 1)..]
+            else
+                ary.[1..]
+        else if length - 1 = idx then
+            if idx = 0 then
+                [||]
+            else
+                ary.[..(idx - 1)]
+        else
+            failwithf "array index %d is out of bounds" idx
+
+    let oneHotEnc   (smpLst: list<float[][]>)
+                    idx 
+                    (dicts:Collections.Generic.Dictionary<string,float> option[]) =
+        let nSamples = List.length smpLst
+        let dLength = Array.length dicts
+        let sLength = smpLst.[0].[idx] |> Array.length
+        if sLength <> dLength then
+            failwithf "size of dictionary %d <> number of samples %d" dLength sLength
+        let mutable offset = 0
+        for d = 0 to dLength - 1 do
+            let dictO = dicts.[d]
+            match dictO with
+            | None -> ()
+            | Some dict ->
+                let nClasses = dict.Count
+                let sLength = smpLst.[0].[idx] |> Array.length
+                for s = 0 to nSamples - 1 do
+                    let oldArray = smpLst.[s].[idx]
+                    let newArray = Array.create nClasses 0.0
+                    let newArray = Array.append oldArray newArray
+                    let classIdx = int oldArray.[d - offset]
+                    newArray.[sLength - 1 + classIdx] <- 1.0
+                    smpLst.[s].[idx] <- newArray |> deleteArrayIdx d
+                offset <- offset + 1
+        smpLst
+
+    let dataOneHotEncoding data dict =
+        let (xDict,tDict) = dict
+        let data = oneHotEnc data 0 xDict
+        let data = oneHotEnc data 1 tDict
+        data
+
     ///Reads a file and returns data as nd Arrays
     ///In:      path: locaton of the file
     ///         tgt: indices of columns that should be contained in the target array
@@ -117,9 +164,10 @@ module DataParser =
                     let _,idxX = xDict.TryGetValue c
                     xArryTemp.[idxX] <- numAry.[s,c]
 
-            outList <- List.append outList [xArryTemp |> ArrayNDHost.ofArray,tArryTemp |> ArrayNDHost.ofArray ]
-        outList , (xDicts,tDicts)
+            outList <- List.append outList [[|xArryTemp ;tArryTemp|]]
+        dataOneHotEncoding outList  (xDicts,tDicts)
     
+
     type floatSample ={
         Input:  ArrayNDHostT<float>;
         Target: ArrayNDHostT<float>
@@ -133,17 +181,18 @@ module DataParser =
     ///Loads a file and returns a dataset of floats and two lists of dictionarrys that match non numeric values to class indices
     ///all columns of the file with indices in tgt are target values, the rest are input values
     let loadFloatDataset path (tgt: list<int>) separator=
-        let data, dicts = fileToData path tgt separator
-        let data = data |> List.map (fun (x,y) -> {Input = x;Target= y})
+        let data = fileToData path tgt separator
+        let data = data |> List.map (fun x ->  {Input = x.[0] |> ArrayNDHost.ofArray;
+                                                Target= x.[1] |> ArrayNDHost.ofArray})
         let dataSet = data |> Dataset.FromSamples
-        dataSet,dicts
+        dataSet
 
     ///Loads a file and returns a dataset of singles and two lists of dictionarrys that match non numeric values to class indices
     ///all columns of the file with indices in tgt are target values, the rest are input values
     let loadSingleDataset path (tgt: list<int>) separator=
-        let data, dicts = fileToData path tgt separator
-        let data = data |> List.map (fun (x,y) -> 
-            {InputS = x |> ArrayNDHost.toArray |> Array.map (fun x -> conv<single> x) |> ArrayNDHost.ofArray;
-            TargetS = y |> ArrayNDHost.toArray |> Array.map (fun x -> conv<single> x) |> ArrayNDHost.ofArray})
+        let data = fileToData path tgt separator
+        let data = data |> List.map (fun x -> 
+            {InputS = x.[0]  |> Array.map (fun x -> conv<single> x) |> ArrayNDHost.ofArray;
+            TargetS = x.[1]  |> Array.map (fun x -> conv<single> x) |> ArrayNDHost.ofArray})
         let dataSet = data |> Dataset.FromSamples
-        dataSet,dicts
+        dataSet
