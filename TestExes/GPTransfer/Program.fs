@@ -18,7 +18,7 @@ module Program =
         
         printfn "Training 2 Layer MLP on abalone dataset gender classification"
         ///Load the ablone dataset, classify gender from data
-        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
+        let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
         let data = (TrnValTst.Of(fullDataset)).ToCuda() 
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
