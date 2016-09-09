@@ -7,8 +7,11 @@ open System
 module MultiGPLayer =
 
     type HyperPars = {
-        /// number of units, i.e. number of GPs
-        NGPs:     SizeSpecT
+        /// number of units, i.e. number of GPs = Number of outputs
+        NGPs:       SizeSpecT
+
+//        /// number of inputs
+//        NInput:     SizeSpecT 
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
@@ -24,23 +27,30 @@ module MultiGPLayer =
         TrnT:               ExprT<single> ref
         /// standard deviation of GP target values:  [gp, trn_smpl]
         TrnSigma:           ExprT<single> ref
-
+//        /// expression for the weight vector:        [n_inp, gp] 
+//        Weights:            ExprT<single> ref
         /// hyper-parameters
         HyperPars:          HyperPars
     }
 
 
-    let internal initLengthscales seed (shp: int list) : ArrayNDHostT<'T> = 
-         ArrayNDHost.zeros shp
+    let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
+         let rng = System.Random seed
+         //Right now: all GPs equal
+         ArrayNDHost.ones shp
 
-    let internal initTrnX seed (shp: int list) : ArrayNDHostT<'T> = 
+    let internal initTrnX seed (shp: int list) : ArrayNDHostT<single> = 
+        let n_gps = shp.[0]
+        let n_trn = shp.[1]
+        let rng = System.Random seed
+        //Right now: all GPs equal
+        rng.SortedUniformArrayND (-10.0f,10.0f) shp
+
+    let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
         ArrayNDHost.zeros shp
 
-    let internal initTrnT seed (shp: int list) : ArrayNDHostT<'T> = 
-        ArrayNDHost.zeros shp
-
-    let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<'T> = 
-        ArrayNDHost.zeros shp
+    let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<single> = 
+        (ArrayNDHost.ones<single> shp) * sqrt 0.1f
 
     let pars (mb: ModelBuilder<_>) hp = {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               initLengthscales)

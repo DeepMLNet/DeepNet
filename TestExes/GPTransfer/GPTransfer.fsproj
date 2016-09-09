@@ -38,6 +38,7 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Data.TypeProviders" />
     <Reference Include="ManagedCuda">
       <HintPath>..\..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
@@ -47,6 +48,8 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
@@ -55,6 +58,7 @@
     <Compile Include="GPTransferModel.fs" />
     <Compile Include="InvTest.fs" />
     <Compile Include="DataParser.fs" />
+    <Compile Include="TestFunctions.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
