@@ -11,13 +11,17 @@ open Optimizers
 
 module Program =
     
-    let classificationMLMGP()=
+    let classificationMLMGP dev=
         printfn "Training 2Layer MLMGP on abalone dataset gender classification"
 
         printfn "Training 2 Layer MLP on abalone dataset gender classification"
         ///Load the ablone dataset, classify gender from data
         let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
-        let data = (TrnValTst.Of(fullDataset)).ToCuda() 
+        
+        let data = TrnValTst.Of(fullDataset)
+        if dev = DevCuda then
+            let data = (TrnValTst.Of(fullDataset)).ToCuda()
+            ()
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "MultiGPModel"
@@ -42,13 +46,13 @@ module Program =
         mb.SetSize nHidden 10
         mb.SetSize nTrn 20
 
-        let mi = mb.Instantiate DevCuda
+        let mi = mb.Instantiate dev
 
         // loss expression
         let loss = MLGPT.loss mlmgp input.T target.T
 
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, DevCuda)
+        let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: singleSample) =
@@ -76,14 +80,17 @@ module Program =
         let result = Train.train trainable data trainCfg
         ()
 
-    let classificationMLP()=
+    let classificationMLP dev=
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
 //        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
         
         printfn "Training 2 Layer MLP on abalone dataset gender classification"
         ///Load the ablone dataset, classify gender from data
         let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
-        let data = (TrnValTst.Of(fullDataset)).ToCuda() 
+        let data = TrnValTst.Of(fullDataset)
+        if dev = DevCuda then
+            let data = (TrnValTst.Of(fullDataset)).ToCuda()
+            ()
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "NeuralNetModel"
@@ -109,13 +116,13 @@ module Program =
         mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
         mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
         mb.SetSize nHidden 10
-        let mi = mb.Instantiate DevCuda
+        let mi = mb.Instantiate dev
         
         // loss expression
         let loss = MLP.loss mlp input.T target.T
 
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, DevCuda)
+        let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: singleSample) =
@@ -149,8 +156,8 @@ module Program =
     let main argv = 
 
 //        TestFunctions.testDatasetParser()
-        classificationMLP ()
-        classificationMLMGP()
+        classificationMLP DevHost
+        classificationMLMGP DevHost
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
    
