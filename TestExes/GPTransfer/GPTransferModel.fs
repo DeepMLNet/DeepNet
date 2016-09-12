@@ -334,7 +334,7 @@ module WeightLayer =
 module GPTransferUnit = 
     type HyperPars = {
         /// number of inputs
-        NInputs:    SizeSpecT
+        NInput:    SizeSpecT
 
         /// number of units, i.e. number of GPs = Number of outputs
         NGPs:       SizeSpecT
@@ -356,7 +356,7 @@ module GPTransferUnit =
 
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
         WeightL = WeightLayer.pars (mb.Module "WeigltL") 
-            {NInput = hp.NInputs; NGPs = hp.NGPs}
+            {NInput = hp.NInput; NGPs = hp.NGPs}
         MultiGPL = MultiGPLayer.pars (mb.Module "MultiGPL")
             {NGPs = hp.NGPs; NTrnSmpls = hp.NTrnSmpls}
         HyperPars = hp

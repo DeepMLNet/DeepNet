@@ -11,6 +11,70 @@ open Optimizers
 
 module Program =
     
+    let classificationMLMGP()=
+        printfn "Training 2Layer MLMGP on abalone dataset gender classification"
+
+        printfn "Training 2 Layer MLP on abalone dataset gender classification"
+        ///Load the ablone dataset, classify gender from data
+        let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
+        let data = (TrnValTst.Of(fullDataset)).ToCuda() 
+        ///classified the dataset using a MLP with one hidden layer
+        ///(analogous to Lern Mnist Project)
+        let mb = ModelBuilder<single> "MultiGPModel"
+
+        let nBatch  = mb.Size "nBatch"
+        let nInput  = mb.Size "nInput"
+        let nClass  = mb.Size "nClass"
+        let nHidden = mb.Size "nHidden"
+        let nTrn = mb.Size "nTrn"
+
+        let mlmgp = 
+            MLGPT.pars (mb.Module "MLMGP") 
+                { Layers = [{NInput=nInput; NGPs=nHidden; NTrnSmpls=nTrn}
+                            {NInput=nHidden; NGPs=nClass; NTrnSmpls=nTrn}]
+                  LossMeasure = LossLayer.CrossEntropy }
+                // define variables
+        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
+        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+
+        mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
+        mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
+        mb.SetSize nHidden 10
+        mb.SetSize nTrn 20
+
+        let mi = mb.Instantiate DevCuda
+
+        // loss expression
+        let loss = MLGPT.loss mlmgp input.T target.T
+
+        // optimizer
+        let opt = Adam (loss, mi.ParameterVector, DevCuda)
+        let optCfg = opt.DefaultCfg
+
+        let smplVarEnv (smpl: singleSample) =
+            VarEnv.empty
+            |> VarEnv.add input smpl.InputS
+            |> VarEnv.add target smpl.TargetS
+
+        let trainable =
+            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+
+        let trainCfg : Train.Cfg = {    
+            Seed               = 100   
+            BatchSize          = 500 
+            LossRecordInterval = 10                                   
+            Termination        = Train.ItersWithoutImprovement 100
+            MinImprovement     = 1e-7  
+            TargetLoss         = None  
+            MinIters           = Some 100 
+            MaxIters           = None  
+            LearningRates      = [1e-3; 1e-4; 1e-5]                               
+            CheckpointDir      = None  
+            DiscardCheckpoint  = false 
+            }
+
+        let result = Train.train trainable data trainCfg
+        ()
 
     let classificationMLP()=
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
@@ -44,7 +108,7 @@ module Program =
         // instantiate model
         mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
         mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
-        mb.SetSize nHidden 20
+        mb.SetSize nHidden 10
         let mi = mb.Instantiate DevCuda
         
         // loss expression
@@ -86,6 +150,7 @@ module Program =
 
 //        TestFunctions.testDatasetParser()
         classificationMLP ()
+        classificationMLMGP()
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
    
