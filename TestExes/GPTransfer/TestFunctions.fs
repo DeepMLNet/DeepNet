@@ -86,7 +86,7 @@ module TestFunctions =
         let mi = mb.Instantiate device
 
         //model outputs
-        let pred_mean = MultiGPLayer.pred mgp inp_mean inp_cov
+        let pred_mean,predcov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
         let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
 
 //        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
