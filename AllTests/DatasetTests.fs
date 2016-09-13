@@ -75,3 +75,18 @@ type CurveDataset () =
         printfn "Saved"
         let dataset2 : Dataset<CurveSample> = Dataset.Load "DatasetTests.h5"
         printfn "Loaded."
+
+
+
+
+[<Fact>]
+let ``Loading CSV datasets`` () =
+    let paths = ["abalone.txt"; "arrhythmia.txt"; "covtype.data.gz"; "imports-85.data"; "SPECT.txt"]
+    for path in paths do
+        printfn "Loading %s" path
+        let data = CsvLoader.loadFile CsvLoader.DefaultParameters path
+        let ds = Dataset.FromSamples data
+        printfn "%A" ds
+        for smpl in data |> Seq.take 10 do
+            printfn "%A" smpl
+        printfn ""

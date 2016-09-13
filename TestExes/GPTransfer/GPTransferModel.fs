@@ -403,7 +403,7 @@ module GPTransferUnit =
         |> MultiGPLayer.pred pars.MultiGPL
 
 
-module InitialLayer =
+module InputLayer =
 
     let cov input =
         let nSmpls = (Expr.shapeOf input).[0]
@@ -411,41 +411,39 @@ module InitialLayer =
         let bc = SizeSpec.broadcastable
         // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
         // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
-        Expr.reshape [nSmpls; nInput; bc] input *
-        Expr.reshape [nSmpls; bc; nInput] input
-
+        Expr.zeros [nSmpls; nInput; nInput]
     let transform input =
         input, (cov input)
 
-//module MLGPT = 
-//    
-//    type HyperPars = {
-//        /// a list of the hyper parameters of the layers
-//        Layers: GPTransferUnit.HyperPars list
-//        /// the loss measure
-//        LossMeasure: LossLayer.Measures
-//    }
-//
-//    type Pars<'T> = {
-//        /// a lsit of the parameters of the GPTransfer Layers
-//        Layers:     GPTransferUnit.Pars<'T> list
-//        /// hyper-parameters
-//        HyperPars:  HyperPars 
-//    }
-//
-//    let pars (mb: ModelBuilder<_>) (hp:HyperPars) = {
-//        Layers = hp.Layers
-//        |>List.mapi (fun idx gphp -> 
-//                    GPTransferUnit.pars (mb.Module (sprintf "Layer%d" idx)) gphp)
-//        HyperPars = hp
-//    } 
-//    
-//    let pred (pars: Pars<'T>) input = 
-//        let inputDist = initialLayer.transform input
-//        (inputDist, pars.Layers)
-//        ||> List.fold (fun inp p -> GPTransferUnit.pred p inp)
-//
-//
-//    let loss pars input target =
-//        let predmu,predSigma = (pred pars input)
-//        LossLayer.loss pars.HyperPars.LossMeasure predmu target
+module MLGPT = 
+    
+    type HyperPars = {
+        /// a list of the hyper parameters of the layers
+        Layers: GPTransferUnit.HyperPars list
+        /// the loss measure
+        LossMeasure: LossLayer.Measures
+    }
+
+    type Pars<'T> = {
+        /// a lsit of the parameters of the GPTransfer Layers
+        Layers:     GPTransferUnit.Pars list
+        /// hyper-parameters
+        HyperPars:  HyperPars 
+    }
+
+    let pars (mb: ModelBuilder<_>) (hp:HyperPars) = {
+        Layers = hp.Layers
+        |>List.mapi (fun idx gphp -> 
+                    GPTransferUnit.pars (mb.Module (sprintf "Layer%d" idx)) gphp)
+        HyperPars = hp
+    } 
+    
+    let pred (pars: Pars<'T>) input = 
+        let inputDist = InputLayer.transform input
+        (inputDist, pars.Layers)
+        ||> List.fold (fun inp p -> GPTransferUnit.pred p inp)
+
+
+    let loss pars input target =
+        let predmu,predSigma = (pred pars input)
+        LossLayer.loss pars.HyperPars.LossMeasure predmu target
