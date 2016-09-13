@@ -112,11 +112,18 @@ module ArrayNDLayout =
     let emptyVector =
         {Shape=[0]; Stride=[1]; Offset=0;}
 
+    /// True if strides are equal at all dimensions with size > 1.
+    let inline stridesEqual (shp: int list) (aStr: int list) (bStr: int list) =
+        List.zip3 shp aStr bStr
+        |> List.forall (fun (s, a, b) -> if s > 1 then a = b else true)
+
     /// true if the ArrayND is contiguous
-    let inline isC a = (stride a = cStride (shape a))
+    let inline isC a = 
+        stridesEqual a.Shape (stride a) (cStride a.Shape)
 
     /// true if the ArrayND is in Fortran order
-    let inline isF a = (stride a = fStride (shape a))
+    let inline isF a = 
+        stridesEqual a.Shape (stride a) (fStride a.Shape)
 
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a =
@@ -130,6 +137,17 @@ module ArrayNDLayout =
     /// adds a new dimension of size one to the right
     let inline padRight a =
         {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
+
+    /// cuts one dimension from the left
+    let inline cutLeft a =
+        if nDims a = 0 then failwith "cannot remove dimensions from scalar"
+        {a with Shape=a.Shape.[1..]; Stride=a.Stride.[1..]}
+
+    /// cuts one dimension from the right
+    let inline cutRight a =
+        if nDims a = 0 then failwith "cannot remove dimensions from scalar"
+        let nd = nDims a
+        {a with Shape=a.Shape.[.. nd-2]; Stride=a.Stride.[.. nd-2]}       
 
     /// broadcast the given dimension to the given size
     let inline broadcastDim dim size a =
@@ -216,7 +234,7 @@ module ArrayNDLayout =
         if shpElems <> nElems a then
             failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
                 (shape a) (nElems a) shp shpElems
-        {a with Shape=shp; Stride=cStride shp;}
+        {a with Shape=shp; Stride=cStride shp}
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =

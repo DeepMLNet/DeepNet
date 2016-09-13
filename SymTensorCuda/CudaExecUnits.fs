@@ -612,7 +612,9 @@ module CudaExecUnit =
         if nd > 2 then
             let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1)
             if isUnitary then
-                manikin |> ArrayND.reshapeView manikin.Shape.[nd-2..]
+                let mutable m = manikin
+                for i=0 to nd-3 do m <- ArrayND.cutLeft m
+                m
             else manikin
         else manikin           
 
