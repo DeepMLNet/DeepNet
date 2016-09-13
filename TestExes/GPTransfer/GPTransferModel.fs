@@ -129,7 +129,7 @@ module MultiGPLayer =
         Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
     ///Elementwise Matrix needed for calculation of the covarance prediction.
-    let T nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
+    let Told nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // T element expression
         // inputs  l[gp]
         //         x[gp, trn_smpl]
@@ -162,6 +162,39 @@ module MultiGPLayer =
 
         let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero ()) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
+
+    ///Elementwise Matrix needed for calculation of the covarance prediction.
+    let Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
+        // T element expression
+        // inputs  l[gp]
+        //         x[gp, trn_smpl]
+        //         m[smpl, gp]        -- mu
+        //         s[smpl, gp1, gp2]  -- Sigma
+        // output  T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
+
+        let smpl = ElemExpr.idx 0
+        let gp1 = ElemExpr.idx 1
+        let gp2 = ElemExpr.idx 2
+        let t1 = ElemExpr.idx 3
+        let t2 = ElemExpr.idx 4
+        let m = ElemExpr.argElem 0
+        let s = ElemExpr.argElem 1
+        let l = ElemExpr.argElem 2
+        let x = ElemExpr.argElem 3
+
+        // Mathematica: k = gp1  l = gp2   i=t1   j=t2
+
+        let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
+                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
+        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let e = exp(-eNom / eDnm)
+        let Tnom = e * l[gp1] * l[gp2]
+
+        let Tdnm = sqrt ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero()) (Tnom / Tdnm)
+        Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
+
 
 
     let setCovDiag nSmpls nGps cov var =
@@ -245,7 +278,8 @@ module MultiGPLayer =
         let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
-        let T = T nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let T = Tnew nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta
@@ -281,7 +315,7 @@ module MultiGPLayer =
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
         let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        pred_mean //, pred_cov
+        pred_mean , pred_cov
 
 
 

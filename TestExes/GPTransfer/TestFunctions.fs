@@ -90,11 +90,11 @@ module TestFunctions =
         //model outputs
 //        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
         let pred_mean = MultiGPLayer.pred mgp  (inp_mean, inp_cov)
-//        let pred_mean,predcov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
-        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
+        let pred_mean,pred_cov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
+//        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
 
 //        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
-//        let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
+        let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
 
         //creating random training vectors
         let trn_x_list = [1..ngps] |> randomSortedLists rand (-5.0f,5.0f) ntraining 
@@ -150,16 +150,16 @@ module TestFunctions =
             let inp_mean_host = rand.UniformArrayND (-5.0f ,5.0f) [1;ngps]
             let inp_mean_val = inp_mean_host |> post device
 
-            //let inp_covhost = ArrayNDHost.zeros<single> [1;ngps;ngps]
-            //let inp_covhost = 0.1f * ArrayNDHost.ones [1;ngps] |> ArrayND.diagMat
+            let inp_cov_host = ArrayNDHost.zeros<single> [1;ngps;ngps]
+            //let inp_cov_host = 0.1f * ArrayNDHost.ones [1;ngps] |> ArrayND.diagMat
 
-            let inp_cov_host = rand.UniformArrayND (-2.0f, 2.0f) [1;ngps;ngps]
+            //let inp_cov_host = rand.UniformArrayND (-2.0f, 2.0f) [1;ngps;ngps]
             let inp_covhost = makePsd inp_cov_host
 
             let inp_cov_val = inp_covhost |> post device
 
             //calculate predicted mean and variance
-            let pred_mean = pred_mean inp_mean_val inp_cov_val
+            let pred_mean,pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
 
             let transMean = transTestFn1 inp_mean_val inp_cov_val
             let transCov = transTestFn2 inp_mean_val inp_cov_val
@@ -184,7 +184,7 @@ module TestFunctions =
                 In_Mean = inp_mean_host;
                 In_Cov = inp_covhost;
                 Pred_Mean = pred_mean;
-                Pred_Cov = inp_covhost}
+                Pred_Cov = pred_cov}
 
             //print inputs and predictions
             printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
@@ -196,7 +196,7 @@ module TestFunctions =
             printfn "inp_cov=\n%A" inp_cov_val
             printfn ""
             printfn "pred_mean=\n%A" pred_mean
-//            printfn "pred_cov=\n%A" pred_cov
+            printfn "pred_cov=\n%A" pred_cov
 
             //return sample of inputs and predictions
             testInOut
