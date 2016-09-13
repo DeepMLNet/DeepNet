@@ -46,7 +46,7 @@ module Program =
         mb.SetSize nTrn 20
 
         let mi = mb.Instantiate dev
-        let pred = GPTransferUnit.pred gptu (initialLayer.transform input)
+        let pred = GPTransferUnit.pred gptu (InitialLayer.transform input)
         //loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred target
 

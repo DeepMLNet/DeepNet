@@ -140,7 +140,7 @@ module TestFunctions =
         let transMean,transCov = WeightLayer.transform w (inp_mean,inp_cov)
         let transTestFn1 =  mi.Func transMean |> arg2 inp_mean inp_cov
         let transTestFn2 =  mi.Func transCov  |> arg2 inp_mean inp_cov
-        let initLMean,initLCov = initialLayer.transform inp_mean
+        let initLMean,initLCov = InitialLayer.transform inp_mean
         let initTestFn1 =  mi.Func initLMean |> arg1 inp_mean
         let initTestFn2 =  mi.Func initLCov |> arg1 inp_mean
         ///run GpTransferModel with random test inputs

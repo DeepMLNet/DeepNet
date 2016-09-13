@@ -296,21 +296,20 @@ module WeightLayer =
     }
 
     /// Weight layer parameters.
-    type Pars<'T> = {
+    type Pars = {
         /// expression for the weights [nGPs,nInput]
-        Weights:        ExprT<'T> ref
+        Weights:        ExprT<single> ref
         /// hyper-parameters
         HyperPars:      HyperPars
     }
 
-    let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
-        let fanOut = shp.[0] |> float
-        let fanIn = shp.[1] |> float
-        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
+    let internal initWeights seed (shp: int list) : ArrayNDHostT<single> = 
+        let fanOut = shp.[0] |> single
+        let fanIn = shp.[1] |> single
+        let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
         let rng = System.Random seed
         
-        rng.SeqDouble(-r, r)
-        |> Seq.map conv<'T>
+        rng.SeqSingle(-r, r)
         |> ArrayNDHost.ofSeqWithShape shp
 
     let pars (mb: ModelBuilder<_>) hp = {
@@ -348,11 +347,11 @@ module GPTransferUnit =
     }
 
         /// Weight layer parameters.
-    type Pars<'T> = {
+    type Pars = {
         // WeightLayer
-        WeightL:  WeightLayer.Pars<'T>
+        WeightL:        WeightLayer.Pars
         //MultiGPLayer
-        MultiGPL: MultiGPLayer.Pars
+        MultiGPL:       MultiGPLayer.Pars
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -364,12 +363,14 @@ module GPTransferUnit =
             {NGPs = hp.NGPs; NTrnSmpls = hp.NTrnSmpls}
         HyperPars = hp
     }
-    let pred (pars: Pars<'T>) input = 
+
+    let pred (pars: Pars) input = 
         WeightLayer.transform pars.WeightL input 
         |> MultiGPLayer.pred pars.MultiGPL
 
 
-module initialLayer =
+module InitialLayer =
+
     let cov input =
         let nSmpls = (Expr.shapeOf input).[0]
         let nInput = (Expr.shapeOf input).[1]
@@ -378,6 +379,7 @@ module initialLayer =
         // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
         Expr.reshape [nSmpls; nInput; bc] input *
         Expr.reshape [nSmpls; bc; nInput] input
+
     let transform input =
         input, (cov input)
 
