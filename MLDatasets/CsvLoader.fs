@@ -188,9 +188,9 @@ module CsvLoader =
         let csv () = CsvFile.Load(reader(), separators=pars.Separators, quote='"', hasHeaders=false)
         let rowTypes = loadRowTypes pars.IntTreatment (csv ())
         let categoryTables = buildCategoryTables rowTypes
-        let data = loadData rowTypes (csv ())
-        let dataArrays = fieldsToArrayNDs pars.Missing pars.CategoryEncoding rowTypes categoryTables pars.TargetCols data
-        let samples = toCsvSamples pars.TargetCols dataArrays
+        let data = loadData rowTypes (csv ()) 
+        let dataArrays = fieldsToArrayNDs pars.Missing pars.CategoryEncoding rowTypes categoryTables pars.TargetCols data 
+        let samples = toCsvSamples pars.TargetCols dataArrays 
         samples
 
     let loadTextFile (pars: Parameters) path =
