@@ -48,7 +48,14 @@ type R () =
         |> RCall.param "col" color
         |> RCall.call R.lines
 
-    static member par2 (param, value) =
+    static member points2 (?x, ?y, ?color) =
+        RCall.empty
+        |> RCall.param "x" x
+        |> RCall.param "y" y
+        |> RCall.param "col" color
+        |> RCall.call R.points
+
+    static member par2 (param: string, value: 'f) =
         RCall.empty
         |> RCall.param param (Some value)
         |> RCall.call R.par
@@ -90,4 +97,12 @@ type R () =
         |> RCall.param "useRaster" (Some true)
         |> RCall.call R.image
 
+
+    static member pdfPage (filename: string, ?nPlots) =
+        let nPlots = defaultArg nPlots 1
+        R.pdf (filename) |> ignore 
+        R.par2 ("oma", [0; 0; 0; 0])
+        R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+        R.par2 ("mgp", [1.7; 0.7; 0.0])
+        R.par2 ("mfrow", [nPlots; 1])
  
