@@ -281,8 +281,11 @@ module MultiGPLayer =
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
         let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        pred_mean, pred_cov
+        pred_mean //, pred_cov
 
+
+
+/// [["nInput"; "nBatch"]; ["nInput"; "nHidden"]]
 module WeightLayer =
     type HyperPars = {
         /// number of inputs
@@ -316,11 +319,11 @@ module WeightLayer =
     }
 
     let transform pars (mu,sigma) =
-//    let transform pars mu = 
         //[smpl,inp] .* [inp,gp] 
         //=>[smpl,gp]
         let newMu = mu .* (!pars.Weights).T
-    
+        //[1*,gp,inp] .* [smpl,inp,inp] => [smpl,gp,inp]
+        //[smpl,gp,inp] .* [1*,inp,gp] => [smpl,gp,gp]
         //[1*,gp,inp] .* [smpl,inp,inp] .* [1*,inp,gp]
         //=> [smpl,gp,gp]
         let nGps = pars.HyperPars.NGPs
@@ -328,7 +331,7 @@ module WeightLayer =
         let bc = SizeSpec.broadcastable
         let newSigma =  (Expr.reshape [bc;nGps;nInput] !pars.Weights) .*
                         sigma .*
-                        (Expr.reshape [bc;nGps;nInput] (!pars.Weights).T)
+                        (Expr.reshape [bc;nInput;nGps] (!pars.Weights).T)
         newMu, newSigma
 
 module GPTransferUnit = 
@@ -365,6 +368,7 @@ module GPTransferUnit =
         WeightLayer.transform pars.WeightL input 
         |> MultiGPLayer.pred pars.MultiGPL
 
+
 module initialLayer =
     let cov input =
         let nSmpls = (Expr.shapeOf input).[0]
@@ -377,35 +381,35 @@ module initialLayer =
     let transform input =
         input, (cov input)
 
-module MLGPT = 
-    
-    type HyperPars = {
-        /// a list of the hyper parameters of the layers
-        Layers: GPTransferUnit.HyperPars list
-        /// the loss measure
-        LossMeasure: LossLayer.Measures
-    }
-
-    type Pars<'T> = {
-        /// a lsit of the parameters of the GPTransfer Layers
-        Layers:     GPTransferUnit.Pars<'T> list
-        /// hyper-parameters
-        HyperPars:  HyperPars 
-    }
-
-    let pars (mb: ModelBuilder<_>) (hp:HyperPars) = {
-        Layers = hp.Layers
-        |>List.mapi (fun idx gphp -> 
-                    GPTransferUnit.pars (mb.Module (sprintf "Layer%d" idx)) gphp)
-        HyperPars = hp
-    } 
-    
-    let pred (pars: Pars<'T>) input = 
-        let inputDist = initialLayer.transform input
-        (inputDist, pars.Layers)
-        ||> List.fold (fun inp p -> GPTransferUnit.pred p inp)
-
-
-    let loss pars input target =
-        let predmu,predSigma = (pred pars input)
-        LossLayer.loss pars.HyperPars.LossMeasure predmu target
+//module MLGPT = 
+//    
+//    type HyperPars = {
+//        /// a list of the hyper parameters of the layers
+//        Layers: GPTransferUnit.HyperPars list
+//        /// the loss measure
+//        LossMeasure: LossLayer.Measures
+//    }
+//
+//    type Pars<'T> = {
+//        /// a lsit of the parameters of the GPTransfer Layers
+//        Layers:     GPTransferUnit.Pars<'T> list
+//        /// hyper-parameters
+//        HyperPars:  HyperPars 
+//    }
+//
+//    let pars (mb: ModelBuilder<_>) (hp:HyperPars) = {
+//        Layers = hp.Layers
+//        |>List.mapi (fun idx gphp -> 
+//                    GPTransferUnit.pars (mb.Module (sprintf "Layer%d" idx)) gphp)
+//        HyperPars = hp
+//    } 
+//    
+//    let pred (pars: Pars<'T>) input = 
+//        let inputDist = initialLayer.transform input
+//        (inputDist, pars.Layers)
+//        ||> List.fold (fun inp p -> GPTransferUnit.pred p inp)
+//
+//
+//    let loss pars input target =
+//        let predmu,predSigma = (pred pars input)
+//        LossLayer.loss pars.HyperPars.LossMeasure predmu target

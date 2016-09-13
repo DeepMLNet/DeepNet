@@ -76,6 +76,8 @@ module TestFunctions =
         let nGPs      = mb.Size "nGPs"
         let nTrnSmpls = mb.Size "nTrnSmpls"
         
+        let w =
+            WeightLayer.pars (mb.Module "WL") {NInput = nGPs; NGPs = nGPs}
 
         let mgp = 
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
@@ -86,7 +88,9 @@ module TestFunctions =
         let mi = mb.Instantiate device
 
         //model outputs
-        let pred_mean,predcov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
+//        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
+        let pred_mean = MultiGPLayer.pred mgp  (inp_mean, inp_cov)
+//        let pred_mean,predcov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
         let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
 
 //        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
@@ -133,7 +137,12 @@ module TestFunctions =
         mi.ParameterStorage.[!mgp.TrnT] <- trn_t_val
         mi.ParameterStorage.[!mgp.TrnSigma] <- trn_sigma_val
 
-
+        let transMean,transCov = WeightLayer.transform w (inp_mean,inp_cov)
+        let transTestFn1 =  mi.Func transMean |> arg2 inp_mean inp_cov
+        let transTestFn2 =  mi.Func transCov  |> arg2 inp_mean inp_cov
+        let initLMean,initLCov = initialLayer.transform inp_mean
+        let initTestFn1 =  mi.Func initLMean |> arg1 inp_mean
+        let initTestFn2 =  mi.Func initLCov |> arg1 inp_mean
         ///run GpTransferModel with random test inputs
         let randomTest () =
 
@@ -151,6 +160,23 @@ module TestFunctions =
 
             //calculate predicted mean and variance
             let pred_mean = pred_mean inp_mean_val inp_cov_val
+
+            let transMean = transTestFn1 inp_mean_val inp_cov_val
+            let transCov = transTestFn2 inp_mean_val inp_cov_val
+
+            printfn "transMean=\n%A" transMean
+            printfn ""
+            printfn "transCov=\n%A" transCov
+            printfn ""
+
+
+            let initMean = initTestFn1 inp_mean_val
+            let initCov = initTestFn2 inp_mean_val
+
+            printfn "initLMean=\n%A" initMean
+            printfn ""
+            printfn "initLCov=\n%A" initCov
+            printfn ""
 
 
             //save inputs and predictions in sample datatype
@@ -177,7 +203,7 @@ module TestFunctions =
 
         //run ntest tests and save samples in dataset
         Dump.start "dump.h5"
-        printfn "Testing Multi GP Transfer Model"
+        printfn "Testing Multi GP Transfer Model on %A" device
         let testList = [1..ntest]
                        |> List.map (fun n-> 
                             Dump.prefix <- sprintf "%d" n
