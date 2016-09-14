@@ -231,8 +231,8 @@ module MultiGPLayer =
         let Kk_inv = Expr.invert Kk
         let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
-//        let d_Kk_inv = Deriv.compute Kk_inv 
-//        printfn "d_Kk_inv=\n%A" d_Kk_inv
+        let d_Kk_inv = Deriv.compute Kk_inv 
+        printfn "d_Kk_inv=\n%A" d_Kk_inv
         
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
@@ -249,8 +249,8 @@ module MultiGPLayer =
         let beta = Kk_inv .* !trnT
         let beta = beta |> Expr.dump "beta"
 
-//        let d_beta = Deriv.compute beta 
-//        printfn "d_beta=\n%A" d_beta
+        let d_beta = Deriv.compute beta 
+        printfn "d_beta=\n%A" d_beta
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
@@ -272,8 +272,8 @@ module MultiGPLayer =
             Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
         let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
-//        let d_betaBetaT = Deriv.compute betaBetaT 
-//        printfn "d_betaBetaT=\n%A" d_betaBetaT
+        let d_betaBetaT = Deriv.compute betaBetaT 
+        printfn "d_betaBetaT=\n%A" d_betaBetaT
 
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
