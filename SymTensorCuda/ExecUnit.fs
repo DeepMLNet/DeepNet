@@ -411,23 +411,23 @@ module ExecUnit =
         let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval 
 
         // execution units
-        let mutable execUnits = []
+        let execUnits = ResizeArray<ExecUnitT<'e>>()
         let mutable execUnitIdCnt = 0
         let newExecUnitId () =
             execUnitIdCnt <- execUnitIdCnt + 1
             execUnitIdCnt
         let submitExecUnit eu =
-            execUnits <- eu :: execUnits
+            execUnits.Add eu
 
-        let mutable initItems = []
-        let submitInitItems ii =
-            initItems <- ii @ initItems
+        let initItems = ResizeArray<'e>()
+        let submitInitItems (ii: 'e list) =
+            initItems.AddRange ii
 
         // storage space
-        let mutable memAllocs = []
+        let memAllocs = ResizeArray<MemAllocManikinT>()
         let newMemory typ elements kind = 
-            let mem = {Id=List.length memAllocs; TypeName=typ; Elements=elements; Kind=kind}
-            memAllocs <- mem :: memAllocs
+            let mem = {Id=memAllocs.Count; TypeName=typ; Elements=elements; Kind=kind}
+            memAllocs.Add mem
             MemAlloc mem
 
         // evaluation request
@@ -562,6 +562,7 @@ module ExecUnit =
             processEvalRequest ()
 
         // post-process execUnits
+        let execUnits = List.ofSeq execUnits
         if Compiler.Cuda.Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
         let execUnits =
             execUnits
@@ -606,8 +607,8 @@ module ExecUnit =
             Expr = expr
             ExecUnits = execUnits
             Result = exprRes.Value
-            MemAllocs = memAllocs
-            InitItems = initItems
+            MemAllocs = memAllocs |> List.ofSeq
+            InitItems = initItems |> List.ofSeq
         }
 
 
