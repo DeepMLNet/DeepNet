@@ -92,11 +92,6 @@ module TestFunctions =
         let pred_mean,pred_cov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
 //        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
         
-        printfn "derivatives MultiGPLayer"
-        let d_mean = Deriv.compute pred_mean 
-        printfn "d_mean=\n%A" d_mean
-        let d_cov = Deriv.compute pred_cov 
-        printfn "d_cov=\n%A" d_cov
 
 
 //        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
@@ -210,7 +205,7 @@ module TestFunctions =
         let ninputs = 5
         let ntraining = 10
         let ntests = 1
-        let batchSize = 2
+        let batchSize = 1
 
         //building the model
         let mb = ModelBuilder<single> "Test"
@@ -234,11 +229,6 @@ module TestFunctions =
         let pred_mean, pred_cov = GPTransferUnit.pred gptu (InputLayer.transform inp_mean)
 
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
-        printfn "derivatives GPTransferUnit"
-        let d_mean = Deriv.compute pred_mean 
-        printfn "d_mean=\n%A" d_mean
-        let d_cov = Deriv.compute pred_cov 
-        printfn "d_cov=\n%A" d_cov
 
         let randomTest () =
 

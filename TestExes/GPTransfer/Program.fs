@@ -47,6 +47,8 @@ module Program =
 
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
+        printfn "shp pred=\n%A" (Expr.shapeOf pred)
+        printfn "shp target=\n%A" (Expr.shapeOf target)
         //loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred target
 
@@ -236,7 +238,7 @@ module Program =
         TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             
-        TestFunctions.TestGPTransferUnit DevHost
+//        TestFunctions.TestGPTransferUnit DevHost
 //        TestFunctions.TestGPTransferUnit DevCuda
 
 
