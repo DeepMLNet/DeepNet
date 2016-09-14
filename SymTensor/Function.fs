@@ -20,13 +20,25 @@ module VarEnv =
     let addUVarSpec (vs: UVarSpecT) (value: IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
         Map.add vs value varEnv
 
+    /// remove variable value from environment
+    let removeUVarSpec (vs: UVarSpecT) (varEnv: VarEnvT) : VarEnvT =
+        Map.remove vs varEnv
+
     /// add variable value to environment
     let addVarSpecT (vs: VarSpecT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
         addUVarSpec (UVarSpec.ofVarSpec vs) (value :> IArrayNDT) varEnv        
 
+    /// remove variable value from environment
+    let removeVarSpecT (vs: VarSpecT<'T>) (varEnv: VarEnvT) : VarEnvT =
+        removeUVarSpec (UVarSpec.ofVarSpec vs) varEnv        
+
     /// add variable value to environment
     let add (var: Expr.ExprT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
         addVarSpecT (Expr.extractVar var) value varEnv
+
+    /// remove variable value from environment
+    let remove (var: Expr.ExprT<'T>) (varEnv: VarEnvT) : VarEnvT =
+        removeVarSpecT (Expr.extractVar var) varEnv
 
     /// get variable value from environment
     let getUnified (vs: UVarSpecT) (varEnv: VarEnvT) : IArrayNDT =
@@ -342,8 +354,8 @@ module FuncTypes =
         fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
             f (ve |> VarEnv.add vs value)
 
-    let inline addVarEnv f =
-        fun (ve: VarEnvT) (varEnv: VarEnvT) ->
+    let addVarEnv (varEnv: VarEnvT) f =
+        fun (ve: VarEnvT) ->
             f (VarEnv.join ve varEnv)
 
     let (^@^) a b =

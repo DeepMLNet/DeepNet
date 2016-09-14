@@ -66,6 +66,7 @@
     <Compile Include="MNISTTests.fs" />
     <Compile Include="NeuralNetOnMNIST.fs" />
     <Compile Include="OpTests.fs" />
+    <Compile Include="DerivTests.fs" />
     <Compile Include="ElemExprTests.fs" />
     <Content Include="App.config" />
     <None Include="TestData\NPZ1.npz">
