@@ -77,7 +77,7 @@ module TestFunctions =
         let nTrnSmpls = mb.Size "nTrnSmpls"
         
         let w =
-            WeightLayer.pars (mb.Module "WL") {NInput = nGPs; NGPs = nGPs}
+            WeightLayer.pars (mb.Module "WL") {NInput = nGPs; NOutput = nGPs}
 
         let mgp = 
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
@@ -89,9 +89,15 @@ module TestFunctions =
 
         //model outputs
 //        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
-        let pred_mean = MultiGPLayer.pred mgp  (inp_mean, inp_cov)
         let pred_mean,pred_cov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
 //        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
+        
+        printfn "derivatives MultiGPLayer"
+        let d_mean = Deriv.compute pred_mean 
+        printfn "d_mean=\n%A" d_mean
+        let d_cov = Deriv.compute pred_cov 
+        printfn "d_cov=\n%A" d_cov
+
 
 //        let pred_mean, pred_cov = MultiGPLayer.pred mgp inp_mean inp_cov
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg2 inp_mean inp_cov
@@ -161,24 +167,6 @@ module TestFunctions =
             //calculate predicted mean and variance
             let pred_mean,pred_cov = pred_mean_cov_fn inp_mean_val inp_cov_val
 
-            let transMean = transTestFn1 inp_mean_val inp_cov_val
-            let transCov = transTestFn2 inp_mean_val inp_cov_val
-
-            printfn "transMean=\n%A" transMean
-            printfn ""
-            printfn "transCov=\n%A" transCov
-            printfn ""
-
-
-            let initMean = initTestFn1 inp_mean_val
-            let initCov = initTestFn2 inp_mean_val
-
-            printfn "initLMean=\n%A" initMean
-            printfn ""
-            printfn "initLCov=\n%A" initCov
-            printfn ""
-
-
             //save inputs and predictions in sample datatype
             let testInOut = {
                 In_Mean = inp_mean_host;
@@ -214,3 +202,67 @@ module TestFunctions =
         let testFileName = sprintf "TestData.h5"
         testData.Save(testFileName)
     
+    let TestGPTransferUnit device =
+        //initiating random number generator 
+        let rand = Random(1)
+        //defining size parameters
+        let ngps = 3
+        let ninputs = 5
+        let ntraining = 10
+        let ntests = 1
+        let batchSize = 2
+
+        //building the model
+        let mb = ModelBuilder<single> "Test"
+
+        let nSmpls       = mb.Size "nSmpls"
+        let nInputs      = mb.Size "nInputs"
+        let nGPs         = mb.Size "nGPs"
+        let nTrnSmpls    = mb.Size "nTrnSmpls"
+
+        let gptu = 
+           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NGPs = nGPs; NTrnSmpls = nTrnSmpls}
+
+        let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nInputs]
+        
+        mb.SetSize  nGPs         ngps
+        mb.SetSize  nTrnSmpls    ntraining
+        mb.SetSize  nInputs      ninputs
+
+        let mi = mb.Instantiate device
+
+        let pred_mean, pred_cov = GPTransferUnit.pred gptu (InputLayer.transform inp_mean)
+
+        let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
+        printfn "derivatives GPTransferUnit"
+        let d_mean = Deriv.compute pred_mean 
+        printfn "d_mean=\n%A" d_mean
+        let d_cov = Deriv.compute pred_cov 
+        printfn "d_cov=\n%A" d_cov
+
+        let randomTest () =
+
+            //generate random test inputs
+            let inp_mean_host = rand.UniformArrayND (-5.0f ,10.0f) [batchSize;ninputs]
+            let inp_mean_val = inp_mean_host |> post device
+
+
+            //calculate predicted mean and variance
+            let pred_mean,pred_cov = pred_mean_cov_fn inp_mean_val
+
+
+            //print inputs and predictions
+
+            printfn "inp_mean=\n%A" inp_mean_val
+            printfn ""
+            printfn "pred_mean=\n%A" pred_mean
+            printfn "pred_cov=\n%A" pred_cov
+
+            //return sample of inputs and predictions
+        Dump.start "gptudump.h5"
+        let testList = [1..ntests]
+                       |> List.map (fun n-> 
+                            Dump.prefix <- sprintf "%d" n
+                            randomTest () )
+        Dump.stop ()
+        ()

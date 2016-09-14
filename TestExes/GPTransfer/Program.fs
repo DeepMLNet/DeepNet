@@ -12,17 +12,16 @@ open Models
 module Program =
     
 
-    let classificationGPTransferUnit dev=
-        printfn "Trainingone GPTransfer Unit on abalone dataset gender classification"
+    let classificationGPTransferUnit()=
+        printfn "Trainingone GPTransfer Unit on abalone dataset age classification"
+        
+        let dev = DevCuda
 
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullData = CsvLoader.loadFile pars "abalone.data" 
         let fullDataset = Dataset.FromSamples fullData
-        let data = TrnValTst.Of(fullDataset)
-        if dev = DevCuda then
-            let data = (TrnValTst.Of(fullDataset)).ToCuda()
-            ()
+        let data = TrnValTst.Of(fullDataset).ToCuda()
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "MultiGPModel"
@@ -41,6 +40,7 @@ module Program =
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
         let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
+
         mb.SetSize nInput (fullDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
@@ -51,8 +51,8 @@ module Program =
         let loss = LossLayer.loss LossLayer.CrossEntropy pred target
 
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, dev)
-        let optCfg = opt.DefaultCfg
+        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -81,18 +81,17 @@ module Program =
 
 
 
-    let classificationMLMGP dev=
-        printfn "Training 2 Layer MLMGP on abalone dataset gender classification"
+    let classificationMLMGP()=
+        printfn "Training 2 Layer MLMGP on abalone dataset age classification"
+
+        let dev = DevCuda
 
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullData = CsvLoader.loadFile pars "abalone.data" 
         let fullDataset = Dataset.FromSamples fullData
         
-        let data = TrnValTst.Of(fullDataset)
-        if dev = DevCuda then
-            let data = (TrnValTst.Of(fullDataset)).ToCuda()
-            ()
+        let data = TrnValTst.Of(fullDataset).ToCuda()
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "MultiGPModel"
@@ -123,8 +122,8 @@ module Program =
         let loss = MLGPT.loss mlmgp input target
 
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, dev)
-        let optCfg = opt.DefaultCfg
+        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -151,19 +150,19 @@ module Program =
         let result = Train.train trainable data trainCfg
         ()
 
-    let classificationMLP dev=
+    let classificationMLP()=
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
 //        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
         
-        printfn "Training 2 Layer MLP on abalone dataset gender classification"
+        printfn "Training 2 Layer MLP on abalone dataset age classification"
+
+        let dev = DevCuda
+
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullData = CsvLoader.loadFile pars "abalone.data" 
         let fullDataset = Dataset.FromSamples fullData
-        let data = TrnValTst.Of(fullDataset)
-        if dev = DevCuda then
-            let data = (TrnValTst.Of(fullDataset)).ToCuda()
-            ()
+        let data = TrnValTst.Of(fullDataset).ToCuda()
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "NeuralNetModel"
@@ -195,8 +194,8 @@ module Program =
         let loss = MLP.loss mlp input.T target.T
 
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, dev)
-        let optCfg = opt.DefaultCfg
+        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -230,13 +229,17 @@ module Program =
 
 //        TestFunctions.testDatasetParser()
 
-//        classificationMLP DevCuda
-        classificationGPTransferUnit DevCuda
-//        classificationMLMGP DevCuda
+//        classificationMLP ()
+//        classificationGPTransferUnit ()
+//        classificationMLMGP ()
 
-//        TestFunctions.testMultiGPLayer DevHost
+        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
-   
+            
+        TestFunctions.TestGPTransferUnit DevHost
+//        TestFunctions.TestGPTransferUnit DevCuda
+
+
 //        TestUtils.evalHostCuda TestFunctions.testMultiGPLayer
 //        TestUtils.compareTraces TestFunctions.testMultiGPLayer false |> ignore
 

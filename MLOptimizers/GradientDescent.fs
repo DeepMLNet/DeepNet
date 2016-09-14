@@ -31,6 +31,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
 
     member this.Minimize =
         let grad = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars)
+
         Expr.storeToVar pars (pars - cfg.Step * grad)
 
     member this.Use f =
