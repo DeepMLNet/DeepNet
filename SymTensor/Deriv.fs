@@ -81,7 +81,7 @@ module Deriv =
             | Truncate -> Map.empty
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
-            | Invert -> -expr.T .* egExpanded .* expr.T |> reverseDiffStep a
+            | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> reverseDiffStep a
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
 
             | Subtensor srs ->

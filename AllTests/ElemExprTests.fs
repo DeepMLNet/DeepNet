@@ -225,8 +225,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let kseinv = Expr.invert kse  
     
     let dKseinv = Deriv.compute kseinv
-    let dKseinvdX  = dKse |> Deriv.ofVar xTensor
-    let dKseinvdL  = dKse |> Deriv.ofVar lTensor
+    let dKseinvdX  = dKseinv |> Deriv.ofVar xTensor
+    let dKseinvdL  = dKseinv |> Deriv.ofVar lTensor
 
     let kseinvFn = Func.make DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
     let dKseinvFn = Func.make2 DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
