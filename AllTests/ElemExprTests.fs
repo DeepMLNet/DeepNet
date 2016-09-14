@@ -196,7 +196,7 @@ let ``Codegen: KSE`` () =
 [<Fact>]
 let ``Eval and deriv: KSE in Expr on Host`` () =   
     // input  x[gp, smpl]
-    //        l[gp]
+    //        l[gp] 
     // output cov[gp, smpl1, smpl2]
 
     printfn "======= Testing KSE in Expr on Host:"

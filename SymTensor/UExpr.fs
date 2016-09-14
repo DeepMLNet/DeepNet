@@ -1,5 +1,6 @@
 ﻿namespace SymTensor
 
+open System.Diagnostics
 open System.Reflection
 open System.Collections.Generic
 open Expr
@@ -199,19 +200,39 @@ module UExpr =
     /// the shape of the given unified expression
     let inline shapeOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = shp
 
+//    let rec countOps (UExpr (_, subExprs, _)) =
+//        subExprs
+//        |> List.map countOps
+//        |> List.sum
+//        |> fun n -> n + 1
+
+    let countOps expr  =
+        let visited = HashSet<UExprT> ()
+        let rec doCount (UExpr (_, subExprs, _) as expr) =
+            if visited.Contains expr then 0
+            else
+                visited.Add expr |> ignore
+
+                subExprs
+                |> List.map doCount
+                |> List.sum
+                |> fun n -> n + 1
+        let sw = Stopwatch.StartNew()
+        let res = doCount expr
+        printfn "countOps took %A" sw.Elapsed
+        res
+
     /// counts how many times subExpr occurs in unified expression uexpr
     let subExprOccurrences uexpr =
         let cnt = Dictionary<UExprT, int>()
-        let rec build expr =
-            if cnt.ContainsKey(expr) then
-                cnt.[expr] <- cnt.[expr] + 1
+        let rec build (UExpr (_, subExprs, _) as uexpr) =
+            if cnt.ContainsKey(uexpr) then
+                cnt.[uexpr] <- cnt.[uexpr] + 1
             else
-                cnt.[expr] <- 1
+                cnt.[uexpr] <- 1
 
-            match expr with
-            | UExpr (_, srcs, _) ->
-                for src in srcs do
-                    build src
+            for subExpr in subExprs do
+                build subExpr
         build uexpr
 
         fun subExpr ->

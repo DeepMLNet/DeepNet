@@ -13,7 +13,7 @@ module Program =
     
 
     let classificationGPTransferUnit()=
-        printfn "Trainingone GPTransfer Unit on abalone dataset age classification"
+        printfn "Training one GPTransfer Unit on abalone dataset age classification"
         
         let dev = DevCuda
 
@@ -231,6 +231,7 @@ module Program =
 
         SymTensor.Compiler.Cuda.Debug.Timing <- true
         SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
+        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
 
 //        TestFunctions.testDatasetParser()
