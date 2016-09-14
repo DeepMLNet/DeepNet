@@ -777,21 +777,35 @@ module Expr =
         let sa = shapeOf a
         reshape (ShapeSpec.padRight sa) a
 
-    /// dot product
+    /// Dot product.
+    /// Behavior depends on the dimensionality of the arguments.
+    /// Cases: 
+    /// (1, 1) -> vector-vector dot product resulting in a scalar
+    /// (2, 1) -> matrix-vector dot product resulting in a vector
+    /// (2, 2) -> matrix-matrix dot product resulting in a matrix
+    /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
+    /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
     let dot (a: ExprT<'T>) (b: ExprT<'T>) =
         let sa, sb = shapeOf a, shapeOf b
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 1, 1 -> sum (a * b)
+            | 1, 1 -> 
+                // vector-vector dot product
+                sum (a * b)
             | 2, 1 -> 
+                // matrix-vector dot product
                 let bm = b |> reshape (ShapeSpec.padRight sb)
                 Binary(Dot, a, bm) |> reshape [sa.[0]]
-            | 2, 2 -> Binary(Dot, a, b)
+            | 2, 2 -> 
+                // matrix-matrix dot product
+                Binary(Dot, a, b)
             | na, nb when na = nb -> 
+                // batched matrix-matrix dot product
                 let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
                 let ba = a |> broadcastIfNecessary bsa
                 let bb = b |> broadcastIfNecessary bsb    
                 Binary(Dot, ba, bb)
             | na, nb when na = nb + 1 ->
+                // batched matrix-vector dot product
                 let psb = ShapeSpec.padRight sb
                 let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
                 let ba = a |> broadcastIfNecessary bsa
@@ -809,6 +823,15 @@ module Expr =
 
     type ExprT with
         // tensor binary
+
+        /// Dot product.
+        /// Behavior depends on the dimensionality of the arguments.
+        /// Cases: 
+        /// (1, 1) -> vector-vector dot product resulting in a scalar
+        /// (2, 1) -> matrix-vector dot product resulting in a vector
+        /// (2, 2) -> matrix-matrix dot product resulting in a matrix
+        /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
+        /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
         static member (.*) (a: ExprT<'T>, b: ExprT<'T>) = dot a b
         static member (%*) (a: ExprT<'T>, b: ExprT<'T>) = tensorProduct a b
 

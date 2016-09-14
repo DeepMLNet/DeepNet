@@ -144,9 +144,10 @@ module Deriv =
                 // calculate Jacobian wrt a by transposing expression and resulting Jacobian
                 let aShp = shapeOf a
                 let nd = ShapeSpec.nDim aShp
-                let egT = egExpanded |> swapDim (nd-1) nd |> collapse
+                let batchShp = aShp.[0..nd-3]
+                let egT = egExpanded.T |> collapse
                 let daT = mxWrtX (b.T) (a.T) (expr.T) egT
-                let da = daT |> reshape [funElems; aShp.[1]; aShp.[0]] |> swapDim (nd-1) nd |> collapse
+                let da = daT |> reshape ([funElems] @ batchShp @ [aShp.[nd-1]; aShp.[nd-2]]) |> transpose |> collapse
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"

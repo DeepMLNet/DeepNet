@@ -36,7 +36,7 @@ let ``Dot`` () =
     )
 
 [<Fact>]
-let ``Dot2`` () =
+let ``Batched Dot`` () =
     randomDerivativeCheck 1e-4 [[2;3; 3]; [2;3]] (fun [a; b] ->
         a .* b 
     )
