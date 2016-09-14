@@ -7,8 +7,7 @@ module Debug =
     let DisableStreams = false
 
     /// outputs messages when a function / kernel is launched
-    [<Literal>]
-    let TraceCalls = false
+    let mutable TraceCalls = false
 
     /// compiles kernels with debug information and no optimizations
     [<Literal>]

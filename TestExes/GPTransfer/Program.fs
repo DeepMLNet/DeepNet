@@ -19,7 +19,7 @@ module Program =
 
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "abalone.data" 
+        let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset).ToCuda()
         ///classified the dataset using a MLP with one hidden layer
@@ -90,7 +90,7 @@ module Program =
 
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "abalone.data" 
+        let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         
         let data = TrnValTst.Of(fullDataset).ToCuda()
@@ -162,7 +162,7 @@ module Program =
 
         ///Load the ablone dataset, classify gender from data
         let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
-        let fullData = CsvLoader.loadFile pars "abalone.data" 
+        let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset).ToCuda()
         ///classified the dataset using a MLP with one hidden layer
@@ -229,13 +229,17 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
+        SymTensor.Compiler.Cuda.Debug.Timing <- true
+        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
+
+
 //        TestFunctions.testDatasetParser()
 
 //        classificationMLP ()
-//        classificationGPTransferUnit ()
+        classificationGPTransferUnit ()
 //        classificationMLMGP ()
 
-        TestFunctions.testMultiGPLayer DevHost
+//        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             
 //        TestFunctions.TestGPTransferUnit DevHost
