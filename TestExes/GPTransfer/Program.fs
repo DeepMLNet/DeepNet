@@ -6,7 +6,6 @@ open SymTensor.Compiler.Cuda
 open System
 open Datasets
 open Models
-open DataParser
 open Optimizers
 open Models
 
@@ -17,8 +16,9 @@ module Program =
         printfn "Trainingone GPTransfer Unit on abalone dataset gender classification"
 
         ///Load the ablone dataset, classify gender from data
-        let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
-        
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset)
         if dev = DevCuda then
             let data = (TrnValTst.Of(fullDataset)).ToCuda()
@@ -41,8 +41,8 @@ module Program =
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
         let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
-        mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
-        mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
+        mb.SetSize nInput (fullDataset.[0].Input |> ArrayND.nElems)
+        mb.SetSize nClass (fullDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
 
         let mi = mb.Instantiate dev
@@ -54,10 +54,10 @@ module Program =
         let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
-        let smplVarEnv (smpl: singleSample) =
+        let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
-            |> VarEnv.add input smpl.InputS
-            |> VarEnv.add target smpl.TargetS
+            |> VarEnv.add input smpl.Input
+            |> VarEnv.add target smpl.Target
 
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
@@ -85,7 +85,9 @@ module Program =
         printfn "Training 2 Layer MLMGP on abalone dataset gender classification"
 
         ///Load the ablone dataset, classify gender from data
-        let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullDataset = Dataset.FromSamples fullData
         
         let data = TrnValTst.Of(fullDataset)
         if dev = DevCuda then
@@ -110,8 +112,8 @@ module Program =
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
         let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
-        mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
-        mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
+        mb.SetSize nInput (fullDataset.[0].Input |> ArrayND.nElems)
+        mb.SetSize nClass (fullDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nHidden 10
         mb.SetSize nTrn 20
 
@@ -124,10 +126,10 @@ module Program =
         let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
-        let smplVarEnv (smpl: singleSample) =
+        let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
-            |> VarEnv.add input smpl.InputS
-            |> VarEnv.add target smpl.TargetS
+            |> VarEnv.add input smpl.Input
+            |> VarEnv.add target smpl.Target
 
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
@@ -155,7 +157,9 @@ module Program =
         
         printfn "Training 2 Layer MLP on abalone dataset gender classification"
         ///Load the ablone dataset, classify gender from data
-        let fullDataset = (DataParser.loadSingleDataset "abalone.data.txt" [0] ',')
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let fullData = CsvLoader.loadFile pars "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/" 
+        let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset)
         if dev = DevCuda then
             let data = (TrnValTst.Of(fullDataset)).ToCuda()
@@ -182,8 +186,8 @@ module Program =
 
 
         // instantiate model
-        mb.SetSize nInput (fullDataset.[0].InputS |> ArrayND.nElems)
-        mb.SetSize nClass (fullDataset.[0].TargetS |> ArrayND.nElems)
+        mb.SetSize nInput (fullDataset.[0].Input |> ArrayND.nElems)
+        mb.SetSize nClass (fullDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nHidden 10
         let mi = mb.Instantiate dev
         
@@ -194,10 +198,10 @@ module Program =
         let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
-        let smplVarEnv (smpl: singleSample) =
+        let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
-            |> VarEnv.add input smpl.InputS
-            |> VarEnv.add target smpl.TargetS
+            |> VarEnv.add input smpl.Input
+            |> VarEnv.add target smpl.Target
 
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg

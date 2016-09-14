@@ -214,34 +214,3 @@ module TestFunctions =
         let testFileName = sprintf "TestData.h5"
         testData.Save(testFileName)
     
-    let testDatasetParser() =
-        let printData path tgt sep =
-            let data = DataParser.loadSingleDataset path tgt sep
-            printfn "Printing %s Dataset\n target:%A" path tgt
-            for smpl in data do
-                printfn "Sample: %A" smpl
-
-
-
-        let printAbloneData8() =     
-            printfn "printing ablone data"
-            printData "abalone.data.txt" [8] ',' 
-        let printAbloneData0() =     
-            printfn "printing ablone data"
-            printData "abalone.data.txt" [0] ',' 
-
-
-//        let printLetterRecognition() =
-//            printfn "printing letter-recognition data"
-//            printData "letter-recognition.data.txt" [0] ',' 
-
-//        let printAutoMpg() =
-//            printfn "printing auto-mpg data"
-//            printData "auto-mpg.data.txt" ' ' [0] 
-//
-        printAbloneData8()
-        printAbloneData0()
-
-//        printLetterRecognition()
-//        printAutoMpg()
-
