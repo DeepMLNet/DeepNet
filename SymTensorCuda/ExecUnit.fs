@@ -398,14 +398,11 @@ module ExecUnit =
     /// generates execution units that will evaluate the given unified expression
     let exprToExecUnits (gen: ExecUnitsGeneratorT<'e>) (expr: UExprT) : ExecUnitsForExprT<'e> =
 
-        if SymTensor.Compiler.Cuda.Debug.Timing then
-            printfn "UExpr contains %d unique ops" (UExpr.countOps expr)
+        if SymTensor.Compiler.Cuda.Debug.TraceCompile then
+            printfn "UExpr contains %d unique ops" (UExpr.countUniqueOps expr)
 
         // number of occurrences of subexpressions
-        let sw = Stopwatch.StartNew()
         let exprOccurrences = UExpr.subExprOccurrences expr
-        if SymTensor.Compiler.Cuda.Debug.Timing then
-            printfn "Building SubExprOccurrences took %A" sw.Elapsed
 
         // calculates the numeric shape
         let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval 
@@ -562,8 +559,9 @@ module ExecUnit =
         while exprsWithReqMultiplicity.Count > 0 do
             processEvalRequest ()
             uniqueProcessedRequests <- uniqueProcessedRequests + 1
-        printfn "Processed %d unique evaluation requests and created %d execution units." 
-            uniqueProcessedRequests execUnits.Count
+        if Compiler.Cuda.Debug.TraceCompile then
+            printfn "Processed %d unique evaluation requests and created %d execution units." 
+                uniqueProcessedRequests execUnits.Count
 
         // post-process execUnits
         let execUnits = List.ofSeq execUnits
