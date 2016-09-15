@@ -22,6 +22,7 @@ module Program =
         let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset).ToCuda()
+
         ///classified the dataset using a MLP with one hidden layer
         ///(analogous to Lern Mnist Project)
         let mb = ModelBuilder<single> "MultiGPModel"
@@ -47,13 +48,11 @@ module Program =
 
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
-        printfn "shp pred=\n%A" (Expr.shapeOf pred)
-        printfn "shp target=\n%A" (Expr.shapeOf target)
         //loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred target
 
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let opt =  Adam (loss, mi.ParameterVector, dev)
         let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
