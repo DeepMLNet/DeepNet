@@ -106,7 +106,7 @@ module Program =
         let mlmgp = 
             MLGPT.pars (mb.Module "MLMGP") 
                 { Layers = [{NInput=nInput; NGPs=nHidden; NTrnSmpls=nTrn}
-                            {NInput=nInput; NGPs=nClass; NTrnSmpls=nTrn}]
+                            {NInput=nHidden; NGPs=nClass; NTrnSmpls=nTrn}]
                   LossMeasure = LossLayer.CrossEntropy }
                 // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
@@ -190,7 +190,6 @@ module Program =
         mb.SetSize nClass (fullDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nHidden 10
         let mi = mb.Instantiate dev
-        
         // loss expression
         let loss = MLP.loss mlp input.T target.T
 
