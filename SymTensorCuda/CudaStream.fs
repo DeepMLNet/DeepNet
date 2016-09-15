@@ -1,5 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Diagnostics
+
 open Basics
 open SymTensor.Compiler
 
@@ -29,8 +31,10 @@ module CudaStreamSeq =
 
     /// converts execution units to stream commands
     let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
+        let sw = Stopwatch.StartNew()
         /// collection of ExecUnits we have to process
         let coll = ExecUnit.Collection execUnits
+        printfn "Creating collection took %A" sw.Elapsed
 
         /// event counter
         let mutable eventObjectCnt = 0

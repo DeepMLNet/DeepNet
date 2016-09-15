@@ -229,6 +229,8 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
+        //Microsoft.VisualStudio.Profiler.DataCollection.StopProfile (Microsoft.VisualStudio.Profiler.ProfileLevel.Process, Microsoft.VisualStudio.Profiler.DataCollection.CurrentId) |> ignore
+
         SymTensor.Compiler.Cuda.Debug.Timing <- true
         SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
         SymTensor.Compiler.Cuda.Debug.TraceCompile <- true

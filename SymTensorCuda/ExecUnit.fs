@@ -399,7 +399,7 @@ module ExecUnit =
     let exprToExecUnits (gen: ExecUnitsGeneratorT<'e>) (expr: UExprT) : ExecUnitsForExprT<'e> =
 
         if SymTensor.Compiler.Cuda.Debug.Timing then
-            printfn "UExpr contains %d ops" (UExpr.countOps expr)
+            printfn "UExpr contains %d unique ops" (UExpr.countOps expr)
 
         // number of occurrences of subexpressions
         let sw = Stopwatch.StartNew()
@@ -431,8 +431,8 @@ module ExecUnit =
             MemAlloc mem
 
         // evaluation request
-        let evalReqsByExpr = Dictionary<UExprT, ResizeArray<EvalReqT>>()
-        let evalReqMultiplicities = Dictionary<UExprT, int>()
+        let evalReqsByExpr = Dictionary<UExprT, ResizeArray<EvalReqT>>(HashIdentity.Reference)
+        let evalReqMultiplicities = Dictionary<UExprT, int>(HashIdentity.Reference)
         let exprsWithReqMultiplicity = Queue<UExprT>()
         let mutable evalReqCnt = 0
         let submitEvalRequest expr multiplicity storage onCompletion =
@@ -477,7 +477,7 @@ module ExecUnit =
                   
             // emit exec unit to evaluate expression
             let (UExpr(op, srcs, metadata)) = erqExpr
-            let subreqResults = Dictionary<UExprT, EvalResultT>()
+            let subreqResults = Dictionary<UExprT, EvalResultT>(HashIdentity.Reference)
 
             let onMaybeCompleted () =
                 if srcs |> List.forall (fun s -> subreqResults.ContainsKey s) then  
@@ -558,8 +558,12 @@ module ExecUnit =
         submitEvalRequest expr 1 trgtReq (fun res -> exprRes <- Some res)
 
         // processing loop
+        let mutable uniqueProcessedRequests = 0
         while exprsWithReqMultiplicity.Count > 0 do
             processEvalRequest ()
+            uniqueProcessedRequests <- uniqueProcessedRequests + 1
+        printfn "Processed %d unique evaluation requests and created %d execution units." 
+            uniqueProcessedRequests execUnits.Count
 
         // post-process execUnits
         let execUnits = List.ofSeq execUnits
@@ -592,7 +596,6 @@ module ExecUnit =
                 | _ -> eu
             )
 
-        //Microsoft.VisualStudio.Profiler.DataCollection.StartProfile (Microsoft.VisualStudio.Profiler.ProfileLevel.Process, Microsoft.VisualStudio.Profiler.DataCollection.CurrentId) |> ignore
 
         #if !DISABLE_RERUN_AFTER
         // Build RerunAfter dependencies.
