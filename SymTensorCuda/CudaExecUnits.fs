@@ -658,10 +658,10 @@ module CudaExecUnit =
         // C++ signature:
         // void sumLastAxis(TTarget &trgt, TSrc &src, 
         //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-        let tmpSize = ArrayNDManikin.sizeInBytes srcAdj
+        let tmpSize = max (ArrayNDManikin.sizeInBytes srcAdj) 4096
         let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev
         execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
-                                                ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+                                              ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv ({MemAllocator=memAllocator

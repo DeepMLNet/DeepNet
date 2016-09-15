@@ -3,15 +3,13 @@
 
 module Debug =
     /// redirects all stream calls to the null stream
-    [<Literal>]
-    let DisableStreams = false
+    let mutable DisableStreams = false
 
     /// outputs messages when a function / kernel is launched
     let mutable TraceCalls = false
 
     /// compiles kernels with debug information and no optimizations
-    [<Literal>]
-    let DebugCompile = false
+    let mutable DebugCompile = false
 
     /// prints timing information during CUDA function compilation
     let mutable Timing = false
@@ -23,4 +21,4 @@ module Debug =
     let mutable TraceCompile = false
 
     /// dumps kernel code before it is compiled
-    let mutable DumpCode = true
+    let mutable DumpCode = false

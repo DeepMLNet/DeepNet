@@ -66,6 +66,7 @@ module Program =
         let trainCfg : Train.Cfg = {    
             Seed               = 100   
             BatchSize          = 500 
+            //BatchSize          = 10
             LossRecordInterval = 10                                   
             Termination        = Train.ItersWithoutImprovement 100
             MinImprovement     = 1e-7  
@@ -231,7 +232,12 @@ module Program =
         SymTensor.Compiler.Cuda.Debug.Timing <- true
         SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
         SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
+        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
+        SymTensor.Compiler.Cuda.Debug.MemUsage <- true
+        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
+        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 
+        let trc = SymTensor.Trace.startSession "trace"
 
 //        TestFunctions.testDatasetParser()
 
@@ -250,6 +256,8 @@ module Program =
 //        TestUtils.compareTraces TestFunctions.testMultiGPLayer false |> ignore
 
 
+        //let tr = trc.End()
+        ()
 
 
         0

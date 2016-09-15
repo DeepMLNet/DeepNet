@@ -47,6 +47,8 @@ template <typename TTarget, typename TSrc>
 void sumLastAxis(TTarget &trgt, TSrc &src,
 	             CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size) {
 
+	printf("in sumLastAxis\n");
+
 	buffer_allocator alloc("sumLastAxis", tmp_buffer, tmp_buffer_size);
 
 	ArrayNDRange<TSrc> srcRange(src);
@@ -66,6 +68,8 @@ void sumLastAxis(TTarget &trgt, TSrc &src,
 						  srcRange.begin(),
 						  thrust::make_discard_iterator(),
 		                  trgtRange.begin());
+
+	printf("leaving sumLastAxis\n");
 }
 
 

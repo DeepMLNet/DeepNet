@@ -42,7 +42,7 @@ module Compile =
     /// prepares a compile directory
     let prepareCompileDir code =        
         // create temp directory
-        let rec getTempDir () = 
+        let rec getTempDir () =  
             let dirname = Path.Combine(compileDirRoot, Path.GetRandomFileName())
             if not (Directory.Exists dirname) then dirname
             else getTempDir()
@@ -328,7 +328,10 @@ module CudaExprWorkspaceTypes =
         let execCalls calls =
             let mutable previousCall = None
             for call in calls do
-                //printfn "CUDA call: %A" call
+                if Debug.TraceCalls then
+                    match call with
+                    | ExecItem (Trace _, _) -> ()
+                    | _ -> printfn "CUDA call: %A" call
 
                 match call with 
                 // memory management
@@ -535,6 +538,12 @@ module CudaExprWorkspaceTypes =
                     let ldA = a.LeadingDimension 
                     let ldB = b.LeadingDimension 
                     let ldTrgt = trgt.LeadingDimension 
+
+                    if Debug.TraceCalls then
+                        printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, ldA=%d, ldB=%d, ldTrgt=%d, \
+                                 nSamples=%d" 
+                            (getStream strm).Pointer m n k ldA ldB ldTrgt a.NSamples
+
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                              m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, 
@@ -596,6 +605,7 @@ module CudaExprWorkspaceTypes =
                         match previousCall with
                         | Some pc -> printfn "Last call was %A" pc
                         | None -> ()
+                        printfn "Expression was %A" uexpr
 
                         let crashTraceFile = "crash_trace.txt"
                         use tw = File.CreateText crashTraceFile
@@ -605,10 +615,16 @@ module CudaExprWorkspaceTypes =
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                     let resHost = resDev.ToHost()
-                    let msg = sprintf "previous call: %A" previousCall
+                    let msg = 
+                        match previousCall with
+                        | Some (ExecItem (Trace _, _)) | None -> "no previous call"
+                        | Some pc -> sprintf "previous call: %A" pc                        
                     Trace.exprEvaledWithMsg uexpr resHost msg
 
                 previousCall <- Some call
+
+//                if Debug.DisableStreams then
+//                    CudaSup.context.Synchronize ()
 
         // initialize
         #if !CUDA_DUMMY
