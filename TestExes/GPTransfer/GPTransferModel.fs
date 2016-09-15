@@ -30,8 +30,6 @@ module MultiGPLayer =
         HyperPars:          HyperPars
     }
 
-    let debug = false
-
     let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
          let rng = System.Random seed
          //Right now: all GPs equal
@@ -226,24 +224,12 @@ module MultiGPLayer =
         let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
         let Kk = Kk |> Expr.dump "Kk"
         
-        if debug then
-            let d_Kk = Deriv.compute Kk 
-            printfn "d_Kk=\n%A" d_Kk
-        
         let Kk_inv = Expr.invert Kk
         let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
-        
-        if debug then
-            let d_Kk_inv = Deriv.compute Kk_inv 
-            printfn "d_Kk_inv=\n%A" d_Kk_inv
         
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let lk = lk |> Expr.dump "lk"
-        
-        if debug then
-            let d_lk = Deriv.compute lk 
-            printfn "d_lk=\n%A" d_lk
         
         // trnT [gp, trn_smpl]
         let trnT = pars.TrnT
@@ -252,10 +238,6 @@ module MultiGPLayer =
         // ==> beta [gp, trn_smpl]
         let beta = Kk_inv .* !trnT
         let beta = beta |> Expr.dump "beta"
-        
-        if debug then
-            let d_beta = Deriv.compute beta 
-            printfn "d_beta=\n%A" d_beta
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
@@ -264,11 +246,6 @@ module MultiGPLayer =
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let L = L |> Expr.dump "L"
-        
-        if debug then
-            let d_L = Deriv.compute L 
-            printfn "d_L=\n%A" d_L
 
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -289,10 +266,6 @@ module MultiGPLayer =
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
         let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
-        if debug then
-            let d_lkLkT = Deriv.compute lkLkT 
-            printfn "d_lkLkT=\n%A" d_lkLkT
-
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
@@ -312,10 +285,6 @@ module MultiGPLayer =
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let T = Tnew nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let T = T |> Expr.dump "T"
-
-        if debug then
-            let d_T = Deriv.compute T
-            printfn "d_T=\n%A" d_T
 
         // calculate betaTbeta = beta.T .* T .* beta
         // beta[gp, trn_smpl]
