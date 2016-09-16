@@ -662,22 +662,60 @@ module CudaExecUnit =
                 manikin.Shape (ArrayND.stride manikin)
         ArrayND.transpose manikin
 
-    let execItemsForSum memAllocator trgt src =
-        // C++ signature:
-        // void sum(TTarget &trgt, TSrc &src, 
-        //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-        let tmpSize = ArrayNDManikin.sizeInBytes src
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev       
-        execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl src;
-                                      ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+    /// exection items to reduce src over the last axis into trgt
+    let rec batchReduceLastAxis (memAllocator: MemAllocatorT) reduceFn (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) 
+            : CudaExecItemT list =
+        let reduceBatchSize = 16
+        let nReduceElems = src.Shape.[src.NDims - 1]
 
-    /// exection items to sum over the specified axis
-    let execItemsForSumAxis ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        if nReduceElems <= reduceBatchSize then
+            // no split necessary
+            reduceFn trgt src
+        else
+            // split last dimension
+            let reduceBatches = nReduceElems / reduceBatchSize
+            let reduceRem = nReduceElems - reduceBatches * reduceBatchSize
+
+            // create array manikin for source with split last dimension
+            let batchSrcShp = 
+                (ArrayND.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
+            let reduceStride = (ArrayND.stride src).[src.NDims-1]
+            let batchSrcStride = 
+                (ArrayND.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
+            let batchSrc = 
+                src |> ArrayND.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
+
+            // create temporary target
+            let tmpShp = 
+                if reduceRem = 0 then trgt.Shape @ [reduceBatches]
+                else trgt.Shape @ [reduceBatches + 1]
+            let tmpTrgt = ArrayNDManikin.newC memAllocator trgt.TypeName tmpShp
+
+            // perform reduction of batch
+            let batchTrgt = tmpTrgt.[Fill, 0 .. reduceBatches-1] :?> ArrayNDManikinT
+            let batchExecItems = reduceFn batchTrgt batchSrc
+
+            // perform reduction of remaining elements, if necessary
+            let remExecItems =
+                if reduceRem = 0 then []
+                else
+                    let remSrc = src.[Fill, reduceBatches*reduceBatchSize ..] :?> ArrayNDManikinT
+                    let remTrgt = tmpTrgt.[Fill, reduceBatches] :?> ArrayNDManikinT
+                    reduceFn remTrgt remSrc
+
+            // recursively reduce temporary target
+            let recExecItems = batchReduceLastAxis memAllocator reduceFn trgt tmpTrgt
+
+            batchExecItems @ remExecItems @ recExecItems
+
+    /// exection items to sum src over the specified axis into trgt
+    let execItemsForSumAxis memAllocator ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.reorderAxes axOrder src
 
+        // initial value is zero for summation
         let initial = 
             match trgt.TypeName with
             | t when t = TypeName.ofType<double> -> 0.0  |> box
@@ -685,12 +723,28 @@ module CudaExecUnit =
             | t when t = TypeName.ofType<int>    -> 0    |> box
             | t when t = TypeName.ofType<byte>   -> 0uy  |> box
             | t -> failwithf "unsupported type %A" t
-        execItemsForReduction trgt (NoArgEOpArgTmpl("AddEOp_t", false)) (ConstEOpArgTmpl initial) srcAdj
 
-    /// exection items to sum over the specified axis
-    let execItemsForSumAxisOptimized memAllocator ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
-        execItemsForSumAxis ax trgt src
+        (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
+            execItemsForReduction tmpTrgt (NoArgEOpArgTmpl("AddEOp_t", false)) (ConstEOpArgTmpl initial) tmpSrc        
+        )
 
+    /// exection items to sum all elements of src into the scalar trgt
+    let rec execItemsForSum memAllocator (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        if ArrayND.nDims trgt <> 0 then failwith "sum target must be scalar"
+
+        match src.Shape with
+        | [_] -> execItemsForSumAxis memAllocator 0 trgt src
+        | [] -> copyExecItems trgt src
+        | srcShp ->
+            // create temporary target
+            let nDims = ArrayND.nDims src
+            let tmpShp = srcShp.[0 .. nDims-2]
+            let tmp = ArrayNDManikin.newC memAllocator src.TypeName tmpShp            
+
+            // sum over last axis, and then sum recursively over remaining axes
+            let sumLastExecItems = execItemsForSumAxis memAllocator (nDims-1) tmp src
+            let sumOtherExecItems = execItemsForSum memAllocator trgt tmp
+            sumLastExecItems @ sumOtherExecItems
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
@@ -766,7 +820,7 @@ module CudaExecUnit =
         | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
         // reductions
         | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxisOptimized memAllocator ax dfltChTrgt srcsDfltCh.[0]
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]
 
         // tensor ops
         | UUnaryOp (Diag _) -> []

@@ -98,6 +98,14 @@ let ``Trace compare: sum axis 2`` () =
         a |> Expr.sumAxis 3 |> Expr.sumAxis 0
     )
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: large sum axis`` () =
+    requireEqualTracesWithRandomData [[7; 200]] (fun [a] ->
+        a |> Expr.sumAxis 0
+    )
+
+
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
