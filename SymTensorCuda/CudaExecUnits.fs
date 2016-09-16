@@ -678,9 +678,6 @@ module CudaExecUnit =
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.reorderAxes axOrder src
 
-        printfn "sum original over axis %d: %A -> %A" ax src.Shape trgt.Shape
-        printfn "sum: %A -> %A" srcAdj.Shape trgt.Shape
-
         let initial = 
             match trgt.TypeName with
             | t when t = TypeName.ofType<double> -> 0.0  |> box
