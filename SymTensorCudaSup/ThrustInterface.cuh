@@ -25,12 +25,10 @@
 //#define PRINT_BUFFER_ALLOCATOR_STATS
 
 
-
 /// Thrust allocator that assigns memory sequentially from a preallocated buffer.
 class buffer_allocator 
 {
   private:
-	//static const std::ptrdiff_t alignment = 0x10000;
 	static const std::ptrdiff_t alignment = 32;
 
 	std::string name;

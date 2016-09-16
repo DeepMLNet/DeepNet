@@ -48,8 +48,6 @@ template <typename TTarget, typename TSrc>
 void sumLastAxis(TTarget &trgt, TSrc &src,
 	             CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size) {
 
-	printf("in sumLastAxis\n");
-
 	buffer_allocator alloc("sumLastAxis", tmp_buffer, tmp_buffer_size);
 
 	ArrayNDRange<TSrc> srcRange(src);
@@ -61,11 +59,9 @@ void sumLastAxis(TTarget &trgt, TSrc &src,
 	typedef LinearIndexToSumAxisKey<TSrc> IdxToKeyT;
 	typedef thrust::transform_iterator<IdxToKeyT, LinearIndexIteratorT> KeyIteratorT;
 	KeyIteratorT sumKeys(LinearIndexIteratorT(0), IdxToKeyT(src));
-
-	/*
-	// perform sum by axis
-	//thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
 	typedef typename ArrayNDRange<TTarget>::iterator iterator;
+
+	// perform sum by axis
 	thrust::pair<thrust::discard_iterator<>, iterator> result = 
 		thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
 							  sumKeys,
@@ -73,20 +69,11 @@ void sumLastAxis(TTarget &trgt, TSrc &src,
 							  srcRange.begin(),
 							  thrust::make_discard_iterator(),
 							  trgtRange.begin());
+
 	iterator outputLast = result.second;
-
 	if (outputLast > trgtRange.end()) {
-		printf("sumLastAxis overflow!!!!!\n");
+		printf("!!!!!! sumLastAxis overflow !!!!!\n");
 	}
-	else {
-		printf("sumLastAxis okay\n");
-	}
-
-	//std::cout << "outputLast:      " << outputLast << std::endl;
-	//std::cout << "trgtRange.end(): " << trgtRange.end() << std::endl;
-
-	printf("leaving sumLastAxis\n");
-	*/
 }
 
 
