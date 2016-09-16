@@ -262,6 +262,20 @@ for dims = 0 to maxDims do
         for withIndexes in [true; false] do
             elementwiseWrapper ary withIndexes
 
+    let reduceWrapper () =
+        wrt "template <typename TElemwiseOp, typename TTarget, typename TSrc>" 
+        wrt "_dev void reduceTo%dD(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {" dims
+        elementwiseLoop false (fun dims ->      
+            let trgtPoses = ad |>> prn "pos%d" |> cw ", "           
+            let srcPoses = Seq.append (ad |>> prn "pos%d") (Seq.singleton "reducePos") |> cw ", "
+            wrt "  typename TTarget::DataType v = initial;"
+            wrt "  for (size_t reducePos = 0; reducePos < src.shape(%d); reducePos++) {" dims
+            wrt "    v = op(v, src.element(%s));" srcPoses
+            wrt "  }"
+            wrt "  trgt.element(%s) = v;" trgtPoses)
+        wrt "}"
+        wrt ""
+    reduceWrapper()
 
     let elementsWrapper ary =
         let srcTmpl = 
