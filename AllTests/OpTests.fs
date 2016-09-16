@@ -79,6 +79,28 @@ let ``Trace compare: batched matrix inverse`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
+let ``Trace compare: sum`` () =
+    requireEqualTracesWithRandomData [[7; 3; 4; 5]] (fun [a] ->
+        Expr.sum a
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: sum axis 1`` () =
+    requireEqualTracesWithRandomData [[7; 3; 4; 5]] (fun [a] ->
+        Expr.sumAxis 1 a
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: sum axis 2`` () =
+    requireEqualTracesWithRandomData [[7; 3; 4; 5]] (fun [a] ->
+        a |> Expr.sumAxis 3 |> Expr.sumAxis 0
+    )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Singular matrix inverse`` () =
     let a = Expr.var "a" [SizeSpec.fix 3; SizeSpec.fix 3]
     let expr = Expr.invert a
