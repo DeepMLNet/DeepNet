@@ -544,6 +544,17 @@ module CudaExprWorkspaceTypes =
                                  nSamples=%d" 
                             (getStream strm).Pointer m n k ldA ldB ldTrgt a.NSamples
 
+                        let desiredVals = a.GetPointerArrayValues execEnv
+                        printfn "desired pointer array values: %A" desiredVals
+                        let valDevVar = a.GetPointerArrayDevice execEnv
+                        let valsFromDev : CUdeviceptr [] = Array.zeroCreate desiredVals.Length
+                        valDevVar.CopyToHost(valsFromDev)
+                        printfn "pointer array location: %A" valDevVar.DevicePointer
+                        printfn "pointer array values from device: %A" valsFromDev
+
+                        if List.ofArray desiredVals <> List.ofArray valsFromDev then
+                            failwith "value mismatch!!!!!"
+
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                              m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, 
@@ -579,6 +590,11 @@ module CudaExprWorkspaceTypes =
 
                     use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
                     ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+
+                    if Debug.TraceCalls then
+                        printfn "Initializing BLAS pointer array on stream %d" (getStream strm).Pointer
+                        printfn "pointer array location: %A" ptrAryDevVar.DevicePointer
+                        printfn "Values: %A" ptrAryValues
 
                 | ExecItem (ExtensionExecItem eei, strm) ->
                     eei.Execute execEnv strm
@@ -622,6 +638,22 @@ module CudaExprWorkspaceTypes =
                     Trace.exprEvaledWithMsg uexpr resHost msg
 
                 previousCall <- Some call
+
+
+                // special debug:
+                match call with
+                | CudaCallT.MemAlloc _ -> ()
+                | _ ->
+                    let valDevVar = new CudaDeviceVariable<CUdeviceptr> (CUdeviceptr (SizeT 55876875264UL), 
+                                                                         SizeT (500 * sizeof<CUdeviceptr>))
+                    let valsFromDev : CUdeviceptr [] = Array.zeroCreate 500
+                    valDevVar.CopyToHost(valsFromDev)
+                    if valsFromDev.[0] <> CUdeviceptr (SizeT 55876823552UL) then
+                        printfn "=============================== special pointer array wrong"
+//                    printfn "==============================="
+//                    printfn "special pointer array location: %A" valDevVar.DevicePointer
+//                    printfn "special pointer array values from device: %A" valsFromDev
+//                    printfn "==============================="
 
 //                if Debug.DisableStreams then
 //                    CudaSup.context.Synchronize ()

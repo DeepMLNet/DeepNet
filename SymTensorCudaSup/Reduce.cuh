@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <iostream>
 #include <cuda.h>
 
 #include "Utils.cuh"
@@ -61,15 +62,31 @@ void sumLastAxis(TTarget &trgt, TSrc &src,
 	typedef thrust::transform_iterator<IdxToKeyT, LinearIndexIteratorT> KeyIteratorT;
 	KeyIteratorT sumKeys(LinearIndexIteratorT(0), IdxToKeyT(src));
 
+	/*
 	// perform sum by axis
-	thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
-						  sumKeys,
-						  sumKeys + src.size(),
-						  srcRange.begin(),
-						  thrust::make_discard_iterator(),
-		                  trgtRange.begin());
+	//thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
+	typedef typename ArrayNDRange<TTarget>::iterator iterator;
+	thrust::pair<thrust::discard_iterator<>, iterator> result = 
+		thrust::reduce_by_key(thrust::cuda::par(alloc).on(stream),
+							  sumKeys,
+							  sumKeys + src.size(),
+							  srcRange.begin(),
+							  thrust::make_discard_iterator(),
+							  trgtRange.begin());
+	iterator outputLast = result.second;
+
+	if (outputLast > trgtRange.end()) {
+		printf("sumLastAxis overflow!!!!!\n");
+	}
+	else {
+		printf("sumLastAxis okay\n");
+	}
+
+	//std::cout << "outputLast:      " << outputLast << std::endl;
+	//std::cout << "trgtRange.end(): " << trgtRange.end() << std::endl;
 
 	printf("leaving sumLastAxis\n");
+	*/
 }
 
 

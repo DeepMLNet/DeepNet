@@ -237,7 +237,7 @@ module Program =
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
         SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 
-        let trc = SymTensor.Trace.startSession "trace"
+        //let trc = SymTensor.Trace.startSession "trace"
 
 //        TestFunctions.testDatasetParser()
 
