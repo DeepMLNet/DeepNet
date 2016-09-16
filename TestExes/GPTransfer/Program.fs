@@ -229,9 +229,9 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
-//        SymTensor.Compiler.Cuda.Debug.Timing <- true
+        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
-//        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
+        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.MemUsage <- true
 //        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
