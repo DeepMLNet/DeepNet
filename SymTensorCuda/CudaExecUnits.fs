@@ -495,7 +495,7 @@ module CudaExecUnit =
                     cInitialOp :> ICudaArgTmpl
                     ArrayNDArgTmpl trgt :> ICudaArgTmpl
                     ArrayNDArgTmpl src :> ICudaArgTmpl]
-        let funcName = sprintf "reduceTo%d" (ArrayND.nDims trgt)
+        let funcName = sprintf "reduceTo%dD" (ArrayND.nDims trgt)
         funcName, args
 
     /// execution items for a reduction operation
@@ -675,9 +675,10 @@ module CudaExecUnit =
     let execItemsForSumAxis ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
-        let axOrder = Seq.concat [{0 .. ax-1}; {ax+1 .. nd-1}; {ax .. ax}] |> Seq.toList
+        let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.reorderAxes axOrder src
 
+        printfn "sum original over axis %d: %A -> %A" ax src.Shape trgt.Shape
         printfn "sum: %A -> %A" srcAdj.Shape trgt.Shape
 
         let initial = 
