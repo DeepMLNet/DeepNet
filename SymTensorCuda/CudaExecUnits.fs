@@ -489,6 +489,28 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
+    /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
+    let reductionFuncnameAndArgs trgt cOp cInitialOp src =
+        let args = [cOp :> ICudaArgTmpl
+                    cInitialOp :> ICudaArgTmpl
+                    ArrayNDArgTmpl trgt :> ICudaArgTmpl
+                    ArrayNDArgTmpl src :> ICudaArgTmpl]
+        let funcName = sprintf "reduceTo%d" (ArrayND.nDims trgt)
+        funcName, args
+
+    /// execution items for a reduction operation
+    let execItemsForReduction trgt cOp cInitialOp src =
+        match ArrayND.shape trgt, ArrayND.shape src with
+        | _, [] -> failwith "cannot reduce a scalar array"
+        | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
+            failwithf "cannot reduce from %d dimensions to %d dimensions" srcShp.Length trgtShp.Length
+        | trgtShp, srcShp when trgtShp <> srcShp.[0 .. srcShp.Length-2] ->
+            failwithf "cannot reduce from shape %A to shape %A" srcShp trgtShp 
+        | _ -> ()
+
+        let funcName, args = reductionFuncnameAndArgs trgt cOp cInitialOp src
+        execItemsForKernel funcName args args (workDimForElemwise trgt false)
+
     /// function name of elements wrapper and its arguments for the given target, operation and sources
     let elementsFuncnameAndArgs trgt cOp srcViews =
         let args = 
@@ -649,19 +671,28 @@ module CudaExecUnit =
         execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl src;
                                       ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
 
-    let execItemsForSumAxis memAllocator ax trgt src =
+    /// exection items to sum over the specified axis
+    let execItemsForSumAxis ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
-        let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
+        let axOrder = Seq.concat [{0 .. ax-1}; {ax+1 .. nd-1}; {ax .. ax}] |> Seq.toList
         let srcAdj = ArrayND.reorderAxes axOrder src
 
-        // C++ signature:
-        // void sumLastAxis(TTarget &trgt, TSrc &src, 
-        //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-        let tmpSize = max (ArrayNDManikin.sizeInBytes srcAdj) 4096
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev
-        execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
-                                              ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+        printfn "sum: %A -> %A" srcAdj.Shape trgt.Shape
+
+        let initial = 
+            match trgt.TypeName with
+            | t when t = TypeName.ofType<double> -> 0.0  |> box
+            | t when t = TypeName.ofType<single> -> 0.0f |> box
+            | t when t = TypeName.ofType<int>    -> 0    |> box
+            | t when t = TypeName.ofType<byte>   -> 0uy  |> box
+            | t -> failwithf "unsupported type %A" t
+        execItemsForReduction trgt (NoArgEOpArgTmpl("AddEOp_t", false)) (ConstEOpArgTmpl initial) srcAdj
+
+    /// exection items to sum over the specified axis
+    let execItemsForSumAxisOptimized memAllocator ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        execItemsForSumAxis ax trgt src
+
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
@@ -737,7 +768,7 @@ module CudaExecUnit =
         | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
         // reductions
         | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxisOptimized memAllocator ax dfltChTrgt srcsDfltCh.[0]
 
         // tensor ops
         | UUnaryOp (Diag _) -> []

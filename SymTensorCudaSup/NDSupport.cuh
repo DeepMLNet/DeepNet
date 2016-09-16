@@ -212,11 +212,11 @@ _dev void elemwise6Ary0D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
 
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo0D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo0D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(0); reducePos++) {
     v = op(v, src.element(reducePos));
   }
@@ -585,15 +585,15 @@ _dev void elemwise6Ary1D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo1D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo1D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
     for (size_t iter0 = 0; iter0 < iters0; iter0++) {
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(1); reducePos++) {
     v = op(v, src.element(pos0, reducePos));
   }
@@ -1068,8 +1068,8 @@ _dev void elemwise6Ary2D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo2D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo2D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
     const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);
@@ -1079,7 +1079,7 @@ _dev void reduceTo2D(const TElemwiseOp &op, const typename TTarget::DataType &in
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(2); reducePos++) {
     v = op(v, src.element(pos0, pos1, reducePos));
   }
@@ -1645,8 +1645,8 @@ _dev void elemwise6Ary3D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo3D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo3D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);
     const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
@@ -1659,7 +1659,7 @@ _dev void reduceTo3D(const TElemwiseOp &op, const typename TTarget::DataType &in
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(3); reducePos++) {
     v = op(v, src.element(pos0, pos1, pos2, reducePos));
   }
@@ -2344,8 +2344,8 @@ _dev void elemwise6Ary4D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo4D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo4D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3), gridDim.z * blockDim.z);
     const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
@@ -2364,7 +2364,7 @@ _dev void reduceTo4D(const TElemwiseOp &op, const typename TTarget::DataType &in
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(4); reducePos++) {
     v = op(v, src.element(pos0, pos1, pos2, pos3, reducePos));
   }
@@ -3139,8 +3139,8 @@ _dev void elemwise6Ary5D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo5D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo5D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4), gridDim.z * blockDim.z);
     const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
@@ -3162,7 +3162,7 @@ _dev void reduceTo5D(const TElemwiseOp &op, const typename TTarget::DataType &in
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3)) && (pos4 < trgt.shape(4))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(5); reducePos++) {
     v = op(v, src.element(pos0, pos1, pos2, pos3, pos4, reducePos));
   }
@@ -4006,8 +4006,8 @@ _dev void elemwise6Ary6D(const TElemwiseOp &op, TTarget &trgt, const TSrc0 &src0
     }
 }
 
-template <typename TElemwiseOp, typename TTarget, typename TSrc>
-_dev void reduceTo6D(const TElemwiseOp &op, const typename TTarget::DataType &initial, TTarget &trgt, const TSrc &src) {
+template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>
+_dev void reduceTo6D(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {
 
     const size_t itersRest = divCeil(trgt.shape(2) * trgt.shape(3) * trgt.shape(4) * trgt.shape(5), gridDim.z * blockDim.z);
     const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);
@@ -4032,7 +4032,7 @@ _dev void reduceTo6D(const TElemwiseOp &op, const typename TTarget::DataType &in
     const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);
     if ((pos0 < trgt.shape(0)) && (pos1 < trgt.shape(1)) && (pos2 < trgt.shape(2)) && (pos3 < trgt.shape(3)) && (pos4 < trgt.shape(4)) && (pos5 < trgt.shape(5))) {
 
-  typename TTarget::DataType v = initial;
+  typename TTarget::DataType v = initialOp();
   for (size_t reducePos = 0; reducePos < src.shape(6); reducePos++) {
     v = op(v, src.element(pos0, pos1, pos2, pos3, pos4, pos5, reducePos));
   }
