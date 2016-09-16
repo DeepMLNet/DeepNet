@@ -1,5 +1,6 @@
 ﻿namespace SymTensor
 
+open Basics
 open ArrayNDNS
 open System
 
@@ -7,9 +8,8 @@ open System
 
 module DerivCheck =
 
-
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let inline numGradEpsilon (epsilon: ^T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
+    let inline numDerivEpsilon (epsilon: ^T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
         let y = f x
         let xShp, yShp = ArrayND.shape x, ArrayND.shape y
         let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
@@ -20,57 +20,38 @@ module DerivCheck =
             let xdf = ArrayND.copy xf
             xdf |> ArrayND.set [xi] ((xf |> ArrayND.get [xi]) + epsilon)
             let ydf = xdf |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
-            let d = (ydf - yf) / epsilon       
-            j |> ArrayND.view [RngAll; RngElem xi] |> ArrayND.copyTo d
+            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfType epsilon ydf)
+            ArrayND.copyTo d (j |> ArrayND.view [RngAll; RngElem xi])
         j
 
     /// evaluates the Jacobian of f at x numerically
-    let inline numGrad (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) = 
-        let epsilon = Convert.ChangeType(1e-5, typeof<'T>) :?> 'T
-        numGradEpsilon epsilon f x
+    let inline numDeriv f x = numDerivEpsilon (conv<'T> 1e-5) f x
 
-    //let exprGradDiff evalEnv wrt expr =
-    //    let g = ExprForwardDiff.grad wrt expr
-    //    let exprFun = (expr |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
-    //    let gradFun = (g |> OpEval.toFun |> OpEval.addArg wrt) |> OpEval.usingEvalEnv evalEnv
-    //
-    //    let value = evalEnv.VarEnv.[Op.extractVar wrt]
-    //    let symGradVal = gradFun value
-    //    let exprGradVal = numGrad exprFun value
-    //    let gradDiff = abs (symGradVal - exprGradVal)
-    //    sum gradDiff |> NDArray.value
-
-
-    let inline reverseDiffDeviations evalEnv expr =
-        let mutable devs = Map.empty
+    /// Checks that symbolic and numeric derivatives of the given expression are close enough.
+    /// The derivatives are evaluated at the location specified by the given VarEnv.
+    let inline checkExpr maxDeviation epsilon varEnv expr =
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs |> Map.toSeq do
-            let exprFun = (expr |> Func.make onHost |> arg (Expr.makeVar wrt)) |> Eval.usingEvalEnv evalEnv
-            let rDiffFun = (rDiff |> Eval.toFun |> Eval.addArg (Expr.makeVar wrt)) |> Eval.usingEvalEnv evalEnv
+            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpecT wrt
+            let exprFun = expr |> Func.make DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            let rDiffFun = rDiff |> Func.make DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
 
-            let value = EvalEnv.getVarSpecT wrt evalEnv
+            let value = VarEnv.getVarSpecT wrt varEnv
             let symGradVal = rDiffFun value
-            let exprGradVal = numGrad exprFun value
+            let exprGradVal = numDerivEpsilon epsilon exprFun value
             let gradDiff = abs (symGradVal - exprGradVal)
 
-            devs <- devs |> Map.add (VarSpec.name wrt) (ArrayND.sum gradDiff |> ArrayND.value)
+            let deviation = ArrayND.sum gradDiff |> ArrayND.value
+            if deviation > maxDeviation then
+                printfn "Symbolic grad of \n%A\n wrt %A is \n%A\n with value \n%A" expr wrt rDiff symGradVal
+                printfn "and numeric grad has value \n%A." exprGradVal
 
-            //printfn "Symbolic grad of \n%A\n wrt %A is \n%A\n with value \n%A" expr wrt rDiff symGradVal
-            //printfn "and numeric grad has value \n%A." exprGradVal
+                failwithf "Deviation of expression %A is %A which is greater than maximum deviation %A."
+                    expr deviation maxDeviation
 
-        devs
-
-    let inline reverseDiffDeviationsOkay evalEnv (expr: ExprT<'T>) =
-        let maxDeviation = Convert.ChangeType(1e-4, typeof<'T>) :?> 'T
-        let devs = reverseDiffDeviations evalEnv expr
-        devs |> Map.iter
-            (fun name dev -> if dev > maxDeviation then printfn "deviation wrt %A = %A" name dev)
-        devs |> Map.forall (fun _ dev -> dev < maxDeviation) 
-
-
-    let inline checkReverseDiff (evalEnv: EvalEnvT) (expr: ExprT<'T>) = 
-        let evalEnv = evalEnv |> EvalEnv.enhance VarEnv.empty 
-
+    /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
+    /// The derivatives are evaluated at the location specified by the given VarEnv.
+    let inline checkExprTree (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: ExprT<'T>) = 
         let rec checkSubExpr expr = 
             match expr with
             | Expr.Leaf(_) -> ()
@@ -81,9 +62,7 @@ module DerivCheck =
                 checkSubExpr b
             | Expr.Nary(_, es) ->
                 es |> List.iter checkSubExpr
-
-            if not (reverseDiffDeviationsOkay evalEnv expr) then
-                failwithf "deviation between numeric and symbolic derivative too large in op %A" (UExpr.extractOp expr)
+            checkExpr maxDeviation epsilon varEnv expr
 
         checkSubExpr expr
 

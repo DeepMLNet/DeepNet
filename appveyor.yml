@@ -44,6 +44,10 @@
         secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
       artifact: /.*\.nupkg/
 
+  notifications:
+    - provider: Slack
+      incoming_webhook:
+        secure: U4pd5P1jUBrzV+8GiLz5hkhHF1hb1VGcHbuD9Dt8rfUG6gTt36VIuwRFvUTfSXqsqz0VObG7nDiZRgiKfFRq5jvOW8BaY+ImM98FvhAbjTg=
     
 -
   branches:
@@ -84,6 +88,11 @@
 
   artifacts:
     - path: dist\Release\*.nupkg
+
+  notifications:
+    - provider: Slack
+      incoming_webhook:
+        secure: U4pd5P1jUBrzV+8GiLz5hkhHF1hb1VGcHbuD9Dt8rfUG6gTt36VIuwRFvUTfSXqsqz0VObG7nDiZRgiKfFRq5jvOW8BaY+ImM98FvhAbjTg=
 
 -
   branches:
@@ -137,6 +146,11 @@
       api_key:
         secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
       artifact: /.*\.nupkg/
+
+  notifications:
+    - provider: Slack
+      incoming_webhook:
+        secure: U4pd5P1jUBrzV+8GiLz5hkhHF1hb1VGcHbuD9Dt8rfUG6gTt36VIuwRFvUTfSXqsqz0VObG7nDiZRgiKfFRq5jvOW8BaY+ImM98FvhAbjTg=
   
  
 # all other branches: 
@@ -176,3 +190,7 @@
   artifacts:
     - path: dist\Release\*.nupkg
 
+  notifications:
+    - provider: Slack
+      incoming_webhook:
+        secure: U4pd5P1jUBrzV+8GiLz5hkhHF1hb1VGcHbuD9Dt8rfUG6gTt36VIuwRFvUTfSXqsqz0VObG7nDiZRgiKfFRq5jvOW8BaY+ImM98FvhAbjTg=

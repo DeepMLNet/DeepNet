@@ -461,6 +461,14 @@ module ArrayND =
     let inline padRight a =
         relayout (ArrayNDLayout.padRight (layout a)) a
 
+    /// cuts one dimension from the left
+    let inline cutLeft a =
+        relayout (ArrayNDLayout.cutLeft (layout a)) a
+      
+    /// cuts one dimension from the right
+    let inline cutRight a =
+        relayout (ArrayNDLayout.cutRight (layout a)) a        
+
     /// broadcast the given dimension to the given size
     let inline broadcastDim dim size a =
         relayout (ArrayNDLayout.broadcastDim dim size (layout a)) a        

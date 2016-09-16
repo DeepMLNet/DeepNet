@@ -4,6 +4,7 @@ open System.IO
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -44,29 +45,40 @@ let evalHostCuda func =
     func DevCuda
     printfn "Done."
 
+let buildVars shps = 
+    [for idx, shp in List.indexed shps do
+        let name = sprintf "v%d" idx
+        let sshp = 
+            shp 
+            |> List.map (function | -1 -> SizeSpec.broadcastable
+                                    | s -> SizeSpec.fix s)
+        yield Expr.var name sshp]
+
+let buildVarEnv (vars: ExprT<'T> list) shps (rng: System.Random) (dev: IDevice) =
+    (VarEnv.empty, List.zip vars shps)
+    ||> List.fold (fun varEnv (var, shp) ->
+        let shp = shp |> List.map (function | -1 -> 1  | s -> s)
+        let value = rng.UniformArrayND (conv<'T> -1.0, conv<'T> 1.0) shp |> dev.ToDev
+        varEnv |> VarEnv.add var value
+    )
+
+
 let randomEval shps exprFn (dev: IDevice) =
     let rng = System.Random(123)
-
-    let vars = 
-        [for idx, shp in List.indexed shps do
-            let name = sprintf "v%d" idx
-            let sshp = 
-                shp 
-                |> List.map (function | -1 -> SizeSpec.broadcastable
-                                      | s -> SizeSpec.fix s)
-            yield Expr.var name sshp]
+    let vars = buildVars shps
     let expr = exprFn vars
     let fn = Func.make dev.DefaultFactory expr
-
-    let varEnv = 
-        (VarEnv.empty, List.zip vars shps)
-        ||> List.fold (fun varEnv (var, shp) ->
-            let shp = shp |> List.map (function | -1 -> 1  | s -> s)
-            let value = rng.UniformArrayND (-1.0f, 1.0f) shp |> dev.ToDev
-            varEnv |> VarEnv.add var value
-        )
+    let varEnv = buildVarEnv vars shps rng dev
     fn varEnv |> ignore
 
-let requireEqualTracesWithRandomData shps exprFn =
+let requireEqualTracesWithRandomData shps (exprFn: ExprT<single> list -> ExprT<single>) =
     compareTraces (randomEval shps exprFn) false
     |> should equal 0
+
+let randomDerivativeCheck tolerance shps (exprFn: ExprT<float> list -> ExprT<float>) =
+    let rng = System.Random(123)
+    let vars = buildVars shps
+    let expr = exprFn vars
+    let varEnv = buildVarEnv vars shps rng DevHost
+    DerivCheck.checkExprTree tolerance 1e-7 varEnv expr
+

@@ -81,7 +81,7 @@ module Deriv =
             | Truncate -> Map.empty
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
-            | Invert -> -expr.T .* egExpanded .* expr.T |> reverseDiffStep a
+            | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> reverseDiffStep a
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
 
             | Subtensor srs ->
@@ -144,9 +144,10 @@ module Deriv =
                 // calculate Jacobian wrt a by transposing expression and resulting Jacobian
                 let aShp = shapeOf a
                 let nd = ShapeSpec.nDim aShp
-                let egT = egExpanded |> swapDim (nd-1) nd |> collapse
+                let batchShp = aShp.[0..nd-3]
+                let egT = egExpanded.T |> collapse
                 let daT = mxWrtX (b.T) (a.T) (expr.T) egT
-                let da = daT |> reshape [funElems; aShp.[1]; aShp.[0]] |> swapDim (nd-1) nd |> collapse
+                let da = daT |> reshape ([funElems] @ batchShp @ [aShp.[nd-1]; aShp.[nd-2]]) |> transpose |> collapse
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"

@@ -196,7 +196,7 @@ let ``Codegen: KSE`` () =
 [<Fact>]
 let ``Eval and deriv: KSE in Expr on Host`` () =   
     // input  x[gp, smpl]
-    //        l[gp]
+    //        l[gp] 
     // output cov[gp, smpl1, smpl2]
 
     printfn "======= Testing KSE in Expr on Host:"
@@ -222,18 +222,32 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let kseFn = Func.make DevHost.DefaultFactory kse |> arg2 xTensor lTensor
     let dKseFn = Func.make2 DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
+    let kseinv = Expr.invert kse  
+    
+    let dKseinv = Deriv.compute kseinv
+    let dKseinvdX  = dKseinv |> Deriv.ofVar xTensor
+    let dKseinvdL  = dKseinv |> Deriv.ofVar lTensor
+
+    let kseinvFn = Func.make DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
+    let dKseinvFn = Func.make2 DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
+
     let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5] |> ArrayNDHost.ofList
 
     let kseVal = kseFn xVal lVal
     let dKsedXVal, dKsedLVal = dKseFn xVal lVal
 
+    let kseinvVal = kseinvFn xVal lVal
+    let dKseinvdXVal, dKseinvdLVal = dKseinvFn xVal lVal
+
     printfn "x=\n%A" xVal
     printfn "l=\n%A" lVal
     printfn "kse=\n%A" kseVal
     printfn "dkse / dx=\n%A" dKsedXVal
     printfn "dkse / dl=\n%A" dKsedLVal
-
+    printfn "kseinv=\n%A" kseinvVal
+    printfn "dkseinv / dx=\n%A" dKseinvdXVal
+    printfn "dkseinv / dl=\n%A" dKseinvdLVal
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Eval and deriv: KSE in Expr on CUDA`` () =   
