@@ -18,7 +18,7 @@ module Program =
         let dev = DevCuda
 
         ///Load the ablone dataset, classify gender from data
-        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [0]}
         let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset).ToCuda()
@@ -50,6 +50,7 @@ module Program =
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
         //loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred target
+
 
         // optimizer
         let opt =  Adam (loss, mi.ParameterVector, dev)
@@ -89,7 +90,7 @@ module Program =
         let dev = DevCuda
 
         ///Load the ablone dataset, classify gender from data
-        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [0]}
         let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         
@@ -107,7 +108,7 @@ module Program =
         let mlmgp = 
             MLGPT.pars (mb.Module "MLMGP") 
                 { Layers = [{NInput=nInput; NGPs=nHidden; NTrnSmpls=nTrn}
-                            {NInput=nInput; NGPs=nClass; NTrnSmpls=nTrn}]
+                            {NInput=nHidden; NGPs=nClass; NTrnSmpls=nTrn}]
                   LossMeasure = LossLayer.CrossEntropy }
                 // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
@@ -148,8 +149,9 @@ module Program =
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
             }
-
         let result = Train.train trainable data trainCfg
+
+
         ()
 
     let classificationMLP()=
@@ -161,7 +163,7 @@ module Program =
         let dev = DevCuda
 
         ///Load the ablone dataset, classify gender from data
-        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [0]}
         let fullData = CsvLoader.loadFile pars "abalone.txt" 
         let fullDataset = Dataset.FromSamples fullData
         let data = TrnValTst.Of(fullDataset).ToCuda()
@@ -242,9 +244,11 @@ module Program =
 //        TestFunctions.testDatasetParser()
 
 //        classificationMLP ()
-        classificationGPTransferUnit ()
-//        classificationMLMGP ()
+        Dump.start "gptraindump.h5"
 
+        classificationGPTransferUnit ()
+        Dump.stop()
+//        classificationMLMGP ()
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             
