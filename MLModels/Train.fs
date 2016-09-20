@@ -253,6 +253,7 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
             // execute training
+            Dump.prefix <- sprintf "%d" iter
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
