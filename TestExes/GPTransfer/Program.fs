@@ -90,9 +90,10 @@ module Program =
             TargetLoss         = None  
             MinIters           = Some 100 
             MaxIters           = None  
-            LearningRates      = [1e-3]                               
+            LearningRates      = [1e-3; 1e-4; 1e-5]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
+            DumpPrefix         = None
             }
 //
         let result = Train.train trainable data trainCfg
@@ -161,6 +162,7 @@ module Program =
             LearningRates      = [1e-3; 1e-4; 1e-5]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
+            DumpPrefix         = None
             }
         let result = Train.train trainable data trainCfg
 
@@ -230,6 +232,7 @@ module Program =
             LearningRates      = [1e-3; 1e-4; 1e-5]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
+            DumpPrefix         = None
             }
 
         let result = Train.train trainable data trainCfg
@@ -303,6 +306,7 @@ module Program =
             LearningRates      = [1e-3; 1e-4; 1e-5]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
+            DumpPrefix         = None
             }
 
         let result = Train.train trainable data trainCfg
@@ -372,6 +376,7 @@ module Program =
             LearningRates      = [1e-3; 1e-4; 1e-5]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
+            DumpPrefix         = None
             }
 
         let result = Train.train trainable data trainCfg

@@ -100,6 +100,9 @@ module Train =
         CheckpointDir:                  string option
         /// If true, checkpoint is not loaded from disk.
         DiscardCheckpoint:              bool
+        /// If set, during each iteration the dump prefix will be set to the given string
+        /// concatenated with the iteration number.
+        DumpPrefix:                     string option
     } 
 
     /// Default training configuration.
@@ -115,6 +118,7 @@ module Train =
         LearningRates               = [1e-3; 1e-4; 1e-5; 1e-6]
         CheckpointDir               = None
         DiscardCheckpoint           = false
+        DumpPrefix                  = None
     }
 
     /// training faith
@@ -125,6 +129,7 @@ module Train =
         | TargetLossReached
         | UserTerminated
         | CheckpointRequested
+        | NaNEncountered
 
     /// Result of training
     type TrainingResult = {
@@ -252,13 +257,18 @@ module Train =
 
         /// training function
         let rec doTrain iter learningRate log =
+
+            /// set dump prefix
+            match cfg.DumpPrefix with
+            | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter
+            | None -> ()
+
             // execute training
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
                 // compute and log validation & test 
-                Dump.prefix <- sprintf "%d" iter
                 let entry = {
                     TrainingLog.Iter    = iter
                     TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
@@ -302,6 +312,10 @@ module Train =
                     faith <- Continue
                 | _ -> ()
 
+                let isNan x = Double.IsInfinity x || Double.IsNaN x
+                if isNan entry.TrnLoss || isNan entry.ValLoss || isNan entry.TstLoss then
+                    faith <- NaNEncountered
+
                 // process user input
                 match Util.getKey () with
                 | Some 'q' ->
@@ -336,7 +350,8 @@ module Train =
                     | None -> ()
 
                 match faith with
-                | NoImprovement when not rLearningRates.IsEmpty -> 
+                | NoImprovement 
+                | NaNEncountered when not rLearningRates.IsEmpty -> 
                     // reset log to best iteration so far 
                     let log = log |> TrainingLog.removeToIter (TrainingLog.bestIter log)
                     // continue with lower learning rate
@@ -344,8 +359,6 @@ module Train =
                 | _ -> log, faith, learningRates
             | [] -> failwith "no learning rates"
         
-        Dump.start "trainDump.h5"
-        Dump.prefix <- "start"
         // initialize or load checkpoint
         let log, learningRates, duration, faith =
             match cp with
@@ -365,7 +378,6 @@ module Train =
             | _ ->
                 TrainingLog.create cfg.MinImprovement, cfg.LearningRates, TimeSpan.Zero, Continue
         
-
         // train
         let log, duration, faith = 
             match faith with
@@ -407,7 +419,7 @@ module Train =
                 // training already finished in loaded checkpoint
                 printfn "Training finished in loaded checkpoint"
                 log, duration, faith
-        Dump.stop ()
+
         let bestEntry, _ = TrainingLog.best log
         printfn "Training completed after %d iterations in %A because %A" bestEntry.Iter duration faith
 
