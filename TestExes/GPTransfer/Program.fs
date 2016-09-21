@@ -56,10 +56,12 @@ module Program =
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
 
+        let softmax act = exp act / Expr.sumKeepingAxis 0 (exp act)
+
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
         
-        
+//        let pred = softmax pred
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
@@ -82,13 +84,13 @@ module Program =
             Seed               = 100   
             BatchSize          = 500 
             //BatchSize          = 10
-            LossRecordInterval = 10                                   
+            LossRecordInterval = 1                                   
             Termination        = Train.ItersWithoutImprovement 100
             MinImprovement     = 1e-7  
             TargetLoss         = None  
             MinIters           = Some 100 
             MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
+            LearningRates      = [1e-3]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
             }
@@ -379,7 +381,7 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
-//        SymTensor.Compiler.Cuda.Debug.Timing <- true
+        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
@@ -403,8 +405,8 @@ module Program =
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             
-        TestFunctions.TestGPTransferUnit DevHost
-        TestFunctions.TestGPTransferUnit DevCuda
+//        TestFunctions.TestGPTransferUnit DevHost
+//        TestFunctions.TestGPTransferUnit DevCuda
 
 
 //        TestUtils.evalHostCuda TestFunctions.testMultiGPLayer

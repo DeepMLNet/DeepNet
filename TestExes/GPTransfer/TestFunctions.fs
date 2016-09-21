@@ -231,13 +231,12 @@ module TestFunctions =
         let mi = mb.Instantiate device
 
         let pred_mean, pred_cov = GPTransferUnit.pred gptu (InputLayer.transform inp_mean)
-
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
 
-        let loss =  -target * log pred |> Expr.sumAxis 0 |> Expr.mean
+//        let loss =  -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "Loss"
-        let cmplr = DevCuda.Compiler, CompileEnv.empty
-        let loss_fn = Func.make cmplr loss |> arg2 pred_mean target
+//        let cmplr = DevCuda.Compiler, CompileEnv.empty
+//        let loss_fn = Func.make cmplr loss |> arg2 pred_mean target
 
 //        let dLoss = Deriv.compute loss |> Deriv.ofVar mi.ParameterVector  |> Expr.reshape (Expr.shapeOf mi.ParameterVector) 
 //        let dLoss = dLoss |> Expr.dump "dLoss"
@@ -256,7 +255,7 @@ module TestFunctions =
             let target_val = pred_mean + randOffset
             //print inputs and predictions
 
-            let l = loss_fn pred_mean target_val
+//            let l = loss_fn pred_mean target_val
 //            let dL = dLoss_fn pred_mean tar
 
             printfn "inp_mean=\n%A" inp_mean_val
@@ -264,8 +263,8 @@ module TestFunctions =
             printfn "pred_mean=\n%A" pred_mean
             printfn "pred_cov=\n%A" pred_cov
             printfn ""
-            printfn "loss=\n%A" l
-            printfn ""
+//            printfn "loss=\n%A" l
+//            printfn ""
 //            printfn "dLoss=\n%A" dL
 //            printfn ""
             //return sample of inputs and predictions

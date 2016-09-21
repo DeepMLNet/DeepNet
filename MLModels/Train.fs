@@ -253,12 +253,12 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
             // execute training
-            Dump.prefix <- sprintf "%d" iter
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
-                // compute and log validation & test losses
+                // compute and log validation & test 
+                Dump.prefix <- sprintf "%d" iter
                 let entry = {
                     TrainingLog.Iter    = iter
                     TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
@@ -343,7 +343,9 @@ module Train =
                     trainLoop log rLearningRates
                 | _ -> log, faith, learningRates
             | [] -> failwith "no learning rates"
-
+        
+        Dump.start "trainDump.h5"
+        Dump.prefix <- "start"
         // initialize or load checkpoint
         let log, learningRates, duration, faith =
             match cp with
@@ -362,6 +364,7 @@ module Train =
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
                 TrainingLog.create cfg.MinImprovement, cfg.LearningRates, TimeSpan.Zero, Continue
+        
 
         // train
         let log, duration, faith = 
@@ -404,7 +407,7 @@ module Train =
                 // training already finished in loaded checkpoint
                 printfn "Training finished in loaded checkpoint"
                 log, duration, faith
-
+        Dump.stop ()
         let bestEntry, _ = TrainingLog.best log
         printfn "Training completed after %d iterations in %A because %A" bestEntry.Iter duration faith
 
