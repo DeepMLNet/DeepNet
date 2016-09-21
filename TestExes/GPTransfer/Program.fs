@@ -66,12 +66,15 @@ module Program =
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
+        let pred = max pred (Expr.scalar 1e-3f)
+
         // loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred.T target.T
+        let loss = loss |> Expr.checkFinite "loss"
 
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, dev)
-        let optCfg =opt.DefaultCfg
+        let opt = Adam (loss, mi.ParameterVector, dev)
+        let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
