@@ -157,7 +157,9 @@ module Expr =
         | Multiply                      
         | Divide                        
         | Modulo
-        | Power                         
+        | Power            
+        | MaxElemwise
+        | MinElemwise             
     
         // ==== matrix/tensor operations ====
         /// matrix*matrix => matrix dot product
@@ -286,6 +288,8 @@ module Expr =
         | Divide
         | Modulo
         | Power
+        | MaxElemwise
+        | MinElemwise
             -> Some ()
         | _ -> None
 
@@ -391,7 +395,9 @@ module Expr =
         | Binary (Multiply, a, _)                      
         | Binary (Divide, a, _)                        
         | Binary (Modulo, a, _)
-        | Binary (Power, a, _)                         
+        | Binary (Power, a, _)     
+        | Binary (MaxElemwise, a, _)                    
+        | Binary (MinElemwise, a, _)                    
             -> shapeOf a
             
         // matrix/tensor operations
@@ -684,7 +690,7 @@ module Expr =
         static member (*) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Multiply a b
         static member (/) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Divide a b
         static member (%) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Modulo a b
-        static member Pow (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Power a b
+        static member Pow (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Power a b    
 
         // elementwise binary with basetype
         static member (+) (a: ExprT<'T>, b: 'T) = a + (scalar b)
@@ -711,6 +717,14 @@ module Expr =
     /// square root
     let sqrtt (a: ExprT<'T>) =
         ExprT<'T>.Sqrt a
+
+    /// elementwise maximum
+    let maxElemwise a b =
+        constructElementwise MaxElemwise a b
+
+    /// elementwise minimum
+    let minElemwise a b =
+        constructElementwise MinElemwise a b
 
     /// reshape (assuming C-continguous order) tensor; element count does not change
     let reshape ss a = Unary(Reshape(ss), a) |> check

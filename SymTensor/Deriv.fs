@@ -126,6 +126,8 @@ module Deriv =
             | Modulo -> eg .+ (padLeft (-truncate (a / b)) |> collapse) // TODO: FIXME
             | Power -> (egExpanded * padLeft (b * a**(b - one())) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
+            | MaxElemwise -> failwith "TODO"
+            | MinElemwise -> failwith "TODO"
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
                 let mxWrtX (m: ExprT<'T>) x y dy =

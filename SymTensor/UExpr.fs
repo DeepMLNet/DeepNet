@@ -157,7 +157,9 @@ module UExpr =
                 | Binary (Expr.Multiply, a, b)  -> binary Multiply a b                     
                 | Binary (Expr.Divide, a, b)    -> binary Divide a b             
                 | Binary (Expr.Modulo, a, b)    -> binary Modulo a b          
-                | Binary (Expr.Power, a, b)     -> binary Power a b               
+                | Binary (Expr.Power, a, b)     -> binary Power a b           
+                | Binary (Expr.MaxElemwise, a, b)       -> binary MaxElemwise a b
+                | Binary (Expr.MinElemwise, a, b)       -> binary MinElemwise a b
                 | Binary (Expr.Dot, a, b)       -> binary Dot a b                   
                 | Binary (Expr.TensorProduct, a, b) -> binary TensorProduct a b         
                 | Binary (Expr.SetSubtensor sr, a, b) ->

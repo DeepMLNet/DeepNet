@@ -856,6 +856,14 @@ module ArrayND =
         let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
         typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) a
 
+    /// Elementwise picks the maximum of a or b.
+    let inline maxElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        typedMap2 (max) (max) (max) (max) (max) a b
+
+    /// Elementwise picks the minimum of a or b.
+    let inline minElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        typedMap2 (min) (min) (min) (min) (min) a b
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         

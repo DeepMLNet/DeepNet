@@ -122,6 +122,8 @@ module HostEval =
                     | Divide -> av / bv
                     | Modulo -> av % bv
                     | Power -> av ** bv
+                    | MaxElemwise -> ArrayND.maxElemwise av bv 
+                    | MinElemwise -> ArrayND.minElemwise av bv 
                     | Dot -> av .* bv
                     | TensorProduct -> av %* bv
                     | SetSubtensor sr -> 

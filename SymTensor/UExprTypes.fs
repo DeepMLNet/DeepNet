@@ -92,7 +92,9 @@ module UExprTypes =
         | Multiply                      
         | Divide       
         | Modulo                 
-        | Power                         
+        | Power                     
+        | MaxElemwise
+        | MinElemwise    
         | Dot                           
         | TensorProduct                 
 
