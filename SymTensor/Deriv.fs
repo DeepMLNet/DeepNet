@@ -111,6 +111,8 @@ module Deriv =
             | Print _ -> eg |> reverseDiffStep a
             | Dump _ -> eg |> reverseDiffStep a
             | Annotated _ -> eg |> reverseDiffStep a
+            | CheckFinite name ->
+                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) |> reverseDiffStep a
 
         | Binary(op, a, b) ->
             let inline (.+) da db = totalDerivates [a; b] [da; db]

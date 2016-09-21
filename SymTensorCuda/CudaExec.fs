@@ -505,12 +505,17 @@ module CudaExprWorkspaceTypes =
                     use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
                                                                           BasicTypes.SizeT(length))
                     dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
-                | ExecItem (Memset (value, dst), strm) ->
+                | ExecItem (MemsetSingle (value, dst), strm) ->
                     let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
                     dstOffsetVar.MemsetAsync(intval, getStream strm)
+                | ExecItem (MemsetUInt32 (value, dst), strm) ->
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                    BasicTypes.SizeT(length))    
+                    dstOffsetVar.MemsetAsync(value, getStream strm)
 
                 // CUBLAS 
                 | ExecItem (BlasGemm (aOp, bOp, aFac, a, b, trgtFac, trgt), strm) ->   
@@ -598,6 +603,28 @@ module CudaExprWorkspaceTypes =
                         let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
                         let resHost = resDev.ToHost()    
                         Dump.dumpValue name resHost
+
+                | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
+                    // source counter
+                    let counterVarByteVar, _ = CudaExecEnv.getDevMemForManikin execEnv counter
+                    use counterVarIntVar = new CudaDeviceVariable<int> (counterVarByteVar.DevicePointer)
+
+                    // temporary destination
+                    let counterVar : int[] = Array.zeroCreate 0
+                    let gcHnd = GCHandle.Alloc(counterVar, GCHandleType.Pinned)
+                    use counterVarPinned = new CudaRegisteredHostMemory<int>(gcHnd.AddrOfPinnedObject(), SizeT 1)
+
+                    // copy from source counter to temporary destination
+                    counterVarPinned.AsyncCopyFromDevice(counterVarIntVar, getStream strm)
+
+                    // add callback when copy is finished
+                    let callback (hStream: CUstream) (status: CUResult) (userData: System.IntPtr) =
+                        gcHnd.Free()
+                        if counterVar.[0] <> 0 then
+                            printfn "Infinity or NaN encountered in %s" name
+                            failwithf "Infinity or NaN encountered in %s" name
+                    use stream = new CudaStream (getStream strm)
+                    stream.AddCallback (CUstreamCallback callback, nativeint 0, CUStreamAddCallbackFlags.None)
 
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->

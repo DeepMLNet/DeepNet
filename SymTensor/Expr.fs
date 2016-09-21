@@ -139,6 +139,8 @@ module Expr =
         | Print of string
         /// dumps the value into the given dataset in the active HDF5 dump file
         | Dump of string
+        /// checks the value for NaNs and infinities, outputs their location and stops the computation
+        | CheckFinite of string
         /// annotation (no influence on value)
         | Annotated of string       
 
@@ -380,6 +382,7 @@ module Expr =
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
         | Unary(Print _, a) -> shapeOf a
         | Unary(Dump _, a) -> shapeOf a
+        | Unary(CheckFinite _, a) -> shapeOf a
         | Unary(Annotated(_), a) -> shapeOf a
 
         // binary elementwise
@@ -1018,6 +1021,10 @@ module Expr =
     let dump name a =
         Unary (Dump name, a) |> check
 
+    /// checks the value for NaNs and infinities, outputs their location and stops the computation
+    let checkFinite name a =
+        Unary (CheckFinite name, a) |> check
+
     /// interpolator tables
     let private tablesOfInterpolators = new Dictionary<IInterpolator, IArrayNDT>()
 
@@ -1110,6 +1117,7 @@ module Expr =
     let interpolate2D interpolator a b =
         interpolate interpolator [a; b]
 
+   
 
 
 [<AutoOpen>]

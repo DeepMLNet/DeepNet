@@ -83,7 +83,8 @@ module UExprTypes =
         | StoreToVar of UVarSpecT
         | Print of string
         | Dump of string
-        | Annotated of string       
+        | Annotated of string   
+        | CheckFinite of string    
 
     and UBinaryOpT =
         | Add                           

@@ -107,6 +107,11 @@ module HostEval =
                     | Dump name ->
                         Dump.dumpValue name av
                         av
+                    | CheckFinite name ->
+                        if not (ArrayND.allFinite av |> ArrayND.value) then
+                            printfn "Infinity or NaN encountered in %s with value:\n%A" name av
+                            failwithf "Infinity or NaN encountered in %s" name
+                        av
                     | Annotated _-> av                
                 | Binary(op, a, b) ->
                     let av, bv = doEval a, doEval b  

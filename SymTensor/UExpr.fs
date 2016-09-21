@@ -150,6 +150,7 @@ module UExpr =
                 | Unary (Expr.Print msg, a)     -> unary (Print msg) a
                 | Unary (Expr.Dump name, a)     -> unary (Dump name) a
                 | Unary (Expr.Annotated ano, a) -> unary (Annotated ano) a
+                | Unary (Expr.CheckFinite name, a) -> unary (CheckFinite name) a
 
                 | Binary (Expr.Add, a, b)       -> binary Add a b
                 | Binary (Expr.Substract, a, b) -> binary Substract a b

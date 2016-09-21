@@ -24,7 +24,8 @@ module CudaExecUnitTypes =
         | MemcpyDtoD of IDevMemRngTmpl * IDevMemRngTmpl
         | MemcpyHtoD of IHostMemRngTmpl * IDevMemRngTmpl
         | MemcpyDtoH of IDevMemRngTmpl * IHostMemRngTmpl
-        | Memset of single * IDevMemRngTmpl
+        | MemsetSingle of single * IDevMemRngTmpl
+        | MemsetUInt32 of uint32 * IDevMemRngTmpl
         // execution control
         | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
         | CallCFunc of TmplInstT * System.Type * (ICudaArgTmpl list)
@@ -48,6 +49,7 @@ module CudaExecUnitTypes =
         | Trace of UExprT * ArrayNDManikinT
         | PrintWithMsg of string * ArrayNDManikinT
         | DumpValue of string * ArrayNDManikinT
+        | CheckNonFiniteCounter of string * ArrayNDManikinT
 
 
     type SrcReqsHelpersT = {
@@ -239,6 +241,7 @@ module CudaExecUnit =
         | UUnaryOp (Print _) -> inplaceFirstSrcReq
         | UUnaryOp (Dump _) -> inplaceFirstSrcReq
         | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
+        | UUnaryOp (CheckFinite _) -> inplaceFirstSrcReq
 
         // binary element-wise
         | UBinaryOp Add -> inplaceFirstSrcReq
@@ -407,6 +410,7 @@ module CudaExecUnit =
         | UUnaryOp (Print _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
         | UUnaryOp (Dump _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
         | UUnaryOp (Annotated _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
+        | UUnaryOp (CheckFinite _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
 
         // binary element-wise
         | UBinaryOp Add -> dfltChInplaceOvrwrtTrgt ()
@@ -898,6 +902,12 @@ module CudaExecUnit =
         // misc
         | UUnaryOp (Print msg) -> [PrintWithMsg (msg, srcsDfltCh.[0])]
         | UUnaryOp (Dump name) -> [DumpValue (name, srcsDfltCh.[0])]
+        | UUnaryOp (CheckFinite name) ->
+            let nonFiniteCount = ArrayNDManikin.newC memAllocator TypeName.ofType<int> [1]
+            let initItems = [MemsetUInt32 (0u, ArrayNDDevMemRngTmpl nonFiniteCount)]
+            let countItems = execItemsForElemwise dfltChTrgt (CheckFiniteIEOpArgTmpl (nonFiniteCount, name)) srcsDfltCh
+            let checkItems = [CheckNonFiniteCounter (name, nonFiniteCount)]
+            initItems @ countItems @ checkItems
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise

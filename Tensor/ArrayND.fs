@@ -651,6 +651,12 @@ module ArrayND =
         let m = a.CastToMe mCast
         m :?> 'B
 
+    let inline uncheckedApplyTypeChange (f: ArrayNDT<'A> -> ArrayNDT<'R>) 
+            (a: 'B when 'B :> ArrayNDT<'T>) : ArrayNDT<'R> =
+        let aCast = a.Cast<'A> ()
+        let mCast = f aCast 
+        mCast
+
     let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) 
             (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : 'B =
         let aCast = a.Cast<'A> ()
@@ -688,6 +694,19 @@ module ArrayND =
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
 
+    let inline typedApplyTypeChange  (fBool:   ArrayNDT<bool>   -> ArrayNDT<'R>) 
+                                     (fDouble: ArrayNDT<double> -> ArrayNDT<'R>) 
+                                     (fSingle: ArrayNDT<single> -> ArrayNDT<'R>)
+                                     (fInt:    ArrayNDT<int>    -> ArrayNDT<'R>)
+                                     (fByte:   ArrayNDT<byte>   -> ArrayNDT<'R>)
+                                     (a: #ArrayNDT<'T>) =
+        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApplyTypeChange fBool a 
+        elif typeof<'T>.Equals(typeof<double>) then uncheckedApplyTypeChange fDouble a 
+        elif typeof<'T>.Equals(typeof<single>) then uncheckedApplyTypeChange fSingle a 
+        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApplyTypeChange fInt    a 
+        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApplyTypeChange fByte   a 
+        else failwith "unknown type"
+
     let inline typedApply2  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<bool>) 
                             (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
@@ -721,6 +740,14 @@ module ArrayND =
                         (fByte:   byte   -> byte)
                         (a: #ArrayNDT<'T>) =
         typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fByte) a
+
+    let inline typedMapTypeChange (fBool:   bool   -> 'R)
+                                  (fDouble: double -> 'R) 
+                                  (fSingle: single -> 'R)
+                                  (fInt:    int    -> 'R)
+                                  (fByte:   byte   -> 'R)
+                                  (a: #ArrayNDT<'T>) =
+        typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fByte) a
 
     let inline typedMap2 (fBool:   bool   -> bool   -> bool)
                          (fDouble: double -> double -> double) 
@@ -823,6 +850,12 @@ module ArrayND =
     let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
+    /// Elementwise check if a value is finite (not NaN and not infinite).
+    let inline isFinite (a: ArrayNDT<'T>) =
+        let isFiniteSingle v = not (System.Single.IsInfinity v || System.Single.IsNaN v)
+        let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
+        typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) a
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
@@ -918,6 +951,10 @@ module ArrayND =
     /// If arrays have different shape, then false is returned.
     let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
+
+    /// Returns true if all values in the tensor are finite (not NaN and not infinite).
+    let inline allFinite (a: ArrayNDT<'T>) =
+        a |> isFinite |> all
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =

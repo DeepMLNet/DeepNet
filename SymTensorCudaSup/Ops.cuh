@@ -5,6 +5,12 @@
 
 // dummy functions for IntelliSense
 #ifndef __CUDACC__ 
+
+int atomicAdd(int* address, int val); 
+unsigned int atomicAdd(unsigned int* address, unsigned int val); 
+unsigned long long int atomicAdd(unsigned long long int* address, unsigned long long int val); 
+float atomicAdd(float* address, float val);
+
 template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
 template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
 template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
@@ -31,6 +37,30 @@ struct DiagonalOneIEOp_t {
 	}
 };
 
+
+struct CheckFiniteIEOp_t {
+
+	int *nonFiniteCountPtr;
+	const char name[50];
+
+	_devonly float operator() (const size_t *pos, const size_t dims, float a) {
+		if (!isfinite(a)) {
+			atomicAdd(nonFiniteCountPtr, 1);
+
+			switch (dims) {
+			case 0:	printf("Non-finite element in %s at [].\n", name); break;
+			case 1: printf("Non-finite element in %s at [%u].\n", name, pos[0]); break;
+			case 2: printf("Non-finite element in %s at [%u; %u].\n", name, pos[0], pos[1]); break;
+			case 3: printf("Non-finite element in %s at [%u; %u; %u].\n", name, pos[0], pos[1], pos[2]); break;
+			case 4: printf("Non-finite element in %s at [%u; %u; %u; %u].\n", name, pos[0], pos[1], pos[2], pos[3]); break;
+			case 5: printf("Non-finite element in %s at [%u; %u; %u; %u; %u].\n", name, pos[0], pos[1], pos[2], pos[3], pos[4]); break;
+			default: printf("Non-finite element in %s.", name);
+			}			
+		}
+
+		return a;
+	}
+};
 
 
 
