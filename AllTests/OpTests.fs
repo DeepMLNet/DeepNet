@@ -231,3 +231,30 @@ let ``Interpolate1D: derivative test on host`` () =
 let ``Interpolate1D: derivative test on CUDA`` () =    
     ``Interpolate1D: derivative test`` DevCuda
 
+
+let checkFiniteOpTest diagVal offDiagVal =
+    let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let b = Expr.var<single> "b" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let expr = a / b |> Expr.checkFinite "a / b"
+    let fn = Func.make DevCuda.DefaultFactory expr |> arg2 a b
+    let av = ArrayNDCuda.ones<single> [3; 3]
+    let dv = diagVal * ArrayNDCuda.ones<single> [3]
+    let bv = offDiagVal * ArrayNDCuda.ones<single> [3; 3]
+    (ArrayND.diag bv).[*] <- dv
+    printfn "a=\n%A" av
+    printfn "b=\n%A" bv
+    let iav = fn av bv
+    printfn "a / b=\n%A" iav
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Check finite on CUDA failing`` () =
+    SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+    printfn "failing:"
+    checkFiniteOpTest 1.0f 0.0f
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Check finite on CUDA passing`` () =
+    printfn "passing:"
+    checkFiniteOpTest 1.0f 0.5f

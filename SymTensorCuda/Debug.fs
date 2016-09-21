@@ -22,3 +22,6 @@ module Debug =
 
     /// dumps kernel code before it is compiled
     let mutable DumpCode = false
+
+    /// terminates the program when a non-finite tensor was found by the CheckFinite op
+    let mutable TerminateWhenNonFinite = true

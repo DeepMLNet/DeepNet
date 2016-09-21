@@ -610,7 +610,7 @@ module CudaExprWorkspaceTypes =
                     use counterVarIntVar = new CudaDeviceVariable<int> (counterVarByteVar.DevicePointer)
 
                     // temporary destination
-                    let counterVar : int[] = Array.zeroCreate 0
+                    let counterVar : int[] = Array.zeroCreate 1
                     let gcHnd = GCHandle.Alloc(counterVar, GCHandleType.Pinned)
                     use counterVarPinned = new CudaRegisteredHostMemory<int>(gcHnd.AddrOfPinnedObject(), SizeT 1)
 
@@ -621,8 +621,8 @@ module CudaExprWorkspaceTypes =
                     let callback (hStream: CUstream) (status: CUResult) (userData: System.IntPtr) =
                         gcHnd.Free()
                         if counterVar.[0] <> 0 then
-                            printfn "Infinity or NaN encountered in %s" name
-                            failwithf "Infinity or NaN encountered in %s" name
+                            printfn "Infinity or NaN encountered in %d elements of %s." counterVar.[0] name 
+                            if Debug.TerminateWhenNonFinite then exit 1
                     use stream = new CudaStream (getStream strm)
                     stream.AddCallback (CUstreamCallback callback, nativeint 0, CUStreamAddCallbackFlags.None)
 

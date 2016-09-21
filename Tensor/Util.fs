@@ -3,6 +3,7 @@
 open System
 open System.Reflection
 open System.IO
+open System.Runtime.InteropServices
 
 
 module Seq = 
@@ -133,6 +134,19 @@ module Util =
         | _ when typ = typeof<int>      -> "int"
         | _ when typ = typeof<byte>     -> "char"
         | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// Returns the contents of a blittable structure as a byte array.
+    let structToBytes (s: 'S when 'S: struct) =
+        let size = Marshal.SizeOf(typeof<'S>)
+        let byteAry : byte[] = Array.zeroCreate size
+
+        let tmpPtr = Marshal.AllocHGlobal(size)
+        Marshal.StructureToPtr(s, tmpPtr, false)
+        Marshal.Copy(tmpPtr, byteAry, 0, size)
+        Marshal.DestroyStructure(tmpPtr, typeof<'S>)
+        Marshal.FreeHGlobal(tmpPtr)
+
+        byteAry
 
     /// Returns "Some key" when a key was pressed, otherwise "None".
     let getKey () =

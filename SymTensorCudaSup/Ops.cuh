@@ -40,17 +40,17 @@ struct DiagonalOneIEOp_t {
 
 struct CheckFiniteIEOp_t {
 
-	int *nonFiniteCountPtr;
+	int * const nonFiniteCountPtr;
 	const char name[50];
 
-	_devonly float operator() (const size_t *pos, const size_t dims, float a) {
+	_devonly float operator() (const size_t *pos, const size_t dims, float a) const {
 		if (!isfinite(a)) {
 			atomicAdd(nonFiniteCountPtr, 1);
 
 			switch (dims) {
 			case 0:	printf("Non-finite element in %s at [].\n", name); break;
 			case 1: printf("Non-finite element in %s at [%u].\n", name, pos[0]); break;
-			case 2: printf("Non-finite element in %s at [%u; %u].\n", name, pos[0], pos[1]); break;
+			case 2: printf("Non-finite element in %s at [%llu; %llu].\n", name, pos[0], pos[1]); break;
 			case 3: printf("Non-finite element in %s at [%u; %u; %u].\n", name, pos[0], pos[1], pos[2]); break;
 			case 4: printf("Non-finite element in %s at [%u; %u; %u; %u].\n", name, pos[0], pos[1], pos[2], pos[3]); break;
 			case 5: printf("Non-finite element in %s at [%u; %u; %u; %u; %u].\n", name, pos[0], pos[1], pos[2], pos[3], pos[4]); break;

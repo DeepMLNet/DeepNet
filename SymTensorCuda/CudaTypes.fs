@@ -511,13 +511,14 @@ module ArgTemplates =
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl
 
-
+    
     [<Struct>]
-    [<type: StructLayout(LayoutKind.Sequential, Pack=4)>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4, CharSet=CharSet.Ansi)>]
     /// check finite elementwise operation C++ structure
-    type CheckFiniteIEOpArg<'T when 'T: struct> =
+    type CheckFiniteIEOpArg =
         val NonFiniteCountPtr: CUdeviceptr
         [<MarshalAs(UnmanagedType.ByValTStr, SizeConst=50)>] val Name: string
+
         new (nonFiniteCountPtr, name) = 
             {NonFiniteCountPtr=nonFiniteCountPtr; Name=name}
 
@@ -528,7 +529,7 @@ module ArgTemplates =
             member this.CPPTypeName = "CheckFiniteIEOp_t"
             member this.GetArg env strm = 
                 let devVar, _ = CudaExecEnv.getDevMemForManikin env nonFiniteCount
-                CheckFiniteIEOpArg (devVar.DevicePointer, name) |> box
+                CheckFiniteIEOpArg (devVar.DevicePointer, name) |> Util.structToBytes |> box
         interface ICudaOp with
             member this.IsIndexed = true
         interface ICudaOpAndArgTmpl
