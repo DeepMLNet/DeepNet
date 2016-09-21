@@ -25,12 +25,11 @@
 //#define PRINT_BUFFER_ALLOCATOR_STATS
 
 
-
 /// Thrust allocator that assigns memory sequentially from a preallocated buffer.
 class buffer_allocator 
 {
   private:
-	static const std::ptrdiff_t alignment = 8;
+	static const std::ptrdiff_t alignment = 32;
 
 	std::string name;
 	char *buffer;
@@ -38,7 +37,6 @@ class buffer_allocator
 
 	size_t allocs = 0;
 	size_t pos = 0;
-	size_t freed = 0;
 
   public:
     typedef char value_type;
@@ -59,11 +57,10 @@ class buffer_allocator
 	void print_statistics()
 	{
 		std::cout << "buffer_allocator " << name << ": ";
-		std::cout << "allocations=" << allocs << "  ";
-		std::cout << "size=" << (size / 1024) << " kB  ";
-		std::cout << "used=" << (pos / 1024) << " kB  ";
-		std::cout << "remaining=" << ((size - pos) / 1024) << " kB  ";
-		std::cout << "freed=" << (freed / 1024) << " kB" << std::endl;
+		std::cout << "allocations=" << std::dec << allocs << "  ";
+		std::cout << "size=" << std::dec << size << " Bytes  ";
+		std::cout << "used=" << std::dec << pos << " Bytes  ";
+		std::cout << "remaining=" << std::dec << (size - pos) << " bytes  ";
 	}
 
     char *allocate(std::ptrdiff_t num_bytes)
@@ -72,7 +69,7 @@ class buffer_allocator
 		if (pos + num_bytes >= size)
 		{	
 			std::cerr << "buffer_allocator " << name << " is out of memory " <<
-				"while processing request of size " << (num_bytes / 1024) << "kB" << std::endl;
+				"while processing request of size " << std::dec <<  num_bytes << "bytes" << std::endl;
 			print_statistics();
 			throw std::bad_alloc();
 		}
@@ -84,7 +81,7 @@ class buffer_allocator
 		allocs++;
 
 		#ifdef TRACE_BUFFER_ALLOCATOR
-		std::cout << "buffer allocator " << name << " allocated " << num_bytes << " bytes " <<
+		std::cout << "buffer allocator " << name << " allocated " << std::dec << num_bytes << " bytes " <<
 			"at 0x" << std::hex << static_cast<void *>(ptr) << std::endl;
 		#endif	
 
@@ -94,10 +91,8 @@ class buffer_allocator
     void deallocate(char *ptr, size_t num_bytes)
     {
 		// we do not free any memory
-		freed += num_bytes;
-
 		#ifdef TRACE_BUFFER_ALLOCATOR
-		std::cout << "buffer allocator " << name << " freed " << num_bytes << " bytes " <<
+		std::cout << "buffer allocator " << name << " freed " <<
 			"at 0x" << std::hex << static_cast<void *>(ptr) << std::endl;
 		#endif	
     }

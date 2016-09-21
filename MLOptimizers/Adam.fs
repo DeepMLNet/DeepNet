@@ -94,11 +94,9 @@ module AdamTypes =
             }
 
         member this.Minimize =
-            let pars_shp = Expr.shapeOf pars
-            let gradient = Deriv.compute loss 
-            let gradient = gradient |> Deriv.ofVar pars 
-            let grad_shp = Expr.shapeOf gradient
-            let gradient = gradient|> Expr.reshape (Expr.shapeOf pars)
+            let gradient = Deriv.compute loss |> Deriv.ofVar pars
+//            let gradient = gradient |> Expr.dump "gradient"
+            let gradient = gradient|> Expr.reshape (Expr.shapeOf pars) 
 
             let one, two = Expr.scalart 1, Expr.scalart 2
             let oneHalf = Expr.scalar (conv<'T> 0.5)

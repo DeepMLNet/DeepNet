@@ -489,6 +489,28 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
+    /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
+    let reductionFuncnameAndArgs trgt cOp cInitialOp src =
+        let args = [cOp :> ICudaArgTmpl
+                    cInitialOp :> ICudaArgTmpl
+                    ArrayNDArgTmpl trgt :> ICudaArgTmpl
+                    ArrayNDArgTmpl src :> ICudaArgTmpl]
+        let funcName = sprintf "reduceTo%dD" (ArrayND.nDims trgt)
+        funcName, args
+
+    /// execution items for a reduction operation
+    let execItemsForReduction trgt cOp cInitialOp src =
+        match ArrayND.shape trgt, ArrayND.shape src with
+        | _, [] -> failwith "cannot reduce a scalar array"
+        | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
+            failwithf "cannot reduce from %d dimensions to %d dimensions" srcShp.Length trgtShp.Length
+        | trgtShp, srcShp when trgtShp <> srcShp.[0 .. srcShp.Length-2] ->
+            failwithf "cannot reduce from shape %A to shape %A" srcShp trgtShp 
+        | _ -> ()
+
+        let funcName, args = reductionFuncnameAndArgs trgt cOp cInitialOp src
+        execItemsForKernel funcName args args (workDimForElemwise trgt false)
+
     /// function name of elements wrapper and its arguments for the given target, operation and sources
     let elementsFuncnameAndArgs trgt cOp srcViews =
         let args = 
@@ -640,28 +662,89 @@ module CudaExecUnit =
                 manikin.Shape (ArrayND.stride manikin)
         ArrayND.transpose manikin
 
-    let execItemsForSum memAllocator trgt src =
-        // C++ signature:
-        // void sum(TTarget &trgt, TSrc &src, 
-        //          CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-        let tmpSize = ArrayNDManikin.sizeInBytes src
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev       
-        execItemsForCFunc<CPPSum> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl src;
-                                      ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+    /// exection items to reduce src over the last axis into trgt
+    let rec batchReduceLastAxis (memAllocator: MemAllocatorT) reduceFn (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) 
+            : CudaExecItemT list =
+        let reduceBatchSize = 16
+        let nReduceElems = src.Shape.[src.NDims - 1]
 
-    let execItemsForSumAxis memAllocator ax trgt src =
+        if nReduceElems <= reduceBatchSize then
+            // no split necessary
+            reduceFn trgt src
+        else
+            // split last dimension
+            let reduceBatches = nReduceElems / reduceBatchSize
+            let reduceRem = nReduceElems - reduceBatches * reduceBatchSize
+
+            // create array manikin for source with split last dimension
+            let batchSrcShp = 
+                (ArrayND.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
+            let reduceStride = (ArrayND.stride src).[src.NDims-1]
+            let batchSrcStride = 
+                (ArrayND.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
+            let batchSrc = 
+                src |> ArrayND.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
+
+            // create temporary target
+            let tmpShp = 
+                if reduceRem = 0 then trgt.Shape @ [reduceBatches]
+                else trgt.Shape @ [reduceBatches + 1]
+            let tmpTrgt = ArrayNDManikin.newC memAllocator trgt.TypeName tmpShp
+
+            // perform reduction of batch
+            let batchTrgt = tmpTrgt.[Fill, 0 .. reduceBatches-1] :?> ArrayNDManikinT
+            let batchExecItems = reduceFn batchTrgt batchSrc
+
+            // perform reduction of remaining elements, if necessary
+            let remExecItems =
+                if reduceRem = 0 then []
+                else
+                    let remSrc = src.[Fill, reduceBatches*reduceBatchSize ..] :?> ArrayNDManikinT
+                    let remTrgt = tmpTrgt.[Fill, reduceBatches] :?> ArrayNDManikinT
+                    reduceFn remTrgt remSrc
+
+            // recursively reduce temporary target
+            let recExecItems = batchReduceLastAxis memAllocator reduceFn trgt tmpTrgt
+
+            batchExecItems @ remExecItems @ recExecItems
+
+    /// exection items to sum src over the specified axis into trgt
+    let execItemsForSumAxis memAllocator ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
-        let axOrder = Seq.concat [ {0 .. ax-1}; {ax + 1 .. nd - 1}; Seq.singleton ax] |> Seq.toList
+        let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.reorderAxes axOrder src
 
-        // C++ signature:
-        // void sumLastAxis(TTarget &trgt, TSrc &src, 
-        //                  CUstream &stream, char *tmp_buffer, size_t tmp_buffer_size);
-        let tmpSize = ArrayNDManikin.sizeInBytes srcAdj
-        let tmp = memAllocator TypeName.ofType<byte> tmpSize MemAllocDev
-        execItemsForCFunc<CPPSumLastAxis> [] [ArrayNDArgTmpl trgt; ArrayNDArgTmpl srcAdj;
-                                                ExecStreamArgTmpl(); BytePtrArgTmpl tmp; SizeTArgTmpl tmpSize]
+        // initial value is zero for summation
+        let initial = 
+            match trgt.TypeName with
+            | t when t = TypeName.ofType<double> -> 0.0  |> box
+            | t when t = TypeName.ofType<single> -> 0.0f |> box
+            | t when t = TypeName.ofType<int>    -> 0    |> box
+            | t when t = TypeName.ofType<byte>   -> 0uy  |> box
+            | t -> failwithf "unsupported type %A" t
+
+        (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
+            execItemsForReduction tmpTrgt (NoArgEOpArgTmpl("AddEOp_t", false)) (ConstEOpArgTmpl initial) tmpSrc        
+        )
+
+    /// exection items to sum all elements of src into the scalar trgt
+    let rec execItemsForSum memAllocator (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        if ArrayND.nDims trgt <> 0 then failwith "sum target must be scalar"
+
+        match src.Shape with
+        | [_] -> execItemsForSumAxis memAllocator 0 trgt src
+        | [] -> copyExecItems trgt src
+        | srcShp ->
+            // create temporary target
+            let nDims = ArrayND.nDims src
+            let tmpShp = srcShp.[0 .. nDims-2]
+            let tmp = ArrayNDManikin.newC memAllocator src.TypeName tmpShp            
+
+            // sum over last axis, and then sum recursively over remaining axes
+            let sumLastExecItems = execItemsForSumAxis memAllocator (nDims-1) tmp src
+            let sumOtherExecItems = execItemsForSum memAllocator trgt tmp
+            sumLastExecItems @ sumOtherExecItems
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
