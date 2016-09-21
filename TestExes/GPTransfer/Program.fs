@@ -56,17 +56,18 @@ module Program =
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
 
-        let softmax act = exp act / Expr.sumKeepingAxis 0 (exp act)
 
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
+
+        let softmax act = exp act / Expr.sumKeepingAxis 1 (exp act)
         
-//        let pred = softmax pred
+        let pred = softmax pred
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
         // loss expression
-        let loss = LossLayer.loss LossLayer.CrossEntropy pred target
+        let loss = LossLayer.loss LossLayer.CrossEntropy pred.T target.T
 
         // optimizer
         let opt =  Adam (loss, mi.ParameterVector, dev)
@@ -90,7 +91,7 @@ module Program =
             TargetLoss         = None  
             MinIters           = Some 100 
             MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
+            LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]                               
             CheckpointDir      = None  
             DiscardCheckpoint  = false 
             DumpPrefix         = None
@@ -279,7 +280,7 @@ module Program =
                 
         
         //loss expression
-        let loss = LossLayer.loss LossLayer.MSE pred target
+        let loss = LossLayer.loss LossLayer.MSE pred.T target.T
 
         // optimizer
         let opt =  Adam (loss, mi.ParameterVector, dev)
@@ -388,9 +389,9 @@ module Program =
 
         SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
-//        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
+        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
-//        SymTensor.Compiler.Cuda.Debug.MemUsage <- true
+        SymTensor.Compiler.Cuda.Debug.MemUsage <- true
 //        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
 //        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 
