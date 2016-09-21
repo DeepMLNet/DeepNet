@@ -220,28 +220,42 @@ module MultiGPLayer =
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
+        let lengthscales = !pars.Lengthscales
+        let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
+
+        let trnX = !pars.TrnX
+        let trnX = trnX |> Expr.checkFinite "trnX"
+
+        let trnSigma = !pars.TrnSigma
+        let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
+
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
+        let Kk = Kk |> Expr.checkFinite "Kk"
 //        let Kk = Kk |> Expr.dump "Kk"
         
         let Kk_inv = Expr.invert Kk
+        let Kk_inv = Kk_inv |> Expr.checkFinite "Kk_inv"
 //        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let lk = lk |> Expr.checkFinite "lk"
 //        let lk = lk |> Expr.dump "lk"
         
         // trnT [gp, trn_smpl]
-        let trnT = pars.TrnT
+        let trnT = !pars.TrnT
+        let trnT = trnT |> Expr.checkFinite "trnT"
 
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
-        let beta = Kk_inv .* !trnT
+        let beta = Kk_inv .* trnT
 //        let beta = beta |> Expr.dump "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+        let pred_mean = pred_mean |> Expr.checkFinite "pred_mean"
         let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]

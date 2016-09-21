@@ -62,7 +62,7 @@ module Program =
 
         let softmax act = exp act / Expr.sumKeepingAxis 1 (exp act)
         
-        let pred = softmax pred
+        //let pred = softmax pred
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
