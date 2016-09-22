@@ -11,20 +11,69 @@ open Models
 
 module Program =
     
+    ///Creates the datasets
     let parsClass = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8]}
     let fullClassificationData = CsvLoader.loadFile parsClass "abalone.txt" 
     let fullClassificationDataset = Dataset.FromSamples fullClassificationData
-    let classificationData = TrnValTst.Of(fullClassificationDataset).ToCuda()
-//
-//    let fullRegressionDataset = fullClassificationDataset
-//    let regressionData = classificationData
-//
+    let classificationDataHost = TrnValTst.Of(fullClassificationDataset)
+    let classificationData = classificationDataHost.ToCuda()
+
+
     let parsReg = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8];IntTreatment=CsvLoader.IntAsNumerical}
     let fullRegressionData = CsvLoader.loadFile parsReg "abalone.txt" 
     let fullRegressionDataset = Dataset.FromSamples fullRegressionData
     let regressionData = TrnValTst.Of(fullRegressionDataset).ToCuda()
 
+    ///Retruns the index of the maximum element in an ArrayND
+    let maxPosition (inAry: ArrayNDHostT<single>) =
+        let maxElem = inAry |> ArrayND.maxAxis 0
+        let maxElem = Seq.head (ArrayND.allElems maxElem)
+        let pos = ArrayND.allElems inAry |> Seq.findIndex (fun elem -> elem = maxElem)
+        ArrayNDHost.scalar (single pos)
 
+    ///Retruns the index of the maximum element alone one axis od an ArrayND
+    let maxPositionAxis dim inAry= 
+        ArrayND.axisReduce maxPosition dim inAry
+
+    ///Calculates the number of errors in one batch             
+    let batchClassificationErrors (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (input:ArrayNDT<single>) (target:ArrayNDT<single>) =
+        let predAry = (modelPred input)
+        let aryToHost (ary: ArrayNDT<single>) =
+            match ary with
+            | :?  ArrayNDCudaT<single> as predCuda -> 
+                predCuda.ToHost ()
+            | :? ArrayNDHostT<single> as predHost -> 
+                predHost
+            | _ -> failwith "Array neither on Host nor on Cuda"
+        let pred = aryToHost predAry
+        let targ = aryToHost target
+        let predClass = maxPositionAxis 1 pred
+        let targetClass = maxPositionAxis 1 targ
+        let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
+        let err = Seq.head (ArrayND.allElems errors)
+        err
+
+    ///Calculates the number of errors in one dataset
+    let setClassificationErrors (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (inSeq: seq<CsvLoader.CsvSample>) =
+        let errs =  inSeq
+                    |>Seq.map (fun {Input = inp;Target = trg} -> 
+                        batchClassificationErrors modelPred inp  trg )
+                    |>Seq.fold (fun acc elem -> acc + elem) 0.0f
+        errs
+    ///Calculates the fraction of errors for train-, validation- and test-dataset
+    let classificationErrors batchsize (dataset:TrnValTst<CsvLoader.CsvSample>) (modelPred: ArrayNDT<single> -> ArrayNDT<single>) =
+        let nTrnSmpls = dataset.Trn.NSamples
+        let nValSmpls = dataset.Val.NSamples
+        let nTstSmpls = dataset.Tst.NSamples
+        let trnBatches = dataset.Trn.PaddedBatches batchsize ()
+        let valBatches = dataset.Val.PaddedBatches batchsize ()
+        let tstBatches = dataset.Tst.PaddedBatches batchsize ()
+        let trnError = setClassificationErrors modelPred trnBatches / (single nTrnSmpls)
+        let valError = setClassificationErrors modelPred valBatches / (single nValSmpls)                
+        let tstError = setClassificationErrors modelPred tstBatches / (single nTstSmpls)
+        trnError,valError,tstError
+
+    ///classification on abalone dataset using a single GPTransfer Unit
     let classificationGPTransferUnit()=
         printfn "Training one GPTransfer Unit on abalone dataset age classification"
         
@@ -69,6 +118,8 @@ module Program =
         //let pred = max pred (Expr.scalar 1e-3f)
         let pred = pred**2.0f + 1e-3f
 
+        let pred_fun =  mi.Func pred |> arg1 input 
+
         // loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred.T target.T
         let loss = loss |> Expr.checkFinite "loss"
@@ -84,28 +135,23 @@ module Program =
 
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+        
+        let batchSize = 500
 
-        let trainCfg : Train.Cfg = {    
-            Seed               = 100   
-            BatchSize          = 500 
-            //BatchSize          = 10
-            LossRecordInterval = 1                                   
-            Termination        = Train.ItersWithoutImprovement 100
-            MinImprovement     = 1e-7  
-            TargetLoss         = None  
-            MinIters           = Some 100 
-            MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]                               
-            CheckpointDir      = None  
-            DiscardCheckpoint  = false 
-            DumpPrefix         = None
-            }
-//
+        let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
+                                                Termination        = Train.ItersWithoutImprovement 100
+                                                DumpPrefix         = None}
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors before training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         let result = Train.train trainable data trainCfg
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors after training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         ()
 
 
-
+    ///classification on abalone dataset using a network of GPTransfer Units
     let classificationMLMGP()=
         printfn "Training 2 Layer MLMGP on abalone dataset age classification"
 
@@ -155,25 +201,15 @@ module Program =
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
 
-        let trainCfg : Train.Cfg = {    
-            Seed               = 100   
-            BatchSize          = 500 
-            LossRecordInterval = 10                                   
-            Termination        = Train.ItersWithoutImprovement 100
-            MinImprovement     = 1e-7  
-            TargetLoss         = None  
-            MinIters           = Some 100 
-            MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
-            CheckpointDir      = None  
-            DiscardCheckpoint  = false 
-            DumpPrefix         = None
-            }
+        let trainCfg : Train.Cfg = {Train.defaultCfg with   BatchSize          = 500
+                                                            Termination        = Train.ItersWithoutImprovement 100
+                                                            DumpPrefix         = None}
         let result = Train.train trainable data trainCfg
 
 
         ()
-
+    
+    ///classification on abalone dataset using a multilayer perceptron
     let classificationMLP()=
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
 //        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
@@ -212,7 +248,10 @@ module Program =
         let mi = mb.Instantiate dev
         // loss expression
         let loss = MLP.loss mlp input.T target.T
-
+        
+        let pred = MLP.pred mlp input.T
+        let pred_fun =  mi.Func pred.T |> arg1 input 
+        
         // optimizer
         let opt =  Adam (loss, mi.ParameterVector, DevCuda)
         let optCfg =opt.DefaultCfg
@@ -224,26 +263,20 @@ module Program =
 
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
-
-        let trainCfg : Train.Cfg = {    
-            Seed               = 100   
-            BatchSize          = 500 
-            LossRecordInterval = 10                                   
-            Termination        = Train.ItersWithoutImprovement 100
-            MinImprovement     = 1e-7  
-            TargetLoss         = None  
-            MinIters           = Some 100 
-            MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
-            CheckpointDir      = None  
-            DiscardCheckpoint  = false 
-            DumpPrefix         = None
-            }
-
+        let batchSize = 500
+        let trainCfg= {Train.defaultCfg with   BatchSize          = batchSize
+                                               Termination        = Train.ItersWithoutImprovement 100
+                                               DumpPrefix         = None}
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors before training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         let result = Train.train trainable data trainCfg
-
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors after training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         ()
     
+    ///regression on abalone dataset using a single GPTransfer Unit
     let regressionGPTransferUnit()=
         printfn "Training one GPTransfer Unit on abalone dataset age regression"
         
@@ -275,14 +308,9 @@ module Program =
         mb.SetSize nClass (fullRegressionDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
 
-        printfn "nInput=\n%A" (fullRegressionDataset.[0].Input |> ArrayND.nElems)
-        printfn "nClass=\n%A" (fullRegressionDataset.[0].Target |> ArrayND.nElems)
-        printfn "mb=\n%A" mb.PrettyString
-
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
-                
-        
+
         //loss expression
         let loss = LossLayer.loss LossLayer.MSE pred.T target.T
 
@@ -298,25 +326,15 @@ module Program =
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
 
-        let trainCfg : Train.Cfg = {    
-            Seed               = 100   
-            BatchSize          = 500 
-            //BatchSize          = 10
-            LossRecordInterval = 10                                   
-            Termination        = Train.ItersWithoutImprovement 100
-            MinImprovement     = 1e-7  
-            TargetLoss         = None  
-            MinIters           = Some 100 
-            MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
-            CheckpointDir      = None  
-            DiscardCheckpoint  = false 
-            DumpPrefix         = None
-            }
+        let trainCfg = {Train.defaultCfg with   BatchSize          = 500
+                                                Termination        = Train.ItersWithoutImprovement 100
+                                                DumpPrefix         = None}
 
         let result = Train.train trainable data trainCfg
+        
         ()
-
+    
+    ///regressionn on abalone dataset using a multilayer perceptron
     let regressionMLP()=
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
 //        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
@@ -369,20 +387,9 @@ module Program =
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
 
-        let trainCfg : Train.Cfg = {    
-            Seed               = 100   
-            BatchSize          = 500 
-            LossRecordInterval = 10                                   
-            Termination        = Train.ItersWithoutImprovement 100
-            MinImprovement     = 1e-7  
-            TargetLoss         = None  
-            MinIters           = Some 100 
-            MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
-            CheckpointDir      = None  
-            DiscardCheckpoint  = false 
-            DumpPrefix         = None
-            }
+        let trainCfg = {Train.defaultCfg with   BatchSize          = 500
+                                                Termination        = Train.ItersWithoutImprovement 100
+                                                DumpPrefix         = None}
 
         let result = Train.train trainable data trainCfg
 
@@ -410,7 +417,7 @@ module Program =
         classificationGPTransferUnit ()
 //        Dump.stop()
 //        classificationMLMGP ()
-//        classificationMLP ()
+        classificationMLP ()
 
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda

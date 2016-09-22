@@ -65,6 +65,7 @@ let trainCfg : Train.Cfg = {
     LearningRates      = [1e-3; 1e-4; 1e-5]                               
     CheckpointDir      = None  
     DiscardCheckpoint  = false 
+    DumpPrefix         = None
 } 
 
 
