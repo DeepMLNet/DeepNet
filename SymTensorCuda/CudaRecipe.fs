@@ -238,8 +238,7 @@ module CudaRecipe =
 
                     let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
-                | WaitOnRerunEvent evtp ->
-                    let evt = Option.get !evtp
+                | WaitOnRerunEvent evt ->
                     let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
                 | EmitEvent evtp ->
@@ -249,7 +248,8 @@ module CudaRecipe =
 
                     let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
-                | EmitRerunEvent evt ->
+                | EmitRerunEvent evtp ->
+                    let evt = Option.get !evtp
                     let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
                     cmd :: generate streamCallHistory activeEvents remainingStreams
                 | Perform cmd ->
@@ -361,6 +361,7 @@ module CudaRecipe =
             let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)
             printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
 
+        exit 0
 
         {
             KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache

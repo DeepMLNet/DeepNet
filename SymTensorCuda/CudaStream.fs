@@ -1,6 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
 open System.Diagnostics
+open System.Collections.Generic
 
 open Basics
 open SymTensor
@@ -18,14 +19,14 @@ module CudaCmdTypes =
         | Perform                   of 'e
         | WaitOnEvent               of EventT
         | EmitEvent                 of EventPlaceHolderT
-        | WaitOnRerunEvent          of EventPlaceHolderT
-        | EmitRerunEvent            of EventT
+        | WaitOnRerunEvent          of EventT
+        | EmitRerunEvent            of EventPlaceHolderT
         | RerunSatisfied            of ExecUnitIdT
         | ExecUnitStart             of ExecUnitIdT
         | ExecUnitEnd               of ExecUnitIdT
 
     /// a sequence of commands executed on a stream
-    type StreamCmdsT<'e> = List<CudaCmdT<'e>>
+    type StreamCmdsT<'e> = CudaCmdT<'e> list
 
 
 module CudaStreamSeq =
@@ -33,10 +34,7 @@ module CudaStreamSeq =
     /// converts execution units to stream commands
     let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
         /// collection of ExecUnits we have to process
-        let sw = Stopwatch.StartNew()
         let coll = ExecUnit.Collection execUnits
-        if Compiler.Cuda.Debug.Timing then
-            printfn "Creating ExecUnit collection took %A" sw.Elapsed
 
         /// event counter
         let mutable eventObjectCnt = 0
@@ -50,8 +48,9 @@ module CudaStreamSeq =
         let mutable eventOfUnit : Map<ExecUnitIdT, EventT> = Map.empty
         /// placeholder for an event
         let mutable eventPlaceHolders : Map<ExecUnitIdT, EventPlaceHolderT> = Map.empty
-        /// event placeholders that are waiting for the RerunAfter event of the ExecUnit
-        let mutable rerunEventWaiters : Map<ExecUnitIdT, ResizeArray<EventPlaceHolderT>> = Map.empty
+        /// rerun events
+        let rerunEvents = Dictionary<ExecUnitIdT, EventPlaceHolderT> ()
+
         /// ExecUnits that still need to be processed
         let mutable execUnitsToProcess = execUnits
         /// ExecUnitIds that have already been processed
@@ -163,6 +162,23 @@ module CudaStreamSeq =
             | Some id -> id
             | None -> newEventObjectId ()
 
+        /// gets the rerun event for waiting on the ExecUnit with id rraId
+        let getRerunEvent (rraId: ExecUnitIdT) =
+            match !rerunEvents.[rraId] with
+            | Some evt -> evt
+            | None ->
+                let evt = {
+                    EventObjectId=newEventObjectId()
+                    CorrelationId=newCorrelationId() 
+                    EmittingExecUnitId=rraId
+                }               
+                rerunEvents.[rraId] := Some evt
+                evt
+
+        // create rerun event placeholders
+        for eu in execUnits do
+            rerunEvents.Add (eu.Id, ref None)           
+
         // generate streams
         while not execUnitsToProcess.IsEmpty do
             // find an execution unit that has all dependencies satisfied
@@ -220,22 +236,8 @@ module CudaStreamSeq =
             let rerunsMissing = rerunsRequired - rerunsSatisfiedByDeps - rerunsSatisfiedOnStream |> Set.toList
 
             // wait until missing RerunAfter constraints are satisfied
-            if not (List.isEmpty rerunsMissing) then
-                // emit an placeholder WaitOnRerunEvent 
-                let evtPh = ref None
-                WaitOnRerunEvent evtPh |> emitToStream euStream
-                // add ourselves to the list of event waiters of the ExecUnitTs we are allowed to rerun after
-                for rraId in eu.RerunAfter do
-                    if processedExecUnitIds.Contains rraId then
-                        failwithf "cannot add ExecUnit %d to rerun event waiters of ExecUnit %d because \
-                                   the second has been processed already" eu.Id rraId
-
-                    match rerunEventWaiters |> Map.tryFind rraId with
-                    | Some waiters -> waiters.Add evtPh
-                    | None ->
-                        let waiters = ResizeArray<EventPlaceHolderT>()
-                        waiters.Add evtPh
-                        rerunEventWaiters <- rerunEventWaiters |> Map.add rraId waiters
+            for missingRraId in rerunsMissing do
+                WaitOnRerunEvent (getRerunEvent missingRraId) |> emitToStream euStream
 
             // emit that the missing RerunAfter constraints are now satisfied in this stream
             let rerunsUnmarkedOnStream = (rerunsSatisfiedByDeps + rerunsRequired) - rerunsSatisfiedOnStream
@@ -251,19 +253,8 @@ module CudaStreamSeq =
             eventPlaceHolders <- eventPlaceHolders |> Map.add eu.Id evtPh
             EmitEvent evtPh |> emitToStream euStream
 
-            // check if we need to emit a rerun event
-            match rerunEventWaiters |> Map.tryFind eu.Id with
-            | Some waiters ->
-                // create new event and emit it
-                let evt = {EventObjectId=newEventObjectId(); 
-                           CorrelationId=newCorrelationId(); 
-                           EmittingExecUnitId=eu.Id}
-                EmitRerunEvent evt |> emitToStream euStream
-
-                // fill event into all waiters
-                for evtPh in waiters do
-                    evtPh := Some evt
-            | None -> ()
+            // emit rerun event
+            EmitRerunEvent rerunEvents.[eu.Id] |> emitToStream euStream
 
             // emit ExecUnit end marker
             ExecUnitEnd eu.Id |> emitToStream euStream
@@ -272,13 +263,14 @@ module CudaStreamSeq =
             execUnitsToProcess <- execUnitsToProcess |> List.withoutValue eu
             processedExecUnitIds <- processedExecUnitIds |> Set.add eu.Id
 
-        // remove empty EmitEvent placeholders
+        // remove empty EmitEvent and EmitRerunEvent placeholders
         let streams = 
             streams 
             |> Seq.map (
                 Seq.filter (fun op -> 
                     match op with
                     | EmitEvent re when !re = None -> false
+                    | EmitRerunEvent re when !re = None -> false
                     | _ -> true)
                 >> Seq.toList)
             |> Seq.toList
