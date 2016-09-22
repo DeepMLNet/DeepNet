@@ -90,7 +90,6 @@
     <EmbeddedResource Include="..\SymTensorCudaSup\Subtensor.cuh">
       <Link>Subtensor.cuh</Link>
     </EmbeddedResource>
-    <Content Include="OldStreamEventCode.txt" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
