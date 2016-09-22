@@ -357,9 +357,13 @@ module CudaRecipe =
             printfn "Stream generation:      %A" timeForStreams
             printfn "Op generation:          %A" timeForOps
             printfn "Call generation:        %A" timeForCalls
-        if Debug.MemUsage then
+        if Debug.ResourceUsage then
             let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)
+            let cmdCounts = List.concat streams |> List.length
             printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
+            printfn "Used CUDA streams:      %d" streams.Length
+            printfn "Used CUDA events:       %d" eventObjCnt
+            printfn "Total CUDA work calls:  %d" cmdCounts
 
         exit 0
 

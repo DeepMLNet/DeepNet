@@ -15,7 +15,7 @@ module Debug =
     let mutable Timing = false
 
     /// prints CUDA memory usage during CUDA function compilation
-    let mutable MemUsage = false
+    let mutable ResourceUsage = false
 
     /// prints each compile step during compilation
     let mutable TraceCompile = false

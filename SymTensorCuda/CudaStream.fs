@@ -31,6 +31,12 @@ module CudaCmdTypes =
 
 module CudaStreamSeq =
 
+    type private StreamReuse = {
+        Stream:                     StreamT
+        mutable StreamAvailable:    bool
+        CandidateUnits:             Set<ExecUnitIdT>
+    }
+
     /// converts execution units to stream commands
     let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
         /// collection of ExecUnits we have to process
@@ -50,6 +56,8 @@ module CudaStreamSeq =
         let mutable eventPlaceHolders = Dictionary<ExecUnitIdT, EventPlaceHolderT> ()
         /// rerun events
         let rerunEvent = Dictionary<ExecUnitIdT, EventPlaceHolderT> ()
+
+        let streamReuse = Dictionary<ExecUnitIdT, StreamReuse> ()
 
         /// ExecUnits that still need to be processed
         let execUnitsToProcess = Queue (execUnits)
@@ -188,26 +196,73 @@ module CudaStreamSeq =
             if dependsSatisfied eu then
                 // depends satisfied, process execution unit
 
-                // find a stream to run the execution unit on
+                // Check if an existing stream can be reused for this execution unit.
+                let streamToReuse =
+                    // Try to take over the stream of a unit we depend on directly.
+                    let streamTakeOverCands = 
+                        coll.DependsOn eu
+                        |> List.choose (fun deu -> 
+                            match streamReuse.[deu.Id] with
+                            | {StreamAvailable=true} as sr -> Some sr
+                            | {StreamAvailable=false} -> None)
 
-                /// all streams that are reusable below the units we depend on            
-                let availStreams =
-                    coll.DependsOn eu 
-                    |> Seq.collect availableStreamsBelowExecUnit
-                    |> Seq.cache
-                /// all streams of the units we directly depend on, that are reusable below the units we depend on            
-                let streamTakeOverCands = 
-                    eu.DependsOn 
-                    |> Seq.map (fun pId -> streamOfUnit.[pId]) 
-                    |> Seq.filter (fun strm -> availStreams |> Seq.contains strm)
+                    if not (List.isEmpty streamTakeOverCands) then
+                        // Take over the stream with least commands in it.
+                        Some (streamTakeOverCands |> List.minBy (fun sr -> streamLength sr.Stream))
+                    else
+                        // No stream available from a unit we depend on directly.                       
+                        // Build list of streams that can be reused.
+                        let reuseCands = seq {
+                            for deu in coll.DependsOn eu do
+                                for ceuId in streamReuse.[deu.Id].CandidateUnits do
+                                    match streamReuse.[ceuId] with
+                                    | {StreamAvailable=true} as sr -> yield sr
+                                    | {StreamAvailable=false} -> ()
+                        }
+                        // Use the first available reusable stream, if any is available.
+                        Seq.tryHead reuseCands 
 
-                // If we can take over a stream, then take over the one with least commands in it.
-                // Otherwise, use the first available reusable stream or create a new one.
-                let euStream = 
-                    if Seq.isEmpty streamTakeOverCands then 
-                        if Seq.isEmpty availStreams then newStream ()
-                        else Seq.head availStreams
-                    else streamTakeOverCands |> Seq.minBy streamLength
+                // Determine stream of this execution unit.
+                let euStream =
+                    match streamToReuse with
+                    | Some sr -> 
+                        sr.StreamAvailable <- false
+                        sr.Stream
+                    | None -> newStream ()                                  
+
+                // Build stream reuse information for this execution unit.
+                let candidateReuseUnits = [
+                    for deu in coll.DependsOn eu do
+                        let sr = streamReuse.[deu.Id]
+                        if sr.StreamAvailable then yield deu.Id
+                        for ceuId in sr.CandidateUnits do
+                            if streamReuse.[ceuId].StreamAvailable then yield ceuId
+                ]
+                streamReuse.[eu.Id] <- {
+                    Stream          = euStream
+                    StreamAvailable = true
+                    CandidateUnits  = candidateReuseUnits |> Set.ofList 
+                }
+                 
+
+//                /// all streams that are reusable below the units we depend on            
+//                let availStreams =
+//                    coll.DependsOn eu 
+//                    |> Seq.collect availableStreamsBelowExecUnit
+//                    |> Seq.cache
+//                /// all streams of the units we directly depend on, that are reusable below the units we depend on            
+//                let streamTakeOverCands = 
+//                    eu.DependsOn 
+//                    |> Seq.map (fun pId -> streamOfUnit.[pId]) 
+//                    |> Seq.filter (fun strm -> availStreams |> Seq.contains strm)
+//
+//                // If we can take over a stream, then take over the one with least commands in it.
+//                // Otherwise, use the first available reusable stream or create a new one.
+//                let euStream = 
+//                    if Seq.isEmpty streamTakeOverCands then 
+//                        if Seq.isEmpty availStreams then newStream ()
+//                        else Seq.head availStreams
+//                    else streamTakeOverCands |> Seq.minBy streamLength
 
                 // store stream
                 streamOfUnit.Add (eu.Id, euStream)
