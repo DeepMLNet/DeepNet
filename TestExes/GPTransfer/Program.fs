@@ -141,12 +141,12 @@ module Program =
 
         let softmax act = exp act / Expr.sumKeepingAxis 1 (exp act)
         
-        //let pred = softmax pred
+        let pred = softmax pred
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
         //let pred = max pred (Expr.scalar 1e-3f)
-        let pred = pred**2.0f + 1e-3f
+        //let pred = pred**2.0f + 1e-3f
 
         let pred_fun =  mi.Func pred |> arg1 input 
 
@@ -428,11 +428,11 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
-        SymTensor.Compiler.Cuda.Debug.Timing <- true
+//        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
-        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
+//        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
-        SymTensor.Compiler.Cuda.Debug.MemUsage <- true
+//        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
 //        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
 //        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 

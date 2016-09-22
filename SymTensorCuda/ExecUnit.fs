@@ -108,41 +108,38 @@ module ExecUnitsTypes =
 
 module ExecUnit =
 
+    type private ExecUnitList<'e> = ResizeArray<ExecUnitT<'e>>
+
     /// a collection of ExecUnits
-    type Collection<'e> (eus: ExecUnitT<'e> seq) =
-        
-        let eus = eus |> List.ofSeq
+    type Collection<'e> (eus: ExecUnitT<'e> list) =     
+              
+        do if Compiler.Cuda.Debug.TraceCompile then
+            printfn "Creating ExecUnit collection..."
+        let sw = Stopwatch.StartNew()
 
-        let byIdMap =
-            eus
-            |> Seq.map (fun eu -> eu.Id, eu)
-            |> Map.ofSeq
+        let byIdMap = Dictionary<ExecUnitIdT, ExecUnitT<'e>> ()
+        do for eu in eus do
+            byIdMap.Add (eu.Id, eu) |> ignore
 
-        let dependants =
-            let build =
-                seq { for eu in eus -> eu.Id, List<ExecUnitT<_>>()}
-                |> Map.ofSeq
+        let dependants = Dictionary<ExecUnitIdT, ExecUnitList<'e>> ()
+        do
+            for eu in eus do
+                dependants.Add (eu.Id, ResizeArray<ExecUnitT<'e>> ())
             for eu in eus do
                 for d in eu.DependsOn do
-                    build.[d].Add eu
-            build
+                    dependants.[d].Add eu
 
-        let sortedByDep =
-            let unsorted = LinkedList eus
-            let sorted = List<ExecUnitT<'e>> (Seq.length eus)
-        
-            while unsorted.Count > 0 do           
-                let toAdd =
-                    unsorted
-                    |> Seq.filter (fun eu -> 
-                        eu.DependsOn |> List.forall (fun depId ->
-                            sorted |> Seq.exists (fun seu -> seu.Id = depId)))
-            
-                for eu in toAdd |> Seq.toList do
-                    sorted.Add eu |> ignore
-                    unsorted.Remove eu |> ignore
-
-            sorted |> Seq.toList
+        let sortedByDep = ResizeArray<ExecUnitT<'e>> ()
+        do
+            let satisfied = HashSet<ExecUnitIdT> ()
+            let rec addWithDependencies (eu: ExecUnitT<'e>) =
+                if not (satisfied.Contains eu.Id) then
+                    for dep in eu.DependsOn do
+                        addWithDependencies byIdMap.[dep]
+                    sortedByDep.Add eu
+                    satisfied.Add eu.Id |> ignore
+            for eu in eus do
+                addWithDependencies eu
 
         let storesByVar =
             let build = Dictionary<UVarSpecT, List<ExecUnitT<_>>> ()
@@ -154,6 +151,8 @@ module ExecUnit =
                 | _ -> ()
             build         
             
+        do if Compiler.Cuda.Debug.Timing then
+            printfn "Creating ExecUnit collection took %A" sw.Elapsed
 
         /// list of all execution unit contained in this collection
         member this.ExecUnits = eus
@@ -165,10 +164,10 @@ module ExecUnit =
         member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly () :> seq<_>
 
         /// all ExecUnits that eu directly depends on
-        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> Seq.map this.ById
+        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> List.map this.ById
 
         /// a list of ExecUnits in this collection so that an ExecUnit comes after all ExecUnits it depends on
-        member this.SortedByDep = sortedByDep
+        member this.SortedByDep = sortedByDep |> List.ofSeq
        
         /// returns all successors of eu (execution units that depend (indirectly) on eu)
         member this.AllSuccessorsOf (eu: ExecUnitT<'e>) = seq {
@@ -559,12 +558,29 @@ module ExecUnit =
         while exprsWithReqMultiplicity.Count > 0 do
             processEvalRequest ()
             uniqueProcessedRequests <- uniqueProcessedRequests + 1
+        let execUnits = List.ofSeq execUnits
         if Compiler.Cuda.Debug.TraceCompile then
             printfn "Processed %d unique evaluation requests and created %d execution units." 
-                uniqueProcessedRequests execUnits.Count
+                uniqueProcessedRequests execUnits.Length
+        
+        // build variable access and memory access tables
+        let eusByReadVar = Dictionary<UVarSpecT, HashSet<ExecUnitIdT>> ()
+        let eusByAccessMem = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
+        for eu in execUnits do
+            match eu.Expr with
+            | UExpr(ULeafOp (Var vs), _, _) -> 
+                if not (eusByReadVar.ContainsKey vs) then
+                    eusByReadVar.[vs] <- HashSet<ExecUnitIdT> ()
+                eusByReadVar.[vs].Add eu.Id |> ignore
+            | _ -> ()            
+            for m in eu.Manikins do
+                let mem = ArrayNDManikin.storage m
+                if not (eusByAccessMem.ContainsKey mem) then
+                    eusByAccessMem.[mem] <- HashSet<ExecUnitIdT> ()
+                eusByAccessMem.[mem].Add eu.Id |> ignore
 
-        // post-process execUnits
-        let execUnits = List.ofSeq execUnits
+        // add extra dependencies to ExecUnits that execute a StoreToVar operation
+        let sw = Stopwatch.StartNew()
         if Compiler.Cuda.Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
         let execUnits =
             execUnits
@@ -573,36 +589,35 @@ module ExecUnit =
                 | UExpr(UUnaryOp (StoreToVar storeVs), _, _) ->
                     // For every StoreToVar operation:
                     // Find all EUs that read from the variable's memory.
-                    let varMem = MemExternal storeVs
-                    let varAccessIds =
-                        execUnits
-                        |> List.filter (fun ceu ->
-                            let readsVar = 
-                                match ceu.Expr with
-                                | UExpr(ULeafOp (Var readVs), _, _) when readVs = storeVs -> true
-                                | _ -> false
-                            let accessesMemory = 
-                                ceu.Manikins 
-                                |> List.exists (fun m -> ArrayNDManikin.storage m = varMem)
-                            ceu <> eu && (readsVar || accessesMemory))
-                        |> List.map (fun eu -> eu.Id)
+                    let readVarEus =
+                        match eusByReadVar.TryFind storeVs with
+                        | Some eus -> eus |> List.ofSeq
+                        | None -> []
+                    let accessMemEus =
+                        match eusByAccessMem.TryFind (MemExternal storeVs) with
+                        | Some eus -> eus |> List.ofSeq
+                        | None -> []
                         
                     // Add their ids to the StoreToVar EU dependencies, so that 
                     // they are executed before the original variable value 
                     // gets overwritten.
-                    {eu with DependsOn = eu.DependsOn @ varAccessIds}                
+                    let varAccessEus =
+                        readVarEus @ accessMemEus
+                        |> List.filter ((<>) eu.Id)
+                    {eu with DependsOn = eu.DependsOn @ varAccessEus}                
                 | _ -> eu
             )
+        if Compiler.Cuda.Debug.Timing then
+            printfn "Adding StoreToVar dependencies took %A" sw.Elapsed
 
-
-        #if !DISABLE_RERUN_AFTER
         // Build RerunAfter dependencies.
+        #if !DISABLE_RERUN_AFTER
         if Compiler.Cuda.Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
         let sw = Stopwatch.StartNew()
         let execUnits = buildRerunAfter execUnits 
         if Compiler.Cuda.Debug.Timing then
             printfn "Building RerunAfter dependencies took %A" sw.Elapsed
-        #endif // !DISABLE_RERUN_AFTER
+        #endif 
 
         {
             Expr = expr

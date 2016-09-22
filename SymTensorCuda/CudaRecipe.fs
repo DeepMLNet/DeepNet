@@ -1,5 +1,6 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Collections.Generic
 open System.Diagnostics
 
 open ManagedCuda
@@ -165,8 +166,12 @@ module CudaRecipe =
             [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strm, args)]
         | cmd -> [ExecItem (cmd, strm)]
 
+    type private StreamQueue<'c> = Queue<CudaCmdT<'c>>
+
     /// generates a sequence of CUDA calls from streams
-    let generateCalls streams cache =    
+    let generateCalls (streams: StreamCmdsT<CudaExecItemT> list) cache =    
+        let calls = ResizeArray<CudaCallT> ()
+
         /// the number of times WaitOnEvent is called for a particular correlation
         let correlationIdWaiters =
             seq {
@@ -176,98 +181,99 @@ module CudaRecipe =
                         | WaitOnEvent evt -> yield evt.CorrelationId
                         | _ -> ()
             } |> Seq.countBy id |> Map.ofSeq
-        
-        let rec generate streamCallHistory activeEvents streams =
-            if List.exists ((<>) []) streams then
-                // sort streams by call history
-                let streamsSorted = 
-                    streams
-                    |> List.indexed
-                    |> List.sortByDescending (fun (i, strm) ->                         
-                        let callsBetween = 
-                            match streamCallHistory |> List.tryFindIndex ((=) i) with
-                            | Some ord -> ord
-                            | None -> 9999
-                        let syncPenalty = 
-                            match strm with
-                            | EmitEvent _::_ -> 1000
-                            | WaitOnEvent _::_ -> -1000
-                            | _ -> 0
-                        callsBetween + syncPenalty)         
 
-                // find stream to process
-                let strmIdToProcess, strmToProcess = 
-                    try
-                        streamsSorted 
-                        |> List.find (fun (_, strm) ->
-                            match strm with
-                            | WaitOnEvent evt ::_ when 
-                                activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
-                                // WaitOnEvent can only be called when EmitEvent 
-                                // with same CorrelationId has been called before.
-                            | WaitOnEvent _ ::_ -> false
-                            | EmitEvent evtp ::_ ->
-                                match !evtp with
-                                | Some evt when
-                                    activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
-                                    // EmitEvent for a given event must be called
-                                    // after all necessary calls to WaitOnEvent for a previous correlation.
-                                | _ -> true
-                            | [] -> false
-                            | _ -> true)
-                    with
-                    :? System.Collections.Generic.KeyNotFoundException ->
-                        // cannot find a stream that matches above rules
-                        printfn "Error: deadlock during stream sequencing"
-                        printfn "Streams to process:\n%A" streamsSorted
-                        printfn "Active events:\n%A" activeEvents
-                        failwith "deadlock during stream sequencing"
+        // convert stream lists to queues
+        let streams = streams |> List.map (fun strm -> Queue strm)       
 
-                // book keeping
-                let execOp = List.head strmToProcess       
-                let remainingStreams = 
-                    streams 
-                    |> List.map (fun strm -> 
-                        if strm = strmToProcess then List.tail strm
-                        else strm)
+        // active events
+        let activeEventObjects = Dictionary<EventObjectT, int> ()
+        let activeEventCorrelations = Dictionary<int, int> ()
 
-                match execOp with
-                | WaitOnEvent evt ->
-                    // remove active event
-                    let activeEvents = activeEvents |> List.removeValueOnce evt
+        /// the number of total calls since the last call on a particular stream
+        let lastCallOnStream = Dictionary<StreamT, int> ()       
+        for strmId = 0 to streams.Length - 1 do
+            lastCallOnStream.[strmId] <- 0
 
-                    let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
-                    cmd :: generate streamCallHistory activeEvents remainingStreams
-                | WaitOnRerunEvent evtp ->
-                    let evt = Option.get !evtp
-                    let cmd = StreamWaitEvent (strmIdToProcess, evt.EventObjectId)
-                    cmd :: generate streamCallHistory activeEvents remainingStreams
-                | EmitEvent evtp ->
-                    // add active event as many times as it will be waited upon
-                    let evt = Option.get !evtp
-                    let activeEvents = List.replicate correlationIdWaiters.[evt.CorrelationId] evt @ activeEvents
+        while streams |> Seq.exists (fun s -> s.Count > 0) do
+            // Sort streams so that the stream that was called the longest time ago
+            // comes first. This ensures that CUDA stream calls are interleaved
+            // properly.
+            let streamsSorted = 
+                streams
+                |> Seq.indexed
+                |> Seq.sortByDescending (fun (strmId, strm) ->                         
+                    // Prioritze emitting of events and penalize synchronization.
+                    let syncModifier = 
+                        match strm.TryPeek with
+                        | Some (EmitEvent _)   | Some (EmitRerunEvent _)   ->  1000
+                        | Some (WaitOnEvent _) | Some (WaitOnRerunEvent _) -> -1000
+                        | _ -> 0
+                    lastCallOnStream.[strmId] + syncModifier)    
+                |> List.ofSeq     
 
-                    let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
-                    cmd :: generate streamCallHistory activeEvents remainingStreams
-                | EmitRerunEvent evt ->
-                    let cmd = EventRecord (evt.EventObjectId, strmIdToProcess)
-                    cmd :: generate streamCallHistory activeEvents remainingStreams
-                | Perform cmd ->
-                    // perform a non-synchronization operation
-                    let streamCallHistory = strmIdToProcess :: streamCallHistory
+            // find stream to process
+            let strmIdToProcess, strmToProcess = 
+                try
+                    streamsSorted 
+                    |> List.find (fun (_, strm) ->
+                        match strm.TryPeek with
+                        | Some (WaitOnEvent evt) ->
+                            // WaitOnEvent can only be called when EmitEvent 
+                            // with same CorrelationId has been called before.
+                            activeEventCorrelations.GetOrDefault evt.CorrelationId 0 > 0
+                        | Some (EmitEvent evtp) ->
+                            // EmitEvent for a given event must be called
+                            // after all necessary calls to WaitOnEvent for a previous correlation.
+                            activeEventObjects.GetOrDefault (!evtp).Value.EventObjectId 0 = 0 
+                        | Some _ -> true
+                        | None -> false)
+                with :? System.Collections.Generic.KeyNotFoundException ->
+                    // cannot find a stream that matches above rules
+                    printfn "Error: deadlock during stream sequencing"
+                    printfn "Streams to process:\n%A" streamsSorted
+                    printfn "Active event objects:\n%A" activeEventObjects
+                    printfn "Active event correlations:\n%A" activeEventCorrelations
+                    failwith "deadlock during stream sequencing"
 
-                    // generate CUDA call template
-                    let calls = callsForExecItem cmd cache strmIdToProcess
+            // generate call for stream
+            let execOp = strmToProcess.Dequeue ()
+            match execOp with
+            | WaitOnEvent evt ->
+                // remove active event
+                activeEventObjects.[evt.EventObjectId] <- activeEventObjects.[evt.EventObjectId] - 1
+                activeEventCorrelations.[evt.CorrelationId] <- activeEventCorrelations.[evt.CorrelationId] - 1                
 
-                    calls @ generate streamCallHistory activeEvents remainingStreams
-                | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 
-                    // ignore informational markers
-                    generate streamCallHistory activeEvents remainingStreams
-            else
-                // streams are all empty
-                []
+                calls.Add (StreamWaitEvent (strmIdToProcess, evt.EventObjectId))
+            | WaitOnRerunEvent evt ->
+                calls.Add (StreamWaitEvent (strmIdToProcess, evt.EventObjectId))
+            | EmitEvent evtp ->
+                let evt = Option.get !evtp
+                // add active event as many times as it will be waited upon
+                let nWaiters = correlationIdWaiters.[evt.CorrelationId]
+                activeEventObjects.[evt.EventObjectId] <-
+                    activeEventObjects.GetOrDefault evt.EventObjectId 0 + nWaiters
+                activeEventCorrelations.[evt.CorrelationId] <-
+                    activeEventCorrelations.GetOrDefault evt.CorrelationId 0 + nWaiters
 
-        generate [] [] streams
+                calls.Add (EventRecord (evt.EventObjectId, strmIdToProcess))
+            | EmitRerunEvent evtp ->
+                let evt = Option.get !evtp
+                calls.Add (EventRecord (evt.EventObjectId, strmIdToProcess))
+            | Perform cmd ->
+                // perform a non-synchronization operation, i.e. some useful work
+                for strmId=0 to streams.Length - 1 do
+                    lastCallOnStream.[strmId] <-
+                        if strmId = strmIdToProcess then 0
+                        else lastCallOnStream.[strmId] + 1
+
+                // generate CUDA call template
+                let cmdCalls = callsForExecItem cmd cache strmIdToProcess
+                calls.AddRange cmdCalls
+            | RerunSatisfied _ | ExecUnitStart _ | ExecUnitEnd _ -> 
+                // ignore informational markers
+                ()
+
+        calls |> List.ofSeq
 
     /// generates init and dispose calls for CUDA resources
     let generateAllocAndDispose compileEnv memAllocs streamCnt eventObjCnt =
@@ -357,10 +363,13 @@ module CudaRecipe =
             printfn "Stream generation:      %A" timeForStreams
             printfn "Op generation:          %A" timeForOps
             printfn "Call generation:        %A" timeForCalls
-        if Debug.MemUsage then
+        if Debug.ResourceUsage then
             let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)
+            let cmdCounts = List.concat streams |> List.length
             printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
-
+            printfn "Used CUDA streams:      %d" streams.Length
+            printfn "Used CUDA events:       %d" eventObjCnt
+            printfn "Total CUDA exec calls:  %d" execCalls.Length
 
         {
             KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
