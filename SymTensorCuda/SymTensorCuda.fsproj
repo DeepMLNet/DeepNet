@@ -23,7 +23,7 @@
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;OPTIMIZED_STREAM_ASSIGNMENT</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;OPTIMIZED_STREAM_ASSIGNMENT; OPTIMIZED_EVENT_ASSIGNMENT</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Debug\SymTensorCuda.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>

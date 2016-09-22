@@ -37,6 +37,19 @@ module CudaStreamSeq =
         CandidateUnits:             Set<ExecUnitIdT>
     }
 
+    type private EventRelationship = {
+        Emitter:                    ExecUnitIdT
+        Waiter:                     ExecUnitIdT
+    }
+
+    type private EventObjectReuse = {
+        EmittedEvent:               EventPlaceHolderT
+        mutable Available:          bool
+        Waiters:                    HashSet<ExecUnitIdT>
+        WaitedUpon:                 Set<EventRelationship>
+        CandidateUnits:             Set<ExecUnitIdT>  
+    }
+
     /// converts execution units to stream commands
     let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
         /// collection of ExecUnits we have to process
@@ -58,6 +71,7 @@ module CudaStreamSeq =
         let rerunEvent = Dictionary<ExecUnitIdT, EventPlaceHolderT> ()
 
         let streamReuse = Dictionary<ExecUnitIdT, StreamReuse> ()
+        let eventObjectReuse = Dictionary<ExecUnitIdT, EventObjectReuse> ()
 
         /// ExecUnits that still need to be processed
         let execUnitsToProcess = Queue (execUnits)
@@ -276,6 +290,7 @@ module CudaStreamSeq =
                 ExecUnitStart eu.Id |> emitToStream euStream
                
                 // our stream needs to wait on the results of the streams we depend on
+                let euWaitingUponDirectly = ResizeArray<EventRelationship> ()
                 let endingUnits = eu.DependsOn |> Seq.filter (fun pId -> streamOfUnit.[pId] <> euStream)
                 for endingUnitId in endingUnits do            
                     match eventOfUnit.TryFind endingUnitId with
@@ -283,14 +298,55 @@ module CudaStreamSeq =
                         // wait on already emitted event, if possible
                         WaitOnEvent evt |> emitToStream euStream
                     | None ->
-                        // assign an event (either new or reusable) to the last ExecUnit of the ending stream
-                        let evtObjId = findAvailableEventObjectIdFor (coll.ById endingUnitId)
+                        #if OPTIMIZED_EVENT_ASSIGNMENT
+                        // find a reuseable event object or create a new one
+                        let evtObjId =
+                            let eor = eventObjectReuse.[endingUnitId]
+                            let reuseable = seq {
+                                // for all canididate units:
+                                for ceuId in eor.CandidateUnits do
+                                    // check that candidate unit has all its dependants processed
+                                    let ceu = coll.ById ceuId
+                                    let dependantsProcessed =
+                                        coll.DependantsOf ceu   
+                                        |> Seq.forall (fun deu -> processedExecUnitIds.Contains deu.Id)
+                                    if dependantsProcessed then
+                                        // check that candidate unit has available event 
+                                        let ceor = eventObjectReuse.[ceuId]
+                                        if Option.isSome !ceor.EmittedEvent && ceor.Available then
+                                            // check that eu waits upon all waiters of the candidate unit
+                                            let needToWaitUpon = 
+                                                ceor.Waiters
+                                                |> Seq.map (fun waiterId -> {Emitter=ceuId; Waiter=waiterId})
+                                                |> Set.ofSeq
+                                            if Set.isSuperset eor.WaitedUpon needToWaitUpon then
+                                                yield ceor
+                            }
+                            match Seq.tryHead reuseable with
+                            | Some eor ->
+                                eor.Available <- false
+                                (!eor.EmittedEvent).Value.EventObjectId
+                            | None -> newEventObjectId ()
+                        #else
+                        let evtObjId = findAvailableEventObjectIdFor (coll.ById endingUnitId)               
+                        #endif
+
+                        // assign an event to the last ExecUnit of the ending stream
                         let evt = {EventObjectId=evtObjId; CorrelationId=newCorrelationId(); EmittingExecUnitId=endingUnitId}
                         eventOfUnit.Add (endingUnitId, evt)
                 
                         // fill in event placeholder and wait for event
                         eventPlaceHolders.[endingUnitId] := Some evt
                         WaitOnEvent evt |> emitToStream euStream
+
+                    // add this execution unit to the waiters list of units we wait upon
+                    eventObjectReuse.[endingUnitId].Waiters.Add eu.Id |> ignore
+
+                    // add to list of units this units waits upon directly
+                    euWaitingUponDirectly.Add {
+                        Emitter = endingUnitId
+                        Waiter  = eu.Id
+                    }                    
 
                 // find out which RerunAfter constraints are not yet satisfied on this stream
                 let rerunsSatisfiedByDeps =
@@ -318,6 +374,23 @@ module CudaStreamSeq =
                 let evtPh = ref None
                 eventPlaceHolders.Add (eu.Id, evtPh)
                 EmitEvent evtPh |> emitToStream euStream
+
+                // build event reuse information 
+                let waitingUpon = [
+                    yield! euWaitingUponDirectly
+                    for deu in coll.DependsOn eu do
+                        let deor = eventObjectReuse.[deu.Id]
+                        for er in deor.WaitedUpon do
+                            if eventObjectReuse.[er.Emitter].Available then
+                                yield er
+                ]
+                eventObjectReuse.[eu.Id] <- {
+                    EmittedEvent    = evtPh
+                    Available       = true
+                    Waiters         = HashSet<ExecUnitIdT> ()
+                    WaitedUpon      = waitingUpon |> Set.ofList
+                    CandidateUnits  = waitingUpon |> List.map (fun er -> er.Emitter) |> Set.ofList
+                }
 
                 // emit rerun event
                 EmitRerunEvent rerunEvent.[eu.Id] |> emitToStream euStream
