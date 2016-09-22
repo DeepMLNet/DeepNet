@@ -365,8 +365,6 @@ module CudaRecipe =
             printfn "Used CUDA events:       %d" eventObjCnt
             printfn "Total CUDA work calls:  %d" cmdCounts
 
-        //exit 0
-
         {
             KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
             CPPCode        = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache
