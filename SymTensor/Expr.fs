@@ -434,7 +434,7 @@ module Expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<obj>()
+    let checkedExprs = HashSet<System.IComparable> (HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT<'T>) =
