@@ -8,6 +8,7 @@ open Datasets
 open Models
 open Optimizers
 open Models
+open Basics
 
 module Program =
     
@@ -34,43 +35,72 @@ module Program =
     ///Retruns the index of the maximum element alone one axis od an ArrayND
     let maxPositionAxis dim inAry= 
         ArrayND.axisReduce maxPosition dim inAry
+    let aryToHost (ary: ArrayNDT<single>) =
+        match ary with
+        | :?  ArrayNDCudaT<single> as predCuda -> 
+            predCuda.ToHost ()
+        | :? ArrayNDHostT<single> as predHost -> 
+            predHost
+        | _ -> failwith "Array neither on Host nor on Cuda"
+
+    let broadcastWithZeros size (ary:ArrayNDT<single>) = 
+        let inSize = ary.Shape.[0]
+        if inSize < size then
+            let newShape = ary.Shape |> List.set 0 size
+            let tempAry = ary |> ArrayND.newCOfSameType newShape
+            tempAry.[0 .. inSize-1, Fill] <-  ary.[0 .. inSize-1, Fill]
+            tempAry
+        else ary
 
     ///Calculates the number of errors in one batch             
-    let batchClassificationErrors (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (input:ArrayNDT<single>) (target:ArrayNDT<single>) =
-        let predAry = (modelPred input)
-        let aryToHost (ary: ArrayNDT<single>) =
-            match ary with
-            | :?  ArrayNDCudaT<single> as predCuda -> 
-                predCuda.ToHost ()
-            | :? ArrayNDHostT<single> as predHost -> 
-                predHost
-            | _ -> failwith "Array neither on Host nor on Cuda"
-        let pred = aryToHost predAry
-        let targ = aryToHost target
-        let predClass = maxPositionAxis 1 pred
-        let targetClass = maxPositionAxis 1 targ
-        let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
-        let err = Seq.head (ArrayND.allElems errors)
-        err
+    let batchClassificationErrors batchSize (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (input:ArrayNDT<single>) (target:ArrayNDT<single>) =
+        let inSize = input.Shape.[0]
+        if inSize < batchSize then
+            let input = broadcastWithZeros batchSize input
+            let target = broadcastWithZeros batchSize target
+            let predAry = (modelPred input)
+            predAry.[inSize..batchSize - 1,Fill] <- target.[inSize..batchSize - 1,Fill]
+
+            let pred = aryToHost predAry
+            let targ = aryToHost target
+            let predClass = maxPositionAxis 1 pred
+            let targetClass = maxPositionAxis 1 targ
+            let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
+            let err = Seq.head (ArrayND.allElems errors)
+            printfn "errors in batch = %f" err
+            err
+        else
+            let predAry = (modelPred input)
+
+            let pred = aryToHost predAry
+            let targ = aryToHost target
+            let predClass = maxPositionAxis 1 pred
+            let targetClass = maxPositionAxis 1 targ
+            let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
+            let err = Seq.head (ArrayND.allElems errors)
+            printfn "errors in batch = %f" err
+            err
 
     ///Calculates the number of errors in one dataset
-    let setClassificationErrors (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (inSeq: seq<CsvLoader.CsvSample>) =
+    let setClassificationErrors batchSize (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (inSeq: seq<CsvLoader.CsvSample>) =
         let errs =  inSeq
                     |>Seq.map (fun {Input = inp;Target = trg} -> 
-                        batchClassificationErrors modelPred inp  trg )
+                        batchClassificationErrors batchSize modelPred inp  trg )
                     |>Seq.fold (fun acc elem -> acc + elem) 0.0f
+        printfn "errors in set = %f" errs
         errs
+
     ///Calculates the fraction of errors for train-, validation- and test-dataset
-    let classificationErrors batchsize (dataset:TrnValTst<CsvLoader.CsvSample>) (modelPred: ArrayNDT<single> -> ArrayNDT<single>) =
+    let classificationErrors batchSize (dataset:TrnValTst<CsvLoader.CsvSample>) (modelPred: ArrayNDT<single> -> ArrayNDT<single>) =
         let nTrnSmpls = dataset.Trn.NSamples
         let nValSmpls = dataset.Val.NSamples
         let nTstSmpls = dataset.Tst.NSamples
-        let trnBatches = dataset.Trn.PaddedBatches batchsize ()
-        let valBatches = dataset.Val.PaddedBatches batchsize ()
-        let tstBatches = dataset.Tst.PaddedBatches batchsize ()
-        let trnError = setClassificationErrors modelPred trnBatches / (single nTrnSmpls)
-        let valError = setClassificationErrors modelPred valBatches / (single nValSmpls)                
-        let tstError = setClassificationErrors modelPred tstBatches / (single nTstSmpls)
+        let trnBatches = dataset.Trn.Batches batchSize 
+        let valBatches = dataset.Val.Batches batchSize 
+        let tstBatches = dataset.Tst.Batches batchSize 
+        let trnError = setClassificationErrors batchSize modelPred trnBatches  / (single nTrnSmpls)
+        let valError = setClassificationErrors batchSize modelPred valBatches  / (single nValSmpls)                
+        let tstError = setClassificationErrors batchSize modelPred tstBatches  / (single nTstSmpls)
         trnError,valError,tstError
 
     ///classification on abalone dataset using a single GPTransfer Unit
@@ -414,10 +444,10 @@ module Program =
 //        regressionGPTransferUnit ()
 
 //        Dump.start "gptraindump.h5"
-//        classificationGPTransferUnit ()
+        classificationGPTransferUnit ()
 //        Dump.stop()
 //        classificationMLMGP ()
-        classificationMLP ()
+//        classificationMLP ()
 
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
