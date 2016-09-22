@@ -19,7 +19,11 @@ open DiskMap
 
 module Compile = 
 
-    type ModCacheKey = {Code: string; HeaderHashes: Map<string, byte list>; CompilerArgs: string list}
+    type ModCacheKey = {
+        Code:           string
+        HeaderHashes:   Map<string, byte list>
+        CompilerArgs:   string list
+    }
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
@@ -30,14 +34,6 @@ module Compile =
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
     let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
-
-    /// modification time of C++ header files
-    //let headerModTimes =
-    //    let includePath = Util.assemblyDirectory
-    //    Directory.EnumerateFiles(includePath, "*.cuh")
-    //    |> Seq.map (fun headerFile ->
-    //        Path.GetFileName headerFile, File.GetLastWriteTimeUtc headerFile)
-    //    |> Map.ofSeq
 
     /// prepares a compile directory
     let prepareCompileDir code =        
@@ -128,16 +124,14 @@ module Compile =
                     printfn "%s" log
                     exit 1
                 let log = cmplr.GetLogAsString()
-                printfn "%s" log
+                printf "%s" log
 
                 let ptx = cmplr.GetPTX()
                 krnlPtxCache.Set cacheKey ptx
                 ptx    
 
         #if !CUDA_DUMMY
-
-        //printfn "CUDA jitting of %s:" modName
-        
+       
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
         jitOpts.Add(jitInfoBuffer)
@@ -153,7 +147,6 @@ module Compile =
         //printfn "%s" jitInfoBuffer.Value   
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
-        //printfn "JIT done."
 
         let krnls =
             krnlNames
@@ -176,7 +169,9 @@ module Compile =
 
     /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
     /// functions objects for the specified C function names.
-    let loadCppCode modCode (funcDelegates: Map<string, System.Type>)  =
+    let loadCppCode modCode (funcDelegates: Map<string, System.Type>) =
+        if Debug.DumpCode then dumpCode modCode
+
         let compileDir, modPath, headerHashes = prepareCompileDir modCode
         let libPath = Path.Combine (compileDir, "mod.dll")
 
@@ -318,8 +313,14 @@ module CudaExprWorkspaceTypes =
 
         // compile and load CUDA C++ host/device module
         /// C++ functions
-        let cFuncs, cLibHndl, cCompileDir = Compile.loadCppCode recipe.CPPCode cFuncDelegates
+        let cFuncs, cLibHndl, cCompileDir = 
+            if not (Map.isEmpty cFuncDelegates) then
+                let cFuncs, cLibHndl, cCompileDir = Compile.loadCppCode recipe.CPPCode cFuncDelegates
+                cFuncs, Some cLibHndl, Some cCompileDir
+            else
+                Map.empty, None, None
     
+        /// get CUstream of stream object
         let getStream strm = 
             if Debug.DisableStreams then CUstream.NullStream
             else execEnv.Stream.[strm].Stream
@@ -688,8 +689,11 @@ module CudaExprWorkspaceTypes =
                     CudaSup.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
-                Compile.unloadCppCode cLibHndl
-                Compile.removeCompileDir cCompileDir
+                match cLibHndl, cCompileDir with
+                | Some cLibHndl, Some cCompileDir ->
+                    Compile.unloadCppCode cLibHndl
+                    Compile.removeCompileDir cCompileDir
+                | _ -> ()
                 Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 
