@@ -170,6 +170,8 @@ module CudaRecipe =
 
     /// generates a sequence of CUDA calls from streams
     let generateCalls (streams: StreamCmdsT<CudaExecItemT> list) cache =    
+        let calls = ResizeArray<CudaCallT> ()
+
         /// the number of times WaitOnEvent is called for a particular correlation
         let correlationIdWaiters =
             seq {
@@ -180,15 +182,15 @@ module CudaRecipe =
                         | _ -> ()
             } |> Seq.countBy id |> Map.ofSeq
 
-        let streams = streams |> List.map (fun strm -> Queue strm)
-        
-        let calls = ResizeArray<CudaCallT> ()
+        // convert stream lists to queues
+        let streams = streams |> List.map (fun strm -> Queue strm)       
+
+        // active events
         let activeEventObjects = Dictionary<EventObjectT, int> ()
         let activeEventCorrelations = Dictionary<int, int> ()
-        let lastCallOnStream = Dictionary<StreamT, int> ()
-        
-        //let rec generate streamCallHistory activeEvents streams =
-      
+
+        /// the number of total calls since the last call on a particular stream
+        let lastCallOnStream = Dictionary<StreamT, int> ()       
         for strmId = 0 to streams.Length - 1 do
             lastCallOnStream.[strmId] <- 0
 
@@ -215,22 +217,16 @@ module CudaRecipe =
                     streamsSorted 
                     |> List.find (fun (_, strm) ->
                         match strm.TryPeek with
-                        | Some (WaitOnEvent evt) 
-                            when activeEventCorrelations.GetOrDefault evt.CorrelationId 0 > 0 -> true
-                            //activeEvents |> List.exists (fun e -> e.CorrelationId = evt.CorrelationId) -> true
+                        | Some (WaitOnEvent evt) ->
                             // WaitOnEvent can only be called when EmitEvent 
                             // with same CorrelationId has been called before.
-                        | Some (WaitOnEvent _) -> false
+                            activeEventCorrelations.GetOrDefault evt.CorrelationId 0 > 0
                         | Some (EmitEvent evtp) ->
-                            match !evtp with
-                            | Some evt when
-                                activeEventObjects.GetOrDefault evt.EventObjectId 0 > 0 -> false
-                                //activeEvents |> List.exists (fun e -> e.EventObjectId = evt.EventObjectId) -> false
-                                // EmitEvent for a given event must be called
-                                // after all necessary calls to WaitOnEvent for a previous correlation.
-                            | _ -> true
-                        | None -> false
-                        | _ -> true)
+                            // EmitEvent for a given event must be called
+                            // after all necessary calls to WaitOnEvent for a previous correlation.
+                            activeEventObjects.GetOrDefault (!evtp).Value.EventObjectId 0 = 0 
+                        | Some _ -> true
+                        | None -> false)
                 with :? System.Collections.Generic.KeyNotFoundException ->
                     // cannot find a stream that matches above rules
                     printfn "Error: deadlock during stream sequencing"
@@ -269,7 +265,6 @@ module CudaRecipe =
                     lastCallOnStream.[strmId] <-
                         if strmId = strmIdToProcess then 0
                         else lastCallOnStream.[strmId] + 1
-                //let streamCallHistory = strmIdToProcess :: streamCallHistory
 
                 // generate CUDA call template
                 let cmdCalls = callsForExecItem cmd cache strmIdToProcess
@@ -279,7 +274,6 @@ module CudaRecipe =
                 ()
 
         calls |> List.ofSeq
-        //generate [] [] streams
 
     /// generates init and dispose calls for CUDA resources
     let generateAllocAndDispose compileEnv memAllocs streamCnt eventObjCnt =
@@ -375,9 +369,7 @@ module CudaRecipe =
             printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
             printfn "Used CUDA streams:      %d" streams.Length
             printfn "Used CUDA events:       %d" eventObjCnt
-            printfn "Total CUDA work calls:  %d" cmdCounts
-
-        //exit 0
+            printfn "Total CUDA exec calls:  %d" execCalls.Length
 
         {
             KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
