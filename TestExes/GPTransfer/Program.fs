@@ -62,12 +62,12 @@ module Program =
 
         let softmax act = exp act / Expr.sumKeepingAxis 1 (exp act)
         
-        //let pred = softmax pred
+        let pred = softmax pred
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
         //let pred = max pred (Expr.scalar 1e-3f)
-        let pred = pred**2.0f + 1e-3f
+        //let pred = pred**2.0f + 1e-3f
 
         // loss expression
         let loss = LossLayer.loss LossLayer.CrossEntropy pred.T target.T

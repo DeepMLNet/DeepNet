@@ -558,12 +558,28 @@ module ExecUnit =
         while exprsWithReqMultiplicity.Count > 0 do
             processEvalRequest ()
             uniqueProcessedRequests <- uniqueProcessedRequests + 1
+        let execUnits = List.ofSeq execUnits
         if Compiler.Cuda.Debug.TraceCompile then
             printfn "Processed %d unique evaluation requests and created %d execution units." 
-                uniqueProcessedRequests execUnits.Count
+                uniqueProcessedRequests execUnits.Length
+        
+        // build variable access and memory access tables
+        let eusByReadVar = Dictionary<UVarSpecT, HashSet<ExecUnitIdT>> ()
+        let eusByAccessMem = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
+        for eu in execUnits do
+            match eu.Expr with
+            | UExpr(ULeafOp (Var vs), _, _) -> 
+                if not (eusByReadVar.ContainsKey vs) then
+                    eusByReadVar.[vs] <- HashSet<ExecUnitIdT> ()
+                eusByReadVar.[vs].Add eu.Id |> ignore
+            | _ -> ()            
+            for m in eu.Manikins do
+                let mem = ArrayNDManikin.storage m
+                if not (eusByAccessMem.ContainsKey mem) then
+                    eusByAccessMem.[mem] <- HashSet<ExecUnitIdT> ()
+                eusByAccessMem.[mem].Add eu.Id |> ignore
 
-        // post-process execUnits
-        let execUnits = List.ofSeq execUnits
+        // add extra dependencies to ExecUnits that execute a StoreToVar operation
         let sw = Stopwatch.StartNew()
         if Compiler.Cuda.Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
         let execUnits =
@@ -573,37 +589,35 @@ module ExecUnit =
                 | UExpr(UUnaryOp (StoreToVar storeVs), _, _) ->
                     // For every StoreToVar operation:
                     // Find all EUs that read from the variable's memory.
-                    let varMem = MemExternal storeVs
-                    let varAccessIds =
-                        execUnits
-                        |> List.filter (fun ceu ->
-                            let readsVar = 
-                                match ceu.Expr with
-                                | UExpr(ULeafOp (Var readVs), _, _) when readVs = storeVs -> true
-                                | _ -> false
-                            let accessesMemory = 
-                                ceu.Manikins 
-                                |> List.exists (fun m -> ArrayNDManikin.storage m = varMem)
-                            ceu <> eu && (readsVar || accessesMemory))
-                        |> List.map (fun eu -> eu.Id)
+                    let readVarEus =
+                        match eusByReadVar.TryFind storeVs with
+                        | Some eus -> eus |> List.ofSeq
+                        | None -> []
+                    let accessMemEus =
+                        match eusByAccessMem.TryFind (MemExternal storeVs) with
+                        | Some eus -> eus |> List.ofSeq
+                        | None -> []
                         
                     // Add their ids to the StoreToVar EU dependencies, so that 
                     // they are executed before the original variable value 
                     // gets overwritten.
-                    {eu with DependsOn = eu.DependsOn @ varAccessIds}                
+                    let varAccessEus =
+                        readVarEus @ accessMemEus
+                        |> List.filter ((<>) eu.Id)
+                    {eu with DependsOn = eu.DependsOn @ varAccessEus}                
                 | _ -> eu
             )
         if Compiler.Cuda.Debug.Timing then
             printfn "Adding StoreToVar dependencies took %A" sw.Elapsed
 
-        #if !DISABLE_RERUN_AFTER
         // Build RerunAfter dependencies.
+        #if !DISABLE_RERUN_AFTER
         if Compiler.Cuda.Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
         let sw = Stopwatch.StartNew()
         let execUnits = buildRerunAfter execUnits 
         if Compiler.Cuda.Debug.Timing then
             printfn "Building RerunAfter dependencies took %A" sw.Elapsed
-        #endif // !DISABLE_RERUN_AFTER
+        #endif 
 
         {
             Expr = expr
