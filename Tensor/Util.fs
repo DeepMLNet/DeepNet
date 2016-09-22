@@ -81,6 +81,7 @@ module Array2D =
 
 
 
+
 [<AutoOpen>]
 module UtilTypes =
 
@@ -89,6 +90,12 @@ module UtilTypes =
 
     [<Measure>]
     type elements
+
+    type System.Collections.Generic.Dictionary<'TKey, 'TValue> with
+        member this.TryFind key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 

@@ -164,7 +164,7 @@ module ExecUnit =
         member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly () :> seq<_>
 
         /// all ExecUnits that eu directly depends on
-        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> Seq.map this.ById
+        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> List.map this.ById
 
         /// a list of ExecUnits in this collection so that an ExecUnit comes after all ExecUnits it depends on
         member this.SortedByDep = sortedByDep |> List.ofSeq
