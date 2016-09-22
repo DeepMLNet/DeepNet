@@ -76,9 +76,9 @@ module Types =
 
     /// a CUDA event that can be used for synchronization
     type EventT = {
-        EventObjectId: int; 
-        CorrelationId: int;     
-        EmittingExecUnitId: int;
+        EventObjectId:          EventObjectT
+        CorrelationId:          int     
+        EmittingExecUnitId:     int
     }
 
     type RegHostMemT = {

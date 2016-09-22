@@ -97,6 +97,16 @@ module UtilTypes =
             if this.TryGetValue (key, value) then Some !value
             else None
 
+        member this.GetOrDefault key dflt =
+            match this.TryFind key with
+            | Some v -> v
+            | None -> dflt
+
+    type System.Collections.Generic.Queue<'T> with
+        member this.TryPeek =
+            if this.Count > 0 then Some (this.Peek())
+            else None
+
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 
     let conv<'T> value : 'T =
