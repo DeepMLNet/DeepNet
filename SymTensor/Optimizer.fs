@@ -61,7 +61,7 @@ module Optimizer =
         | _ -> failwith "not an elements expression"
 
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<System.IComparable, obj> ()
+    let private optimized = Dictionary<System.IComparable, obj> (HashIdentity.Reference)
 
     /// Optimizes an expression.
     let rec optimize (expr: ExprT<'T>) : ExprT<'T> =
