@@ -465,6 +465,12 @@ module ArgTemplates =
             [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
                 let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0; 0]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
+
+        member this.PointerArrayCacheKey env =
+            let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
+            devVar.DevicePointer, memOffset
+
+        member val PointerArrayCacheKeyOnDevice : (CUdeviceptr * int) option = None with get, set
             
         member this.GetPointerArrayDevice env = 
             let devVar, _ = CudaExecEnv.getDevMem env ptrAryDevMem

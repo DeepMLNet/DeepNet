@@ -5,6 +5,12 @@ module Debug =
     /// redirects all stream calls to the null stream
     let mutable DisableStreams = false
 
+    /// disables all events
+    let mutable DisableEvents = false
+
+    /// synchronizes the CUDA context after each call to detect errors
+    let mutable SyncAfterEachCudaCall = false
+
     /// outputs messages when a function / kernel is launched
     let mutable TraceCalls = false
 

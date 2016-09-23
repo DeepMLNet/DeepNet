@@ -349,6 +349,7 @@ module CudaExprWorkspaceTypes =
                         let sizeInBytes = elements * typeSize
                         let ptr = Marshal.AllocHGlobal sizeInBytes
                         let cudaRegMem = new CudaRegisteredHostMemory<byte> (ptr, SizeT sizeInBytes)
+                        cudaRegMem.Register (CUMemHostRegisterFlags.None)
                         execEnv.RegHostMem.Add(mem, {Ptr=ptr; CudaRegHostMem=cudaRegMem})
                 | CudaCallT.MemFree mem ->
                     match mem.Kind with
@@ -358,6 +359,7 @@ module CudaExprWorkspaceTypes =
                             execEnv.InternalMem.Remove mem |> ignore
                     | MemAllocRegHost ->
                         if execEnv.RegHostMem.ContainsKey mem then
+                            execEnv.RegHostMem.[mem].CudaRegHostMem.Unregister ()
                             execEnv.RegHostMem.[mem].CudaRegHostMem.Dispose()
                             Marshal.FreeHGlobal execEnv.RegHostMem.[mem].Ptr
                             execEnv.RegHostMem.Remove mem |> ignore
@@ -377,15 +379,19 @@ module CudaExprWorkspaceTypes =
 
                 // event management
                 | EventCreate (evnt, flags) ->
-                    execEnv.Event.Add(evnt, new CudaEvent(flags))
+                    if not Debug.DisableEvents then
+                        execEnv.Event.Add(evnt, new CudaEvent(flags))
                 | EventDestory evnt ->
-                    if execEnv.Event.ContainsKey evnt then
-                        execEnv.Event.[evnt].Dispose()
-                        execEnv.Event.Remove(evnt) |> ignore
+                    if not Debug.DisableEvents then
+                        if execEnv.Event.ContainsKey evnt then
+                            execEnv.Event.[evnt].Dispose()
+                            execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
-                    execEnv.Event.[evnt].Record(getStream strm)
+                    if not Debug.DisableEvents then
+                        execEnv.Event.[evnt].Record(getStream strm)
                 | EventSynchronize evnt ->
-                    execEnv.Event.[evnt].Synchronize()
+                    if not Debug.DisableEvents then
+                        execEnv.Event.[evnt].Synchronize()
 
                 // texture object management
                 | TextureCreate tex ->
@@ -456,12 +462,9 @@ module CudaExprWorkspaceTypes =
 
                     if Debug.TraceCalls then
                         printfn "Launching kernel %s on stream %d with work dims %A using block dims %A and grid dims %A" 
-                            krnl (getStream strm).Pointer workDim blockDim gridDim
+                            krnl strm workDim blockDim gridDim
 
-                    if Debug.DisableStreams then
-                        kernels.[krnl].Run(argArray) |> ignore
-                    else
-                        kernels.[krnl].RunAsync(getStream strm, argArray)                   
+                    kernels.[krnl].RunAsync(getStream strm, argArray)                   
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
                 | CudaCallT.CallCFunc (name, _, strm, argTmpls) ->
@@ -470,7 +473,7 @@ module CudaExprWorkspaceTypes =
                     let argArray = args |> List.toArray
  
                     if Debug.TraceCalls then
-                        printfn "Calling C function %s on stream %d" name (getStream strm).Pointer
+                        printfn "Calling C function %s on stream %d" name strm
 
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
@@ -498,6 +501,8 @@ module CudaExprWorkspaceTypes =
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, getStream strm)
+                    if Debug.TraceCalls then
+                        printfn "MemcpyHtoD of %d bytes on stream %d" length strm
                 | ExecItem (MemcpyDtoH (src, dst), strm) ->
                     let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
@@ -506,6 +511,8 @@ module CudaExprWorkspaceTypes =
                     use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
                                                                           BasicTypes.SizeT(length))
                     dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
+                    if Debug.TraceCalls then
+                        printfn "MemcpyDtoH of %d bytes on stream %d" length strm
                 | ExecItem (MemsetSingle (value, dst), strm) ->
                     let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
@@ -548,7 +555,7 @@ module CudaExprWorkspaceTypes =
                     if Debug.TraceCalls then
                         printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, \
                                  ldA=%d, ldB=%d, ldTrgt=%d, nSamples=%d" 
-                            (getStream strm).Pointer m n k ldA ldB ldTrgt a.NSamples
+                            strm m n k ldA ldB ldTrgt a.NSamples
 
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
@@ -577,17 +584,20 @@ module CudaExprWorkspaceTypes =
                                                 a.NSamples)
 
                 | ExecItem (BlasInitPointerArray (aryTmpl), strm) ->
-                    let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
-                    let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
-                    for n = 0 to ptrAryValues.Length - 1 do
-                        Marshal.StructureToPtr (ptrAryValues.[n], 
-                                                ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
+                    let cacheKey = aryTmpl.PointerArrayCacheKey execEnv
+                    if aryTmpl.PointerArrayCacheKeyOnDevice <> Some cacheKey then
+                        let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
+                        let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
+                        for n = 0 to ptrAryValues.Length - 1 do
+                            Marshal.StructureToPtr (ptrAryValues.[n], 
+                                                    ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
 
-                    use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
-                    ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+                        use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
+                        ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+                        aryTmpl.PointerArrayCacheKeyOnDevice <- Some cacheKey
 
-                    if Debug.TraceCalls then
-                        printfn "Initializing BLAS pointer array on stream %d" (getStream strm).Pointer
+                        if Debug.TraceCalls then
+                            printfn "Initializing BLAS pointer array on stream %d" strm
 
                 | ExecItem (ExtensionExecItem eei, strm) ->
                     eei.Execute execEnv strm
@@ -606,26 +616,27 @@ module CudaExprWorkspaceTypes =
                         Dump.dumpValue name resHost
 
                 | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
-                    // source counter
-                    let counterVarByteVar, _ = CudaExecEnv.getDevMemForManikin execEnv counter
-                    use counterVarIntVar = new CudaDeviceVariable<int> (counterVarByteVar.DevicePointer)
+                    if Debug.TerminateWhenNonFinite then
+                        // source counter
+                        let counterVarByteVar, _ = CudaExecEnv.getDevMemForManikin execEnv counter
+                        use counterVarIntVar = new CudaDeviceVariable<int> (counterVarByteVar.DevicePointer)
 
-                    // temporary destination
-                    let counterVar : int[] = Array.zeroCreate 1
-                    let gcHnd = GCHandle.Alloc(counterVar, GCHandleType.Pinned)
-                    use counterVarPinned = new CudaRegisteredHostMemory<int>(gcHnd.AddrOfPinnedObject(), SizeT 1)
+                        // temporary destination
+                        let counterVar : int[] = Array.zeroCreate 1
+                        let gcHnd = GCHandle.Alloc(counterVar, GCHandleType.Pinned)
+                        use counterVarPinned = new CudaRegisteredHostMemory<int>(gcHnd.AddrOfPinnedObject(), SizeT 1)
 
-                    // copy from source counter to temporary destination
-                    counterVarPinned.AsyncCopyFromDevice(counterVarIntVar, getStream strm)
+                        // copy from source counter to temporary destination
+                        counterVarPinned.AsyncCopyFromDevice(counterVarIntVar, getStream strm)
 
-                    // add callback when copy is finished
-                    let callback (hStream: CUstream) (status: CUResult) (userData: System.IntPtr) =
-                        gcHnd.Free()
-                        if counterVar.[0] <> 0 then
-                            printfn "Infinity or NaN encountered in %d elements of %s." counterVar.[0] name 
-                            if Debug.TerminateWhenNonFinite then exit 1
-                    use stream = new CudaStream (getStream strm)
-                    stream.AddCallback (CUstreamCallback callback, nativeint 0, CUStreamAddCallbackFlags.None)
+                        // add callback when copy is finished
+                        let callback (hStream: CUstream) (status: CUResult) (userData: System.IntPtr) =
+                            gcHnd.Free()
+                            if counterVar.[0] <> 0 then
+                                printfn "Infinity or NaN encountered in %d elements of %s." counterVar.[0] name 
+                                exit 1
+                        use stream = new CudaStream (getStream strm)
+                        stream.AddCallback (CUstreamCallback callback, nativeint 0, CUStreamAddCallbackFlags.None)
 
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->
@@ -654,8 +665,8 @@ module CudaExprWorkspaceTypes =
 
                 previousCall <- Some call
 
-                if Debug.DisableStreams && not (Trace.isActive ()) then
-                    // synchronize to make sure that CUDA errors occur here
+                // synchronize to make sure that CUDA errors occur here
+                if Debug.SyncAfterEachCudaCall then
                     try
                         CudaSup.context.Synchronize ()
                     with :? CudaException as ex ->

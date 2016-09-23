@@ -299,17 +299,17 @@ module Train =
                     faith <- NoImprovement
                 | _ -> ()
 
-                match cfg.MaxIters with
-                | Some maxIters when iter >= maxIters -> 
-                    printfn "Maximum number of iterations reached"
-                    faith <- IterLimitReached
-                | _ -> ()
                 match cfg.MinIters with
                 | Some minIters when iter < minIters -> 
                     if faith <> Continue then
                         printfn "But continuing since minimum number of iterations %d is not yet reached"
                             minIters
                     faith <- Continue
+                | _ -> ()
+                match cfg.MaxIters with
+                | Some maxIters when iter >= maxIters -> 
+                    printfn "Maximum number of iterations reached"
+                    faith <- IterLimitReached
                 | _ -> ()
 
                 let isNan x = Double.IsInfinity x || Double.IsNaN x
