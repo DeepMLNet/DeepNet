@@ -20,7 +20,7 @@ module Program =
     let classificationData = classificationDataHost.ToCuda()
 
 
-    let parsReg = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8];IntTreatment=CsvLoader.IntAsNumerical}
+    let parsReg = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [7;8];IntTreatment=CsvLoader.IntAsNumerical}
     let fullRegressionData = CsvLoader.loadFile parsReg "abalone.txt" 
     let fullRegressionDataset = Dataset.FromSamples fullRegressionData
     let regressionData = TrnValTst.Of(fullRegressionDataset).ToCuda()
@@ -67,7 +67,6 @@ module Program =
             let targetClass = maxPositionAxis 1 targ
             let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
             let err = Seq.head (ArrayND.allElems errors)
-            printfn "errors in batch = %f" err
             err
         else
             let predAry = (modelPred input)
@@ -78,7 +77,6 @@ module Program =
             let targetClass = maxPositionAxis 1 targ
             let errors = ArrayND.map2TC (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass |> ArrayND.sum
             let err = Seq.head (ArrayND.allElems errors)
-            printfn "errors in batch = %f" err
             err
 
     ///Calculates the number of errors in one dataset
@@ -87,7 +85,6 @@ module Program =
                     |>Seq.map (fun {Input = inp;Target = trg} -> 
                         batchClassificationErrors batchSize modelPred inp  trg )
                     |>Seq.fold (fun acc elem -> acc + elem) 0.0f
-        printfn "errors in set = %f" errs
         errs
 
     ///Calculates the fraction of errors for train-, validation- and test-dataset
@@ -124,7 +121,7 @@ module Program =
         let gptu = 
             GPTransferUnit.pars (mb.Module "GPTUP") 
                 { NInput = nInput
-                  NGPs = nClass
+                  NOutput = nClass
                   NTrnSmpls = nTrn}
                 // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
@@ -137,23 +134,25 @@ module Program =
 
 
         let mi = mb.Instantiate dev
-        let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
+        let pred,_ = GPTransferUnit.pred gptu (InputLayer.transform input)
 
-        let softmax act = exp act / Expr.sumKeepingAxis 1 (exp act)
+        let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
         
-        let pred = softmax pred
+//        let pred = softmax pred + 1e-3f
+        let pred = pred|> Expr.dump "pred"
+        let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
         
         //let pred = max pred (Expr.scalar 1e-3f)
-        //let pred = pred**2.0f + 1e-3f
+//        let pred = pred**2.0f + 1e-3f
 
         let pred_fun =  mi.Func pred |> arg1 input 
 
         // loss expression
-        let loss = LossLayer.loss LossLayer.CrossEntropy pred.T target.T
+        let loss = LossLayer.loss LossLayer.MSE pred.T target.T
         let loss = loss |> Expr.checkFinite "loss"
-
+        let loss = loss |> Expr.dump "loss"
         // optimizer
         let opt = Adam (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
@@ -171,11 +170,15 @@ module Program =
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 20}
-//        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
-//        printfn"Classification errors before training:"
-//        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
+                                                MaxIters           = Some 20
+                                                }
+        //let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        //printfn"Classification errors before training:"
+        //printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         let result = Train.train trainable data trainCfg
+        //printfn "Training Time: %A" sw.Elapsed
+        
+
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors after training:"
         printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
@@ -203,8 +206,8 @@ module Program =
 
         let mlmgp = 
             MLGPT.pars (mb.Module "MLMGP") 
-                { Layers = [{NInput=nInput; NGPs=nHidden; NTrnSmpls=nTrn}
-                            {NInput=nHidden; NGPs=nClass; NTrnSmpls=nTrn}]
+                { Layers = [{NInput=nInput; NOutput=nHidden; NTrnSmpls=nTrn}
+                            {NInput=nHidden; NOutput=nClass; NTrnSmpls=nTrn}]
                   LossMeasure = LossLayer.CrossEntropy }
                 // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
@@ -220,6 +223,9 @@ module Program =
         // loss expression
         let loss = MLGPT.loss mlmgp input target
 
+        let pred,_ = MLGPT.pred mlmgp input
+        let pred_fun =  mi.Func pred |> arg1 input 
+
         // optimizer
         let opt =  Adam (loss, mi.ParameterVector, DevCuda)
         let optCfg =opt.DefaultCfg
@@ -228,15 +234,26 @@ module Program =
             VarEnv.empty
             |> VarEnv.add input smpl.Input
             |> VarEnv.add target smpl.Target
-
+        
+        let batchSize = 500
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
 
-        let trainCfg : Train.Cfg = {Train.defaultCfg with   BatchSize          = 500
+        let trainCfg : Train.Cfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                             Termination        = Train.ItersWithoutImprovement 100
-                                                            DumpPrefix         = None}
+                                                            }
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors before training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
+                
+        let sw = System.Diagnostics.Stopwatch.StartNew()
         let result = Train.train trainable data trainCfg
+        sw.Stop()
+        printfn "Training Time: %A" sw.Elapsed
 
+        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+        printfn"Classification errors after training:"
+        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
 
         ()
     
@@ -245,7 +262,7 @@ module Program =
 //        printfn "Training 2 Layer MLP on letterRecognition dataset"
 //        let fullDataset = (DataParser.loadSingleDataset "letter-recognition.data.txt" [0] ',')
         
-        printfn "Training 2 Layer MLP on abalone dataset age classification"
+        printfn "Training 1 Layer MLP on abalone dataset age classification"
 
         let dev = DevCuda
 
@@ -264,9 +281,10 @@ module Program =
        // define model parameters
         let mlp = 
             MLP.pars (mb.Module "MLP") 
-                { Layers = [{NInput=nInput; NOutput=nHidden; TransferFunc=NeuralLayer.Tanh}
-                            {NInput=nHidden; NOutput=nClass; TransferFunc=NeuralLayer.SoftMax}]
-                  LossMeasure = LossLayer.CrossEntropy }
+                { Layers = [
+//                            {NInput=nInput; NOutput=nHidden; TransferFunc=NeuralLayer.Tanh}
+                            {NInput=nInput; NOutput=nClass; TransferFunc=NeuralLayer.SoftMax}]
+                  LossMeasure = LossLayer.MSE }
         // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
         let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
@@ -296,12 +314,20 @@ module Program =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
         let batchSize = 500
         let trainCfg= {Train.defaultCfg with   BatchSize          = batchSize
+                                               LossRecordInterval = 20
                                                Termination        = Train.ItersWithoutImprovement 100
-                                               DumpPrefix         = None}
+                                               MaxIters           = Some 20
+//                                               DumpPrefix         = Some "MLP"
+                                               }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors before training:"
         printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
+                
+        let sw = System.Diagnostics.Stopwatch.StartNew()
         let result = Train.train trainable data trainCfg
+        result.Save "result.json"
+        printfn "Training Time: %A" sw.Elapsed
+
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors after training:"
         printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
@@ -328,7 +354,7 @@ module Program =
         let gptu = 
             GPTransferUnit.pars (mb.Module "GPTUP") 
                 { NInput = nInput
-                  NGPs = nClass
+                  NOutput = nClass
                   NTrnSmpls = nTrn}
                 // define variables
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
@@ -339,6 +365,8 @@ module Program =
         mb.SetSize nClass (fullRegressionDataset.[0].Target |> ArrayND.nElems)
         mb.SetSize nTrn 20
 
+        printfn "shapeInputs = %A" (fullRegressionDataset.[0].Input |> ArrayND.shape)
+        printfn "shapeTargets = %A" (fullRegressionDataset.[0].Target |> ArrayND.shape)
         let mi = mb.Instantiate dev
         let pred, _ = GPTransferUnit.pred gptu (InputLayer.transform input)
 
@@ -362,6 +390,7 @@ module Program =
                                                 DumpPrefix         = None}
 
         let result = Train.train trainable data trainCfg
+        result.Save "result.json"
         
         ()
     
@@ -396,7 +425,6 @@ module Program =
         let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
         let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
 
-
         // instantiate model
         mb.SetSize nInput (fullRegressionDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullRegressionDataset.[0].Target |> ArrayND.nElems)
@@ -423,7 +451,7 @@ module Program =
                                                 DumpPrefix         = None}
 
         let result = Train.train trainable data trainCfg
-
+        result.Save "result.json"
 
         ()
     [<EntryPoint>]
@@ -436,11 +464,9 @@ module Program =
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
         SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
-        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
-        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
-        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-        SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
-        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+//        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
+//        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
+//        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 
         //let trc = SymTensor.Trace.startSession "trace"
 
@@ -450,11 +476,11 @@ module Program =
 //        regressionGPTransferUnit ()
 
 //        Dump.start "gptraindump.h5"
-        classificationGPTransferUnit ()
-//        Dump.stop()
+//        Dump.prefix <- sprintf "pre"
+        classificationMLP ()
+//        classificationGPTransferUnit ()
 //        classificationMLMGP ()
-//        classificationMLP ()
-
+//        Dump.stop()
 //        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             

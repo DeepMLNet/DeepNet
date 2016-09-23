@@ -224,7 +224,6 @@ module Train =
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
-        
         // checkpoint data
         let cp =
             match cfg.CheckpointDir with

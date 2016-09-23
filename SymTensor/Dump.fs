@@ -24,6 +24,10 @@ module Dump =
         target.Value.Dispose ()
         target <- None
 
+    let getTarget () =
+        if not (isActive ()) then failwith "no dump session active"
+        target.Value
+
     let dumpValue name value =
         match target with
         | Some t ->

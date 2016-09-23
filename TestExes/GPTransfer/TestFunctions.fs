@@ -66,7 +66,7 @@ module TestFunctions =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
-        let ngps = 3
+        let ngps = 2
         let ntraining = 10
         let ntest = 1
 
@@ -109,9 +109,9 @@ module TestFunctions =
         printfn "Trn_t =\n%A" trn_t_host
 
         //lengthscale vectore hardcoded
-        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
+//        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
 //        //random lengthscale vector
-//        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
+        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
 
         //sigma vector hardcoded
         let trn_sigma_host = (ArrayNDHost.ones<single> [ngps;ntraining]) * sqrt 0.1f
@@ -202,7 +202,7 @@ module TestFunctions =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
-        let ngps = 3
+        let ngps = 1
         let ninputs = 5
         let ntraining = 10
         let ntests = 20
@@ -217,7 +217,7 @@ module TestFunctions =
         let nTrnSmpls    = mb.Size "nTrnSmpls"
 
         let gptu = 
-           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NGPs = nGPs; NTrnSmpls = nTrnSmpls}
+           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NOutput = nGPs; NTrnSmpls = nTrnSmpls}
 
         let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nInputs]
         let pred : ExprT<single> = mb.Var "Pred" [nSmpls; nGPs]
