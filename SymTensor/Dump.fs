@@ -11,6 +11,9 @@ module Dump =
     let mutable prefix = ""
     let mutable private dumpedFullnames : Set<string> = Set []
 
+    let getTarget ()=
+        target
+
     let isActive () =
         target.IsSome
 

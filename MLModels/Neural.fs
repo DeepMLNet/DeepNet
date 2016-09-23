@@ -33,7 +33,9 @@ module LossLayer =
             -(target * log pred + (Expr.one<'T>() - target) * log (Expr.one<'T>() - pred))
             |> Expr.mean
         | CrossEntropy ->
-            -target * log pred
+            let logPred = log pred
+            let logPred = logPred |>Expr.dump "log pred" |> Expr.checkFinite "log pred"
+            -target * logPred
             |> Expr.sumAxis 0
             |> Expr.mean
 
