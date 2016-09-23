@@ -66,7 +66,7 @@ module TestFunctions =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
-        let ngps = 1
+        let ngps = 2
         let ntraining = 10
         let ntest = 1
 
@@ -110,9 +110,8 @@ module TestFunctions =
 
         //lengthscale vectore hardcoded
 //        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
-        let ls_host = [1.0f]  |> ArrayNDHost.ofList 
 //        //random lengthscale vector
-//        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
+        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
 
         //sigma vector hardcoded
         let trn_sigma_host = (ArrayNDHost.ones<single> [ngps;ntraining]) * sqrt 0.1f

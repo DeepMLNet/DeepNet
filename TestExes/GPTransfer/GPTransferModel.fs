@@ -215,7 +215,6 @@ module MultiGPLayer =
     let pred pars (mu, sigma) =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
-        printfn "shapeOf mu = %A" (Expr.shapeOf mu)
         let nSmpls = (Expr.shapeOf mu).[0]
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls

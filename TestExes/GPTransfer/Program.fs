@@ -477,10 +477,10 @@ module Program =
 //        Dump.start "gptraindump.h5"
 //        Dump.prefix <- sprintf "pre"
 //        classificationMLP ()
-        classificationGPTransferUnit ()
+//        classificationGPTransferUnit ()
 //        classificationMLMGP ()
 //        Dump.stop()
-//        TestFunctions.testMultiGPLayer DevHost
+        TestFunctions.testMultiGPLayer DevHost
 //        TestFunctions.testMultiGPLayer DevCuda
             
 //        TestFunctions.TestGPTransferUnit DevHost
