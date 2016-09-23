@@ -170,7 +170,8 @@ module Program =
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
-                                                DumpPrefix         = None}
+                                                DumpPrefix         = None
+                                                MaxIters           = Some 20}
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors before training:"
         printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
@@ -434,7 +435,10 @@ module Program =
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
 //        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-//        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
+        SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
+        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
 
         //let trc = SymTensor.Trace.startSession "trace"
 
@@ -461,6 +465,7 @@ module Program =
 
 
         //let tr = trc.End()
+        Cuda.CudaSup.shutdown ()
         0
 
 
