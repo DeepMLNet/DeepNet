@@ -26,6 +26,9 @@ module Debug =
     /// prints each compile step during compilation
     let mutable TraceCompile = false
 
+    /// prints ptxas verbose information during compilation
+    let mutable PtxasInfo = false
+
     /// dumps kernel code before it is compiled
     let mutable DumpCode = false
 

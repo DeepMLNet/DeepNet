@@ -1,5 +1,6 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Diagnostics
 open System.Runtime.InteropServices
 open System.IO
 open System.Reflection
@@ -116,37 +117,48 @@ module Compile =
             match krnlPtxCache.TryGet cacheKey with
             | Some ptx -> ptx
             | None ->
-                printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
+                let sw = Stopwatch.StartNew ()
+                if Debug.TraceCompile then
+                    printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
                     printfn "%s" log
                     exit 1
-                let log = cmplr.GetLogAsString()
-                printf "%s" log
+                if Debug.TraceCompile then
+                    let log = cmplr.GetLogAsString()
+                    printf "%s" log
+                if Debug.Timing then printfn "nvrtc took %A" sw.Elapsed
 
                 let ptx = cmplr.GetPTX()
-                krnlPtxCache.Set cacheKey ptx
+                krnlPtxCache.Set cacheKey ptx                
                 ptx    
 
         #if !CUDA_DUMMY
+
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then
+            printfn "JITing PTX code..."
        
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
         jitOpts.Add(jitInfoBuffer)
         use jitErrorBuffer = new CudaJOErrorLogBuffer(10000)   
         jitOpts.Add(jitErrorBuffer)
-        //use jitLogVerbose = new CudaJOLogVerbose(true)
-        //jitOpts.Add(jitLogVerbose)
+        use jitLogVerbose = new CudaJOLogVerbose(true)
+        jitOpts.Add(jitLogVerbose)
 
         let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
-        //printfn "%s" jitErrorBuffer.Value
-        //printfn "%s" jitInfoBuffer.Value   
+        if Debug.PtxasInfo then
+            printfn "%s" jitErrorBuffer.Value
+            printfn "%s" jitInfoBuffer.Value   
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
+
+        if Debug.Timing then printfn "JITing PTX code took %A" sw.Elapsed
 
         let krnls =
             krnlNames
