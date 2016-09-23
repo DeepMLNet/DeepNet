@@ -181,7 +181,8 @@ module Func =
     /// of variable sizes and locations is printed.
     let printInstantiations = false
 
-    //type private UExprGenT = SymSizeEnvT -> (UExprT * Set<UVarSpecT> * bool) 
+    /// If true, expressions are not optimized during function creation.
+    let mutable DisableOptimizer = false
 
     type private UExprGenT = {
         Generate:               SymSizeEnvT -> UExprT
@@ -189,7 +190,10 @@ module Func =
     }
 
     let private uExprGenerate baseExpr symSizes =
-        baseExpr |> Expr.substSymSizes symSizes |> UExpr.toUExpr
+        let expr =
+            if DisableOptimizer then baseExpr
+            else Optimizer.optimize baseExpr
+        expr |> Expr.substSymSizes symSizes |> UExpr.toUExpr
 
     let private uExprVarSpecsAndEvalable baseExpr symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes 
