@@ -172,9 +172,9 @@ module Program =
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
                                                 MaxIters           = Some 20}
-        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
-        printfn"Classification errors before training:"
-        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
+//        let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
+//        printfn"Classification errors before training:"
+//        printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
         let result = Train.train trainable data trainCfg
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors after training:"
@@ -428,6 +428,9 @@ module Program =
         ()
     [<EntryPoint>]
     let main argv = 
+
+        SymTensor.Debug.Timing <- true
+        SymTensor.Debug.TraceCompile <- true
 
         SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true

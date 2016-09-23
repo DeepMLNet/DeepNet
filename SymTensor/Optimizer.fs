@@ -60,27 +60,38 @@ module Optimizer =
 
         | _ -> failwith "not an elements expression"
 
-    /// optimizes and expression
-    let rec optimize expr =
-        match expr with
-        | Leaf _ -> expr
+    /// Cache of optimized expressions.
+    let private optimized = Dictionary<System.IComparable, obj> ()
 
-        // combine subsequent reshapes
-        | Unary (Reshape ss, Unary (Reshape _, a)) ->
-            optimize (Unary(Reshape ss, a))
+    /// Optimizes an expression.
+    let rec optimize (expr: ExprT<'T>) : ExprT<'T> =
+        match optimized.TryFind expr with
+        | Some opt -> opt :?> ExprT<'T>
+        | None ->
+            let opt = 
+                match expr with
+                | Leaf _ -> expr
 
-        // remove unnecessary reshapes
-        | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
-            optimize a            
+                // combine subsequent reshapes
+                | Unary (Reshape ss, Unary (Reshape _, a)) ->
+                    optimize (Unary(Reshape ss, a))
 
-        | Unary(op, a) -> Unary(op, optimize a)            
-        | Binary(op, a, b) -> Binary(op, optimize a, optimize b)
+                // remove unnecessary reshapes
+                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
+                    optimize a            
 
-        | Nary (Elements (resShape, elemExpr), es) ->
-            let es = es |> List.map optimize
-            optimizeElements (Nary (Elements (resShape, elemExpr), es))
+                | Unary(op, a) -> Unary(op, optimize a)            
+                | Binary(op, a, b) -> Binary(op, optimize a, optimize b)
 
-        | Nary(op, es) -> Nary(op, List.map optimize es)
+                | Nary (Elements (resShape, elemExpr), es) ->
+                    let es = es |> List.map optimize
+                    optimizeElements (Nary (Elements (resShape, elemExpr), es))
+
+                | Nary(op, es) -> Nary(op, List.map optimize es)
+
+            optimized.[opt] <- opt
+            opt
+
 
 
 

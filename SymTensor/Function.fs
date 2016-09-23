@@ -1,8 +1,29 @@
 ﻿namespace SymTensor
 
+open System.Diagnostics
+
 open Basics
 open ArrayNDNS
 open UExprTypes
+
+
+module Debug = 
+
+    /// If true, then information about function instantiations for a particular set
+    /// of variable sizes and locations is printed.
+    let mutable PrintInstantiations = false
+
+    /// If true, expressions are not optimized during function creation.
+    let mutable DisableOptimizer = false
+
+    /// if true, prints compilation step messages
+    let mutable TraceCompile = false
+
+    /// if true, prints compilation times
+    let mutable Timing = false
+
+
+
 
 [<AutoOpen>]
 module VarEnvTypes = 
@@ -177,23 +198,30 @@ module CompileEnv =
 /// Generates F# function from expressions.
 module Func =
 
-    /// If true, then information about function instantiations for a particular set
-    /// of variable sizes and locations is printed.
-    let printInstantiations = false
-
-    /// If true, expressions are not optimized during function creation.
-    let mutable DisableOptimizer = false
-
     type private UExprGenT = {
         Generate:               SymSizeEnvT -> UExprT
         UVarSpecsAndEvalable:   SymSizeEnvT -> Set<UVarSpecT> * bool       
     }
 
     let private uExprGenerate baseExpr symSizes =
-        let expr =
-            if DisableOptimizer then baseExpr
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then printfn "Optimizing expression..." 
+        let optimizedExpr = 
+            if Debug.DisableOptimizer then baseExpr
             else Optimizer.optimize baseExpr
-        expr |> Expr.substSymSizes symSizes |> UExpr.toUExpr
+        if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
+
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
+        let substExpr = optimizedExpr |> Expr.substSymSizes symSizes
+        if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
+
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then printfn "Converting to UExpr..."
+        let uExpr = UExpr.toUExpr substExpr
+        if Debug.Timing then printfn "Converting to UExpr took %A" sw.Elapsed
+        
+        uExpr
 
     let private uExprVarSpecsAndEvalable baseExpr symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes 
@@ -300,10 +328,10 @@ module Func =
 
                 // compile and cache compiled function if necessary
                 if not (Map.containsKey compileEnv variants) then 
-                    if printInstantiations then printfn "Instantiating new function variant for %A" compileEnv
+                    if Debug.PrintInstantiations then printfn "Instantiating new function variant for %A" compileEnv
                     variants <- variants |> Map.add compileEnv (tryCompile compileEnv true).Value
                 else
-                    if printInstantiations then printfn "Using cached function variant for %A" compileEnv
+                    if Debug.PrintInstantiations then printfn "Using cached function variant for %A" compileEnv
 
                 // evaluate
                 performEval variants.[compileEnv] varEnv

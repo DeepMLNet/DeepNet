@@ -440,10 +440,10 @@ module Expr =
     let rec checkExpr (expr: ExprT<'T>) =
         if not (checkedExprs.Contains expr) then
             let mutable shapesBeingChecked = []
-            let mutable opBeingChecked = ""
+            let mutable opBeingChecked = fun () -> ""
             let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
                 if not (ssa .= ssb) then 
-                    failwithf "%s is incompatiables with shapes %A" opBeingChecked shapesBeingChecked
+                    failwithf "%s is incompatiables with shapes %A" (opBeingChecked()) shapesBeingChecked
             let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
                 List.iter2 (.=) sa sb
 
@@ -455,7 +455,7 @@ module Expr =
                 let sa = shapeOf a
                 let nda = ShapeSpec.nDim sa
                 shapesBeingChecked <- [sa]
-                opBeingChecked <- sprintf "%A" op
+                opBeingChecked <- fun () -> sprintf "%A" op
 
                 match op with
                 | SumAxis(ax) when not (0 <= ax && ax < nda) ->
@@ -500,7 +500,7 @@ module Expr =
                 let sa, sb = shapeOf a, shapeOf b
                 let nda, ndb = ShapeSpec.nDim sa, ShapeSpec.nDim sb
                 shapesBeingChecked <- [sa; sb]
-                opBeingChecked <- sprintf "%A" op
+                opBeingChecked <- fun () -> sprintf "%A" op
 
                 match op with
                 | BinaryElemwiseOp ->
@@ -520,7 +520,7 @@ module Expr =
                 es |> List.iter checkExpr
                 let ss = es |> List.map shapeOf
                 shapesBeingChecked <- ss
-                opBeingChecked <- sprintf "%A" op
+                opBeingChecked <- fun () -> sprintf "%A" op
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
