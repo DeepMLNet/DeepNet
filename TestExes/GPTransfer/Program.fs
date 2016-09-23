@@ -316,7 +316,7 @@ module Program =
         let trainCfg= {Train.defaultCfg with   BatchSize          = batchSize
                                                LossRecordInterval = 20
                                                Termination        = Train.ItersWithoutImprovement 100
-                                               MaxIters           = Some 20
+//                                               MaxIters           = Some 100
 //                                               DumpPrefix         = Some "MLP"
                                                }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
@@ -457,12 +457,12 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
-        SymTensor.Debug.Timing <- true
-        SymTensor.Debug.TraceCompile <- true
+//        SymTensor.Debug.Timing <- true
+//        SymTensor.Debug.TraceCompile <- true
 
-        SymTensor.Compiler.Cuda.Debug.Timing <- true
+//        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
-        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
+//        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
 //        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
