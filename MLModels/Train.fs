@@ -103,6 +103,8 @@ module Train =
         /// If set, during each iteration the dump prefix will be set to the given string
         /// concatenated with the iteration number.
         DumpPrefix:                     string option
+        /// If true parameters from best Iteration are returned as Array option
+        ReturnBestParams:               bool
     } 
 
     /// Default training configuration.
@@ -119,6 +121,7 @@ module Train =
         CheckpointDir               = None
         DiscardCheckpoint           = false
         DumpPrefix                  = None
+        ReturnBestParams            = false
     }
 
     /// training faith
@@ -224,7 +227,6 @@ module Train =
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
-        
         // checkpoint data
         let cp =
             match cfg.CheckpointDir with
@@ -420,15 +422,19 @@ module Train =
                 printfn "Training finished in loaded checkpoint"
                 log, duration, faith
 
-        let bestEntry, _ = TrainingLog.best log
+        let bestEntry, bestPars = TrainingLog.best log
+        
         printfn "Training completed after %d iterations in %A because %A" bestEntry.Iter duration faith
-
-        {
-            History             = List.rev log.History
-            Best                = bestEntry
-            TerminationReason   = faith
-            Duration            = duration
-        }
+        let result = {
+                        History             = List.rev log.History
+                        Best                = bestEntry
+                        TerminationReason   = faith
+                        Duration            = duration
+                        }
+        if cfg.ReturnBestParams then
+            result, Some bestPars
+        else
+            result, None
         
                                   
 
