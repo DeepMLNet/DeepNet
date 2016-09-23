@@ -33,7 +33,7 @@ module MultiGPLayer =
     let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
          let rng = System.Random seed
          //Right now: all GPs equal
-         ArrayNDHost.ones shp
+         ArrayNDHost.ones<single> shp
 
     let internal initTrnX seed (shp: int list) : ArrayNDHostT<single> = 
         let n_gps = shp.[0]
@@ -44,7 +44,7 @@ module MultiGPLayer =
         ArrayND.broadcastToShape shp oneTrn
 
     let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
-        ArrayNDHost.ones shp
+        ArrayNDHost.ones<single> shp
 
     let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<single> = 
         (ArrayNDHost.ones<single> shp) * sqrt 0.1f
@@ -215,7 +215,7 @@ module MultiGPLayer =
     let pred pars (mu, sigma) =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
-
+        printfn "shapeOf mu = %A" (Expr.shapeOf mu)
         let nSmpls = (Expr.shapeOf mu).[0]
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
@@ -391,7 +391,7 @@ module GPTransferUnit =
         NInput:    SizeSpecT
 
         /// number of units, i.e. number of GPs = Number of outputs
-        NGPs:       SizeSpecT
+        NOutput:       SizeSpecT
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
@@ -410,9 +410,9 @@ module GPTransferUnit =
 
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
         WeightL = WeightLayer.pars (mb.Module "WeigltL") 
-            {NInput = hp.NInput; NOutput = hp.NGPs}
+            {NInput = hp.NInput; NOutput = hp.NOutput}
         MultiGPL = MultiGPLayer.pars (mb.Module "MultiGPL")
-            {NGPs = hp.NGPs; NTrnSmpls = hp.NTrnSmpls}
+            {NGPs = hp.NOutput; NTrnSmpls = hp.NTrnSmpls}
         HyperPars = hp
     }
 
@@ -429,15 +429,17 @@ module GPTransferUnit =
         p_mean, p_cov
 
 
-module InputLayer =
+module InputLayer=
 
     let cov input =
+
         let nSmpls = (Expr.shapeOf input).[0]
         let nInput = (Expr.shapeOf input).[1]
         // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
         // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
         Expr.zeros [nSmpls; nInput; nInput]
-    let transform input =
+
+    let transform input  =
         input, (cov input)
 
 module MLGPT = 
@@ -471,4 +473,4 @@ module MLGPT =
 
     let loss pars input target =
         let predmu,predSigma = (pred pars input)
-        LossLayer.loss pars.HyperPars.LossMeasure predmu target
+        LossLayer.loss pars.HyperPars.LossMeasure predmu.T (Expr.transpose target)
