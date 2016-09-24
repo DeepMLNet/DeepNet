@@ -53,6 +53,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Debug.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />

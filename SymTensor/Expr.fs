@@ -1037,7 +1037,9 @@ module Expr =
 
     /// checks the value for NaNs and infinities, outputs their location and stops the computation
     let checkFinite name a =
-        Unary (CheckFinite name, a) |> check
+        if Debug.EnableCheckFinite then
+            Unary (CheckFinite name, a) |> check
+        else a |> check
 
     /// interpolator tables
     let private tablesOfInterpolators = new Dictionary<IInterpolator, IArrayNDT>()

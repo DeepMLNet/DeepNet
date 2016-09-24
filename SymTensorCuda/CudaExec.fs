@@ -257,7 +257,7 @@ module CudaExprWorkspaceTypes =
     type CudaExprWorkspace (recipe: CudaRecipeT) =
         let mutable disposed = false
 
-        do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
+        //do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
 
         /// execution environment
         let execEnv = {

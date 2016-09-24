@@ -130,8 +130,10 @@ module Program =
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
-        mb.SetSize nTrn 20
+        mb.SetSize nTrn 5
 
+        printfn "nInput=%d  nClass=%d  nTrn=%d"
+            (mb.GetSize nInput) (mb.GetSize nClass) (mb.GetSize nTrn)
 
         let mi = mb.Instantiate dev
         let pred,_ = GPTransferUnit.pred gptu (InputLayer.transform input)
@@ -170,7 +172,7 @@ module Program =
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 20
+                                                MaxIters           = Some 300
                                                 }
         //let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         //printfn"Classification errors before training:"
@@ -314,9 +316,8 @@ module Program =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
         let batchSize = 500
         let trainCfg= {Train.defaultCfg with   BatchSize          = batchSize
-                                               LossRecordInterval = 20
                                                Termination        = Train.ItersWithoutImprovement 100
-//                                               MaxIters           = Some 100
+                                               MaxIters           = Some 300
 //                                               DumpPrefix         = Some "MLP"
                                                }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
@@ -459,14 +460,16 @@ module Program =
 
 //        SymTensor.Debug.Timing <- true
 //        SymTensor.Debug.TraceCompile <- true
-
+        SymTensor.Debug.EnableCheckFinite <- false
 //        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
-//        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-//        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+        SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
+        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+//        SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
 
         //let trc = SymTensor.Trace.startSession "trace"
 
@@ -477,8 +480,8 @@ module Program =
 
 //        Dump.start "gptraindump.h5"
 //        Dump.prefix <- sprintf "pre"
-        classificationMLP ()
-//        classificationGPTransferUnit ()
+//        classificationMLP ()
+        classificationGPTransferUnit ()
 //        classificationMLMGP ()
 //        Dump.stop()
 //        TestFunctions.testMultiGPLayer DevHost

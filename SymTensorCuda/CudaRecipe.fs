@@ -370,6 +370,8 @@ module CudaRecipe =
             printfn "Used CUDA streams:      %d" streams.Length
             printfn "Used CUDA events:       %d" eventObjCnt
             printfn "Total CUDA exec calls:  %d" execCalls.Length
+        if Debug.TerminateAfterRecipeGeneration then
+            exit 0
 
         {
             KernelCode     = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
