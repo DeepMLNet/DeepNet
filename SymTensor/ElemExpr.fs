@@ -96,6 +96,7 @@ module ElemExpr =
         static member (/) (a: ElemExprT, b: ElemExprT) = Binary(Divide, a, b)
         static member (%) (a: ElemExprT, b: ElemExprT) = Binary(Modulo, a, b)
         static member Pow (a: ElemExprT, b: ElemExprT) = Binary(Power, a, b)
+        static member ( *** ) (a: ElemExprT, b: ElemExprT) = a ** b
 
         // elementwise binary with basetype
         static member (+) (a: ElemExprT, b: 'T) = a + (scalar b)
@@ -104,6 +105,7 @@ module ElemExpr =
         static member (/) (a: ElemExprT, b: 'T) = a / (scalar b)
         static member (%) (a: ElemExprT, b: 'T) = a % (scalar b)
         static member Pow (a: ElemExprT, b: 'T) = a ** (scalar b)
+        static member ( *** ) (a: ElemExprT, b: 'T) = a ** (scalar b)
 
         static member (+) (a: 'T, b: ElemExprT) = (scalar a) + b
         static member (-) (a: 'T, b: ElemExprT) = (scalar a) - b
@@ -111,6 +113,7 @@ module ElemExpr =
         static member (/) (a: 'T, b: ElemExprT) = (scalar a) / b
         static member (%) (a: 'T, b: ElemExprT) = (scalar a) % b
         static member Pow (a: 'T, b: ElemExprT) = (scalar a) ** b          
+        static member ( *** ) (a: 'T, b: ElemExprT) = (scalar a) ** b          
           
     /// sign keeping type
     let signt (a: ElemExprT) =

@@ -91,11 +91,16 @@ module VarEnv =
         varEnv 
         |> Map.toSeq
         |> Seq.map (fun (vs, value) -> 
+            if TypeName.ofTypeInst value.DataType <> vs.TypeName then
+                failwithf "variable %A was expected to be of type %A but a \
+                           value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
+
             let ss = UVarSpec.shape vs
             let ns = ss |> SymSizeEnv.substShape symSizes |> ShapeSpec.eval
             if ArrayND.shape value <> ns then
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A was provided" vs ns ss (ArrayND.shape value)
+                           value with shape %A was provided" vs.Name ns ss (ArrayND.shape value)
+
             UVarSpec.substSymSizes symSizes vs, value)
         |> Map.ofSeq
         
@@ -218,7 +223,9 @@ module Func =
         CompileEnv: CompileEnvT
     }
 
-    let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) : (VarEnvT -> IArrayNDT list) =      
+    let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) 
+            : (VarEnvT -> IArrayNDT list) =     
+             
         let compiler, baseCompileEnv = compileSpec
 
         /// Tries to compile the expression using the given CompileEnv.

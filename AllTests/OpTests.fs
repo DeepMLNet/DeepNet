@@ -122,8 +122,8 @@ let ``Singular matrix inverse`` () =
 let ``Interpolate1D: simple test`` device =
     let tbl = [1.0f; 2.0f; 3.0f; 4.0f; 5.0f; 6.0f]
                 |> ArrayNDHost.ofList |> post device
-    let minVal = 1.0f
-    let maxVal = 6.0f
+    let minVal = 1.0
+    let maxVal = 6.0
 
     let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
@@ -149,8 +149,8 @@ let ``Interpolate2D: simple test`` device =
                [4.0f; 5.0f; 6.0f]
                [7.0f; 8.0f; 9.0f]]
               |> ArrayNDHost.ofList2D |> post device
-    let minVal = [0.0f; 0.0f]
-    let maxVal = [2.0f; 2.0f]
+    let minVal = [0.0; 0.0]
+    let maxVal = [2.0; 2.0]
 
     let ip = Expr.createInterpolator tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
 
@@ -196,8 +196,8 @@ let ``Interpolate2D: simple test on CUDA`` () =
 let ``Interpolate1D: derivative test`` device =
     let tbl = [1.0f; 2.0f; 4.0f; 7.0f; 11.0f; 16.0f]
                 |> ArrayNDHost.ofList |> post device
-    let minVal = 1.0f
-    let maxVal = 6.0f
+    let minVal = 1.0
+    let maxVal = 6.0
 
     let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 

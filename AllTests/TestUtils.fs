@@ -54,7 +54,7 @@ let buildVars shps =
                                     | s -> SizeSpec.fix s)
         yield Expr.var name sshp]
 
-let buildVarEnv (vars: ExprT<'T> list) shps (rng: System.Random) (dev: IDevice) =
+let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) =
     (VarEnv.empty, List.zip vars shps)
     ||> List.fold (fun varEnv (var, shp) ->
         let shp = shp |> List.map (function | -1 -> 1  | s -> s)
@@ -71,11 +71,11 @@ let randomEval shps exprFn (dev: IDevice) =
     let varEnv = buildVarEnv vars shps rng dev
     fn varEnv |> ignore
 
-let requireEqualTracesWithRandomData shps (exprFn: ExprT<single> list -> ExprT<single>) =
+let requireEqualTracesWithRandomData shps (exprFn: ExprT list -> ExprT) =
     compareTraces (randomEval shps exprFn) false
     |> should equal 0
 
-let randomDerivativeCheck tolerance shps (exprFn: ExprT<float> list -> ExprT<float>) =
+let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
     let rng = System.Random(123)
     let vars = buildVars shps
     let expr = exprFn vars
