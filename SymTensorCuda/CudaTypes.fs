@@ -49,7 +49,7 @@ module Types =
         /// texture objects
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator
-        InterpolatorTextures:       Dictionary<IInterpolator, TextureObjectT>
+        InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
         /// values for constants
         ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
     }
@@ -591,7 +591,7 @@ module ArgTemplates =
              Offset=offset}
 
 
-    type InterpolateEOpArgTmpl (ip:           IInterpolator,
+    type InterpolateEOpArgTmpl (ip:           InterpolatorT,
                                 compileEnv:   CudaCompileEnvT) =
 
         let tbl = 
@@ -645,18 +645,18 @@ module ArgTemplates =
 
                 match ip.NDims with
                 | 1 -> Interpolate1DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
                                             offset)
                        |> box
                 | 2 -> Interpolate2DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
-                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
+                                            single ip.MinArg.[1], single ip.Resolution.[1],
                                             offset)
                        |> box
                 | 3 -> Interpolate3DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
-                                            ip.MinArg.[1], ip.Resolution.[1],
-                                            ip.MinArg.[2], ip.Resolution.[2],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
+                                            single ip.MinArg.[1], single ip.Resolution.[1],
+                                            single ip.MinArg.[2], single ip.Resolution.[2],
                                             offset)
                        |> box
                 | _ -> failwith "unsupported"

@@ -18,6 +18,29 @@ module ExprTypes0 =
         | InterpolateToLeft
 
 
+    /// one dimensional linear interpoator
+    type InterpolatorT = 
+        {
+            /// ID
+            Id:         int
+            /// data type
+            TypeName:   TypeNameT
+            /// minimum argument value
+            MinArg:     float list
+            /// maximum argument value
+            MaxArg:     float list
+            /// resolution
+            Resolution: float list
+            /// interpolation behaviour
+            Mode:       InterpolationModeT
+            /// extrapolation behaviour
+            Outside:    OutsideInterpolatorRangeT list
+            /// interpolator for derivative
+            Derivative: InterpolatorT option
+        }        
+        
+        member this.NDims = List.length this.Resolution
+
 //[<AutoOpen>]
 module UExprTypes = 
 
@@ -32,17 +55,6 @@ module UExprTypes =
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpecT<int>
     type UExprRngsSpecT = SimpleRangesSpecT<int>
-
-    /// type-neutral interface for Interpolator1D
-    type IInterpolator = 
-        inherit System.IComparable 
-
-        abstract MinArg: single list
-        abstract MaxArg: single list
-        abstract Resolution: single list
-        abstract Mode: InterpolationModeT
-        abstract Outside: OutsideInterpolatorRangeT list
-        abstract NDims: int
 
     type ULeafOpT =
         | Identity of SizeSpecT
@@ -103,7 +115,7 @@ module UExprTypes =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
         | Elements of ShapeSpecT * UElemExpr.UElemFuncT
-        | Interpolate of IInterpolator  
+        | Interpolate of InterpolatorT
         | ExtensionOp of IUOp             
 
     /// unified op of any arity and type

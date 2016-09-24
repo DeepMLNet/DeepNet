@@ -29,40 +29,7 @@ module Expr =
         | FixedArity of int
         | DynamicArity
 
-    /// non-generic interface for Interpolator
-    type IInterpolator = UExprTypes.IInterpolator
-
-    /// one dimensional linear interpoator
-    type InterpolatorT = 
-        {
-            /// ID
-            Id:         int
-            /// data type
-            TypeName:   TypeNameT
-            /// minimum argument value
-            MinArg:     float list
-            /// maximum argument value
-            MaxArg:     float list
-            /// resolution
-            Resolution: float list
-            /// interpolation behaviour
-            Mode:       InterpolationModeT
-            /// extrapolation behaviour
-            Outside:    OutsideInterpolatorRangeT list
-            /// interpolator for derivative
-            Derivative: InterpolatorT option
-        }        
-        
-        member this.NDims = List.length this.Resolution
-
-        interface IInterpolator with
-            member this.MinArg = List.map conv<single> this.MinArg
-            member this.MaxArg = List.map conv<single> this.MaxArg
-            member this.Resolution = List.map single this.Resolution
-            member this.Mode = this.Mode
-            member this.Outside = this.Outside
-            member this.NDims = this.NDims
-
+    /// scalar constant value
     type ConstSpecT = 
         {Value:  System.IComparable} 
         with
