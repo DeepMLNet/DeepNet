@@ -33,14 +33,16 @@ module Expr =
     type IInterpolator = UExprTypes.IInterpolator
 
     /// one dimensional linear interpoator
-    type InterpolatorT<'T> = 
+    type InterpolatorT = 
         {
             /// ID
             Id:         int
+            /// data type
+            TypeName:   TypeNameT
             /// minimum argument value
-            MinArg:     'T list
+            MinArg:     float list
             /// maximum argument value
-            MaxArg:     'T list
+            MaxArg:     float list
             /// resolution
             Resolution: float list
             /// interpolation behaviour
@@ -48,7 +50,7 @@ module Expr =
             /// extrapolation behaviour
             Outside:    OutsideInterpolatorRangeT list
             /// interpolator for derivative
-            Derivative: InterpolatorT<'T> option
+            Derivative: InterpolatorT option
         }        
         
         member this.NDims = List.length this.Resolution
@@ -61,28 +63,33 @@ module Expr =
             member this.Outside = this.Outside
             member this.NDims = this.NDims
 
+    type ConstSpecT = 
+        {Value:  System.IComparable} 
+        with
+            member this.TypeName = TypeName.ofObject this.Value
+
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
-    type LeafOpT<'T> =
+    type LeafOpT =
 
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | Identity of SizeSpecT
+        | Identity of SizeSpecT * TypeNameT
         /// zero tensor of given shape       
-        | Zeros of ShapeSpecT                   
+        | Zeros of ShapeSpecT * TypeNameT                  
         /// scalar of given value
-        | ScalarConst of 'T
+        | ScalarConst of ConstSpecT
         /// scalar of the given size
         | SizeValue of SizeSpecT
 
         // ==== variable access ====
         /// variable read
-        | Var of VarSpecT<'T>       
+        | Var of VarSpecT      
         
 
     /// ops with one expr as argument
     and [<StructuralComparison; StructuralEquality>] 
-        UnaryOpT<'T> =
+        UnaryOpT =
 
         // ==== unary elementwise ==== 
         | Negate                        
@@ -132,7 +139,7 @@ module Expr =
 
         // ==== variable storage ====
         /// variable write
-        | StoreToVar of VarSpecT<'T>
+        | StoreToVar of VarSpecT
 
         // ==== misc ====
         /// prints the value together with the given string
@@ -144,12 +151,12 @@ module Expr =
         /// annotation (no influence on value)
         | Annotated of string       
 
-    and ExprRngSpecT = SimpleRangeSpecT<ExprT<int>>
-    and ExprRngsSpecT = SimpleRangesSpecT<ExprT<int>>
+    and ExprRngSpecT = SimpleRangeSpecT<ExprT>
+    and ExprRngsSpecT = SimpleRangesSpecT<ExprT>
 
     /// ops with two exprs as arguments
     and [<StructuralComparison; StructuralEquality>] 
-        BinaryOpT<'T> =
+        BinaryOpT =
 
         // ==== binary elementwise ====
         | Add                           
@@ -159,8 +166,19 @@ module Expr =
         | Modulo
         | Power            
         | MaxElemwise
-        | MinElemwise             
-    
+        | MinElemwise        
+           
+        // ==== element-wise binary comparison ====
+        //| Equal
+        //| Less
+        //| LessEqual
+        //| Greater
+        //| GreaterEqual
+        //| NotEqual     
+
+        // ==== element-wise conditional ====
+        //| IfThenElse of ExprT
+
         // ==== matrix/tensor operations ====
         /// matrix*matrix => matrix dot product
         | Dot                           
@@ -171,29 +189,25 @@ module Expr =
         /// replace subtensor
         | SetSubtensor of ExprRngsSpecT                 
 
-
     /// ops with an arbitrary exprs as arguments
     and [<StructuralComparison; StructuralEquality>] 
-        NaryOpT<'T> =
+        NaryOpT =
 
         /// evaluate all subexpressions but discard them
         | Discard        
         /// elementwise calculated tensor
-        | Elements of ShapeSpecT * ElemExpr.ElemExprT<'T>
+        | Elements of ShapeSpecT * ElemExpr.ElemExprT<single> // TODO
         /// elementwise interpolation
-        | Interpolate of InterpolatorT<'T>
+        | Interpolate of InterpolatorT
         /// extension op
-        | ExtensionOp of IOp<'T>
+        | ExtensionOp of IOp
    
      
     /// A mathematical operation in an expression.
     /// This models a mathematical function or operator that takes one or more tensors
     /// and returns one tensor.
-    and IOp<'T> =
+    and IOp =
         inherit System.IComparable
-        //inherit System.IEquatable
-        //inherit System.IComparable<'T>
-        //inherit System.IEquatable<'T>
        
         /// Should return the shape of the result, given the shape of the arguments.
         abstract Shape: argShapes: ShapeSpecT list -> ShapeSpecT      
@@ -205,7 +219,7 @@ module Expr =
         /// Should return the op with all symbolic sizes substituted using the specified
         /// substitution table.
         /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-        abstract SubstSymSizes: symSizes: SymSizeEnvT -> IOp<'T>
+        abstract SubstSymSizes: symSizes: SymSizeEnvT -> IOp
 
         /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
         /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
@@ -216,7 +230,7 @@ module Expr =
         /// This op is always the root of the passed expression.
         /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
         /// with the corresponding Uop. It will generate the apropriate unified expression.
-        abstract ToUExpr: expr:ExprT<'T> -> makeOneUop:(UExprTypes.IUOp -> UExprTypes.UExprT) -> UExprTypes.UExprT
+        abstract ToUExpr: expr:ExprT -> makeOneUop:(UExprTypes.IUOp -> UExprTypes.UExprT) -> UExprTypes.UExprT
 
         /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
         /// The derivative is always an NxM matrix where N is the number of elements of the function
@@ -224,34 +238,24 @@ module Expr =
         /// w.r.t. which the derivative is being taken. 
         /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
         /// you return w.r.t. that argument must have NxM elements.
-        abstract Deriv: dOp:ExprT<'T> -> args:ExprT<'T> list -> ExprT<'T> list
+        abstract Deriv: dOp:ExprT -> args:ExprT list -> ExprT list
 
         /// Should evaluate the numerical value of this op given the numerical values of its arguments.
         /// This evaluation should be done on the host using the simplest means possible and is used
         /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
         /// implementations. This method may be omitted when no verification will be done.
-        abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
-
-
-    /// a type conversion op
-    and [<StructuralComparison; StructuralEquality>] 
-        ConvertOpT<'T> =
-
-        | FromInt of ExprT<int>
-        | FromSingle of ExprT<single>
-        | FromDouble of ExprT<double>
+        abstract EvalSimple: args:IArrayNDHostT list -> IArrayNDHostT
 
     /// an expression
     and [<StructuralComparison; StructuralEquality>] 
-        ExprT<'T> =
-        | Leaf of LeafOpT<'T>
-        | Unary of UnaryOpT<'T> * ExprT<'T>
-        | Binary of BinaryOpT<'T> * ExprT<'T> * ExprT<'T>
-        | Nary of NaryOpT<'T> * (ExprT<'T> list)
-        //| Convert of ConvertOpT<'T>
+        ExprT =
+        | Leaf of LeafOpT
+        | Unary of UnaryOpT * ExprT
+        | Binary of BinaryOpT * ExprT * ExprT
+        | Nary of NaryOpT * (ExprT list)
 
-    type FullExprRngSpecT = RangeSpecT<ExprT<int>>
-    type FullExprRngsSpecT = RangesSpecT<ExprT<int>>
+    type FullExprRngSpecT = RangeSpecT<ExprT>
+    type FullExprRngsSpecT = RangesSpecT<ExprT>
 
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
@@ -290,37 +294,57 @@ module Expr =
         | Power
         | MaxElemwise
         | MinElemwise
+        //| Equal
+        //| Less
+        //| LessEqual
+        //| Greater
+        //| GreaterEqual
+        //| NotEqual     
+        //| IfThenElse _
             -> Some ()
         | _ -> None
 
 
     /// Traverses the op tree and for each op calls a function on its arguments and replaces 
     /// them by the function's return value(s).
-    let rec mapOperands unaryMapping binaryMapping naryMapping expr =
-        let subMap = mapOperands unaryMapping binaryMapping naryMapping
-        match expr with
-        | Unary(op, a) -> Unary(op, unaryMapping op (subMap a))
-        | Binary(op, a, b) -> 
-            let ma, mb = binaryMapping op (subMap a) (subMap b)
-            Binary(op, ma, mb)
-        | Nary(op, es) ->
-            let mes = naryMapping op (es |> List.map subMap)
-            Nary(op, mes)
-        | _ -> expr
+//    let rec mapOperands unaryMapping binaryMapping naryMapping expr =
+//        let subMap = mapOperands unaryMapping binaryMapping naryMapping
+//        match expr with
+//        | Unary(op, a) -> Unary(op, unaryMapping op (subMap a))
+//        | Binary(op, a, b) -> 
+//            let ma, mb = binaryMapping op (subMap a) (subMap b)
+//            Binary(op, ma, mb)
+//        | Nary(op, es) ->
+//            let mes = naryMapping op (es |> List.map subMap)
+//            Nary(op, mes)
+//        | _ -> expr
 
     /// returns true if subExpr is contained in expr
     let rec contains subExpr expr =
         if expr = subExpr then true
         else
             match expr with
-            | Unary(_, a) -> contains subExpr a
-            | Binary(_, a, b) -> contains subExpr a || contains subExpr b
-            | Nary(_, es) -> List.exists (contains subExpr) es
+            | Unary (_, a) -> contains subExpr a
+            | Binary (_, a, b) -> contains subExpr a || contains subExpr b
+            | Nary (_, es) -> List.exists (contains subExpr) es
             | _ -> false
 
     /// Produces an error message about incompatible shapes.
     let failshape op sa sb =
         failwithf "op %A was provided with arrays of incompatible shapes %A and %A" op sa sb
+
+    /// Returns the type of the given expression.
+    let rec typename expr =
+        match expr with
+        | Leaf (Identity (ss, tn)) -> tn
+        | Leaf (Zeros (sa, tn)) -> tn
+        | Leaf (ScalarConst cs) -> cs.TypeName
+        | Leaf (SizeValue ss) -> TypeName.ofType<int>
+        | Leaf (Var vs) -> vs.TypeName
+
+        | Unary (op, a) -> typename a
+        | Binary (op, a, b) -> typename a
+        | Nary (op, es) -> typename (List.head es)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -331,8 +355,8 @@ module Expr =
         match expr with
 
         // tensor creation
-        | Leaf(Identity ss) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros ss) -> ss
+        | Leaf(Identity (ss, tn)) -> ShapeSpec.matrix ss ss
+        | Leaf(Zeros (ss, tn)) -> ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
 
@@ -434,10 +458,10 @@ module Expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<System.IComparable> (HashIdentity.Reference)
+    let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
-    let rec checkExpr (expr: ExprT<'T>) =
+    let rec checkExpr (expr: ExprT) =
         if not (checkedExprs.Contains expr) then
             let mutable shapesBeingChecked = []
             let mutable opBeingChecked = fun () -> ""
@@ -502,6 +526,11 @@ module Expr =
                 shapesBeingChecked <- [sa; sb]
                 opBeingChecked <- fun () -> sprintf "%A" op
 
+                let ta, tb = typename a, typename b
+                if ta <> tb then
+                    failwithf "cannot apply binary operation %s to expressions of \
+                               different types %A and %A" (opBeingChecked()) ta tb
+
                 match op with
                 | BinaryElemwiseOp ->
                     sa ..= sb 
@@ -521,6 +550,10 @@ module Expr =
                 let ss = es |> List.map shapeOf
                 shapesBeingChecked <- ss
                 opBeingChecked <- fun () -> sprintf "%A" op
+
+                if es |> List.exists (fun e -> typename e <> typename es.Head) then
+                    failwithf "cannot apply n-ary operation %s to expressions of different types %A"
+                        (opBeingChecked()) (es |> List.map typename)
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
@@ -548,15 +581,15 @@ module Expr =
             checkedExprs.Add expr |> ignore
 
     /// substitues the given symbol sizes into the expression
-    let rec substSymSizes symSizes (expr: ExprT<'T>) =
+    let rec substSymSizes symSizes (expr: ExprT) =
         let sSub = substSymSizes symSizes
         let sSize = SymSizeEnv.subst symSizes
         let sShp = SymSizeEnv.substShape symSizes
         let sSrs = SymSizeEnv.substRange symSizes
 
         match expr with
-        | Leaf (Identity ss) -> Leaf (Identity (sSize ss))
-        | Leaf (Zeros ss) -> Leaf (Zeros (sShp ss))
+        | Leaf (Identity (ss, tn)) -> Leaf (Identity ((sSize ss), tn))
+        | Leaf (Zeros (ss, tn)) -> Leaf (Zeros ((sShp ss), tn))
         | Leaf (SizeValue sc) -> Leaf (SizeValue (sSize sc))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
         | Leaf _ -> expr
@@ -576,10 +609,10 @@ module Expr =
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
     /// true if all shapes in the expression can be evaluated to numeric shapes
-    let rec canEvalAllSymSizes (expr: ExprT<'T>) =
+    let rec canEvalAllSymSizes (expr: ExprT) =
         match expr with
-        | Leaf (Identity ss) -> SizeSpec.canEval ss
-        | Leaf (Zeros ss) -> ShapeSpec.canEval ss
+        | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
+        | Leaf (Zeros (ss, tn)) -> ShapeSpec.canEval ss
         | Leaf (SizeValue sc) -> SizeSpec.canEval sc
         | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
         | Leaf _ -> true
@@ -602,7 +635,7 @@ module Expr =
         | Nary (op, es) -> List.forall canEvalAllSymSizes es
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
-    let check (expr: ExprT<'T>) : ExprT<'T> =
+    let check (expr: ExprT) : ExprT =
         checkExpr expr |> ignore
         expr
 
@@ -620,26 +653,33 @@ module Expr =
 
         doSubst part replacement expr |> check
 
-    /// scalar of given value
-    let inline scalar<'T> (f: 'T) = Leaf(ScalarConst(f)) 
+    /// scalar constant of given value
+    let scalar (f: 'T when 'T :> System.IComparable) = 
+        let cs = {Value=f :> System.IComparable}
+        Leaf (ScalarConst cs) |> check
 
-    /// scalar of given value and type
-    let inline scalart<'T> f = scalar (conv<'T> f)
+    /// scalar of given value converted to same type as given expression
+    let scalarOfSameType expr f = 
+        let tn = typename expr
+        let v = System.Convert.ChangeType(box f, TypeName.getType tn)
+        scalar (v :?> System.IComparable)
+
+    /// scalar 0 of the same type as given expression
+    let inline zeroOfSameType expr = scalarOfSameType expr 0
+
+    /// scalar 1 of the same type as given expression
+    let inline oneOfSameType expr = scalarOfSameType expr 1
+
+    /// scalar 2 of the same type as given expression
+    let inline twoOfSameType expr = scalarOfSameType expr 2
 
     /// scalar with value of given size
-    let sizeValue size = Leaf(SizeValue size)
-
-    /// scalar 0 of appropriate type
-    let inline zero<'T> () = scalar (ArrayNDT<'T>.Zero)
-
-    /// scalar 1 of appropriate type
-    let inline one<'T> () = scalar (ArrayNDT<'T>.One)
-
-    /// scalar 2 of appropriate type
-    let inline two<'T> () = scalart<'T> 2
+    let sizeValue size = 
+        Leaf (SizeValue size) |> check
 
     /// swaps two dimensions of a tensor
-    let swapDim ax1 ax2 a = Unary(SwapDim(ax1, ax2), a) |> check
+    let swapDim ax1 ax2 a = 
+        Unary (SwapDim(ax1, ax2), a) |> check
 
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.
@@ -659,64 +699,64 @@ module Expr =
 
 
     // elementwise operators
-    type ExprT<'T> with
+    type ExprT with
 
         // elementwise unary
-        static member (~+) (a: ExprT<'T>) = a |> check
-        static member (~-) (a: ExprT<'T>) = Unary(Negate, a) |> check 
-        static member Abs (a: ExprT<'T>) = Unary(Abs, a) |> check
-        static member SignT (a: ExprT<'T>) = Unary(SignT, a) |> check
-        static member Log (a: ExprT<'T>) = Unary(Log, a) |> check
-        static member Log10 (a: ExprT<'T>) = Unary(Log10, a) |> check
-        static member Exp (a: ExprT<'T>) = Unary(Exp, a) |> check
-        static member Sin (a: ExprT<'T>) = Unary(Sin, a) |> check
-        static member Cos (a: ExprT<'T>) = Unary(Cos, a) |> check
-        static member Tan (a: ExprT<'T>) = Unary(Tan, a) |> check
-        static member Asin (a: ExprT<'T>) = Unary(Asin, a) |> check
-        static member Acos (a: ExprT<'T>) = Unary(Acos, a) |> check
-        static member Atan (a: ExprT<'T>) = Unary(Atan, a) |> check
-        static member Sinh (a: ExprT<'T>) = Unary(Sinh, a) |> check
-        static member Cosh (a: ExprT<'T>) = Unary(Cosh, a) |> check
-        static member Tanh (a: ExprT<'T>) = Unary(Tanh, a) |> check
-        static member Sqrt (a: ExprT<'T>) = Unary(Sqrt, a) |> check
-        static member Ceiling (a: ExprT<'T>) = Unary(Ceil, a) |> check
-        static member Floor (a: ExprT<'T>) = Unary(Floor, a) |> check
-        static member Round (a: ExprT<'T>) = Unary(Round, a) |> check
-        static member Truncate (a: ExprT<'T>) = Unary(Truncate, a) |> check
+        static member (~+) (a: ExprT) = a |> check
+        static member (~-) (a: ExprT) = Unary(Negate, a) |> check 
+        static member Abs (a: ExprT) = Unary(Abs, a) |> check
+        static member SignT (a: ExprT) = Unary(SignT, a) |> check
+        static member Log (a: ExprT) = Unary(Log, a) |> check
+        static member Log10 (a: ExprT) = Unary(Log10, a) |> check
+        static member Exp (a: ExprT) = Unary(Exp, a) |> check
+        static member Sin (a: ExprT) = Unary(Sin, a) |> check
+        static member Cos (a: ExprT) = Unary(Cos, a) |> check
+        static member Tan (a: ExprT) = Unary(Tan, a) |> check
+        static member Asin (a: ExprT) = Unary(Asin, a) |> check
+        static member Acos (a: ExprT) = Unary(Acos, a) |> check
+        static member Atan (a: ExprT) = Unary(Atan, a) |> check
+        static member Sinh (a: ExprT) = Unary(Sinh, a) |> check
+        static member Cosh (a: ExprT) = Unary(Cosh, a) |> check
+        static member Tanh (a: ExprT) = Unary(Tanh, a) |> check
+        static member Sqrt (a: ExprT) = Unary(Sqrt, a) |> check
+        static member Ceiling (a: ExprT) = Unary(Ceil, a) |> check
+        static member Floor (a: ExprT) = Unary(Floor, a) |> check
+        static member Round (a: ExprT) = Unary(Round, a) |> check
+        static member Truncate (a: ExprT) = Unary(Truncate, a) |> check
 
         // elementwise binary
-        static member (+) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Add a b
-        static member (-) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Substract a b
-        static member (*) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Multiply a b
-        static member (/) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Divide a b
-        static member (%) (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Modulo a b
-        static member Pow (a: ExprT<'T>, b: ExprT<'T>) = constructElementwise Power a b    
+        static member (+) (a: ExprT, b: ExprT) = constructElementwise Add a b
+        static member (-) (a: ExprT, b: ExprT) = constructElementwise Substract a b
+        static member (*) (a: ExprT, b: ExprT) = constructElementwise Multiply a b
+        static member (/) (a: ExprT, b: ExprT) = constructElementwise Divide a b
+        static member (%) (a: ExprT, b: ExprT) = constructElementwise Modulo a b
+        static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b    
 
         // elementwise binary with basetype
-        static member (+) (a: ExprT<'T>, b: 'T) = a + (scalar b)
-        static member (-) (a: ExprT<'T>, b: 'T) = a - (scalar b)
-        static member (*) (a: ExprT<'T>, b: 'T) = a * (scalar b)
-        static member (/) (a: ExprT<'T>, b: 'T) = a / (scalar b)
-        static member (%) (a: ExprT<'T>, b: 'T) = a % (scalar b)
-        static member Pow (a: ExprT<'T>, b: 'T) = a ** (scalar b)
+        static member (+) (a: ExprT, b: System.IComparable) = a + (scalar b)
+        static member (-) (a: ExprT, b: System.IComparable) = a - (scalar b)
+        static member (*) (a: ExprT, b: System.IComparable) = a * (scalar b)
+        static member (/) (a: ExprT, b: System.IComparable) = a / (scalar b)
+        static member (%) (a: ExprT, b: System.IComparable) = a % (scalar b)
+        static member Pow (a: ExprT, b: System.IComparable) = a ** (scalar b)
 
-        static member (+) (a: 'T, b: ExprT<'T>) = (scalar a) + b
-        static member (-) (a: 'T, b: ExprT<'T>) = (scalar a) - b
-        static member (*) (a: 'T, b: ExprT<'T>) = (scalar a) * b
-        static member (/) (a: 'T, b: ExprT<'T>) = (scalar a) / b
-        static member (%) (a: 'T, b: ExprT<'T>) = (scalar a) % b
-        static member Pow (a: 'T, b: ExprT<'T>) = (scalar a) ** b
+        static member (+) (a: System.IComparable, b: ExprT) = (scalar a) + b
+        static member (-) (a: System.IComparable, b: ExprT) = (scalar a) - b
+        static member (*) (a: System.IComparable, b: ExprT) = (scalar a) * b
+        static member (/) (a: System.IComparable, b: ExprT) = (scalar a) / b
+        static member (%) (a: System.IComparable, b: ExprT) = (scalar a) % b
+        static member Pow (a: System.IComparable, b: ExprT) = (scalar a) ** b
 
         // transposition
         member this.T = transpose this
 
     /// sign keeping type
-    let signt (a: ExprT<'T>) =
-        ExprT<'T>.SignT a 
+    let signt (a: ExprT) =
+        ExprT.SignT a 
 
     /// square root
-    let sqrtt (a: ExprT<'T>) =
-        ExprT<'T>.Sqrt a
+    let sqrtt (a: ExprT) =
+        ExprT.Sqrt a
 
     /// elementwise maximum
     let maxElemwise a b =
@@ -755,11 +795,11 @@ module Expr =
         a |> sumAxis ax |> insertBroadcastAxis ax
 
     /// mean over all elements
-    let mean (a: ExprT<'T>) = 
+    let mean (a: ExprT) = 
         sum a / sizeValue (nElems a)
 
     /// mean over given dimension
-    let meanAxis ax (a: ExprT<'T>) =
+    let meanAxis ax (a: ExprT) =
         sumAxis ax a / sizeValue ((shapeOf a).[ax])
 
     /// mean over given dimension, while keeping the axis with one (broadcastable) element
@@ -767,22 +807,28 @@ module Expr =
         a |> meanAxis ax |> insertBroadcastAxis ax
 
     /// identity matrix of given size
-    let identity<'T> size : ExprT<'T> = Leaf(Identity(size)) |> check
+    let identity<'T> size = 
+        Leaf(Identity(size, TypeName.ofType<'T>)) |> check
 
     /// zero tensor of given shape
-    let zeros<'T> ss : ExprT<'T> = Leaf(Zeros(ss)) |> check
+    let zeros<'T> ss =
+        Leaf(Zeros(ss, TypeName.ofType<'T>)) |> check
 
     /// zero matrix of given size
-    let zeroMatrix<'T> rows cols : ExprT<'T> = zeros (ShapeSpec.matrix rows cols)
+    let zeroMatrix<'T> rows cols =
+        zeros<'T> (ShapeSpec.matrix rows cols)
 
-    /// zero tensor with same shape as given tensor
-    let zerosLike (a: ExprT<'T>) : ExprT<'T> = Leaf(Zeros(shapeOf a)) |> check
+    /// zero tensor with same shape and type as given tensor
+    let zerosLike a = 
+        Leaf (Zeros(shapeOf a, typename a)) |> check
 
     /// variable of given name and shape
-    let var<'T> name (ss: ShapeSpecT) : ExprT<'T> = Leaf(Var(VarSpec.ofNameAndShape name ss)) 
+    let var<'T> name (ss: ShapeSpecT) = 
+        Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> check
 
     /// annotated expression
-    let annotate ano a = Unary(Annotated(ano), a) |> check
+    let annotate ano a = 
+        Unary(Annotated(ano), a) |> check
 
     /// adds one broadcastable dimension to the left
     let padLeft a =
@@ -802,7 +848,7 @@ module Expr =
     /// (2, 2) -> matrix-matrix dot product resulting in a matrix
     /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
     /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-    let dot (a: ExprT<'T>) (b: ExprT<'T>) =
+    let dot (a: ExprT) (b: ExprT) =
         let sa, sb = shapeOf a, shapeOf b
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 -> 
@@ -832,7 +878,7 @@ module Expr =
         |> check
 
     /// tensor product
-    let tensorProduct (a: ExprT<'T>) (b: ExprT<'T>) =
+    let tensorProduct (a: ExprT) (b: ExprT) =
         let sa, sb = shapeOf a, shapeOf b
         let psa, psb = ShapeSpec.padToSame sa sb
         let a, b = reshapeIfNecessary psa a, reshapeIfNecessary psb b
@@ -849,8 +895,8 @@ module Expr =
         /// (2, 2) -> matrix-matrix dot product resulting in a matrix
         /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
         /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-        static member (.*) (a: ExprT<'T>, b: ExprT<'T>) = dot a b
-        static member (%*) (a: ExprT<'T>, b: ExprT<'T>) = tensorProduct a b
+        static member (.*) (a: ExprT, b: ExprT) = dot a b
+        static member (%*) (a: ExprT, b: ExprT) = tensorProduct a b
 
     /// extract all variables from an expression
     let rec extractVars expr =
@@ -870,7 +916,7 @@ module Expr =
 
     /// make variable expression from VarSpec
     let makeVar vs =
-        Leaf(Var(vs))
+        Leaf(Var(vs)) |> check
 
     /// store to variable
     let storeToVar ve a =
@@ -917,7 +963,9 @@ module Expr =
                     RSSymStartSymEnd (so, None) :: parseArgs rest
                 | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
                     RSSymStartSymEnd (None, fo) :: parseArgs rest
-                | (:? (ExprT<int> option) as so) :: (:? (PlusElems option) as fo)    :: rest ->
+                | (:? (ExprT option) as so)      :: (:? (PlusElems option) as fo)    :: rest ->
+                    if typename so.Value <> TypeName.ofType<int> then
+                        failwith "need int expression for range start"
                     RSDynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
                 | null                           :: null                             :: rest ->
                     RSSymStartSymEnd (None, None) :: parseArgs rest
@@ -927,8 +975,9 @@ module Expr =
                 | (:? SpecialAxisT as s)  :: rest -> match s with
                                                      | NewAxis -> RSNewAxis :: parseArgs rest
                                                      | Fill    -> RSAllFill :: parseArgs rest
-                | (:? ExprT<int> as e)    :: rest -> RSDynElem e :: parseArgs rest
-
+                | (:? ExprT as e)         :: rest -> if typename e <> TypeName.ofType<int> then
+                                                         failwith "need int expression for element"               
+                                                     RSDynElem e :: parseArgs rest
                 | []                              -> []
                 | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
@@ -951,7 +1000,7 @@ module Expr =
                 | _ -> failwith "item/slice processing error"
 
             // build full range specificaton
-            let argList = allArgs |> Array.toList  |> List.map intToSizeSpec
+            let argList = allArgs |> Array.toList |> List.map intToSizeSpec
 
             let srs, reshp = 
                 match argList with
@@ -1042,17 +1091,17 @@ module Expr =
         else a |> check
 
     /// interpolator tables
-    let private tablesOfInterpolators = new Dictionary<IInterpolator, IArrayNDT>()
+    let private tablesOfInterpolators = new Dictionary<InterpolatorT, IArrayNDT>()
 
     /// interpolator derivatives
-    let private derivativeOfInterpolators = new Dictionary<IInterpolator, IInterpolator>()
+    let private derivativeOfInterpolators = new Dictionary<InterpolatorT, InterpolatorT>()
 
     /// Creates an n-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
-    let createInterpolator (tbl: ArrayNDT<'T>) (minArg: 'T list) (maxArg: 'T list) 
+    let createInterpolator (tbl: ArrayNDT<'T>) (minArg: float list) (maxArg: float list) 
                            (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
-                           (derivative: InterpolatorT<'T> option) =
+                           (derivative: InterpolatorT option) =
         let nDims = minArg.Length
         if maxArg.Length <> nDims || outside.Length <> nDims then
             failwith "minArg, maxArg and outside have inconsistent lengths"
@@ -1060,11 +1109,11 @@ module Expr =
         if tbl.Shape |> List.exists (fun e -> e < 2) then failwith "interpolation table must contain at least 2 entries"
         let ip = {
             Id = tablesOfInterpolators.Count
+            TypeName = TypeName.ofType<'T>
             MinArg = minArg
             MaxArg = maxArg
             Resolution = List.zip3 minArg maxArg tbl.Shape
-                         |> List.map (fun (min, max, nElems) -> 
-                             (conv<float> max - conv<float> min) / float (nElems - 1))
+                         |> List.map (fun (min, max, nElems) -> (max - min) / float (nElems - 1))
             Mode = mode
             Outside = outside
             Derivative = derivative
@@ -1073,50 +1122,56 @@ module Expr =
             (fun () -> tablesOfInterpolators.Add (ip, tbl))        
         ip
 
-    /// Gets the function value table for the specified one-dimensional interpolator.
-    let getInterpolatorTableAsIArrayNDT (ip: IInterpolator) =
-        if tablesOfInterpolators.ContainsKey ip then tablesOfInterpolators.[ip] 
-        else failwithf "interpolator %A is unknown" ip
+    /// Gets the function value table for the specified one-dimensional interpolator as an IArrayNDT.
+    let getInterpolatorTableAsIArrayNDT ip =
+        match tablesOfInterpolators.TryFind ip with
+        | Some ip -> ip
+        | None -> failwithf "interpolator %A is unknown" ip
 
     /// Gets the function value table for the specified one-dimensional interpolator.
-    let getInterpolatorTable (ip: InterpolatorT<'T>) =
+    let getInterpolatorTable<'T> ip =
         getInterpolatorTableAsIArrayNDT ip :?> ArrayNDT<'T>
+
+    type private GetDerivativeOfInterpolator =
+        static member Do<'T> (derivDim: int, ip: InterpolatorT) =
+            if not (0 <= derivDim && derivDim < ip.NDims) then
+                invalidArg "derivDim" "derivative dimension out of range"
+
+            match ip.Derivative with
+            | Some ipd -> ipd  // use provided derivative table
+            | None ->          // create derivative table by numeric differentiation
+                match derivativeOfInterpolators.TryFind ip with
+                | Some ipd -> ipd
+                | None ->
+                    let tbl = getInterpolatorTable ip                 
+                    let diffTbl =
+                        match ip.Mode with
+                        | InterpolateLinearaly ->
+                            let diffTbl = 
+                                ArrayND.diffAxis derivDim tbl / 
+                                ArrayND.scalarOfType (conv<'T> ip.Resolution.[derivDim]) tbl
+                            let zeroShp =
+                                [for d, s in List.indexed tbl.Shape do
+                                    if d = derivDim then yield 1
+                                    else yield s]
+                            let zero = ArrayND.zerosOfSameType zeroShp diffTbl
+                            ArrayND.concat derivDim [diffTbl; zero]
+                        | InterpolateToLeft ->
+                            ArrayND.zerosLike tbl
+                    let outside =
+                        [for d, o in List.indexed ip.Outside do
+                            if d = derivDim then yield Zero
+                            else yield o]
+                    let ipd = createInterpolator diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
+                    lock derivativeOfInterpolators
+                        (fun () -> derivativeOfInterpolators.Add (ip, ipd))
+                    ipd
+
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
-    let getDerivativeOfInterpolator derivDim (ip: InterpolatorT<'T>) =
-        if not (0 <= derivDim && derivDim < ip.NDims) then
-            invalidArg "derivDim" "derivative dimension out of range"
-
-        match ip.Derivative with
-        | Some ipd -> ipd  // use provided derivative table
-        | None ->          // create derivative table by numeric differentiation
-            if derivativeOfInterpolators.ContainsKey ip then 
-                derivativeOfInterpolators.[ip] :?> InterpolatorT<'T>
-            else
-                let tbl = getInterpolatorTable ip                 
-                let diffTbl =
-                    match ip.Mode with
-                    | InterpolateLinearaly ->
-                        let diffTbl = 
-                            ArrayND.diffAxis derivDim tbl / 
-                            ArrayND.scalarOfType (conv<'T> ip.Resolution.[derivDim]) tbl
-                        let zeroShp =
-                            [for d, s in List.indexed tbl.Shape do
-                                if d = derivDim then yield 1
-                                else yield s]
-                        let zero = ArrayND.zerosOfSameType zeroShp diffTbl
-                        ArrayND.concat derivDim [diffTbl; zero]
-                    | InterpolateToLeft ->
-                        ArrayND.zerosLike tbl
-                let outside =
-                    [for d, o in List.indexed ip.Outside do
-                        if d = derivDim then yield Zero
-                        else yield o]
-                let ipd = createInterpolator diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
-                lock derivativeOfInterpolators
-                    (fun () -> derivativeOfInterpolators.Add (ip, ipd))
-                ipd
+    let getDerivativeOfInterpolator (derivDim: int) (ip: InterpolatorT) =
+        callGeneric<GetDerivativeOfInterpolator, InterpolatorT> ip.TypeName.Type (derivDim, ip)                
 
     /// Element-wise n-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the createInterpolator function.
@@ -1139,13 +1194,13 @@ module Expr =
 [<AutoOpen>]
 module ExprTypes2 =
     type ArityT = Expr.ArityT
-    type LeafOpT<'T> = Expr.LeafOpT<'T>
-    type UnaryOpT<'T> = Expr.UnaryOpT<'T>
-    type BinaryOpT<'T> = Expr.BinaryOpT<'T>
-    type NaryOpT<'T> = Expr.NaryOpT<'T>
-    type IOp<'T> = Expr.IOp<'T>
+    type LeafOpT = Expr.LeafOpT
+    type UnaryOpT = Expr.UnaryOpT
+    type BinaryOpT = Expr.BinaryOpT
+    type NaryOpT = Expr.NaryOpT
+    type IOp = Expr.IOp
     type IUOp = UExprTypes.IUOp
-    type ExprT<'T> = Expr.ExprT<'T>
+    type ExprT = Expr.ExprT
 
     
 

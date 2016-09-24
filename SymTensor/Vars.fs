@@ -9,18 +9,28 @@ open ShapeSpec
 module TypeNameTypes =
 
     /// assembly qualified name of a .NET type
-    type TypeNameT = TypeName of string
+    type TypeNameT = 
+        | TypeName of string
+        with 
+            /// gets the System.Type associated by this TypeName        
+            member this.Type = 
+                match this with
+                | TypeName tn -> System.Type.GetType(tn)
 
+            /// gets the size of the represented type in bytes
+            member this.Size =
+                Marshal.SizeOf this.Type
+    
 
 module TypeName =
 
     /// gets the System.Type associated by this TypeName
-    let getType (TypeName tn) =
-        System.Type.GetType(tn)
+    let getType (tn: TypeNameT) =
+        tn.Type
 
     /// gets the size of the represented type in bytes
-    let size tn =
-        Marshal.SizeOf (getType tn)
+    let size (tn: TypeNameT) =
+        tn.Size
 
     /// gets the TypeName associated with the given type
     let ofType<'T> =
@@ -30,7 +40,7 @@ module TypeName =
     let ofTypeInst (t: System.Type) =
         TypeName t.AssemblyQualifiedName
 
-    /// gets the TypeName associated with the given System.Type object
+    /// gets the TypeName associated with the type of then given object
     let ofObject (o: obj) =
         ofTypeInst (o.GetType())
 
@@ -49,17 +59,18 @@ module VarSpecTypes =
 
     /// variable specification: has a name, type and shape specificaiton
     [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
-    type VarSpecT<'T> = 
+    type VarSpecT = 
         {
-            Name:      string; 
-            Shape:     ShapeSpecT;
+            Name:      string
+            Shape:     ShapeSpecT
+            TypeName:  TypeNameT
         }
         
         interface IVarSpec with
             member this.Name = this.Name
             member this.Shape = this.Shape
-            member this.Type = typeof<'T>
-            member this.TypeName = TypeName (typeof<'T>.AssemblyQualifiedName)
+            member this.Type = TypeName.getType this.TypeName
+            member this.TypeName = this.TypeName
             member this.SubstSymSizes symSizes = 
                 {this with Shape=SymSizeEnv.substShape symSizes this.Shape} :> IVarSpec
 
@@ -80,7 +91,7 @@ module VarSpec =
 
     /// create variable specifation by name and shape
     let inline ofNameAndShape name shape =
-        {VarSpecT.Name=name; Shape=shape;}
+        {VarSpecT.Name=name; Shape=shape; TypeName=failwith "TODO"}
 
     /// name of variable
     let name (vs: #IVarSpec) = vs.Name

@@ -4,7 +4,7 @@ open System
 open System.Reflection
 open System.IO
 open System.Runtime.InteropServices
-
+open FSharp.Reflection
 
 module Seq = 
 
@@ -116,6 +116,14 @@ module UtilTypes =
     let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
 
     let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
+
+    /// calls the Do static method on the type 'R with generic type parameters typ
+    /// and the specified arguments
+    let inline callGeneric<'U, 'R> (typ: System.Type) args =
+        let gm = typeof<'U>.GetMethod ("Do", allBindingFlags)
+        let m = gm.MakeGenericMethod ([| typ |])
+        let args = FSharpValue.GetTupleFields args
+        m.Invoke(null, args) :?> 'R       
 
 module Util =
 

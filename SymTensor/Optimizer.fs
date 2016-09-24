@@ -7,7 +7,7 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<System.IComparable, obj> (HashIdentity.Reference)
+    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
 
     /// Returns a list containing one element each axis of the expression.
     /// The element is true if the axis is broadcasted.
@@ -155,9 +155,9 @@ module Optimizer =
 
 
     /// Optimizes an expression.
-    and optimize (expr: ExprT<'T>) : ExprT<'T> =
+    and optimize (expr: ExprT) : ExprT =
         match optimized.TryFind expr with
-        | Some opt -> opt :?> ExprT<'T>
+        | Some opt -> opt 
         | None ->
             let opt = 
                 match expr with
