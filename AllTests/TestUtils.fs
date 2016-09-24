@@ -45,15 +45,17 @@ let evalHostCuda func =
     func DevCuda
     printfn "Done."
 
-let buildVars shps = 
+[<RequiresExplicitTypeArguments>]
+let buildVars<'T> shps = 
     [for idx, shp in List.indexed shps do
         let name = sprintf "v%d" idx
         let sshp = 
             shp 
             |> List.map (function | -1 -> SizeSpec.broadcastable
-                                    | s -> SizeSpec.fix s)
-        yield Expr.var name sshp]
+                                  | s -> SizeSpec.fix s)
+        yield Expr.var<'T> name sshp]
 
+[<RequiresExplicitTypeArguments>]
 let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) =
     (VarEnv.empty, List.zip vars shps)
     ||> List.fold (fun varEnv (var, shp) ->
@@ -62,23 +64,23 @@ let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) 
         varEnv |> VarEnv.add var value
     )
 
-
-let randomEval shps exprFn (dev: IDevice) =
+[<RequiresExplicitTypeArguments>]
+let randomEval<'T> shps exprFn (dev: IDevice) =
     let rng = System.Random(123)
-    let vars = buildVars shps
+    let vars = buildVars<'T> shps
     let expr = exprFn vars
     let fn = Func.make dev.DefaultFactory expr
-    let varEnv = buildVarEnv vars shps rng dev
+    let varEnv = buildVarEnv<'T> vars shps rng dev
     fn varEnv |> ignore
 
 let requireEqualTracesWithRandomData shps (exprFn: ExprT list -> ExprT) =
-    compareTraces (randomEval shps exprFn) false
+    compareTraces (randomEval<single> shps exprFn) false
     |> should equal 0
 
 let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
     let rng = System.Random(123)
-    let vars = buildVars shps
+    let vars = buildVars<float> shps
     let expr = exprFn vars
-    let varEnv = buildVarEnv vars shps rng DevHost
+    let varEnv = buildVarEnv<float> vars shps rng DevHost
     DerivCheck.checkExprTree tolerance 1e-7 varEnv expr
 

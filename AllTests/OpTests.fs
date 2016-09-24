@@ -110,7 +110,7 @@ let ``Trace compare: large sum axis`` () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Singular matrix inverse`` () =
-    let a = Expr.var "a" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 3]
     let expr = Expr.invert a
     let fn = Func.make DevCuda.DefaultFactory expr |> arg1 a
     let av = ArrayNDCuda.zeros<single> [3; 3]
@@ -128,7 +128,7 @@ let ``Interpolate1D: simple test`` device =
     let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
-    let inp = Expr.var "inp" [nSmpls]
+    let inp = Expr.var<float> "inp" [nSmpls]
     let expr = Expr.interpolate1D ip inp
     let fn = Func.make device.DefaultFactory expr |> arg1 inp
 
@@ -155,8 +155,8 @@ let ``Interpolate2D: simple test`` device =
     let ip = Expr.createInterpolator tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
-    let inp1 = Expr.var "inp1" [nSmpls]
-    let inp2 = Expr.var "inp2" [nSmpls]
+    let inp1 = Expr.var<single> "inp1" [nSmpls]
+    let inp2 = Expr.var<single> "inp2" [nSmpls]
     let expr = Expr.interpolate2D ip inp1 inp2
     let fn = Func.make device.DefaultFactory expr |> arg2 inp1 inp2
 
@@ -202,7 +202,7 @@ let ``Interpolate1D: derivative test`` device =
     let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
-    let inp = Expr.var "inp" [nSmpls]
+    let inp = Expr.var<single> "inp" [nSmpls]
     let expr = Expr.interpolate1D ip inp
     let dexpr = Deriv.compute expr
     let dinp = dexpr |> Deriv.ofVar inp

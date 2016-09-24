@@ -428,8 +428,11 @@ module Expr =
         /// symbolic number of elements
         member this.NElems = nElems this
 
-        /// type of this expression
+        /// type name of this expression
         member this.TypeName = typename this  
+
+        /// type of this expression
+        member this.Type = this.TypeName |> TypeName.getType 
 
 
     /// expressions that were already checked for correctness
@@ -445,6 +448,9 @@ module Expr =
                     failwithf "%s is incompatiables with shapes %A" (opBeingChecked()) shapesBeingChecked
             let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
                 List.iter2 (.=) sa sb
+
+            if typename expr = TypeName.ofType<obj> then
+                failwith "Expression type cannot be object."
 
             match expr with 
             | Leaf op -> ()           
@@ -783,10 +789,16 @@ module Expr =
         a |> meanAxis ax |> insertBroadcastAxis ax
 
     /// identity matrix of given size
+    [<RequiresExplicitTypeArguments>]
     let identity<'T> size = 
         Leaf(Identity(size, TypeName.ofType<'T>)) |> check
 
+    /// identity matrix of given size and same type as given expression
+    let identityOfSameType expr size =
+        Leaf(Identity(size, typename expr)) |> check
+
     /// zero tensor of given shape
+    [<RequiresExplicitTypeArguments>]
     let zeros<'T> ss =
         Leaf(Zeros(ss, TypeName.ofType<'T>)) |> check
 
@@ -798,11 +810,8 @@ module Expr =
     let zerosLike a = 
         Leaf (Zeros(shapeOf a, typename a)) |> check
 
-    /// zero matrix of given size
-    let zeroMatrix<'T> rows cols =
-        zeros<'T> (ShapeSpec.matrix rows cols)
-
     /// variable of given name and shape
+    [<RequiresExplicitTypeArguments>]
     let var<'T> name (ss: ShapeSpecT) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> check
 

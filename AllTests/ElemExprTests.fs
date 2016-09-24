@@ -211,8 +211,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let l = ElemExpr.argElem 1
     let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
 
-    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
-    let lTensor = Expr.var "lTensor" [nGps]
+    let xTensor = Expr.var<double> "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var<double> "lTensor" [nGps]
     let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
 
     let dKse = Deriv.compute kse
@@ -268,8 +268,8 @@ let ``Eval and deriv: KSE in Expr on CUDA`` () =
     let l = ElemExpr.argElem 1
     let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) )
 
-    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
-    let lTensor = Expr.var "lTensor" [nGps]
+    let xTensor = Expr.var<single> "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var<single> "lTensor" [nGps]
     let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
 
     let dKse = Deriv.compute kse

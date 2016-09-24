@@ -24,7 +24,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
                                             dev:    IDevice) =
 
     let cfg = {
-        Step        = Expr.var "GradientDescent.Cfg.Step" []
+        Step        = Expr.var<'T> "GradientDescent.Cfg.Step" []
     }
 
     let rp = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)

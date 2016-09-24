@@ -53,21 +53,21 @@ module AdamTypes =
                                      dev:   IDevice) =
 
         let cfg = {
-            CfgExpr.Step        = Expr.var "Adam.Cfg.Step"          []
-            CfgExpr.Momentum    = Expr.var "Adam.Cfg.Momentum"      []
-            CfgExpr.Decay       = Expr.var "Adam.Cfg.Decay"         []
-            CfgExpr.DecayMom1   = Expr.var "Adam.Cfg.DecayMom1"     []
-            CfgExpr.DecayMom2   = Expr.var "Adam.Cfg.DecayMom2"     []
-            CfgExpr.Offset      = Expr.var "Adam.Cfg.Offset"        []
+            CfgExpr.Step        = Expr.var<'T> "Adam.Cfg.Step"          []
+            CfgExpr.Momentum    = Expr.var<'T> "Adam.Cfg.Momentum"      []
+            CfgExpr.Decay       = Expr.var<'T> "Adam.Cfg.Decay"         []
+            CfgExpr.DecayMom1   = Expr.var<'T> "Adam.Cfg.DecayMom1"     []
+            CfgExpr.DecayMom2   = Expr.var<'T> "Adam.Cfg.DecayMom2"     []
+            CfgExpr.Offset      = Expr.var<'T> "Adam.Cfg.Offset"        []
         }
 
         let state = {
-            StateExpr.Iter      = Expr.var "Adam.State.Iter"        []
-            StateExpr.LastStep  = Expr.var "Adam.State.LastStep"    (Expr.shapeOf pars)
-            StateExpr.EstMom1   = Expr.var "Adam.State.EstMom1"     (Expr.shapeOf pars)
-            StateExpr.EstMom2   = Expr.var "Adam.State.EstMom2"     (Expr.shapeOf pars)
-            StateExpr.EstMom1B  = Expr.var "Adam.State.EstMom1B"    (Expr.shapeOf pars)
-            StateExpr.EstMom2B  = Expr.var "Adam.State.EstMom2B"    (Expr.shapeOf pars)            
+            StateExpr.Iter      = Expr.var<'T> "Adam.State.Iter"        []
+            StateExpr.LastStep  = Expr.var<'T> "Adam.State.LastStep"    (Expr.shapeOf pars)
+            StateExpr.EstMom1   = Expr.var<'T> "Adam.State.EstMom1"     (Expr.shapeOf pars)
+            StateExpr.EstMom2   = Expr.var<'T> "Adam.State.EstMom2"     (Expr.shapeOf pars)
+            StateExpr.EstMom1B  = Expr.var<'T> "Adam.State.EstMom1B"    (Expr.shapeOf pars)
+            StateExpr.EstMom2B  = Expr.var<'T> "Adam.State.EstMom2B"    (Expr.shapeOf pars)            
         }
 
         let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)

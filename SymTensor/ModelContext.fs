@@ -57,7 +57,7 @@ module ModelContextTypes =
                 SizeSpec.zero
 
         /// variable containing all parameters
-        let flatVar : ExprT = Expr.var (flatVarName) [totalElems]
+        let flatVar : ExprT = Expr.var<'T> (flatVarName) [totalElems]
 
         /// parameter variables
         let parameterVars =
@@ -95,9 +95,7 @@ module ModelContextTypes =
             | Some deriv -> deriv
             | None -> 
                 printfn "Warning: ParameterSet %s does not occur in expression for differentiation." name
-                Expr.zeroMatrix 
-                    (Expr.shapeOf expr |> ShapeSpec.nElem) 
-                    (Expr.shapeOf this.Flat |> ShapeSpec.nElem)                
+                Expr.zeros<'T> [expr.NElems; this.Flat.NElems]
 
         /// variable for a given parameter
         member this.Item
@@ -230,7 +228,7 @@ module ModelContextTypes =
 
         /// Creates and returns a model variable.
         member this.Var (name: string) (shape: ShapeSpecT) : ExprT =
-            let v = Expr.var (context + "." + name) shape
+            let v = Expr.var<'T> (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v :> IVarSpec)
             v
 
@@ -239,7 +237,7 @@ module ModelContextTypes =
             let initializer = defaultArg initializer defaultInitializer
             if instantiated then failwith "cannot add parameter after model has been instantiated"
 
-            let p = Expr.var (context + "." + name) shape
+            let p = Expr.var<'T> (context + "." + name) shape
             let pRef = ref p
             parameters <- parameters |> Map.add (Expr.extractVar p) {ExprRef = pRef; Initializer = initializer}
             pRef

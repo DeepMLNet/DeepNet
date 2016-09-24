@@ -198,7 +198,7 @@ module Deriv =
 
     /// reverse accumulation autodifferentiation of an expression
     let compute (expr: ExprT) : DerivT =
-        let eg = shapeOf expr |> ShapeSpec.nElem |> identity
+        let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
         reverseDiffStep expr eg
 
     /// extracts the Jacobian of the given variable
