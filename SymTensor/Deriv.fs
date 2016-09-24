@@ -7,29 +7,31 @@ module DerivTypes =
     open Expr
 
     /// map containing the Jacobian for each variable
-    type DerivT<'T> = Map<VarSpecT<'T>, ExprT<'T>>
+    type DerivT = Map<VarSpecT, ExprT>
 
 
 module Deriv =
     open Expr
 
     /// merges to derivative maps
-    let private merge (aGrads: DerivT<_>) (bGrads: DerivT<_>) : DerivT<_> =
+    let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
         (aGrads, bGrads)
         ||> Map.fold (fun m v vg -> match Map.tryFind v m with
                                     | Some ovg -> m |> Map.add v (vg + ovg)
                                     | None -> m |> Map.add v vg) 
 
     /// reverse accumulation autodifferentiation of an expression
-    let rec reverseDiffStep (expr: ExprT<'T>) (eg: ExprT<'T>) : DerivT<'T> =    
-        let exprShp = shapeOf expr
-        let funElems = (shapeOf eg).[0]  
+    let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : DerivT =    
+        let exprShp = expr.Shape
+        let funElems = eg.Shape.[0]  
 
-        if (shapeOf eg).[1] .<> ShapeSpec.nElem (shapeOf expr) then
+        if expr.TypeName <> eg.TypeName then
+            failwithf "Jacobian with type %A was specified for expression of type %A"
+                eg.TypeName expr.TypeName
+        if eg.Shape.[1] .<> expr.NElems then
             printfn "expr=\n%A" expr
             printfn "eg=\n%A" eg
-
-            failwithf "gradient with %A wrt elements was specified for expression with %A elements"
+            failwithf "Jacobian with %A wrt elements was specified for expression with %A elements"
                 (shapeOf eg).[1] (ShapeSpec.nElem (shapeOf expr))
 
         /// expands the second dimension of the the Jacobian into the shape of this expression
@@ -51,10 +53,10 @@ module Deriv =
         match expr with
         | Leaf(op) ->                  
             match op with
-            | Zeros ss -> Map.empty
+            | Zeros _ -> Map.empty
             | ScalarConst _ -> Map.empty
             | SizeValue _ -> Map.empty
-            | Identity ss -> Map.empty
+            | Identity _ -> Map.empty
             | Var v -> Map.empty |> Map.add v eg
 
         | Unary(op, a) ->

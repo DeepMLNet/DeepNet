@@ -29,19 +29,19 @@ module VarEnv =
         Map.remove vs varEnv
 
     /// add variable value to environment
-    let addVarSpecT (vs: VarSpecT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
+    let addVarSpecT (vs: VarSpecT) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
         addUVarSpec (UVarSpec.ofVarSpec vs) (value :> IArrayNDT) varEnv        
 
     /// remove variable value from environment
-    let removeVarSpecT (vs: VarSpecT<'T>) (varEnv: VarEnvT) : VarEnvT =
+    let removeVarSpecT (vs: VarSpecT) (varEnv: VarEnvT) : VarEnvT =
         removeUVarSpec (UVarSpec.ofVarSpec vs) varEnv        
 
     /// add variable value to environment
-    let add (var: Expr.ExprT<'T>) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
+    let add (var: Expr.ExprT) (value: ArrayNDT<'T>) (varEnv: VarEnvT) : VarEnvT =
         addVarSpecT (Expr.extractVar var) value varEnv
 
     /// remove variable value from environment
-    let remove (var: Expr.ExprT<'T>) (varEnv: VarEnvT) : VarEnvT =
+    let remove (var: Expr.ExprT) (varEnv: VarEnvT) : VarEnvT =
         removeVarSpecT (Expr.extractVar var) varEnv
 
     /// get variable value from environment
@@ -49,11 +49,11 @@ module VarEnv =
         varEnv.[vs]
 
     /// get variable value from environment
-    let getVarSpecT (vs: VarSpecT<'T>) (varEnv: VarEnvT) : ArrayNDT<'T> =
+    let getVarSpecT (vs: VarSpecT) (varEnv: VarEnvT) : ArrayNDT<'T> =
         getUnified (UVarSpec.ofVarSpec vs) varEnv :?> ArrayNDT<'T>
 
     /// get variable value from environment
-    let get (var: Expr.ExprT<'T>) (varEnv: VarEnvT) : ArrayNDT<'T> =
+    let get (var: Expr.ExprT) (varEnv: VarEnvT) : ArrayNDT<'T> =
         getVarSpecT (Expr.extractVar var) varEnv
 
     /// empty variable environment
@@ -108,7 +108,7 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> ArrayND.location vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (Expr.ExprT<'T> * ArrayNDT<'T>) seq) =
+    let ofSeq (entries: (Expr.ExprT * ArrayNDT<'T>) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
@@ -321,14 +321,14 @@ module Func =
 
 
     /// makes a function that evaluates the given expression 
-    let make factory (expr0: ExprT<'T0>)  =
+    let make<'T0> factory (expr0: ExprT)  =
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let evalAll = evalWrapper factory [expr0gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>
 
-    let make2 factory (expr0: ExprT<'T0>) (expr1: ExprT<'T1>) =    
+    let make2<'T0, 'T1> factory (expr0: ExprT) (expr1: ExprT) =    
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen]        
@@ -336,7 +336,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>
 
-    let make3 factory (expr0: ExprT<'T0>) (expr1: ExprT<'T1>) (expr2: ExprT<'T2>) =    
+    let make3<'T0, 'T1, 'T2> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) =    
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
@@ -351,21 +351,21 @@ module Func =
 module FuncTypes = 
 
     type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
-    let arg1 (vs0: ExprT<'T0>) f : Arg1Func<_, _> =
+    let arg1 (vs0: ExprT) f : Arg1Func<_, _> =
         fun (val0: ArrayNDT<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
     type Arg2Func<'T0, 'T1, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> 'TR
-    let arg2 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) f : Arg2Func<_, _, _> =
+    let arg2 (vs0: ExprT) (vs1: ExprT) f : Arg2Func<_, _, _> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
     type Arg3Func<'T0, 'T1, 'T2, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> 'TR
-    let arg3 (vs0: ExprT<'T0>) (vs1: ExprT<'T1>) (vs2: ExprT<'T2>) f : Arg3Func<_, _, _, _> =
+    let arg3 (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) f : Arg3Func<_, _, _, _> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
 
-    let addArg (vs: ExprT<'T>) f =
+    let addArg (vs: ExprT) f =
         fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
             f (ve |> VarEnv.add vs value)
 
@@ -373,64 +373,8 @@ module FuncTypes =
         fun (ve: VarEnvT) ->
             f (VarEnv.join ve varEnv)
 
-    let (^@^) a b =
-        (addArg a) b
-            
-    let (^<|) a b =
-        a b
-
-//    let myFun  (ve: VarEnvT)  =
-//        3
-
-//    let testF () =
-//        let f2 = addArg (Expr.scalar 0) myFun
-//        let f3 = addArg (Expr.scalar 1.f) f2
-//        let f4 = addArg (Expr.scalar 1.f) (addArg (Expr.scalar 0) myFun)
-//        let f5 = addArg (Expr.scalar 1.f) ^<| addArg (Expr.scalar 0) myFun
-//
-//        let f6 = addArg (Expr.scalar 2.f) (addArg (Expr.scalar 1) (addArg (Expr.scalar 0.) myFun))
-//        let f7 = addArg (Expr.scalar 2.f) ^<| addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun
-//        let f8 = addArg (Expr.scalar 2.f) ^<| (addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun)
-//        
-//        let f9 = Expr.scalar 2.f ^@^ myFun
-//        let f10 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ myFun
-//        let f11 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. ^@^ myFun
-//
-//        let f12 = VarEnv.empty |> Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. ^@^ myFun
-//
-//        //let f13 = Expr.scalar 2.f ^@^ Expr.scalar 1 ^@^ Expr.scalar 0. 
-//
-//        //let f7b = addArg (Expr.scalar 2.f) ^<| addVarEnv ^<| addArg (Expr.scalar 0) ^<| addArg (Expr.scalar 0.) myFun  
-//
-//        ()
-
-
-//    let inline (.|.) (varEnv: VarEnvT) (var: ExprT<'T>) =
-//        fun (varValue: ArrayNDT<'T>) ->
-//            varEnv |> VarEnv.add var varValue
-
-
-//    let inline (.^.) func (var: ExprT<'T>) =
-//        fun (varEnv: VarEnvT) (varValue: ArrayNDT<'T>) ->
-//            func (varEnv |> VarEnv.add var varValue)
-////
-////    let inline (.||.) func (var: ExprT<'T>) =
-////        fun varEnvBuildFunc (varValue: ArrayNDT<'T>) ->
-////            func (varEnv |> VarEnv.add var varValue)
-//
-////    let inline (.^) func (varEnv: VarEnvT) =
-////        func varEnv
-////        fun (varEnv: VarEnvT) (firstVarValue: ArrayNDT<'T>) ->
-////            func (varEnv |> VarEnv.add var firstVarValue)
-//
-//    let END : VarEnvT = 
-//        VarEnv.empty
-//
-//    let addArg (var: ExprT<'T>) =
-//        fun (varEnv: VarEnvT) ->
-//            fun (varValue: ArrayNDT<'T>) -> varEnv |> VarEnv.add var varValue
-
-//    let tst a b =
-//        a .|. b
-
-
+//    let (^@^) a b =
+//        (addArg a) b
+//            
+//    let (^<|) a b =
+//        a b

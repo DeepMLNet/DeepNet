@@ -244,7 +244,7 @@ module Expr =
         /// This evaluation should be done on the host using the simplest means possible and is used
         /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
         /// implementations. This method may be omitted when no verification will be done.
-        abstract EvalSimple: args:IArrayNDHostT list -> IArrayNDHostT
+        abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
 
     /// an expression
     and [<StructuralComparison; StructuralEquality>] 
@@ -456,6 +456,20 @@ module Expr =
     /// Wraps the given op in a Broadcast op if its shape does not match ss.
     let broadcastIfNecessary ss expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
+
+    type ExprT with
+        /// symbolic shape
+        member this.Shape = shapeOf this
+
+        /// number of dimensions
+        member this.NDims = ShapeSpec.nDim this.Shape
+
+        /// symbolic number of elements
+        member this.NElems = nElems this
+
+        /// type of this expression
+        member this.TypeName = typename this  
+
 
     /// expressions that were already checked for correctness
     let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
@@ -749,6 +763,7 @@ module Expr =
 
         // transposition
         member this.T = transpose this
+    
 
     /// sign keeping type
     let signt (a: ExprT) =

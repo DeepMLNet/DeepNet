@@ -17,8 +17,8 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
-    let private doInterpolate (ip: InterpolatorT<'T>) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
-        let tbl = Expr.getInterpolatorTable ip
+    let private doInterpolate (ip: InterpolatorT) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
+        let tbl : ArrayNDT<'T> = Expr.getInterpolatorTable ip
 
         /// returns interpolation in dimensions to the right of leftIdxs
         let rec interpolateInDim (leftIdxs: int list) (x: float list) =
@@ -26,7 +26,7 @@ module HostEval =
             if d = ip.NDims then
                 conv<float> tbl.[leftIdxs]
             else 
-                let pos = (conv<float> x.[d] - conv<float> ip.MinArg.[d]) / ip.Resolution.[d]
+                let pos = (x.[d] - ip.MinArg.[d]) / ip.Resolution.[d]
                 let posLeft = floor pos 
                 let fac = pos - posLeft
                 let idx = int posLeft 
@@ -49,21 +49,23 @@ module HostEval =
         res
 
     /// evaluate expression to numeric array 
-    let rec eval (evalEnv: EvalEnvT) (expr: ExprT<'T>) =
+    let rec eval (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<'T> =
         let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<_>
         let shapeEval symShape = ShapeSpec.eval symShape
         let sizeEval symSize = SizeSpec.eval symSize
         let rngEval = SimpleRangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
 
-        let rec doEval (expr: ExprT<'T>) =
+        let rec doEval (expr: ExprT) =
+            if expr.TypeName <> TypeName.ofType<'T> then
+                failwith "expression data type mismatch"
             let res = 
                 match expr with
                 | Leaf(op) ->
                     match op with
-                    | Identity ss -> ArrayNDHost.identity (sizeEval ss) 
-                    | Zeros ss -> ArrayNDHost.zeros (shapeEval ss)
-                    | SizeValue sv -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
-                    | ScalarConst f -> ArrayNDHost.scalar f
+                    | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
+                    | Zeros (ss, tn) -> ArrayNDHost.zeros (shapeEval ss)
+                    | SizeValue sv -> sizeEval sv |> box |> unbox |> ArrayNDHost.scalar
+                    | ScalarConst sc -> ArrayNDHost.scalar (sc.Value :?> 'T)
                     | Var(vs) -> varEval vs 
                 | Unary(op, a) ->
                     let av = doEval a
@@ -138,9 +140,10 @@ module HostEval =
                     | Elements (resShape, elemExpr) -> 
                         let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
-                        ElemExpr.eval elemExpr esv nResShape    
+                        failwith "FIXME uncomment"
+                        //ElemExpr.eval elemExpr esv nResShape    
                     | Interpolate ip -> doInterpolate ip esv
-                    | ExtensionOp eop -> eop.EvalSimple esv
+                    | ExtensionOp eop -> eop.EvalSimple esv 
 
             if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) res
@@ -148,26 +151,20 @@ module HostEval =
             
         doEval expr
 
-    and private evalInt (evalEnv: EvalEnvT) (expr: ExprT<int>) =
+    and private evalInt (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<int> =
         eval evalEnv expr
 
     /// helper type for dynamic method invocation
     type private EvalT =
-        static member Eval<'T> (evalEnv: EvalEnvT, expr: ExprT<'T>) : IArrayNDT =
+        static member Do<'T> (evalEnv: EvalEnvT, expr: ExprT) : IArrayNDT =
             eval evalEnv expr :> IArrayNDT
 
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.
     let evalUExpr (evalEnv: EvalEnvT) (UExpr (_, _, {TargetType=tn}) as uexpr) =
         let expr = UExpr.toExpr uexpr
-        let gm = 
-            typeof<EvalT>.GetMethod ("Eval", 
-                                     BindingFlags.NonPublic ||| 
-                                     BindingFlags.Public ||| 
-                                     BindingFlags.Static)
-        let m = gm.MakeGenericMethod ([| TypeName.getType tn |])
-        m.Invoke(null, [| evalEnv; expr |]) :?> IArrayNDT
-        
+        callGeneric<EvalT, IArrayNDT> tn.Type (evalEnv, expr)
+
     /// Evaluates the specified unified expressions.
     /// This is done by evaluating the generating expressions.
     let evalUExprs (evalEnv: EvalEnvT) (uexprs: UExprT list) =
