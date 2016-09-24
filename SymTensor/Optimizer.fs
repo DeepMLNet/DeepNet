@@ -85,7 +85,9 @@ module Optimizer =
 
             let rec splitSum elemExpr =
                 match elemExpr with
-                | ElemExpr.Unary (ElemExpr.Sum (sym, first, last), summand) ->                  
+                | ElemExpr.Unary (ElemExpr.Sum (sym, first, last), summand) ->     
+                    //printfn "Pulling out summand:\n%A" summand
+                                 
                     // replace sum by argument access
                     let sumArgPos = newArg ()
                     let sumArgIdx =
@@ -136,6 +138,9 @@ module Optimizer =
 
             match insigAx with
             | Some (insigAx, _) ->
+                //printfn "removing insignificant axis %d with shape %A of expr:\n%A"
+                //    insigAx resShape.[insigAx] elemExpr
+
                 // replace insignificant axis by axis with one broadcastable element
                 let sigResShape = resShape |> ShapeSpec.set insigAx SizeSpec.broadcastable
                 let sigElements = Expr.elements sigResShape elemExpr args
