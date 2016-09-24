@@ -9,11 +9,11 @@ open ArrayNDNS
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
+    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
-    static member UVarSpecOfExpr<'T> (expr: ExprT<'T>) =
+    static member UVarSpecOfExpr<'T> (expr: ExprT) =
         UVarSpec.ofExpr expr
     static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
         value |> dev.ToHost |> ArrayNDHDF.write hdf name
@@ -59,13 +59,13 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 let baseType, valueType, exprType =                   
                     if valField.PropertyType.IsGenericType && 
                             valField.PropertyType.GetGenericTypeDefinition() = typedefof<ArrayNDT<_>> then
-                        // ArrayNDT<'T> => ExprT<'T>
+                        // ArrayNDT<'T> => ExprT
                         let bt = valField.PropertyType.GetGenericArguments().[0]
-                        bt, Array bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
+                        bt, Array bt, typeof<ExprT>
                     else
-                        // 'T => ExprT<'T> (scalar)
+                        // 'T => ExprT (scalar)
                         let bt = valField.PropertyType
-                        bt, Scalar bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
+                        bt, Scalar bt, typeof<ExprT>
 
                 if exprField.PropertyType <> exprType then
                     failwithf "type mismatch for field %s: 'PVal type %A requires 'PExpr type %A but got %A"

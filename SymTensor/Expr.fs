@@ -829,13 +829,17 @@ module Expr =
     let zeros<'T> ss =
         Leaf(Zeros(ss, TypeName.ofType<'T>)) |> check
 
-    /// zero matrix of given size
-    let zeroMatrix<'T> rows cols =
-        zeros<'T> (ShapeSpec.matrix rows cols)
+    /// zero tensor of given shape and same type as given expression
+    let zerosOfSameType expr ss =
+        Leaf(Zeros(ss, typename expr)) |> check
 
     /// zero tensor with same shape and type as given tensor
     let zerosLike a = 
         Leaf (Zeros(shapeOf a, typename a)) |> check
+
+    /// zero matrix of given size
+    let zeroMatrix<'T> rows cols =
+        zeros<'T> (ShapeSpec.matrix rows cols)
 
     /// variable of given name and shape
     let var<'T> name (ss: ShapeSpecT) = 

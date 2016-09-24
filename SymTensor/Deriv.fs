@@ -50,6 +50,13 @@ module Deriv =
                 let eGrad = reverseDiffStep e de
                 merge totGrad eGrad)
 
+        // useful numbers
+        let zero = Expr.zeroOfSameType expr
+        let one = Expr.oneOfSameType expr
+        let two = Expr.twoOfSameType expr
+        let scalar = Expr.scalarOfSameType expr
+        let zeros = Expr.zerosOfSameType expr
+
         match expr with
         | Leaf(op) ->                  
             match op with
@@ -64,19 +71,19 @@ module Deriv =
             | Negate -> -eg |> reverseDiffStep a
             | Abs -> egExpanded * padLeft (signt a) |> collapse |> reverseDiffStep a
             | SignT -> Map.empty
-            | Log -> egExpanded * padLeft (a ** (-one())) |> collapse |> reverseDiffStep a
-            | Log10 -> eg |> reverseDiffStep (log a / log (scalart<'T> 10))
+            | Log -> egExpanded * padLeft (a ** (-one)) |> collapse |> reverseDiffStep a
+            | Log10 -> eg |> reverseDiffStep (log a / log (scalar 10))
             | Exp -> egExpanded * padLeft (exp a) |> collapse |> reverseDiffStep a
             | Sin -> egExpanded * padLeft (cos a) |> collapse |> reverseDiffStep a
             | Cos -> egExpanded * padLeft (-sin a) |> collapse |> reverseDiffStep a
-            | Tan -> egExpanded * padLeft (one() + (tan a)**two()) |> collapse |> reverseDiffStep a
-            | Asin -> egExpanded * padLeft (one() / sqrtt (one() - a**two())) |> collapse |> reverseDiffStep a
-            | Acos -> egExpanded * padLeft (-one() / sqrtt (one() - a**two())) |> collapse |> reverseDiffStep a
-            | Atan -> egExpanded * padLeft (one() / (one<'T>() + a**two())) |> collapse |> reverseDiffStep a
+            | Tan -> egExpanded * padLeft (one + (tan a)**two) |> collapse |> reverseDiffStep a
+            | Asin -> egExpanded * padLeft (one / sqrtt (one - a**two)) |> collapse |> reverseDiffStep a
+            | Acos -> egExpanded * padLeft (-one / sqrtt (one - a**two)) |> collapse |> reverseDiffStep a
+            | Atan -> egExpanded * padLeft (one / (one + a**two)) |> collapse |> reverseDiffStep a
             | Sinh -> egExpanded * padLeft (cosh a) |> collapse |> reverseDiffStep a
             | Cosh -> egExpanded * padLeft (sinh a) |> collapse |> reverseDiffStep a
-            | Tanh -> egExpanded * padLeft (one() - (tanh a)**two()) |> collapse |> reverseDiffStep a
-            | Sqrt -> egExpanded * padLeft (one() / (two<'T>() * sqrtt a)) |> collapse |> reverseDiffStep a
+            | Tanh -> egExpanded * padLeft (one - (tanh a)**two) |> collapse |> reverseDiffStep a
+            | Sqrt -> egExpanded * padLeft (one / (two * sqrtt a)) |> collapse |> reverseDiffStep a
             | Ceil -> Map.empty
             | Floor -> Map.empty
             | Round -> Map.empty
@@ -87,7 +94,7 @@ module Deriv =
             | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
 
             | Subtensor srs ->
-                let agExpanded : ExprT<'T> = Expr.zeros (funElems :: (shapeOf a))
+                let agExpanded = zeros (funElems :: (shapeOf a))
                 setSubtensor agExpanded.[SRSAll :: srs] egExpanded
                 |> collapse 
                 |> reverseDiffStep a
@@ -124,15 +131,17 @@ module Deriv =
             | Substract -> eg .+ (-eg)
             | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
                           ((egExpanded * (padLeft a)) |> collapse)
-            | Divide -> eg |> reverseDiffStep (a * b ** (-one()))
-            | Modulo -> eg .+ (padLeft (-truncate (a / b)) |> collapse) // TODO: FIXME
-            | Power -> (egExpanded * padLeft (b * a**(b - one())) |> collapse) .+ 
+            | Divide -> eg |> reverseDiffStep (a * b ** (-one))
+            | Modulo -> 
+                failwith "Modulo gradient is broken"
+                eg .+ (padLeft (-truncate (a / b)) |> collapse) 
+            | Power -> (egExpanded * padLeft (b * a**(b - one)) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
             | MaxElemwise -> failwith "TODO"
             | MinElemwise -> failwith "TODO"
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
-                let mxWrtX (m: ExprT<'T>) x y dy =
+                let mxWrtX (m: ExprT) x y dy =
                     let xShp, yShp, dyShp = shapeOf x, shapeOf y, shapeOf dy
                     let nd = ShapeSpec.nDim xShp
                     let batchShp = xShp.[0..nd-3]
@@ -188,12 +197,12 @@ module Deriv =
 
 
     /// reverse accumulation autodifferentiation of an expression
-    let compute (expr: ExprT<'T>) : DerivT<'T> =
+    let compute (expr: ExprT) : DerivT =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identity
         reverseDiffStep expr eg
 
     /// extracts the Jacobian of the given variable
-    let ofVar var (varDiffs: DerivT<'T>) =
+    let ofVar var (varDiffs: DerivT) =
         match varDiffs |> Map.tryFind (extractVar var) with
         | Some d -> d
         | None -> failwithf "the variable %A is not present in the expression" (extractVar var)
