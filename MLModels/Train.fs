@@ -168,9 +168,9 @@ module Train =
     /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
     let trainableFromLossExpr
             (modelInstance: ModelInstance<'T>) 
-            (loss: ExprT<'T>) 
+            (loss: ExprT) 
             (varEnvBuilder: 'Smpl -> VarEnvT)
-            (optimizer: IOptimizer<'T, 'OptCfg, 'OptState>)
+            (optimizer: IOptimizer<'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
         let lossFn = modelInstance.Func loss << varEnvBuilder

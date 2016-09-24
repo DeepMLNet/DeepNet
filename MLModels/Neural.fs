@@ -24,13 +24,15 @@ module LossLayer =
     /// pred.[cls, smpl] must be the predicted probability that the sample
     /// belong to class cls and target.[cls, smpl] must be 1 if the sample
     /// actually belongs to class cls and 0 otherwise.
-    let loss lm (pred: ExprT<'T>) (target: ExprT<'T>) =
+    let loss lm (pred: ExprT) (target: ExprT) =
+        let one = Expr.oneOfSameType pred
+        let two = Expr.twoOfSameType pred
         match lm with
         | MSE -> 
-            (pred - target) ** Expr.two<'T>()
+            (pred - target) ** two
             |> Expr.mean
         | BinaryCrossEntropy ->
-            -(target * log pred + (Expr.one<'T>() - target) * log (Expr.one<'T>() - pred))
+            -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
             let logPred = log pred
@@ -65,9 +67,9 @@ module NeuralLayer =
     /// Neural layer parameters.
     type Pars<'T> = {
         /// expression for the weights
-        Weights:        ExprT<'T> ref
+        Weights:        ExprT ref
         /// expression for the biases
-        Bias:           ExprT<'T> ref
+        Bias:           ExprT ref
         /// hyper-parameters
         HyperPars:      HyperPars
     }
