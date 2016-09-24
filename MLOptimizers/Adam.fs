@@ -16,13 +16,13 @@ module Adam =
         Offset:         'T
     } 
 
-    type CfgExpr<'T> = {
-        Step:           ExprT<'T>
-        Momentum:       ExprT<'T>
-        Decay:          ExprT<'T>
-        DecayMom1:      ExprT<'T>
-        DecayMom2:      ExprT<'T>
-        Offset:         ExprT<'T>
+    type CfgExpr = {
+        Step:           ExprT
+        Momentum:       ExprT
+        Decay:          ExprT
+        DecayMom1:      ExprT
+        DecayMom2:      ExprT
+        Offset:         ExprT
     }
 
     type State<'T> = {
@@ -34,13 +34,13 @@ module Adam =
         EstMom2B:       ArrayNDT<'T>
     } 
 
-    type StateExpr<'T> = {
-        Iter:           ExprT<'T>  
-        LastStep:       ExprT<'T>
-        EstMom1:        ExprT<'T>
-        EstMom2:        ExprT<'T>
-        EstMom1B:       ExprT<'T>
-        EstMom2B:       ExprT<'T>
+    type StateExpr = {
+        Iter:           ExprT
+        LastStep:       ExprT
+        EstMom1:        ExprT
+        EstMom2:        ExprT
+        EstMom1B:       ExprT
+        EstMom2B:       ExprT
     }
 
 [<AutoOpen>]
@@ -48,8 +48,8 @@ module AdamTypes =
     open Adam
 
     type Adam<'T when 'T: equality and 'T: comparison> 
-                                    (loss:  ExprT<'T>,
-                                     pars:  ExprT<'T>,
+                                    (loss:  ExprT,
+                                     pars:  ExprT,
                                      dev:   IDevice) =
 
         let cfg = {
@@ -70,8 +70,8 @@ module AdamTypes =
             StateExpr.EstMom2B  = Expr.var "Adam.State.EstMom2B"    (Expr.shapeOf pars)            
         }
 
-        let rpCfg = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)
-        let rpState = VarRecord<State<'T>, StateExpr<'T>> (state, dev)
+        let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
+        let rpState = VarRecord<State<'T>, StateExpr> (state, dev)
 
         member this.DefaultCfg : Cfg<'T> = {
             Step        = conv<'T> 2e-4
@@ -93,11 +93,13 @@ module AdamTypes =
                 EstMom2B    = ArrayNDHost.zeros shp |> dev.ToDev
             }
 
-        member this.Minimize =
-            let gradient = Deriv.compute loss |> Deriv.ofVar pars|> Expr.reshape (Expr.shapeOf pars) 
-            let gradient = gradient |> Expr.checkFinite "gradient"
-            let one, two = Expr.scalart 1, Expr.scalart 2
-            let oneHalf = Expr.scalar (conv<'T> 0.5)
+        member this.Minimize : ExprT =
+            let gradient = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars) 
+            //let gradient = gradient |> Expr.checkFinite "gradient"
+
+            let one = Expr.scalarOfSameType loss 1
+            let oneHalf = Expr.scalarOfSameType loss 0.5
+            let two = Expr.scalarOfSameType loss 2
 
             let m, d, o = cfg.Momentum, cfg.Decay, cfg.Offset
             let dm1, dm2 = cfg.DecayMom1, cfg.DecayMom2
@@ -130,7 +132,7 @@ module AdamTypes =
             rpCfg.PublishLoc mb
             rpState.PublishLoc mb
 
-        interface IOptimizer<'T, Cfg<'T>, State<'T>> with
+        interface IOptimizer<Cfg<'T>, State<'T>> with
             member this.OptStepExpr = this.Minimize
             member this.Use f = this.Use f
             member this.CfgWithLearningRate learningRate cfg = {cfg with Step=conv<'T> learningRate}

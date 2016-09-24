@@ -12,15 +12,15 @@ module GradientDescent =
     }
 
     type CfgExpr<'T> = {
-        Step:           ExprT<'T>
+        Step:           ExprT
     }
 
 
 open GradientDescent
 
 type GradientDescent<'T when 'T: equality and 'T: comparison> 
-                                           (loss:   ExprT<'T>,
-                                            pars:   ExprT<'T>,    
+                                           (loss:   ExprT,
+                                            pars:   ExprT,    
                                             dev:    IDevice) =
 
     let cfg = {
