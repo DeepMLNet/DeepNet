@@ -112,7 +112,7 @@ let ``Trace compare: large sum axis`` () =
 let ``Singular matrix inverse`` () =
     let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 3]
     let expr = Expr.invert a
-    let fn = Func.make DevCuda.DefaultFactory expr |> arg1 a
+    let fn = Func.make<single> DevCuda.DefaultFactory expr |> arg1 a
     let av = ArrayNDCuda.zeros<single> [3; 3]
     let iav = fn av
     printfn "a=\n%A" av
@@ -128,7 +128,7 @@ let ``Interpolate1D: simple test`` device =
     let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
-    let inp = Expr.var<float> "inp" [nSmpls]
+    let inp = Expr.var<single> "inp" [nSmpls]
     let expr = Expr.interpolate1D ip inp
     let fn = Func.make device.DefaultFactory expr |> arg1 inp
 
@@ -236,7 +236,7 @@ let checkFiniteOpTest diagVal offDiagVal =
     let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 3]
     let b = Expr.var<single> "b" [SizeSpec.fix 3; SizeSpec.fix 3]
     let expr = a / b |> Expr.checkFinite "a / b"
-    let fn = Func.make DevCuda.DefaultFactory expr |> arg2 a b
+    let fn = Func.make<single> DevCuda.DefaultFactory expr |> arg2 a b
     let av = ArrayNDCuda.ones<single> [3; 3]
     let dv = diagVal * ArrayNDCuda.ones<single> [3]
     let bv = offDiagVal * ArrayNDCuda.ones<single> [3; 3]

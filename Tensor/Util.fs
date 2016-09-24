@@ -173,6 +173,12 @@ module Util =
 
         byteAry
 
+    /// Verifies that the specified generic type is not obj or IComparable.
+    [<RequiresExplicitTypeArguments>]
+    let checkProperType<'T> () =
+        if typeof<'T> = typeof<obj> || typeof<'T> = typeof<IComparable> then
+            failwith "the type must be instantiated with explicit generic parameters"
+
     /// Returns "Some key" when a key was pressed, otherwise "None".
     let getKey () =
         try

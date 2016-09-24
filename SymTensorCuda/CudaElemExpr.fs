@@ -16,12 +16,17 @@ module CudaElemExpr =
     type CodeT = string
 
 
-    let private constCode tn (c: obj) =
-        match tn with
-        | _ when tn = TypeName.ofType<int> -> sprintf "%d" (c :?> int)
-        | _ when tn = TypeName.ofType<single> -> sprintf "%e" (c :?> single)
-        | _ when tn = TypeName.ofType<double> -> sprintf "%e" (c :?> double)
-        | _ -> failwithf "unsupported type: %A" tn
+    let private constCode tn (c: ConstSpecT) =
+        try
+            match tn with
+            | _ when tn = TypeName.ofType<int> -> sprintf "%d" (c.GetConvertedValue<int>())
+            | _ when tn = TypeName.ofType<single> -> sprintf "%e" (c.GetConvertedValue<single>())
+            | _ when tn = TypeName.ofType<double> -> sprintf "%e" (c.GetConvertedValue<double>())
+            | _ -> failwithf "unsupported type: %A" tn
+        with 
+        | :? InvalidCastException | :? FormatException | :? OverflowException ->
+            failwithf "cannot convert constant %A of type %A to expression type %A"
+                c (c.GetType()) (TypeName.getType tn)
 
     let private cppType tn =
         match tn with
@@ -63,8 +68,7 @@ module CudaElemExpr =
             | Const c -> constCode tn c
             | SizeValue ss ->
                 let svInt = SizeSpec.eval ss
-                let sv = Convert.ChangeType (svInt, TypeName.getType tn)
-                constCode tn sv
+                constCode tn (ConstSpec.ofValue svInt)
             | ArgElement (arg, idxs) ->
                 let argVar = argVars.[arg]
                 let idxStr =

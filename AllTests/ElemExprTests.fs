@@ -219,8 +219,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let dKsedX = dKse |> Deriv.ofVar xTensor
     let dKsedL = dKse |> Deriv.ofVar lTensor
 
-    let kseFn = Func.make DevHost.DefaultFactory kse |> arg2 xTensor lTensor
-    let dKseFn = Func.make2 DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+    let kseFn = Func.make<float> DevHost.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2<float, float> DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
     let kseinv = Expr.invert kse  
     
@@ -228,8 +228,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let dKseinvdX  = dKseinv |> Deriv.ofVar xTensor
     let dKseinvdL  = dKseinv |> Deriv.ofVar lTensor
 
-    let kseinvFn = Func.make DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
-    let dKseinvFn = Func.make2 DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
+    let kseinvFn = Func.make<float> DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
+    let dKseinvFn = Func.make2<float, float> DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
 
     let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5] |> ArrayNDHost.ofList
@@ -276,8 +276,8 @@ let ``Eval and deriv: KSE in Expr on CUDA`` () =
     let dKsedX = dKse |> Deriv.ofVar xTensor
     let dKsedL = dKse |> Deriv.ofVar lTensor
 
-    let kseFn = Func.make DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
-    let dKseFn = Func.make2 DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+    let kseFn = Func.make<single> DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2<single, single> DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
     let xVal = [[1.0f; 1.1f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
     let lVal = [0.5f] |> ArrayNDHost.ofList |> ArrayNDCuda.toDev

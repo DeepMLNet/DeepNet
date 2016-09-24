@@ -41,7 +41,7 @@ module Expr =
         /// scalar of given value
         | ScalarConst of ConstSpecT
         /// scalar of the given size
-        | SizeValue of SizeSpecT
+        | SizeValue of SizeSpecT * TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -300,7 +300,7 @@ module Expr =
         | Leaf (Identity (ss, tn)) -> tn
         | Leaf (Zeros (sa, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
-        | Leaf (SizeValue ss) -> TypeName.ofType<int>
+        | Leaf (SizeValue (ss, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
         | Unary (op, a) -> typename a
@@ -510,7 +510,7 @@ module Expr =
                 let ta, tb = typename a, typename b
                 if ta <> tb then
                     failwithf "cannot apply binary operation %s to expressions of \
-                               different types %A and %A" (opBeingChecked()) ta tb
+                               different types %A and %A" (opBeingChecked()) ta.Type tb.Type
 
                 match op with
                 | BinaryElemwiseOp ->
@@ -534,7 +534,7 @@ module Expr =
 
                 if es |> List.exists (fun e -> typename e <> typename es.Head) then
                     failwithf "cannot apply n-ary operation %s to expressions of different types %A"
-                        (opBeingChecked()) (es |> List.map typename)
+                        (opBeingChecked()) (es |> List.map (typename >> TypeName.getType))
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
@@ -569,9 +569,9 @@ module Expr =
         let sSrs = SymSizeEnv.substRange symSizes
 
         match expr with
-        | Leaf (Identity (ss, tn)) -> Leaf (Identity ((sSize ss), tn))
-        | Leaf (Zeros (ss, tn)) -> Leaf (Zeros ((sShp ss), tn))
-        | Leaf (SizeValue sc) -> Leaf (SizeValue (sSize sc))
+        | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
+        | Leaf (Zeros (ss, tn)) -> Leaf (Zeros (sShp ss, tn))
+        | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
         | Leaf _ -> expr
 
@@ -594,7 +594,7 @@ module Expr =
         match expr with
         | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
         | Leaf (Zeros (ss, tn)) -> ShapeSpec.canEval ss
-        | Leaf (SizeValue sc) -> SizeSpec.canEval sc
+        | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
         | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
         | Leaf _ -> true
 
@@ -635,15 +635,14 @@ module Expr =
         doSubst part replacement expr |> check
 
     /// scalar constant of given value
-    let scalar (f: 'T when 'T :> System.IComparable) = 
-        let cs = {Value=f :> System.IComparable}
-        Leaf (ScalarConst cs) |> check
+    let scalar f = 
+        Leaf (ScalarConst (ConstSpec.ofValue f)) |> check
 
     /// scalar of given value converted to same type as given expression
     let scalarOfSameType expr f = 
         let tn = typename expr
-        let v = System.Convert.ChangeType(box f, TypeName.getType tn)
-        scalar (v :?> System.IComparable)
+        let v = System.Convert.ChangeType (box f, TypeName.getType tn)
+        scalar v
 
     /// scalar 0 of the same type as given expression
     let inline zeroOfSameType expr = scalarOfSameType expr 0
@@ -654,9 +653,14 @@ module Expr =
     /// scalar 2 of the same type as given expression
     let inline twoOfSameType expr = scalarOfSameType expr 2
 
-    /// scalar with value of given size
-    let sizeValue size = 
-        Leaf (SizeValue size) |> check
+    /// scalar with value of given size converted to the given type
+    [<RequiresExplicitTypeArguments>]
+    let sizeValue<'T> size = 
+        Leaf (SizeValue (size, TypeName.ofType<'T>)) |> check
+
+    /// scalar with value of given size converted to the same type as given expression
+    let sizeValueOfSameType expr size = 
+        Leaf (SizeValue (size, typename expr)) |> check
 
     /// swaps two dimensions of a tensor
     let swapDim ax1 ax2 a = 
@@ -778,11 +782,11 @@ module Expr =
 
     /// mean over all elements
     let mean (a: ExprT) = 
-        sum a / sizeValue (nElems a)
+        sum a / sizeValueOfSameType a a.NElems
 
     /// mean over given dimension
     let meanAxis ax (a: ExprT) =
-        sumAxis ax a / sizeValue ((shapeOf a).[ax])
+        sumAxis ax a / sizeValueOfSameType a a.Shape.[ax]
 
     /// mean over given dimension, while keeping the axis with one (broadcastable) element
     let meanKeepingAxis ax a =

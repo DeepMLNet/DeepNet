@@ -59,7 +59,7 @@ module UExprTypes =
     type ULeafOpT =
         | Identity of SizeSpecT
         | Zeros of ShapeSpecT                   
-        | ScalarConst of System.IComparable
+        | ScalarConst of ConstSpecT
         | SizeValue of SizeSpecT
         | Var of UVarSpecT
 

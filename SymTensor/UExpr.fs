@@ -3,6 +3,8 @@
 open System.Diagnostics
 open System.Reflection
 open System.Collections.Generic
+
+open Basics
 open Expr
 open UExprTypes
 
@@ -80,19 +82,15 @@ module UExprRngsSpec =
 
 module UExpr =
 
-    let private emptyUExpr = 
-        UExpr (ULeafOp (ScalarConst null), [], {TargetType=TypeName ""; TargetShape=[]; TargetNShape=[]; Expr=None})
-
     type private UExprCaches = {
         UExprForExpr:       Dictionary<ExprT, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
     }
 
     let rec private toUExprRec (caches: UExprCaches) (expr: ExprT) =
-        let mutable cachedUExpr = emptyUExpr
-        if caches.UExprForExpr.TryGetValue (expr, &cachedUExpr) then
-            cachedUExpr
-        else
+        match caches.UExprForExpr.TryFind expr with
+        | Some cached -> cached
+        | None ->
             let toUExprRec = toUExprRec caches
 
             let metadata = {
@@ -111,8 +109,8 @@ module UExpr =
                 match expr with
                 | Leaf (Expr.Identity (ss, tn)) -> leaf (Identity ss)
                 | Leaf (Expr.Zeros (ss, tn))    -> leaf (Zeros ss)
-                | Leaf (Expr.ScalarConst v)     -> leaf (ScalarConst v.Value)
-                | Leaf (Expr.SizeValue sv)      -> leaf (SizeValue sv)
+                | Leaf (Expr.ScalarConst v)     -> leaf (ScalarConst v)
+                | Leaf (Expr.SizeValue (sv, tn))-> leaf (SizeValue sv)
                 | Leaf (Expr.Var vs)            -> leaf (Var (UVarSpec.ofVarSpec vs))
 
                 | Unary (Expr.Negate, a)        -> unary Negate a
@@ -181,8 +179,9 @@ module UExpr =
                     eop.ToUExpr expr makeOneUop
 
             let uExpr =
-                if caches.UExprs.TryGetValue (uExpr, &cachedUExpr) then cachedUExpr         
-                else uExpr                       
+                match caches.UExprs.TryFind uExpr with
+                | Some cached -> cached
+                | None -> uExpr
 
             caches.UExprForExpr.[expr] <- uExpr     
             uExpr       

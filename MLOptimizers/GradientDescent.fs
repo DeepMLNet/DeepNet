@@ -11,7 +11,7 @@ module GradientDescent =
         Step:           'T
     }
 
-    type CfgExpr<'T> = {
+    type CfgExpr = {
         Step:           ExprT
     }
 
@@ -23,15 +23,16 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
                                             pars:   ExprT,    
                                             dev:    IDevice) =
 
+    do Util.checkProperType<'T> ()
+
     let cfg = {
         Step        = Expr.var<'T> "GradientDescent.Cfg.Step" []
     }
 
-    let rp = VarRecord<Cfg<'T>, CfgExpr<'T>> (cfg, dev)
+    let rp = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
 
     member this.Minimize =
         let grad = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars)
-
         Expr.storeToVar pars (pars - cfg.Step * grad)
 
     member this.Use f =

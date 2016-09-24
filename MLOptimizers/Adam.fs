@@ -52,6 +52,8 @@ module AdamTypes =
                                      pars:  ExprT,
                                      dev:   IDevice) =
 
+        do Util.checkProperType<'T> ()
+
         let cfg = {
             CfgExpr.Step        = Expr.var<'T> "Adam.Cfg.Step"          []
             CfgExpr.Momentum    = Expr.var<'T> "Adam.Cfg.Momentum"      []

@@ -2,6 +2,7 @@
 
 open System.Runtime.InteropServices
 
+open Basics
 open ShapeSpec
 
 
@@ -50,10 +51,47 @@ module ConstSpecTypes =
 
     /// scalar constant value
     type ConstSpecT = 
-        {Value:  System.IComparable} 
+        | ConstInt of int
+        | ConstDouble of double
+        | ConstSingle of single
+        | ConstBool of bool
         with
-            member this.TypeName = TypeName.ofObject this.Value
+            member this.TypeName = 
+                match this with
+                | ConstInt _ -> TypeName.ofType<int>
+                | ConstDouble _ -> TypeName.ofType<double>
+                | ConstSingle _ -> TypeName.ofType<single>
+                | ConstBool _ -> TypeName.ofType<bool>
 
+            member this.GetValue() : 'T =
+                match this with
+                | ConstInt v -> v |> box |> unbox
+                | ConstDouble v -> v |> box |> unbox
+                | ConstSingle v -> v |> box |> unbox
+                | ConstBool v -> v |> box |> unbox  
+                
+            member this.GetConvertedValue<'T>() : 'T =             
+                match this with
+                | ConstInt v -> v |> conv<'T>
+                | ConstDouble v -> v |> conv<'T>
+                | ConstSingle v -> v |> conv<'T>
+                | ConstBool v -> v |> conv<'T>
+
+
+module ConstSpec =
+    let ofValue (value: obj) =
+        match value.GetType() with
+        | t when t = typeof<int> -> ConstInt (value |> unbox)
+        | t when t = typeof<double> -> ConstDouble (value |> unbox)
+        | t when t = typeof<single> -> ConstSingle (value |> unbox)
+        | t when t = typeof<bool> -> ConstBool (value |> unbox)
+        | t -> failwithf "unsupported constant type: %A" t
+
+    let value (cs: ConstSpecT) =
+        cs.GetValue ()
+
+    let typeName (cs: ConstSpecT) =
+        cs.TypeName
 
 [<AutoOpen>]
 module VarSpecTypes =

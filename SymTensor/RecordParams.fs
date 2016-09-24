@@ -113,13 +113,13 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
         fun (ve: VarEnvT) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
 
     /// publishes the locations of the used variables to the given ModelInstance
-    member this.PublishLoc (model: ModelInstance<_>) =
+    member this.PublishLoc (model: ModelInstance<'T>) =
         fieldInfos
         |> Seq.iter (fun fi ->
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
                 let mi = typeof<VarRecordHelpers>.GetMethod("PublishLoc", allBindingFlags)
-                let m = mi.MakeGenericMethod baseType
+                let m = mi.MakeGenericMethod typeof<'T>
                 m.Invoke(null, [|fi.Expr; dev.DefaultLoc; model|]) |> ignore
         )
 

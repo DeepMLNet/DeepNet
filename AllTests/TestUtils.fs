@@ -69,7 +69,7 @@ let randomEval<'T> shps exprFn (dev: IDevice) =
     let rng = System.Random(123)
     let vars = buildVars<'T> shps
     let expr = exprFn vars
-    let fn = Func.make dev.DefaultFactory expr
+    let fn = Func.make<'T> dev.DefaultFactory expr
     let varEnv = buildVarEnv<'T> vars shps rng dev
     fn varEnv |> ignore
 

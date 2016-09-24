@@ -50,12 +50,12 @@ let build device batch =
     printfn "loss is:\n%A" loss
 
     // optimizer (with parameters)
-    let opt = GradientDescent (loss, mi.ParameterVector, device)
+    let opt = GradientDescent<single> (loss, mi.ParameterVector, device)
     opt.PublishLoc mi
 
     // compile functions
-    let lossFun = mi.Func loss |> arg2 input target
-    let optFun = mi.Func (opt.Minimize) |> opt.Use |> arg2 input target
+    let lossFun = mi.Func loss |> arg2<single, single, _> input target
+    let optFun = mi.Func (opt.Minimize) |> opt.Use |> arg2<single, single, _> input target
     
     lossFun, optFun
 

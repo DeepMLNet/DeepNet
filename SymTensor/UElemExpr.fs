@@ -13,7 +13,7 @@ module UElemExpr =
     type ArgElementSpecT = ElemExpr.ArgElementSpecT
 
     type ULeafOpT =
-        | Const of System.IComparable
+        | Const of ConstSpecT
         | SizeValue of SizeSpecT
         | ArgElement of ArgElementSpecT
 
@@ -77,7 +77,7 @@ module UElemExpr =
         let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr tn a; toUElemExpr tn b], tn)
 
         match elemExpr with
-        | Leaf (ElemExpr.Const v)           -> leaf (Const v.Value)
+        | Leaf (ElemExpr.Const v)           -> leaf (Const v)
         | Leaf (ElemExpr.SizeValue sv)      -> leaf (SizeValue sv)
         | Leaf (ElemExpr.ArgElement ae)     -> leaf (ArgElement ae)
 

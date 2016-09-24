@@ -62,7 +62,7 @@ module ElemExprHostEval =
             match expr with
             | Leaf (op) ->
                 match op with
-                | Const v -> conv<'T> v.Value
+                | Const v -> v.GetConvertedValue()
                 | SizeValue ss ->
                     let sv = ss |> SizeSpec.substSymbols symVals |> SizeSpec.eval
                     conv<'T> sv

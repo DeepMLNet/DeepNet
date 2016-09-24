@@ -503,16 +503,15 @@ module ArgTemplates =
         val Value: 'T
         new (value: 'T) = {Value = value}
 
-    type ConstEOpArgTmpl<'T> (value: 'T) =
+    type ConstEOpArgTmpl (value: ConstSpecT) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "ConstEOp_t"
             member this.GetArg env strm = 
-                match box value with
-                | :? single as n -> ConstEOpArg(n) :> obj
-                | :? double as n -> ConstEOpArg(n) :> obj
-                | :? int as n -> ConstEOpArg(n) :> obj
-                | :? byte as n -> ConstEOpArg(n) :> obj
-                | _ -> failwithf "unsupported type %A" (value.GetType())
+                match value with
+                | ConstInt    n -> ConstEOpArg n |> box
+                | ConstDouble n -> ConstEOpArg n |> box
+                | ConstSingle n -> ConstEOpArg n |> box
+                | ConstBool   n -> ConstEOpArg n |> box
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl

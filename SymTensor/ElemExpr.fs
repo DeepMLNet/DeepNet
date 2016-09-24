@@ -60,9 +60,8 @@ module ElemExpr =
         | Binary of BinaryOpT * ElemExprT * ElemExprT
         
     /// a constant value
-    let scalar (f: 'T when 'T :> System.IComparable) =
-        let cs = {Value=f :> System.IComparable}
-        Leaf (Const cs)
+    let scalar f =
+        Leaf (Const (ConstSpec.ofValue f))
               
     type ElemExprT with
 

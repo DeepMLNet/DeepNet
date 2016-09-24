@@ -722,10 +722,9 @@ module CudaExecUnit =
         // initial value is zero for summation
         let initial = 
             match trgt.TypeName with
-            | t when t = TypeName.ofType<double> -> 0.0  |> box
-            | t when t = TypeName.ofType<single> -> 0.0f |> box
-            | t when t = TypeName.ofType<int>    -> 0    |> box
-            | t when t = TypeName.ofType<byte>   -> 0uy  |> box
+            | t when t = TypeName.ofType<double> -> ConstDouble 0.0
+            | t when t = TypeName.ofType<single> -> ConstSingle 0.0f
+            | t when t = TypeName.ofType<int>    -> ConstInt 0
             | t -> failwithf "unsupported type %A" t
 
         (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
@@ -786,12 +785,11 @@ module CudaExecUnit =
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
         | ULeafOp (Zeros _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
-        | ULeafOp (ScalarConst f) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl f) [] 
+        | ULeafOp (ScalarConst cs) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue sv) -> 
             let value = Convert.ChangeType(SizeSpec.eval sv, dfltChTrgt.DataType)
-            let opType = typedefof<ConstEOpArgTmpl<_>>.MakeGenericType(dfltChTrgt.DataType)
-            let op = Activator.CreateInstance(opType, value) :?> ICudaOpAndArgTmpl 
-            execItemsForElemwise dfltChTrgt op [] 
+            let cs = ConstSpec.ofValue value
+            execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with

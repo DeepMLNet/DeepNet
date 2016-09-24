@@ -326,9 +326,18 @@ module Func =
                 // evaluate
                 performEval variants.[compileEnv] varEnv
 
+    [<RequiresExplicitTypeArguments>]
+    let private checkType<'T> pos (expr: ExprT) =
+        if typeof<'T> = typeof<obj> then
+            failwith "The result type of the function was not inferred (is ArrayNDT<obj>) and \
+                      therefore must be specified manually."
+        if typeof<'T> <> expr.Type then
+            failwithf "Result of %s expression is of type %A and cannot be stored in array of type %A."
+                pos expr.Type typeof<'T>
 
     /// makes a function that evaluates the given expression 
     let make<'T0> factory (expr0: ExprT)  =
+        checkType<'T0> "" expr0
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let evalAll = evalWrapper factory [expr0gen]        
         fun (varEnv: VarEnvT) ->
@@ -336,6 +345,8 @@ module Func =
             res.[0] :?> ArrayNDT<'T0>
 
     let make2<'T0, 'T1> factory (expr0: ExprT) (expr1: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen]        
@@ -344,6 +355,9 @@ module Func =
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>
 
     let make3<'T0, 'T1, 'T2> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
+        checkType<'T2> "third" expr2
         let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
@@ -358,21 +372,21 @@ module Func =
 module FuncTypes = 
 
     type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
-    let arg1 (vs0: ExprT) f : Arg1Func<_, _> =
+    let arg1<'T0, 'TR> (vs0: ExprT) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
         fun (val0: ArrayNDT<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
     type Arg2Func<'T0, 'T1, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> 'TR
-    let arg2 (vs0: ExprT) (vs1: ExprT) f : Arg2Func<_, _, _> =
+    let arg2<'T0, 'T1, 'TR> (vs0: ExprT) (vs1: ExprT) (f: VarEnvT -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
     type Arg3Func<'T0, 'T1, 'T2, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> 'TR
-    let arg3 (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) f : Arg3Func<_, _, _, _> =
+    let arg3<'T0, 'T1, 'T2, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) f : Arg3Func<'T0, 'T1, 'T2, 'TR> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
 
-    let addArg (vs: ExprT) f =
+    let addArg<'T, 'TR> (vs: ExprT) (f: VarEnvT -> 'TR) =
         fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
             f (ve |> VarEnv.add vs value)
 

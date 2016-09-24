@@ -49,23 +49,25 @@ module HostEval =
         res
 
     /// evaluate expression to numeric array 
-    let rec eval (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<'T> =
+    [<RequiresExplicitTypeArguments>]
+    let rec eval<'T> (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<'T> =
         let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<_>
         let shapeEval symShape = ShapeSpec.eval symShape
         let sizeEval symSize = SizeSpec.eval symSize
         let rngEval = SimpleRangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
 
         let rec doEval (expr: ExprT) =
-            if expr.TypeName <> TypeName.ofType<'T> then
-                failwith "expression data type mismatch"
+            if expr.Type <> typeof<'T> then
+                failwithf "expression of type %A does not match eval function of type %A"
+                    expr.Type typeof<'T>
             let res = 
                 match expr with
                 | Leaf(op) ->
                     match op with
                     | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
                     | Zeros (ss, tn) -> ArrayNDHost.zeros (shapeEval ss)
-                    | SizeValue sv -> sizeEval sv |> box |> unbox |> ArrayNDHost.scalar
-                    | ScalarConst sc -> ArrayNDHost.scalar (sc.Value :?> 'T)
+                    | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
+                    | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                 | Unary(op, a) ->
                     let av = doEval a
@@ -140,8 +142,7 @@ module HostEval =
                     | Elements (resShape, elemExpr) -> 
                         let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
-                        failwith "FIXME uncomment"
-                        //ElemExpr.eval elemExpr esv nResShape    
+                        ElemExprHostEval.eval elemExpr esv nResShape    
                     | Interpolate ip -> doInterpolate ip esv
                     | ExtensionOp eop -> eop.EvalSimple esv 
 
@@ -152,12 +153,12 @@ module HostEval =
         doEval expr
 
     and private evalInt (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<int> =
-        eval evalEnv expr
+        eval<int> evalEnv expr
 
     /// helper type for dynamic method invocation
     type private EvalT =
         static member Do<'T> (evalEnv: EvalEnvT, expr: ExprT) : IArrayNDT =
-            eval evalEnv expr :> IArrayNDT
+            eval<'T> evalEnv expr :> IArrayNDT
 
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.
