@@ -154,6 +154,15 @@ module SizeMultinomTypes =
             |> Map.ofSeq
             |> SizeMultinomT
 
+        member this.ContainedSizeSymbols =
+            products
+            |> Map.toSeq
+            |> Seq.map (fun (sp, _) -> sp.Symbols 
+                                       |> Map.toSeq 
+                                       |> Seq.map (fun (sym, _) -> sym))
+            |> Seq.concat
+            |> Set.ofSeq
+
         member this.PrettyString =
             products
             |> Map.toSeq
@@ -266,6 +275,18 @@ module SizeSpecTypes =
         /// unequal size ignoring broadcastability
         static member (.<>) (ssa: SizeSpecT, ssb: SizeSpecT) = not (ssa .= ssb)
 
+        /// the set of all contained SizeSymbols
+        member this.ContainedSizeSymbols =
+            match this with
+            | Base (Sym s)   -> Set [s]
+            | Base (Fixed _) -> Set.empty
+            | Broadcast      -> Set.empty
+            | Multinom m     -> m.ContainedSizeSymbols
+            
+        /// true if the specified SizeSymbol occurs in this SizeSpec
+        member this.ContainsSymbol sym =
+            this.ContainedSizeSymbols.Contains sym
+
         member this.PrettyString =
             match this with
             | Base b -> sprintf "%A" b
@@ -349,6 +370,16 @@ module SizeSpec =
         match tryEval ss with
         | Some s -> s
         | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
+
+    /// returns the set of all contained SizeSymbols
+    let containedSizeSymbols (ss: SizeSpecT) =
+        ss.ContainedSizeSymbols
+
+    /// true if the specified SizeSymbol occurs in the SizeSpec
+    let containsSymbol sym (ss: SizeSpecT) =
+        ss.ContainsSymbol sym 
+
+            
 
 
 [<AutoOpen>]
