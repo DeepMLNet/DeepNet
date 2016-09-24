@@ -46,6 +46,16 @@ module TypeName =
 
 
 [<AutoOpen>]
+module ConstSpecTypes =
+
+    /// scalar constant value
+    type ConstSpecT = 
+        {Value:  System.IComparable} 
+        with
+            member this.TypeName = TypeName.ofObject this.Value
+
+
+[<AutoOpen>]
 module VarSpecTypes =
 
     /// non-generic variable specification interface

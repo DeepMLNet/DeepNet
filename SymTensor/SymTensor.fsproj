@@ -58,6 +58,7 @@
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="ElemExpr.fs" />
+    <Compile Include="ElemExprHostEval.fs" />
     <Compile Include="UElemExpr.fs" />
     <Compile Include="UExprTypes.fs" />
     <Compile Include="Expr.fs" />

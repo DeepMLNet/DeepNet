@@ -29,12 +29,6 @@ module Expr =
         | FixedArity of int
         | DynamicArity
 
-    /// scalar constant value
-    type ConstSpecT = 
-        {Value:  System.IComparable} 
-        with
-            member this.TypeName = TypeName.ofObject this.Value
-
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT =
@@ -163,7 +157,7 @@ module Expr =
         /// evaluate all subexpressions but discard them
         | Discard        
         /// elementwise calculated tensor
-        | Elements of ShapeSpecT * ElemExpr.ElemExprT<single> // TODO
+        | Elements of ShapeSpecT * ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
         /// extension op

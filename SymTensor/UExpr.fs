@@ -173,7 +173,8 @@ module UExpr =
                 | Nary (Expr.Elements (resShape, elemExpr), se) ->
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se
-                    nary (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
+                    let tn = Expr.typename expr
+                    nary (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs tn)) se
                 | Nary (Expr.Interpolate ip, se) -> nary (Interpolate ip) se
                 | Nary (Expr.ExtensionOp eop, se) -> 
                     let makeOneUop uop = nary (ExtensionOp uop) se

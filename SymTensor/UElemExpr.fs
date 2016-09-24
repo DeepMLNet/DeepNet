@@ -71,14 +71,13 @@ module UElemExpr =
     }
 
     /// converts an element expression to a unified element expression
-    let rec toUElemExpr (elemExpr: ElemExprT<'T>) =
-        let tn = TypeName.ofType<'T>
+    let rec toUElemExpr (tn: TypeNameT) (elemExpr: ElemExprT) =
         let leaf uop        = UElemExpr (ULeafOp uop, [], tn)
-        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr a], tn)
-        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr a; toUElemExpr b], tn)
+        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr tn a], tn)
+        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr tn a; toUElemExpr tn b], tn)
 
         match elemExpr with
-        | Leaf (ElemExpr.Const v)           -> leaf (Const (box v :?> System.IComparable))
+        | Leaf (ElemExpr.Const v)           -> leaf (Const v.Value)
         | Leaf (ElemExpr.SizeValue sv)      -> leaf (SizeValue sv)
         | Leaf (ElemExpr.ArgElement ae)     -> leaf (ArgElement ae)
 
@@ -115,9 +114,9 @@ module UElemExpr =
             
 
     /// converts an element expression to a unified element function
-    let toUElemFunc elemExpr nDims nArgs =
+    let toUElemFunc elemExpr nDims nArgs typeName =
         {
-            Expr    = toUElemExpr elemExpr
+            Expr    = toUElemExpr typeName elemExpr
             NDims   = nDims
             NArgs   = nArgs
         }

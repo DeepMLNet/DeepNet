@@ -9,19 +9,17 @@ open System
 module ElemExpr =
 
     /// argument 
-    type ArgT =
-    | Arg of int
+    type ArgT = Arg of int
 
     /// element of an argument
     type ArgElementSpecT = ArgT * ShapeSpecT
     
-
-    type LeafOpT<'T> =
-        | Const of 'T
+    type LeafOpT =
+        | Const of ConstSpecT
         | SizeValue of SizeSpecT
         | ArgElement of ArgElementSpecT
 
-    and UnaryOpT<'T> = 
+    and UnaryOpT = 
         | Negate                        
         | Abs
         | SignT
@@ -45,7 +43,7 @@ module ElemExpr =
         | Sum of SizeSymbolT * SizeSpecT * SizeSpecT
         | KroneckerRng of SizeSpecT * SizeSpecT * SizeSpecT
 
-    and BinaryOpT<'T> = 
+    and BinaryOpT = 
         | Add                           
         | Substract                     
         | Multiply                      
@@ -56,82 +54,80 @@ module ElemExpr =
         
     /// an element expression
     and [<StructuredFormatDisplay("{PrettyString}")>]
-        ElemExprT<'T> =
-        | Leaf of LeafOpT<'T>
-        | Unary of UnaryOpT<'T> * ElemExprT<'T>
-        | Binary of BinaryOpT<'T> * ElemExprT<'T> * ElemExprT<'T>
+        ElemExprT =
+        | Leaf of LeafOpT
+        | Unary of UnaryOpT * ElemExprT
+        | Binary of BinaryOpT * ElemExprT * ElemExprT
         
     /// a constant value
-    let scalar a =
-        Leaf (Const a)
+    let scalar (f: 'T when 'T :> System.IComparable) =
+        let cs = {Value=f :> System.IComparable}
+        Leaf (Const cs)
               
-    type ElemExprT<'T> with
+    type ElemExprT with
 
         // elementwise unary
-        static member (~+) (a: ElemExprT<'T>) = a 
-        static member (~-) (a: ElemExprT<'T>) = Unary(Negate, a)  
-        static member Abs (a: ElemExprT<'T>) = Unary(Abs, a) 
-        static member SignT (a: ElemExprT<'T>) = Unary(SignT, a) 
-        static member Log (a: ElemExprT<'T>) = Unary(Log, a) 
-        static member Log10 (a: ElemExprT<'T>) = Unary(Log10, a) 
-        static member Exp (a: ElemExprT<'T>) = Unary(Exp, a) 
-        static member Sin (a: ElemExprT<'T>) = Unary(Sin, a) 
-        static member Cos (a: ElemExprT<'T>) = Unary(Cos, a) 
-        static member Tan (a: ElemExprT<'T>) = Unary(Tan, a) 
-        static member Asin (a: ElemExprT<'T>) = Unary(Asin, a) 
-        static member Acos (a: ElemExprT<'T>) = Unary(Acos, a) 
-        static member Atan (a: ElemExprT<'T>) = Unary(Atan, a) 
-        static member Sinh (a: ElemExprT<'T>) = Unary(Sinh, a) 
-        static member Cosh (a: ElemExprT<'T>) = Unary(Cosh, a) 
-        static member Tanh (a: ElemExprT<'T>) = Unary(Tanh, a) 
-        static member Sqrt (a: ElemExprT<'T>) = Unary(Sqrt, a) 
-        static member Ceiling (a: ElemExprT<'T>) = Unary(Ceil, a) 
-        static member Floor (a: ElemExprT<'T>) = Unary(Floor, a) 
-        static member Round (a: ElemExprT<'T>) = Unary(Round, a) 
-        static member Truncate (a: ElemExprT<'T>) = Unary(Truncate, a) 
+        static member (~+) (a: ElemExprT) = a 
+        static member (~-) (a: ElemExprT) = Unary(Negate, a)  
+        static member Abs (a: ElemExprT) = Unary(Abs, a) 
+        static member SignT (a: ElemExprT) = Unary(SignT, a) 
+        static member Log (a: ElemExprT) = Unary(Log, a) 
+        static member Log10 (a: ElemExprT) = Unary(Log10, a) 
+        static member Exp (a: ElemExprT) = Unary(Exp, a) 
+        static member Sin (a: ElemExprT) = Unary(Sin, a) 
+        static member Cos (a: ElemExprT) = Unary(Cos, a) 
+        static member Tan (a: ElemExprT) = Unary(Tan, a) 
+        static member Asin (a: ElemExprT) = Unary(Asin, a) 
+        static member Acos (a: ElemExprT) = Unary(Acos, a) 
+        static member Atan (a: ElemExprT) = Unary(Atan, a) 
+        static member Sinh (a: ElemExprT) = Unary(Sinh, a) 
+        static member Cosh (a: ElemExprT) = Unary(Cosh, a) 
+        static member Tanh (a: ElemExprT) = Unary(Tanh, a) 
+        static member Sqrt (a: ElemExprT) = Unary(Sqrt, a) 
+        static member Ceiling (a: ElemExprT) = Unary(Ceil, a) 
+        static member Floor (a: ElemExprT) = Unary(Floor, a) 
+        static member Round (a: ElemExprT) = Unary(Round, a) 
+        static member Truncate (a: ElemExprT) = Unary(Truncate, a) 
 
         // elementwise binary
-        static member (+) (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Add, a, b)
-        static member (-) (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Substract, a, b)
-        static member (*) (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Multiply, a, b)
-        static member (/) (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Divide, a, b)
-        static member (%) (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Modulo, a, b)
-        static member Pow (a: ElemExprT<'T>, b: ElemExprT<'T>) = Binary(Power, a, b)
+        static member (+) (a: ElemExprT, b: ElemExprT) = Binary(Add, a, b)
+        static member (-) (a: ElemExprT, b: ElemExprT) = Binary(Substract, a, b)
+        static member (*) (a: ElemExprT, b: ElemExprT) = Binary(Multiply, a, b)
+        static member (/) (a: ElemExprT, b: ElemExprT) = Binary(Divide, a, b)
+        static member (%) (a: ElemExprT, b: ElemExprT) = Binary(Modulo, a, b)
+        static member Pow (a: ElemExprT, b: ElemExprT) = Binary(Power, a, b)
 
         // elementwise binary with basetype
-        static member (+) (a: ElemExprT<'T>, b: 'T) = a + (scalar b)
-        static member (-) (a: ElemExprT<'T>, b: 'T) = a - (scalar b)
-        static member (*) (a: ElemExprT<'T>, b: 'T) = a * (scalar b)
-        static member (/) (a: ElemExprT<'T>, b: 'T) = a / (scalar b)
-        static member (%) (a: ElemExprT<'T>, b: 'T) = a % (scalar b)
-        static member Pow (a: ElemExprT<'T>, b: 'T) = a ** (scalar b)
+        static member (+) (a: ElemExprT, b: 'T) = a + (scalar b)
+        static member (-) (a: ElemExprT, b: 'T) = a - (scalar b)
+        static member (*) (a: ElemExprT, b: 'T) = a * (scalar b)
+        static member (/) (a: ElemExprT, b: 'T) = a / (scalar b)
+        static member (%) (a: ElemExprT, b: 'T) = a % (scalar b)
+        static member Pow (a: ElemExprT, b: 'T) = a ** (scalar b)
 
-        static member (+) (a: 'T, b: ElemExprT<'T>) = (scalar a) + b
-        static member (-) (a: 'T, b: ElemExprT<'T>) = (scalar a) - b
-        static member (*) (a: 'T, b: ElemExprT<'T>) = (scalar a) * b
-        static member (/) (a: 'T, b: ElemExprT<'T>) = (scalar a) / b
-        static member (%) (a: 'T, b: ElemExprT<'T>) = (scalar a) % b
-        static member Pow (a: 'T, b: ElemExprT<'T>) = (scalar a) ** b          
+        static member (+) (a: 'T, b: ElemExprT) = (scalar a) + b
+        static member (-) (a: 'T, b: ElemExprT) = (scalar a) - b
+        static member (*) (a: 'T, b: ElemExprT) = (scalar a) * b
+        static member (/) (a: 'T, b: ElemExprT) = (scalar a) / b
+        static member (%) (a: 'T, b: ElemExprT) = (scalar a) % b
+        static member Pow (a: 'T, b: ElemExprT) = (scalar a) ** b          
           
     /// sign keeping type
-    let signt (a: ElemExprT<'T>) =
-        ElemExprT<'T>.SignT a 
+    let signt (a: ElemExprT) =
+        ElemExprT.SignT a 
 
     /// square root
-    let sqrtt (a: ElemExprT<'T>) =
-        ElemExprT<'T>.Sqrt a       
+    let sqrtt (a: ElemExprT) =
+        ElemExprT.Sqrt a       
         
-    /// scalar of given value and type
-    let inline scalart<'T> f = scalar (conv<'T> f)
-
     /// scalar 0 of appropriate type
-    let inline zero<'T> () = scalar (ArrayNDT<'T>.Zero)
+    let zero = scalar 0
 
     /// scalar 1 of appropriate type
-    let inline one<'T> () = scalar (ArrayNDT<'T>.One)
+    let one = scalar 1
 
     /// scalar 2 of appropriate type
-    let inline two<'T> () = scalart<'T> 2
+    let two = scalar 2
            
     /// index symbol for given dimension of the result
     let idxSymbol dim =
@@ -170,18 +166,18 @@ module ElemExpr =
     let argElem pos idx =
         Leaf (ArgElement (Arg pos, idx))
 
-    type Argument1D<'T> (pos: int) =       
-        member this.Item with get (i0) : ElemExprT<'T> = argElem pos [i0]
-    type Argument2D<'T> (pos: int) =       
-        member this.Item with get (i0, i1) : ElemExprT<'T> = argElem pos [i0; i1]
-    type Argument3D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2) : ElemExprT<'T> = argElem pos [i0; i1; i2]
-    type Argument4D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3]
-    type Argument5D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3; i4]
-    type Argument6D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT<'T> = argElem pos [i0; i1; i2; i3; i4; i5]
+    type Argument1D (pos: int) =       
+        member this.Item with get (i0) : ElemExprT = argElem pos [i0]
+    type Argument2D (pos: int) =       
+        member this.Item with get (i0, i1) : ElemExprT = argElem pos [i0; i1]
+    type Argument3D (pos: int) =       
+        member this.Item with get (i0, i1, i2) : ElemExprT = argElem pos [i0; i1; i2]
+    type Argument4D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem pos [i0; i1; i2; i3]
+    type Argument5D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem pos [i0; i1; i2; i3; i4]
+    type Argument6D (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem pos [i0; i1; i2; i3; i4; i5]
 
     /// scalar argument at given position
     let arg0D pos = argElem pos []
@@ -204,132 +200,6 @@ module ElemExpr =
         | Leaf (ArgElement argSpec) -> argSpec
         | _ -> failwith "the provided element expression is not an argument"
    
-    let inline uncheckedApply (f: 'T -> 'T) (a: 'S) : 'S =
-        let av = a |> box |> unbox
-        f av |> box |> unbox
-
-    let inline uncheckedApply2 (f: 'T -> 'T -> 'T) (a: 'S) (b: 'S) : 'S =
-        let av = a |> box |> unbox
-        let bv = b |> box |> unbox
-        f av bv |> box |> unbox
-
-    let inline typedApply   (fBool:   bool   -> bool) 
-                            (fDouble: double -> double) 
-                            (fSingle: single -> single)
-                            (fInt:    int    -> int)
-                            (fByte:   byte   -> byte)
-                            (a: 'T) : 'T =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply fBool a
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
-        else failwith "unknown type"
-
-
-    let inline typedApply2   (fBool:   bool   -> bool   -> bool) 
-                             (fDouble: double -> double -> double) 
-                             (fSingle: single -> single -> single)
-                             (fInt:    int    -> int    -> int)
-                             (fByte:   byte   -> byte   -> byte)
-                             (a: 'T) (b: 'T) : 'T =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2 fBool   a b
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b 
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
-        else failwith "unknown type"
-
-    /// unsupported operation for this type
-    let inline unsp (a: 'T) : 'R = 
-        failwithf "operation unsupported for type %A" typeof<'T>
-
-    let inline signImpl (x: 'T) =
-        conv<'T> (sign x)
-
-    /// evaluates the specified element of an element expression
-    let evalElement (expr: ElemExprT<'T>) (args: ArrayNDT<'T> list) (idxs: ShapeSpecT) =
-
-        let rec doEval symVals expr = 
-            match expr with
-            | Leaf (op) ->
-                match op with
-                | Const v -> v
-                | SizeValue ss ->
-                    let sv = ss |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    conv<'T> sv
-                | ArgElement (Arg n, argIdxs) ->
-                    let argIdxs = ShapeSpec.substSymbols symVals argIdxs
-                    let argIdxsVal = ShapeSpec.eval argIdxs
-                    args.[n] |> ArrayND.get argIdxsVal
-
-            | Unary (op, a) ->
-                let av () = doEval symVals a
-                match op with
-                | Negate ->   typedApply (unsp) (~-) (~-) (~-) (unsp) (av ())
-                | Abs ->      typedApply (unsp) abs abs abs (unsp) (av ())
-                | SignT ->    typedApply (unsp) signImpl signImpl sign (unsp) (av ())
-                | Log ->      typedApply (unsp) log log (unsp) (unsp) (av ())
-                | Log10 ->    typedApply (unsp) log10 log10 (unsp) (unsp) (av ())
-                | Exp ->      typedApply (unsp) exp exp (unsp) (unsp) (av ())
-                | Sin ->      typedApply (unsp) sin sin (unsp) (unsp) (av ())
-                | Cos ->      typedApply (unsp) cos cos (unsp) (unsp) (av ())
-                | Tan ->      typedApply (unsp) tan tan (unsp) (unsp) (av ())
-                | Asin ->     typedApply (unsp) asin asin (unsp) (unsp) (av ())
-                | Acos ->     typedApply (unsp) acos acos (unsp) (unsp) (av ())
-                | Atan ->     typedApply (unsp) atan atan (unsp) (unsp) (av ())
-                | Sinh ->     typedApply (unsp) sinh sinh (unsp) (unsp) (av ())
-                | Cosh ->     typedApply (unsp) cosh cosh (unsp) (unsp) (av ())
-                | Tanh ->     typedApply (unsp) tanh tanh (unsp) (unsp) (av ())
-                | Sqrt ->     typedApply (unsp) sqrt sqrt (unsp) (unsp) (av ())
-                | Ceil ->     typedApply (unsp) ceil ceil (unsp) (unsp) (av ())
-                | Floor ->    typedApply (unsp) floor floor (unsp) (unsp) (av ())
-                | Round ->    typedApply (unsp) round round (unsp) (unsp) (av ())
-                | Truncate -> typedApply (unsp) truncate truncate (unsp) (unsp) (av ())
-                | Sum (sym, first, last) ->
-                    let first, last = SizeSpec.eval first, SizeSpec.eval last
-                    (conv<'T> 0, [first .. last])
-                    ||> List.fold (fun sumSoFar symVal ->
-                        let sumElem = 
-                            doEval (symVals |> Map.add sym (SizeSpec.fix symVal)) a
-                        typedApply2 (unsp) (+) (+) (+) (+) sumSoFar sumElem) 
-                | KroneckerRng (s, first, last) ->
-                    let sVal = s |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let firstVal = first |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let lastVal = last |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    if firstVal <= sVal && sVal <= lastVal then av ()
-                    else conv<'T> 0
-
-            | Binary (op, a, b) ->
-                let av () = doEval symVals a
-                let bv () = doEval symVals b
-                match op with
-                | Add  ->       typedApply2 (unsp) (+) (+) (+) (+) (av()) (bv())                 
-                | Substract ->  typedApply2 (unsp) (-) (-) (-) (-) (av()) (bv())              
-                | Multiply ->   typedApply2 (unsp) (*) (*) (*) (*) (av()) (bv())                  
-                | Divide ->     typedApply2 (unsp) (/) (/) (/) (/) (av()) (bv())                    
-                | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) (av()) (bv())
-                | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (av()) (bv())
-                | IfThenElse (left, right) ->
-                    let leftVal = left |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let rightVal = right |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    if leftVal = rightVal then av () else bv ()
-
-        let initialSymVals =
-            seq {for dim, idx in List.indexed idxs do yield (idxSymbol dim, idx)}
-            |> Map.ofSeq
-        doEval initialSymVals expr
-
-
-    /// evaluates all elements of an element expression
-    let eval (expr: ElemExprT<'T>) (args: ArrayNDT<'T> list) (resShape: NShapeSpecT) =
-        let res = ArrayNDHost.zeros<'T> resShape
-        for idx in ArrayNDLayout.allIdxOfShape resShape do
-            let symIdx = idx |> List.map SizeSpec.fix
-            let ev = evalElement expr args symIdx 
-            ArrayND.set idx ev res
-        res
-
     /// returns the required number of arguments of the element expression
     let rec requiredNumberOfArgs expr =
         match expr with
@@ -342,7 +212,7 @@ module ElemExpr =
         | Binary (op, a, b) -> max (requiredNumberOfArgs a) (requiredNumberOfArgs b)
     
     /// checks if the arguments' shapes are compatible with the result shape        
-    let checkArgShapes (expr: ElemExprT<'T>) (argShapes: ShapeSpecT list) (resShape: ShapeSpecT) =
+    let checkArgShapes (expr: ElemExprT) (argShapes: ShapeSpecT list) (resShape: ShapeSpecT) =
         // check number of arguments
         let nArgs = List.length argShapes
         let nReqArgs = requiredNumberOfArgs expr       
@@ -419,7 +289,7 @@ module ElemExpr =
         expr |> substSymSizes dummySymVals |> canEval
 
     /// pretty string of an element expression
-    let rec prettyString (expr: ElemExprT<'T>) =
+    let rec prettyString (expr: ElemExprT) =
         // TODO: delete unnecessary brackets
         match expr with
         | Leaf (op) -> 
@@ -473,9 +343,9 @@ module ElemExpr =
             | IfThenElse (left,right)-> 
                 sprintf "ifThenElse(%A = %A, %s, %s)" left right (prettyString a) (prettyString b)
 
-    type ElemExprT<'T> with
+    type ElemExprT with
         member this.PrettyString = prettyString this
 
 [<AutoOpen>]
 module ElemExprTypes =
-    type ElemExprT<'T> = ElemExpr.ElemExprT<'T>
+    type ElemExprT = ElemExpr.ElemExprT
