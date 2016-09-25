@@ -11,6 +11,7 @@ open ShapeSpec
 module TypeNameTypes =
 
     /// assembly qualified name of a .NET type
+    [<StructuredFormatDisplay("{Pretty}")>]
     type TypeNameT = 
         | TypeName of string
         with 
@@ -22,6 +23,10 @@ module TypeNameTypes =
             /// gets the size of the represented type in bytes
             member this.Size =
                 Marshal.SizeOf this.Type
+
+            /// pretty string
+            member this.Pretty =
+                sprintf "%A" this.Type
     
 /// assembly qualified name of a .NET type
 module TypeName =

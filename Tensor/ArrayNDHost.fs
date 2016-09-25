@@ -150,7 +150,7 @@ module ArrayNDHostTypes =
             let destData = dest.Data
             let condAddrs = FastLayout.allAddr cond.FastLayout
             let ifValAddrs = FastLayout.allAddr this.FastLayout
-            let elseValAddrs = FastLayout.allAddr cond.FastLayout
+            let elseValAddrs = FastLayout.allAddr elseVal.FastLayout
             let destAddrs = FastLayout.allAddr dest.FastLayout
             for destAddr, condAddr, (ifValAddr, elseValAddr) in 
                     Seq.zip3 destAddrs condAddrs (Seq.zip ifValAddrs elseValAddrs) do

@@ -48,17 +48,18 @@ module UExprTypes =
     }
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    
-    type [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{PrettyString}")>]
+    type [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
         UExprT = 
         | UExpr of UOpT * (UExprT list) * UMetadata
 
-        member this.PrettyString =
+        /// pretty string
+        member this.Pretty =
             match this with
-            | UExpr (ULeafOp uop, subs, _) -> sprintf "%A" uop 
-            | UExpr (UUnaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs.[0]
-            | UExpr (UBinaryOp uop, subs, _) -> sprintf "%A (%A, %A)" uop subs.[0] subs.[1]
-            | UExpr (UNaryOp uop, subs, _) -> sprintf "%A (%A)" uop subs
-            | UExpr (UExtraOp uop, subs, _) -> sprintf "%A (%A)" uop subs
+            | UExpr (ULeafOp uop, subs, _) -> sprintf "{%A}" uop 
+            | UExpr (UUnaryOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs.[0]
+            | UExpr (UBinaryOp uop, subs, _) -> sprintf "{%A} (%A, %A)" uop subs.[0] subs.[1]
+            | UExpr (UNaryOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
+            | UExpr (UExtraOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
 
     /// An IOp that can be converted to an unified expression for compilation.
     type ICompilableOp =

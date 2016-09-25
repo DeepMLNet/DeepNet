@@ -291,6 +291,22 @@ struct PowerEOp_t
 	}
 };
 
+struct MaxEOp_t
+{
+	_dev float operator() (float a, float b) const
+	{
+		return max(a, b);
+	}
+};
+
+struct MinEOp_t
+{
+	_dev float operator() (float a, float b) const
+	{
+		return min(a, b);
+	}
+};
+
 struct EqualEOp_t
 {
 	_dev bool operator() (float a, float b) const

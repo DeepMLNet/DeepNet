@@ -167,8 +167,12 @@ module EvalEnv =
 module CompileEnv =
 
     /// empty compile environment
-    let empty =
-        {VarLocs=Map.empty; ResultLoc=LocHost; SymSizes=SymSizeEnv.empty; CanDelay=true;}
+    let empty = {
+        VarLocs   = Map.empty 
+        ResultLoc = LocHost
+        SymSizes  = SymSizeEnv.empty
+        CanDelay  = true
+    }
 
  
 /// Generates F# function from expressions.

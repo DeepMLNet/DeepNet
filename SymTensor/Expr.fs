@@ -170,8 +170,7 @@ module Expr =
         /// extension op
         | ExtensionOp of IOp
    
-
-     
+   
     /// A mathematical operation in an expression.
     /// This models a mathematical function or operator that takes one or more tensors
     /// and returns one tensor.
@@ -210,12 +209,20 @@ module Expr =
         abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
 
     /// an expression
-    and [<StructuralComparison; StructuralEquality>] 
+    and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>] 
         ExprT =
         | Leaf of LeafOpT
         | Unary of UnaryOpT * ExprT
         | Binary of BinaryOpT * ExprT * ExprT
         | Nary of NaryOpT * (ExprT list)
+
+        /// pretty string
+        member this.Pretty =
+            match this with
+            | Leaf op -> sprintf "{%A}" op 
+            | Unary (op, a) -> sprintf "{%A} (%A)" op a
+            | Binary (op, a, b) -> sprintf "{%A} (%A, %A)" op a b
+            | Nary (op, es) -> sprintf "{%A} (%A)" op es
 
     type FullExprRngSpecT = RangeSpecT<ExprT>
     type FullExprRngsSpecT = RangesSpecT<ExprT>
@@ -826,7 +833,7 @@ module Expr =
             let condBc = cond |> reshapeIfNecessary condPShp |> broadcastIfNecessary condBcShp
             let ifTrueBc = ifTrue |> reshapeIfNecessary ifTruePShp |> broadcastIfNecessary ifTrueBcShp
             let ifFalseBc = ifFalse |> reshapeIfNecessary ifFalsePShp |> broadcastIfNecessary ifFalseBcShp
-            Binary (IfThenElse cond, ifTrueBc, ifFalseBc) |> check
+            Binary (IfThenElse condBc, ifTrueBc, ifFalseBc) |> check
         | _ -> failwith "impossible"
 
     /// elementwise maximum
@@ -979,12 +986,15 @@ module Expr =
     /// extract all variables from an expression
     let rec extractVars expr =
         match expr with
-        | Leaf(Var vs) -> Set.singleton vs
+        | Leaf (Var vs) -> Set.singleton vs
+        | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
+        | Binary (IfThenElse cond, a, b) -> 
+            Set.unionMany [extractVars cond; extractVars a; extractVars b]
+
         | Leaf _ -> Set.empty
-        | Unary(StoreToVar vs, a) -> extractVars a |> Set.add vs
-        | Unary(_, a) -> extractVars a
-        | Binary(_, a, b) -> Set.union (extractVars a) (extractVars b)
-        | Nary(_, es) -> Set.unionMany (es |> List.map extractVars)
+        | Unary (_, a) -> extractVars a
+        | Binary (_, a, b) -> Set.union (extractVars a) (extractVars b)
+        | Nary (_, es) -> Set.unionMany (es |> List.map extractVars)
 
     /// extract VarSpec from variable expression
     let extractVar expr = 

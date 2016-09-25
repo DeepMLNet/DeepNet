@@ -116,6 +116,27 @@ let ``Singular matrix inverse`` () =
     printfn "a=\n%A" av
     printfn "a^-1=\n%A" iav
 
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min`` () =
+    requireEqualTracesWithRandomData [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c]  ->
+        Expr.minElemwise (Expr.maxElemwise a b) c
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min derivative`` () =
+    requireEqualTracesWithRandomData [[2; 2]; [2; 2]; [2; 2]] (fun [a; b; c]  ->
+        let expr = Expr.minElemwise (Expr.maxElemwise a b) c
+        let dexpr = Deriv.compute expr
+        let da = dexpr |> Deriv.ofVar a
+        let db = dexpr |> Deriv.ofVar b
+        let dc = dexpr |> Deriv.ofVar c
+        Expr.discard [expr; da; db; dc]
+   )
+
+
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: comparison`` () =

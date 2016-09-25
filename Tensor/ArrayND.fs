@@ -226,7 +226,7 @@ module ArrayND =
                 failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (cond.GetType())
             let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
-            let res = this.NewOfSameType (ArrayNDLayout.newC this.Shape)
+            let res = this.NewOfSameType (ArrayNDLayout.newC ifVal.Shape)
             ifVal.IfThenElseImpl cond elseVal res
             res
      
@@ -1297,6 +1297,7 @@ module ArrayND =
                         | t when t=typeof<double> -> "      ..."
                         | t when t=typeof<int>    -> " ..."
                         | t when t=typeof<byte>   -> "..."
+                        | t when t=typeof<bool>   -> " ... "
                         | _ -> "..."
                     (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
 
@@ -1307,6 +1308,7 @@ module ArrayND =
                 elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
                 elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
                 elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
+                elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
                 else sprintf "%A;" v
             | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
             | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"

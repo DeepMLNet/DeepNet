@@ -1,6 +1,7 @@
 ﻿namespace SymTensor
 
 open System
+open System.IO
 open System.Collections.Generic
 open System.Threading
 
@@ -205,7 +206,8 @@ module Trace =
         out ""
 
         for exprEval in trace.ExprEvals do
-            out "Evaluation of expression(s) %A" exprEval.Exprs
+            out "Evaluation of expression(s) %A" 
+                (exprEval.Exprs |> List.map UExpr.toExpr)
             out "Id:       %d" exprEval.Id
             out "Compiler: %s" exprEval.Compiler
             out "Start:    %A" exprEval.Start
@@ -222,13 +224,18 @@ module Trace =
                 out "Event index: %d" idx
                 match evnt with
                 | ExprEvaled (uexpr, res, msg) ->
-                    out "Expression: %A" uexpr
+                    out "Expression: %A" (uexpr |> UExpr.toExpr)
                     out "Result:\n%A" res
                     out "Message: %s" msg
                 out ""
 
             out "==== End of trace ===="
             out ""
+
+    let dumpToFile path trace =
+        use file = File.Open(path, FileMode.Truncate)
+        use sw = new StreamWriter (file)
+        dump sw trace
 
     let dumpActiveTrace file =
         getActiveTraceSession () |> dump file
