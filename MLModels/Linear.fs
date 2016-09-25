@@ -12,13 +12,17 @@ module LinearRegression =
         {Weights = mc.Param ("Weights", [nOut; nIn])} 
         
     let parsFromInput (mc: ModelBuilder<_>) input nOut =
-        pars mc (Expr.shapeOf input).[0] nOut
+        // input [smpl, inUnit]
+        pars mc (Expr.shapeOf input).[1] nOut
 
     let pred (pars: Pars) (input: ExprT) =
-        !pars.Weights .* input
+        // input [smpl, inUnit]
+        // pred  [smpl, outInit]
+        input .* (!pars.Weights).T
 
     let loss pars (input: ExprT) (target: ExprT) =
         let pred = pred pars input
         let two = Expr.twoOfSameType input
-        let diff = (pred - target) ** two
-        Expr.sum diff
+        (pred - target) ** two
+        |> Expr.sumAxis 1
+        |> Expr.mean

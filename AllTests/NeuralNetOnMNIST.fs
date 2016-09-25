@@ -30,11 +30,10 @@ let build device batch =
     // model parameters
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
                 {NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
-  
      
     // input / output variables
-    let input =  mc.Var "Input"  [nInput;  batchSize]
-    let target = mc.Var "Target" [nTarget; batchSize]
+    let input =  mc.Var "Input"  [batchSize; nInput]
+    let target = mc.Var "Target" [batchSize; nTarget]
 
     // set sizes
     mc.SetSize batchSize batch
@@ -62,19 +61,17 @@ let build device batch =
 let getMnist device samples =
     let cut (x: ArrayNDT<_>) =
         match samples with
-        | Some samples -> x.[*, 0..samples-1]
+        | Some samples -> x.[0..samples-1, *]
         | None -> x
 
     let mnist = Mnist.loadRaw mnistPath
     let tstImgs =  
         mnist.TstImgs
-        |> ArrayND.reorderAxes [2; 0; 1] 
-        |> ArrayND.reshape [-1; (ArrayND.shape mnist.TstImgs).[0]]
+        |> ArrayND.reshape [mnist.TstImgs.Shape.[0]; -1]
         |> cut
         |> post device
     let tstLbls =  
         mnist.TstLbls
-        |> ArrayND.reorderAxes [1; 0] 
         |> cut
         |> post device
     tstImgs, tstLbls

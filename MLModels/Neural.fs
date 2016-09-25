@@ -21,10 +21,12 @@ module LossLayer =
     /// Returns an expression for the loss given the loss measure `lm`, the predictions
     /// `pred` and the target values `target`.
     /// If the multi-class cross entropy loss measure is used then
-    /// pred.[cls, smpl] must be the predicted probability that the sample
-    /// belong to class cls and target.[cls, smpl] must be 1 if the sample
+    /// pred.[smpl, cls] must be the predicted probability that the sample
+    /// belong to class cls and target.[smpl, cls] must be 1 if the sample
     /// actually belongs to class cls and 0 otherwise.
     let loss lm (pred: ExprT) (target: ExprT) =
+        // pred   [smpl, cls]
+        // target [smpl, cls]
         let one = Expr.oneOfSameType pred
         let two = Expr.twoOfSameType pred
         match lm with
@@ -35,10 +37,8 @@ module LossLayer =
             -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
-            let logPred = log pred
-            let logPred = logPred |>Expr.dump "log pred" |> Expr.checkFinite "log pred"
-            -target * logPred
-            |> Expr.sumAxis 0
+            -target * log pred
+            |> Expr.sumAxis 1
             |> Expr.mean
 
 
@@ -104,11 +104,15 @@ module NeuralLayer =
     /// neural layer with parameters `pars` given the input `input`.
     /// If the soft-max transfer function is used, the normalization
     /// is performed over axis 0.
-    let pred pars input =
-        let activation = !pars.Weights .* input + !pars.Bias
+    let pred pars (input: ExprT) =
+        // weights [outUnit, inUnit]
+        // bias    [outUnit]
+        // input   [smpl, inUnit]
+        // pred    [smpl, outUnit]
+        let activation = input .* (!pars.Weights).T + !pars.Bias
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
-        | SoftMax  -> exp activation / Expr.sumKeepingAxis 0 (exp activation)
+        | SoftMax  -> exp activation / Expr.sumKeepingAxis 1 (exp activation)
         | Identity -> activation
 
 
