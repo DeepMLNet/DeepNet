@@ -19,13 +19,13 @@ module MultiGPLayer =
 
     type Pars = {
         /// GP lengthscales: [gp]
-        Lengthscales:       ExprT<single> ref
+        Lengthscales:       ExprT ref
         /// x values of GP training samples:         [gp, trn_smpl]
-        TrnX:               ExprT<single> ref
+        TrnX:               ExprT ref
         /// target values of GP training samples:    [gp, trn_smpl]
-        TrnT:               ExprT<single> ref
+        TrnT:               ExprT ref
         /// standard deviation of GP target values:  [gp, trn_smpl]
-        TrnSigma:           ExprT<single> ref
+        TrnSigma:           ExprT ref
         /// hyper-parameters
         HyperPars:          HyperPars
     }
@@ -74,8 +74,8 @@ module MultiGPLayer =
         let x = ElemExpr.argElem 1
         let s = ElemExpr.argElem 2
         let kse =
-            exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) ) +
-            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] ** 2.0f) (ElemExpr.zero())
+            exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) ) +
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.zero)
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
@@ -96,8 +96,8 @@ module MultiGPLayer =
         let l = ElemExpr.argElem 2
         let x = ElemExpr.argElem 3
 
-        let lk1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + s [smpl; gp; gp]) )
-        let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])**2.0f / (2.0f * ((l [gp])**2.0f + s [smpl; gp; gp])) ) )
+        let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
+        let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
 
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
@@ -120,9 +120,9 @@ module MultiGPLayer =
         let l = ElemExpr.argElem 2
         let x = ElemExpr.argElem 3
 
-        let L1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp]) )
-        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp])
-        let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f / (4.0f * (l [gp])**2.0f)
+        let L1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp]) )
+        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp])
+        let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f / (4.0f * (l [gp])***2.0f)
         let L2 = exp (-L2a - L2b)
         let L = L1 * L2
 
@@ -149,18 +149,18 @@ module MultiGPLayer =
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
-        let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
-                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let eNom = (x[gp2;t2]-m[smpl;gp2])***2.f * (l[gp1]***2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
+                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) ) 
+        let eDnm = 2.f * ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
         let e = exp(-eNom / eDnm)
         let Tnom = e * l[gp1] * l[gp2]
 
-        let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]**2.f
-        let sq2Nom = s[smpl;gp1;gp2]**2.f - (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2])
-        let sq2Dnm = s[smpl;gp1;gp2]**2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
+        let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]***2.f
+        let sq2Nom = s[smpl;gp1;gp2]***2.f - (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2])
+        let sq2Dnm = s[smpl;gp1;gp2]***2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero ()) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
     ///Elementwise Matrix needed for calculation of the covarance prediction.
@@ -184,15 +184,15 @@ module MultiGPLayer =
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
-        let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
-                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let eNom = (x[gp2;t2]-m[smpl;gp2])***2.f * (l[gp1]***2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
+                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) ) 
+        let eDnm = 2.f * ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
         let e = exp(-eNom / eDnm)
         let Tnom = e * l[gp1] * l[gp2]
 
-        let Tdnm = sqrt ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let Tdnm = sqrt ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero()) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
@@ -349,7 +349,7 @@ module WeightLayer =
     /// Weight layer parameters.
     type Pars = {
         /// expression for the weights [nGPs,nInput]
-        Weights:        ExprT<single> ref
+        Weights:        ExprT ref
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -436,7 +436,7 @@ module InputLayer=
         let nInput = (Expr.shapeOf input).[1]
         // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
         // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
-        Expr.zeros [nSmpls; nInput; nInput]
+        Expr.zeros<single> [nSmpls; nInput; nInput]
 
     let transform input  =
         input, (cov input)

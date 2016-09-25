@@ -124,8 +124,8 @@ module Program =
                   NOutput = nClass
                   NTrnSmpls = nTrn}
                 // define variables
-        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
-        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+        let input  = mb.Var "Input"  [nBatch; nInput]
+        let target = mb.Var "Target" [nBatch; nClass]
 
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
@@ -156,7 +156,7 @@ module Program =
         let loss = loss |> Expr.checkFinite "loss"
         let loss = loss |> Expr.dump "loss"
         // optimizer
-        let opt = Adam (loss, mi.ParameterVector, dev)
+        let opt = Adam<single> (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
@@ -212,8 +212,8 @@ module Program =
                             {NInput=nHidden; NOutput=nClass; NTrnSmpls=nTrn}]
                   LossMeasure = LossLayer.CrossEntropy }
                 // define variables
-        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
-        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+        let input  = mb.Var "Input"  [nBatch; nInput]
+        let target = mb.Var "Target" [nBatch; nClass]
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
@@ -229,7 +229,7 @@ module Program =
         let pred_fun =  mi.Func pred |> arg1 input 
 
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
         let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
@@ -288,8 +288,8 @@ module Program =
                             {NInput=nInput; NOutput=nClass; TransferFunc=NeuralLayer.SoftMax}]
                   LossMeasure = LossLayer.MSE }
         // define variables
-        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
-        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+        let input  = mb.Var "Input"  [nBatch; nInput]
+        let target = mb.Var "Target" [nBatch; nClass]
 
 
         // instantiate model
@@ -304,7 +304,7 @@ module Program =
         let pred_fun =  mi.Func pred.T |> arg1 input 
         
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
         let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
@@ -358,8 +358,8 @@ module Program =
                   NOutput = nClass
                   NTrnSmpls = nTrn}
                 // define variables
-        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
-        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+        let input  = mb.Var "Input"  [nBatch; nInput]
+        let target = mb.Var "Target" [nBatch; nClass]
 
 
         mb.SetSize nInput (fullRegressionDataset.[0].Input |> ArrayND.nElems)
@@ -375,7 +375,7 @@ module Program =
         let loss = LossLayer.loss LossLayer.MSE pred.T target.T
 
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, dev)
+        let opt =  Adam<single> (loss, mi.ParameterVector, dev)
         let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
@@ -423,8 +423,8 @@ module Program =
                             {NInput=nHidden; NOutput=nClass; TransferFunc=NeuralLayer.Identity}]
                   LossMeasure = LossLayer.MSE }
         // define variables
-        let input  : ExprT<single> = mb.Var "Input"  [nBatch; nInput]
-        let target : ExprT<single> = mb.Var "Target" [nBatch; nClass]
+        let input  = mb.Var "Input"  [nBatch; nInput]
+        let target = mb.Var "Target" [nBatch; nClass]
 
         // instantiate model
         mb.SetSize nInput (fullRegressionDataset.[0].Input |> ArrayND.nElems)
@@ -436,7 +436,7 @@ module Program =
         let loss = MLP.loss mlp input.T target.T
 
         // optimizer
-        let opt =  Adam (loss, mi.ParameterVector, DevCuda)
+        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
         let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =

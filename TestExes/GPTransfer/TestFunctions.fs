@@ -82,8 +82,8 @@ module TestFunctions =
 
         let mgp = 
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
-        let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nGPs]
-        let inp_cov   : ExprT<single> = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
+        let inp_mean = mb.Var "inp_mean"  [nSmpls; nGPs]
+        let inp_cov  = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
         mb.SetSize nGPs      ngps
         mb.SetSize nTrnSmpls ntraining
         let mi = mb.Instantiate device
@@ -219,9 +219,9 @@ module TestFunctions =
         let gptu = 
            GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NOutput = nGPs; NTrnSmpls = nTrnSmpls}
 
-        let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nInputs]
-        let pred : ExprT<single> = mb.Var "Pred" [nSmpls; nGPs]
-        let target : ExprT<single> = mb.Var "Target" [nSmpls; nGPs]
+        let inp_mean = mb.Var "inp_mean"  [nSmpls; nInputs]
+        let pred     = mb.Var "Pred"      [nSmpls; nGPs]
+        let target   = mb.Var "Target"    [nSmpls; nGPs]
 
 
         mb.SetSize  nGPs         ngps
