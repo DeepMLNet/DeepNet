@@ -11,14 +11,6 @@ open Expr
 [<AutoOpen>]
 module UExprTypes = 
 
-//    /// unified variable specification
-//    [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
-//    type UVarSpecT = {
-//        Name:      string
-//        Shape:     ShapeSpecT
-//        TypeName:  TypeNameT
-//    }
-
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpecT<int>
     type UExprRngsSpecT = SimpleRangesSpecT<int>
@@ -32,6 +24,7 @@ module UExprTypes =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
         | Elements of ShapeSpecT * UElemExpr.UElemFuncT
+        | IfThenElse
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
@@ -76,12 +69,6 @@ module UExprTypes =
         /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
         /// with the corresponding Uop. It will generate the apropriate unified expression.
         abstract ToUExpr: expr:ExprT -> makeOneUop:(IUOp -> UExprT) -> UExprT
-
-
-
-//module UVarSpec =
-//
-
 
 
 module UExprRngsSpec =
@@ -148,6 +135,8 @@ module UExpr =
                 | Expr.Binary (Expr.SetSubtensor sr, a, b) ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr   
                     extra (SetSubtensor usr) (a :: b :: dynExprs)
+                | Expr.Binary (Expr.IfThenElse cond, ifTrue, ifFalse) ->
+                    extra IfThenElse [ifTrue; ifFalse; cond]
                 | Expr.Nary (Expr.Elements (resShape, elemExpr), se) ->
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se

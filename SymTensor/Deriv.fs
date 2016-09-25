@@ -25,6 +25,7 @@ module Deriv =
         let exprShp = expr.Shape
         let funElems = eg.Shape.[0]  
 
+        // check type and shape
         if expr.TypeName <> eg.TypeName then
             failwithf "Jacobian with type %A was specified for expression of type %A"
                 eg.TypeName expr.TypeName
@@ -49,6 +50,10 @@ module Deriv =
             ||> List.fold (fun totGrad (e, de) ->
                 let eGrad = reverseDiffStep e de
                 merge totGrad eGrad)
+
+        /// logic op failure
+        let failLogic op =
+            failwithf "cannot calculate derivative of logic or comparison operation %A" op
 
         // useful numbers
         let zero = Expr.zeroOfSameType expr
@@ -88,6 +93,9 @@ module Deriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
+            
+            | Not -> failLogic op
+
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> reverseDiffStep a
@@ -137,8 +145,28 @@ module Deriv =
                 eg .+ (padLeft (-truncate (a / b)) |> collapse) 
             | Power -> (egExpanded * padLeft (b * a**(b - one)) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
-            | MaxElemwise -> failwith "TODO"
-            | MinElemwise -> failwith "TODO"
+            
+            | MaxElemwise -> eg |> reverseDiffStep (ifThenElse (a >>>> b) a b)
+            | MinElemwise -> eg |> reverseDiffStep (ifThenElse (a <<<< b) a b)
+
+            | Equal
+            | Less
+            | LessEqual
+            | Greater
+            | GreaterEqual
+            | NotEqual
+                -> failLogic op
+
+            | And 
+            | Or 
+                -> failLogic op
+
+            | IfThenElse cond ->
+                let egZeros = zerosLike egExpanded
+                let da = ifThenElse (padLeft cond) egExpanded egZeros |> collapse
+                let db = ifThenElse (padLeft cond) egZeros egExpanded |> collapse
+                da .+ db
+
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
                 let mxWrtX (m: ExprT) x y dy =
