@@ -735,6 +735,13 @@ module CudaExprWorkspaceTypes =
                 execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
                 execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
 
+                // Register host variables with CUDA.
+                // This does nothing if a variable is already registered.
+                let hostVarRegs =
+                    hostVar
+                    |> Map.toList
+                    |> List.map (fun (_, hvAry) -> ArrayNDHostReg.lock (hvAry :?> IArrayNDHostT))
+
                 // TODO: implement proper synchronization.
                 // For now we synchronize the whole context to make sure that data transfers
                 // from and to the GPU do not overlap with the computation that may involve
@@ -742,6 +749,7 @@ module CudaExprWorkspaceTypes =
                 CudaSup.context.Synchronize () 
                 execCalls recipe.ExecCalls
                 CudaSup.context.Synchronize () 
+
 
             )
 

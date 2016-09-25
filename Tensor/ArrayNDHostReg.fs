@@ -8,17 +8,19 @@ open Basics
 open ArrayNDHost
 
 
-module CudaRegMemSupport =
-    // TODO: make thread safe
+module internal CudaRegMemSupport =
+
+    /// synchronization lock
+    let internal syncLock = obj ()
 
     /// registration count
-    let registeredCount = new Dictionary<IArrayNDHostT, int>()
+    let internal registeredCount = new Dictionary<IArrayNDHostT, int>()
 
     /// master data registrations
-    let dataRegistrations = new Dictionary<IArrayNDHostT, obj>()
+    let internal dataRegistrations = new Dictionary<IArrayNDHostT, obj>()
 
     /// decreases reference count for page locked data
-    let decrRefCount data  =
+    let internal decrRefCount data  =
         registeredCount.[data] <- registeredCount.[data] - 1
         if registeredCount.[data] = 0 then
             dataRegistrations.Remove data |> ignore
@@ -27,6 +29,7 @@ module CudaRegMemSupport =
 
 
 [<AutoOpen>]
+/// CUDA registered memory for data arrays handle
 module CudaRegMemTypes =
 
     /// CUDA registered memory for data arrays handle
@@ -38,30 +41,36 @@ module CudaRegMemTypes =
 
         interface IDisposable with
             member this.Dispose() =          
-                disposed <- true
-                if CudaRegMemSupport.decrRefCount hostArray then            
-                    // unregister memory
-                    cudaMem.Unregister() 
-                    // release cuda memory handle 
-                    cudaMem.Dispose()
-                    // unpin managed memory
-                    (pinHnd :> IDisposable).Dispose()
+                lock CudaRegMemSupport.syncLock (fun () ->
+                    if not disposed then 
+                        if CudaRegMemSupport.decrRefCount hostArray then            
+                            // unregister memory
+                            cudaMem.Unregister() 
+                            // release cuda memory handle 
+                            cudaMem.Dispose()
+                            // unpin managed memory
+                            (pinHnd :> IDisposable).Dispose()
+                    disposed <- true
+                )
+
+        override this.Finalize () =
+            (this :> IDisposable).Dispose()
 
         /// the data array
         member this.HostArray = 
-            if disposed then failwith "DataLock is disposed"
+            if disposed then failwith "CudaRegMemHnd is disposed"
             hostArray
         member internal this.HostArrayPriv = hostArray
 
         /// GC memory pin handle
         member this.PinHnd = 
-            if disposed then failwith "DataLock is disposed"
+            if disposed then failwith "CudaRegMemHnd is disposed"
             pinHnd
         member internal this.PinHndPriv = pinHnd
 
         /// the CudaRegisteredHostMemory
         member this.CudaRegisteredMemory = 
-            if disposed then failwith "DataLock is disposed"
+            if disposed then failwith "CudaRegMemHnd is disposed"
             cudaMem
         member internal this.CudaRegisteredMemoryPriv = cudaMem
 
@@ -74,38 +83,44 @@ module ArrayNDHostReg =
 
     /// get CudaRegMemHnd for already locked ArrayNDHostT          
     let get data =      
-        if not (dataRegistrations.ContainsKey data) then
-            failwithf "%A is not registered data" data
-        registeredCount.[data] <- registeredCount.[data] + 1
-        let dr = dataRegistrations.[data] :?> CudaRegMemHnd
-        new CudaRegMemHnd(dr.HostArrayPriv, dr.PinHndPriv, dr.CudaRegisteredMemoryPriv)   
+        lock CudaRegMemSupport.syncLock (fun () ->
+            if not (dataRegistrations.ContainsKey data) then
+                failwith "the specified tensor is not registered with CUDA for data transfer" 
+            registeredCount.[data] <- registeredCount.[data] + 1
+            let dr = dataRegistrations.[data] :?> CudaRegMemHnd
+            new CudaRegMemHnd(dr.HostArrayPriv, dr.PinHndPriv, dr.CudaRegisteredMemoryPriv)   
+        )
         
     /// gets the CudaRegisteredMemory for already locked ArrayNDHostT without 
     /// incrementing the reference count
     let getCudaRegisteredMemory data =
-        if not (dataRegistrations.ContainsKey data) then
-            failwithf "the specified array is not registered data" 
-        let dr = dataRegistrations.[data] :?> CudaRegMemHnd
-        dr.CudaRegisteredMemory
+        lock CudaRegMemSupport.syncLock (fun () ->
+            if not (dataRegistrations.ContainsKey data) then
+                failwith "the specified tensor is not registered with CUDA for data transfer" 
+            let dr = dataRegistrations.[data] :?> CudaRegMemHnd
+            dr.CudaRegisteredMemory
+        )
             
     /// locks ArrayNDHostT (multiple registrations are okay) and returns the corresponding CudaRegMemHnd
     let lock (data: IArrayNDHostT) = 
-        if dataRegistrations.ContainsKey data then get data      
-        else
-            // pin managed memory so that address cannot change
-            let pinHnd = data.Pin ()
-            let dataAddr = pinHnd.Ptr
-            let dataByteSize = data.DataSizeInBytes
+        lock CudaRegMemSupport.syncLock (fun () ->
+            if dataRegistrations.ContainsKey data then get data      
+            else
+                // pin managed memory so that address cannot change
+                let pinHnd = data.Pin ()
+                let dataAddr = pinHnd.Ptr
+                let dataByteSize = data.DataSizeInBytes
 
-            // construct cuda memory handle and register it
-            let cudaMem = new CudaRegisteredHostMemory<byte>(dataAddr, SizeT dataByteSize)    
-            cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
+                // construct cuda memory handle and register it
+                let cudaMem = new CudaRegisteredHostMemory<byte>(dataAddr, SizeT dataByteSize)    
+                cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
 
-            // create handle object
-            let dr = new CudaRegMemHnd(data, pinHnd, cudaMem)     
-            dataRegistrations.[data] <- dr
-            registeredCount.[data] <- 1
-            dr
+                // create handle object
+                let dr = new CudaRegMemHnd(data, pinHnd, cudaMem)     
+                dataRegistrations.[data] <- dr
+                registeredCount.[data] <- 1
+                dr
+        )
 
     /// unlocks a ArrayNDHostT
     let unlock dataLock =

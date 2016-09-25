@@ -436,9 +436,13 @@ module Expr =
         | Nary(Interpolate _, es) -> shapeOf es.Head
         | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
 
-    /// number of elements 
+    /// number of elements of given expression
     let nElems expr =
         expr |> shapeOf |> ShapeSpec.nElem
+
+    /// number of dimensions of given expression
+    let nDims expr =
+        expr |> shapeOf |> ShapeSpec.nDim
 
     /// Wraps the given op in a Reshape op if its shape does not match ss.
     let reshapeIfNecessary ss expr =
@@ -464,6 +468,10 @@ module Expr =
         /// type of this expression
         member this.Type = this.TypeName |> TypeName.getType 
 
+    /// checks that given axis is valid for specified expression
+    let checkAxis ax expr =
+        if not (0 <= ax && ax < nDims expr) then
+            failwithf "invalid axis %d for expression of shape %A" ax (shapeOf expr)
 
     /// expressions that were already checked for correctness
     let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
@@ -861,6 +869,18 @@ module Expr =
     /// inserts a broadcast axis at the given dimension
     let insertBroadcastAxis dim a =
         a |> reshape (shapeOf a |> ShapeSpec.insertBroadcastAxis dim)
+
+    /// Replicates the tensor the given number of repetitions along the given axis.
+    let replicate dim reps a =
+        a |> checkAxis dim
+
+        // 1. insert axis of size one left to repetition axis
+        // 2. broadcast along the new axis to number of repetitions
+        // 3. reshape to result shape
+        a 
+        |> insertBroadcastAxis dim
+        |> broadcast (a.Shape |> ShapeSpec.insertAxis dim reps)
+        |> reshape (a.Shape |> List.set dim (reps * a.Shape.[dim]))
 
     /// summaiton of all elements
     let sum a = Unary(Sum, a) |> check

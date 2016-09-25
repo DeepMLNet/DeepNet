@@ -59,6 +59,9 @@ module VarEnv =
                 if VarSpec.nDims vSym <> ArrayND.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
                         (ArrayND.shape vVal) vSym
+                let failShape () =
+                    failwithf "expected variable %s with shape %A but got value with shape %A"
+                        vSym.Name vSym.Shape (ArrayND.shape vVal)
 
                 (VarSpec.shape vSym, ArrayND.shape vVal)
                 ||> List.zip
@@ -67,11 +70,11 @@ module VarEnv =
                     | Base (Sym sym) -> env |> SymSizeEnv.add sym (Base (Fixed svVal))
                     | Base (Fixed f) -> 
                         if f = svVal then env
-                        else failwithf "%A <> %d" svSym svVal
+                        else failShape ()
                     | Broadcast ->
                         if 1 = svVal then env
-                        else failwithf "1 <> %d" svVal
-                    | Multinom m -> failwithf "%A <> %d" m svVal
+                        else failShape ()
+                    | Multinom m -> failShape ()
                 ) env)
 
     /// substitues the given symbol sizes into the variable environment

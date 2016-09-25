@@ -128,9 +128,6 @@ module VarSpec =
     let inline ofNameShapeAndTypeName name shape typeName : VarSpecT =
         {Name=name; Shape=shape; TypeName=typeName}
 
-//    let ofExpr expr =
-//        expr |> Expr.extractVar |> ofVarSpec
-
     /// name of variable
     let name (vs: VarSpecT) =
         vs.Name

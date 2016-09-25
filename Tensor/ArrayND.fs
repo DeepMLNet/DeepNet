@@ -1227,7 +1227,7 @@ module ArrayND =
         diffAxis (a.NDims-1) a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // concatenation
+    // concatenation and replication
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
     /// Concatenates the list of tensors in the given axis.
@@ -1261,8 +1261,22 @@ module ArrayND =
                         else RngAll)
                 cc.[ccRng] <- ary
                 pos <- pos + aryLen
-
         cc
+
+    /// Replicates the tensor the given number of repetitions along the given axis.
+    let replicate dim reps (ary: #ArrayNDT<'T>) =
+        ary |> checkAxis dim
+        if reps < 0 then
+            invalidArg "reps" "number of repetitions cannot be negative"
+
+        // 1. insert axis of size one left to repetition axis
+        // 2. broadcast along the new axis to number of repetitions
+        // 3. reshape to result shape
+        ary 
+        |> reshape (ary.Shape |> List.insert dim 1)
+        |> broadcastDim dim reps
+        |> reshape (ary.Shape |> List.set dim (reps * ary.Shape.[dim]))
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // pretty printing

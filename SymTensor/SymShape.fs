@@ -396,13 +396,16 @@ module ShapeSpecTypes =
 module ShapeSpec =
     open SizeSymbolTypes
 
-    let withoutAxis ax (sa: ShapeSpecT) =
+    let insertAxis ax ss (sa: ShapeSpecT) : ShapeSpecT =
+        sa |> List.insert ax ss
+
+    let withoutAxis ax (sa: ShapeSpecT) : ShapeSpecT =
         sa |> List.without ax
 
-    let insertBroadcastAxis ax (sa: ShapeSpecT) =
-        sa |> List.insert ax Broadcast
+    let insertBroadcastAxis ax (sa: ShapeSpecT) : ShapeSpecT =
+        sa |> insertAxis ax Broadcast
 
-    let set ax size (sa: ShapeSpecT) =
+    let set ax size (sa: ShapeSpecT) : ShapeSpecT =
         sa |> List.set ax size
 
     let nDim (sa: ShapeSpecT) =
@@ -412,32 +415,32 @@ module ShapeSpec =
         if List.isEmpty sa then SizeSpec.one
         else List.reduce (*) sa
 
-    let flatten (sa: ShapeSpecT) =
+    let flatten (sa: ShapeSpecT) : ShapeSpecT =
         [nElem sa]
 
-    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) =
+    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) : ShapeSpecT =
         sa @ sb
 
-    let transpose (sa: ShapeSpecT) =
+    let transpose (sa: ShapeSpecT) : ShapeSpecT =
         if nDim sa <> 2 then failwithf "need matrix to transpose but have shape %A" sa
         List.rev sa
 
-    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) =
+    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) : ShapeSpecT =
         sa  |> List.set ax1 sa.[ax2]
             |> List.set ax2 sa.[ax1]
 
-    let scalar = []
+    let scalar : ShapeSpecT = []
 
-    let vector (ss: SizeSpecT) = [ss]
+    let vector (ss: SizeSpecT) : ShapeSpecT = [ss]
 
-    let matrix (sr: SizeSpecT) (sc: SizeSpecT) = [sr; sc]
+    let matrix (sr: SizeSpecT) (sc: SizeSpecT) : ShapeSpecT = [sr; sc]
 
-    let emptyVector = [Base (Fixed 0)]
+    let emptyVector : ShapeSpecT = [Base (Fixed 0)]
 
-    let padLeft (sa: ShapeSpecT) =
+    let padLeft (sa: ShapeSpecT) : ShapeSpecT =
         (Broadcast)::sa
 
-    let padRight (sa: ShapeSpecT) =
+    let padRight (sa: ShapeSpecT) : ShapeSpecT =
         sa @ [Broadcast]
 
     /// pads shapes from the left until they have same rank
@@ -456,7 +459,7 @@ module ShapeSpec =
                 sa <- padLeft sa
             sa)
 
-    let broadcast (sa: ShapeSpecT) dim size =
+    let broadcast (sa: ShapeSpecT) dim size : ShapeSpecT =
         match sa.[dim] with
         | Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
@@ -507,17 +510,17 @@ module ShapeSpec =
                 failwithf "cannot broadcast shapes %A of different rank to same size" sas                
             broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
 
-    let enableBroadcast dim (sa: ShapeSpecT) =
+    let enableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBroadcast dim (sa: ShapeSpecT) =
+    let disableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim (Base (Fixed 1)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableAllBroadcasts sa =
+    let disableAllBroadcasts sa : ShapeSpecT =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
     let equalWithBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =

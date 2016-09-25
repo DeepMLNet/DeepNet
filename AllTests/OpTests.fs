@@ -116,6 +116,18 @@ let ``Singular matrix inverse`` () =
     printfn "a=\n%A" av
     printfn "a^-1=\n%A" iav
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Replicate`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicate 0 (SizeSpec.fix 2) a
+    let expr1 = Expr.replicate 1 (SizeSpec.fix 3) a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory expr0 expr1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let av0, av1 = fns av
+    printfn "a=\n%A" av 
+    printfn "rep 0 2 a=\n%A" av0
+    printfn "rep 1 3 a=\n%A" av1
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
