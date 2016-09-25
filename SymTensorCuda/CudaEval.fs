@@ -33,10 +33,11 @@ module CudaEval =
                     // expression has data that needs to be stored       
                     // create variable that will be inserted into expression
                     let resVarName = sprintf "__RESULT%d__" i
-                    let resVar = UVarSpec.ofNameShapeAndTypeName resVarName shp tn                     
+                    let resVar = 
+                        {VarSpecT.Name=resVarName; Shape=shp; TypeName=tn}
 
                     // insert StoreToVar op in expression
-                    (UExpr (UUnaryOp (StoreToVar resVar), [uexpr], 
+                    (UExpr (UUnaryOp (Expr.StoreToVar resVar), [uexpr], 
                             {TargetType=tn; TargetShape=shp; TargetNShape=nshp; Expr=None}), 
                      Some resVar, resAllocator)
                 else
@@ -55,14 +56,14 @@ module CudaEval =
         /// unified expression containing all expressions to evaluate
         let mergedUexpr =
             match transferUExprs with
-            | [] -> UExpr (UNaryOp Discard, [], 
+            | [] -> UExpr (UNaryOp Expr.Discard, [], 
                            {TargetType=TypeName.ofType<int>
                             TargetShape=ShapeSpec.emptyVector
                             TargetNShape=[0]
                             Expr=None})
             | [uexpr] -> uexpr
             | UExpr (_, _, {TargetType=tn}) :: _ ->
-                UExpr (UNaryOp Discard, transferUExprs, 
+                UExpr (UNaryOp Expr.Discard, transferUExprs, 
                        {TargetType=tn
                         TargetShape=ShapeSpec.emptyVector
                         TargetNShape=[0]
@@ -90,7 +91,7 @@ module CudaEval =
                 ||> List.zip
                 |> List.fold (fun varEnv (var, value) -> 
                         match var with
-                        | Some vs -> varEnv |> VarEnv.addUVarSpec vs value
+                        | Some vs -> varEnv |> VarEnv.addVarSpec vs value
                         | None -> varEnv)
                     evalEnv.VarEnv               
 

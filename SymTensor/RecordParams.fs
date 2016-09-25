@@ -14,7 +14,7 @@ type private VarRecordHelpers () =
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
-        UVarSpec.ofExpr expr
+        Expr.extractVar expr
     static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
         value |> dev.ToHost |> ArrayNDHDF.write hdf name
     static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
@@ -30,7 +30,7 @@ type private ValueType =
 
 type private RFieldInfo = {
     Expr:           obj
-    VarSpec:        UVarSpecT
+    VarSpec:        VarSpecT
     ValueType:      ValueType
 }
 
@@ -74,7 +74,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 // extract UVarSpecT
                 let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", allBindingFlags) 
                 let m = mi.MakeGenericMethod baseType
-                let varSpec = m.Invoke(null, [|exprData|]) :?> UVarSpecT
+                let varSpec = m.Invoke(null, [|exprData|]) :?> VarSpecT
 
                 yield {Expr=exprData; VarSpec=varSpec; ValueType=valueType}
         } 
@@ -101,9 +101,9 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                         let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
                         let m = mi.MakeGenericMethod baseType
                         let valueAry = m.Invoke(null, [|box value; box dev|]) :?> IArrayNDT
-                        varEnv |> VarEnv.addUVarSpec fi.VarSpec valueAry
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec valueAry
                     | Array _ ->
-                        varEnv |> VarEnv.addUVarSpec fi.VarSpec (value :?> IArrayNDT)
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> IArrayNDT)
                 )
             varEnvCache <- Some (value, varEnv)
             varEnv      

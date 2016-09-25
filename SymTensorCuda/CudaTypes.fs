@@ -21,7 +21,7 @@ module Types =
     /// device memory pointer
     type DevMemPtrT = {
         /// base memory
-        Base: MemManikinT;
+        Base: MemManikinT
         /// offset in elements
         Offset: int
     }
@@ -30,7 +30,7 @@ module Types =
     type HostExternalMemT = {Name: string}
     /// host memory pointer
     type HostMemPtrT = {
-        Base: HostExternalMemT;
+        Base: HostExternalMemT
         Offset: int
     }
 
@@ -43,7 +43,7 @@ module Types =
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// storage location of variables
-        VarStorLoc:                 Map<UVarSpecT, ArrayLocT>
+        VarStorLoc:                 Map<VarSpecT, ArrayLocT>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
         /// texture objects
@@ -61,11 +61,11 @@ module Types =
 
     /// template instantiation specification
     type TmplInstT = {
-        FuncName:       string; 
-        Domain:         FuncDomainT; 
-        TmplArgs:       string list; 
-        RetType:        string; 
-        ArgTypes:       string list;
+        FuncName:       string
+        Domain:         FuncDomainT
+        TmplArgs:       string list
+        RetType:        string
+        ArgTypes:       string list
     }
 
     /// a CUDA compute stream
@@ -97,24 +97,24 @@ module Types =
         Event:                  Dictionary<EventObjectT, CudaEvent>
         InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
-        mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
-        mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
+        mutable ExternalVar:    Map<VarSpecT, IArrayNDCudaT>
+        mutable HostVar:        Map<VarSpecT, IArrayNDHostT>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
         ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
     }
     
     /// CUDA device memory range
     type DevMemRngT = {
-        DeviceMem:              CudaDeviceVariable<byte>;
-        OffsetInBytes:          int;
-        LengthInBytes:          int;
+        DeviceMem:              CudaDeviceVariable<byte>
+        OffsetInBytes:          int
+        LengthInBytes:          int
     }
 
     /// CUDA host memory range
     type HostMemRngT = {
-        HostMem:                CudaRegisteredHostMemory<byte>;
-        OffsetInBytes:          int;
-        LengthInBytes:          int;
+        HostMem:                CudaRegisteredHostMemory<byte>
+        OffsetInBytes:          int
+        LengthInBytes:          int
     }
 
 
@@ -594,7 +594,7 @@ module ArgTemplates =
                                 compileEnv:   CudaCompileEnvT) =
 
         let tbl = 
-            match Expr.getInterpolatorTableAsIArrayNDT ip with
+            match Interpolator.getInterpolatorTableAsIArrayNDT ip with
             | :? IArrayNDCudaT as tbl -> tbl
             | _ -> failwith "interpolation table must be stored on CUDA device"
     

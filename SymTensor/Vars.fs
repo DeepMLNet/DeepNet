@@ -7,6 +7,7 @@ open ShapeSpec
 
 
 [<AutoOpen>]
+/// TypeName types
 module TypeNameTypes =
 
     /// assembly qualified name of a .NET type
@@ -22,7 +23,7 @@ module TypeNameTypes =
             member this.Size =
                 Marshal.SizeOf this.Type
     
-
+/// assembly qualified name of a .NET type
 module TypeName =
 
     /// gets the System.Type associated by this TypeName
@@ -47,6 +48,7 @@ module TypeName =
 
 
 [<AutoOpen>]
+/// scalar constant value types
 module ConstSpecTypes =
 
     /// scalar constant value
@@ -56,6 +58,7 @@ module ConstSpecTypes =
         | ConstSingle of single
         | ConstBool of bool
         with
+            /// the type name of the constant
             member this.TypeName = 
                 match this with
                 | ConstInt _ -> TypeName.ofType<int>
@@ -63,6 +66,7 @@ module ConstSpecTypes =
                 | ConstSingle _ -> TypeName.ofType<single>
                 | ConstBool _ -> TypeName.ofType<bool>
 
+            /// gets the value which must be of type 'T
             member this.GetValue() : 'T =
                 match this with
                 | ConstInt v -> v |> box |> unbox
@@ -70,6 +74,7 @@ module ConstSpecTypes =
                 | ConstSingle v -> v |> box |> unbox
                 | ConstBool v -> v |> box |> unbox  
                 
+            /// gets the value converting it to type 'T
             member this.GetConvertedValue<'T>() : 'T =             
                 match this with
                 | ConstInt v -> v |> conv<'T>
@@ -77,8 +82,10 @@ module ConstSpecTypes =
                 | ConstSingle v -> v |> conv<'T>
                 | ConstBool v -> v |> conv<'T>
 
-
+/// scalar constant value
 module ConstSpec =
+
+    /// creates a ConstSpecT from a scalar value
     let ofValue (value: obj) =
         match value.GetType() with
         | t when t = typeof<int> -> ConstInt (value |> unbox)
@@ -87,70 +94,71 @@ module ConstSpec =
         | t when t = typeof<bool> -> ConstBool (value |> unbox)
         | t -> failwithf "unsupported constant type: %A" t
 
+    /// gets the value 
     let value (cs: ConstSpecT) =
         cs.GetValue ()
 
+    /// the type name
     let typeName (cs: ConstSpecT) =
         cs.TypeName
 
-[<AutoOpen>]
-module VarSpecTypes =
 
-    /// non-generic variable specification interface
-    type IVarSpec =
-        inherit System.IComparable
-        abstract member Name : string 
-        abstract member Shape: ShapeSpecT
-        abstract member Type: System.Type
-        abstract member TypeName: TypeNameT
-        abstract member SubstSymSizes: SymSizeEnvT -> IVarSpec
+[<AutoOpen>]
+/// variable specification types
+module VarSpecTypes =
 
     /// variable specification: has a name, type and shape specificaiton
     [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
-    type VarSpecT = 
-        {
-            Name:      string
-            Shape:     ShapeSpecT
-            TypeName:  TypeNameT
-        }
+    type VarSpecT = {
+        Name:      string
+        Shape:     ShapeSpecT
+        TypeName:  TypeNameT
+    }
         
-        interface IVarSpec with
-            member this.Name = this.Name
-            member this.Shape = this.Shape
-            member this.Type = TypeName.getType this.TypeName
-            member this.TypeName = this.TypeName
-            member this.SubstSymSizes symSizes = 
-                {this with Shape=SymSizeEnv.substShape symSizes this.Shape} :> IVarSpec
 
-//        interface System.IComparable with
-//            member this.CompareTo otherObj =
-//                let this = this :> IVarSpec
-//                match otherObj with
-//                | :? IVarSpec as othr -> 
-//                    compare 
-//                        (this.Name, this.Shape, this.TypeName) 
-//                        (othr.Name, othr.Shape, othr.TypeName)
-//                | _ -> invalidArg "otherObj" "cannot compare values of different types"
-//
-
-
-
+/// variable specification
 module VarSpec =
 
-    /// create variable specifation by name and shape
-    let inline ofNameAndShape name shape =
-        {VarSpecT.Name=name; Shape=shape; TypeName=failwith "TODO"}
+    /// create variable specifation by name and shape and type
+    let inline ofNameShapeAndTypeName name shape typeName : VarSpecT =
+        {Name=name; Shape=shape; TypeName=typeName}
+
+//    let ofExpr expr =
+//        expr |> Expr.extractVar |> ofVarSpec
 
     /// name of variable
-    let name (vs: #IVarSpec) = vs.Name
+    let name (vs: VarSpecT) =
+        vs.Name
 
     /// shape of variable
-    let shape (vs: #IVarSpec) = vs.Shape
+    let shape (vs: VarSpecT) =
+        vs.Shape
+
+    /// number of dimensions of variable
+    let nDims vs =
+        shape vs |> ShapeSpec.nDim
+
+    /// type of variable
+    let typ (vs: VarSpecT) = 
+        vs.TypeName |> TypeName.getType 
 
     /// typename of variable
-    let typeName (vs: #IVarSpec) = vs.TypeName
+    let typeName (vs: VarSpecT) =
+        vs.TypeName
 
     /// substitutes the size symbol environment into the variable
-    let substSymSizes symSizeEnv (vs: 'T when 'T :> IVarSpec) = 
-        vs.SubstSymSizes symSizeEnv :?> 'T
+    let substSymSizes symSizes (vs: VarSpecT) = 
+        {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
 
+    /// gets variable by name
+    let tryFindByName (vs: VarSpecT) map =
+        map |> Map.tryPick 
+            (fun cvs value -> 
+                if name cvs = name vs then Some value
+                else None)
+
+    /// gets variable by name
+    let findByName vs map =
+        match tryFindByName vs map with
+        | Some value -> value
+        | None -> raise (System.Collections.Generic.KeyNotFoundException())

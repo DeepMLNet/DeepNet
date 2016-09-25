@@ -725,8 +725,8 @@ module CudaExprWorkspaceTypes =
                 (this :> System.IDisposable).Dispose()
 
         /// Evaluate expression.
-        member this.Eval(externalVar: Map<UVarSpecT, IArrayNDT>,
-                         hostVar:     Map<UVarSpecT, IArrayNDT>) =
+        member this.Eval(externalVar: Map<VarSpecT, IArrayNDT>,
+                         hostVar:     Map<VarSpecT, IArrayNDT>) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
             CudaSup.checkContext ()
 

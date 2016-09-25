@@ -170,6 +170,7 @@ module Expr =
         /// extension op
         | ExtensionOp of IOp
    
+
      
     /// A mathematical operation in an expression.
     /// This models a mathematical function or operator that takes one or more tensors
@@ -193,12 +194,6 @@ module Expr =
         /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
         /// return true on all sizes used in this op.
         abstract CanEvalAllSymSizes: bool
-
-        /// Should create a unified expression from the given expression.
-        /// This op is always the root of the passed expression.
-        /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
-        /// with the corresponding Uop. It will generate the apropriate unified expression.
-        abstract ToUExpr: expr:ExprT -> makeOneUop:(UExprTypes.IUOp -> UExprTypes.UExprT) -> UExprTypes.UExprT
 
         /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
         /// The derivative is always an NxM matrix where N is the number of elements of the function
@@ -1173,89 +1168,6 @@ module Expr =
             Unary (CheckFinite name, a) |> check
         else a |> check
 
-    /// interpolator tables
-    let private tablesOfInterpolators = new Dictionary<InterpolatorT, IArrayNDT>()
-
-    /// interpolator derivatives
-    let private derivativeOfInterpolators = new Dictionary<InterpolatorT, InterpolatorT>()
-
-    /// Creates an n-dimensional linear interpolator,
-    /// where table contains the equally spaced function values between minArg and maxArg.
-    /// Optionally, an interpolator for the derivative can be specified.
-    let createInterpolator (tbl: ArrayNDT<'T>) (minArg: float list) (maxArg: float list) 
-                           (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
-                           (derivative: InterpolatorT option) =
-        let nDims = minArg.Length
-        if maxArg.Length <> nDims || outside.Length <> nDims then
-            failwith "minArg, maxArg and outside have inconsistent lengths"
-        if tbl.NDims <> nDims then failwith "interpolation table has wrong number of dimensions"
-        if tbl.Shape |> List.exists (fun e -> e < 2) then failwith "interpolation table must contain at least 2 entries"
-        let ip = {
-            Id = tablesOfInterpolators.Count
-            TypeName = TypeName.ofType<'T>
-            MinArg = minArg
-            MaxArg = maxArg
-            Resolution = List.zip3 minArg maxArg tbl.Shape
-                         |> List.map (fun (min, max, nElems) -> (max - min) / float (nElems - 1))
-            Mode = mode
-            Outside = outside
-            Derivative = derivative
-        }
-        lock tablesOfInterpolators
-            (fun () -> tablesOfInterpolators.Add (ip, tbl))        
-        ip
-
-    /// Gets the function value table for the specified one-dimensional interpolator as an IArrayNDT.
-    let getInterpolatorTableAsIArrayNDT ip =
-        match tablesOfInterpolators.TryFind ip with
-        | Some ip -> ip
-        | None -> failwithf "interpolator %A is unknown" ip
-
-    /// Gets the function value table for the specified one-dimensional interpolator.
-    let getInterpolatorTable<'T> ip =
-        getInterpolatorTableAsIArrayNDT ip :?> ArrayNDT<'T>
-
-    type private GetDerivativeOfInterpolator =
-        static member Do<'T> (derivDim: int, ip: InterpolatorT) =
-            if not (0 <= derivDim && derivDim < ip.NDims) then
-                invalidArg "derivDim" "derivative dimension out of range"
-
-            match ip.Derivative with
-            | Some ipd -> ipd  // use provided derivative table
-            | None ->          // create derivative table by numeric differentiation
-                match derivativeOfInterpolators.TryFind ip with
-                | Some ipd -> ipd
-                | None ->
-                    let tbl = getInterpolatorTable ip                 
-                    let diffTbl =
-                        match ip.Mode with
-                        | InterpolateLinearaly ->
-                            let diffTbl = 
-                                ArrayND.diffAxis derivDim tbl / 
-                                ArrayND.scalarOfType (conv<'T> ip.Resolution.[derivDim]) tbl
-                            let zeroShp =
-                                [for d, s in List.indexed tbl.Shape do
-                                    if d = derivDim then yield 1
-                                    else yield s]
-                            let zero = ArrayND.zerosOfSameType zeroShp diffTbl
-                            ArrayND.concat derivDim [diffTbl; zero]
-                        | InterpolateToLeft ->
-                            ArrayND.zerosLike tbl
-                    let outside =
-                        [for d, o in List.indexed ip.Outside do
-                            if d = derivDim then yield Zero
-                            else yield o]
-                    let ipd = createInterpolator diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
-                    lock derivativeOfInterpolators
-                        (fun () -> derivativeOfInterpolators.Add (ip, ipd))
-                    ipd
-
-
-    /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
-    /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
-    let getDerivativeOfInterpolator (derivDim: int) (ip: InterpolatorT) =
-        callGeneric<GetDerivativeOfInterpolator, InterpolatorT> "Do" [ip.TypeName.Type] (derivDim, ip)                
-
     /// Element-wise n-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the createInterpolator function.
     let interpolate interpolator e =
@@ -1275,14 +1187,13 @@ module Expr =
 
 
 [<AutoOpen>]
-module ExprTypes2 =
+module ExprTypes =
     type ArityT = Expr.ArityT
     type LeafOpT = Expr.LeafOpT
     type UnaryOpT = Expr.UnaryOpT
     type BinaryOpT = Expr.BinaryOpT
     type NaryOpT = Expr.NaryOpT
     type IOp = Expr.IOp
-    type IUOp = UExprTypes.IUOp
     type ExprT = Expr.ExprT
 
     

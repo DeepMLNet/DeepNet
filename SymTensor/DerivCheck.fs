@@ -33,11 +33,11 @@ module DerivCheck =
     let inline checkExpr (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs |> Map.toSeq do
-            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpecT wrt
+            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
             let exprFun = expr |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
             let rDiffFun = rDiff |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
 
-            let value = VarEnv.getVarSpecT wrt varEnv
+            let value = VarEnv.getVarSpec wrt varEnv
             let symGradVal = rDiffFun value
             let exprGradVal = numDerivEpsilon epsilon exprFun value
             let gradDiff = abs (symGradVal - exprGradVal)

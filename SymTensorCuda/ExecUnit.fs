@@ -142,10 +142,10 @@ module ExecUnit =
                 addWithDependencies eu
 
         let storesByVar =
-            let build = Dictionary<UVarSpecT, List<ExecUnitT<_>>> ()
+            let build = Dictionary<VarSpecT, List<ExecUnitT<_>>> ()
             for eu in eus do
                 match eu.Expr with
-                | UExpr(UUnaryOp (StoreToVar vs), _, _) ->
+                | UExpr (UUnaryOp (Expr.StoreToVar vs), _, _) ->
                     if not (build.ContainsKey vs) then build.[vs] <- List ()
                     build.[vs].Add eu
                 | _ -> ()
@@ -345,7 +345,7 @@ module ExecUnit =
 
                 // If this execution unit is a variable read:
                 match eu.Expr with
-                | UExpr(ULeafOp (Var readVs), _, _) ->
+                | UExpr(ULeafOp (Expr.Var readVs), _, _) ->
                     // Find all StoreToVars to the same variable operations.
                     // We may only run again, after the previous variable write has been completed.
                     let stvs = coll.StoresToVar readVs                               
@@ -564,11 +564,11 @@ module ExecUnit =
                 uniqueProcessedRequests execUnits.Length
         
         // build variable access and memory access tables
-        let eusByReadVar = Dictionary<UVarSpecT, HashSet<ExecUnitIdT>> ()
+        let eusByReadVar = Dictionary<VarSpecT, HashSet<ExecUnitIdT>> ()
         let eusByAccessMem = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
         for eu in execUnits do
             match eu.Expr with
-            | UExpr(ULeafOp (Var vs), _, _) -> 
+            | UExpr(ULeafOp (Expr.Var vs), _, _) -> 
                 if not (eusByReadVar.ContainsKey vs) then
                     eusByReadVar.[vs] <- HashSet<ExecUnitIdT> ()
                 eusByReadVar.[vs].Add eu.Id |> ignore
@@ -586,7 +586,7 @@ module ExecUnit =
             execUnits
             |> List.map (fun eu ->
                 match eu.Expr with
-                | UExpr(UUnaryOp (StoreToVar storeVs), _, _) ->
+                | UExpr(UUnaryOp (Expr.StoreToVar storeVs), _, _) ->
                     // For every StoreToVar operation:
                     // Find all EUs that read from the variable's memory.
                     let readVarEus =

@@ -188,7 +188,7 @@ module ModelContextTypes =
 
         let mutable subMBs = Map.empty
         let mutable parameters : Map<VarSpecT, ParameterInfo<'T>> = Map.empty
-        let mutable vars : Set<IVarSpec> = Set.empty
+        let mutable vars : Set<VarSpecT> = Set.empty
         let mutable symSizes = []
         let mutable symSizeEnv = SymSizeEnv.empty
         let mutable varLocs : VarLocsT = Map.empty
@@ -229,7 +229,7 @@ module ModelContextTypes =
         /// Creates and returns a model variable.
         member this.Var (name: string) (shape: ShapeSpecT) : ExprT =
             let v = Expr.var<'T> (context + "." + name) shape
-            vars <- vars |> Set.add (Expr.extractVar v :> IVarSpec)
+            vars <- vars |> Set.add (Expr.extractVar v)
             v
 
         /// Creates and returns a model parameter.
@@ -296,7 +296,7 @@ module ModelContextTypes =
 
         /// sets the location of the given variable
         member this.SetLoc var loc =
-            varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) loc
+            varLocs <- varLocs |> Map.add (Expr.extractVar var) loc
 
         /// Infers localtion symbolic size by matching a variables symbolic shape to the shape
         /// of the given variable value.
@@ -306,7 +306,7 @@ module ModelContextTypes =
             |> VarEnv.inferSymSizes symSizeEnv
             |> fun ss -> symSizeEnv <- ss
 
-            varLocs <- varLocs |> Map.add (Expr.extractVar var |> UVarSpec.ofVarSpec) (ArrayND.location value)
+            varLocs <- varLocs |> Map.add (Expr.extractVar var) (ArrayND.location value)
 
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
@@ -337,8 +337,8 @@ module ModelContextTypes =
             // apply default variable location
             let mutable varLocs = varLocs
             for var in vars do
-                if not (varLocs |> Map.containsKey (UVarSpec.ofVarSpec var)) then
-                    varLocs <- varLocs |> Map.add (UVarSpec.ofVarSpec var) device.DefaultLoc
+                if not (varLocs |> Map.containsKey var) then
+                    varLocs <- varLocs |> Map.add var device.DefaultLoc
 
             // create compile environement
             let compileEnv =
@@ -375,7 +375,7 @@ module ModelContextTypes =
 
         let compileSpec resultLoc = 
             // add ParameterStorage to variable locations
-            let psVar = Expr.extractVar parameterSet.Flat |> UVarSpec.ofVarSpec
+            let psVar = Expr.extractVar parameterSet.Flat 
             let psVal = parameterStorage.Flat
             let varLocs =
                 compileEnv.VarLocs
@@ -407,7 +407,7 @@ module ModelContextTypes =
 
         /// sets the location of the given variable
         member this.SetLoc var loc =
-            let uvs = var |> Expr.extractVar |> UVarSpec.ofVarSpec
+            let uvs = Expr.extractVar var 
 
             match compileEnv.VarLocs |> Map.tryFind uvs with
             | Some prvLoc when prvLoc <> loc ->

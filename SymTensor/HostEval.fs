@@ -17,37 +17,6 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
-    let private doInterpolate (ip: InterpolatorT) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
-        let tbl : ArrayNDT<'T> = Expr.getInterpolatorTable ip
-
-        /// returns interpolation in dimensions to the right of leftIdxs
-        let rec interpolateInDim (leftIdxs: int list) (x: float list) =
-            let d = leftIdxs.Length
-            if d = ip.NDims then
-                conv<float> tbl.[leftIdxs]
-            else 
-                let pos = (x.[d] - ip.MinArg.[d]) / ip.Resolution.[d]
-                let posLeft = floor pos 
-                let fac = pos - posLeft
-                let idx = int posLeft 
-                match idx, ip.Outside.[d], ip.Mode with
-                | _, Nearest, _ when idx < 0                 -> interpolateInDim (leftIdxs @ [0]) x
-                | _, Zero,    _ when idx < 0                 -> 0.0
-                | _, Nearest, _ when idx > tbl.Shape.[d] - 2 -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1]) x
-                | _, Zero,    _ when idx > tbl.Shape.[d] - 2 -> 0.0
-                | _, _, InterpolateLinearaly -> 
-                    let left = interpolateInDim (leftIdxs @ [idx]) x
-                    let right = interpolateInDim (leftIdxs @ [idx+1]) x
-                    (1.0 - fac) * left + fac * right
-                | _, _, InterpolateToLeft -> 
-                    interpolateInDim (leftIdxs @ [idx]) x
-
-        let res = ArrayND.zerosLike es.Head
-        for idx in ArrayND.allIdx res do
-            let x = es |> List.map (fun src -> conv<float> src.[idx])
-            res.[idx] <- interpolateInDim [] x |> conv<'T>
-        res
-
     /// evaluation functions
     type private EvalT =       
 
@@ -84,7 +53,7 @@ module HostEval =
                 failwithf "expression of type %A does not match eval function of type %A"
                     expr.Type typeof<'R>
 
-            let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<'T>
+            let varEval vs = evalEnv.VarEnv |> VarEnv.getVarSpec vs |> box :?> ArrayNDHostT<'T>
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
             let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
@@ -140,7 +109,7 @@ module HostEval =
                     | Subtensor sr -> av.[rngEval sr]
                     | StoreToVar vs -> 
                         // TODO: stage variable write to avoid overwrite of used variables
-                        ArrayND.copyTo av (VarEnv.getVarSpecT vs evalEnv.VarEnv)
+                        ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
                         ArrayND.relayout ArrayNDLayout.emptyVector av
                     | Print msg ->
                         printfn "%s=\n%A\n" msg av
@@ -198,7 +167,7 @@ module HostEval =
                         let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
                         ElemExprHostEval.eval elemExpr esv nResShape    
-                    | Interpolate ip -> doInterpolate ip esv
+                    | Interpolate ip -> esv |> Interpolator.interpolate ip 
                     | ExtensionOp eop -> eop.EvalSimple esv 
                     |> box |> unbox
 

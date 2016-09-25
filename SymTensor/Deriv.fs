@@ -187,7 +187,7 @@ module Deriv =
                 | InterpolateLinearaly ->
                     let des = 
                         [for d=0 to es.Length-1 do
-                            let ipd = Expr.getDerivativeOfInterpolator d ip
+                            let ipd = ip |> Interpolator.getDerivativeOfInterpolator d 
                             yield egExpanded * padLeft (Expr.interpolate ipd es)]
                     totalDerivates es des
                 | InterpolateToLeft -> Map.empty

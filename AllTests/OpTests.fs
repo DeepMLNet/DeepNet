@@ -125,7 +125,7 @@ let ``Interpolate1D: simple test`` device =
     let minVal = 1.0
     let maxVal = 6.0
 
-    let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
+    let ip = Interpolator.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp = Expr.var<single> "inp" [nSmpls]
@@ -152,7 +152,7 @@ let ``Interpolate2D: simple test`` device =
     let minVal = [0.0; 0.0]
     let maxVal = [2.0; 2.0]
 
-    let ip = Expr.createInterpolator tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
+    let ip = Interpolator.createInterpolator tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp1 = Expr.var<single> "inp1" [nSmpls]
@@ -199,7 +199,7 @@ let ``Interpolate1D: derivative test`` device =
     let minVal = 1.0
     let maxVal = 6.0
 
-    let ip = Expr.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
+    let ip = Interpolator.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp = Expr.var<single> "inp" [nSmpls]

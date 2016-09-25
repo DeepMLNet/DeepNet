@@ -7,6 +7,7 @@ open Basics.Cuda
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
+open Expr
 open UExprTypes
 
 
@@ -127,11 +128,11 @@ module CudaExecUnitTypes =
 module CudaExecUnit =
     open ManagedCuda.BasicTypes
 
-    /// converts a IUOp to a ICudaUOp
-    let toCudaUOp (uop: IUOp)  =
+    /// converts a IUOp or a IOp to a ICudaUOp
+    let toCudaUOp (uop: obj)  =
         match uop with
         | :? ICudaUOp as cudaUOp -> cudaUOp
-        | _ -> failwith "the UOp %A needs to implement the ICudaUOp interface"
+        | _ -> failwith "For CUDA compilation the op %A needs to implement the ICudaUOp interface."
 
     /// The operation the blasArg will perform.
     type BlasArgOperation =
@@ -256,14 +257,19 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> dfltSrcWithNoViewReq
-        | UNaryOp (Subtensor _) -> dfltSrcWithNoViewReq
-        | UNaryOp (SetSubtensor _) -> 
+        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
+
+        // extra
+        | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq
+        | UExtraOp (SetSubtensor _) -> 
             // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
             inplaceFirstSrcReq
-        | UNaryOp (Elements _) -> dfltSrcWithNoViewReq            
-        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
+        | UExtraOp (Elements _) -> dfltSrcWithNoViewReq            
+
+        // extension ops
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
+        | UExtraOp (ExtensionExtraOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
 
 
     /// computes the definitive target view of an op given its source views
@@ -425,7 +431,10 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> dfltChOutplaceTrgt ()
-        | UNaryOp (Subtensor srs) -> 
+        | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()  
+        
+        // extra
+        | UExtraOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
                 // dynamic sub-tensors will be copied out of the src
                 dfltChOutplaceTrgt ()
@@ -433,14 +442,18 @@ module CudaExecUnit =
                 // symbolic sub-tensors use a view of the src 
                 let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
                 dfltChTrgt (srcsDfltCh.[0].[rng] :?> ArrayNDManikinT) srcsDfltChShared.[0]
-        | UNaryOp (SetSubtensor _) ->
+        | UExtraOp (SetSubtensor _) ->
             if not (srcsDfltChShared.[0]) then 
                 dfltChTrgt srcsDfltCh.[0] false
             else dfltChOutplaceTrgt ()
-        | UNaryOp (Elements _) -> dfltChOutplaceTrgt ()
-        | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()    
+        | UExtraOp (Elements _) -> dfltChOutplaceTrgt ()
+
+        // extension        
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
+        | UExtraOp (ExtensionExtraOp eop) -> 
+            (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
+
    
     /// execution item to launch the given kernel template function
     let execItemsForKernel cppFuncName tmplTmpls argTmpls workDim = 
@@ -786,7 +799,7 @@ module CudaExecUnit =
         | ULeafOp (Identity _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
         | ULeafOp (Zeros _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
         | ULeafOp (ScalarConst cs) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
-        | ULeafOp (SizeValue sv) -> 
+        | ULeafOp (SizeValue (sv, _)) -> 
             let value = Convert.ChangeType(SizeSpec.eval sv, dfltChTrgt.DataType)
             let cs = ConstSpec.ofValue value
             execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
@@ -950,13 +963,17 @@ module CudaExecUnit =
 
         // nary
         | UNaryOp Discard -> []
-        | UNaryOp (Subtensor srs) ->
+        | UNaryOp (Interpolate ip) -> 
+            execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
+
+        // extra
+        | UExtraOp (Subtensor srs) ->
             if SimpleRangesSpec.isDynamic srs then 
                 // copy dynamic subtensor out of the src
                 execItemsForCopyFromDynamicSubtensor dfltChTrgt 
                     srcsDfltCh.[0] srs (List.tail srcsDfltCh)
             else [] // symbolic subtensor uses a slice of the src view
-        | UNaryOp (SetSubtensor srs) ->
+        | UExtraOp (SetSubtensor srs) ->
             // copy "a" if necessary
             let copyItems = 
                 if dfltChTrgt <> srcsDfltCh.[0] then 
@@ -966,11 +983,13 @@ module CudaExecUnit =
                 execItemsForCopyToDynamicSubtensor dfltChTrgt srs 
                     (List.skip 2 srcsDfltCh) srcsDfltCh.[1]
             copyItems @ setItems
-        | UNaryOp (Elements (_, elemFunc)) ->
+        | UExtraOp (Elements (_, elemFunc)) ->
             execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
-        | UNaryOp (Interpolate ip) -> 
-            execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
+
+        // extension
         | UNaryOp (ExtensionOp eop) -> 
+            (toCudaUOp eop).ExecItems compileEnv args helpers
+        | UExtraOp (ExtensionExtraOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 
                 
