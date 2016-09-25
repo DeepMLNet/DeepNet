@@ -90,6 +90,9 @@
     <EmbeddedResource Include="..\SymTensorCudaSup\Subtensor.cuh">
       <Link>Subtensor.cuh</Link>
     </EmbeddedResource>
+    <EmbeddedResource Include="..\SymTensorCudaSup\Interpolate.cuh">
+      <Link>Interpolate.cuh</Link>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">

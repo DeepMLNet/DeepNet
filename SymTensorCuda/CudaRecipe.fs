@@ -116,7 +116,7 @@ module TmplInstCache =
 
 module CudaRecipe =
 
-    let commonIncludes = ["Utils.cuh"; "NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"]
+    let commonIncludes = ["Utils.cuh"; "NDSupport.cuh"; "Subtensor.cuh"; "Ops.cuh"; "Interpolate.cuh"]
     let kernelModuleIncludes = commonIncludes
     let cppModuleIncludes = commonIncludes @ ["ThrustInterface.cuh"; "Reduce.cuh"; "stdio.h"]
 

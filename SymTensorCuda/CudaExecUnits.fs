@@ -364,7 +364,9 @@ module CudaExecUnit =
             match srcs 
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
-                                    not (ArrayND.isBroadcasted view) && not shared) with
+                                    view.TypeName = typ &&
+                                    not (ArrayND.isBroadcasted view) && 
+                                    not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]
             | None -> dfltChOutplaceTrgt ()     
 
@@ -1008,7 +1010,7 @@ module CudaExecUnit =
         // binary element-wise comparison
         | UBinaryOp Equal ->        execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("EqualEOp_t",        false)) srcsDfltCh
         | UBinaryOp Less ->         execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LessEOp_t",         false)) srcsDfltCh
-        | UBinaryOp LessEqual ->    execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LesEqualEOp_t",     false)) srcsDfltCh
+        | UBinaryOp LessEqual ->    execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LessEqualEOp_t",    false)) srcsDfltCh
         | UBinaryOp Greater ->      execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("GreaterEOp_t",      false)) srcsDfltCh
         | UBinaryOp GreaterEqual -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("GreaterEqualEOp_t", false)) srcsDfltCh   
         | UBinaryOp NotEqual ->     execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("NotEqualEOp_t",     false)) srcsDfltCh   
@@ -1048,7 +1050,7 @@ module CudaExecUnit =
 
             aCopyItems @ bCopyItems @ blasItems
 
-        | UBinaryOp TensorProduct -> [] // TODO
+        | UBinaryOp TensorProduct -> failwith "TensorProduct is not implemented"
 
         // nary
         | UNaryOp Discard -> []
@@ -1081,8 +1083,8 @@ module CudaExecUnit =
             execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
 
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
-        | UExtraOp IfThenElse -> 
-            failwith "TODO"
+        | UExtraOp IfThenElse ->  
+            execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("IfThenElseEOp_t", false)) srcsDfltCh   
 
         // extension
         | UNaryOp (ExtensionOp eop) -> 

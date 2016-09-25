@@ -881,8 +881,12 @@ module ArrayND =
         ArrayNDT<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
+    /// Check for exact equality when type is int or bool.
     let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
-        abs (a - b) <<== aTol + rTol * abs b
+        match typeof<'T> with
+        | t when t = typeof<bool> -> (box a :?> ArrayNDT<bool>) ==== (box b :?> ArrayNDT<bool>) 
+        | t when t = typeof<int>  -> (box a :?> ArrayNDT<int>)  ==== (box b :?> ArrayNDT<int>) 
+        | _ ->  abs (a - b) <<== aTol + rTol * abs b
 
     /// Elementwise check if two arrays have same (within machine precision) values.
     let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =

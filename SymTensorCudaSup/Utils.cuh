@@ -6,6 +6,8 @@
 #include <stdio.h>
 #endif
 
+#define _dev __host__ __device__ __forceinline__ 
+#define _devonly __device__ __forceinline__
 
 #ifdef ENABLE_CALL_TRACE
 #define KERNEL_TRACE(msg)   \
@@ -20,9 +22,17 @@
 #endif
 
 
-#define _dev __host__ __device__ __forceinline__ 
-#define _devonly __device__ __forceinline__
+// dummy functions for IntelliSense
+#ifndef __CUDACC__ 
+int atomicAdd(int* address, int val); 
+unsigned int atomicAdd(unsigned int* address, unsigned int val); 
+unsigned long long int atomicAdd(unsigned long long int* address, unsigned long long int val); 
+float atomicAdd(float* address, float val);
 
+template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
+template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
+template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
+#endif
 
 
 template <typename T>

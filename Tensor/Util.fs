@@ -191,6 +191,7 @@ module Util =
         | _ when typ = typeof<single>   -> "float"
         | _ when typ = typeof<int>      -> "int"
         | _ when typ = typeof<byte>     -> "char"
+        | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
 
     /// Returns the contents of a blittable structure as a byte array.

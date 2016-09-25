@@ -65,16 +65,20 @@ let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) 
     )
 
 [<RequiresExplicitTypeArguments>]
-let randomEval<'T> shps exprFn (dev: IDevice) =
+let randomEval<'T, 'R> shps exprFn (dev: IDevice) =
     let rng = System.Random(123)
     let vars = buildVars<'T> shps
     let expr = exprFn vars
-    let fn = Func.make<'T> dev.DefaultFactory expr
+    let fn = Func.make<'R> dev.DefaultFactory expr
     let varEnv = buildVarEnv<'T> vars shps rng dev
     fn varEnv |> ignore
 
 let requireEqualTracesWithRandomData shps (exprFn: ExprT list -> ExprT) =
-    compareTraces (randomEval<single> shps exprFn) false
+    compareTraces (randomEval<single, single> shps exprFn) false
+    |> should equal 0
+
+let requireEqualTracesWithRandomDataLogic shps (exprFn: ExprT list -> ExprT) =
+    compareTraces (randomEval<single, bool> shps exprFn) false
     |> should equal 0
 
 let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =

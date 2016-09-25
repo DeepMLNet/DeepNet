@@ -105,8 +105,6 @@ let ``Trace compare: large sum axis`` () =
         a |> Expr.sumAxis 0
     )
 
-
-
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Singular matrix inverse`` () =
@@ -118,6 +116,57 @@ let ``Singular matrix inverse`` () =
     printfn "a=\n%A" av
     printfn "a^-1=\n%A" iav
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: comparison`` () =
+    requireEqualTracesWithRandomDataLogic [[3; 3]; [3; 3]] (fun [a; b] ->
+        a >>== b
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: comparison, logics`` () =
+    requireEqualTracesWithRandomDataLogic [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c] ->
+        a >>== b &&&& ~~~~(b <<<< c)
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: comparison, logics, conditionals`` () =
+    requireEqualTracesWithRandomData [[5; 5]; [5; 5]; [5; 5]; [5; 5]] (fun [a; b; c; d] ->
+        Expr.ifThenElse ((a <<== b) &&&& (b >>>> c)) (d) (a) 
+    )
+
+
+let conditionalsTest (device: IDevice) =
+    let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let b = Expr.var<single> "b" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let c = Expr.var<single> "c" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let d = Expr.var<single> "d" [SizeSpec.fix 3; SizeSpec.fix 3]
+    let expr = Expr.ifThenElse ((a <<== b) &&&& (b >>>> c)) (d) (a) 
+    let fn = Func.make<single> device.DefaultFactory expr |> arg4 a b c d
+    let rng = System.Random (123)
+    let av = rng.UniformArrayND (-1.0f, 1.0f) [3; 3] |> post device
+    let bv = rng.UniformArrayND (-1.0f, 1.0f) [3; 3] |> post device
+    let cv = rng.UniformArrayND (-1.0f, 1.0f) [3; 3] |> post device
+    let dv = rng.UniformArrayND (-1.0f, 1.0f) [3; 3] |> post device
+    let res = fn av bv cv dv
+    printfn "a=\n%A" av
+    printfn "b=\n%A" bv
+    printfn "c=\n%A" cv
+    printfn "d=\n%A" dv
+    printfn "res=\n%A" res
+
+[<Fact>]
+let ``Comparison, logics, conditionals on host`` () =
+    conditionalsTest DevHost
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Comparison, logics, conditionals on CUDA`` () =
+    SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+    conditionalsTest DevCuda
+    
 
 let ``Interpolate1D: simple test`` device =
     let tbl = [1.0f; 2.0f; 3.0f; 4.0f; 5.0f; 6.0f]
