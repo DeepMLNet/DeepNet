@@ -6,6 +6,7 @@ open ShapeSpec
 open VarSpec
 open System
 
+/// element expression
 module ElemExpr =
 
     /// argument 
@@ -347,6 +348,51 @@ module ElemExpr =
 
     type ElemExprT with
         member this.PrettyString = prettyString this
+
+
+/// unified element expression
+module UElemExpr = 
+    open ElemExpr
+
+    /// unified element expression op
+    type UOpT =
+        | ULeafOp of LeafOpT
+        | UUnaryOp of UnaryOpT
+        | UBinaryOp of BinaryOpT
+    
+    /// unified element expression
+    type UElemExprT =
+        | UElemExpr of UOpT * (UElemExprT list) * TypeNameT
+
+    /// element function
+    type UElemFuncT = {
+        /// element expression
+        Expr:       UElemExprT
+        /// number of dimensions of the result
+        NDims:      int
+        /// number of input arguments
+        NArgs:      int
+    }
+
+    /// converts an element expression to a unified element expression
+    let rec toUElemExpr (tn: TypeNameT) (elemExpr: ElemExprT) =
+        let leaf uop        = UElemExpr (ULeafOp uop, [], tn)
+        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr tn a], tn)
+        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr tn a; toUElemExpr tn b], tn)
+
+        match elemExpr with
+        | Leaf op -> leaf op
+        | Unary (op, a) -> unary op a
+        | Binary (op, a, b) -> binary op a b           
+
+    /// converts an element expression to a unified element function
+    let toUElemFunc elemExpr nDims nArgs typeName =
+        {
+            Expr    = toUElemExpr typeName elemExpr
+            NDims   = nDims
+            NArgs   = nArgs
+        }
+
 
 [<AutoOpen>]
 module ElemExprTypes =

@@ -8,7 +8,9 @@ open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler
 
+open ElemExpr
 open UElemExpr
+
 
 module CudaElemExpr =
     

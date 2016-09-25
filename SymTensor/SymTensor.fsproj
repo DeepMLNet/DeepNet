@@ -62,7 +62,6 @@
     <Compile Include="Interpolator.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="Optimizer.fs" />
-    <Compile Include="UElemExpr.fs" />
     <Compile Include="UExpr.fs" />
     <Compile Include="Dump.fs" />
     <Compile Include="Trace.fs" />
