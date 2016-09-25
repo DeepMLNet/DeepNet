@@ -74,6 +74,9 @@ module Expr =
         | Round
         | Truncate
 
+        // ==== element-wise unary logic ====
+        | Not
+
         // ==== tensor operations ====
         /// extract diagonal along given axes
         | Diag of int * int
@@ -130,15 +133,19 @@ module Expr =
         | MinElemwise        
            
         // ==== element-wise binary comparison ====
-        //| Equal
-        //| Less
-        //| LessEqual
-        //| Greater
-        //| GreaterEqual
-        //| NotEqual     
+        | Equal
+        | Less
+        | LessEqual
+        | Greater
+        | GreaterEqual
+        | NotEqual     
+
+        // ==== element-wise binary logic ====
+        | And
+        | Or
 
         // ==== element-wise conditional ====
-        //| IfThenElse of ExprT
+        | IfThenElse of ExprT
 
         // ==== matrix/tensor operations ====
         /// matrix*matrix => matrix dot product
@@ -241,6 +248,7 @@ module Expr =
         | Floor
         | Round
         | Truncate
+        | Not
             -> Some ()
         | _ -> None
 
@@ -255,30 +263,32 @@ module Expr =
         | Power
         | MaxElemwise
         | MinElemwise
-        //| Equal
-        //| Less
-        //| LessEqual
-        //| Greater
-        //| GreaterEqual
-        //| NotEqual     
-        //| IfThenElse _
+        | Equal
+        | Less
+        | LessEqual
+        | Greater
+        | GreaterEqual
+        | NotEqual     
+        | IfThenElse _
+        | And
+        | Or
             -> Some ()
         | _ -> None
 
 
     /// Traverses the op tree and for each op calls a function on its arguments and replaces 
     /// them by the function's return value(s).
-//    let rec mapOperands unaryMapping binaryMapping naryMapping expr =
-//        let subMap = mapOperands unaryMapping binaryMapping naryMapping
-//        match expr with
-//        | Unary(op, a) -> Unary(op, unaryMapping op (subMap a))
-//        | Binary(op, a, b) -> 
-//            let ma, mb = binaryMapping op (subMap a) (subMap b)
-//            Binary(op, ma, mb)
-//        | Nary(op, es) ->
-//            let mes = naryMapping op (es |> List.map subMap)
-//            Nary(op, mes)
-//        | _ -> expr
+    let rec mapOperands unaryMapping binaryMapping naryMapping expr =
+        let subMap = mapOperands unaryMapping binaryMapping naryMapping
+        match expr with
+        | Unary(op, a) -> Unary(op, unaryMapping op (subMap a))
+        | Binary(op, a, b) -> 
+            let ma, mb = binaryMapping op (subMap a) (subMap b)
+            Binary(op, ma, mb)
+        | Nary(op, es) ->
+            let mes = naryMapping op (es |> List.map subMap)
+            Nary(op, mes)
+        | _ -> expr
 
     /// returns true if subExpr is contained in expr
     let rec contains subExpr expr =
@@ -302,6 +312,14 @@ module Expr =
         | Leaf (ScalarConst cs) -> cs.TypeName
         | Leaf (SizeValue (ss, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
+
+        | Binary (Equal, _, _)
+        | Binary (Less, _, _)
+        | Binary (LessEqual, _, _)
+        | Binary (Greater, _, _)
+        | Binary (GreaterEqual, _, _)
+        | Binary (NotEqual, _, _)
+            -> TypeName.ofType<bool>
 
         | Unary (op, a) -> typename a
         | Binary (op, a, b) -> typename a
@@ -345,6 +363,7 @@ module Expr =
         | Unary (Floor, a)
         | Unary (Round, a)
         | Unary (Truncate, a)
+        | Unary (Not, a)
             -> shapeOf a
 
         // tensor operations
@@ -382,7 +401,16 @@ module Expr =
         | Binary (Modulo, a, _)
         | Binary (Power, a, _)     
         | Binary (MaxElemwise, a, _)                    
-        | Binary (MinElemwise, a, _)                    
+        | Binary (MinElemwise, a, _)       
+        | Binary (Equal, a, _)             
+        | Binary (Less, a, _)
+        | Binary (LessEqual, a, _)
+        | Binary (Greater, a, _)
+        | Binary (GreaterEqual, a, _)
+        | Binary (NotEqual, a, _)
+        | Binary (IfThenElse _, a, _)
+        | Binary (And, a, _)
+        | Binary (Or, a, _)
             -> shapeOf a
             
         // matrix/tensor operations
@@ -445,9 +473,14 @@ module Expr =
             let mutable opBeingChecked = fun () -> ""
             let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
                 if not (ssa .= ssb) then 
-                    failwithf "%s is incompatiables with shapes %A" (opBeingChecked()) shapesBeingChecked
+                    failwithf "%s is incompatiables with shapes %A" 
+                        (opBeingChecked()) shapesBeingChecked
             let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
                 List.iter2 (.=) sa sb
+            let reqBool a =
+                if typename a <> TypeName.ofType<bool> then
+                    failwithf "%s requires data type bool but got %A" 
+                        (opBeingChecked()) (typename a).Type
 
             if typename expr = TypeName.ofType<obj> then
                 failwith "Expression type cannot be object."
@@ -463,6 +496,7 @@ module Expr =
                 opBeingChecked <- fun () -> sprintf "%A" op
 
                 match op with
+                | Not -> reqBool a
                 | SumAxis(ax) when not (0 <= ax && ax < nda) ->
                     failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
@@ -513,6 +547,16 @@ module Expr =
                                different types %A and %A" (opBeingChecked()) ta.Type tb.Type
 
                 match op with
+                | And
+                | Or ->
+                    reqBool a
+                    reqBool b
+                | IfThenElse c ->
+                    checkExpr c
+                    if c.Type <> typeof<bool> then
+                        failwith "condition of IfThenElse must be expression of type bool"
+                    c.Shape ..= sa 
+                    sa ..= sb
                 | BinaryElemwiseOp ->
                     sa ..= sb 
                 | Dot -> 
@@ -581,6 +625,7 @@ module Expr =
         | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
+        | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (sSub c), sSub a, sSub b)
         | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
         | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
@@ -606,6 +651,8 @@ module Expr =
 
         | Binary (SetSubtensor srs, a, b) -> 
             SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a && canEvalAllSymSizes b
+        | Binary (IfThenElse c, a, b) ->
+            canEvalAllSymSizes c && canEvalAllSymSizes a && canEvalAllSymSizes b 
         | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
 
         | Nary (Elements (trgtShp, elemExpr), es) -> 
@@ -629,6 +676,8 @@ module Expr =
             | _ when expr = part -> replacement
             | Leaf _ -> expr
             | Unary (op, a) -> Unary (op, subSubst a)
+            | Binary (IfThenElse c, a, b) -> 
+                Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
             | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
             | Nary (op, es) -> Nary (op, es |> List.map subSubst)
 
@@ -680,7 +729,7 @@ module Expr =
         let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
         let ba = a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
-        Binary(op, ba, bb) |> check
+        Binary (op, ba, bb) |> check
 
 
     // elementwise operators
@@ -709,6 +758,9 @@ module Expr =
         static member Round (a: ExprT) = Unary(Round, a) |> check
         static member Truncate (a: ExprT) = Unary(Truncate, a) |> check
 
+        // element-wise unary logic
+        static member (~~~~) (a: ExprT) = Unary(Not, a) |> check
+
         // elementwise binary
         static member (+) (a: ExprT, b: ExprT) = constructElementwise Add a b
         static member (-) (a: ExprT, b: ExprT) = constructElementwise Substract a b
@@ -717,6 +769,18 @@ module Expr =
         static member (%) (a: ExprT, b: ExprT) = constructElementwise Modulo a b
         static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b    
 
+        // element-wise binary logic
+        static member (&&&&) (a: ExprT, b: ExprT) = constructElementwise And a b
+        static member (||||) (a: ExprT, b: ExprT) = constructElementwise Or a b
+
+        // element-wise binary comparison
+        static member (====) (a: ExprT, b: ExprT) = constructElementwise Equal a b
+        static member (<<<<) (a: ExprT, b: ExprT) = constructElementwise Less a b
+        static member (<<==) (a: ExprT, b: ExprT) = constructElementwise LessEqual a b
+        static member (>>>>) (a: ExprT, b: ExprT) = constructElementwise Greater a b
+        static member (>>==) (a: ExprT, b: ExprT) = constructElementwise GreaterEqual a b
+        static member (<<>>) (a: ExprT, b: ExprT) = constructElementwise NotEqual a b
+
         // elementwise binary with basetype
         static member (+) (a: ExprT, b: System.IComparable) = a + (scalar b)
         static member (-) (a: ExprT, b: System.IComparable) = a - (scalar b)
@@ -724,6 +788,12 @@ module Expr =
         static member (/) (a: ExprT, b: System.IComparable) = a / (scalar b)
         static member (%) (a: ExprT, b: System.IComparable) = a % (scalar b)
         static member Pow (a: ExprT, b: System.IComparable) = a ** (scalar b)
+        static member (====) (a: ExprT, b: System.IComparable) = constructElementwise Equal a (scalar b)
+        static member (<<<<) (a: ExprT, b: System.IComparable) = constructElementwise Less a (scalar b)
+        static member (<<==) (a: ExprT, b: System.IComparable) = constructElementwise LessEqual a (scalar b)
+        static member (>>>>) (a: ExprT, b: System.IComparable) = constructElementwise Greater a (scalar b)
+        static member (>>==) (a: ExprT, b: System.IComparable) = constructElementwise GreaterEqual a (scalar b)
+        static member (<<>>) (a: ExprT, b: System.IComparable) = constructElementwise NotEqual a (scalar b)
 
         static member (+) (a: System.IComparable, b: ExprT) = (scalar a) + b
         static member (-) (a: System.IComparable, b: ExprT) = (scalar a) - b
@@ -731,6 +801,12 @@ module Expr =
         static member (/) (a: System.IComparable, b: ExprT) = (scalar a) / b
         static member (%) (a: System.IComparable, b: ExprT) = (scalar a) % b
         static member Pow (a: System.IComparable, b: ExprT) = (scalar a) ** b
+        static member (====) (a: System.IComparable, b: ExprT) = constructElementwise Equal (scalar a) b
+        static member (<<<<) (a: System.IComparable, b: ExprT) = constructElementwise Less (scalar a) b
+        static member (<<==) (a: System.IComparable, b: ExprT) = constructElementwise LessEqual (scalar a) b
+        static member (>>>>) (a: System.IComparable, b: ExprT) = constructElementwise Greater (scalar a) b
+        static member (>>==) (a: System.IComparable, b: ExprT) = constructElementwise GreaterEqual (scalar a) b
+        static member (<<>>) (a: System.IComparable, b: ExprT) = constructElementwise NotEqual (scalar a) b
 
         // transposition
         member this.T = transpose this
@@ -743,6 +819,20 @@ module Expr =
     /// square root
     let sqrtt (a: ExprT) =
         ExprT.Sqrt a
+
+    /// elementwise uses elements from ifTrue if cond is true, 
+    /// otherwise elements from ifFalse
+    let ifThenElse cond ifTrue ifFalse =
+        let shps = [shapeOf cond; shapeOf ifTrue; shapeOf ifFalse]
+        let pShps = ShapeSpec.padToSameMany shps
+        let bcShps = ShapeSpec.broadcastToSameMany false pShps           
+        match pShps, bcShps with
+        | [condPShp; ifTruePShp; ifFalsePShp], [condBcShp; ifTrueBcShp; ifFalseBcShp] -> 
+            let condBc = cond |> reshapeIfNecessary condPShp |> broadcastIfNecessary condBcShp
+            let ifTrueBc = ifTrue |> reshapeIfNecessary ifTruePShp |> broadcastIfNecessary ifTrueBcShp
+            let ifFalseBc = ifFalse |> reshapeIfNecessary ifFalsePShp |> broadcastIfNecessary ifFalseBcShp
+            Binary (IfThenElse cond, ifTrueBc, ifFalseBc) |> check
+        | _ -> failwith "impossible"
 
     /// elementwise maximum
     let maxElemwise a b =
@@ -1164,7 +1254,7 @@ module Expr =
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
     let getDerivativeOfInterpolator (derivDim: int) (ip: InterpolatorT) =
-        callGeneric<GetDerivativeOfInterpolator, InterpolatorT> ip.TypeName.Type (derivDim, ip)                
+        callGeneric<GetDerivativeOfInterpolator, InterpolatorT> "Do" [ip.TypeName.Type] (derivDim, ip)                
 
     /// Element-wise n-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the createInterpolator function.

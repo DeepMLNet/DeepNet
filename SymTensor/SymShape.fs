@@ -440,15 +440,26 @@ module ShapeSpec =
     let padRight (sa: ShapeSpecT) =
         sa @ [Broadcast]
 
+    /// pads shapes from the left until they have same rank
     let rec padToSame sa sb =
-        if nDim sa < nDim sb then padToSame (padRight sa) sb
-        elif nDim sb < nDim sa then padToSame sa (padRight sb)
+        if nDim sa < nDim sb then padToSame (padLeft sa) sb
+        elif nDim sb < nDim sa then padToSame sa (padLeft sb)
         else sa, sb
+
+    /// pads shapes from the left until they have same rank
+    let rec padToSameMany sas =
+        let nDimsNeeded = sas |> List.map nDim |> List.max
+        sas 
+        |> List.map (fun sa ->
+            let mutable sa = sa
+            while nDim sa < nDimsNeeded do
+                sa <- padLeft sa
+            sa)
 
     let broadcast (sa: ShapeSpecT) dim size =
         match sa.[dim] with
-            | Broadcast -> List.set dim size sa
-            | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
+        | Broadcast -> List.set dim size sa
+        | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
     let broadcastToSameInDims dims mustEqual saIn sbIn =
         let mutable sa, sb = saIn, sbIn
@@ -456,16 +467,45 @@ module ShapeSpec =
             if not (d < nDim sa && d < nDim sb) then
                 failwithf "cannot broadcast shapes %A and %A to same size in non-existant dimension %d" sa sb d
             match sa.[d], sb.[d] with
-                | al, bl when al = Broadcast -> sa <- broadcast sa d bl
-                | al, bl when bl = Broadcast -> sb <- broadcast sb d al
-                | al, bl when (if mustEqual then al = bl else true) -> ()        
-                | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
+            | al, bl when al = Broadcast -> sa <- broadcast sa d bl
+            | al, bl when bl = Broadcast -> sb <- broadcast sb d al
+            | al, bl when (if mustEqual then al = bl else true) -> ()        
+            | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
+
+    let broadcastToSameInDimsMany dims mustEqual sas =
+        let mutable sas = sas
+        for d in dims do
+            if not (sas |> List.forall (fun sa -> d < nDim sa)) then
+                failwithf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
+            let ls = sas |> List.map (fun sa -> sa.[d])
+            if ls |> List.exists ((=) Broadcast) then
+                let nonBc = ls |> List.filter (fun l -> l <> Broadcast)
+                match Set nonBc |> Set.count with
+                | 0 -> ()
+                | 1 ->
+                    let target = List.head nonBc
+                    sas <- sas |> List.map (fun sa -> sa |> set d target)
+                | _ ->
+                    failwithf "cannot broadcast shapes %A to same size in dimension %d because \
+                               they don't agree in the target size" sas d                
+            elif mustEqual then
+                if Set ls |> Set.count > 1 then
+                    failwithf "non-broadcast dimension %d of shapes %A does not agree" d sas
+        sas
 
     let broadcastToSame mustEqual sa sb =
         if nDim sa <> nDim sb then 
             failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
         broadcastToSameInDims [0 .. (nDim sa - 1)] mustEqual sa sb
+
+    let broadcastToSameMany mustEqual sas =
+        match sas with
+        | [] -> []
+        | sa::rSas ->
+            if rSas |> List.exists (fun rsa -> nDim sa <> nDim rsa) then
+                failwithf "cannot broadcast shapes %A of different rank to same size" sas                
+            broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
 
     let enableBroadcast dim (sa: ShapeSpecT) =
         match sa.[dim] with

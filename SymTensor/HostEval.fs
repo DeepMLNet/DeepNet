@@ -48,19 +48,54 @@ module HostEval =
             res.[idx] <- interpolateInDim [] x |> conv<'T>
         res
 
-    /// evaluate expression to numeric array 
-    [<RequiresExplicitTypeArguments>]
-    let rec eval<'T> (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<'T> =
-        let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<_>
-        let shapeEval symShape = ShapeSpec.eval symShape
-        let sizeEval symSize = SizeSpec.eval symSize
-        let rngEval = SimpleRangesSpec.eval (fun expr -> evalInt evalEnv expr |> ArrayND.value)
+    /// evaluation functions
+    type private EvalT =       
 
-        let rec doEval (expr: ExprT) =
-            if expr.Type <> typeof<'T> then
+        static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
+            let retType = expr.Type
+            if retType <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
-                    expr.Type typeof<'T>
-            let res = 
+                    retType typeof<'R>
+
+            let argType = 
+                match expr with
+                | Leaf _ -> retType
+                | Unary (_, a) -> a.Type
+                | Binary (_, a, b) ->
+                    if a.Type <> b.Type then
+                        failwithf "currently arguments of binary ops must have same data type 
+                                   but we got types %A and %A" a.Type b.Type
+                    a.Type
+                | Nary (_, es) ->
+                    match es with
+                    | [] -> retType
+                    | [e] -> e.Type
+                    | e::res ->
+                        if res |> List.exists (fun re -> re.Type <> e.Type) then
+                            failwithf "currently arguments of n-ary ops must all have the same 
+                                       data type but we got types %A" 
+                                       (es |> List.map (fun e -> e.Type))
+                        e.Type
+
+            callGeneric<EvalT, ArrayNDHostT<'R>> "DoEval" [argType; retType] (evalEnv, expr)
+
+        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
+            if expr.Type <> typeof<'R> then
+                failwithf "expression of type %A does not match eval function of type %A"
+                    expr.Type typeof<'R>
+
+            let varEval vs = VarEnv.getVarSpecT vs evalEnv.VarEnv :?> ArrayNDHostT<'T>
+            let shapeEval symShape = ShapeSpec.eval symShape
+            let sizeEval symSize = SizeSpec.eval symSize
+            let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
+            let rngEval = 
+                SimpleRangesSpec.eval 
+                    (fun intExpr -> EvalT.Eval<int> (evalEnv, intExpr) |> ArrayND.value)
+            let toBool (v : ArrayNDHostT<'V>) : ArrayNDHostT<bool> = v |> box |> unbox
+            let toT (v: ArrayNDHostT<'V>) : ArrayNDHostT<'T> = v |> box |> unbox
+            let toR (v: ArrayNDHostT<'V>) : ArrayNDHostT<'R> = v |> box |> unbox
+        
+            let res : ArrayNDHostT<'R> = 
                 match expr with
                 | Leaf(op) ->
                     match op with
@@ -69,8 +104,9 @@ module HostEval =
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
+                    |> box |> unbox
                 | Unary(op, a) ->
-                    let av = doEval a
+                    let av = subEval a
                     match op with
                     | Negate -> -av
                     | Abs -> abs av
@@ -92,6 +128,7 @@ module HostEval =
                     | Floor -> floor av
                     | Round -> round av
                     | Truncate -> truncate av
+                    | Not -> ~~~~(toBool av) |> toT
                     | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
                     | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
                     | Invert -> ArrayND.invert av
@@ -116,27 +153,45 @@ module HostEval =
                             printfn "Infinity or NaN encountered in %s with value:\n%A" name av
                             failwithf "Infinity or NaN encountered in %s" name
                         av
-                    | Annotated _-> av                
+                    | Annotated _-> av  
+                    |> box |> unbox              
                 | Binary(op, a, b) ->
-                    let av, bv = doEval a, doEval b  
+                    let av, bv = subEval a, subEval b
                     match op with
-                    | Add -> av + bv
-                    | Substract -> av - bv
-                    | Multiply -> av * bv
-                    | Divide -> av / bv
-                    | Modulo -> av % bv
-                    | Power -> av ** bv
-                    | MaxElemwise -> ArrayND.maxElemwise av bv 
-                    | MinElemwise -> ArrayND.minElemwise av bv 
-                    | Dot -> av .* bv
-                    | TensorProduct -> av %* bv
-                    | SetSubtensor sr -> 
-                        let v = ArrayND.copy av
-                        v.[rngEval sr] <- bv
-                        v
+                    | Equal -> av ==== bv |> toR
+                    | Less -> av <<<< bv |> toR
+                    | LessEqual -> av <<== bv |> toR
+                    | Greater -> av >>>> bv |> toR
+                    | GreaterEqual -> av >>== bv |> toR
+                    | NotEqual -> av <<>> bv |> toR
+                    | _ ->
+                        match op with
+                        | Equal | Less | LessEqual 
+                        | Greater | GreaterEqual | NotEqual
+                            -> failwith "implemented above"
+                        | Add -> av + bv
+                        | Substract -> av - bv
+                        | Multiply -> av * bv
+                        | Divide -> av / bv
+                        | Modulo -> av % bv
+                        | Power -> av ** bv
+                        | MaxElemwise -> ArrayND.maxElemwise av bv 
+                        | MinElemwise -> ArrayND.minElemwise av bv 
+                        | Dot -> av .* bv
+                        | TensorProduct -> av %* bv
+                        | And -> (toBool av) &&&& (toBool bv) |> toT
+                        | Or -> (toBool av) |||| (toBool bv) |> toT
+                        | IfThenElse cond ->
+                            let condVal = EvalT.Eval<bool> (evalEnv, cond) 
+                            ArrayND.ifThenElse condVal av bv
+                        | SetSubtensor sr -> 
+                            let v = ArrayND.copy av
+                            v.[rngEval sr] <- bv
+                            v                        
+                        |> box |> unbox
 
                 | Nary(op, es) ->
-                    let esv = List.map doEval es
+                    let esv = es |> List.map subEval
                     match op with 
                     | Discard -> ArrayNDHost.zeros [0]
                     | Elements (resShape, elemExpr) -> 
@@ -145,26 +200,17 @@ module HostEval =
                         ElemExprHostEval.eval elemExpr esv nResShape    
                     | Interpolate ip -> doInterpolate ip esv
                     | ExtensionOp eop -> eop.EvalSimple esv 
+                    |> box |> unbox
 
             if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) res
             res
             
-        doEval expr
-
-    and private evalInt (evalEnv: EvalEnvT) (expr: ExprT) : ArrayNDHostT<int> =
-        eval<int> evalEnv expr
-
-    /// helper type for dynamic method invocation
-    type private EvalT =
-        static member Do<'T> (evalEnv: EvalEnvT, expr: ExprT) : IArrayNDT =
-            eval<'T> evalEnv expr :> IArrayNDT
-
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.
-    let evalUExpr (evalEnv: EvalEnvT) (UExpr (_, _, {TargetType=tn}) as uexpr) =
-        let expr = UExpr.toExpr uexpr
-        callGeneric<EvalT, IArrayNDT> tn.Type (evalEnv, expr)
+    let evalUExpr (evalEnv: EvalEnvT) uExpr =
+        let expr = UExpr.toExpr uExpr
+        callGeneric<EvalT, IArrayNDT> "Eval" [expr.Type] (evalEnv, expr)
 
     /// Evaluates the specified unified expressions.
     /// This is done by evaluating the generating expressions.

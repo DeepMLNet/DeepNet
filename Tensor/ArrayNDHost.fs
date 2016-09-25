@@ -140,6 +140,23 @@ module ArrayNDHostTypes =
             for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
                 destData.[destAddr] <- f data.[thisAddr] otherData.[otherAddr]
 
+        override this.IfThenElseImpl (cond: ArrayNDT<bool>) (elseVal: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
+            let cond = cond :?> ArrayNDHostT<bool>
+            let elseVal = elseVal :?> ArrayNDHostT<'T>
+            let dest = dest :?> ArrayNDHostT<'T>                
+            let condData = cond.Data
+            let ifValData = this.Data
+            let elseValData = elseVal.Data
+            let destData = dest.Data
+            let condAddrs = FastLayout.allAddr cond.FastLayout
+            let ifValAddrs = FastLayout.allAddr this.FastLayout
+            let elseValAddrs = FastLayout.allAddr cond.FastLayout
+            let destAddrs = FastLayout.allAddr dest.FastLayout
+            for destAddr, condAddr, (ifValAddr, elseValAddr) in 
+                    Seq.zip3 destAddrs condAddrs (Seq.zip ifValAddrs elseValAddrs) do
+                destData.[destAddr] <- 
+                    if condData.[condAddr] then ifValData.[ifValAddr] else elseValData.[elseValAddr]
+
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
                 FastLayout.allAddr this.FastLayout
@@ -175,7 +192,9 @@ module ArrayNDHostTypes =
 
         static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDHostT<bool>
         static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDHostT<bool>
+        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<== b :?> ArrayNDHostT<bool>
         static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDHostT<bool>
+        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>== b :?> ArrayNDHostT<bool>
         static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDHostT<bool>
 
         /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS

@@ -156,11 +156,21 @@ module ArrayNDLayout =
         | 1 -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0 a.Stride}
         | _ -> failwithf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
 
-    /// pads shapes from the right until they have same rank
+    /// pads shapes from the left until they have same rank
     let rec padToSame a b =
         if nDims a < nDims b then padToSame (padLeft a) b
         elif nDims b < nDims a then padToSame a (padLeft b)
         else a, b
+
+    /// pads shapes from the left until they have same rank
+    let rec padToSameMany sas =
+        let nDimsNeeded = sas |> List.map nDims |> List.max
+        sas 
+        |> List.map (fun sa ->
+            let mutable sa = sa
+            while nDims sa < nDimsNeeded do
+                sa <- padLeft sa
+            sa)
 
     /// cannot broadcast to same shape
     exception CannotBroadcast of string
@@ -181,14 +191,49 @@ module ArrayNDLayout =
                     (shape ain) (shape bin) dims |> CannotBroadcast |> raise
         a, b       
 
+    /// broadcasts to have the same size in the given dimensions    
+    let broadcastToSameInDimsMany dims sas =
+        let mutable sas = sas
+        for d in dims do
+            if not (sas |> List.forall (fun sa -> d < nDims sa)) then
+                sprintf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
+                |> CannotBroadcast |> raise 
+            let ls = sas |> List.map (fun sa -> sa.Shape.[d])
+            if ls |> List.exists ((=) 1) then
+                let nonBc = ls |> List.filter (fun l -> l <> 1)
+                match Set nonBc |> Set.count with
+                | 0 -> ()
+                | 1 ->
+                    let target = List.head nonBc
+                    sas <- sas |> List.map (fun sa -> sa |> broadcastDim d target)
+                | _ ->
+                    sprintf "cannot broadcast shapes %A to same size in dimension %d because \
+                             they don't agree in the target size" sas d  
+                             |> CannotBroadcast |> raise              
+            elif Set ls |> Set.count > 1 then
+                failwithf "non-broadcast dimension %d of shapes %A does not agree" d sas
+        sas
+
     /// broadcasts to have the same size
     let inline broadcastToSame ain bin =
-        let mutable a, b = padToSame ain bin
+        let a, b = padToSame ain bin
         try
             broadcastToSameInDims [0..nDims a - 1] a b
         with CannotBroadcast _ ->
             sprintf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
             |> CannotBroadcast |> raise
+
+    /// broadcasts to have the same size
+    let inline broadcastToSameMany sas =
+        match sas with
+        | [] -> []
+        | _ ->
+            let sas = padToSameMany sas
+            try
+                broadcastToSameInDimsMany [0 .. (nDims sas.Head - 1)] sas
+            with CannotBroadcast _ ->
+                sprintf "cannot broadcast shapes %A to same size" (sas |> List.map shape)
+                |> CannotBroadcast |> raise
 
     /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape bs ain =

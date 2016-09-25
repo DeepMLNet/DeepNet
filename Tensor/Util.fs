@@ -4,6 +4,7 @@ open System
 open System.Reflection
 open System.IO
 open System.Runtime.InteropServices
+open System.Collections.Concurrent
 open FSharp.Reflection
 
 module Seq = 
@@ -102,6 +103,17 @@ module UtilTypes =
             | Some v -> v
             | None -> dflt
 
+    type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
+        member this.TryFind key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
+
+        member this.GetOrDefault key dflt =
+            match this.TryFind key with
+            | Some v -> v
+            | None -> dflt
+
     type System.Collections.Generic.Queue<'T> with
         member this.TryPeek =
             if this.Count > 0 then Some (this.Peek())
@@ -117,11 +129,32 @@ module UtilTypes =
 
     let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
 
-    /// calls the Do static method on the type 'R with generic type parameters typ
-    /// and the specified arguments
-    let inline callGeneric<'U, 'R> (typ: System.Type) args =
-        let gm = typeof<'U>.GetMethod ("Do", allBindingFlags)
-        let m = gm.MakeGenericMethod ([| typ |])
+    type private GenericMethodDescT = {
+        ContainingType:     string
+        MethodName:         string
+        GenericTypeArgs:    string list
+    }
+
+    let private genericMethodCache = ConcurrentDictionary<GenericMethodDescT, MethodInfo> ()
+
+    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// and the specified arguments in tupled form. Return value is of type 'R.
+    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+        let gmd = {
+            ContainingType  = typeof<'U>.AssemblyQualifiedName
+            MethodName      = methodName
+            GenericTypeArgs = genericTypeArgs |> List.map (fun t -> t.AssemblyQualifiedName)
+        }
+
+        let m =
+            match genericMethodCache.TryFind gmd with
+            | Some m -> m
+            | None ->
+                let gm = typeof<'U>.GetMethod (methodName, allBindingFlags)
+                let m = gm.MakeGenericMethod (List.toArray genericTypeArgs)
+                genericMethodCache.[gmd] <- m
+                m
+
         let args = FSharpValue.GetTupleFields args
         m.Invoke(null, args) :?> 'R       
 

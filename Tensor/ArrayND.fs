@@ -160,6 +160,14 @@ module ArrayND =
             let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
             this.NewView lThis, other.NewView lOther
 
+        /// broadcasts this and other1 and other2 to the same shape if possible
+        member this.BroadcastToSame3 (other1: ArrayNDT<_>) (other2: ArrayNDT<_>) =
+            let layouts = ArrayNDLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
+            match layouts with
+            | [lThis; lOther1; lOther2] ->
+                this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
+            | _ -> failwith "impossible"
+
         /// broadcasts this array to the given shape if possible
         member this.BroadcastToShape shp = 
             let l = ArrayNDLayout.broadcastToShape shp this.Layout
@@ -190,7 +198,6 @@ module ArrayND =
 
         abstract Map2Impl: ('T -> 'T -> 'R) -> ArrayNDT<'T> -> ArrayNDT<'R> -> unit
         default this.Map2Impl f other result =
-            // slow fallback mapping
             for idx in ArrayNDLayout.allIdx this.Layout do
                 result.[idx] <- f this.[idx] other.[idx]
 
@@ -204,6 +211,25 @@ module ArrayND =
             this.Map2Impl f other res
             res
 
+        abstract IfThenElseImpl: ArrayNDT<bool> -> ArrayNDT<'T> -> ArrayNDT<'T> -> unit
+        default this.IfThenElseImpl cond elseVal result =
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
+
+        /// elementwise uses elements from this if cond is true, 
+        /// otherwise elements from elseVal
+        member this.IfThenElse (cond: #ArrayNDT<bool>) (elseVal: #ArrayNDT<'T>) =
+            if elseVal.GetType() <> this.GetType() then
+                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (elseVal.GetType())
+            if cond.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
+                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (cond.GetType())
+            let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
+            let res = this.NewOfSameType (ArrayNDLayout.newC this.Shape)
+            ifVal.IfThenElseImpl cond elseVal res
+            res
+     
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
@@ -825,6 +851,12 @@ module ArrayND =
         static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)       
         static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfType b a)
         static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfType b a)
+        static member (====) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) a (scalarOfType b a)   
+        static member (<<<<) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) a (scalarOfType b a)   
+        static member (<<==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) a (scalarOfType b a)   
+        static member (>>>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) a (scalarOfType b a)   
+        static member (>>==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) a (scalarOfType b a)   
+        static member (<<>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a (scalarOfType b a)   
 
         static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) + b
         static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) - b
@@ -834,6 +866,12 @@ module ArrayND =
         static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) ** b
         static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) &&&& b
         static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) |||| b
+        static member (====) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (scalarOfType a b) b
+        static member (<<<<) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (scalarOfType a b) b
+        static member (<<==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (scalarOfType a b) b
+        static member (>>>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (scalarOfType a b) b
+        static member (>>==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (scalarOfType a b) b
+        static member (<<>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (scalarOfType a b) b
 
         // transposition
         member this.T = transpose this
@@ -863,6 +901,11 @@ module ArrayND =
     /// Elementwise picks the minimum of a or b.
     let inline minElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         typedMap2 (min) (min) (min) (min) (min) a b
+
+    /// Elementwise uses elements from ifTrue if cond is true, 
+    /// otherwise elements from ifFalse.
+    let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
+        ifTrue.IfThenElse cond ifFalse :?> 'B
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
