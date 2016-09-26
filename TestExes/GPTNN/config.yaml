@@ -1,0 +1,18 @@
+Data:
+  Path: abalone.txt
+  TargetCols: [8]
+Network:
+  Type: GPTransferUnit
+  Name: GPTU
+  Layers: 1
+  Layer1:
+    Hyperpars:
+      NInput: 8
+      NGPs: out
+      NTrnSmpls: 20
+Training:
+  Opt:
+    Optimizer: Adam
+    Congif: default
+  Loss: CrossEntropy
+  Config: default

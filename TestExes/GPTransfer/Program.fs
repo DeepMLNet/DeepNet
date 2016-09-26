@@ -7,7 +7,6 @@ open System
 open Datasets
 open Models
 open Optimizers
-open Models
 open Basics
 
 module Program =
@@ -321,6 +320,11 @@ module Program =
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn"Classification errors after training:"
         printfn "Train Error = %f%%, Validation Error = %f%%, Test Error =%f%% " (trnErr*100.0f) (valErr*100.0f) (tstErr*100.0f)
+        let paramSet = mi.ParameterSet
+        let paramValues = mi.ParameterStorage
+        let paramVector = mi.ParameterVector
+        let parameterValue = mi.ParameterValues
+        let pars = mb.Parameters
         ()
     
     ///regression on abalone dataset using a single GPTransfer Unit
