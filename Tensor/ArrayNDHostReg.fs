@@ -32,6 +32,9 @@ module internal CudaRegMemSupport =
 /// CUDA registered memory for data arrays handle
 module CudaRegMemTypes =
 
+    /// cannot register memory, probably because it is not properly aligned
+    exception CannotRegisterMemory
+
     /// CUDA registered memory for data arrays handle
     type CudaRegMemHnd (hostArray:  IArrayNDHostT, 
                         pinHnd:     PinnedMemoryT, 
@@ -79,7 +82,6 @@ module CudaRegMemTypes =
         member internal this.CudaRegisteredMemoryPriv = cudaMem
 
 
-
 /// Methods for locking an NDArray into memory and registering the memory with CUDA
 /// for fast data transfers with GPU device.
 module ArrayNDHostReg =
@@ -103,8 +105,8 @@ module ArrayNDHostReg =
                 failwith "the specified tensor is not registered with CUDA for data transfer" 
             let dr = dataRegistrations.[data] :?> CudaRegMemHnd
             dr.CudaRegisteredMemory
-        )
-            
+        )            
+
     /// locks ArrayNDHostT (multiple registrations are okay) and returns the corresponding CudaRegMemHnd
     let lock (data: IArrayNDHostT) = 
         lock CudaRegMemSupport.syncLock (fun () ->
@@ -117,7 +119,13 @@ module ArrayNDHostReg =
 
                 // construct cuda memory handle and register it
                 let cudaMem = new CudaRegisteredHostMemory<byte>(dataAddr, SizeT dataByteSize)    
-                cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
+                try
+                    cudaMem.Register(BasicTypes.CUMemHostRegisterFlags.None)
+                with :? CudaException as ex ->
+                    if ex.CudaError = CUResult.ErrorInvalidValue then
+                        /// probably memory is not properly aligned
+                        raise CannotRegisterMemory
+                    else reraise ()
 
                 // create handle object
                 let dr = new CudaRegMemHnd(data, pinHnd, cudaMem)     
