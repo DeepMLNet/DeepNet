@@ -528,7 +528,7 @@ module Expr =
                 | PermuteAxes perm -> 
                     if nda <> List.length perm then
                         failwithf "permutation %A must have same rank as shape %A" perm sa
-                    if Permutation.is perm then
+                    if not (Permutation.is perm) then
                         failwithf "%A is not a valid permutation of an %d-dimensional tensor" perm nda
                 | StoreToVar vs ->
                     sa ..= (VarSpec.shape vs)

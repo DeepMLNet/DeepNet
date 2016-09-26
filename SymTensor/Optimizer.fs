@@ -163,6 +163,10 @@ module Optimizer =
                 match expr with
                 | Leaf _ -> expr
 
+                // remove unnecessary axes permutations
+                | Unary (PermuteAxes perm, a) when Permutation.isIdentity perm ->
+                    optimize a
+
                 // remove unnecessary reshapes
                 | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
                     optimize a            
@@ -171,6 +175,11 @@ module Optimizer =
                 | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
                     optimize a
 
+                // combine subsequent axes permutations
+                | Unary (PermuteAxes perm1, Unary (PermuteAxes perm2, a)) ->
+                    let perm = Permutation.chain perm1 perm2
+                    optimize (Unary (PermuteAxes perm, a))
+
                 // combine subsequent reshapes
                 | Unary (Reshape ss, Unary (Reshape _, a)) ->
                     optimize (Unary (Reshape ss, a))
@@ -178,7 +187,6 @@ module Optimizer =
                 // combine subsequent broadcasts
                 | Unary (DoBroadcast bc, Unary (DoBroadcast _, a)) ->
                     optimize (Unary (DoBroadcast bc, a))
-
 
                 | Unary(op, a) -> Unary (op, optimize a)            
                 | Binary(op, a, b) -> Binary (op, optimize a, optimize b)

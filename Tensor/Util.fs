@@ -243,6 +243,7 @@ module Permutation =
 
     /// true if then given permutation is the identity permutation
     let isIdentity (perm: int list) =
+        check perm
         perm = [0 .. (length perm)-1]
 
     /// inverts the given permutation

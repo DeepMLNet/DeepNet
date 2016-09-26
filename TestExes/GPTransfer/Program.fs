@@ -128,7 +128,7 @@ module Program =
 
         let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
         
-        let pred = max (softmax pred) (Expr.scalar 1e-3f)
+        //let pred = max (softmax pred) (Expr.scalar 1e-3f)
         let pred = pred |> Expr.dump "pred"
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
