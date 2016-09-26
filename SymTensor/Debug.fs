@@ -10,6 +10,9 @@ module Debug =
     /// If true, expressions are not optimized during function creation.
     let mutable DisableOptimizer = false
 
+    /// If ture, optimizer statistics are printed.
+    let mutable PrintOptimizerStatistics = false
+
     /// if true, prints compilation step messages
     let mutable TraceCompile = false
 

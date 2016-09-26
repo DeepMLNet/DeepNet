@@ -188,8 +188,26 @@ module Optimizer =
                 | Unary (DoBroadcast bc, Unary (DoBroadcast _, a)) ->
                     optimize (Unary (DoBroadcast bc, a))
 
-                | Unary(op, a) -> Unary (op, optimize a)            
-                | Binary(op, a, b) -> Binary (op, optimize a, optimize b)
+                // pull permute through broadcast
+                | Unary (DoBroadcast bc, Unary (PermuteAxes perm, a)) ->
+                    let bcPerm = bc |> Permutation.apply (Permutation.invert perm)
+                    optimize (Unary (PermuteAxes perm, Unary (DoBroadcast bcPerm, a)))
+
+                // pull permute, broadcast and reshape through unary elementwise ops
+                | Unary (UnaryElemwiseOp as op, Unary (PermuteAxes _ as lop, a)) 
+                | Unary (UnaryElemwiseOp as op, Unary (Reshape _ as lop, a)) 
+                | Unary (UnaryElemwiseOp as op, Unary (DoBroadcast _ as lop, a)) ->
+                    optimize (Unary (lop, Unary (op, a)))
+
+                // pull matching permute, broadcast and reshape through binary elementwise ops
+                | Binary (BinaryElemwiseOp as op, Unary (PermuteAxes _ as lopa, a),
+                                                  Unary (PermuteAxes _ as lopb, b))
+                | Binary (BinaryElemwiseOp as op, Unary (Reshape _ as lopa, a),
+                                                  Unary (Reshape _ as lopb, b))
+                | Binary (BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
+                                                  Unary (DoBroadcast _ as lopb, b))
+                            when lopa = lopb ->
+                    optimize (Unary (lopa, Binary (op, a, b)))
 
                 // optimize elements expressions
                 | Nary (Elements (resShape, elemExpr), args) ->
@@ -198,11 +216,13 @@ module Optimizer =
                     |> pullSumOutOfElements
                     |> broadcastInsignificantElementsAxes
 
+                // pass through
+                | Unary(op, a) -> Unary (op, optimize a)            
+                | Binary(op, a, b) -> Binary (op, optimize a, optimize b)
                 | Nary(op, es) -> Nary (op, List.map optimize es)
 
             optimized.[opt] <- opt
             opt
-
 
 
 

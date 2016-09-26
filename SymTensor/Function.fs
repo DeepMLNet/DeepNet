@@ -193,6 +193,10 @@ module Func =
             if Debug.DisableOptimizer then baseExpr
             else Optimizer.optimize baseExpr
         if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
+        if Debug.PrintOptimizerStatistics then
+            printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 
+                (Expr.countOps baseExpr) (Expr.countOps optimizedExpr)
+                (Expr.countUniqueOps baseExpr) (Expr.countUniqueOps optimizedExpr)
 
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Substituting symbolic sizes..."

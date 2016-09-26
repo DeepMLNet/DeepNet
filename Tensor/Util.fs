@@ -260,7 +260,7 @@ module Permutation =
         perm2 |> List.permute (fun i -> perm1.[i])
 
     /// permutes the list using the given permutation
-    let permuteList (perm: int list) lst =
+    let apply (perm: int list) lst =
         check perm
         lst |> List.permute (fun i -> perm.[i])
 

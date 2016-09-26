@@ -275,7 +275,6 @@ module Expr =
         | Greater
         | GreaterEqual
         | NotEqual     
-        | IfThenElse _
         | And
         | Or
             -> Some ()
@@ -714,6 +713,28 @@ module Expr =
             | Nary (op, es) -> Nary (op, es |> List.map subSubst)
 
         doSubst part replacement expr |> check
+
+    /// counts operators, not counting repeating subexpressions
+    let countUniqueOps expr  =
+        let visited = HashSet<ExprT> (HashIdentity.Structural)
+        let rec doCount expr =
+            if visited.Contains expr then 0
+            else
+                visited.Add expr |> ignore
+                match expr with
+                | Leaf _ -> 1
+                | Unary (_, a) -> 1 + doCount a
+                | Binary (_, a, b) -> 1 + doCount a + doCount b
+                | Nary (_, es) -> 1 + List.sumBy doCount es
+        doCount expr
+
+    /// counts operators, including repeating subexpressions
+    let rec countOps expr  =
+        match expr with
+        | Leaf _ -> 1
+        | Unary (_, a) -> 1 + countOps a
+        | Binary (_, a, b) -> 1 + countOps a + countOps b
+        | Nary (_, es) -> 1 + List.sumBy countOps es
 
     /// scalar constant of given value
     let scalar f = 
