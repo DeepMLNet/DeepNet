@@ -60,7 +60,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MathematicaInterface", "Tes
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SmoothADP", "SmoothADP\SmoothADP.fsproj", "{2DE8ECBC-0C8C-47E6-BD14-CEB2E957C5CD}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TrainFromConfig", "TestExes\GPTNN\TrainFromConfig.fsproj", "{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TrainFromConfig", "TestExes\TrainFromConfig\TrainFromConfig.fsproj", "{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -164,8 +164,8 @@ Global
 		{2DE8ECBC-0C8C-47E6-BD14-CEB2E957C5CD}.Release|x64.Build.0 = Release|x64
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|x64.ActiveCfg = Release|x64
-		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|x64.Build.0 = Release|x64
+		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|x64.ActiveCfg = Debug|x64
+		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Debug|x64.Build.0 = Debug|x64
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}.Release|x64.ActiveCfg = Release|x64
