@@ -69,7 +69,6 @@ module HostEval =
                 | Leaf(op) ->
                     match op with
                     | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
-                    | Zeros (ss, tn) -> ArrayNDHost.zeros (shapeEval ss)
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 

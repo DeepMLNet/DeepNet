@@ -152,6 +152,12 @@ module Optimizer =
 
         | _ -> failwith "not an elements expression"
 
+    /// combines elemwise and elements operations into one elements operation
+//    and combineIntoElements (expr: ExprT) : ExprT =
+//        match expr with
+//        | Leaf 
+//
+//        expr
 
 
     /// Optimizes an expression.

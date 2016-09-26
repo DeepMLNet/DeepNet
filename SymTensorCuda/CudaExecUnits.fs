@@ -871,7 +871,6 @@ module CudaExecUnit =
         match op with 
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
-        | ULeafOp (Zeros _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
         | ULeafOp (ScalarConst cs) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue (sv, _)) -> 
             let value = Convert.ChangeType(SizeSpec.eval sv, dfltChTrgt.DataType)

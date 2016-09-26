@@ -33,15 +33,15 @@ module Expr =
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT =
 
-        // ==== tensor creation ====
-        /// tensor with 1 on diagonal of given shape
-        | Identity of shape:SizeSpecT * typ:TypeNameT
-        /// zero tensor of given shape       
-        | Zeros of shape:ShapeSpecT * typ:TypeNameT                  
+        // ==== scalars ============
         /// scalar of given value
         | ScalarConst of ConstSpecT
         /// scalar of the given size
         | SizeValue of value:SizeSpecT * typ:TypeNameT
+
+        // ==== tensor creation ====
+        /// tensor with 1 on diagonal of given shape
+        | Identity of shape:SizeSpecT * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -313,7 +313,6 @@ module Expr =
     let rec typename expr =
         match expr with
         | Leaf (Identity (_, tn)) -> tn
-        | Leaf (Zeros (_, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
         | Leaf (SizeValue (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
@@ -340,7 +339,6 @@ module Expr =
 
         // tensor creation
         | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros (ss, _)) -> ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
 
@@ -641,7 +639,6 @@ module Expr =
 
         match expr with
         | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
-        | Leaf (Zeros (ss, tn)) -> Leaf (Zeros (sShp ss, tn))
         | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
         | Leaf _ -> expr
@@ -666,7 +663,6 @@ module Expr =
     let rec canEvalAllSymSizes (expr: ExprT) =
         match expr with
         | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
-        | Leaf (Zeros (ss, tn)) -> ShapeSpec.canEval ss
         | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
         | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
         | Leaf _ -> true
@@ -972,18 +968,26 @@ module Expr =
     let identityOfSameType expr size =
         Leaf(Identity(size, typename expr)) |> check
 
+    /// tensor of given shape filled with specified value
+    let filled (shp: ShapeSpecT) value =
+        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
+        scalar value
+        |> reshape bcShp
+        |> broadcast shp
+
     /// zero tensor of given shape
     [<RequiresExplicitTypeArguments>]
-    let zeros<'T> ss =
-        Leaf(Zeros(ss, TypeName.ofType<'T>)) |> check
+    let zeros<'T> (shp: ShapeSpecT) =
+        filled shp (conv<'T> 0)
 
     /// zero tensor of given shape and same type as given expression
-    let zerosOfSameType expr ss =
-        Leaf(Zeros(ss, typename expr)) |> check
+    let zerosOfSameType expr shp =
+        let zero = System.Convert.ChangeType (box 0, (typename expr).Type)
+        filled shp zero
 
     /// zero tensor with same shape and type as given tensor
-    let zerosLike a = 
-        Leaf (Zeros(shapeOf a, typename a)) |> check
+    let zerosLike expr = 
+        zerosOfSameType expr expr.Shape
 
     /// variable of given name and shape
     [<RequiresExplicitTypeArguments>]

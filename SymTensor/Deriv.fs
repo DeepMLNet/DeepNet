@@ -65,7 +65,6 @@ module Deriv =
         match expr with
         | Leaf(op) ->                  
             match op with
-            | Zeros _ -> Map.empty
             | ScalarConst _ -> Map.empty
             | SizeValue _ -> Map.empty
             | Identity _ -> Map.empty
