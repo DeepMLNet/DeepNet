@@ -10,15 +10,15 @@ open System
 module ElemExpr =
 
     /// argument 
-    type ArgT = Arg of int
+    type ArgT = Arg of pos:int
 
     /// element of an argument
     type ArgElementSpecT = ArgT * ShapeSpecT
     
     type LeafOpT =
         | Const of ConstSpecT
-        | SizeValue of SizeSpecT
-        | ArgElement of ArgElementSpecT
+        | SizeValue of value:SizeSpecT * typ:TypeNameT
+        | ArgElement of argElem:ArgElementSpecT * typ:TypeNameT
 
     and UnaryOpT = 
         | Negate                        
@@ -60,78 +60,96 @@ module ElemExpr =
         | Unary of UnaryOpT * ElemExprT
         | Binary of BinaryOpT * ElemExprT * ElemExprT
         
+    /// data type name of the element expression
+    let rec typeName expr =
+        match expr with
+        | Leaf (Const cs) -> cs.TypeName
+        | Leaf (SizeValue (_, tn)) -> tn
+        | Leaf (ArgElement (_, tn)) -> tn
+
+        | Unary (_, a) -> typeName a
+        | Binary (_, a, b) ->
+            let ta, tb = typeName a, typeName b
+            if ta <> tb then
+                failwithf "ElemExpr must be of one type only but got types %A and %A"
+                    ta.Type tb.Type
+            ta
+
+    type ElemExprT with
+        /// typename of data
+        member this.TypeName = typeName this
+
+        /// type of data
+        member this.Type = TypeName.getType this.TypeName
+
+    /// checks the elements expression
+    let check expr =
+        typeName expr |> ignore
+        expr
+
     /// a constant value
     let scalar f =
-        Leaf (Const (ConstSpec.ofValue f))
+        Leaf (Const (ConstSpec.ofValue f)) |> check
               
     type ElemExprT with
 
         // elementwise unary
-        static member (~+) (a: ElemExprT) = a 
-        static member (~-) (a: ElemExprT) = Unary(Negate, a)  
-        static member Abs (a: ElemExprT) = Unary(Abs, a) 
-        static member SignT (a: ElemExprT) = Unary(SignT, a) 
-        static member Log (a: ElemExprT) = Unary(Log, a) 
-        static member Log10 (a: ElemExprT) = Unary(Log10, a) 
-        static member Exp (a: ElemExprT) = Unary(Exp, a) 
-        static member Sin (a: ElemExprT) = Unary(Sin, a) 
-        static member Cos (a: ElemExprT) = Unary(Cos, a) 
-        static member Tan (a: ElemExprT) = Unary(Tan, a) 
-        static member Asin (a: ElemExprT) = Unary(Asin, a) 
-        static member Acos (a: ElemExprT) = Unary(Acos, a) 
-        static member Atan (a: ElemExprT) = Unary(Atan, a) 
-        static member Sinh (a: ElemExprT) = Unary(Sinh, a) 
-        static member Cosh (a: ElemExprT) = Unary(Cosh, a) 
-        static member Tanh (a: ElemExprT) = Unary(Tanh, a) 
-        static member Sqrt (a: ElemExprT) = Unary(Sqrt, a) 
-        static member Ceiling (a: ElemExprT) = Unary(Ceil, a) 
-        static member Floor (a: ElemExprT) = Unary(Floor, a) 
-        static member Round (a: ElemExprT) = Unary(Round, a) 
-        static member Truncate (a: ElemExprT) = Unary(Truncate, a) 
+        static member (~+) (a: ElemExprT) = a |> check
+        static member (~-) (a: ElemExprT) = Unary(Negate, a) |> check
+        static member Abs (a: ElemExprT) = Unary(Abs, a) |> check
+        static member SignT (a: ElemExprT) = Unary(SignT, a) |> check
+        static member Log (a: ElemExprT) = Unary(Log, a) |> check
+        static member Log10 (a: ElemExprT) = Unary(Log10, a) |> check
+        static member Exp (a: ElemExprT) = Unary(Exp, a) |> check
+        static member Sin (a: ElemExprT) = Unary(Sin, a) |> check
+        static member Cos (a: ElemExprT) = Unary(Cos, a) |> check
+        static member Tan (a: ElemExprT) = Unary(Tan, a) |> check
+        static member Asin (a: ElemExprT) = Unary(Asin, a) |> check
+        static member Acos (a: ElemExprT) = Unary(Acos, a) |> check
+        static member Atan (a: ElemExprT) = Unary(Atan, a) |> check
+        static member Sinh (a: ElemExprT) = Unary(Sinh, a) |> check
+        static member Cosh (a: ElemExprT) = Unary(Cosh, a) |> check
+        static member Tanh (a: ElemExprT) = Unary(Tanh, a) |> check
+        static member Sqrt (a: ElemExprT) = Unary(Sqrt, a) |> check
+        static member Ceiling (a: ElemExprT) = Unary(Ceil, a) |> check
+        static member Floor (a: ElemExprT) = Unary(Floor, a) |> check
+        static member Round (a: ElemExprT) = Unary(Round, a) |> check
+        static member Truncate (a: ElemExprT) = Unary(Truncate, a) |> check
 
         // elementwise binary
-        static member (+) (a: ElemExprT, b: ElemExprT) = Binary(Add, a, b)
-        static member (-) (a: ElemExprT, b: ElemExprT) = Binary(Substract, a, b)
-        static member (*) (a: ElemExprT, b: ElemExprT) = Binary(Multiply, a, b)
-        static member (/) (a: ElemExprT, b: ElemExprT) = Binary(Divide, a, b)
-        static member (%) (a: ElemExprT, b: ElemExprT) = Binary(Modulo, a, b)
-        static member Pow (a: ElemExprT, b: ElemExprT) = Binary(Power, a, b)
-        static member ( *** ) (a: ElemExprT, b: ElemExprT) = a ** b
+        static member (+) (a: ElemExprT, b: ElemExprT) = Binary(Add, a, b) |> check
+        static member (-) (a: ElemExprT, b: ElemExprT) = Binary(Substract, a, b) |> check
+        static member (*) (a: ElemExprT, b: ElemExprT) = Binary(Multiply, a, b) |> check
+        static member (/) (a: ElemExprT, b: ElemExprT) = Binary(Divide, a, b) |> check
+        static member (%) (a: ElemExprT, b: ElemExprT) = Binary(Modulo, a, b) |> check
+        static member Pow (a: ElemExprT, b: ElemExprT) = Binary(Power, a, b) |> check
+        static member ( *** ) (a: ElemExprT, b: ElemExprT) = a ** b 
 
         // elementwise binary with basetype
-        static member (+) (a: ElemExprT, b: 'T) = a + (scalar b)
-        static member (-) (a: ElemExprT, b: 'T) = a - (scalar b)
-        static member (*) (a: ElemExprT, b: 'T) = a * (scalar b)
-        static member (/) (a: ElemExprT, b: 'T) = a / (scalar b)
-        static member (%) (a: ElemExprT, b: 'T) = a % (scalar b)
-        static member Pow (a: ElemExprT, b: 'T) = a ** (scalar b)
+        static member (+) (a: ElemExprT, b: 'T) = a + (scalar b) |> check
+        static member (-) (a: ElemExprT, b: 'T) = a - (scalar b) |> check
+        static member (*) (a: ElemExprT, b: 'T) = a * (scalar b) |> check
+        static member (/) (a: ElemExprT, b: 'T) = a / (scalar b) |> check
+        static member (%) (a: ElemExprT, b: 'T) = a % (scalar b) |> check
+        static member Pow (a: ElemExprT, b: 'T) = a ** (scalar b) |> check
         static member ( *** ) (a: ElemExprT, b: 'T) = a ** (scalar b)
 
-        static member (+) (a: 'T, b: ElemExprT) = (scalar a) + b
-        static member (-) (a: 'T, b: ElemExprT) = (scalar a) - b
-        static member (*) (a: 'T, b: ElemExprT) = (scalar a) * b
-        static member (/) (a: 'T, b: ElemExprT) = (scalar a) / b
-        static member (%) (a: 'T, b: ElemExprT) = (scalar a) % b
-        static member Pow (a: 'T, b: ElemExprT) = (scalar a) ** b          
+        static member (+) (a: 'T, b: ElemExprT) = (scalar a) + b |> check
+        static member (-) (a: 'T, b: ElemExprT) = (scalar a) - b |> check
+        static member (*) (a: 'T, b: ElemExprT) = (scalar a) * b |> check
+        static member (/) (a: 'T, b: ElemExprT) = (scalar a) / b |> check
+        static member (%) (a: 'T, b: ElemExprT) = (scalar a) % b |> check
+        static member Pow (a: 'T, b: ElemExprT) = (scalar a) ** b |> check  
         static member ( *** ) (a: 'T, b: ElemExprT) = (scalar a) ** b          
           
     /// sign keeping type
     let signt (a: ElemExprT) =
-        ElemExprT.SignT a 
+        ElemExprT.SignT a |> check
 
     /// square root
     let sqrtt (a: ElemExprT) =
-        ElemExprT.Sqrt a       
-        
-    /// scalar 0 of appropriate type
-    let zero = scalar 0
-
-    /// scalar 1 of appropriate type
-    let one = scalar 1
-
-    /// scalar 2 of appropriate type
-    let two = scalar 2
-           
+        ElemExprT.Sqrt a |> check
+                  
     /// index symbol for given dimension of the result
     let idxSymbol dim =
         sprintf "R%d" dim
@@ -139,7 +157,7 @@ module ElemExpr =
 
     /// index size of given dimension of the result
     let idx dim =
-        Base (Sym (idxSymbol dim))
+        Base (Sym (idxSymbol dim)) 
 
     /// summation symbol of given name
     let sumSymbol name =
@@ -154,68 +172,82 @@ module ElemExpr =
     let sum idx first last expr =
         match idx with
         | Base (Sym (sumSym)) ->
-            Unary (Sum (sumSym, first, last), expr) 
+            Unary (Sum (sumSym, first, last), expr) |> check
         | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
 
     /// If left=right, then thenExpr else elseExpr.
     let ifThenElse left right thenExpr elseExpr =
-        Binary (IfThenElse (left, right), thenExpr, elseExpr)
+        Binary (IfThenElse (left, right), thenExpr, elseExpr) |> check
 
     /// expr if first <= sym <= last, otherwise 0.
     let kroneckerRng sym first last expr =
-        Unary (KroneckerRng (sym, first, last), expr)
+        Unary (KroneckerRng (sym, first, last), expr) |> check
 
     /// the element with index idx of the n-th argument
-    let argElem pos idx =
-        Leaf (ArgElement (Arg pos, idx))
+    [<RequiresExplicitTypeArguments>]
+    let argElem<'T> pos idx =
+        Leaf (ArgElement ((Arg pos, idx), TypeName.ofType<'T>)) |> check
 
-    type Argument1D (pos: int) =       
-        member this.Item with get (i0) : ElemExprT = argElem pos [i0]
-    type Argument2D (pos: int) =       
-        member this.Item with get (i0, i1) : ElemExprT = argElem pos [i0; i1]
-    type Argument3D (pos: int) =       
-        member this.Item with get (i0, i1, i2) : ElemExprT = argElem pos [i0; i1; i2]
-    type Argument4D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem pos [i0; i1; i2; i3]
-    type Argument5D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem pos [i0; i1; i2; i3; i4]
-    type Argument6D (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem pos [i0; i1; i2; i3; i4; i5]
+    /// the element with index idx of the n-th argument of given type
+    let argElemWithType typ pos idx =
+        Leaf (ArgElement ((Arg pos, idx), TypeName.ofTypeInst typ)) |> check
+
+    type Argument1D<'T> (pos: int) =       
+        member this.Item with get (i0) : ElemExprT = argElem<'T> pos [i0]
+    type Argument2D<'T> (pos: int) =       
+        member this.Item with get (i0, i1) : ElemExprT = argElem<'T> pos [i0; i1]
+    type Argument3D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2) : ElemExprT = argElem<'T> pos [i0; i1; i2]
+    type Argument4D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3]
+    type Argument5D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4]
+    type Argument6D<'T> (pos: int) =       
+        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4; i5]
 
     /// scalar argument at given position
-    let arg0D pos = argElem pos []
+    [<RequiresExplicitTypeArguments>] 
+    let arg0D<'T> pos = argElem<'T> pos []
     /// 1-dimensional argument at given position
-    let arg1D pos = Argument1D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg1D<'T> pos = Argument1D<'T> pos
     /// 2-dimensional argument at given position
-    let arg2D pos = Argument2D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg2D<'T> pos = Argument2D<'T> pos
     /// 3-dimensional argument at given position
-    let arg3D pos = Argument3D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg3D<'T> pos = Argument3D<'T> pos
     /// 4-dimensional argument at given position
-    let arg4D pos = Argument4D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg4D<'T> pos = Argument4D<'T> pos
     /// 5-dimensional argument at given position
-    let arg5D pos = Argument5D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg5D<'T> pos = Argument5D<'T> pos
     /// 6-dimensional argument at given position
-    let arg6D pos = Argument6D pos
+    [<RequiresExplicitTypeArguments>] 
+    let arg6D<'T> pos = Argument6D<'T> pos
 
     /// extract ArgElementSpec from element expression
     let extractArg expr =
         match expr with
-        | Leaf (ArgElement argSpec) -> argSpec
+        | Leaf (ArgElement (argSpec, _)) -> argSpec
         | _ -> failwith "the provided element expression is not an argument"
    
     /// returns the required number of arguments of the element expression
     let rec requiredNumberOfArgs expr =
         match expr with
-        | Leaf (ArgElement (Arg n, _)) -> 
+        | Leaf (ArgElement ((Arg n, _), _)) -> 
             if n < 0 then failwith "argument index must be positive"
             n
-        | Leaf _ -> 0
 
+        | Leaf _ -> 0
         | Unary (op, a) -> requiredNumberOfArgs a
         | Binary (op, a, b) -> max (requiredNumberOfArgs a) (requiredNumberOfArgs b)
     
-    /// checks if the arguments' shapes are compatible with the result shape        
-    let checkArgShapes (expr: ElemExprT) (argShapes: ShapeSpecT list) (resShape: ShapeSpecT) =
+    /// checks if the arguments' shapes are compatible with the result shape and that the types match
+    let checkCompatibility (expr: ElemExprT) (argShapes: ShapeSpecT list) (argTypes: TypeNameT list) 
+            (resShape: ShapeSpecT) =
+
         // check number of arguments
         let nArgs = List.length argShapes
         let nReqArgs = requiredNumberOfArgs expr       
@@ -224,20 +256,25 @@ module ElemExpr =
                 nReqArgs nArgs
 
         // check dimensionality of arguments
-        let rec checkDims expr =
+        let rec check expr =
             match expr with
-            | Leaf (ArgElement (Arg n, idx)) ->
+            | Leaf (ArgElement ((Arg n, idx), tn)) ->
                 let idxDim = ShapeSpec.nDim idx
                 let argDim = ShapeSpec.nDim argShapes.[n]
                 if idxDim <> argDim then
                     failwithf 
                         "the argument with zero-based index %d has %d dimensions but was used  \
                          with %d dimensions in the element expression" n argDim idxDim
+                let argType = argTypes.[n]
+                if argType <> tn then
+                    failwithf 
+                        "the argument with zero-based index %d has type %A but was used  \
+                         as type %A in the element expression" n argType.Type tn.Type
             | Leaf _ -> ()
 
-            | Unary (_, a) -> checkDims a
-            | Binary (_, a, b) -> checkDims a; checkDims b
-        checkDims expr
+            | Unary (_, a) -> check a
+            | Binary (_, a, b) -> check a; check b
+        check expr
 
     /// substitutes the specified size symbols with their replacements 
     let rec substSymSizes symSizes expr = 
@@ -246,8 +283,8 @@ module ElemExpr =
         let sShp = SymSizeEnv.substShape symSizes
 
         match expr with
-        | Leaf (SizeValue sc) -> Leaf (SizeValue (sSize sc))
-        | Leaf (ArgElement (arg, argIdxs)) -> Leaf (ArgElement (arg, sShp argIdxs))
+        | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue ((sSize sc), tn))
+        | Leaf (ArgElement ((arg, argIdxs), tn)) -> Leaf (ArgElement ((arg, sShp argIdxs), tn))
         | Leaf _ -> expr
 
         | Unary (Sum (sym, first, last), a) -> 
@@ -263,8 +300,8 @@ module ElemExpr =
     let canEvalAllSymSizes expr =
         let rec canEval expr =  
             match expr with
-            | Leaf (SizeValue sc) -> SizeSpec.canEval sc
-            | Leaf (ArgElement (arg, argIdxs)) -> ShapeSpec.canEval argIdxs
+            | Leaf (SizeValue (sc, _)) -> SizeSpec.canEval sc
+            | Leaf (ArgElement ((arg, argIdxs), _)) -> ShapeSpec.canEval argIdxs
             | Leaf _ -> true
 
             | Unary (Sum (sym, first, last), a) -> 
@@ -298,8 +335,8 @@ module ElemExpr =
         | Leaf (op) -> 
             match op with
             | Const v -> sprintf "%A" v
-            | SizeValue ss -> sprintf "%A" ss
-            | ArgElement ((Arg a), idxs) -> sprintf "a%d%A" a idxs
+            | SizeValue (ss, _) -> sprintf "%A" ss
+            | ArgElement ((Arg a, idxs), _) -> sprintf "a%d%A" a idxs
         
         | Unary (op, a) ->
             match op with
@@ -326,14 +363,14 @@ module ElemExpr =
             | Sum (sumSym, first, last)-> 
                 sprintf "sum(%A[%A..%A], %s)" sumSym first last (prettyString a)
             | KroneckerRng (s, first, last) ->
-                sprintf "%s[%s%s%s %s %s%s%s](%s)"  (String('\u03B4',1)) 
-                                                    (prettyString (Leaf (SizeValue first)))
+                sprintf "%s[%A%s%A %s %A%s%A](%s)"  (String('\u03B4',1)) 
+                                                    first
                                                     (String('\u2264',1))
-                                                    (prettyString (Leaf (SizeValue s)))
+                                                    s
                                                     (String('\u2227',1))
-                                                    (prettyString (Leaf (SizeValue s)))
+                                                    s
                                                     (String('\u2264',1))
-                                                    (prettyString (Leaf (SizeValue last)))
+                                                    last
                                                     (prettyString a)
         | Binary(op, a, b) -> 
             match op with
@@ -375,10 +412,11 @@ module UElemExpr =
     }
 
     /// converts an element expression to a unified element expression
-    let rec toUElemExpr (tn: TypeNameT) (elemExpr: ElemExprT) =
+    let rec toUElemExpr (elemExpr: ElemExprT) =
+        let tn = ElemExpr.typeName elemExpr
         let leaf uop        = UElemExpr (ULeafOp uop, [], tn)
-        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr tn a], tn)
-        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr tn a; toUElemExpr tn b], tn)
+        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr a], tn)
+        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr a; toUElemExpr b], tn)
 
         match elemExpr with
         | Leaf op -> leaf op
@@ -386,9 +424,9 @@ module UElemExpr =
         | Binary (op, a, b) -> binary op a b           
 
     /// converts an element expression to a unified element function
-    let toUElemFunc elemExpr nDims nArgs typeName =
+    let toUElemFunc elemExpr nDims nArgs =
         {
-            Expr    = toUElemExpr typeName elemExpr
+            Expr    = toUElemExpr elemExpr
             NDims   = nDims
             NArgs   = nArgs
         }

@@ -21,13 +21,16 @@ module ElemExprDeriv =
 
     let rec reverseDiffStep (expr: ElemExprT) (eg: ElemExprT) : DerivT =    
         let rds = reverseDiffStep
-        
+        let zero = 0 |> convTo expr.Type |> scalar
+        let one = 1 |> convTo expr.Type |> scalar
+        let two = 2 |> convTo expr.Type |> scalar
+
         match expr with
         | Leaf (op) ->
             match op with
             | Const _ -> Map.empty
             | SizeValue _ -> Map.empty
-            | ArgElement argSpec -> Map [argSpec, eg]
+            | ArgElement (argSpec, _) -> Map [argSpec, eg]
 
         | Unary (op, a) ->
             match op with
@@ -68,11 +71,12 @@ module ElemExprDeriv =
             | IfThenElse (left, right) -> 
                 ifThenElse left right eg zero .+ ifThenElse left right zero eg 
 
-
     let compute (expr: ElemExprT) : DerivT =
+        let one = 1 |> convTo expr.Type |> scalar
         reverseDiffStep expr one
 
     let ofArgElem (argElem: ElemExprT) (deriv: DerivT) =
+        let zero = 0 |> convTo argElem.Type |> scalar
         match deriv |> Map.tryFind (ElemExpr.extractArg argElem) with
         | Some da -> da
         | None -> zero
@@ -85,7 +89,8 @@ module ElemExprDeriv =
         let nDims = ShapeSpec.nDim exprShp
         let allDerives = compute expr
         let egArgNo = nArgs
-        let egElem = ElemExpr.argElem egArgNo
+        let egElem = ElemExpr.argElemWithType (ElemExpr.typeName expr).Type egArgNo
+        let zero = 0 |> convTo expr.Type |> scalar
 
         let mutable sumSymbolCnt = 0
         let newSumSymbol () =

@@ -37,8 +37,8 @@ module Optimizer =
             let rec sigInDim dim elemExpr =
                 let dimSym = ElemExpr.idxSymbol dim
                 match elemExpr with
-                | ElemExpr.Leaf (ElemExpr.SizeValue ss) -> ss.ContainsSymbol dimSym 
-                | ElemExpr.Leaf (ElemExpr.ArgElement (arg, sa)) ->
+                | ElemExpr.Leaf (ElemExpr.SizeValue (ss, _)) -> ss.ContainsSymbol dimSym 
+                | ElemExpr.Leaf (ElemExpr.ArgElement ((arg, sa), _)) ->
                     List.zip sa argsBroadcasted.[arg]
                     |> List.exists (fun (dimSs, dimBc) ->
                         dimSs.ContainsSymbol dimSym && not dimBc)
@@ -89,10 +89,11 @@ module Optimizer =
                     //printfn "Pulling out summand:\n%A" summand
                                  
                     // replace sum by argument access
+                    let typ = (ElemExpr.typeName elemExpr).Type
                     let sumArgPos = newArg ()
                     let sumArgIdx =
                         [for d=0 to nDims - 1 do yield ElemExpr.idx d]
-                    let sumArg = ElemExpr.argElem sumArgPos sumArgIdx
+                    let sumArg = ElemExpr.argElemWithType typ sumArgPos sumArgIdx
 
                     // add summation dimension to the right
                     let sumElems = last - first - 1
@@ -153,11 +154,13 @@ module Optimizer =
         | _ -> failwith "not an elements expression"
 
     /// combines elemwise and elements operations into one elements operation
-//    and combineIntoElements (expr: ExprT) : ExprT =
-//        match expr with
-//        | Leaf 
-//
-//        expr
+    and combineIntoElements (expr: ExprT) : ExprT =
+        let shp = Expr.shapeOf expr
+        match expr with
+        | Leaf (ScalarConst cs) ->
+            // can convert to ElemExpr
+            Expr.elements shp (ElemExpr.Leaf (ElemExpr.Const cs)) []
+
 
 
     /// Optimizes an expression.

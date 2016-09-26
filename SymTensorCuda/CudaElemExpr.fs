@@ -68,10 +68,10 @@ module CudaElemExpr =
         | ULeafOp leafOp ->
             match leafOp with
             | Const c -> constCode tn c
-            | SizeValue ss ->
+            | SizeValue (ss, _) ->
                 let svInt = SizeSpec.eval ss
                 constCode tn (ConstSpec.ofValue svInt)
-            | ArgElement (arg, idxs) ->
+            | ArgElement ((arg, idxs), _) ->
                 let argVar = argVars.[arg]
                 let idxStr =
                     idxs

@@ -121,6 +121,11 @@ module UtilTypes =
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 
+    /// convert given value to specified type and return as obj
+    let convTo (typ: System.Type) value =
+        Convert.ChangeType(box value, typ)
+
+    /// convert given value to type 'T
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 

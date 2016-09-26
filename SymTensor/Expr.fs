@@ -168,7 +168,7 @@ module Expr =
         /// evaluate all subexpressions but discard them
         | Discard        
         /// elementwise calculated tensor
-        | Elements of ShapeSpecT * ElemExpr.ElemExprT
+        | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
         /// extension op
@@ -324,6 +324,9 @@ module Expr =
         | Binary (GreaterEqual, _, _)
         | Binary (NotEqual, _, _)
             -> TypeName.ofType<bool>
+
+        | Nary (Elements (_, elemExpr), _) 
+            -> ElemExpr.typeName elemExpr
 
         | Unary (_, a) -> typename a
         | Binary (_, a, b) -> typename a
@@ -606,7 +609,9 @@ module Expr =
                         (opBeingChecked()) (es |> List.map (typename >> TypeName.getType))
 
                 match op with
-                | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
+                | Elements (trgtShp, elemExpr) -> 
+                    let tns = es |> List.map typename
+                    ElemExpr.checkCompatibility elemExpr ss tns trgtShp
                 | Interpolate ip ->
                     let nDims = ip.MinArg.Length
                     if nDims < 1 then
