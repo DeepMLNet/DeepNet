@@ -66,7 +66,6 @@ let trainCfg : Train.Cfg = {
     CheckpointDir      = None  
     DiscardCheckpoint  = false 
     DumpPrefix         = None
-    ReturnBestParams   = false
 } 
 
 
