@@ -9,24 +9,19 @@ open ArrayNDNS
 open SymTensor
 
 module ConfigTraining = 
-    type TestConfig = YamlConfig<"Config.yaml">
+    type TrainConfig = YamlConfig<"Config.yaml">
 
-    type NetworkT = GPTransferUnit| MLGPT | MLP
-
-    type HyperparsT =   GPTPars of list<GPTransferUnit.HyperPars> 
-                        | MLGPTPars of list<MLGPT.HyperPars> 
-                        | MLPPars of list<MLP.HyperPars> 
-
-    type Network = {
-        Type:   NetworkT
-        Name:   string
-        Layers: int
-        Hypers: HyperparsT
-        }
-
+    let dataFromConfig (config:TrainConfig)=
+        let pars = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = config.Data.TargetCols |> List.map (fun x -> int x)}
+        let fullData = CsvLoader.loadFile pars config.Data.Path
+        let fullDataset = Dataset.FromSamples fullData
+        let splitDataHost = TrnValTst.Of(fullDataset)
+        match config.Training.Device with
+        | DevCuda -> splitDataHost.ToCuda()
+        | _ -> splitDataHost
     [<EntryPoint>]
     let main argv = 
-        let config = TestConfig()
+        let config = TrainConfig()
         let netName = config.Network.Name
         printfn "NetworkName = %s" netName
         0 // return an integer exit code

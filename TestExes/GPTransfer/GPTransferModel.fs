@@ -224,7 +224,6 @@ module MultiGPLayer =
 
         let trnX = !pars.TrnX
         let trnX = trnX |> Expr.checkFinite "trnX"
-
         let trnSigma = !pars.TrnSigma
         let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
 

@@ -498,7 +498,6 @@ module Program =
 //        TestUtils.evalHostCuda TestFunctions.testMultiGPLayer
 //        TestUtils.compareTraces TestFunctions.testMultiGPLayer false |> ignore
 
-
         //let tr = trc.End()
         Cuda.CudaSup.shutdown ()
         0

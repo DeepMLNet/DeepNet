@@ -2,7 +2,7 @@ Data:
   Path: abalone.txt
   TargetCols: [8]
 Network:
-  Type: GPTransferUnit
+  Type: GPTransfer
   Name: GPTU
   Layers: 1
   Layer1:
@@ -11,6 +11,7 @@ Network:
       NGPs: out
       NTrnSmpls: 20
 Training:
+  Device: DevCuda
   Opt:
     Optimizer: Adam
     Congif: default
