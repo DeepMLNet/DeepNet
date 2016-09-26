@@ -104,7 +104,8 @@ module Program =
                 { NInput = nInput
                   NOutput = nClass
                   NTrnSmpls = nTrn}
-                // define variables
+        
+        // define variables
         let input  = mb.Var "Input"  [nBatch; nInput]
         let target = mb.Var "Target" [nBatch; nClass]
 

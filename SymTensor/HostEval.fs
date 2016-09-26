@@ -111,6 +111,8 @@ module HostEval =
                         // TODO: stage variable write to avoid overwrite of used variables
                         ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
                         ArrayND.relayout ArrayNDLayout.emptyVector av
+                    | NullifyJacobian -> av
+                    | AssumeJacobian _ -> av
                     | Print msg ->
                         printfn "%s=\n%A\n" msg av
                         av

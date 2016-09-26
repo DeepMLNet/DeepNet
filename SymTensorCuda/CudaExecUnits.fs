@@ -301,6 +301,9 @@ module CudaExecUnit =
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse -> inplaceFirstSrcReq
 
+        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
+        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+
         // extension ops
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
         | UExtraOp (ExtensionExtraOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
@@ -515,6 +518,9 @@ module CudaExecUnit =
 
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse ->  dfltChInplaceOvrwrtTrgt ()  
+
+        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
+        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
         // extension        
         | UNaryOp (ExtensionOp eop) -> 
@@ -1086,6 +1092,9 @@ module CudaExecUnit =
         | UExtraOp IfThenElse ->  
             execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("IfThenElseEOp_t", false)) srcsDfltCh   
 
+        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
+        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+
         // extension
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
@@ -1111,6 +1120,7 @@ module CudaExecUnit =
             TrgtGivenSrcs=trgtGivenSrcs compileEnv
             SrcReqs=srcReqs compileEnv
         } 
+
 
 
 
