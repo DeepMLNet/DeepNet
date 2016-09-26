@@ -233,9 +233,8 @@ module Trace =
             out ""
 
     let dumpToFile path trace =
-        use file = File.Open(path, FileMode.Truncate)
-        use sw = new StreamWriter (file)
-        dump sw trace
+        use file = File.CreateText path
+        dump file trace
 
     let dumpActiveTrace file =
         getActiveTraceSession () |> dump file
