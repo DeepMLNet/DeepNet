@@ -188,23 +188,10 @@ module ExecUnit =
         member this.IsSuccessorOf (a: ExecUnitT<'e>) (b: ExecUnitT<'e>) =
             this.AllSuccessorsOf b |> Seq.exists (fun eu -> eu.Id = a.Id)
 
-        /// Return all EUs above or equal to "eu" that access "storage" for the last time.
-        member this.LastStorageAccess storage (eu: ExecUnitT<_>) = seq {
-            let isAccessing =
-                eu.Manikins
-                |> List.exists (fun m -> m.Storage = storage)
-
-            if isAccessing then yield eu
-            else
-                for deuId in eu.DependsOn do
-                    yield! this.LastStorageAccess storage (this.ById deuId)
-        }
-
         /// all StoreToVar ExecUnits that store into the given variable
         member this.StoresToVar vs =
             if storesByVar.ContainsKey vs then storesByVar.[vs].AsReadOnly () :> seq<_>
             else Seq.empty
-
 
         /// Walks all ExecUnits contained in this collection calling processFn for each.
         /// The order is so that each execution unit is visited after all the nodes it 
@@ -283,7 +270,7 @@ module ExecUnit =
                         
             // store 
             lastStorageAccessInOrAbove.[eu.Id] <- lsa
-
+            
             // For all of the nodes we depend on, check if all nodes that depend on them have
             // been processed. If yes, then remove information about the parents because it
             // is no longer needed.
@@ -474,9 +461,10 @@ module ExecUnit =
             // emit exec unit to evaluate expression
             let (UExpr(op, srcs, metadata)) = erqExpr
             let subreqResults = Dictionary<UExprT, EvalResultT>(HashIdentity.Reference)
+            let mutable submitted = false
 
             let onMaybeCompleted () =
-                if srcs |> List.forall (fun s -> subreqResults.ContainsKey s) then  
+                if srcs |> List.forall (fun s -> subreqResults.ContainsKey s) && not submitted then  
                     // continuation, when eval requests for all sources have been processed                     
 
                     // determine our definitive target storage
@@ -528,6 +516,7 @@ module ExecUnit =
                         Manikins   = trgtManikins @ srcManikins
                         RerunAfter = []
                     }                                    
+                    submitted <- true
                     submitExecUnit eu
                            
                     let result = {ExecUnitId=eu.Id; Channels=trgtChannelsAndShared}

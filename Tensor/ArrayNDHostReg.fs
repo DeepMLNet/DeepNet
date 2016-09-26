@@ -68,6 +68,10 @@ module CudaRegMemTypes =
             pinHnd
         member internal this.PinHndPriv = pinHnd
 
+        /// pointer to data 
+        member this.Ptr =
+            this.PinHnd.Ptr
+
         /// the CudaRegisteredHostMemory
         member this.CudaRegisteredMemory = 
             if disposed then failwith "CudaRegMemHnd is disposed"

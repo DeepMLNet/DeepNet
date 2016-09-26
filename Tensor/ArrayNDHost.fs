@@ -13,9 +13,12 @@ open MKL
 module ArrayNDHostTypes = 
 
     /// pinned .NET managed memory
-    type PinnedMemoryT (gcHnd: GCHandle) =       
+    type PinnedMemoryT (gcHnd: GCHandle, size: int64) =       
         /// pointer to storage array 
         member this.Ptr = gcHnd.AddrOfPinnedObject()
+
+        /// size of storage array in bytes
+        member this.Size = size
 
         interface IDisposable with
             member this.Dispose() = gcHnd.Free()
@@ -69,7 +72,7 @@ module ArrayNDHostTypes =
         /// pins the underlying data array and returns the corresponding GCHandle
         member this.Pin () =
             let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-            new PinnedMemoryT (gcHnd) 
+            new PinnedMemoryT (gcHnd, data.LongLength * int64 sizeof<'T>) 
 
         /// size of underlying data array in bytes
         member this.DataSizeInBytes = data.Length * sizeof<'T>

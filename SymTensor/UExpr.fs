@@ -133,6 +133,8 @@ module UExpr =
                 | Expr.Unary (Expr.Subtensor sr, a)  ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
                     extra (Subtensor usr) (a :: dynExprs)
+                | Expr.Unary (Expr.NullifyJacobian, a) -> toUExprRec a
+                | Expr.Unary (Expr.AssumeJacobian _, a) -> toUExprRec a
                 | Expr.Binary (Expr.SetSubtensor sr, a, b) ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr   
                     extra (SetSubtensor usr) (a :: b :: dynExprs)

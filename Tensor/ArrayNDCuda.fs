@@ -155,13 +155,16 @@ module ArrayNDCudaTypes =
         static member CopyIntoDev (dst: ArrayNDCudaT<'T>) (src: ArrayNDHostT<'T>) =
             if ArrayND.shape dst <> ArrayND.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isC dst && ArrayND.offset dst = 0) then
-                invalidArg "dst" "dst must be contiguous without offset"
+            if not (ArrayND.isC dst) then
+                invalidArg "dst" "dst must be contiguous"
+            //printfn "CopyIntoDev: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
 
-            let src = ArrayND.ensureCAndOffsetFree src 
-            use srcMem = src.Pin()       
-            dst.Storage.Data.CopyToDevice(srcMem.Ptr, SizeT(0), SizeT(0), 
-                                          SizeT(sizeof<'T> * ArrayND.nElems src))
+            let src = ArrayND.ensureC src 
+            use srcMem = ArrayNDHostReg.lock src
+            dst.Storage.Data.CopyToDevice(srcMem.Ptr, 
+                                          SizeT (sizeof<'T> * ArrayND.offset src), 
+                                          SizeT (sizeof<'T> * ArrayND.offset dst),
+                                          SizeT (sizeof<'T> * ArrayND.nElems src))
 
         /// Copies the specified ArrayNDHostT to the device
         static member OfHost (src: ArrayNDHostT<'T>) =
@@ -174,12 +177,15 @@ module ArrayNDCudaTypes =
         static member CopyIntoHost (dst: ArrayNDHostT<'T>) (src: ArrayNDCudaT<'T>) =
             if ArrayND.shape dst <> ArrayND.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isC dst && ArrayND.offset dst = 0) then
-                invalidArg "dst" "dst must be contiguous without offset"
+            if not (ArrayND.isC dst) then
+                invalidArg "dst" "dst must be contiguous"
+            //printfn "CopyIntoHost: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
 
-            let src = ArrayND.ensureCAndOffsetFree src 
-            use dstMem = dst.Pin()
-            src.Storage.Data.CopyToHost(dstMem.Ptr, SizeT 0, SizeT 0, 
+            let src = ArrayND.ensureC src 
+            use dstMem = ArrayNDHostReg.lock dst     
+            src.Storage.Data.CopyToHost(dstMem.Ptr, 
+                                        SizeT (sizeof<'T> * ArrayND.offset src), 
+                                        SizeT (sizeof<'T> * ArrayND.offset dst), 
                                         SizeT (sizeof<'T> * ArrayND.nElems src))
 
         /// Copies this ArrayNDCudaT to the host

@@ -158,13 +158,13 @@ module Compile =
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
 
+        let krnls =
+            (Map.empty, krnlNames)
+            ||> Seq.fold (fun krnls name -> 
+                krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
+
         if Debug.Timing then printfn "JITing PTX code took %A" sw.Elapsed
 
-        let krnls =
-            krnlNames
-            |> Seq.fold (fun krnls name -> 
-                krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
-                Map.empty
         krnls, cuMod, compileDir
 
         #else
@@ -661,7 +661,7 @@ module CudaExprWorkspaceTypes =
                         | None -> ()
                         printfn "Expression was %A" uexpr
 
-                        let crashTraceFile = "crash_trace.txt"
+                        let crashTraceFile = "CudaCrashTrace.txt"
                         use tw = File.CreateText crashTraceFile
                         Trace.dumpActiveTrace tw
                         printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)

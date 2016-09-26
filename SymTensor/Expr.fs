@@ -106,6 +106,10 @@ module Expr =
         | StoreToVar of VarSpecT
 
         // ==== misc ====
+        /// nullifies the Jacobian of its argument when calculating derivatives
+        | NullifyJacobian
+        /// assumes the specified Jacobian for its argument when calculating derivatives
+        | AssumeJacobian of ExprT
         /// prints the value together with the given string
         | Print of string
         /// dumps the value into the given dataset in the active HDF5 dump file
@@ -366,6 +370,8 @@ module Expr =
         | Unary (Round, a)
         | Unary (Truncate, a)
         | Unary (Not, a)
+        | Unary (NullifyJacobian, a)
+        | Unary (AssumeJacobian _, a)
             -> shapeOf a
 
         // tensor operations
@@ -541,6 +547,16 @@ module Expr =
                     if nda < 2 then
                         failwithf "need at least a matrix to invert but got shape %A" sa
                     sa.[nda-2] .= sa.[nda-1]
+                | AssumeJacobian jac ->
+                    checkExpr jac
+                    if typename jac <> typename expr then
+                        failwithf "Jacobian type %A does not match expression type %A."
+                            (typename jac).Type (typename expr).Type
+                    if nDims jac <> 2 then
+                        failwithf "Jacobian shape %A must be two-dimensional" (shapeOf jac)
+                    if (shapeOf jac).[1] <> nElems expr then
+                        failwithf "Jacobian shape %A must have %A elements in second dimension" 
+                            (shapeOf jac) (nElems expr)
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -633,6 +649,7 @@ module Expr =
         | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
         | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
         | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
+        | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
         | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (sSub c), sSub a, sSub b)
@@ -657,6 +674,7 @@ module Expr =
         | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
         | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && canEvalAllSymSizes a
         | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a
+        | Unary (AssumeJacobian jac, a) -> canEvalAllSymSizes jac && canEvalAllSymSizes a
         | Unary (op, a) -> canEvalAllSymSizes a
 
         | Binary (SetSubtensor srs, a, b) -> 
@@ -686,6 +704,8 @@ module Expr =
             | _ when expr = part -> replacement
             | Leaf _ -> expr
             | Unary (op, a) -> Unary (op, subSubst a)
+            | Unary (AssumeJacobian jac, a) ->
+                Unary (AssumeJacobian (subSubst jac), subSubst a)
             | Binary (IfThenElse c, a, b) -> 
                 Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
             | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
@@ -1183,6 +1203,14 @@ module Expr =
     /// result shape
     let elements trgtShp elemExpr args =
         Nary (Elements (trgtShp, elemExpr), args) |> check
+
+    /// nullifies the Jacobian when calculating derivatives
+    let assumeZeroDerivative expr =
+        Unary (NullifyJacobian, expr) |> check
+
+    /// assumes the specified Jacobian when calculating derivatives
+    let assumeJacobian jac expr =
+        Unary (AssumeJacobian jac, expr) |> check
 
     /// print the result with the given message when evaluated
     let print msg a =

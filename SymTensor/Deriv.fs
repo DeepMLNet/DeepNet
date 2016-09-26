@@ -125,6 +125,20 @@ module Deriv =
                 let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
                 bc |> collapse |> reverseDiffStep a
             | StoreToVar _ -> eg |> reverseDiffStep a
+
+            | NullifyJacobian ->
+                Expr.zerosLike eg |> reverseDiffStep a
+            | AssumeJacobian jac ->
+                let jacBc =
+                    match eg.Shape.[0], jac.Shape.[0] with
+                    | fl, jl when fl = jl -> jac
+                    | fl, jl when jl = SizeSpec.broadcastable ->
+                        jac |> Expr.broadcast [fl; jac.Shape.[1]]
+                    | _ -> 
+                        failwithf "cannot broadcast specified Jacobian of shape %A to required 
+                                   Jacobian shape %A" jac.Shape eg.Shape
+                jacBc |> reverseDiffStep a
+
             | Print _ -> eg |> reverseDiffStep a
             | Dump _ -> eg |> reverseDiffStep a
             | Annotated _ -> eg |> reverseDiffStep a
