@@ -163,17 +163,22 @@ module Optimizer =
                 match expr with
                 | Leaf _ -> expr
 
+                // remove unnecessary reshapes
+                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
+                    optimize a            
+
+                // remove unnecessary broadcasts
+                | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
+                    optimize a
+
                 // combine subsequent reshapes
                 | Unary (Reshape ss, Unary (Reshape _, a)) ->
                     optimize (Unary (Reshape ss, a))
 
-                // combine subsequenct broadcast
+                // combine subsequent broadcasts
                 | Unary (DoBroadcast bc, Unary (DoBroadcast _, a)) ->
                     optimize (Unary (DoBroadcast bc, a))
 
-                // remove unnecessary reshapes
-                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
-                    optimize a            
 
                 | Unary(op, a) -> Unary (op, optimize a)            
                 | Binary(op, a, b) -> Binary (op, optimize a, optimize b)

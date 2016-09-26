@@ -99,7 +99,11 @@ module Deriv =
             | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
             | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> reverseDiffStep a
-            | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
+            | PermuteAxes perm -> 
+                let backPerm = Permutation.invert perm
+                let egePerm = 
+                    0 :: List.map (fun p -> p + 1) backPerm
+                egExpanded |> permuteAxes egePerm |> collapse |> reverseDiffStep a
 
             | Subtensor srs ->
                 let agExpanded = zeros (funElems :: (shapeOf a))

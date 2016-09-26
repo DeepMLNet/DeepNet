@@ -35,13 +35,13 @@ module Expr =
 
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | Identity of SizeSpecT * TypeNameT
+        | Identity of shape:SizeSpecT * typ:TypeNameT
         /// zero tensor of given shape       
-        | Zeros of ShapeSpecT * TypeNameT                  
+        | Zeros of shape:ShapeSpecT * typ:TypeNameT                  
         /// scalar of given value
         | ScalarConst of ConstSpecT
         /// scalar of the given size
-        | SizeValue of SizeSpecT * TypeNameT
+        | SizeValue of value:SizeSpecT * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -96,8 +96,8 @@ module Expr =
         | Reshape of ShapeSpecT         
         /// broadcast tensor; element count may change
         | DoBroadcast of ShapeSpecT       
-        /// swaps two dimensions of a tensor
-        | SwapDim of int * int          
+        /// permutes the axes of the tensor
+        | PermuteAxes of perm:int list
         /// subtensor 
         | Subtensor of ExprRngsSpecT
 
@@ -313,10 +313,10 @@ module Expr =
     /// Returns the type of the given expression.
     let rec typename expr =
         match expr with
-        | Leaf (Identity (ss, tn)) -> tn
-        | Leaf (Zeros (sa, tn)) -> tn
+        | Leaf (Identity (_, tn)) -> tn
+        | Leaf (Zeros (_, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
-        | Leaf (SizeValue (ss, tn)) -> tn
+        | Leaf (SizeValue (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
         | Binary (Equal, _, _)
@@ -327,9 +327,9 @@ module Expr =
         | Binary (NotEqual, _, _)
             -> TypeName.ofType<bool>
 
-        | Unary (op, a) -> typename a
-        | Binary (op, a, b) -> typename a
-        | Nary (op, es) -> typename (List.head es)
+        | Unary (_, a) -> typename a
+        | Binary (_, a, b) -> typename a
+        | Nary (_, es) -> typename (List.head es)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -340,8 +340,8 @@ module Expr =
         match expr with
 
         // tensor creation
-        | Leaf(Identity (ss, tn)) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros (ss, tn)) -> ss
+        | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
+        | Leaf(Zeros (ss, _)) -> ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
 
@@ -386,7 +386,7 @@ module Expr =
         // shape operations
         | Unary(Reshape(ss), _) -> ss
         | Unary(DoBroadcast(ss), _) -> ss
-        | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
+        | Unary(PermuteAxes perm, a) -> shapeOf a |> ShapeSpec.permuteAxes perm
         | Unary(Subtensor(srs), a) ->
             (srs, shapeOf a)
             ||> List.map2 (fun sr shp ->
@@ -525,9 +525,11 @@ module Expr =
                         match sa.[dim], ss.[dim] with
                         | SizeSpecT.Broadcast, _ -> ()
                         | ssa, ssb -> ssa .= ssb
-                | SwapDim(ax1, ax2) when 
-                        not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 < nda) ->
-                    failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+                | PermuteAxes perm -> 
+                    if nda <> List.length perm then
+                        failwithf "permutation %A must have same rank as shape %A" perm sa
+                    if Permutation.is perm then
+                        failwithf "%A is not a valid permutation of an %d-dimensional tensor" perm nda
                 | StoreToVar vs ->
                     sa ..= (VarSpec.shape vs)
                 | Diag(ax1, ax2) ->
@@ -741,9 +743,25 @@ module Expr =
     let sizeValueOfSameType expr size = 
         Leaf (SizeValue (size, typename expr)) |> check
 
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let permuteAxes perm a =
+        Unary (PermuteAxes perm, a) |> check
+
     /// swaps two dimensions of a tensor
     let swapDim ax1 ax2 a = 
-        Unary (SwapDim(ax1, ax2), a) |> check
+        a |> checkAxis ax1
+        a |> checkAxis ax2
+        if ax1 = ax2 then a
+        else
+            let perm = 
+                [0 .. nDims a - 1]
+                |> List.map (function
+                             | d when d=ax1 -> ax2
+                             | d when d=ax2 -> ax1
+                             | d -> d)
+            a |> permuteAxes perm
 
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.

@@ -223,3 +223,43 @@ module Util =
             // input is redirected from a file.
             None
 
+
+/// Permutation utilities
+module Permutation =
+    
+    /// true if the given list is a permutation of the numbers 0 to perm.Length-1
+    let is (perm: int list) =
+        let nd = perm.Length
+        Set perm = Set [0 .. nd-1]
+
+    let private check (perm: int list) =
+        if not (is perm) then
+            failwithf "%A is not a permutation" perm
+
+    /// the length of the given permutation
+    let length (perm: int list) =
+        check perm
+        perm.Length
+
+    /// true if then given permutation is the identity permutation
+    let isIdentity (perm: int list) =
+        perm = [0 .. (length perm)-1]
+
+    /// inverts the given permutation
+    let invert (perm: int list) =
+        check perm
+        List.indexed perm
+        |> List.sortBy (fun (i, p) -> p)
+        |> List.map (fun (i, p) -> i)
+    
+    /// returns the permutation that would result in applying perm1 after perm2    
+    let chain (perm1: int list) (perm2: int list) =
+        check perm1
+        check perm2
+        perm2 |> List.permute (fun i -> perm1.[i])
+
+    /// permutes the list using the given permutation
+    let permuteList (perm: int list) lst =
+        check perm
+        lst |> List.permute (fun i -> perm.[i])
+

@@ -234,9 +234,9 @@ module CudaExecUnit =
                 [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0] rv))]
             | _ -> dfltSrcWithNoViewReq
         | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq
-        | UUnaryOp (SwapDim (ax1, ax2)) ->
+        | UUnaryOp (PermuteAxes perm) ->
             match trgtDfltChReq with
-            | Some rv -> [dfltChReq (Some (ArrayND.swapDim ax1 ax2 rv))]
+            | Some rv -> [dfltChReq (Some (ArrayND.permuteAxes (Permutation.invert perm) rv))]
             | _ -> dfltSrcWithNoViewReq
 
         // variable access
@@ -452,8 +452,8 @@ module CudaExecUnit =
             else dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
             dfltChTrgt (ArrayND.broadcastToShape trgtShape srcsDfltCh.[0]) srcsDfltChShared.[0]
-        | UUnaryOp (SwapDim (ax1, ax2)) ->
-            dfltChTrgt (ArrayND.swapDim ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
+        | UUnaryOp (PermuteAxes perm) ->
+            dfltChTrgt (ArrayND.permuteAxes perm srcsDfltCh.[0]) srcsDfltChShared.[0]
 
         // variable access
         | UUnaryOp (StoreToVar _) -> 
@@ -804,7 +804,7 @@ module CudaExecUnit =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.reorderAxes axOrder src
+        let srcAdj = ArrayND.permuteAxes axOrder src
 
         // initial value is zero for summation
         let initial = 
@@ -958,7 +958,7 @@ module CudaExecUnit =
                 copyExecItems dfltChTrgt srcsDfltCh.[0]
             else []
         | UUnaryOp (DoBroadcast _) -> []
-        | UUnaryOp (SwapDim _) -> []
+        | UUnaryOp (PermuteAxes _) -> []
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
