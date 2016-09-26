@@ -118,11 +118,18 @@ module Program =
             (mb.GetSize nInput) (mb.GetSize nClass) (mb.GetSize nTrn)
 
         let mi = mb.Instantiate dev
+
+//        gptu.MultiGPL.TrnX := !gptu.MultiGPL.TrnX |> Expr.assumeZeroDerivative
+//        gptu.MultiGPL.TrnT := !gptu.MultiGPL.TrnT |> Expr.assumeZeroDerivative
+//        gptu.MultiGPL.TrnSigma := !gptu.MultiGPL.TrnSigma |> Expr.assumeZeroDerivative
+//        gptu.MultiGPL.Lengthscales := !gptu.MultiGPL.Lengthscales |> Expr.assumeZeroDerivative
+        gptu.WeightL.Weights := !gptu.WeightL.Weights |> Expr.assumeZeroDerivative
+
         let pred,_ = GPTransferUnit.pred gptu (InputLayer.transform input)
 
         let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
         
-//        let pred = softmax pred + 1e-3f
+        let pred = max (softmax pred) (Expr.scalar 1e-3f)
         let pred = pred |> Expr.dump "pred"
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
@@ -450,7 +457,7 @@ module Program =
 //        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
         SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
-        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+//        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 //        SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
 
         //let trc = SymTensor.Trace.startSession "trace"
