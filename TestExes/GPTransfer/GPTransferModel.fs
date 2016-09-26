@@ -40,8 +40,8 @@ module MultiGPLayer =
         let n_trn = shp.[1]
         let rng = System.Random seed
         //Right now: all GPs equal
-        let oneTrn = rng.SortedUniformArrayND (-10.0f,10.0f) [n_trn]
-        ArrayND.broadcastToShape shp oneTrn
+        let oneTrn = rng.SortedUniformArrayND (-5.0f,5.0f) [1;n_trn]
+        oneTrn |> ArrayND.replicate 0 n_gps
 
     let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
         ArrayNDHost.ones<single> shp

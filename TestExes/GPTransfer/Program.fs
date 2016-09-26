@@ -283,10 +283,10 @@ module Program =
         // instantiate model
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
-        mb.SetSize nHidden 10
+//        mb.SetSize nHidden 10
         let mi = mb.Instantiate dev
         // loss expression
-        let loss = MLP.loss mlp input.T target.T
+        let loss = MLP.loss mlp input target
         
         let pred = MLP.pred mlp input.T
         let pred_fun =  mi.Func pred.T |> arg1 input 
