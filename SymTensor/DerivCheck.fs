@@ -9,7 +9,7 @@ open System
 module DerivCheck =
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let inline numDerivEpsilon (epsilon: ^T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
+    let inline numDerivEpsilon (epsilon: 'T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
         let y = f x
         let xShp, yShp = ArrayND.shape x, ArrayND.shape y
         let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
@@ -20,9 +20,9 @@ module DerivCheck =
             let xdf = ArrayND.copy xf
             xdf |> ArrayND.set [xi] ((xf |> ArrayND.get [xi]) + epsilon)
             let ydf = xdf |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
-            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfType epsilon ydf)
+            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfSameType ydf epsilon)
             ArrayND.copyTo d (j |> ArrayND.view [RngAll; RngElem xi])
-        j
+        j 
 
     /// evaluates the Jacobian of f at x numerically
     let inline numDeriv f x = 

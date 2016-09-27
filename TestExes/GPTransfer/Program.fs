@@ -24,16 +24,6 @@ module Program =
     let fullRegressionDataset = Dataset.FromSamples fullRegressionData
     let regressionData = TrnValTst.Of(fullRegressionDataset).ToCuda()
 
-    ///Retruns the index of the maximum element in an ArrayND
-    let maxPosition (inAry: ArrayNDHostT<single>) =
-        let maxElem = inAry |> ArrayND.max |> ArrayND.value
-        let pos = ArrayND.allElems inAry |> Seq.findIndex (fun elem -> elem = maxElem)
-        pos |> single |> ArrayNDHost.scalar
-
-    ///Retruns the index of the maximum element alone one axis od an ArrayND
-    let maxPositionAxis dim inAry = 
-        ArrayND.axisReduce maxPosition dim inAry
-
     let aryToHost (ary: ArrayNDT<single>) =
         match ary with
         | :?  ArrayNDCudaT<single> as predCuda -> 
@@ -55,10 +45,10 @@ module Program =
     let batchClassificationErrors batchSize (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (input:ArrayNDT<single>) (target:ArrayNDT<single>) =
         let pred = modelPred input |> aryToHost
         let targ = target |> aryToHost
-        let predClass = maxPositionAxis 1 pred
-        let targetClass = maxPositionAxis 1 targ
+        let predClass = pred |> ArrayND.argMaxAxis 1
+        let targetClass = targ |> ArrayND.argMaxAxis 1
 
-        ArrayND.map2 (fun a b -> if a = b then 0.0f else 1.0f) predClass targetClass 
+        ArrayND.ifThenElse (predClass ==== targetClass) (ArrayNDHost.scalar 0.0f) (ArrayNDHost.scalar 1.0f)
         |> ArrayND.sum
         |> ArrayND.value
 
@@ -111,7 +101,7 @@ module Program =
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
-        mb.SetSize nTrn 20
+        mb.SetSize nTrn 10
 
         printfn "nInput=%d  nClass=%d  nTrn=%d"
             (mb.GetSize nInput) (mb.GetSize nClass) (mb.GetSize nTrn)

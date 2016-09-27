@@ -110,7 +110,7 @@ module Interpolator =
                         | InterpolateLinearaly ->
                             let diffTbl = 
                                 ArrayND.diffAxis derivDim tbl / 
-                                ArrayND.scalarOfType (conv<'T> ip.Resolution.[derivDim]) tbl
+                                ArrayND.scalarOfSameType tbl (conv<'T> ip.Resolution.[derivDim]) 
                             let zeroShp =
                                 [for d, s in List.indexed tbl.Shape do
                                     if d = derivDim then yield 1
