@@ -111,7 +111,7 @@ module Program =
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
-        mb.SetSize nTrn 5
+        mb.SetSize nTrn 10
 
         printfn "nInput=%d  nClass=%d  nTrn=%d"
             (mb.GetSize nInput) (mb.GetSize nClass) (mb.GetSize nTrn)
@@ -155,12 +155,13 @@ module Program =
         let trainable =
             Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
         
-        let batchSize = 500
+        //let batchSize = 500
+        let batchSize = Int32.MaxValue
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 300
+                                                MaxIters           = Some 300 // 20 //300
                                                 }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn "Classification errors before training:"
@@ -462,7 +463,7 @@ module Program =
         SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
         SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
-//        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 //        SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
 
         //let trc = SymTensor.Trace.startSession "trace"

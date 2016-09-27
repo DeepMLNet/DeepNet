@@ -1,8 +1,8 @@
 ﻿open System.Text
 open System.IO
 
-let maxDims = 6
-let maxArity = 6
+let maxDims = 7
+let maxArity = 30
 
 let combineWith sep items =    
     let rec combine items = 

@@ -708,7 +708,8 @@ module CudaExprWorkspaceTypes =
 
                     // cleanup CUDA resources
                     execCalls recipe.DisposeCalls
-                    Compile.unloadCudaCode krnlModHndl
+                    if krnlModHndl <> Unchecked.defaultof<CUmodule> then
+                        Compile.unloadCudaCode krnlModHndl
                     CudaSup.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
@@ -717,7 +718,8 @@ module CudaExprWorkspaceTypes =
                     Compile.unloadCppCode cLibHndl
                     Compile.removeCompileDir cCompileDir
                 | _ -> ()
-                Compile.removeCompileDir krnlCompileDir
+                if krnlCompileDir <> null then
+                    Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 
         override this.Finalize() =

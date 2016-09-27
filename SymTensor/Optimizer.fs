@@ -153,14 +153,101 @@ module Optimizer =
 
         | _ -> failwith "not an elements expression"
 
+
+    and leafOpToElemOp op =
+        match op with
+        | ScalarConst cs        -> Some (ElemExpr.Const cs)
+        | SizeValue (value, tn) -> Some (ElemExpr.SizeValue (value, tn))
+        | _                     -> None
+
+    and unaryOpToElemOp op =
+        match op with
+        | Negate    -> Some ElemExpr.Negate
+        | Abs       -> Some ElemExpr.Abs
+        | SignT     -> Some ElemExpr.SignT
+        | Log       -> Some ElemExpr.Log
+        | Log10     -> Some ElemExpr.Log10  
+        | Exp       -> Some ElemExpr.Exp
+        | Sin       -> Some ElemExpr.Sin 
+        | Cos       -> Some ElemExpr.Cos 
+        | Tan       -> Some ElemExpr.Tan  
+        | Asin      -> Some ElemExpr.Asin
+        | Acos      -> Some ElemExpr.Acos
+        | Atan      -> Some ElemExpr.Atan
+        | Sinh      -> Some ElemExpr.Sinh
+        | Cosh      -> Some ElemExpr.Cosh
+        | Tanh      -> Some ElemExpr.Tanh
+        | Sqrt      -> Some ElemExpr.Sqrt 
+        | Ceil      -> Some ElemExpr.Ceil
+        | Floor     -> Some ElemExpr.Floor
+        | Round     -> Some ElemExpr.Round
+        | Truncate  -> Some ElemExpr.Truncate
+        | _         -> None
+
+    and binaryOpToElemOp op =
+        match op with
+        | Add       -> Some ElemExpr.Add
+        | Substract -> Some ElemExpr.Substract
+        | Multiply  -> Some ElemExpr.Multiply
+        | Divide    -> Some ElemExpr.Divide
+        | Modulo    -> Some ElemExpr.Modulo
+        | Power     -> Some ElemExpr.Power
+        | _         -> None
+
     /// combines elemwise and elements operations into one elements operation
     and combineIntoElements (expr: ExprT) : ExprT =
         let shp = Expr.shapeOf expr
-        match expr with
-        | Leaf (ScalarConst cs) ->
-            // can convert to ElemExpr
-            Expr.elements shp (ElemExpr.Leaf (ElemExpr.Const cs)) []
+        let nd = Expr.nDims expr
+        let idxs = [0 .. nd-1] |> List.map ElemExpr.idx
 
+        /// Gets the element expression for the argument, or starts a
+        /// new element expression if the argument is not an element expression.
+        let getArgElemExpr argExpr =
+            match argExpr with
+            | Nary (Elements (_, argElemExpr), argArgs) -> argElemExpr, argArgs
+            | _ -> ElemExpr.argElemWithType argExpr.Type 0 idxs, [argExpr]  
+
+        /// Joins the arguments of two element expressions and adjusts them accordingly.
+        let joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs) =
+            let rec adjust expr =
+                match expr with
+                | ElemExpr.Leaf (ElemExpr.ArgElement ((ElemExpr.Arg arg, idx), tn)) ->
+                    ElemExpr.Leaf (ElemExpr.ArgElement ((ElemExpr.Arg (arg + List.length aArgs), idx), tn))
+                | ElemExpr.Leaf _ -> expr
+                | ElemExpr.Unary (op, a) -> ElemExpr.Unary (op, adjust a)
+                | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, adjust a, adjust b)
+            aElemExpr, adjust bElemExpr, aArgs @ bArgs
+
+        match expr with
+        | Leaf op ->
+            match leafOpToElemOp op with
+            | Some elemOp -> Expr.elements shp (ElemExpr.Leaf elemOp) []
+            | None -> expr
+        
+        | Unary (op, aExpr) ->
+            match unaryOpToElemOp op with
+            | Some elemOp ->       
+                let aElemExpr, aArgs = getArgElemExpr aExpr        
+                let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
+                Expr.elements shp elemExpr aArgs
+            | None -> expr
+                    
+        | Binary (op, aExpr, bExpr) ->
+            match binaryOpToElemOp op with
+            | Some elemOp ->
+                let aElemExpr, aArgs = getArgElemExpr aExpr   
+                let bElemExpr, bArgs = getArgElemExpr bExpr   
+                let aElemExpr, bElemExpr, abArgs = 
+                    joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
+                let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
+                Expr.elements shp elemExpr abArgs
+            | None -> expr
+
+        // TODO: if we are an ElemExpr, merge with children
+        | Nary (Elements (_, elemExpr), args) ->
+            expr
+
+        | Nary _ -> expr
 
 
     /// Optimizes an expression.
@@ -170,7 +257,6 @@ module Optimizer =
         | None ->
             let opt = 
                 match expr with
-                | Leaf _ -> expr
 
                 // remove unnecessary axes permutations
                 | Unary (PermuteAxes perm, a) when Permutation.isIdentity perm ->
@@ -226,9 +312,13 @@ module Optimizer =
                     |> broadcastInsignificantElementsAxes
 
                 // pass through
+                | Leaf _ -> expr
                 | Unary(op, a) -> Unary (op, optimize a)            
                 | Binary(op, a, b) -> Binary (op, optimize a, optimize b)
                 | Nary(op, es) -> Nary (op, List.map optimize es)
+
+            // try to combine elementwise operations into an element expression
+            let opt = combineIntoElements opt
 
             optimized.[opt] <- opt
             opt

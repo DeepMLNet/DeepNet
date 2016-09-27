@@ -627,8 +627,10 @@ module CudaExecUnit =
         let opTmplArgs = 
             srcViews
             |> List.map (fun (manikin: ArrayNDManikinT) -> manikin.CPPType)
-            |> String.concat ", "
-        let opTypeName = sprintf "%s<%s>" opName opTmplArgs
+            |> String.concat ", "       
+        let opTypeName = 
+            if opTmplArgs = "" then opName
+            else sprintf "%s<%s>" opName opTmplArgs
 
         let funcName, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews
         let workDims = workDimForElemwise trgt false

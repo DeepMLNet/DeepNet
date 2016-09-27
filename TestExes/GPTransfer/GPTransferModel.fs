@@ -67,12 +67,8 @@ module MultiGPLayer =
         //        l[gp]
         //        s[gp, trn_smpl]
         // output cov[gp, trn_smpl1, trn_smpl2]
-        let gp = ElemExpr.idx 0   
-        let trn_smpl1 = ElemExpr.idx 1
-        let trn_smpl2 = ElemExpr.idx 2
-        let l = ElemExpr.argElem<single> 0
-        let x = ElemExpr.argElem<single> 1
-        let s = ElemExpr.argElem<single> 2
+        let gp, trn_smpl1, trn_smpl2 = ElemExpr.idx3   
+        let l, x, s = ElemExpr.arg3<single>
         let kse =
             exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) ) +
             ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.scalar 0.0f)

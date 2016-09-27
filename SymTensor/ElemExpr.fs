@@ -159,6 +159,14 @@ module ElemExpr =
     let idx dim =
         Base (Sym (idxSymbol dim)) 
 
+    let idx1 = idx 0
+    let idx2 = idx 0, idx 1
+    let idx3 = idx 0, idx 1, idx 2
+    let idx4 = idx 0, idx 1, idx 2, idx 3
+    let idx5 = idx 0, idx 1, idx 2, idx 3, idx 4
+    let idx6 = idx 0, idx 1, idx 2, idx 3, idx 4, idx 5
+    let idx7 = idx 0, idx 1, idx 2, idx 3, idx 4, idx 6, idx 7
+
     /// summation symbol of given name
     let sumSymbol name =
         sprintf "SUM_%s" name 
@@ -192,40 +200,55 @@ module ElemExpr =
     let argElemWithType typ pos idx =
         Leaf (ArgElement ((Arg pos, idx), TypeName.ofTypeInst typ)) |> check
 
-    type Argument1D<'T> (pos: int) =       
-        member this.Item with get (i0) : ElemExprT = argElem<'T> pos [i0]
-    type Argument2D<'T> (pos: int) =       
-        member this.Item with get (i0, i1) : ElemExprT = argElem<'T> pos [i0; i1]
-    type Argument3D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2) : ElemExprT = argElem<'T> pos [i0; i1; i2]
-    type Argument4D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3]
-    type Argument5D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4]
-    type Argument6D<'T> (pos: int) =       
-        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4; i5]
+    [<RequiresExplicitTypeArguments>]
+    let arg1<'T> = argElem<'T> 0
+    [<RequiresExplicitTypeArguments>]
+    let arg2<'T> = argElem<'T> 0, argElem<'T> 1
+    [<RequiresExplicitTypeArguments>]
+    let arg3<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2
+    [<RequiresExplicitTypeArguments>]
+    let arg4<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3
+    [<RequiresExplicitTypeArguments>]
+    let arg5<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4
+    [<RequiresExplicitTypeArguments>]
+    let arg6<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4, argElem<'T> 5
+    [<RequiresExplicitTypeArguments>]
+    let arg7<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4, argElem<'T> 5, argElem<'T> 6
 
-    /// scalar argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg0D<'T> pos = argElem<'T> pos []
-    /// 1-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg1D<'T> pos = Argument1D<'T> pos
-    /// 2-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg2D<'T> pos = Argument2D<'T> pos
-    /// 3-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg3D<'T> pos = Argument3D<'T> pos
-    /// 4-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg4D<'T> pos = Argument4D<'T> pos
-    /// 5-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg5D<'T> pos = Argument5D<'T> pos
-    /// 6-dimensional argument at given position
-    [<RequiresExplicitTypeArguments>] 
-    let arg6D<'T> pos = Argument6D<'T> pos
+//    type Argument1D<'T> (pos: int) =       
+//        member this.Item with get (i0) : ElemExprT = argElem<'T> pos [i0]
+//    type Argument2D<'T> (pos: int) =       
+//        member this.Item with get (i0, i1) : ElemExprT = argElem<'T> pos [i0; i1]
+//    type Argument3D<'T> (pos: int) =       
+//        member this.Item with get (i0, i1, i2) : ElemExprT = argElem<'T> pos [i0; i1; i2]
+//    type Argument4D<'T> (pos: int) =       
+//        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3]
+//    type Argument5D<'T> (pos: int) =       
+//        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4]
+//    type Argument6D<'T> (pos: int) =       
+//        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4; i5]
+//
+//    /// scalar argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg0D<'T> pos = argElem<'T> pos []
+//    /// 1-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg1D<'T> pos = Argument1D<'T> pos
+//    /// 2-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg2D<'T> pos = Argument2D<'T> pos
+//    /// 3-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg3D<'T> pos = Argument3D<'T> pos
+//    /// 4-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg4D<'T> pos = Argument4D<'T> pos
+//    /// 5-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg5D<'T> pos = Argument5D<'T> pos
+//    /// 6-dimensional argument at given position
+//    [<RequiresExplicitTypeArguments>] 
+//    let arg6D<'T> pos = Argument6D<'T> pos
 
     /// extract ArgElementSpec from element expression
     let extractArg expr =
@@ -250,6 +273,8 @@ module ElemExpr =
 
         // check number of arguments
         let nArgs = List.length argShapes
+        if argTypes.Length <> nArgs then
+            failwith "argShapes and argTypes must be of same length"
         let nReqArgs = requiredNumberOfArgs expr       
         if nReqArgs > nArgs then
             failwithf "the element expression requires at least %d arguments but only %d arguments were specified"
@@ -259,6 +284,9 @@ module ElemExpr =
         let rec check expr =
             match expr with
             | Leaf (ArgElement ((Arg n, idx), tn)) ->
+                if not (0 <= n && n < nArgs) then
+                    failwithf "the argument with zero-based index %d used in the element \
+                               expression does not exist" n
                 let idxDim = ShapeSpec.nDim idx
                 let argDim = ShapeSpec.nDim argShapes.[n]
                 if idxDim <> argDim then

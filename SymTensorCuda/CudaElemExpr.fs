@@ -68,9 +68,7 @@ module CudaElemExpr =
         | ULeafOp leafOp ->
             match leafOp with
             | Const c -> constCode tn c
-            | SizeValue (ss, _) ->
-                let svInt = SizeSpec.eval ss
-                constCode tn (ConstSpec.ofValue svInt)
+            | SizeValue (ss, _) -> ssCode ss
             | ArgElement ((arg, idxs), _) ->
                 let argVar = argVars.[arg]
                 let idxStr =
@@ -210,8 +208,11 @@ module CudaElemExpr =
             for d=0 to nTrgtDims-1 do yield sprintf "const size_t p%d" d
             for a=0 to nArgs-1 do yield sprintf "const Ta%d &a%d" a a
         ]
-        let functorCode =
-            sprintf "template <%s>\n" (tmplArgs |> String.concat ", ") +
+        let functorCode =    
+            let tmpl =         
+                if List.isEmpty tmplArgs then ""
+                else sprintf "template <%s>\n" (tmplArgs |> String.concat ", ") 
+            tmpl +
             sprintf "struct %s {\n" name +
             sprintf "  _dev %s operator() (%s) const {\n" retType (funcArgs |> String.concat ", ") +
             calcCode +

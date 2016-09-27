@@ -35,7 +35,7 @@ module Expr =
 
         // ==== scalars ============
         /// scalar of given value
-        | ScalarConst of ConstSpecT
+        | ScalarConst of value:ConstSpecT
         /// scalar of the given size
         | SizeValue of value:SizeSpecT * typ:TypeNameT
 
@@ -611,6 +611,7 @@ module Expr =
                 match op with
                 | Elements (trgtShp, elemExpr) -> 
                     let tns = es |> List.map typename
+                    ElemExpr.check elemExpr |> ignore
                     ElemExpr.checkCompatibility elemExpr ss tns trgtShp
                 | Interpolate ip ->
                     let nDims = ip.MinArg.Length
