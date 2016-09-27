@@ -468,6 +468,7 @@ module Program =
         SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
         SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 //        SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
+        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
         //let trc = SymTensor.Trace.startSession "trace"
 

@@ -17,6 +17,12 @@ module Debug =
     /// compiles kernels with debug information and no optimizations
     let mutable DebugCompile = false
 
+    /// enable the use of fast math operations in kernels
+    let mutable FastKernelMath = false
+
+    /// tells nvrtc that all pointers are restricted
+    let mutable RestrictKernels = true
+
     /// compiles kernels with source line-number information (for nVidia profiler)
     let mutable GenerateLineInfo = false
 

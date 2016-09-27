@@ -98,18 +98,15 @@ module Compile =
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)
         let baseCmplrArgs = [
-            "--std=c++11"
-            "-DWIN32_LEAN_AND_MEAN"
-            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
-            sprintf "--gpu-architecture=%s" CudaSup.nvccArch
-        ]
-        let dbgArgs = [
-            if Debug.DebugCompile then 
-                yield "--device-debug"
-            if Debug.DebugCompile || Debug.GenerateLineInfo then
-                yield "--generate-line-info"
+            yield "--std=c++11"
+            yield "-DWIN32_LEAN_AND_MEAN"
+            yield "-Xcudafe"; yield "--diag_suppress=declared_but_not_referenced"
+            yield sprintf "--gpu-architecture=%s" CudaSup.nvccArch
+            if Debug.FastKernelMath then yield "--use_fast_math"
+            if Debug.RestrictKernels then yield "--restrict"
+            if Debug.DebugCompile then yield "--device-debug"
+            if Debug.DebugCompile || Debug.GenerateLineInfo then yield "--generate-line-info"
         ] 
-        let baseCmplrArgs = baseCmplrArgs @ dbgArgs
         let cmplrArgs = 
             baseCmplrArgs @ [ 
                 sprintf "--include-path=\"%s\"" compileDir
@@ -129,7 +126,7 @@ module Compile =
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
                     printfn "%s" log
-                    exit 1
+                    failwithf "nvrtc compile error: %s" log
                 if Debug.TraceCompile then
                     let log = cmplr.GetLogAsString()
                     printf "%s" log
