@@ -32,7 +32,7 @@ module DerivCheck =
     /// The derivatives are evaluated at the location specified by the given VarEnv.
     let inline checkExpr (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
         let rDiffs = Deriv.compute expr
-        for wrt, rDiff in rDiffs |> Map.toSeq do
+        for wrt, rDiff in rDiffs.Jacobians |> Map.toSeq do
             let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
             let exprFun = expr |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
             let rDiffFun = rDiff |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)

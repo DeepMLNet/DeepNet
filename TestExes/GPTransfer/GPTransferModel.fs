@@ -215,16 +215,18 @@ module MultiGPLayer =
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
+        let mu = mu |> Expr.checkFinite "mu"
+        let sigma = sigma |> Expr.checkFinite "sigma"
+
         let lengthscales = !pars.Lengthscales
         let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
-
         let trnX = !pars.TrnX
         let trnX = trnX |> Expr.checkFinite "trnX"
         let trnSigma = !pars.TrnSigma
         let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
 
         // Kk [gp, trn_smpl1, trn_smpl2]
-        let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
+        let Kk = Kk nGps nTrnSmpls lengthscales trnX trnSigma
         let Kk = Kk |> Expr.checkFinite "Kk"
 //        let Kk = Kk |> Expr.dump "Kk"
         
@@ -233,7 +235,7 @@ module MultiGPLayer =
 //        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let lk = lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
 //        let lk = lk |> Expr.dump "lk"
         
@@ -253,7 +255,7 @@ module MultiGPLayer =
         let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
-        let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
 
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -291,7 +293,7 @@ module MultiGPLayer =
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let T = Tnew nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let T = Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
 //        let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta

@@ -131,6 +131,7 @@ module Program =
         //let pred = max (softmax pred) (Expr.scalar 1e-3f)
         let pred = max (pred) (Expr.scalar 1e-5f)
         let pred = pred |> Expr.dump "pred"
+        let pred = Expr.filled pred.Shape 0.1f
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
@@ -161,9 +162,10 @@ module Program =
         let batchSize = Int32.MaxValue
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
+                                                LearningRates      = [1e-2]
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 500 //Some 20 //300
+                                                //MaxIters           = Some 500 //Some 20 //300
                                                 }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn "Classification errors before training:"
@@ -456,7 +458,7 @@ module Program =
 
 //        SymTensor.Debug.Timing <- true
 //        SymTensor.Debug.TraceCompile <- true
-        SymTensor.Debug.EnableCheckFinite <- false
+//        SymTensor.Debug.EnableCheckFinite <- false
 //        SymTensor.Debug.PrintOptimizerStatistics <- true
 //        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
@@ -468,7 +470,7 @@ module Program =
 //        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+//        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
         SymTensor.Compiler.Cuda.Debug.DumpCode <- true
 //        SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
         SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true

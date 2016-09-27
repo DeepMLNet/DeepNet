@@ -21,3 +21,7 @@ module Debug =
 
     /// if false, Expr.checkFinite is doing nothing
     let mutable EnableCheckFinite = true
+
+    /// if true, Deriv.ofVar fails if specified variable was not present in derived expression
+    let mutable FailIfVarNotInDerivative = false
+
