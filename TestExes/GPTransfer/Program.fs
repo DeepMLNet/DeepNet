@@ -111,7 +111,7 @@ module Program =
 
         mb.SetSize nInput (fullClassificationDataset.[0].Input |> ArrayND.nElems)
         mb.SetSize nClass (fullClassificationDataset.[0].Target |> ArrayND.nElems)
-        mb.SetSize nTrn 10
+        mb.SetSize nTrn 20
 
         printfn "nInput=%d  nClass=%d  nTrn=%d"
             (mb.GetSize nInput) (mb.GetSize nClass) (mb.GetSize nTrn)
@@ -129,6 +129,7 @@ module Program =
         let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
         
         //let pred = max (softmax pred) (Expr.scalar 1e-3f)
+        let pred = max (pred) (Expr.scalar 1e-5f)
         let pred = pred |> Expr.dump "pred"
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
@@ -140,11 +141,12 @@ module Program =
         let pred_fun =  mi.Func pred |> arg1 input 
 
         // loss expression
-        let loss = LossLayer.loss LossLayer.MSE pred.T target.T
+        let loss = LossLayer.loss LossLayer.CrossEntropy pred target
         let loss = loss |> Expr.checkFinite "loss"
         let loss = loss |> Expr.dump "loss"
         // optimizer
-        let opt = Adam<single> (loss, mi.ParameterVector, dev)
+        //let opt = Adam<single> (loss, mi.ParameterVector, dev)
+        let opt = GradientDescent<single> (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =

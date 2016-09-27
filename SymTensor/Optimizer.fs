@@ -359,7 +359,7 @@ module Optimizer =
                 | Nary(op, es) -> Nary (op, List.map optimize es)
 
             // try to combine elementwise operations into an element expression
-            let opt = combineIntoElements opt
+            //let opt = combineIntoElements opt
 
             optimized.[opt] <- opt
             opt
