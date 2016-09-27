@@ -8,7 +8,9 @@ module DerivTypes =
 
     /// Jacobians for each variable
     type DerivT = {
+        /// the expression the derivative was calculated of
         Expr:       ExprT
+        /// the Jacobians w.r.t. the variables occuring in the expression
         Jacobians:  Map<VarSpecT, ExprT>
     }
 
@@ -254,7 +256,7 @@ module Deriv =
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
 
-    /// reverse accumulation autodifferentiation of an expression
+    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
     let compute (expr: ExprT) : DerivT =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
         reverseDiffStep expr expr eg

@@ -129,9 +129,9 @@ module Program =
         let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
         
         //let pred = max (softmax pred) (Expr.scalar 1e-3f)
-        let pred = max (pred) (Expr.scalar 1e-5f)
+        let pred = Expr.maxElemwise pred (Expr.scalar 1e-5f)
+        let pred = Expr.minElemwise pred (Expr.scalar 20.0f)
         let pred = pred |> Expr.dump "pred"
-        let pred = Expr.filled pred.Shape 0.1f
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
 //        let loss = loss |> Expr.dump "loss"
@@ -146,8 +146,8 @@ module Program =
         let loss = loss |> Expr.checkFinite "loss"
         let loss = loss |> Expr.dump "loss"
         // optimizer
-        //let opt = Adam<single> (loss, mi.ParameterVector, dev)
-        let opt = GradientDescent<single> (loss, mi.ParameterVector, dev)
+        let opt = Adam<single> (loss, mi.ParameterVector, dev)
+        //let opt = GradientDescent<single> (loss, mi.ParameterVector, dev)
         let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
@@ -162,7 +162,6 @@ module Program =
         let batchSize = Int32.MaxValue
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
-                                                LearningRates      = [1e-2]
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
                                                 //MaxIters           = Some 500 //Some 20 //300
@@ -458,7 +457,7 @@ module Program =
 
 //        SymTensor.Debug.Timing <- true
 //        SymTensor.Debug.TraceCompile <- true
-//        SymTensor.Debug.EnableCheckFinite <- false
+        SymTensor.Debug.EnableCheckFinite <- false
 //        SymTensor.Debug.PrintOptimizerStatistics <- true
 //        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
