@@ -179,22 +179,21 @@ for dims = 0 to maxDims do
     let elementwiseLoop withPosArray fBody =
         if dims > 3 then
             let restElements = 
-                {2 .. dims - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
+                {0 .. dims-3} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
             wrt " const idx_t restElems = %s;" restElements
             wrt " for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {"
-            wrt " idx_t pos2 = posR;"
-            for d = dims - 1 downto 2 do
+            wrt " idx_t pos%d = posR;" (dims-3)
+            for d = 0 to dims-4 do
                 let incr = 
-                    {2 .. d - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
-                if d > 2 then
-                    wrt " const idx_t pos%d = pos2 / (%s);" d incr
-                    wrt " pos2 -= pos%d * (%s);" d incr
+                    {d+1 .. dims-3} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
+                wrt " const idx_t pos%d = pos%d / (%s);" d (dims-3) incr
+                wrt " pos%d -= pos%d * (%s);" (dims-3) d incr
         if dims = 3 then
-            wrt " for (idx_t pos2 = threadIdx.z + blockIdx.z * blockDim.z; pos2 < trgt.shape(2); pos2 += gridDim.z * blockDim.z) {"
+            wrt " for (idx_t pos%d = threadIdx.z + blockIdx.z * blockDim.z; pos%d < trgt.shape(%d); pos%d += gridDim.z * blockDim.z) {" (dims-3) (dims-3) (dims-3) (dims-3)
         if dims >= 2 then
-            wrt " for (idx_t pos1 = threadIdx.y + blockIdx.y * blockDim.y; pos1 < trgt.shape(1); pos1 += gridDim.y * blockDim.y) {"
+            wrt " for (idx_t pos%d = threadIdx.y + blockIdx.y * blockDim.y; pos%d < trgt.shape(%d); pos%d += gridDim.y * blockDim.y) {" (dims-2) (dims-2) (dims-2) (dims-2)
         if dims >= 1 then
-            wrt " for (idx_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {"
+            wrt " for (idx_t pos%d = threadIdx.x + blockIdx.x * blockDim.x; pos%d < trgt.shape(%d); pos%d += gridDim.x * blockDim.x) {" (dims-1) (dims-1) (dims-1) (dims-1)
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
@@ -225,7 +224,7 @@ for dims = 0 to maxDims do
             {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
         let allArgDecls = "const TElemwiseOp &op" :: "TTarget &trgt" :: srcArgDecls
         let indexedName = if withIndexes then "Indexed" else ""
-        wrt "_dev void elemwise%dAry%dD%s(%s) {" ary dims indexedName (allArgDecls |> cw ", ")
+        wrt "_dev void elemwise%dAry%dD%s (%s) {" ary dims indexedName (allArgDecls |> cw ", ")
 
         elementwiseLoop withIndexes (fun dims ->      
             let poses = ad |>> prn "pos%d" |> cw ", "
@@ -241,7 +240,7 @@ for dims = 0 to maxDims do
 
     let reduceWrapper () =
         wrt "template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>" 
-        wrt "_dev void reduceTo%dD(const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {" dims
+        wrt "_dev void reduceTo%dD (const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {" dims
         elementwiseLoop false (fun dims ->      
             let trgtPoses = ad |>> prn "pos%d" |> cw ", "           
             let srcPoses = Seq.append (ad |>> prn "pos%d") (Seq.singleton "reducePos") |> cw ", "
@@ -263,7 +262,7 @@ for dims = 0 to maxDims do
         let srcArgDecls =
             {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
         let allArgDecls = "const TElementsOp &op" :: "TTarget &trgt" :: srcArgDecls
-        wrt "_dev void elements%dAry%dD(%s) {" ary dims (allArgDecls |> cw ", ")
+        wrt "_dev void elements%dAry%dD (%s) {" ary dims (allArgDecls |> cw ", ")
 
         elementwiseLoop false (fun dims ->      
             let poses = ad |>> prn "pos%d" |> Seq.toList

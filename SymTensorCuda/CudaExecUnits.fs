@@ -538,19 +538,19 @@ module CudaExecUnit =
             RetType="void"
             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls
         }    
-        [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
+        [LaunchKernel (cFuncTmpl, workDim, argTmpls)]
 
-    /// returns the CUDA work dimensions for an element-wise or elements operation
+    /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
         | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
         | 0 -> (1, 1, 1)
         | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
-        | 2 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], 1)
-        | 3 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[2])
+        | 2 -> ((ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0], 1)
+        | 3 -> ((ArrayND.shape trgt).[2], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0])
         | d ->
-            let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
-            ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
+            let rest = {0 .. d-3} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
+            ((ArrayND.shape trgt).[d-1], (ArrayND.shape trgt).[d-2], rest)
 
     /// returns the C++ template instantiation code for the given template and argument list
     let cppTemplateInstantiation tmpl args =

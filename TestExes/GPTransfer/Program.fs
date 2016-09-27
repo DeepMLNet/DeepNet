@@ -161,7 +161,7 @@ module Program =
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 20 //300
+                                                MaxIters           = Some 300 //Some 20 //300
                                                 }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn "Classification errors before training:"
