@@ -8,10 +8,10 @@ open SymTensor
 module OptimizerTypes =
 
     /// Optimizer.
-    type IOptimizer<'T, 'OptCfg, 'OptState> =
+    type IOptimizer<'OptCfg, 'OptState> =
 
         /// Expression performing one optimization step.
-        abstract member OptStepExpr: ExprT<'T>
+        abstract member OptStepExpr: ExprT
 
         abstract member Use: (VarEnvT -> 'A) -> (VarEnvT -> 'OptCfg -> 'OptState -> 'A)
 

@@ -7,25 +7,28 @@ open ManagedCuda.BasicTypes
 [<AutoOpen>]
 module CudaSupTypes =
 
-    /// dimensionality of parallel work to perform
+    /// dimensionality of parallel work to perform (x, y, z)
     type WorkDimT = int * int * int
 
-    /// CUDA block dimension
+    /// CUDA block dimension (x, y, z)
     type BlockDimT = int * int * int
 
-    /// CUDA grid dimension
+    /// CUDA grid dimension (x, y, z)
     type GridDimT = int * int * int
 
     /// CUDA launch dimension
-    type LaunchDimT = {Block: BlockDimT; Grid: GridDimT;}
+    type LaunchDimT = {
+        Block: BlockDimT
+        Grid:  GridDimT
+    }
 
 
 module CudaSup =
 
-    /// convert block/grid dimension to VectorTypes.dim3
+    /// convert block/grid dimension (x, y, z) to VectorTypes.dim3
     let toDim3 d =
         let (x: int), y, z = d
-        VectorTypes.dim3(x, y, z)
+        VectorTypes.dim3 (x, y, z)
 
     /// CUDA context
     let context = 

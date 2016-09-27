@@ -4,20 +4,25 @@ open SymTensor
 
 module LinearRegression =
 
-    type Pars<'T> = {
-        Weights:    ExprT<'T> ref
+    type Pars = {
+        Weights:    ExprT ref
     }
 
     let pars (mc: ModelBuilder<_>) nIn nOut =
         {Weights = mc.Param ("Weights", [nOut; nIn])} 
         
     let parsFromInput (mc: ModelBuilder<_>) input nOut =
-        pars mc (Expr.shapeOf input).[0] nOut
+        // input [smpl, inUnit]
+        pars mc (Expr.shapeOf input).[1] nOut
 
-    let pred (pars: Pars<'T>) (input: ExprT<'T>) =
-        !pars.Weights .* input
+    let pred (pars: Pars) (input: ExprT) =
+        // input [smpl, inUnit]
+        // pred  [smpl, outInit]
+        input .* (!pars.Weights).T
 
-    let loss pars (input: ExprT<'T>) (target: ExprT<'T>) =
+    let loss pars (input: ExprT) (target: ExprT) =
         let pred = pred pars input
-        let diff = (pred - target) ** Expr.two<'T>()
-        Expr.sum diff
+        let two = Expr.twoOfSameType input
+        (pred - target) ** two
+        |> Expr.sumAxis 1
+        |> Expr.mean

@@ -6,6 +6,8 @@
 #include <stdio.h>
 #endif
 
+#define _dev __host__ __device__ __forceinline__ 
+#define _devonly __device__ __forceinline__
 
 #ifdef ENABLE_CALL_TRACE
 #define KERNEL_TRACE(msg)   \
@@ -19,10 +21,20 @@
 #define HOST_TRACE(msg) {}
 #endif
 
+// dummy functions for IntelliSense
+#ifndef __CUDACC__ 
+int atomicAdd(int* address, int val); 
+unsigned int atomicAdd(unsigned int* address, unsigned int val); 
+unsigned long long int atomicAdd(unsigned long long int* address, unsigned long long int val); 
+float atomicAdd(float* address, float val);
 
-#define _dev __host__ __device__ __forceinline__ 
-#define _devonly __device__ __forceinline__
+template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
+template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
+template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
+#endif
 
+
+typedef unsigned int idx_t;
 
 
 template <typename T>
@@ -38,19 +50,19 @@ _dev T max(const T a, const T b)
 }
 
 
-_dev size_t divCeil(const size_t a, const size_t b)
+_dev idx_t divCeil(const idx_t a, const idx_t b)
 {
 	return (a + b - 1) / b;
 }
 
 // An array of fixed size that can be passed by value in function calls.
-template <typename T, size_t Tsize>
+template <typename T, idx_t Tsize>
 struct Array {
 	T mElements[Tsize];
 
 	_dev T& operator[] (const int idx) { return mElements[idx]; };
 	const _dev T& operator[] (const int idx) const { return mElements[idx]; };
-	size_t _dev size() const { return Tsize; }
+	idx_t _dev size() const { return Tsize; }
 };
 
 

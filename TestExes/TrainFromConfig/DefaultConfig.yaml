@@ -1,0 +1,34 @@
+Data:
+  Path: abalone.txt
+  TargetCols: [8]
+Model:
+  Type: GPTransfer
+  Name: GPTU
+  Hyperpars: 
+    GPTransfer:
+      - NInput: 0
+        NOutput: 0
+        NTrnSmpls: 20
+    Neural:
+      - NInput: 0
+        NOutput: 0
+        TransferFunc: Tanh
+Training:
+  Device: DevCuda
+  Opt:
+    Optimizer: Adam
+    Congif: default
+  Loss: CrossEntropy
+  Config:
+    Seed                : 1
+    BatchSize           : 10000
+    LossRecordInterval  : 10
+    Termination         : IterGain 1.25
+    MinImprovement      : 1e-7
+    TargetLoss          : None
+    MinIters            : Some 100
+    MaxIters            : None
+    LearningRates       : [1e-3, 1e-4, 1e-5, 1e-6]
+    CheckpointDir       : None
+    DiscardCheckpoint   : false
+    DumpPrefix          : None

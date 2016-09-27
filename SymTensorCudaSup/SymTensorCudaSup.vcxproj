@@ -106,6 +106,7 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Interpolate.cuh" />
     <ClInclude Include="NDSupport.cuh">
       <DeploymentContent>false</DeploymentContent>
     </ClInclude>

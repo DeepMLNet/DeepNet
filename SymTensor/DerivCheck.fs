@@ -9,7 +9,7 @@ open System
 module DerivCheck =
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let inline numDerivEpsilon (epsilon: ^T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
+    let inline numDerivEpsilon (epsilon: 'T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
         let y = f x
         let xShp, yShp = ArrayND.shape x, ArrayND.shape y
         let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
@@ -20,23 +20,24 @@ module DerivCheck =
             let xdf = ArrayND.copy xf
             xdf |> ArrayND.set [xi] ((xf |> ArrayND.get [xi]) + epsilon)
             let ydf = xdf |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
-            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfType epsilon ydf)
+            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfSameType ydf epsilon)
             ArrayND.copyTo d (j |> ArrayND.view [RngAll; RngElem xi])
-        j
+        j 
 
     /// evaluates the Jacobian of f at x numerically
-    let inline numDeriv f x = numDerivEpsilon (conv<'T> 1e-5) f x
+    let inline numDeriv f x = 
+        numDerivEpsilon (conv<'T> 1e-5) f x
 
     /// Checks that symbolic and numeric derivatives of the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    let inline checkExpr maxDeviation epsilon varEnv expr =
+    let inline checkExpr (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
         let rDiffs = Deriv.compute expr
-        for wrt, rDiff in rDiffs |> Map.toSeq do
-            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpecT wrt
-            let exprFun = expr |> Func.make DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
-            let rDiffFun = rDiff |> Func.make DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+        for wrt, rDiff in rDiffs.Jacobians |> Map.toSeq do
+            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
+            let exprFun = expr |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            let rDiffFun = rDiff |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
 
-            let value = VarEnv.getVarSpecT wrt varEnv
+            let value = VarEnv.getVarSpec wrt varEnv
             let symGradVal = rDiffFun value
             let exprGradVal = numDerivEpsilon epsilon exprFun value
             let gradDiff = abs (symGradVal - exprGradVal)
@@ -51,7 +52,7 @@ module DerivCheck =
 
     /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    let inline checkExprTree (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: ExprT<'T>) = 
+    let inline checkExprTree (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: ExprT) = 
         let rec checkSubExpr expr = 
             match expr with
             | Expr.Leaf(_) -> ()

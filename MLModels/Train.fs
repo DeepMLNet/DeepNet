@@ -100,6 +100,9 @@ module Train =
         CheckpointDir:                  string option
         /// If true, checkpoint is not loaded from disk.
         DiscardCheckpoint:              bool
+        /// If set, during each iteration the dump prefix will be set to the given string
+        /// concatenated with the iteration number.
+        DumpPrefix:                     string option
     } 
 
     /// Default training configuration.
@@ -115,6 +118,7 @@ module Train =
         LearningRates               = [1e-3; 1e-4; 1e-5; 1e-6]
         CheckpointDir               = None
         DiscardCheckpoint           = false
+        DumpPrefix                  = None
     }
 
     /// training faith
@@ -125,6 +129,7 @@ module Train =
         | TargetLossReached
         | UserTerminated
         | CheckpointRequested
+        | NaNEncountered
 
     /// Result of training
     type TrainingResult = {
@@ -163,9 +168,9 @@ module Train =
     /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
     let trainableFromLossExpr
             (modelInstance: ModelInstance<'T>) 
-            (loss: ExprT<'T>) 
+            (loss: ExprT) 
             (varEnvBuilder: 'Smpl -> VarEnvT)
-            (optimizer: IOptimizer<'T, 'OptCfg, 'OptState>)
+            (optimizer: IOptimizer<'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
         let lossFn = modelInstance.Func loss << varEnvBuilder
@@ -183,7 +188,7 @@ module Train =
             member this.SaveModel path = modelInstance.SavePars path
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
-                and set (value) = modelInstance.ParameterValues.[Fill] <- value
+                and set (value) = modelInstance.ParameterValues <- value
             member this.InitOptState () = optState <- optimizer.InitialState optCfg modelInstance.ParameterValues
             member this.LoadOptState path = optState <- optimizer.LoadState path
             member this.SaveOptState path = optimizer.SaveState path optState    
@@ -219,7 +224,6 @@ module Train =
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
-        
         // checkpoint data
         let cp =
             match cfg.CheckpointDir with
@@ -252,12 +256,18 @@ module Train =
 
         /// training function
         let rec doTrain iter learningRate log =
+
+            /// set dump prefix
+            match cfg.DumpPrefix with
+            | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter
+            | None -> ()
+
             // execute training
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
-                // compute and log validation & test losses
+                // compute and log validation & test 
                 let entry = {
                     TrainingLog.Iter    = iter
                     TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
@@ -288,11 +298,6 @@ module Train =
                     faith <- NoImprovement
                 | _ -> ()
 
-                match cfg.MaxIters with
-                | Some maxIters when iter >= maxIters -> 
-                    printfn "Maximum number of iterations reached"
-                    faith <- IterLimitReached
-                | _ -> ()
                 match cfg.MinIters with
                 | Some minIters when iter < minIters -> 
                     if faith <> Continue then
@@ -300,6 +305,15 @@ module Train =
                             minIters
                     faith <- Continue
                 | _ -> ()
+                match cfg.MaxIters with
+                | Some maxIters when iter >= maxIters -> 
+                    printfn "Maximum number of iterations reached"
+                    faith <- IterLimitReached
+                | _ -> ()
+
+                let isNan x = Double.IsInfinity x || Double.IsNaN x
+                if isNan entry.TrnLoss || isNan entry.ValLoss || isNan entry.TstLoss then
+                    faith <- NaNEncountered
 
                 // process user input
                 match Util.getKey () with
@@ -335,14 +349,15 @@ module Train =
                     | None -> ()
 
                 match faith with
-                | NoImprovement when not rLearningRates.IsEmpty -> 
+                | NoImprovement 
+                | NaNEncountered when not rLearningRates.IsEmpty -> 
                     // reset log to best iteration so far 
                     let log = log |> TrainingLog.removeToIter (TrainingLog.bestIter log)
                     // continue with lower learning rate
                     trainLoop log rLearningRates
                 | _ -> log, faith, learningRates
             | [] -> failwith "no learning rates"
-
+        
         // initialize or load checkpoint
         let log, learningRates, duration, faith =
             match cp with
@@ -361,7 +376,7 @@ module Train =
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
                 TrainingLog.create cfg.MinImprovement, cfg.LearningRates, TimeSpan.Zero, Continue
-
+        
         // train
         let log, duration, faith = 
             match faith with

@@ -92,7 +92,7 @@ module ArrayNDLayout =
             | [] -> failwith "unexpected"    
 
     /// computes the stride given the shape for the ArrayND to be in Fortran order (column-major)
-    let inline fStride (shape: int list) =
+    let fStride (shape: int list) =
         let rec buildStride elemsLeft shape =
             match shape with
             | [] -> []
@@ -101,11 +101,11 @@ module ArrayNDLayout =
         buildStride 1 shape
 
     /// a contiguous (row-major) ArrayND layout of the given shape 
-    let inline newC shp =
+    let newC shp =
         {Shape=shp; Stride=cStride shp; Offset=0;}
 
     /// a Fortran (column-major) ArrayND layout of the given shape 
-    let inline newF shp =
+    let newF shp =
         {Shape=shp; Stride=fStride shp; Offset=0;}
 
     /// an ArrayND layout for an empty (zero elements) vector (1D)
@@ -113,54 +113,64 @@ module ArrayNDLayout =
         {Shape=[0]; Stride=[1]; Offset=0;}
 
     /// True if strides are equal at all dimensions with size > 1.
-    let inline stridesEqual (shp: int list) (aStr: int list) (bStr: int list) =
+    let stridesEqual (shp: int list) (aStr: int list) (bStr: int list) =
         List.zip3 shp aStr bStr
         |> List.forall (fun (s, a, b) -> if s > 1 then a = b else true)
 
     /// true if the ArrayND is contiguous
-    let inline isC a = 
+    let isC a = 
         stridesEqual a.Shape (stride a) (cStride a.Shape)
 
     /// true if the ArrayND is in Fortran order
-    let inline isF a = 
+    let isF a = 
         stridesEqual a.Shape (stride a) (fStride a.Shape)
 
     /// true if the memory of the ArrayND is a contiguous block
-    let inline hasContiguousMemory a =
+    let hasContiguousMemory a =
         isC a || isF a
         // TODO: extend to any memory ordering
 
     /// adds a new dimension of size one to the left
-    let inline padLeft a =
+    let padLeft a =
         {a with Shape=1::a.Shape; Stride=0::a.Stride}
 
     /// adds a new dimension of size one to the right
-    let inline padRight a =
+    let padRight a =
         {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
 
     /// cuts one dimension from the left
-    let inline cutLeft a =
+    let cutLeft a =
         if nDims a = 0 then failwith "cannot remove dimensions from scalar"
         {a with Shape=a.Shape.[1..]; Stride=a.Stride.[1..]}
 
     /// cuts one dimension from the right
-    let inline cutRight a =
+    let cutRight a =
         if nDims a = 0 then failwith "cannot remove dimensions from scalar"
         let nd = nDims a
         {a with Shape=a.Shape.[.. nd-2]; Stride=a.Stride.[.. nd-2]}       
 
     /// broadcast the given dimension to the given size
-    let inline broadcastDim dim size a =
+    let broadcastDim dim size a =
         if size < 0 then invalidArg "size" "size must be positive"
         match (shape a).[dim] with
         | 1 -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0 a.Stride}
         | _ -> failwithf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
 
-    /// pads shapes from the right until they have same rank
+    /// pads shapes from the left until they have same rank
     let rec padToSame a b =
         if nDims a < nDims b then padToSame (padLeft a) b
         elif nDims b < nDims a then padToSame a (padLeft b)
         else a, b
+
+    /// pads shapes from the left until they have same rank
+    let rec padToSameMany sas =
+        let nDimsNeeded = sas |> List.map nDims |> List.max
+        sas 
+        |> List.map (fun sa ->
+            let mutable sa = sa
+            while nDims sa < nDimsNeeded do
+                sa <- padLeft sa
+            sa)
 
     /// cannot broadcast to same shape
     exception CannotBroadcast of string
@@ -181,17 +191,54 @@ module ArrayNDLayout =
                     (shape ain) (shape bin) dims |> CannotBroadcast |> raise
         a, b       
 
+    /// broadcasts to have the same size in the given dimensions    
+    let broadcastToSameInDimsMany dims sas =
+        let mutable sas = sas
+        for d in dims do
+            if not (sas |> List.forall (fun sa -> d < nDims sa)) then
+                sprintf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
+                |> CannotBroadcast |> raise 
+            let ls = sas |> List.map (fun sa -> sa.Shape.[d])
+            if ls |> List.exists ((=) 1) then
+                let nonBc = ls |> List.filter (fun l -> l <> 1)
+                match Set nonBc |> Set.count with
+                | 0 -> ()
+                | 1 ->
+                    let target = List.head nonBc
+                    sas <- sas |> List.map (fun sa -> 
+                        if sa.Shape.[d] <> target then sa |> broadcastDim d target
+                        else sa)
+                | _ ->
+                    sprintf "cannot broadcast shapes %A to same size in dimension %d because \
+                             they don't agree in the target size" sas d  
+                             |> CannotBroadcast |> raise              
+            elif Set ls |> Set.count > 1 then
+                failwithf "non-broadcast dimension %d of shapes %A does not agree" d sas
+        sas
+
     /// broadcasts to have the same size
-    let inline broadcastToSame ain bin =
-        let mutable a, b = padToSame ain bin
+    let broadcastToSame ain bin =
+        let a, b = padToSame ain bin
         try
             broadcastToSameInDims [0..nDims a - 1] a b
         with CannotBroadcast _ ->
             sprintf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
             |> CannotBroadcast |> raise
 
+    /// broadcasts to have the same size
+    let broadcastToSameMany sas =
+        match sas with
+        | [] -> []
+        | _ ->
+            let sas = padToSameMany sas
+            try
+                broadcastToSameInDimsMany [0 .. (nDims sas.Head - 1)] sas
+            with CannotBroadcast _ ->
+                sprintf "cannot broadcast shapes %A to same size" (sas |> List.map shape)
+                |> CannotBroadcast |> raise
+
     /// broadcasts a ArrayND to the given shape
-    let inline broadcastToShape bs ain =
+    let broadcastToShape bs ain =
         let bsDim = List.length bs
         if bsDim < nDims ain then
             failwithf "cannot broadcast to shape %A from shape %A of higher rank" bs (shape ain)        
@@ -207,13 +254,13 @@ module ArrayNDLayout =
         a
 
     /// returns true if at least one dimension is broadcasted
-    let inline isBroadcasted a =
+    let isBroadcasted a =
         (shape a, stride a)
         ||> List.exists2 (fun shp str -> str = 0 && shp > 1)
 
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
-    let inline reshape shp a =
+    let reshape shp a =
         if not (isC a) then
             invalidArg "a" "layout must be contiguous for reshape"
 
@@ -237,7 +284,7 @@ module ArrayNDLayout =
         {a with Shape=shp; Stride=cStride shp}
 
     /// swaps the given dimensions
-    let inline swapDim ax1 ax2 a =
+    let swapDim ax1 ax2 a =
         if not (0 <= ax1 && ax1 < nDims a && 0 <= ax2 && ax2 < nDims a) then
             failwithf "cannot swap dimension %d with %d of for shape %A" ax1 ax2 (shape a)
         let shp, str = shape a, stride a
@@ -246,17 +293,19 @@ module ArrayNDLayout =
 
     /// Transposes the given layout of a matrix.
     /// If the array has more then two dimensions, the last two axes are swapped.
-    let inline transpose a =
+    let transpose a =
         let nd = nDims a
         if nd < 2 then failwithf "cannot transpose non-matrix of shape %A" (shape a)
         swapDim (nd-2) (nd-1) a
 
-    /// reorders the axes as specified
-    let inline reorderAxes (newOrder: int list) a =
-        if nDims a <> List.length newOrder then
-            failwithf "permutation %A should have same rank as shape %A" newOrder (shape a)
-        {a with Shape = List.permute (fun i -> newOrder.[i]) a.Shape;
-                Stride = List.permute (fun i -> newOrder.[i]) a.Stride;}
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let permuteAxes (permut: int list) a =
+        if nDims a <> List.length permut then
+            failwithf "permutation %A must have same rank as shape %A" permut (shape a)
+        {a with Shape = List.permute (fun i -> permut.[i]) a.Shape;
+                Stride = List.permute (fun i -> permut.[i]) a.Stride;}
 
     /// creates a subview layout
     let rec view ranges a =
@@ -306,7 +355,7 @@ module ArrayNDLayout =
 
         recView ranges a
 
-    let allSourceRangesAndTargetIdxsForAxisReduction dim a =
+    let allSrcRngsAndTrgtIdxsForAxisReduce dim a =
         if not (0 <= dim && dim < nDims a) then
             failwithf "reduction dimension %d out of range for shape %A" dim (shape a)
 

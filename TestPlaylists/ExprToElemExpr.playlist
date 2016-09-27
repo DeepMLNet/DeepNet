@@ -1,0 +1,1 @@
+<Playlist Version="1.0"><Add Test="NeuralNetOnMNIST.Neural net compiles for GPU" /><Add Test="NeuralNetOnMNIST.Loss decreases during training on GPU" /><Add Test="DerivTests.Batch inverse" /><Add Test="ElemExprTests.Eval and deriv: KSE in Expr on Host" /><Add Test="NeuralNetOnMNIST.CPU and GPU have same trace during training" /></Playlist>

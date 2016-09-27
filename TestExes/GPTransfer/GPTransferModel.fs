@@ -19,13 +19,13 @@ module MultiGPLayer =
 
     type Pars = {
         /// GP lengthscales: [gp]
-        Lengthscales:       ExprT<single> ref
+        Lengthscales:       ExprT ref
         /// x values of GP training samples:         [gp, trn_smpl]
-        TrnX:               ExprT<single> ref
+        TrnX:               ExprT ref
         /// target values of GP training samples:    [gp, trn_smpl]
-        TrnT:               ExprT<single> ref
+        TrnT:               ExprT ref
         /// standard deviation of GP target values:  [gp, trn_smpl]
-        TrnSigma:           ExprT<single> ref
+        TrnSigma:           ExprT ref
         /// hyper-parameters
         HyperPars:          HyperPars
     }
@@ -33,18 +33,18 @@ module MultiGPLayer =
     let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
          let rng = System.Random seed
          //Right now: all GPs equal
-         ArrayNDHost.ones shp
+         ArrayNDHost.ones<single> shp
 
     let internal initTrnX seed (shp: int list) : ArrayNDHostT<single> = 
         let n_gps = shp.[0]
         let n_trn = shp.[1]
         let rng = System.Random seed
         //Right now: all GPs equal
-        let oneTrn = rng.SortedUniformArrayND (-10.0f,10.0f) [n_trn]
-        ArrayND.broadcastToShape shp oneTrn
+        let oneTrn = rng.SortedUniformArrayND (-5.0f,5.0f) [1;n_trn]
+        oneTrn |> ArrayND.replicate 0 n_gps
 
     let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
-        ArrayNDHost.ones shp
+        ArrayNDHost.ones<single> shp
 
     let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<single> = 
         (ArrayNDHost.ones<single> shp) * sqrt 0.1f
@@ -67,15 +67,11 @@ module MultiGPLayer =
         //        l[gp]
         //        s[gp, trn_smpl]
         // output cov[gp, trn_smpl1, trn_smpl2]
-        let gp = ElemExpr.idx 0   
-        let trn_smpl1 = ElemExpr.idx 1
-        let trn_smpl2 = ElemExpr.idx 2
-        let l = ElemExpr.argElem 0
-        let x = ElemExpr.argElem 1
-        let s = ElemExpr.argElem 2
+        let gp, trn_smpl1, trn_smpl2 = ElemExpr.idx3   
+        let l, x, s = ElemExpr.arg3<single>
         let kse =
-            exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) ) +
-            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] ** 2.0f) (ElemExpr.zero())
+            exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) ) +
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.scalar 0.0f)
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
@@ -91,13 +87,13 @@ module MultiGPLayer =
         let smpl = ElemExpr.idx 0
         let gp = ElemExpr.idx 1
         let trn_smpl = ElemExpr.idx 2
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
-        let lk1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + s [smpl; gp; gp]) )
-        let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])**2.0f / (2.0f * ((l [gp])**2.0f + s [smpl; gp; gp])) ) )
+        let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
+        let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
 
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
@@ -115,14 +111,14 @@ module MultiGPLayer =
         let gp = ElemExpr.idx 1
         let trn_smpl1 = ElemExpr.idx 2
         let trn_smpl2 = ElemExpr.idx 3
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
-        let L1 = sqrt ( (l [gp])**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp]) )
-        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )**2.0f / ((l [gp])**2.0f + 2.0f * s [smpl; gp; gp])
-        let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])**2.0f / (4.0f * (l [gp])**2.0f)
+        let L1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp]) )
+        let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp])
+        let L2b = (x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f / (4.0f * (l [gp])***2.0f)
         let L2 = exp (-L2a - L2b)
         let L = L1 * L2
 
@@ -142,25 +138,25 @@ module MultiGPLayer =
         let gp2 = ElemExpr.idx 2
         let t1 = ElemExpr.idx 3
         let t2 = ElemExpr.idx 4
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
-        let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
-                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let eNom = (x[gp2;t2]-m[smpl;gp2])***2.f * (l[gp1]***2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
+                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) ) 
+        let eDnm = 2.f * ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
         let e = exp(-eNom / eDnm)
         let Tnom = e * l[gp1] * l[gp2]
 
-        let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]**2.f
-        let sq2Nom = s[smpl;gp1;gp2]**2.f - (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2])
-        let sq2Dnm = s[smpl;gp1;gp2]**2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
+        let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]***2.f
+        let sq2Nom = s[smpl;gp1;gp2]***2.f - (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2])
+        let sq2Dnm = s[smpl;gp1;gp2]***2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero ()) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.scalar 0.0f) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
     ///Elementwise Matrix needed for calculation of the covarance prediction.
@@ -177,22 +173,22 @@ module MultiGPLayer =
         let gp2 = ElemExpr.idx 2
         let t1 = ElemExpr.idx 3
         let t2 = ElemExpr.idx 4
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
-        let eNom = (x[gp2;t2]-m[smpl;gp2])**2.f * (l[gp1]**2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
-                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let eNom = (x[gp2;t2]-m[smpl;gp2])***2.f * (l[gp1]***2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
+                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) ) 
+        let eDnm = 2.f * ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
         let e = exp(-eNom / eDnm)
         let Tnom = e * l[gp1] * l[gp2]
 
-        let Tdnm = sqrt ( (l[gp1]**2.f + s[smpl;gp1;gp1]) * (l[gp2]**2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]**2.f )
+        let Tdnm = sqrt ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero()) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.scalar 0.0f) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
@@ -205,8 +201,8 @@ module MultiGPLayer =
         let smpl = ElemExpr.idx 0
         let gp1 = ElemExpr.idx 1
         let gp2 = ElemExpr.idx 2
-        let c = ElemExpr.argElem 0
-        let v = ElemExpr.argElem 1
+        let c = ElemExpr.argElem<single> 0
+        let v = ElemExpr.argElem<single> 1
 
         let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
         Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
@@ -215,37 +211,51 @@ module MultiGPLayer =
     let pred pars (mu, sigma) =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
-
         let nSmpls = (Expr.shapeOf mu).[0]
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
+        let mu = mu |> Expr.checkFinite "mu"
+        let sigma = sigma |> Expr.checkFinite "sigma"
+
+        let lengthscales = !pars.Lengthscales
+        let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
+        let trnX = !pars.TrnX
+        let trnX = trnX |> Expr.checkFinite "trnX"
+        let trnSigma = !pars.TrnSigma
+        let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
+
         // Kk [gp, trn_smpl1, trn_smpl2]
-        let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
-        let Kk = Kk |> Expr.dump "Kk"
+        let Kk = Kk nGps nTrnSmpls lengthscales trnX trnSigma
+        let Kk = Kk |> Expr.checkFinite "Kk"
+//        let Kk = Kk |> Expr.dump "Kk"
         
         let Kk_inv = Expr.invert Kk
-        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
+        let Kk_inv = Kk_inv |> Expr.checkFinite "Kk_inv"
+//        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let lk = lk |> Expr.dump "lk"
+        let lk = lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
+        let lk = lk |> Expr.checkFinite "lk"
+//        let lk = lk |> Expr.dump "lk"
         
         // trnT [gp, trn_smpl]
-        let trnT = pars.TrnT
+        let trnT = !pars.TrnT
+        let trnT = trnT |> Expr.checkFinite "trnT"
 
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
-        let beta = Kk_inv .* !trnT
-        let beta = beta |> Expr.dump "beta"
+        let beta = Kk_inv .* trnT
+//        let beta = beta |> Expr.dump "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+        let pred_mean = pred_mean |> Expr.checkFinite "pred_mean"
         let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
-        let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
 
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -253,7 +263,7 @@ module MultiGPLayer =
         let betaBetaT = 
             Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
-        let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
+//        let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
 //        let d_betaBetaT = Deriv.compute betaBetaT 
 //        printfn "d_betaBetaT=\n%A" d_betaBetaT
@@ -264,27 +274,27 @@ module MultiGPLayer =
         let lkLkT =
             Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
-        let lkLkT = lkLkT |> Expr.dump "lkLkT"
+//        let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
-        let var1 = var1 |> Expr.dump "var1"
+//        let var1 = var1 |> Expr.dump "var1"
         
         // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
-        let var2 = var2 |> Expr.dump "var2"
+//        let var2 = var2 |> Expr.dump "var2"
 
         let pred_var = 1.0f - var1 - var2
-        let pred_var = pred_var |> Expr.dump "pred_var"
+//        let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let T = Tnew nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let T = T |> Expr.dump "T"
+        let T = Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
+//        let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta
         // beta[gp, trn_smpl]
@@ -301,7 +311,7 @@ module MultiGPLayer =
         // [smpl, gp1, gp2, 1, 1] ==> [smpl, gp1, gp2]
         let betaTbeta =
             betaTbeta |> Expr.reshape [nSmpls; nGps; nGps]   
-        let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
+//        let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
 
         // calculate m_k * m_l
         // [smpl, gp1, 1*] * [smpl, 1*, gp2]
@@ -309,11 +319,11 @@ module MultiGPLayer =
         let mkml = 
             (Expr.reshape [nSmpls; nGps; bc] pred_mean) *
             (Expr.reshape [nSmpls; bc; nGps] pred_mean)
-        let mkml = mkml |> Expr.dump "mkml"
+//        let mkml = mkml |> Expr.dump "mkml"
 
         /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
         let pred_cov_without_var = betaTbeta - mkml
-        let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
+//        let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
@@ -336,7 +346,7 @@ module WeightLayer =
     /// Weight layer parameters.
     type Pars = {
         /// expression for the weights [nGPs,nInput]
-        Weights:        ExprT<single> ref
+        Weights:        ExprT ref
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -377,7 +387,7 @@ module GPTransferUnit =
         NInput:    SizeSpecT
 
         /// number of units, i.e. number of GPs = Number of outputs
-        NGPs:       SizeSpecT
+        NOutput:       SizeSpecT
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
@@ -396,34 +406,36 @@ module GPTransferUnit =
 
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
         WeightL = WeightLayer.pars (mb.Module "WeigltL") 
-            {NInput = hp.NInput; NOutput = hp.NGPs}
+            {NInput = hp.NInput; NOutput = hp.NOutput}
         MultiGPL = MultiGPLayer.pars (mb.Module "MultiGPL")
-            {NGPs = hp.NGPs; NTrnSmpls = hp.NTrnSmpls}
+            {NGPs = hp.NOutput; NTrnSmpls = hp.NTrnSmpls}
         HyperPars = hp
     }
 
     let pred (pars: Pars) input = 
         let in_mean, in_cov = input
-        let in_mean = in_mean|> Expr.dump "in_mean"
-        let in_cov = in_cov |> Expr.dump "in_cov"
+//        let in_mean = in_mean|> Expr.dump "in_mean"
+//        let in_cov = in_cov |> Expr.dump "in_cov"
         let w_mean,w_cov = WeightLayer.transform pars.WeightL (in_mean,in_cov)
-        let w_mean = w_mean |> Expr.dump "w_mean"
-        let w_cov = w_cov |> Expr.dump "w_cov"
+//        let w_mean = w_mean |> Expr.dump "w_mean"
+//        let w_cov = w_cov |> Expr.dump "w_cov"
         let p_mean,p_cov = MultiGPLayer.pred pars.MultiGPL (w_mean,w_cov)
-        let p_mean = p_mean |> Expr.dump "p_mean"
-        let p_cov = p_cov |> Expr.dump "p_cov"
+//        let p_mean = p_mean |> Expr.dump "p_mean"
+//        let p_cov = p_cov |> Expr.dump "p_cov"
         p_mean, p_cov
 
 
-module InputLayer =
+module InputLayer=
 
     let cov input =
+
         let nSmpls = (Expr.shapeOf input).[0]
         let nInput = (Expr.shapeOf input).[1]
         // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
         // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
-        Expr.zeros [nSmpls; nInput; nInput]
-    let transform input =
+        Expr.zeros<single> [nSmpls; nInput; nInput]
+
+    let transform input  =
         input, (cov input)
 
 module MLGPT = 
@@ -457,4 +469,4 @@ module MLGPT =
 
     let loss pars input target =
         let predmu,predSigma = (pred pars input)
-        LossLayer.loss pars.HyperPars.LossMeasure predmu target
+        LossLayer.loss pars.HyperPars.LossMeasure predmu.T (Expr.transpose target)

@@ -138,6 +138,7 @@ module ArrayND =
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
             // slow element-wise fallback copy
+            printfn "Warning: fallback slow ArrayNDT.CopyTo is being used"
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
@@ -159,6 +160,14 @@ module ArrayND =
         member this.BroadcastToSame (other: ArrayNDT<_>) =
             let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
             this.NewView lThis, other.NewView lOther
+
+        /// broadcasts this and other1 and other2 to the same shape if possible
+        member this.BroadcastToSame3 (other1: ArrayNDT<_>) (other2: ArrayNDT<_>) =
+            let layouts = ArrayNDLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
+            match layouts with
+            | [lThis; lOther1; lOther2] ->
+                this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
+            | _ -> failwith "impossible"
 
         /// broadcasts this array to the given shape if possible
         member this.BroadcastToShape shp = 
@@ -190,7 +199,6 @@ module ArrayND =
 
         abstract Map2Impl: ('T -> 'T -> 'R) -> ArrayNDT<'T> -> ArrayNDT<'R> -> unit
         default this.Map2Impl f other result =
-            // slow fallback mapping
             for idx in ArrayNDLayout.allIdx this.Layout do
                 result.[idx] <- f this.[idx] other.[idx]
 
@@ -204,6 +212,25 @@ module ArrayND =
             this.Map2Impl f other res
             res
 
+        abstract IfThenElseImpl: ArrayNDT<bool> -> ArrayNDT<'T> -> ArrayNDT<'T> -> unit
+        default this.IfThenElseImpl cond elseVal result =
+            for idx in ArrayNDLayout.allIdx this.Layout do
+                result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
+
+        /// elementwise uses elements from this if cond is true, 
+        /// otherwise elements from elseVal
+        member this.IfThenElse (cond: #ArrayNDT<bool>) (elseVal: #ArrayNDT<'T>) =
+            if elseVal.GetType() <> this.GetType() then
+                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (elseVal.GetType())
+            if cond.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
+                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (cond.GetType())
+            let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
+            let res = this.NewOfSameType (ArrayNDLayout.newC ifVal.Shape)
+            ifVal.IfThenElseImpl cond elseVal res
+            res
+     
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
@@ -527,9 +554,11 @@ module ArrayND =
     let inline transpose a =
         relayout (ArrayNDLayout.transpose (layout a)) a
 
-    /// reorders the axes as specified
-    let inline reorderAxes (newOrder: int list) a =
-        relayout (ArrayNDLayout.reorderAxes newOrder (layout a)) a
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let inline permuteAxes (permut: int list) a =
+        relayout (ArrayNDLayout.permuteAxes permut (layout a)) a
 
     /// creates a view of an ArrayND
     let inline view ranges a =
@@ -540,8 +569,14 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// creates a scalar ArrayND of given value and type
-    let scalarOfType (value: 'T) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
+    let scalarOfSameType (a: 'B when 'B :> ArrayNDT<'T>) (value: 'T) : 'B =
         let ary = newCOfSameType [] a
+        set [] value ary
+        ary
+
+    /// creates a scalar ArrayND of given value 
+    let scalarOfType a (value: 'T) =
+        let ary = newCOfType [] a
         set [] value ary
         ary
 
@@ -651,6 +686,12 @@ module ArrayND =
         let m = a.CastToMe mCast
         m :?> 'B
 
+    let inline uncheckedApplyTypeChange (f: ArrayNDT<'A> -> ArrayNDT<'R>) 
+            (a: 'B when 'B :> ArrayNDT<'T>) : ArrayNDT<'R> =
+        let aCast = a.Cast<'A> ()
+        let mCast = f aCast 
+        mCast
+
     let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) 
             (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : 'B =
         let aCast = a.Cast<'A> ()
@@ -688,6 +729,19 @@ module ArrayND =
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
 
+    let inline typedApplyTypeChange  (fBool:   ArrayNDT<bool>   -> ArrayNDT<'R>) 
+                                     (fDouble: ArrayNDT<double> -> ArrayNDT<'R>) 
+                                     (fSingle: ArrayNDT<single> -> ArrayNDT<'R>)
+                                     (fInt:    ArrayNDT<int>    -> ArrayNDT<'R>)
+                                     (fByte:   ArrayNDT<byte>   -> ArrayNDT<'R>)
+                                     (a: #ArrayNDT<'T>) =
+        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApplyTypeChange fBool a 
+        elif typeof<'T>.Equals(typeof<double>) then uncheckedApplyTypeChange fDouble a 
+        elif typeof<'T>.Equals(typeof<single>) then uncheckedApplyTypeChange fSingle a 
+        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApplyTypeChange fInt    a 
+        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApplyTypeChange fByte   a 
+        else failwith "unknown type"
+
     let inline typedApply2  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<bool>) 
                             (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
@@ -721,6 +775,14 @@ module ArrayND =
                         (fByte:   byte   -> byte)
                         (a: #ArrayNDT<'T>) =
         typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fByte) a
+
+    let inline typedMapTypeChange (fBool:   bool   -> 'R)
+                                  (fDouble: double -> 'R) 
+                                  (fSingle: single -> 'R)
+                                  (fInt:    int    -> 'R)
+                                  (fByte:   byte   -> 'R)
+                                  (a: #ArrayNDT<'T>) =
+        typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fByte) a
 
     let inline typedMap2 (fBool:   bool   -> bool   -> bool)
                          (fDouble: double -> double -> double) 
@@ -790,23 +852,35 @@ module ArrayND =
         static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a b
 
         // element-wise binary with scalars
-        static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfType b a)
-        static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfType b a)
-        static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfType b a)
-        static member inline (/) (a: #ArrayNDT<'T>, b: 'T) = a / (scalarOfType b a)
-        static member inline (%) (a: #ArrayNDT<'T>, b: 'T) = a % (scalarOfType b a)
-        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfType b a)       
-        static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfType b a)
-        static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfType b a)
+        static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfSameType a b)
+        static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfSameType a b)
+        static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfSameType a b)
+        static member inline (/) (a: #ArrayNDT<'T>, b: 'T) = a / (scalarOfSameType a b)
+        static member inline (%) (a: #ArrayNDT<'T>, b: 'T) = a % (scalarOfSameType a b)
+        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfSameType a b)        
+        static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfSameType a b)
+        static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfSameType a b)
+        static member (====) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
+        static member (<<<<) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
+        static member (<<==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) a (scalarOfSameType a b)    
+        static member (>>>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
+        static member (>>==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
+        static member (<<>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
 
-        static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) + b
-        static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) - b
-        static member inline (*) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) * b
-        static member inline (/) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) / b
-        static member inline (%) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) % b
-        static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfType a b) ** b
-        static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) &&&& b
-        static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfType a b) |||| b
+        static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) + b
+        static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) - b
+        static member inline (*) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) * b
+        static member inline (/) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) / b
+        static member inline (%) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) % b
+        static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) ** b
+        static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) &&&& b
+        static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) |||| b
+        static member (====) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (scalarOfSameType b a) b
+        static member (<<<<) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (scalarOfSameType b a) b
+        static member (<<==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
+        static member (>>>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (scalarOfSameType b a) b
+        static member (>>==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
+        static member (<<>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
 
         // transposition
         member this.T = transpose this
@@ -816,12 +890,35 @@ module ArrayND =
         ArrayNDT<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
+    /// Check for exact equality when type is int or bool.
     let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
-        abs (a - b) <<== aTol + rTol * abs b
+        match typeof<'T> with
+        | t when t = typeof<bool> -> (box a :?> ArrayNDT<bool>) ==== (box b :?> ArrayNDT<bool>) 
+        | t when t = typeof<int>  -> (box a :?> ArrayNDT<int>)  ==== (box b :?> ArrayNDT<int>) 
+        | _ ->  abs (a - b) <<== aTol + rTol * abs b
 
     /// Elementwise check if two arrays have same (within machine precision) values.
     let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
+
+    /// Elementwise check if a value is finite (not NaN and not infinite).
+    let inline isFinite (a: ArrayNDT<'T>) =
+        let isFiniteSingle v = not (System.Single.IsInfinity v || System.Single.IsNaN v)
+        let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
+        typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) a
+
+    /// Elementwise picks the maximum of a or b.
+    let inline maxElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        typedMap2 (max) (max) (max) (max) (max) a b
+
+    /// Elementwise picks the minimum of a or b.
+    let inline minElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+        typedMap2 (min) (min) (min) (min) (min) a b
+
+    /// Elementwise uses elements from ifTrue if cond is true, 
+    /// otherwise elements from ifFalse.
+    let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
+        ifTrue.IfThenElse cond ifFalse :?> 'B
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
@@ -834,15 +931,20 @@ module ArrayND =
         | _ -> failwithf "array of shape %A is not a scalar" (shape a)
       
     /// applies the given reduction function over the given dimension
-    let inline axisReduce f dim a =
-        let c = newCOfSameType (List.without dim (shape a)) a
-        for srcRng, dstIdx in ArrayNDLayout.allSourceRangesAndTargetIdxsForAxisReduction dim (layout a) do
+    let inline axisReduceTypeChange (f: ArrayNDT<'T> -> ArrayNDT<'R>) dim (a: ArrayNDT<'T>) : ArrayNDT<'R> =
+        let c = newCOfType (List.without dim (shape a)) a
+        for srcRng, dstIdx in ArrayNDLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
             set dstIdx (f (view srcRng a) |> get []) c
         c
 
+    /// applies the given reduction function over the given dimension
+    let inline axisReduce (f: ArrayNDT<'T> -> ArrayNDT<'T>) dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        axisReduceTypeChange f dim a :?> 'A
+
     let inline private sumImpl (a: ArrayNDT<'T>) =
-        let value = allElems a |> Seq.fold (+) ArrayNDT<'T>.Zero         
-        scalarOfType value a
+        allElems a 
+        |> Seq.fold (+) ArrayNDT<'T>.Zero         
+        |> scalarOfSameType a 
 
     /// element-wise sum
     let sum (a: #ArrayNDT<'T>) =
@@ -853,8 +955,9 @@ module ArrayND =
         axisReduce sum dim a
     
     let inline private productImpl (a: ArrayNDT<'T>) =
-        let value = allElems a |> Seq.fold (*) ArrayNDT<'T>.One
-        scalarOfType value a
+        allElems a 
+        |> Seq.fold (*) ArrayNDT<'T>.One
+        |> scalarOfSameType a 
 
     /// element-wise product
     let product (a: #ArrayNDT<'T>) =
@@ -865,40 +968,72 @@ module ArrayND =
         axisReduce product dim a
 
     let inline private maxImpl a =
-        let value = allElems a |> Seq.reduce max
-        scalarOfType value a
+        allElems a 
+        |> Seq.reduce max
+        |> scalarOfSameType a 
 
     /// maximum value
     let max a =
         if nElems a = 0 then invalidArg "a" "cannot compute max of empty ArrayNDT"
         typedApply (unsp) maxImpl maxImpl maxImpl maxImpl a
+    
+    /// position of maximum value
+    let argMax a =
+        allIdx a
+        |> Seq.maxBy (fun idx -> a |> get idx)
 
     /// maximum value over given axis
     let maxAxis dim a = 
         axisReduce max dim a
 
+    let inline private argMaxAxisReduc (a: ArrayNDT<'T>) =
+        allIdx a
+        |> Seq.maxBy (fun idx -> a |> get idx)
+        |> fun idx -> idx.[0]
+        |> scalarOfType a
+
+    /// positions of maximum values along given axis
+    let argMaxAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
+        axisReduceTypeChange argMaxAxisReduc dim a
+
     let inline private minImpl a =
-        let value = allElems a |> Seq.reduce min
-        scalarOfType value a
+        allElems a 
+        |> Seq.reduce min
+        |> scalarOfSameType a 
 
     /// minimum value
     let min a =
         if nElems a = 0 then invalidArg "a" "cannot compute min of empty ArrayNDT"
         typedApply (unsp) minImpl minImpl minImpl minImpl a
 
+    /// position of maximum value
+    let argMin a =
+        allIdx a
+        |> Seq.minBy (fun idx -> a |> get idx)
+
     /// minimum value over given axis
     let minAxis dim a = 
         axisReduce min dim a
 
+    let inline private argMinAxisReduc (a: ArrayNDT<'T>) =
+        allIdx a
+        |> Seq.minBy (fun idx -> a |> get idx)
+        |> fun idx -> idx.[0]
+        |> scalarOfType a
+
+    /// positions of maximum values along given axis
+    let argMinAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
+        axisReduceTypeChange argMinAxisReduc dim a
+
     /// true if all elements of the array are true
     let all a =
         let value = allElems a |> Seq.fold (&&) true
-        scalarOfType value a
+        scalarOfSameType a value
 
     /// true if any element of the array is true
     let any a =
         let value = allElems a |> Seq.fold (||) false
-        scalarOfType value a
+        scalarOfSameType a value
      
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations
@@ -918,6 +1053,10 @@ module ArrayND =
     /// If arrays have different shape, then false is returned.
     let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
         almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
+
+    /// Returns true if all values in the tensor are finite (not NaN and not infinite).
+    let inline allFinite (a: ArrayNDT<'T>) =
+        a |> isFinite |> all
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
@@ -1135,7 +1274,7 @@ module ArrayND =
         diffAxis (a.NDims-1) a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    // concatenation
+    // concatenation and replication
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
     /// Concatenates the list of tensors in the given axis.
@@ -1169,8 +1308,22 @@ module ArrayND =
                         else RngAll)
                 cc.[ccRng] <- ary
                 pos <- pos + aryLen
-
         cc
+
+    /// Replicates the tensor the given number of repetitions along the given axis.
+    let replicate dim reps (ary: #ArrayNDT<'T>) =
+        ary |> checkAxis dim
+        if reps < 0 then
+            invalidArg "reps" "number of repetitions cannot be negative"
+
+        // 1. insert axis of size one left to repetition axis
+        // 2. broadcast along the new axis to number of repetitions
+        // 3. reshape to result shape
+        ary 
+        |> reshape (ary.Shape |> List.insert dim 1)
+        |> broadcastDim dim reps
+        |> reshape (ary.Shape |> List.set dim (reps * ary.Shape.[dim]))
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // pretty printing
@@ -1205,6 +1358,7 @@ module ArrayND =
                         | t when t=typeof<double> -> "      ..."
                         | t when t=typeof<int>    -> " ..."
                         | t when t=typeof<byte>   -> "..."
+                        | t when t=typeof<bool>   -> " ... "
                         | _ -> "..."
                     (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
 
@@ -1215,6 +1369,7 @@ module ArrayND =
                 elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
                 elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
                 elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
+                elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
                 else sprintf "%A;" v
             | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
             | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"

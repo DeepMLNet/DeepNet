@@ -10,43 +10,46 @@ open ElemExpr
 module ElemExprDeriv =
 
     /// map containing the derivative for each argument
-    type DerivT<'T> = Map<ArgElementSpecT, ElemExprT<'T>>
+    type DerivT = Map<ArgElementSpecT, ElemExprT>
         
     /// merges to derivative maps
-    let private merge (aGrads: DerivT<_>) (bGrads: DerivT<_>) : DerivT<_> =
+    let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
         (aGrads, bGrads)
         ||> Map.fold (fun m v vg -> match Map.tryFind v m with
                                     | Some ovg -> m |> Map.add v (vg + ovg)
                                     | None -> m |> Map.add v vg) 
 
-    let rec reverseDiffStep (expr: ElemExprT<'T>) (eg: ElemExprT<'T>) : DerivT<'T> =    
+    let rec reverseDiffStep (expr: ElemExprT) (eg: ElemExprT) : DerivT =    
         let rds = reverseDiffStep
-        
+        let zero = 0 |> convTo expr.Type |> scalar
+        let one = 1 |> convTo expr.Type |> scalar
+        let two = 2 |> convTo expr.Type |> scalar
+
         match expr with
         | Leaf (op) ->
             match op with
             | Const _ -> Map.empty
             | SizeValue _ -> Map.empty
-            | ArgElement argSpec -> Map [argSpec, eg]
+            | ArgElement (argSpec, _) -> Map [argSpec, eg]
 
         | Unary (op, a) ->
             match op with
             | Negate -> -eg |> rds a
             | Abs -> eg * signt a |> rds a
             | SignT -> Map.empty
-            | Log -> eg * (a ** -(one())) |> rds a
-            | Log10 -> eg |> rds (log a / log (scalart 10))
+            | Log -> eg * (a ** -(one)) |> rds a
+            | Log10 -> eg |> rds (log a / log (scalar 10))
             | Exp -> eg * exp a |> rds a
             | Sin -> eg * cos a |> rds a
             | Cos -> eg * (-sin a) |> rds a
-            | Tan -> eg * (one<'T>() + (tan a)**two<'T>()) |> rds a
-            | Asin -> eg * (one<'T>() / sqrtt (one<'T>() - a**two<'T>())) |> rds a
-            | Acos -> eg * (-one<'T>() / sqrtt (one<'T>() - a**two<'T>())) |> rds a
-            | Atan -> eg * (one<'T>() / (one<'T>() + a**two<'T>())) |> rds a
+            | Tan -> eg * (one + (tan a)**two) |> rds a
+            | Asin -> eg * (one / sqrtt (one - a**two)) |> rds a
+            | Acos -> eg * (-one / sqrtt (one - a**two)) |> rds a
+            | Atan -> eg * (one / (one + a**two)) |> rds a
             | Sinh -> eg * cosh a |> rds a
             | Cosh -> eg * sinh a |> rds a
-            | Tanh -> eg * (one<'T>() - (tanh a)**two<'T>()) |> rds a
-            | Sqrt -> eg * (one<'T>() / (two<'T>() * sqrtt a)) |> rds a
+            | Tanh -> eg * (one - (tanh a)**two) |> rds a
+            | Sqrt -> eg * (one / (two * sqrtt a)) |> rds a
             | Ceil -> Map.empty
             | Floor -> Map.empty
             | Round -> Map.empty
@@ -62,30 +65,32 @@ module ElemExprDeriv =
             | Add -> eg .+ eg 
             | Substract -> eg .+ (-eg)
             | Multiply -> (eg * b) .+ (a * eg)
-            | Divide -> eg |> rds (a * b ** (-one()))
+            | Divide -> eg |> rds (a * b ** (-one))
             | Modulo -> eg .+ (-truncate (a / b))    // TODO: FIXME
-            | Power -> (eg * b * a**(b - one())) .+ (eg * a**b * log a)
+            | Power -> (eg * b * a**(b - one)) .+ (eg * a**b * log a)
             | IfThenElse (left, right) -> 
-                ifThenElse left right eg (zero()) .+ ifThenElse left right (zero()) eg 
+                ifThenElse left right eg zero .+ ifThenElse left right zero eg 
 
+    let compute (expr: ElemExprT) : DerivT =
+        let one = 1 |> convTo expr.Type |> scalar
+        reverseDiffStep expr one
 
-    let compute (expr: ElemExprT<'T>) : DerivT<'T> =
-        reverseDiffStep expr (one())
-
-    let ofArgElem (argElem: ElemExprT<'T>) (deriv: DerivT<'T>) =
+    let ofArgElem (argElem: ElemExprT) (deriv: DerivT) =
+        let zero = 0 |> convTo argElem.Type |> scalar
         match deriv |> Map.tryFind (ElemExpr.extractArg argElem) with
         | Some da -> da
-        | None -> ElemExpr.zero ()
+        | None -> zero
 
     type private DerivDim =
         | SummingDim of SizeSymbolT * SizeSpecT * SizeSpecT * SizeSymbolT
         | FixedDim of SizeSpecT * SizeSymbolT
 
-    let buildDerivElemExpr (expr: ElemExprT<'T>) (exprShp: ShapeSpecT) nArgs =
+    let buildDerivElemExpr (expr: ElemExprT) (exprShp: ShapeSpecT) nArgs =
         let nDims = ShapeSpec.nDim exprShp
         let allDerives = compute expr
         let egArgNo = nArgs
-        let egElem = ElemExpr.argElem egArgNo
+        let egElem = ElemExpr.argElemWithType (ElemExpr.typeName expr).Type egArgNo
+        let zero = 0 |> convTo expr.Type |> scalar
 
         let mutable sumSymbolCnt = 0
         let newSumSymbol () =
@@ -136,12 +141,11 @@ module ElemExprDeriv =
                                     derivSumSoFar
                                     |> ElemExpr.substSymSizes (Map [oldSym, ss]))
 
-
                         // apply constraints if necessary
                         let argExpr =
                             (argExprSumed, sol.RightValues)
                             ||> Map.fold (fun kroneckersSoFar idxSym reqVal ->
-                                ElemExpr.ifThenElse (Base (Sym idxSym)) reqVal kroneckersSoFar (ElemExpr.zero()))
+                                ElemExpr.ifThenElse (Base (Sym idxSym)) reqVal kroneckersSoFar zero)
 
                         // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
                         let resSyms = [for d=1 to nArgDims do yield idx d]
@@ -153,7 +157,7 @@ module ElemExprDeriv =
                 ]
 
                 let argExprSum = 
-                    if List.isEmpty argExprs then zero ()
+                    if List.isEmpty argExprs then zero 
                     else argExprs |> List.reduce (+)
                 yield argExprSum
         ]

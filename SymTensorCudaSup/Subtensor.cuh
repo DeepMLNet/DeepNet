@@ -9,7 +9,7 @@ _dev TDyn dynamicSubtensor(TBase &base, const TIdx &idx) {
 	TDyn dyn;
 	dyn.mData = const_cast<typename TDyn::DataType *>(base.data());
 	dyn.mOffset = base.offset();
-	for (size_t dim = 0; dim < dyn.nDim(); dim++) {
+	for (idx_t dim = 0; dim < dyn.nDim(); dim++) {
 		if (idx[dim])
 			dyn.mOffset += base.stride(dim) * (*(idx[dim]));
 		dyn.mStride[dim] = base.stride(dim);
@@ -23,9 +23,9 @@ _dev const TDyn dynamicSubtensor(const TBase &base, const TIdx &idx) {
 }
 
 
-template <typename TTrgt, typename TBaseSrc, typename TDynSrc, size_t nTrgtIdxs>
+template <typename TTrgt, typename TBaseSrc, typename TDynSrc, idx_t nTrgtIdxs>
 _dev void copyFromDynamicSubtensor(TTrgt &trgt, 
-								   const TBaseSrc &baseSrc, const Array<size_t *, nTrgtIdxs> &srcIdx)
+								   const TBaseSrc &baseSrc, const Array<idx_t *, nTrgtIdxs> &srcIdx)
 {
 	IdEOp_t copyOp;
 	TDynSrc dynSrc = dynamicSubtensor<TDynSrc>(baseSrc, srcIdx);
@@ -33,8 +33,8 @@ _dev void copyFromDynamicSubtensor(TTrgt &trgt,
 }
 
 
-template <typename TBaseTrgt, typename TDynTrgt, size_t nTrgtIdxs, typename TSrc>
-_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<size_t *, nTrgtIdxs> &trgtIdx,
+template <typename TBaseTrgt, typename TDynTrgt, idx_t nTrgtIdxs, typename TSrc>
+_dev void copyToDynamicSubtensor(TBaseTrgt &baseTrgt, const Array<idx_t *, nTrgtIdxs> &trgtIdx,
 								 const TSrc &src)
 {
 	IdEOp_t copyOp;

@@ -13,9 +13,12 @@ open MKL
 module ArrayNDHostTypes = 
 
     /// pinned .NET managed memory
-    type PinnedMemoryT (gcHnd: GCHandle) =       
+    type PinnedMemoryT (gcHnd: GCHandle, size: int64) =       
         /// pointer to storage array 
         member this.Ptr = gcHnd.AddrOfPinnedObject()
+
+        /// size of storage array in bytes
+        member this.Size = size
 
         interface IDisposable with
             member this.Dispose() = gcHnd.Free()
@@ -69,7 +72,7 @@ module ArrayNDHostTypes =
         /// pins the underlying data array and returns the corresponding GCHandle
         member this.Pin () =
             let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-            new PinnedMemoryT (gcHnd) 
+            new PinnedMemoryT (gcHnd, data.LongLength * int64 sizeof<'T>) 
 
         /// size of underlying data array in bytes
         member this.DataSizeInBytes = data.Length * sizeof<'T>
@@ -100,7 +103,6 @@ module ArrayNDHostTypes =
             ArrayNDT<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDHostT<'T> as dest ->
-
                 if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
                         ArrayND.stride this = ArrayND.stride dest then
                     // use array block copy
@@ -140,6 +142,23 @@ module ArrayNDHostTypes =
             for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
                 destData.[destAddr] <- f data.[thisAddr] otherData.[otherAddr]
 
+        override this.IfThenElseImpl (cond: ArrayNDT<bool>) (elseVal: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
+            let cond = cond :?> ArrayNDHostT<bool>
+            let elseVal = elseVal :?> ArrayNDHostT<'T>
+            let dest = dest :?> ArrayNDHostT<'T>                
+            let condData = cond.Data
+            let ifValData = this.Data
+            let elseValData = elseVal.Data
+            let destData = dest.Data
+            let condAddrs = FastLayout.allAddr cond.FastLayout
+            let ifValAddrs = FastLayout.allAddr this.FastLayout
+            let elseValAddrs = FastLayout.allAddr elseVal.FastLayout
+            let destAddrs = FastLayout.allAddr dest.FastLayout
+            for destAddr, condAddr, (ifValAddr, elseValAddr) in 
+                    Seq.zip3 destAddrs condAddrs (Seq.zip ifValAddrs elseValAddrs) do
+                destData.[destAddr] <- 
+                    if condData.[condAddr] then ifValData.[ifValAddr] else elseValData.[elseValAddr]
+
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
                 FastLayout.allAddr this.FastLayout
@@ -175,7 +194,9 @@ module ArrayNDHostTypes =
 
         static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDHostT<bool>
         static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDHostT<bool>
+        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<== b :?> ArrayNDHostT<bool>
         static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDHostT<bool>
+        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>== b :?> ArrayNDHostT<bool>
         static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDHostT<bool>
 
         /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS

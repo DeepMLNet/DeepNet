@@ -154,6 +154,15 @@ module SizeMultinomTypes =
             |> Map.ofSeq
             |> SizeMultinomT
 
+        member this.ContainedSizeSymbols =
+            products
+            |> Map.toSeq
+            |> Seq.map (fun (sp, _) -> sp.Symbols 
+                                       |> Map.toSeq 
+                                       |> Seq.map (fun (sym, _) -> sym))
+            |> Seq.concat
+            |> Set.ofSeq
+
         member this.PrettyString =
             products
             |> Map.toSeq
@@ -266,6 +275,18 @@ module SizeSpecTypes =
         /// unequal size ignoring broadcastability
         static member (.<>) (ssa: SizeSpecT, ssb: SizeSpecT) = not (ssa .= ssb)
 
+        /// the set of all contained SizeSymbols
+        member this.ContainedSizeSymbols =
+            match this with
+            | Base (Sym s)   -> Set [s]
+            | Base (Fixed _) -> Set.empty
+            | Broadcast      -> Set.empty
+            | Multinom m     -> m.ContainedSizeSymbols
+            
+        /// true if the specified SizeSymbol occurs in this SizeSpec
+        member this.ContainsSymbol sym =
+            this.ContainedSizeSymbols.Contains sym
+
         member this.PrettyString =
             match this with
             | Base b -> sprintf "%A" b
@@ -350,6 +371,16 @@ module SizeSpec =
         | Some s -> s
         | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
 
+    /// returns the set of all contained SizeSymbols
+    let containedSizeSymbols (ss: SizeSpecT) =
+        ss.ContainedSizeSymbols
+
+    /// true if the specified SizeSymbol occurs in the SizeSpec
+    let containsSymbol sym (ss: SizeSpecT) =
+        ss.ContainsSymbol sym 
+
+            
+
 
 [<AutoOpen>]
 module ShapeSpecTypes =
@@ -365,13 +396,16 @@ module ShapeSpecTypes =
 module ShapeSpec =
     open SizeSymbolTypes
 
-    let withoutAxis ax (sa: ShapeSpecT) =
+    let insertAxis ax ss (sa: ShapeSpecT) : ShapeSpecT =
+        sa |> List.insert ax ss
+
+    let withoutAxis ax (sa: ShapeSpecT) : ShapeSpecT =
         sa |> List.without ax
 
-    let insertBroadcastAxis ax (sa: ShapeSpecT) =
-        sa |> List.insert ax Broadcast
+    let insertBroadcastAxis ax (sa: ShapeSpecT) : ShapeSpecT =
+        sa |> insertAxis ax Broadcast
 
-    let set ax size (sa: ShapeSpecT) =
+    let set ax size (sa: ShapeSpecT) : ShapeSpecT =
         sa |> List.set ax size
 
     let nDim (sa: ShapeSpecT) =
@@ -381,43 +415,54 @@ module ShapeSpec =
         if List.isEmpty sa then SizeSpec.one
         else List.reduce (*) sa
 
-    let flatten (sa: ShapeSpecT) =
+    let flatten (sa: ShapeSpecT) : ShapeSpecT =
         [nElem sa]
 
-    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) =
+    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) : ShapeSpecT =
         sa @ sb
 
-    let transpose (sa: ShapeSpecT) =
+    let transpose (sa: ShapeSpecT) : ShapeSpecT =
         if nDim sa <> 2 then failwithf "need matrix to transpose but have shape %A" sa
         List.rev sa
 
-    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) =
+    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) : ShapeSpecT =
         sa  |> List.set ax1 sa.[ax2]
             |> List.set ax2 sa.[ax1]
 
-    let scalar = []
+    let scalar : ShapeSpecT = []
 
-    let vector (ss: SizeSpecT) = [ss]
+    let vector (ss: SizeSpecT) : ShapeSpecT = [ss]
 
-    let matrix (sr: SizeSpecT) (sc: SizeSpecT) = [sr; sc]
+    let matrix (sr: SizeSpecT) (sc: SizeSpecT) : ShapeSpecT = [sr; sc]
 
-    let emptyVector = [Base (Fixed 0)]
+    let emptyVector : ShapeSpecT = [Base (Fixed 0)]
 
-    let padLeft (sa: ShapeSpecT) =
+    let padLeft (sa: ShapeSpecT) : ShapeSpecT =
         (Broadcast)::sa
 
-    let padRight (sa: ShapeSpecT) =
+    let padRight (sa: ShapeSpecT) : ShapeSpecT =
         sa @ [Broadcast]
 
+    /// pads shapes from the left until they have same rank
     let rec padToSame sa sb =
-        if nDim sa < nDim sb then padToSame (padRight sa) sb
-        elif nDim sb < nDim sa then padToSame sa (padRight sb)
+        if nDim sa < nDim sb then padToSame (padLeft sa) sb
+        elif nDim sb < nDim sa then padToSame sa (padLeft sb)
         else sa, sb
 
-    let broadcast (sa: ShapeSpecT) dim size =
+    /// pads shapes from the left until they have same rank
+    let rec padToSameMany sas =
+        let nDimsNeeded = sas |> List.map nDim |> List.max
+        sas 
+        |> List.map (fun sa ->
+            let mutable sa = sa
+            while nDim sa < nDimsNeeded do
+                sa <- padLeft sa
+            sa)
+
+    let broadcast (sa: ShapeSpecT) dim size : ShapeSpecT =
         match sa.[dim] with
-            | Broadcast -> List.set dim size sa
-            | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
+        | Broadcast -> List.set dim size sa
+        | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
     let broadcastToSameInDims dims mustEqual saIn sbIn =
         let mutable sa, sb = saIn, sbIn
@@ -425,28 +470,57 @@ module ShapeSpec =
             if not (d < nDim sa && d < nDim sb) then
                 failwithf "cannot broadcast shapes %A and %A to same size in non-existant dimension %d" sa sb d
             match sa.[d], sb.[d] with
-                | al, bl when al = Broadcast -> sa <- broadcast sa d bl
-                | al, bl when bl = Broadcast -> sb <- broadcast sb d al
-                | al, bl when (if mustEqual then al = bl else true) -> ()        
-                | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
+            | al, bl when al = Broadcast -> sa <- broadcast sa d bl
+            | al, bl when bl = Broadcast -> sb <- broadcast sb d al
+            | al, bl when (if mustEqual then al = bl else true) -> ()        
+            | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
+
+    let broadcastToSameInDimsMany dims mustEqual sas =
+        let mutable sas = sas
+        for d in dims do
+            if not (sas |> List.forall (fun sa -> d < nDim sa)) then
+                failwithf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
+            let ls = sas |> List.map (fun sa -> sa.[d])
+            if ls |> List.exists ((=) Broadcast) then
+                let nonBc = ls |> List.filter (fun l -> l <> Broadcast)
+                match Set nonBc |> Set.count with
+                | 0 -> ()
+                | 1 ->
+                    let target = List.head nonBc
+                    sas <- sas |> List.map (fun sa -> sa |> set d target)
+                | _ ->
+                    failwithf "cannot broadcast shapes %A to same size in dimension %d because \
+                               they don't agree in the target size" sas d                
+            elif mustEqual then
+                if Set ls |> Set.count > 1 then
+                    failwithf "non-broadcast dimension %d of shapes %A does not agree" d sas
+        sas
 
     let broadcastToSame mustEqual sa sb =
         if nDim sa <> nDim sb then 
             failwithf "cannot broadcast shapes %A and %A of different rank to same size" sa sb
         broadcastToSameInDims [0 .. (nDim sa - 1)] mustEqual sa sb
 
-    let enableBroadcast dim (sa: ShapeSpecT) =
+    let broadcastToSameMany mustEqual sas =
+        match sas with
+        | [] -> []
+        | sa::rSas ->
+            if rSas |> List.exists (fun rsa -> nDim sa <> nDim rsa) then
+                failwithf "cannot broadcast shapes %A of different rank to same size" sas                
+            broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
+
+    let enableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBroadcast dim (sa: ShapeSpecT) =
+    let disableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
         match sa.[dim] with
         | Base (Fixed 1) | Broadcast -> List.set dim (Base (Fixed 1)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableAllBroadcasts sa =
+    let disableAllBroadcasts sa : ShapeSpecT =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed 1) else ss) sa
 
     let equalWithBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
@@ -456,6 +530,12 @@ module ShapeSpec =
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
          List.length sa = List.length sb &&
             List.forall2 SizeSpec.equalWithBroadcastability sa sb
+
+    /// Permutes the axes as specified.
+    let permuteAxes (permut: int list) (sa: ShapeSpecT) : ShapeSpecT =
+        if nDim sa <> List.length permut then
+            failwithf "permutation %A must have same rank as shape %A" permut sa
+        sa |> List.permute (fun i -> permut.[i])
 
     /// evaluates shape to numeric shape, if possible
     let tryEval (sa: ShapeSpecT) : NShapeSpecT option =

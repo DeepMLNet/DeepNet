@@ -19,14 +19,14 @@ let ``Eval: simple`` () =
     printfn "======= Testing evaluation:"
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
 
     let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
     let yVal = [[4.0; 5.0; 6.0]
                 [7.0; 8.0; 9.0]] |> ArrayNDHost.ofList2D
-    let res = ElemExpr.eval expr [xVal; yVal] [xVal.Shape.[0]]
+    let res = ElemExprHostEval.eval expr [xVal; yVal] [xVal.Shape.[0]]
 
     printfn "Expr:\n%A" expr
     printfn "x=\n%A" xVal
@@ -48,13 +48,13 @@ let ``Eval: sum`` () =
     let js = SizeSpec.fix 3
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
+    let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
 
     let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
     let xVal = xVal + ArrayNDHost.ones [3; 3]
-    let res = ElemExpr.eval expr [xVal] [xVal.Shape.[0]]
+    let res = ElemExprHostEval.eval expr [xVal] [xVal.Shape.[0]]
 
     printfn "Expr:\n%A" expr
     printfn "x=\n%A" xVal
@@ -74,8 +74,8 @@ let ``Deriv: 1`` () =
     let ks = SizeSpec.symbol "ks"
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [ks] 2
 
@@ -97,8 +97,8 @@ let ``Deriv: 2`` () =
     let k = ElemExpr.idx 0   
     let l = ElemExpr.idx 1
 
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [l; k]
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [ks; ls] 2
 
@@ -118,7 +118,7 @@ let ``Deriv: sum`` () =
     let js = SizeSpec.fix 3
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
+    let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [is] 1
@@ -141,9 +141,9 @@ let ``Eval and deriv: KSE`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
-    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1    
+    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
 
     printfn "KSE:\n%A" kse
@@ -153,7 +153,7 @@ let ``Eval and deriv: KSE`` () =
 
     let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5] |> ArrayNDHost.ofList
-    let kseVal = ElemExpr.eval kse [xVal; lVal] [1; 3; 3]
+    let kseVal = ElemExprHostEval.eval kse [xVal; lVal] [1; 3; 3]
 
     printfn "x=\n%A" xVal
     printfn "l=\n%A" lVal
@@ -161,8 +161,8 @@ let ``Eval and deriv: KSE`` () =
 
     let dKseVal = kseVal |> ArrayND.reshape [1; 1; 3; 3]
 
-    let dKSe0Val = ElemExpr.eval dKse.[0] [xVal; lVal; dKseVal] [1; 1; 3]
-    let dKSe1Val = ElemExpr.eval dKse.[1] [xVal; lVal; dKseVal] [1; 1]
+    let dKSe0Val = ElemExprHostEval.eval dKse.[0] [xVal; lVal; dKseVal] [1; 1; 3]
+    let dKSe1Val = ElemExprHostEval.eval dKse.[1] [xVal; lVal; dKseVal] [1; 1]
     printfn "dkse / dx=\n%A" dKSe0Val
     printfn "dkse / dl=\n%A" dKSe1Val
 
@@ -177,15 +177,15 @@ let ``Codegen: KSE`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
-    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1
+    let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
     let dKsedX, dKsedL = dKse.[0], dKse.[1]
 
-    let uKse = UElemExpr.toUElemFunc kse 3 2
-    let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1)
-    let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1)
+    let uKse = UElemExpr.toUElemFunc kse 3 2 
+    let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1) 
+    let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1) 
     let kseCode = CudaElemExpr.generateFunctor "KSE" uKse
     let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX 
     let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL 
@@ -207,20 +207,20 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
-    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0) / (2.0 * (l [gp])**2.0) )
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1
+    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
 
-    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
-    let lTensor = Expr.var "lTensor" [nGps]
+    let xTensor = Expr.var<double> "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var<double> "lTensor" [nGps]
     let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
 
     let dKse = Deriv.compute kse
     let dKsedX = dKse |> Deriv.ofVar xTensor
     let dKsedL = dKse |> Deriv.ofVar lTensor
 
-    let kseFn = Func.make DevHost.DefaultFactory kse |> arg2 xTensor lTensor
-    let dKseFn = Func.make2 DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+    let kseFn = Func.make<float> DevHost.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2<float, float> DevHost.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
     let kseinv = Expr.invert kse  
     
@@ -228,8 +228,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let dKseinvdX  = dKseinv |> Deriv.ofVar xTensor
     let dKseinvdL  = dKseinv |> Deriv.ofVar lTensor
 
-    let kseinvFn = Func.make DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
-    let dKseinvFn = Func.make2 DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
+    let kseinvFn = Func.make<float> DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
+    let dKseinvFn = Func.make2<float, float> DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
 
     let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5] |> ArrayNDHost.ofList
@@ -248,6 +248,7 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     printfn "kseinv=\n%A" kseinvVal
     printfn "dkseinv / dx=\n%A" dKseinvdXVal
     printfn "dkseinv / dl=\n%A" dKseinvdLVal
+
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Eval and deriv: KSE in Expr on CUDA`` () =   
@@ -263,20 +264,20 @@ let ``Eval and deriv: KSE in Expr on CUDA`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
-    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) )
+    let x = ElemExpr.argElem<single> 0
+    let l = ElemExpr.argElem<single> 1
+    let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) )
 
-    let xTensor = Expr.var "xTensor" [nGps; nSmpls] 
-    let lTensor = Expr.var "lTensor" [nGps]
+    let xTensor = Expr.var<single> "xTensor" [nGps; nSmpls] 
+    let lTensor = Expr.var<single> "lTensor" [nGps]
     let kse = Expr.elements [nGps; nSmpls; nSmpls] kseExpr [xTensor; lTensor]
 
     let dKse = Deriv.compute kse
     let dKsedX = dKse |> Deriv.ofVar xTensor
     let dKsedL = dKse |> Deriv.ofVar lTensor
 
-    let kseFn = Func.make DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
-    let dKseFn = Func.make2 DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
+    let kseFn = Func.make<single> DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
+    let dKseFn = Func.make2<single, single> DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
     let xVal = [[1.0f; 1.1f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
     let lVal = [0.5f] |> ArrayNDHost.ofList |> ArrayNDCuda.toDev
@@ -298,9 +299,9 @@ let kseElemExpr () =
     let gp = ElemExpr.idx 0   
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
-    exp (- ((x [gp; smpl1] - x [gp; smpl2])**2.0f) / (2.0f * (l [gp])**2.0f) )
+    let x = ElemExpr.argElem<single> 0
+    let l = ElemExpr.argElem<single> 1
+    exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) )
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
@@ -361,11 +362,11 @@ let ``Eval and derive: lkse`` () =
     let gp = ElemExpr.idx 0
     let smpl = ElemExpr.idx 1
 
-    let mu = ElemExpr.argElem 0
-    let sigma = ElemExpr.argElem 1
-    let x = ElemExpr.argElem 2
-    let l = ElemExpr.argElem 3
-    let lkse = sqrt( l[gp]**2.0 / (l[gp]**2.0 + sigma[gp;gp]) ) * exp(- ((mu[gp]- x[gp;smpl])**2.0) / (2.0 * (l[gp]**2.0 + sigma[gp;gp])) )
+    let mu = ElemExpr.argElem<float> 0
+    let sigma = ElemExpr.argElem<float> 1
+    let x = ElemExpr.argElem<float> 2
+    let l = ElemExpr.argElem<float> 3
+    let lkse = sqrt( l[gp]***2.0 / (l[gp]***2.0 + sigma[gp;gp]) ) * exp(- ((mu[gp]- x[gp;smpl])***2.0) / (2.0 * (l[gp]***2.0 + sigma[gp;gp])) )
     let dLkse = ElemExprDeriv.buildDerivElemExpr lkse [nGps;nSmpls] 4
 
     printfn "lk=\n%A" lkse
@@ -378,7 +379,7 @@ let ``Eval and derive: lkse`` () =
     let lVal = [0.5;0.6] |> ArrayNDHost.ofList
     let muVal = [1.0;0.5] |> ArrayNDHost.ofList
     let sigmaVal = [[0.4;0.2];[0.2;0.8]] |> ArrayNDHost.ofList2D
-    let lkseVal = ElemExpr.eval lkse [muVal;sigmaVal;xVal;lVal] [2;3]
+    let lkseVal = ElemExprHostEval.eval lkse [muVal;sigmaVal;xVal;lVal] [2;3]
 
     printfn "mu=\n%A" muVal
     printfn "sigma=\n%A" sigmaVal
@@ -388,10 +389,10 @@ let ``Eval and derive: lkse`` () =
 
     let dlkseVal = lkseVal |> ArrayND.reshape [1; 2; 3]
 
-    let dlk0Val = ElemExpr.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
-    let dlk1Val = ElemExpr.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;2]
-    let dlk2Val = ElemExpr.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;3]
-    let dlk3Val = ElemExpr.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
+    let dlk0Val = ElemExprHostEval.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
+    let dlk1Val = ElemExprHostEval.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;2]
+    let dlk2Val = ElemExprHostEval.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;3]
+    let dlk3Val = ElemExprHostEval.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
     printfn "dlkse / dmu=\n%A" dlk0Val
     printfn "dlkse / dsigma=\n%A" dlk1Val
     printfn "dlkse / dx=\n%A" dlk2Val

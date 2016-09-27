@@ -9,12 +9,12 @@ open ArrayNDNS
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT<'T>) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
+    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
-    static member UVarSpecOfExpr<'T> (expr: ExprT<'T>) =
-        UVarSpec.ofExpr expr
+    static member UVarSpecOfExpr<'T> (expr: ExprT) =
+        Expr.extractVar expr
     static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
         value |> dev.ToHost |> ArrayNDHDF.write hdf name
     static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
@@ -30,7 +30,7 @@ type private ValueType =
 
 type private RFieldInfo = {
     Expr:           obj
-    VarSpec:        UVarSpecT
+    VarSpec:        VarSpecT
     ValueType:      ValueType
 }
 
@@ -59,13 +59,13 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 let baseType, valueType, exprType =                   
                     if valField.PropertyType.IsGenericType && 
                             valField.PropertyType.GetGenericTypeDefinition() = typedefof<ArrayNDT<_>> then
-                        // ArrayNDT<'T> => ExprT<'T>
+                        // ArrayNDT<'T> => ExprT
                         let bt = valField.PropertyType.GetGenericArguments().[0]
-                        bt, Array bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
+                        bt, Array bt, typeof<ExprT>
                     else
-                        // 'T => ExprT<'T> (scalar)
+                        // 'T => ExprT (scalar)
                         let bt = valField.PropertyType
-                        bt, Scalar bt, typedefof<ExprT<_>>.MakeGenericType [|bt|]
+                        bt, Scalar bt, typeof<ExprT>
 
                 if exprField.PropertyType <> exprType then
                     failwithf "type mismatch for field %s: 'PVal type %A requires 'PExpr type %A but got %A"
@@ -74,7 +74,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 // extract UVarSpecT
                 let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", allBindingFlags) 
                 let m = mi.MakeGenericMethod baseType
-                let varSpec = m.Invoke(null, [|exprData|]) :?> UVarSpecT
+                let varSpec = m.Invoke(null, [|exprData|]) :?> VarSpecT
 
                 yield {Expr=exprData; VarSpec=varSpec; ValueType=valueType}
         } 
@@ -101,9 +101,9 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                         let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
                         let m = mi.MakeGenericMethod baseType
                         let valueAry = m.Invoke(null, [|box value; box dev|]) :?> IArrayNDT
-                        varEnv |> VarEnv.addUVarSpec fi.VarSpec valueAry
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec valueAry
                     | Array _ ->
-                        varEnv |> VarEnv.addUVarSpec fi.VarSpec (value :?> IArrayNDT)
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> IArrayNDT)
                 )
             varEnvCache <- Some (value, varEnv)
             varEnv      
@@ -113,13 +113,13 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
         fun (ve: VarEnvT) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
 
     /// publishes the locations of the used variables to the given ModelInstance
-    member this.PublishLoc (model: ModelInstance<_>) =
+    member this.PublishLoc (model: ModelInstance<'T>) =
         fieldInfos
         |> Seq.iter (fun fi ->
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
                 let mi = typeof<VarRecordHelpers>.GetMethod("PublishLoc", allBindingFlags)
-                let m = mi.MakeGenericMethod baseType
+                let m = mi.MakeGenericMethod typeof<'T>
                 m.Invoke(null, [|fi.Expr; dev.DefaultLoc; model|]) |> ignore
         )
 

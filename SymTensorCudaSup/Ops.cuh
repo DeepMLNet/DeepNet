@@ -3,21 +3,35 @@
 #include "Utils.cuh"
 
 
-// dummy functions for IntelliSense
-#ifndef __CUDACC__ 
-template <typename T> T tex1D(cudaTextureObject_t texObj, float x);
-template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
-template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
-#endif
+
+// ============================= leaf ops ==============================================
+
+struct ConstEOp_t
+{
+	const float value;
+	_dev float operator() () const
+	{
+		return value;
+	}
+};
+
+
+struct ZerosEOp_t
+{
+	_dev float operator() () const
+	{
+		return 0.0f;
+	}
+};
 
 
 struct DiagonalOneIEOp_t {
-	_dev float operator() (const size_t *pos, const size_t dims) const {
+	_dev float operator() (const idx_t *pos, const idx_t dims) const {
 		if (dims == 0) {
 			return 1.0;
 		} else {
 			bool allEqual = true;
-			for (size_t dim = 1; dim <= dims; dim++) {
+			for (idx_t dim = 1; dim <= dims; dim++) {
 				if (pos[0] != pos[dim]) {
 					allEqual = false;
 					break;
@@ -32,80 +46,14 @@ struct DiagonalOneIEOp_t {
 };
 
 
+// ============================= unary ops ==============================================
 
-
-struct ConstEOp_t
+struct IdEOp_t
 {
-	_dev ConstEOp_t(float value) : value(value) {}
-
-	_dev float operator() () const
+	_dev float operator() (float a) const
 	{
-		return value;
+		return a;
 	}
-
-	float value;
-};
-
-
-
-struct ZerosEOp_t
-{
-	_dev float operator() () const
-	{
-		return 0.0f;
-	}
-};
-
-
-struct Interpolate1DEOp_t
-{
-	_devonly float operator() (float a0) const 
-	{
-		float idx0 = (a0 - minArg0) / resolution0 + offset;
-		return tex1D<float>(tbl, idx0);
-	}
-
-	cudaTextureObject_t tbl;
-	float minArg0;
-	float resolution0;
-	float offset;
-};
-
-struct Interpolate2DEOp_t
-{
-	_devonly float operator() (float a0, float a1) const 
-	{
-		float idx0 = (a0 - minArg0) / resolution0 + offset;
-		float idx1 = (a1 - minArg1) / resolution1 + offset;
-		return tex2D<float>(tbl, idx1, idx0);
-	}
-
-	cudaTextureObject_t tbl;
-	float minArg0;
-	float resolution0;
-	float minArg1;
-	float resolution1;
-	float offset;
-};
-
-struct Interpolate3DEOp_t
-{
-	_devonly float operator() (float a0, float a1, float a2) const 
-	{
-		float idx0 = (a0 - minArg0) / resolution0 + offset;
-		float idx1 = (a1 - minArg1) / resolution1 + offset;
-		float idx2 = (a2 - minArg2) / resolution2 + offset;
-		return tex3D<float>(tbl, idx2, idx1, idx0);
-	}
-
-	cudaTextureObject_t tbl;
-	float minArg0;
-	float resolution0;
-	float minArg1;
-	float resolution1;
-	float minArg2;
-	float resolution2;
-	float offset;
 };
 
 
@@ -270,15 +218,38 @@ struct TruncateEOp_t
 	}
 };
 
-
-struct IdEOp_t
+struct NotEOp_t
 {
-	_dev float operator() (float a) const
+	_dev float operator() (bool a) const
 	{
+		return !a;
+	}
+};
+
+struct CheckFiniteIEOp_t {
+	int * const nonFiniteCountPtr;
+	const char name[50];
+
+	_devonly float operator() (const idx_t *pos, const idx_t dims, float a) const {
+		if (!isfinite(a)) {
+			atomicAdd(nonFiniteCountPtr, 1);
+
+			switch (dims) {
+			case 0:	printf("Non-finite element in %s at [].\n", name); break;
+			case 1: printf("Non-finite element in %s at [%lu].\n", name, pos[0]); break;
+			case 2: printf("Non-finite element in %s at [%lu; %lu].\n", name, pos[0], pos[1]); break;
+			case 3: printf("Non-finite element in %s at [%lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2]); break;
+			case 4: printf("Non-finite element in %s at [%lu; %lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2], pos[3]); break;
+			case 5: printf("Non-finite element in %s at [%lu; %lu; %lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2], pos[3], pos[4]); break;
+			default: printf("Non-finite element in %s.", name);
+			}			
+		}
 		return a;
 	}
 };
 
+
+// ============================= binary ops ==============================================
 
 struct AddEOp_t
 {
@@ -319,5 +290,100 @@ struct PowerEOp_t
 		return powf(a, b);
 	}
 };
+
+struct MaxEOp_t
+{
+	_dev float operator() (float a, float b) const
+	{
+		return max(a, b);
+	}
+};
+
+struct MinEOp_t
+{
+	_dev float operator() (float a, float b) const
+	{
+		return min(a, b);
+	}
+};
+
+struct EqualEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a == b;
+	}
+};
+
+struct LessEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a < b;
+	}
+};
+
+struct LessEqualEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a <= b;
+	}
+};
+
+struct GreaterEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a > b;
+	}
+};
+
+struct GreaterEqualEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a >= b;
+	}
+};
+
+struct NotEqualEOp_t
+{
+	_dev bool operator() (float a, float b) const
+	{
+		return a != b;
+	}
+};
+
+struct AndEOp_t
+{
+	_dev bool operator() (bool a, bool b) const
+	{
+		return a && b;
+	}
+};
+
+struct OrEOp_t
+{
+	_dev bool operator() (bool a, bool b) const
+	{
+		return a || b;
+	}
+};
+
+
+// ============================= tertiary ops ==============================================
+
+struct IfThenElseEOp_t
+{
+	_dev float operator() (float ifTrue, float ifFalse, bool cond) const
+	{
+		return cond ? ifTrue : ifFalse;
+	}
+};
+
+
+
+
 
 

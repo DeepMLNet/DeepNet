@@ -21,7 +21,7 @@ module Types =
     /// device memory pointer
     type DevMemPtrT = {
         /// base memory
-        Base: MemManikinT;
+        Base: MemManikinT
         /// offset in elements
         Offset: int
     }
@@ -30,7 +30,7 @@ module Types =
     type HostExternalMemT = {Name: string}
     /// host memory pointer
     type HostMemPtrT = {
-        Base: HostExternalMemT;
+        Base: HostExternalMemT
         Offset: int
     }
 
@@ -43,13 +43,13 @@ module Types =
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// storage location of variables
-        VarStorLoc:                 Map<UVarSpecT, ArrayLocT>
+        VarStorLoc:                 Map<VarSpecT, ArrayLocT>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
         /// texture objects
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator
-        InterpolatorTextures:       Dictionary<IInterpolator, TextureObjectT>
+        InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
         /// values for constants
         ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
     }
@@ -61,11 +61,11 @@ module Types =
 
     /// template instantiation specification
     type TmplInstT = {
-        FuncName:       string; 
-        Domain:         FuncDomainT; 
-        TmplArgs:       string list; 
-        RetType:        string; 
-        ArgTypes:       string list;
+        FuncName:       string
+        Domain:         FuncDomainT
+        TmplArgs:       string list
+        RetType:        string
+        ArgTypes:       string list
     }
 
     /// a CUDA compute stream
@@ -76,9 +76,9 @@ module Types =
 
     /// a CUDA event that can be used for synchronization
     type EventT = {
-        EventObjectId: int; 
-        CorrelationId: int;     
-        EmittingExecUnitId: int;
+        EventObjectId:          EventObjectT
+        CorrelationId:          int     
+        EmittingExecUnitId:     int
     }
 
     type RegHostMemT = {
@@ -97,24 +97,24 @@ module Types =
         Event:                  Dictionary<EventObjectT, CudaEvent>
         InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
-        mutable ExternalVar:    Map<UVarSpecT, IArrayNDCudaT>
-        mutable HostVar:        Map<UVarSpecT, IArrayNDHostT>
+        mutable ExternalVar:    Map<VarSpecT, IArrayNDCudaT>
+        mutable HostVar:        Map<VarSpecT, IArrayNDHostT>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
         ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
     }
     
     /// CUDA device memory range
     type DevMemRngT = {
-        DeviceMem:              CudaDeviceVariable<byte>;
-        OffsetInBytes:          int;
-        LengthInBytes:          int;
+        DeviceMem:              CudaDeviceVariable<byte>
+        OffsetInBytes:          int
+        LengthInBytes:          int
     }
 
     /// CUDA host memory range
     type HostMemRngT = {
-        HostMem:                CudaRegisteredHostMemory<byte>;
-        OffsetInBytes:          int;
-        LengthInBytes:          int;
+        HostMem:                CudaRegisteredHostMemory<byte>
+        OffsetInBytes:          int
+        LengthInBytes:          int
     }
 
 
@@ -266,12 +266,12 @@ module ArgTemplates =
                 // currently this cannot be passed as an argument
                 failwith "passing ArrayNDSDArg is not implemented"
 
-    type SizeTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
+    type IdxTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
         do 
             match manikinOpt with
             | Some manikin ->
-                if manikin.DataType <> typeof<int> then 
-                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type int"
+                if manikin.DataType <> typeof<uint32> then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. uint32"
                 if ArrayND.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
                 if ArrayND.offset manikin <> 0 then 
@@ -279,7 +279,7 @@ module ArgTemplates =
             | None -> ()
 
         interface ICudaArrayMemberArgTmpl<IntPtr> with
-            member this.CPPTypeName = "size_t *"
+            member this.CPPTypeName = "idx_t *"
             member this.GetArg env =
                 match manikinOpt with
                 | Some manikin ->
@@ -314,16 +314,6 @@ module ArgTemplates =
                     | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
                     | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
-
-    type SizeTArgTmpl (value: int) =
-        interface ICudaArgTmpl with
-            member this.CPPTypeName = "size_t"
-            member this.GetArg env strm = box (nativeint value) 
-
-//    type CUdeviceptrArrayArgTmpl (MemManikinT) =
-//        interface ICudaArgTmpl with
-//            member this.CPPTypeName = "CUdeviceptr **"
-//            member this.GetArg env strm = box (nativeint value) 
 
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with
@@ -465,6 +455,12 @@ module ArgTemplates =
             [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
                 let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0; 0]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
+
+        member this.PointerArrayCacheKey env =
+            let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
+            devVar.DevicePointer, memOffset
+
+        member val PointerArrayCacheKeyOnDevice : (CUdeviceptr * int) option = None with get, set
             
         member this.GetPointerArrayDevice env = 
             let devVar, _ = CudaExecEnv.getDevMem env ptrAryDevMem
@@ -497,18 +493,40 @@ module ArgTemplates =
         val Value: 'T
         new (value: 'T) = {Value = value}
 
-    type ConstEOpArgTmpl<'T> (value: 'T) =
+    type ConstEOpArgTmpl (value: ConstSpecT) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "ConstEOp_t"
             member this.GetArg env strm = 
-                match box value with
-                | :? single as n -> ConstEOpArg(n) :> obj
-                | :? double as n -> ConstEOpArg(n) :> obj
-                | :? int as n -> ConstEOpArg(n) :> obj
-                | :? byte as n -> ConstEOpArg(n) :> obj
-                | _ -> failwithf "unsupported type %A" (value.GetType())
+                match value with
+                | ConstInt    n -> ConstEOpArg n |> box
+                | ConstDouble n -> ConstEOpArg n |> box
+                | ConstSingle n -> ConstEOpArg n |> box
+                | ConstBool   n -> ConstEOpArg n |> box
         interface ICudaOp with
             member this.IsIndexed = false
+        interface ICudaOpAndArgTmpl
+
+    
+    [<Struct>]
+    [<type: StructLayout(LayoutKind.Sequential, Pack=4, CharSet=CharSet.Ansi)>]
+    /// check finite elementwise operation C++ structure
+    type CheckFiniteIEOpArg =
+        val NonFiniteCountPtr: CUdeviceptr
+        [<MarshalAs(UnmanagedType.ByValTStr, SizeConst=50)>] val Name: string
+
+        new (nonFiniteCountPtr, name) = 
+            {NonFiniteCountPtr=nonFiniteCountPtr; Name=name}
+
+    type CheckFiniteIEOpArgTmpl<'T> (nonFiniteCount: ArrayNDManikinT,
+                                     name:           string) =
+
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "CheckFiniteIEOp_t"
+            member this.GetArg env strm = 
+                let devVar, _ = CudaExecEnv.getDevMemForManikin env nonFiniteCount
+                CheckFiniteIEOpArg (devVar.DevicePointer, name) |> Util.structToBytes |> box
+        interface ICudaOp with
+            member this.IsIndexed = true
         interface ICudaOpAndArgTmpl
 
 
@@ -562,11 +580,11 @@ module ArgTemplates =
              Offset=offset}
 
 
-    type InterpolateEOpArgTmpl (ip:           IInterpolator,
+    type InterpolateEOpArgTmpl (ip:           InterpolatorT,
                                 compileEnv:   CudaCompileEnvT) =
 
         let tbl = 
-            match Expr.getInterpolatorTableAsIArrayNDT ip with
+            match Interpolator.getInterpolatorTableAsIArrayNDT ip with
             | :? IArrayNDCudaT as tbl -> tbl
             | _ -> failwith "interpolation table must be stored on CUDA device"
     
@@ -616,18 +634,18 @@ module ArgTemplates =
 
                 match ip.NDims with
                 | 1 -> Interpolate1DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
                                             offset)
                        |> box
                 | 2 -> Interpolate2DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
-                                            ip.MinArg.[1], ip.Resolution.[1],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
+                                            single ip.MinArg.[1], single ip.Resolution.[1],
                                             offset)
                        |> box
                 | 3 -> Interpolate3DEOpArg (texObj.TexObject, 
-                                            ip.MinArg.[0], ip.Resolution.[0],
-                                            ip.MinArg.[1], ip.Resolution.[1],
-                                            ip.MinArg.[2], ip.Resolution.[2],
+                                            single ip.MinArg.[0], single ip.Resolution.[0],
+                                            single ip.MinArg.[1], single ip.Resolution.[1],
+                                            single ip.MinArg.[2], single ip.Resolution.[2],
                                             offset)
                        |> box
                 | _ -> failwith "unsupported"

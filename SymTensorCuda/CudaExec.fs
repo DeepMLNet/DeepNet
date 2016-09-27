@@ -1,5 +1,6 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
+open System.Diagnostics
 open System.Runtime.InteropServices
 open System.IO
 open System.Reflection
@@ -19,7 +20,11 @@ open DiskMap
 
 module Compile = 
 
-    type ModCacheKey = {Code: string; HeaderHashes: Map<string, byte list>; CompilerArgs: string list}
+    type ModCacheKey = {
+        Code:           string
+        HeaderHashes:   Map<string, byte list>
+        CompilerArgs:   string list
+    }
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
@@ -30,14 +35,6 @@ module Compile =
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
     let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
-
-    /// modification time of C++ header files
-    //let headerModTimes =
-    //    let includePath = Util.assemblyDirectory
-    //    Directory.EnumerateFiles(includePath, "*.cuh")
-    //    |> Seq.map (fun headerFile ->
-    //        Path.GetFileName headerFile, File.GetLastWriteTimeUtc headerFile)
-    //    |> Map.ofSeq
 
     /// prepares a compile directory
     let prepareCompileDir code =        
@@ -101,15 +98,15 @@ module Compile =
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)
         let baseCmplrArgs = [
-            "--std=c++11"
-            "-DWIN32_LEAN_AND_MEAN"
-            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
-            sprintf "--gpu-architecture=%s" CudaSup.nvccArch
-        ]
-        let dbgArgs = 
-            if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
-            else []
-        let baseCmplrArgs = baseCmplrArgs @ dbgArgs
+            yield "--std=c++11"
+            yield "-DWIN32_LEAN_AND_MEAN"
+            yield "-Xcudafe"; yield "--diag_suppress=declared_but_not_referenced"
+            yield sprintf "--gpu-architecture=%s" CudaSup.nvccArch
+            if Debug.FastKernelMath then yield "--use_fast_math"
+            if Debug.RestrictKernels then yield "--restrict"
+            if Debug.DebugCompile then yield "--device-debug"
+            if Debug.DebugCompile || Debug.GenerateLineInfo then yield "--generate-line-info"
+        ] 
         let cmplrArgs = 
             baseCmplrArgs @ [ 
                 sprintf "--include-path=\"%s\"" compileDir
@@ -118,48 +115,57 @@ module Compile =
         let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
-            | Some ptx -> ptx
-            | None ->
-                printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
+            | Some ptx when not Debug.DisableKernelCache -> ptx
+            | _ ->
+                let sw = Stopwatch.StartNew ()
+                if Debug.TraceCompile || Debug.DebugCompile || Debug.GenerateLineInfo ||
+                        Debug.KeepCompileDir || Debug.DisableKernelCache then
+                    printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
                     printfn "%s" log
-                    exit 1
-                let log = cmplr.GetLogAsString()
-                printfn "%s" log
+                    failwithf "nvrtc compile error: %s" log
+                if Debug.TraceCompile then
+                    let log = cmplr.GetLogAsString()
+                    printf "%s" log
+                if Debug.Timing then printfn "nvrtc took %A" sw.Elapsed
 
                 let ptx = cmplr.GetPTX()
-                krnlPtxCache.Set cacheKey ptx
+                krnlPtxCache.Set cacheKey ptx                
                 ptx    
 
         #if !CUDA_DUMMY
 
-        //printfn "CUDA jitting of %s:" modName
-        
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then
+            printfn "JITing PTX code..."
+       
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
         jitOpts.Add(jitInfoBuffer)
         use jitErrorBuffer = new CudaJOErrorLogBuffer(10000)   
         jitOpts.Add(jitErrorBuffer)
-        //use jitLogVerbose = new CudaJOLogVerbose(true)
-        //jitOpts.Add(jitLogVerbose)
+        use jitLogVerbose = new CudaJOLogVerbose(true)
+        jitOpts.Add(jitLogVerbose)
 
         let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
-        //printfn "%s" jitErrorBuffer.Value
-        //printfn "%s" jitInfoBuffer.Value   
+        if Debug.PtxasInfo then
+            printfn "%s" jitErrorBuffer.Value
+            printfn "%s" jitInfoBuffer.Value   
         jitErrorBuffer.FreeHandle()
         jitInfoBuffer.FreeHandle()
-        //printfn "JIT done."
 
         let krnls =
-            krnlNames
-            |> Seq.fold (fun krnls name -> 
+            (Map.empty, krnlNames)
+            ||> Seq.fold (fun krnls name -> 
                 krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
-                Map.empty
+
+        if Debug.Timing then printfn "JITing PTX code took %A" sw.Elapsed
+
         krnls, cuMod, compileDir
 
         #else
@@ -176,7 +182,9 @@ module Compile =
 
     /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
     /// functions objects for the specified C function names.
-    let loadCppCode modCode (funcDelegates: Map<string, System.Type>)  =
+    let loadCppCode modCode (funcDelegates: Map<string, System.Type>) =
+        if Debug.DumpCode then dumpCode modCode
+
         let compileDir, modPath, headerHashes = prepareCompileDir modCode
         let libPath = Path.Combine (compileDir, "mod.dll")
 
@@ -250,7 +258,7 @@ module CudaExprWorkspaceTypes =
     type CudaExprWorkspace (recipe: CudaRecipeT) =
         let mutable disposed = false
 
-        do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
+        //do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
 
         /// execution environment
         let execEnv = {
@@ -305,6 +313,7 @@ module CudaExprWorkspaceTypes =
 
         #if !CUDA_DUMMY
         /// CUDA launch sizes for specified WorkDims
+        let sw = Stopwatch.StartNew ()
         let kernelLaunchDims =
             kernelDistinctLaunches
             |> Set.toSeq
@@ -318,8 +327,14 @@ module CudaExprWorkspaceTypes =
 
         // compile and load CUDA C++ host/device module
         /// C++ functions
-        let cFuncs, cLibHndl, cCompileDir = Compile.loadCppCode recipe.CPPCode cFuncDelegates
+        let cFuncs, cLibHndl, cCompileDir = 
+            if not (Map.isEmpty cFuncDelegates) then
+                let cFuncs, cLibHndl, cCompileDir = Compile.loadCppCode recipe.CPPCode cFuncDelegates
+                cFuncs, Some cLibHndl, Some cCompileDir
+            else
+                Map.empty, None, None
     
+        /// get CUstream of stream object
         let getStream strm = 
             if Debug.DisableStreams then CUstream.NullStream
             else execEnv.Stream.[strm].Stream
@@ -348,6 +363,7 @@ module CudaExprWorkspaceTypes =
                         let sizeInBytes = elements * typeSize
                         let ptr = Marshal.AllocHGlobal sizeInBytes
                         let cudaRegMem = new CudaRegisteredHostMemory<byte> (ptr, SizeT sizeInBytes)
+                        cudaRegMem.Register (CUMemHostRegisterFlags.None)
                         execEnv.RegHostMem.Add(mem, {Ptr=ptr; CudaRegHostMem=cudaRegMem})
                 | CudaCallT.MemFree mem ->
                     match mem.Kind with
@@ -357,6 +373,7 @@ module CudaExprWorkspaceTypes =
                             execEnv.InternalMem.Remove mem |> ignore
                     | MemAllocRegHost ->
                         if execEnv.RegHostMem.ContainsKey mem then
+                            execEnv.RegHostMem.[mem].CudaRegHostMem.Unregister ()
                             execEnv.RegHostMem.[mem].CudaRegHostMem.Dispose()
                             Marshal.FreeHGlobal execEnv.RegHostMem.[mem].Ptr
                             execEnv.RegHostMem.Remove mem |> ignore
@@ -376,15 +393,19 @@ module CudaExprWorkspaceTypes =
 
                 // event management
                 | EventCreate (evnt, flags) ->
-                    execEnv.Event.Add(evnt, new CudaEvent(flags))
+                    if not Debug.DisableEvents then
+                        execEnv.Event.Add(evnt, new CudaEvent(flags))
                 | EventDestory evnt ->
-                    if execEnv.Event.ContainsKey evnt then
-                        execEnv.Event.[evnt].Dispose()
-                        execEnv.Event.Remove(evnt) |> ignore
+                    if not Debug.DisableEvents then
+                        if execEnv.Event.ContainsKey evnt then
+                            execEnv.Event.[evnt].Dispose()
+                            execEnv.Event.Remove(evnt) |> ignore
                 | EventRecord (evnt, strm) ->
-                    execEnv.Event.[evnt].Record(getStream strm)
+                    if not Debug.DisableEvents then
+                        execEnv.Event.[evnt].Record(getStream strm)
                 | EventSynchronize evnt ->
-                    execEnv.Event.[evnt].Synchronize()
+                    if not Debug.DisableEvents then
+                        execEnv.Event.[evnt].Synchronize()
 
                 // texture object management
                 | TextureCreate tex ->
@@ -455,12 +476,9 @@ module CudaExprWorkspaceTypes =
 
                     if Debug.TraceCalls then
                         printfn "Launching kernel %s on stream %d with work dims %A using block dims %A and grid dims %A" 
-                            krnl (getStream strm).Pointer workDim blockDim gridDim
+                            krnl strm workDim blockDim gridDim
 
-                    if Debug.DisableStreams then
-                        kernels.[krnl].Run(argArray) |> ignore
-                    else
-                        kernels.[krnl].RunAsync(getStream strm, argArray)                   
+                    kernels.[krnl].RunAsync(getStream strm, argArray)                   
                 | LaunchCPPKernel _ ->
                     failwith "cannot launch C++ kernel from CudaExec"
                 | CudaCallT.CallCFunc (name, _, strm, argTmpls) ->
@@ -469,7 +487,7 @@ module CudaExprWorkspaceTypes =
                     let argArray = args |> List.toArray
  
                     if Debug.TraceCalls then
-                        printfn "Calling C function %s on stream %d" name (getStream strm).Pointer
+                        printfn "Calling C function %s on stream %d" name strm
 
                     let func = cFuncs.[name]   
                     func.DynamicInvoke(argArray) |> ignore
@@ -497,6 +515,8 @@ module CudaExprWorkspaceTypes =
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     srcOffsetVar.AsyncCopyToDevice(dstOffsetVar, getStream strm)
+                    if Debug.TraceCalls then
+                        printfn "MemcpyHtoD of %d bytes on stream %d" length strm
                 | ExecItem (MemcpyDtoH (src, dst), strm) ->
                     let {HostMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     let {DeviceMem=srcCudaVar; OffsetInBytes=srcOffset} = src.GetRng execEnv
@@ -505,12 +525,19 @@ module CudaExprWorkspaceTypes =
                     use dstOffsetVar = new CudaRegisteredHostMemory<byte>(dstCudaVar.PinnedHostPointer + (nativeint dstOffset), 
                                                                           BasicTypes.SizeT(length))
                     dstOffsetVar.AsyncCopyFromDevice(srcOffsetVar, getStream strm)
-                | ExecItem (Memset (value, dst), strm) ->
+                    if Debug.TraceCalls then
+                        printfn "MemcpyDtoH of %d bytes on stream %d" length strm
+                | ExecItem (MemsetSingle (value, dst), strm) ->
                     let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
                     use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
                                                                     BasicTypes.SizeT(length))
                     let intval = System.BitConverter.ToUInt32(System.BitConverter.GetBytes(value), 0)       
                     dstOffsetVar.MemsetAsync(intval, getStream strm)
+                | ExecItem (MemsetUInt32 (value, dst), strm) ->
+                    let {DeviceMem=dstCudaVar; OffsetInBytes=dstOffset; LengthInBytes=length} = dst.GetRng execEnv
+                    use dstOffsetVar = new CudaDeviceVariable<byte>(dstCudaVar.DevicePointer + (BasicTypes.SizeT dstOffset), 
+                                                                    BasicTypes.SizeT(length))    
+                    dstOffsetVar.MemsetAsync(value, getStream strm)
 
                 // CUBLAS 
                 | ExecItem (BlasGemm (aOp, bOp, aFac, a, b, trgtFac, trgt), strm) ->   
@@ -542,7 +569,7 @@ module CudaExprWorkspaceTypes =
                     if Debug.TraceCalls then
                         printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, \
                                  ldA=%d, ldB=%d, ldTrgt=%d, nSamples=%d" 
-                            (getStream strm).Pointer m n k ldA ldB ldTrgt a.NSamples
+                            strm m n k ldA ldB ldTrgt a.NSamples
 
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
@@ -571,17 +598,20 @@ module CudaExprWorkspaceTypes =
                                                 a.NSamples)
 
                 | ExecItem (BlasInitPointerArray (aryTmpl), strm) ->
-                    let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
-                    let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
-                    for n = 0 to ptrAryValues.Length - 1 do
-                        Marshal.StructureToPtr (ptrAryValues.[n], 
-                                                ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
+                    let cacheKey = aryTmpl.PointerArrayCacheKey execEnv
+                    if aryTmpl.PointerArrayCacheKeyOnDevice <> Some cacheKey then
+                        let ptrAryValues = aryTmpl.GetPointerArrayValues execEnv
+                        let {Ptr=ptrAryHostPtr; CudaRegHostMem=ptrAryHostVar} = aryTmpl.GetPointerArrayHost execEnv 
+                        for n = 0 to ptrAryValues.Length - 1 do
+                            Marshal.StructureToPtr (ptrAryValues.[n], 
+                                                    ptrAryHostPtr + nativeint (n * sizeof<CUdeviceptr>), false)
 
-                    use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
-                    ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+                        use ptrAryDevVar = aryTmpl.GetPointerArrayDevice execEnv
+                        ptrAryHostVar.AsyncCopyToDevice (ptrAryDevVar.DevicePointer, getStream strm)
+                        aryTmpl.PointerArrayCacheKeyOnDevice <- Some cacheKey
 
-                    if Debug.TraceCalls then
-                        printfn "Initializing BLAS pointer array on stream %d" (getStream strm).Pointer
+                        if Debug.TraceCalls then
+                            printfn "Initializing BLAS pointer array on stream %d" strm
 
                 | ExecItem (ExtensionExecItem eei, strm) ->
                     eei.Execute execEnv strm
@@ -599,6 +629,29 @@ module CudaExprWorkspaceTypes =
                         let resHost = resDev.ToHost()    
                         Dump.dumpValue name resHost
 
+                | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
+                    if Debug.TerminateWhenNonFinite then
+                        // source counter
+                        let counterVarByteVar, _ = CudaExecEnv.getDevMemForManikin execEnv counter
+                        use counterVarIntVar = new CudaDeviceVariable<int> (counterVarByteVar.DevicePointer)
+
+                        // temporary destination
+                        let counterVar : int[] = Array.zeroCreate 1
+                        let gcHnd = GCHandle.Alloc(counterVar, GCHandleType.Pinned)
+                        use counterVarPinned = new CudaRegisteredHostMemory<int>(gcHnd.AddrOfPinnedObject(), SizeT 1)
+
+                        // copy from source counter to temporary destination
+                        counterVarPinned.AsyncCopyFromDevice(counterVarIntVar, getStream strm)
+
+                        // add callback when copy is finished
+                        let callback (hStream: CUstream) (status: CUResult) (userData: System.IntPtr) =
+                            gcHnd.Free()
+                            if counterVar.[0] <> 0 then
+                                printfn "Infinity or NaN encountered in %d elements of %s." counterVar.[0] name 
+                                exit 1
+                        use stream = new CudaStream (getStream strm)
+                        stream.AddCallback (CUstreamCallback callback, nativeint 0, CUStreamAddCallbackFlags.None)
+
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->
                     try
@@ -610,7 +663,7 @@ module CudaExprWorkspaceTypes =
                         | None -> ()
                         printfn "Expression was %A" uexpr
 
-                        let crashTraceFile = "crash_trace.txt"
+                        let crashTraceFile = "CudaCrashTrace.txt"
                         use tw = File.CreateText crashTraceFile
                         Trace.dumpActiveTrace tw
                         printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
@@ -626,8 +679,8 @@ module CudaExprWorkspaceTypes =
 
                 previousCall <- Some call
 
-                if Debug.DisableStreams && not (Trace.isActive ()) then
-                    // synchronize to make sure that CUDA errors occur here
+                // synchronize to make sure that CUDA errors occur here
+                if Debug.SyncAfterEachCudaCall then
                     try
                         CudaSup.context.Synchronize ()
                     with :? CudaException as ex ->
@@ -657,13 +710,19 @@ module CudaExprWorkspaceTypes =
 
                     // cleanup CUDA resources
                     execCalls recipe.DisposeCalls
-                    Compile.unloadCudaCode krnlModHndl
+                    if krnlModHndl <> Unchecked.defaultof<CUmodule> then
+                        Compile.unloadCudaCode krnlModHndl
                     CudaSup.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
-                Compile.unloadCppCode cLibHndl
-                Compile.removeCompileDir cCompileDir
-                Compile.removeCompileDir krnlCompileDir
+                match cLibHndl, cCompileDir with
+                | Some cLibHndl, Some cCompileDir ->
+                    Compile.unloadCppCode cLibHndl
+                    if not Debug.KeepCompileDir then
+                        Compile.removeCompileDir cCompileDir
+                | _ -> ()
+                if not Debug.KeepCompileDir && krnlCompileDir <> null then
+                    Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 
         override this.Finalize() =
@@ -671,8 +730,8 @@ module CudaExprWorkspaceTypes =
                 (this :> System.IDisposable).Dispose()
 
         /// Evaluate expression.
-        member this.Eval(externalVar: Map<UVarSpecT, IArrayNDT>,
-                         hostVar:     Map<UVarSpecT, IArrayNDT>) =
+        member this.Eval(externalVar: Map<VarSpecT, IArrayNDT>,
+                         hostVar:     Map<VarSpecT, IArrayNDT>) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
             CudaSup.checkContext ()
 
@@ -681,13 +740,22 @@ module CudaExprWorkspaceTypes =
                 execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
                 execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
 
+                // Register host variables with CUDA.
+                // This does nothing if a variable is already registered.
+                let hostVarRegs =
+                    hostVar
+                    |> Map.toList
+                    |> List.map (fun (_, hvAry) -> ArrayNDHostReg.lock (hvAry :?> IArrayNDHostT))
+
                 // TODO: implement proper synchronization.
                 // For now we synchronize the whole context to make sure that data transfers
                 // from and to the GPU do not overlap with the computation that may involve
                 // the targets/sources of these transfers as input/output variables.
-                CudaSup.context.Synchronize () 
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
                 execCalls recipe.ExecCalls
-                CudaSup.context.Synchronize () 
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
 
             )
 

@@ -1,0 +1,39 @@
+Data:
+  Path: abalone.txt
+  TargetCols:
+    - 8
+Model:
+  Type: MLGPTransfer
+  Name: MultiGPTU
+  Hyperpars:
+    GPTransfer:
+      - NInput: 10
+        NOutput: 28
+        NTrnSmpls: 10
+    Neural:
+      - NInput: 0
+        NOutput: 0
+        TransferFunc: Tanh
+Training:
+  Device: DevCuda
+  Opt:
+    Optimizer: Adam
+    Congif: default
+  Loss: MSE
+  Config:
+    Seed: 1
+    BatchSize: 10000
+    LossRecordInterval: 10
+    Termination: IterGain 1.25
+    MinImprovement: 1E-07
+    TargetLoss: None
+    MinIters: Some 100
+    MaxIters: None
+    LearningRates:
+      - 0.001
+      - 0.0001
+      - 1E-05
+      - 1E-06
+    CheckpointDir: None
+    DiscardCheckpoint: false
+    DumpPrefix: None

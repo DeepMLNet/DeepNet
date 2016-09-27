@@ -5,6 +5,7 @@ open SymTensor
 open SymTensor.Compiler.Cuda
 open System
 open Datasets
+open Models
 
 module TestFunctions =
     
@@ -65,7 +66,7 @@ module TestFunctions =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
-        let ngps = 3
+        let ngps = 2
         let ntraining = 10
         let ntest = 1
 
@@ -81,8 +82,8 @@ module TestFunctions =
 
         let mgp = 
             MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
-        let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nGPs]
-        let inp_cov   : ExprT<single> = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
+        let inp_mean = mb.Var "inp_mean"  [nSmpls; nGPs]
+        let inp_cov  = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
         mb.SetSize nGPs      ngps
         mb.SetSize nTrnSmpls ntraining
         let mi = mb.Instantiate device
@@ -108,9 +109,9 @@ module TestFunctions =
         printfn "Trn_t =\n%A" trn_t_host
 
         //lengthscale vectore hardcoded
-        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
+//        let ls_host = [1.0f; 1.5f; 2.0f] |> ArrayNDHost.ofList 
 //        //random lengthscale vector
-//        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
+        let ls_host = rand.UniformArrayND (0.0f,3.0f) [ngps]
 
         //sigma vector hardcoded
         let trn_sigma_host = (ArrayNDHost.ones<single> [ngps;ntraining]) * sqrt 0.1f
@@ -201,14 +202,14 @@ module TestFunctions =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
-        let ngps = 3
+        let ngps = 1
         let ninputs = 5
         let ntraining = 10
-        let ntests = 1
+        let ntests = 20
         let batchSize = 1
 
         //building the model
-        let mb = ModelBuilder<single> "Test"
+        let mb = ModelBuilder<single> "GPTU_Test"
 
         let nSmpls       = mb.Size "nSmpls"
         let nInputs      = mb.Size "nInputs"
@@ -216,10 +217,13 @@ module TestFunctions =
         let nTrnSmpls    = mb.Size "nTrnSmpls"
 
         let gptu = 
-           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NGPs = nGPs; NTrnSmpls = nTrnSmpls}
+           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NOutput = nGPs; NTrnSmpls = nTrnSmpls}
 
-        let inp_mean  : ExprT<single> = mb.Var "inp_mean"  [nSmpls; nInputs]
-        
+        let inp_mean = mb.Var "inp_mean"  [nSmpls; nInputs]
+        let pred     = mb.Var "Pred"      [nSmpls; nGPs]
+        let target   = mb.Var "Target"    [nSmpls; nGPs]
+
+
         mb.SetSize  nGPs         ngps
         mb.SetSize  nTrnSmpls    ntraining
         mb.SetSize  nInputs      ninputs
@@ -227,8 +231,16 @@ module TestFunctions =
         let mi = mb.Instantiate device
 
         let pred_mean, pred_cov = GPTransferUnit.pred gptu (InputLayer.transform inp_mean)
-
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
+
+//        let loss =  -target * log pred |> Expr.sumAxis 0 |> Expr.mean
+//        let loss = loss |> Expr.dump "Loss"
+//        let cmplr = DevCuda.Compiler, CompileEnv.empty
+//        let loss_fn = Func.make cmplr loss |> arg2 pred_mean target
+
+//        let dLoss = Deriv.compute loss |> Deriv.ofVar mi.ParameterVector  |> Expr.reshape (Expr.shapeOf mi.ParameterVector) 
+//        let dLoss = dLoss |> Expr.dump "dLoss"
+//        let dLoss_fn = mi.Func dLoss |> arg2 pred_mean target
 
         let randomTest () =
 
@@ -239,15 +251,22 @@ module TestFunctions =
 
             //calculate predicted mean and variance
             let pred_mean,pred_cov = pred_mean_cov_fn inp_mean_val
-
-
+            let randOffset = rand.UniformArrayND (-0.2f ,0.2f) [batchSize;ngps] |> post device
+            let target_val = pred_mean + randOffset
             //print inputs and predictions
+
+//            let l = loss_fn pred_mean target_val
+//            let dL = dLoss_fn pred_mean tar
 
             printfn "inp_mean=\n%A" inp_mean_val
             printfn ""
             printfn "pred_mean=\n%A" pred_mean
             printfn "pred_cov=\n%A" pred_cov
-
+            printfn ""
+//            printfn "loss=\n%A" l
+//            printfn ""
+//            printfn "dLoss=\n%A" dL
+//            printfn ""
             //return sample of inputs and predictions
         Dump.start "gptudump.h5"
         let testList = [1..ntests]

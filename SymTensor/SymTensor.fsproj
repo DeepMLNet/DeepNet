@@ -53,12 +53,13 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Debug.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="ElemExpr.fs" />
-    <Compile Include="UElemExpr.fs" />
-    <Compile Include="UExprTypes.fs" />
+    <Compile Include="ElemExprHostEval.fs" />
+    <Compile Include="Interpolator.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />

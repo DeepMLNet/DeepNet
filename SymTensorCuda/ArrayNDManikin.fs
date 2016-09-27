@@ -39,7 +39,7 @@ module ArrayNDManikinTypes =
     /// Memory can either be on the host or the accelerator.
     type MemManikinT =
         | MemAlloc of MemAllocManikinT
-        | MemExternal of UVarSpecT
+        | MemExternal of VarSpecT
         | MemConst of MemConstManikinT
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 

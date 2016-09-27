@@ -3,7 +3,9 @@
 open System
 open System.Reflection
 open System.IO
-
+open System.Runtime.InteropServices
+open System.Collections.Concurrent
+open FSharp.Reflection
 
 module Seq = 
 
@@ -80,6 +82,7 @@ module Array2D =
 
 
 
+
 [<AutoOpen>]
 module UtilTypes =
 
@@ -89,8 +92,40 @@ module UtilTypes =
     [<Measure>]
     type elements
 
+    type System.Collections.Generic.Dictionary<'TKey, 'TValue> with
+        member this.TryFind key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
+
+        member this.GetOrDefault key dflt =
+            match this.TryFind key with
+            | Some v -> v
+            | None -> dflt
+
+    type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
+        member this.TryFind key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
+
+        member this.GetOrDefault key dflt =
+            match this.TryFind key with
+            | Some v -> v
+            | None -> dflt
+
+    type System.Collections.Generic.Queue<'T> with
+        member this.TryPeek =
+            if this.Count > 0 then Some (this.Peek())
+            else None
+
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 
+    /// convert given value to specified type and return as obj
+    let convTo (typ: System.Type) value =
+        Convert.ChangeType(box value, typ)
+
+    /// convert given value to type 'T
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
@@ -98,6 +133,35 @@ module UtilTypes =
     let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
 
     let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
+
+    type private GenericMethodDescT = {
+        ContainingType:     string
+        MethodName:         string
+        GenericTypeArgs:    string list
+    }
+
+    let private genericMethodCache = ConcurrentDictionary<GenericMethodDescT, MethodInfo> ()
+
+    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// and the specified arguments in tupled form. Return value is of type 'R.
+    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+        let gmd = {
+            ContainingType  = typeof<'U>.AssemblyQualifiedName
+            MethodName      = methodName
+            GenericTypeArgs = genericTypeArgs |> List.map (fun t -> t.AssemblyQualifiedName)
+        }
+
+        let m =
+            match genericMethodCache.TryFind gmd with
+            | Some m -> m
+            | None ->
+                let gm = typeof<'U>.GetMethod (methodName, allBindingFlags)
+                let m = gm.MakeGenericMethod (List.toArray genericTypeArgs)
+                genericMethodCache.[gmd] <- m
+                m
+
+        let args = FSharpValue.GetTupleFields args
+        m.Invoke(null, args) :?> 'R       
 
 module Util =
 
@@ -119,7 +183,7 @@ module Util =
     /// path to application directory under AppData\Local
     let localAppData =  
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
-        System.IO.Path.Combine (lad, "expr2")
+        System.IO.Path.Combine (lad, "DeepNet")
     
     /// converts sequence of ints to sequence of strings
     let intToStrSeq items =
@@ -130,9 +194,30 @@ module Util =
         match typ with
         | _ when typ = typeof<double>   -> "double"
         | _ when typ = typeof<single>   -> "float"
-        | _ when typ = typeof<int>      -> "int"
-        | _ when typ = typeof<byte>     -> "char"
+        | _ when typ = typeof<int32>    -> "int"
+        | _ when typ = typeof<uint32>   -> "unsigned int"
+        | _ when typ = typeof<byte>     -> "unsigned char"
+        | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// Returns the contents of a blittable structure as a byte array.
+    let structToBytes (s: 'S when 'S: struct) =
+        let size = Marshal.SizeOf(typeof<'S>)
+        let byteAry : byte[] = Array.zeroCreate size
+
+        let tmpPtr = Marshal.AllocHGlobal(size)
+        Marshal.StructureToPtr(s, tmpPtr, false)
+        Marshal.Copy(tmpPtr, byteAry, 0, size)
+        Marshal.DestroyStructure(tmpPtr, typeof<'S>)
+        Marshal.FreeHGlobal(tmpPtr)
+
+        byteAry
+
+    /// Verifies that the specified generic type is not obj or IComparable.
+    [<RequiresExplicitTypeArguments>]
+    let checkProperType<'T> () =
+        if typeof<'T> = typeof<obj> || typeof<'T> = typeof<IComparable> then
+            failwith "the type must be instantiated with explicit generic parameters"
 
     /// Returns "Some key" when a key was pressed, otherwise "None".
     let getKey () =
@@ -143,4 +228,63 @@ module Util =
             // InvalidOperationException is thrown when process does not have a console or 
             // input is redirected from a file.
             None
+
+    /// matches integral values (e.g. 2, 2.0 or 2.0f, etc.)
+    let (|Integral|_|) (x: 'T) =
+        match typeof<'T> with
+        | t when t = typeof<int> ->
+            Some (x |> box |> unbox<int>)
+        | t when t = typeof<byte> ->
+            Some (x |> box |> unbox<byte> |> int)
+        | t when t = typeof<float> ->
+            let f = x |> box |> unbox<float>
+            if abs (f % 1.0) < System.Double.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | t when t = typeof<single> ->
+            let f = x |> box |> unbox<single>
+            if abs (f % 1.0f) < System.Single.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | _ -> None
+
+/// Permutation utilities
+module Permutation =
+    
+    /// true if the given list is a permutation of the numbers 0 to perm.Length-1
+    let is (perm: int list) =
+        let nd = perm.Length
+        Set perm = Set [0 .. nd-1]
+
+    let private check (perm: int list) =
+        if not (is perm) then
+            failwithf "%A is not a permutation" perm
+
+    /// the length of the given permutation
+    let length (perm: int list) =
+        check perm
+        perm.Length
+
+    /// true if then given permutation is the identity permutation
+    let isIdentity (perm: int list) =
+        check perm
+        perm = [0 .. (length perm)-1]
+
+    /// inverts the given permutation
+    let invert (perm: int list) =
+        check perm
+        List.indexed perm
+        |> List.sortBy (fun (i, p) -> p)
+        |> List.map (fun (i, p) -> i)
+    
+    /// returns the permutation that would result in applying perm1 after perm2    
+    let chain (perm1: int list) (perm2: int list) =
+        check perm1
+        check perm2
+        perm2 |> List.permute (fun i -> perm1.[i])
+
+    /// permutes the list using the given permutation
+    let apply (perm: int list) lst =
+        check perm
+        lst |> List.permute (fun i -> perm.[i])
 

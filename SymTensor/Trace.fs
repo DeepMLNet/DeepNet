@@ -1,6 +1,7 @@
 ﻿namespace SymTensor
 
 open System
+open System.IO
 open System.Collections.Generic
 open System.Threading
 
@@ -132,13 +133,25 @@ module Trace =
 
     let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
         let epsilon = 1e-4f
-        let a = a :?> ArrayNDT<single>
-        let b = b :?> ArrayNDT<single>
-        let diff = abs (a - b)
-        if ArrayND.nElems diff > 0 then
-            let maxDiff = ArrayND.max diff |> ArrayND.value
-            maxDiff <= epsilon
-        else true
+        match a.DataType, b.DataType with
+        | ta, tb when ta <> tb -> false
+        | t, _ when t = typeof<single> ->
+            let a = a :?> ArrayNDT<single>
+            let b = b :?> ArrayNDT<single>
+            let diff = abs (a - b)
+            if ArrayND.nElems diff > 0 then
+                let maxDiff = ArrayND.max diff |> ArrayND.value
+                maxDiff <= epsilon
+            else true
+        | t, _ when t = typeof<bool> ->
+            let a = a :?> ArrayNDT<bool>
+            let b = b :?> ArrayNDT<bool>
+            ArrayND.all (a ==== b) |> ArrayND.value
+        | t, _ when t = typeof<int> ->
+            let a = a :?> ArrayNDT<int>
+            let b = b :?> ArrayNDT<int>
+            ArrayND.all (a ==== b) |> ArrayND.value
+        | t -> failwithf "unsupported data type %A" t
 
     let compareCustom isSimilar a b =
         let maxDiffs = 3
@@ -193,7 +206,8 @@ module Trace =
         out ""
 
         for exprEval in trace.ExprEvals do
-            out "Evaluation of expression(s) %A" exprEval.Exprs
+            out "Evaluation of expression(s) %A" 
+                (exprEval.Exprs |> List.map UExpr.toExpr)
             out "Id:       %d" exprEval.Id
             out "Compiler: %s" exprEval.Compiler
             out "Start:    %A" exprEval.Start
@@ -210,13 +224,17 @@ module Trace =
                 out "Event index: %d" idx
                 match evnt with
                 | ExprEvaled (uexpr, res, msg) ->
-                    out "Expression: %A" uexpr
+                    out "Expression: %A" (uexpr |> UExpr.toExpr)
                     out "Result:\n%A" res
                     out "Message: %s" msg
                 out ""
 
             out "==== End of trace ===="
             out ""
+
+    let dumpToFile path trace =
+        use file = File.CreateText path
+        dump file trace
 
     let dumpActiveTrace file =
         getActiveTraceSession () |> dump file
