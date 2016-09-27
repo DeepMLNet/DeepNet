@@ -647,11 +647,11 @@ module CudaExecUnit =
             match rngs, rngManikins with
             | SRSDynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
                 // for dynamic range pass pointer to result of expression calculating the index
-                (SizeTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                (IdxTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rrngManikins 
             | SRSSymStartSymEnd _ :: rrngs, _ ->
                 // symbolic range has already been applied, pass null (meaning no offset to add)
-                (SizeTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                (IdxTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rngManikins 
             | [], [] -> []
             | _ -> failwith "invalid dynamic range specification"
@@ -662,10 +662,10 @@ module CudaExecUnit =
 
     let execItemsForCopyFromDynamicSubtensor trgt src rngs rngManikins =
         // C++ signature is:
-        //template <typename TTarget, typename TBaseSrc, typename TDynSrc, size_t nDims,
+        //template <typename TTarget, typename TBaseSrc, typename TDynSrc, idx_t nDims,
         //          TElemwise1Ary<IdEOp_t, TTarget, TDynSrc>::type copyFun>
         //_dev void copyFromDynamicSubtensor(TTarget &trgt,  
-        //                                   const TBaseSrc &baseSrc, const Array<size_t, nDims> &srcIdx)
+        //                                   const TBaseSrc &baseSrc, const Array<idx_t, nDims> &srcIdx)
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
         let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)

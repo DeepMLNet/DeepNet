@@ -36,14 +36,14 @@ for dims = 0 to maxDims do
     wrt ""
 
     wrt "struct Pos%dD {" dims
-    wrt "   size_t pos[%d];" (max dims 1)
+    wrt "   idx_t pos[%d];" (max dims 1)
     wrt"    template<typename TArrayND>"
-    wrt "   _dev static Pos%dD fromLinearIdx(const TArrayND &ary, size_t idx) {" dims
+    wrt "   _dev static Pos%dD fromLinearIdx(const TArrayND &ary, idx_t idx) {" dims
     wrt "     Pos%dD p;" dims
     if dims >= 1 then
-        wrt "     const size_t incr%d = 1;" (dims-1)
+        wrt "     const idx_t incr%d = 1;" (dims-1)
     for d = dims - 2 downto 0 do
-        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
+        wrt "     const idx_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
     for d = 0 to dims - 1 do
         wrt "     p.pos[%d] = idx / incr%d;" d d
         wrt "     idx -= p.pos[%d] * incr%d;" d d
@@ -53,30 +53,30 @@ for dims = 0 to maxDims do
     wrt "     return p;"
     wrt "   }"
     wrt"    template<typename TArrayND>"
-    wrt "   _dev static Pos%dD fromLinearIdxWithLastDimSetToZero(const TArrayND &ary, size_t idx) {" dims
+    wrt "   _dev static Pos%dD fromLinearIdxWithLastDimSetToZero(const TArrayND &ary, idx_t idx) {" dims
     wrt "     Pos%dD p = fromLinearIdx(ary, idx);" dims 
     if dims >= 1 then
         wrt "     p[%d] = 0;" (dims - 1)
     wrt "     return p;"
     wrt "    }"
     wrt "    template<typename TArrayND>"
-    wrt "   _dev size_t toLinearIdx(const TArrayND &ary) const {"
+    wrt "   _dev idx_t toLinearIdx(const TArrayND &ary) const {"
     if dims >= 1 then
-        wrt "     const size_t incr%d = 1;" (dims-1)
+        wrt "     const idx_t incr%d = 1;" (dims-1)
     for d = dims - 2 downto 0 do
-        wrt "     const size_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
+        wrt "     const idx_t incr%d = incr%d * ary.shape(%d);" d (d+1) (d+1)
     wrt "     return %s;" (ad |>> (fun i -> prn "incr%d * pos[%d]" i i) |> cwe "0" " + ")
     wrt "   }"
-    wrt "  	_dev size_t &operator[] (const size_t dim) { return pos[dim]; }"
-    wrt "  	_dev const size_t &operator[] (const size_t dim) const { return pos[dim]; }"
+    wrt "  	_dev idx_t &operator[] (const idx_t dim) { return pos[dim]; }"
+    wrt "  	_dev const idx_t &operator[] (const idx_t dim) const { return pos[dim]; }"
     wrt "};"
     wrt ""
     
     if dims > 0 then
-        wrt "template <%s>" (ad |>> prn "size_t shape%d" |> cw ", ")
+        wrt "template <%s>" (ad |>> prn "idx_t shape%d" |> cw ", ")
     wrt "struct ShapeStatic%dD {" dims
     wrt "   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes"
-    wrt "  	_dev size_t shape(const size_t dim) const {"
+    wrt "  	_dev idx_t shape(const idx_t dim) const {"
     if dims > 0 then
         wrt "      switch (dim) {"
         for d in ad do
@@ -91,38 +91,38 @@ for dims = 0 to maxDims do
 
     wrt "struct ShapeDynamic%dD {" dims
     if dims > 0 then
-        wrt "   size_t mShape[%d];" dims
-        wrt "  	_dev size_t shape(const size_t dim) const { return mShape[dim]; }"
+        wrt "   idx_t mShape[%d];" dims
+        wrt "  	_dev idx_t shape(const idx_t dim) const { return mShape[dim]; }"
     else
-        wrt "  	_dev size_t shape(const size_t dim) const { return 0; }"
+        wrt "  	_dev idx_t shape(const idx_t dim) const { return 0; }"
     wrt "};"
     wrt ""
 
     if dims = 0 then
-        wrt "template <size_t offset_>"
+        wrt "template <idx_t offset_>"
     else
-        wrt "template <size_t offset_, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
+        wrt "template <idx_t offset_, %s>" (ad |>> prn "idx_t stride%d" |> cw ", ")
     wrt "struct StrideStatic%dD {" dims
     wrt "   char mDummy; // WORKAROUND: if struct is empty, MSVC and NVCC see different struct sizes"
-    wrt "  	_dev size_t stride(const size_t dim) const {"
+    wrt "  	_dev idx_t stride(const idx_t dim) const {"
     wrt "      switch (dim) {"
     for d in ad do
         wrt "        case %d: return stride%d;" d d
     wrt "        default: return 0;"
     wrt "      }"
     wrt "    }"
-    wrt "   _dev size_t offset() const { return offset_; }"
+    wrt "   _dev idx_t offset() const { return offset_; }"
     wrt "};"
     wrt ""
 
     wrt "struct StrideDynamic%dD {" dims
-    wrt "   size_t mOffset;"
-    wrt "   _dev size_t offset() const { return mOffset; }"
+    wrt "   idx_t mOffset;"
+    wrt "   _dev idx_t offset() const { return mOffset; }"
     if dims > 0 then
-        wrt "   size_t mStride[%d];" dims
-        wrt "  	_dev size_t stride(const size_t dim) const { return mStride[dim]; }"
+        wrt "   idx_t mStride[%d];" dims
+        wrt "  	_dev idx_t stride(const idx_t dim) const { return mStride[dim]; }"
     else
-        wrt "  	_dev size_t stride(const size_t dim) const { return 0; }"
+        wrt "  	_dev idx_t stride(const idx_t dim) const { return 0; }"
     wrt "};"
     wrt ""
 
@@ -132,40 +132,40 @@ for dims = 0 to maxDims do
     wrt "  typedef TData DataType;"
     wrt "  TData *mData;"
     wrt ""
-    wrt "  _dev size_t nDim() const { return %d; }" dims
-    wrt "  _dev size_t index(%s) const {"
-        (ad |>> prn "const size_t pos%d" |> cw ", ")
+    wrt "  _dev idx_t nDim() const { return %d; }" dims
+    wrt "  _dev idx_t index(%s) const {"
+        (ad |>> prn "const idx_t pos%d" |> cw ", ")
     wrt "      return this->offset() + %s;"
         (ad |>> (fun i -> prn "this->stride(%d) * pos%d" i i) |> cwe "0" " + ")
     wrt "  }"
-    wrt "  _dev size_t index(const size_t *pos) const {"
+    wrt "  _dev idx_t index(const idx_t *pos) const {"
     wrt "      return this->offset() + %s;"
         (ad |>> (fun i -> prn "this->stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
     wrt "  }"
-    wrt "  _dev size_t index(const Pos%dD &pos) const {" dims
+    wrt "  _dev idx_t index(const Pos%dD &pos) const {" dims
     wrt "      return this->offset() + %s;"
         (ad |>> (fun i -> prn "this->stride(%d) * pos[%d]" i i) |> cwe "0" " + ")
     wrt "  }"
-    wrt "  _dev size_t size() const {"
+    wrt "  _dev idx_t size() const {"
     wrt "    return %s;"
         (ad |>> prn "this->shape(%d)" |> cwe "1" " * ")
     wrt "  }"
-    wrt "  _dev Pos%dD linearIdxToPos(size_t idx) const { return Pos%dD::fromLinearIdx(*this, idx); }" dims dims
-    wrt "  _dev Pos%dD linearIdxToPosWithLastDimSetToZero(size_t idx) const { return Pos%dD::fromLinearIdxWithLastDimSetToZero(*this, idx); }" dims dims
+    wrt "  _dev Pos%dD linearIdxToPos(idx_t idx) const { return Pos%dD::fromLinearIdx(*this, idx); }" dims dims
+    wrt "  _dev Pos%dD linearIdxToPosWithLastDimSetToZero(idx_t idx) const { return Pos%dD::fromLinearIdxWithLastDimSetToZero(*this, idx); }" dims dims
     wrt "  _dev TData *data() { return mData; }"
     wrt "  _dev const TData *data() const { return mData; }"
     wrt "  _dev TData &element(%s) {"
-        (ad |>> prn "size_t pos%d" |> cw ", ")
+        (ad |>> prn "idx_t pos%d" |> cw ", ")
     wrt "    return data()[index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
     wrt "  _dev const TData &element(%s) const {"
-        (ad |>> prn "size_t pos%d" |> cw ", ")
+        (ad |>> prn "idx_t pos%d" |> cw ", ")
     wrt "    return data()[index(%s)];"
         (ad |>> prn "pos%d" |> cw ", ")
     wrt "  }"
-    wrt "  _dev TData &element(const size_t *pos) { return data()[index(pos)]; }"
-    wrt "  _dev const TData &element(const size_t *pos) const { return data()[index(pos)]; }"
+    wrt "  _dev TData &element(const idx_t *pos) { return data()[index(pos)]; }"
+    wrt "  _dev const TData &element(const idx_t *pos) const { return data()[index(pos)]; }"
     wrt "  _dev TData &element(const Pos%dD &pos) { return data()[index(pos)]; }" dims
     wrt "  _dev const TData &element(const Pos%dD &pos) const { return data()[index(pos)]; }" dims
     wrt ""
@@ -180,30 +180,28 @@ for dims = 0 to maxDims do
         if dims > 3 then
             let restElements = 
                 {2 .. dims - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
-            wrt " const size_t restElems = %s;" restElements
-            wrt " for (size_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {"
-        if dims = 3 then
-            wrt " for (size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z; pos2 < trgt.shape(2); pos2 += gridDim.z * blockDim.z) {"
-        if dims >= 2 then
-            wrt " for (size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y; pos1 < trgt.shape(1); pos1 += gridDim.y * blockDim.y) {"
-        if dims >= 1 then
-            wrt " for (size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {"
-
-        if dims > 3 then
-            wrt " size_t pos2 = posR;"
+            wrt " const idx_t restElems = %s;" restElements
+            wrt " for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {"
+            wrt " idx_t pos2 = posR;"
             for d = dims - 1 downto 2 do
                 let incr = 
                     {2 .. d - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
                 if d > 2 then
-                    wrt " const size_t pos%d = pos2 / (%s);" d incr
+                    wrt " const idx_t pos%d = pos2 / (%s);" d incr
                     wrt " pos2 -= pos%d * (%s);" d incr
+        if dims = 3 then
+            wrt " for (idx_t pos2 = threadIdx.z + blockIdx.z * blockDim.z; pos2 < trgt.shape(2); pos2 += gridDim.z * blockDim.z) {"
+        if dims >= 2 then
+            wrt " for (idx_t pos1 = threadIdx.y + blockIdx.y * blockDim.y; pos1 < trgt.shape(1); pos1 += gridDim.y * blockDim.y) {"
+        if dims >= 1 then
+            wrt " for (idx_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {"
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
             if dims >= 1 then
-                wrt " const size_t pos[] {%s};" (poses |> cw ", ")
+                wrt " const idx_t pos[] {%s};" (poses |> cw ", ")
             else
-                wrt " const size_t *pos = nullptr;"
+                wrt " const idx_t *pos = nullptr;"
 
         wrt ""
         fBody dims
@@ -248,7 +246,7 @@ for dims = 0 to maxDims do
             let trgtPoses = ad |>> prn "pos%d" |> cw ", "           
             let srcPoses = Seq.append (ad |>> prn "pos%d") (Seq.singleton "reducePos") |> cw ", "
             wrt "  typename TTarget::DataType v = initialOp();"
-            wrt "  for (size_t reducePos = 0; reducePos < src.shape(%d); reducePos++) {" dims
+            wrt "  for (idx_t reducePos = 0; reducePos < src.shape(%d); reducePos++) {" dims
             wrt "    v = op(v, src.element(%s));" srcPoses
             wrt "  }"
             wrt "  trgt.element(%s) = v;" trgtPoses)
@@ -279,7 +277,7 @@ for dims = 0 to maxDims do
         elementsWrapper ary 
 
 let elementwiseHeterogenousLoop fBody =
-    wrt " for (size_t idx = threadIdx.x + blockIdx.x * blockDim.x; idx < trgt.size(); idx += gridDim.x * blockDim.x) {"
+    wrt " for (idx_t idx = threadIdx.x + blockIdx.x * blockDim.x; idx < trgt.size(); idx += gridDim.x * blockDim.x) {"
     wrt ""
     fBody ()
     wrt ""

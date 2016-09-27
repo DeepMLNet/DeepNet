@@ -194,8 +194,9 @@ module Util =
         match typ with
         | _ when typ = typeof<double>   -> "double"
         | _ when typ = typeof<single>   -> "float"
-        | _ when typ = typeof<int>      -> "int"
-        | _ when typ = typeof<byte>     -> "char"
+        | _ when typ = typeof<int32>    -> "int"
+        | _ when typ = typeof<uint32>   -> "unsigned int"
+        | _ when typ = typeof<byte>     -> "unsigned char"
         | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
 

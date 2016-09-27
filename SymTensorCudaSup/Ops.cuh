@@ -26,12 +26,12 @@ struct ZerosEOp_t
 
 
 struct DiagonalOneIEOp_t {
-	_dev float operator() (const size_t *pos, const size_t dims) const {
+	_dev float operator() (const idx_t *pos, const idx_t dims) const {
 		if (dims == 0) {
 			return 1.0;
 		} else {
 			bool allEqual = true;
-			for (size_t dim = 1; dim <= dims; dim++) {
+			for (idx_t dim = 1; dim <= dims; dim++) {
 				if (pos[0] != pos[dim]) {
 					allEqual = false;
 					break;
@@ -230,17 +230,17 @@ struct CheckFiniteIEOp_t {
 	int * const nonFiniteCountPtr;
 	const char name[50];
 
-	_devonly float operator() (const size_t *pos, const size_t dims, float a) const {
+	_devonly float operator() (const idx_t *pos, const idx_t dims, float a) const {
 		if (!isfinite(a)) {
 			atomicAdd(nonFiniteCountPtr, 1);
 
 			switch (dims) {
 			case 0:	printf("Non-finite element in %s at [].\n", name); break;
-			case 1: printf("Non-finite element in %s at [%llu].\n", name, pos[0]); break;
-			case 2: printf("Non-finite element in %s at [%llu; %llu].\n", name, pos[0], pos[1]); break;
-			case 3: printf("Non-finite element in %s at [%llu; %llu; %llu].\n", name, pos[0], pos[1], pos[2]); break;
-			case 4: printf("Non-finite element in %s at [%llu; %llu; %llu; %llu].\n", name, pos[0], pos[1], pos[2], pos[3]); break;
-			case 5: printf("Non-finite element in %s at [%llu; %llu; %llu; %llu; %llu].\n", name, pos[0], pos[1], pos[2], pos[3], pos[4]); break;
+			case 1: printf("Non-finite element in %s at [%lu].\n", name, pos[0]); break;
+			case 2: printf("Non-finite element in %s at [%lu; %lu].\n", name, pos[0], pos[1]); break;
+			case 3: printf("Non-finite element in %s at [%lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2]); break;
+			case 4: printf("Non-finite element in %s at [%lu; %lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2], pos[3]); break;
+			case 5: printf("Non-finite element in %s at [%lu; %lu; %lu; %lu; %lu].\n", name, pos[0], pos[1], pos[2], pos[3], pos[4]); break;
 			default: printf("Non-finite element in %s.", name);
 			}			
 		}

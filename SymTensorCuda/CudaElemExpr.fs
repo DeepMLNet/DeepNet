@@ -162,7 +162,7 @@ module CudaElemExpr =
                     // generate loop code
                     let sumCode = 
                         sprintf "%s%s %s = 0;\n" spc myVarType myVarName +
-                        sprintf "%sfor (size_t %s = %s; %s <= %s; %s++) {\n"
+                        sprintf "%sfor (idx_t %s = %s; %s <= %s; %s++) {\n"
                             spc sumIdxVar firstVal sumIdxVar lastVal sumIdxVar +
                         iterCalcCode +
                         sprintf "%s  %s += %s;\n" spc myVarName iterResVarName +
@@ -205,7 +205,7 @@ module CudaElemExpr =
         let tmplArgs = [for a=0 to nArgs-1 do yield sprintf "typename Ta%d" a]
         let retType = match expr with UElemExpr (_, _, tn) -> cppType tn
         let funcArgs = [
-            for d=0 to nTrgtDims-1 do yield sprintf "const size_t p%d" d
+            for d=0 to nTrgtDims-1 do yield sprintf "const idx_t p%d" d
             for a=0 to nArgs-1 do yield sprintf "const Ta%d &a%d" a a
         ]
         let functorCode =    
