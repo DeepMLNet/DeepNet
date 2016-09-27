@@ -183,7 +183,7 @@ module Util =
     /// path to application directory under AppData\Local
     let localAppData =  
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
-        System.IO.Path.Combine (lad, "expr2")
+        System.IO.Path.Combine (lad, "DeepNet")
     
     /// converts sequence of ints to sequence of strings
     let intToStrSeq items =
