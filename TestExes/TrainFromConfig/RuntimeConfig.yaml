@@ -19,7 +19,7 @@ Training:
   Opt:
     Optimizer: Adam
     Congif: default
-  Loss: CrossEntropy
+  Loss: MSE
   Config:
     Seed: 1
     BatchSize: 10000

@@ -49,7 +49,7 @@ module ConfigToModel =
 
     ///Builds the MultiGPTransferUnit Model from the config files
     ///returns prediction, loss and ModelInstance
-    let mlgptFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>)= 
+    let mlgptFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>) (configPath:string)= 
         let mb = ModelBuilder<single> config.Model.Name
         let nBatch  = mb.Size "nBatch"
         let nLayers = config.Model.Hyperpars.GPTransfer.Count
@@ -88,7 +88,7 @@ module ConfigToModel =
         let outSize = data.Trn.[0].Target.Shape.[0]
         config.Model.Hyperpars.GPTransfer.[0].NInput <- inSize
         config.Model.Hyperpars.GPTransfer.[nLayers - 1].NOutput <- outSize
-        config.Save(__SOURCE_DIRECTORY__ + @"\RuntimeConfig.yaml")
+        config.Save(configPath)
         ///set all model sizes
         let configSizes =  config.Model.Hyperpars.GPTransfer |> List.ofSeq
         let setSizes =   List.map2 (fun  ({NInput = nIn; NOutput = nOut;NTrnSmpls = nTrn}:GPTransferUnit.HyperPars)
@@ -105,7 +105,7 @@ module ConfigToModel =
 
     ///Builds the Multilayer Perceptron from the config files
     ///returns prediction, loss and ModelInstance
-    let mlpFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>) = 
+    let mlpFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>) (configPath:string)= 
         let mb = ModelBuilder<single> config.Model.Name
         let nBatch  = mb.Size "nBatch"
         let nLayers = config.Model.Hyperpars.GPTransfer.Count
@@ -142,7 +142,7 @@ module ConfigToModel =
         let outSize = data.Trn.[0].Target.Shape.[0]
         config.Model.Hyperpars.GPTransfer.[0].NInput <- inSize
         config.Model.Hyperpars.GPTransfer.[nLayers - 1].NOutput <- outSize
-        config.Save(__SOURCE_DIRECTORY__ + @"\RuntimeConfig.yaml")
+        config.Save(configPath)
         ///set all model sizes
         let configSizes =  config.Model.Hyperpars.GPTransfer |> List.ofSeq
         let setSizes =   List.map2 (fun  ({NInput = nIn; NOutput = nOut;TransferFunc = _}:NeuralLayer.HyperPars)
@@ -157,11 +157,11 @@ module ConfigToModel =
         let loss = MLP.loss mlp input.T target.T
         pred, loss, mi,input,target
 
-    let modelFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>) = 
+    let modelFromConfig (config:TrainConfig) (data:TrnValTst<CsvLoader.CsvSample>) configPath= 
         let model = config.Model
         match model.Type with
-        | "MLGPTransfer" -> mlgptFromConfig config data
-        | "MLPerceptron" -> mlpFromConfig config data
+        | "MLGPTransfer" -> mlgptFromConfig config data configPath
+        | "MLPerceptron" -> mlpFromConfig config data configPath
         | _ -> failwithf "Model type %s is not defined" model.Type
     
     ///generates the optimizer from the config file
