@@ -122,15 +122,16 @@ module Program =
 //        gptu.MultiGPL.TrnT := !gptu.MultiGPL.TrnT |> Expr.assumeZeroDerivative
 //        gptu.MultiGPL.TrnSigma := !gptu.MultiGPL.TrnSigma |> Expr.assumeZeroDerivative
 //        gptu.MultiGPL.Lengthscales := !gptu.MultiGPL.Lengthscales |> Expr.assumeZeroDerivative
-        gptu.WeightL.Weights := !gptu.WeightL.Weights |> Expr.assumeZeroDerivative
+//        gptu.WeightL.Weights := !gptu.WeightL.Weights |> Expr.assumeZeroDerivative
 
         let pred,_ = GPTransferUnit.pred gptu (InputLayer.transform input)
 
-        let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-3f)
+        let softmax act = exp act / (Expr.sumKeepingAxis 1 (exp act) + 1e-6f)
         
-        //let pred = max (softmax pred) (Expr.scalar 1e-3f)
-        let pred = Expr.maxElemwise pred (Expr.scalar 1e-5f)
-        let pred = Expr.minElemwise pred (Expr.scalar 20.0f)
+        let pred = Expr.maxElemwise pred (Expr.scalar -10.0f)
+        let pred = Expr.minElemwise pred (Expr.scalar  10.0f)
+        //let pred = softmax pred
+
         let pred = pred |> Expr.dump "pred"
         let pred = pred |> Expr.checkFinite "pred"
 //        let loss = -target * log pred |> Expr.sumAxis 0 |> Expr.mean
@@ -142,7 +143,7 @@ module Program =
         let pred_fun =  mi.Func pred |> arg1 input 
 
         // loss expression
-        let loss = LossLayer.loss LossLayer.CrossEntropy pred target
+        let loss = LossLayer.loss LossLayer.MSE pred target
         let loss = loss |> Expr.checkFinite "loss"
         let loss = loss |> Expr.dump "loss"
         // optimizer

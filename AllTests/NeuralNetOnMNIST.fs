@@ -50,13 +50,14 @@ let build device batch =
 
     // optimizer (with parameters)
     let opt = GradientDescent<single> (loss, mi.ParameterVector, device)
+    let optCfg = {GradientDescent.Step=1e-3f}
     opt.PublishLoc mi
 
     // compile functions
     let lossFun = mi.Func loss |> arg2<single, single, _> input target
     let optFun = mi.Func (opt.Minimize) |> opt.Use |> arg2<single, single, _> input target
     
-    lossFun, optFun
+    lossFun, optFun, optCfg, opt.InitialState optCfg mi.ParameterValues
 
 let getMnist device samples =
     let cut (x: ArrayNDT<_>) =
@@ -78,11 +79,12 @@ let getMnist device samples =
 
 let train device samples iters = 
     let tstImgs, tstLbls = getMnist device (Some samples)
-    let lossFun, optFun = build device samples
+    let lossFun, optFun, optCfg, optState = build device samples
     let initialLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
-        optFun tstImgs tstLbls {Step=1e-2f} |> ignore
+        optFun tstImgs tstLbls optCfg optState |> ignore
+        //printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
     let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss
@@ -105,7 +107,7 @@ let ``Neural net compiles for GPU`` () =
 [<Trait("Category", "Skip_CI")>]
 let ``Loss decreases during training on GPU`` () =
     let sw = Stopwatch.StartNew()
-    let initialLoss, finalLoss = train DevCuda 1000 10
+    let initialLoss, finalLoss = train DevCuda 1000 50
     finalLoss |> should lessThan (initialLoss - 0.001f)
     printfn "Model build and train time: %A" sw.Elapsed
 
