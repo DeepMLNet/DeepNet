@@ -58,7 +58,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GPTransfer", "TestExes\GPTr
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MathematicaInterface", "TestExes\MathematicaInterface\MathematicaInterface.fsproj", "{2BA4BCF9-5163-4BBE-B052-569990AFC8C2}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SmoothADP", "SmoothADP\SmoothADP.fsproj", "{2DE8ECBC-0C8C-47E6-BD14-CEB2E957C5CD}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SmoothADP", "TestExes\SmoothADP\SmoothADP.fsproj", "{2DE8ECBC-0C8C-47E6-BD14-CEB2E957C5CD}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TrainFromConfig", "TestExes\TrainFromConfig\TrainFromConfig.fsproj", "{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}"
 EndProject
