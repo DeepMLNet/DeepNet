@@ -400,7 +400,9 @@ module ModelContextTypes =
         member this.ParameterStorage = parameterStorage
 
         /// numeric flat parameter vector
-        member this.ParameterValues = this.ParameterStorage.Flat
+        member this.ParameterValues 
+            with get () = this.ParameterStorage.Flat
+            and set value = this.ParameterStorage.Flat <- value
 
         /// Compile environment.
         member this.CompileEnv = compileEnv

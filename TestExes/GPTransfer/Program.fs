@@ -161,7 +161,7 @@ module Program =
         let trainCfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                 Termination        = Train.ItersWithoutImprovement 100
                                                 DumpPrefix         = None
-                                                MaxIters           = Some 300 //Some 20 //300
+                                                MaxIters           = Some 500 //Some 20 //300
                                                 }
         let trnErr,valErr,tstErr = classificationErrors  batchSize data pred_fun
         printfn "Classification errors before training:"
@@ -455,15 +455,16 @@ module Program =
 //        SymTensor.Debug.Timing <- true
 //        SymTensor.Debug.TraceCompile <- true
         SymTensor.Debug.EnableCheckFinite <- false
-        SymTensor.Debug.PrintOptimizerStatistics <- true
+//        SymTensor.Debug.PrintOptimizerStatistics <- true
 //        SymTensor.Compiler.Cuda.Debug.Timing <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
 //        SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 //        SymTensor.Compiler.Cuda.Debug.DebugCompile <- true
-        SymTensor.Compiler.Cuda.Debug.GenerateLineInfo <- true
-        SymTensor.Compiler.Cuda.Debug.KeepCompileDir <- true
-        SymTensor.Compiler.Cuda.Debug.DisableKernelCache <- true
-        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
+        //SymTensor.Compiler.Cuda.Debug.GenerateLineInfo <- true
+        //SymTensor.Compiler.Cuda.Debug.KeepCompileDir <- true
+        //SymTensor.Compiler.Cuda.Debug.DisableKernelCache <- true
+//        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
+        SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
         SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
         SymTensor.Compiler.Cuda.Debug.DumpCode <- true

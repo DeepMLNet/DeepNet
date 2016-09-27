@@ -103,7 +103,6 @@ module ArrayNDHostTypes =
             ArrayNDT<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDHostT<'T> as dest ->
-
                 if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
                         ArrayND.stride this = ArrayND.stride dest then
                     // use array block copy

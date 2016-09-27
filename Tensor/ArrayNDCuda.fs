@@ -102,7 +102,7 @@ module ArrayNDCudaTypes =
                 setElement (ArrayNDLayout.addr pos layout) value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
-            ArrayNDCudaT<'T>(layout) :> ArrayNDT<'T>
+            ArrayNDCudaT<'T> (layout) :> ArrayNDT<'T>
 
         override this.NewOfType<'N> (layout: ArrayNDLayoutT) = 
             // drop constraint on 'N
@@ -110,7 +110,7 @@ module ArrayNDCudaTypes =
             Activator.CreateInstance (aryType, [|box layout|]) :?> ArrayNDT<'N>
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDCudaT<'T>(layout, storage) :> ArrayNDT<'T>
+            ArrayNDCudaT<'T> (layout, storage) :> ArrayNDT<'T>
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this
@@ -139,7 +139,9 @@ module ArrayNDCudaTypes =
 
         static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDCudaT<bool>
         static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDCudaT<bool>
+        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<== b :?> ArrayNDCudaT<bool>
         static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDCudaT<bool>
+        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>== b :?> ArrayNDCudaT<bool>            
         static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDCudaT<bool>
 
         /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
@@ -204,6 +206,24 @@ module ArrayNDCudaTypes =
                                         SizeT (sizeof<'T> * ArrayND.nElems src))
             dstMemHnd.Dispose ()
             
+
+        override this.CopyTo (dest: ArrayNDT<'T>) =
+            ArrayNDT<'T>.CheckSameShape this dest
+            match dest with
+            | :? ArrayNDCudaT<'T> as dest ->
+                if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
+                        ArrayND.stride this = ArrayND.stride dest then
+                    // use fast CUDA memcpy
+                    dest.Storage.Data.CopyToDevice (this.Storage.Data, 
+                                                    SizeT (sizeof<'T> * ArrayND.offset this),
+                                                    SizeT (sizeof<'T> * ArrayND.offset dest),
+                                                    SizeT (sizeof<'T> * ArrayND.nElems this))
+                else
+                    // use slow element by element copy over host
+                    base.CopyTo dest
+            | :? ArrayNDHostT<'T> as dest when ArrayND.isC dest ->
+                ArrayNDCudaT<'T>.CopyIntoHost dest this
+            | _ -> base.CopyTo dest
 
         /// Copies this ArrayNDCudaT to the host
         member this.ToHost () =

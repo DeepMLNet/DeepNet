@@ -313,6 +313,7 @@ module CudaExprWorkspaceTypes =
 
         #if !CUDA_DUMMY
         /// CUDA launch sizes for specified WorkDims
+        let sw = Stopwatch.StartNew ()
         let kernelLaunchDims =
             kernelDistinctLaunches
             |> Set.toSeq
@@ -750,10 +751,11 @@ module CudaExprWorkspaceTypes =
                 // For now we synchronize the whole context to make sure that data transfers
                 // from and to the GPU do not overlap with the computation that may involve
                 // the targets/sources of these transfers as input/output variables.
-                CudaSup.context.Synchronize () 
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
                 execCalls recipe.ExecCalls
-                CudaSup.context.Synchronize () 
-
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
 
             )
 

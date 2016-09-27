@@ -138,6 +138,7 @@ module ArrayND =
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
             // slow element-wise fallback copy
+            printfn "Warning: fallback slow ArrayNDT.CopyTo is being used"
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
