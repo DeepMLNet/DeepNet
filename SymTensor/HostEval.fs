@@ -69,7 +69,6 @@ module HostEval =
                 | Leaf(op) ->
                     match op with
                     | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
-                    | Zeros (ss, tn) -> ArrayNDHost.zeros (shapeEval ss)
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
@@ -105,7 +104,7 @@ module HostEval =
                     | SumAxis ax -> ArrayND.sumAxis ax av
                     | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                     | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
-                    | SwapDim (ax1, ax2) -> ArrayND.swapDim ax1 ax2 av
+                    | PermuteAxes perm -> ArrayND.permuteAxes perm av
                     | Subtensor sr -> av.[rngEval sr]
                     | StoreToVar vs -> 
                         // TODO: stage variable write to avoid overwrite of used variables

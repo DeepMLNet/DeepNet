@@ -68,10 +68,8 @@ module CudaElemExpr =
         | ULeafOp leafOp ->
             match leafOp with
             | Const c -> constCode tn c
-            | SizeValue ss ->
-                let svInt = SizeSpec.eval ss
-                constCode tn (ConstSpec.ofValue svInt)
-            | ArgElement (arg, idxs) ->
+            | SizeValue (ss, _) -> ssCode ss
+            | ArgElement ((arg, idxs), _) ->
                 let argVar = argVars.[arg]
                 let idxStr =
                     idxs
@@ -164,7 +162,7 @@ module CudaElemExpr =
                     // generate loop code
                     let sumCode = 
                         sprintf "%s%s %s = 0;\n" spc myVarType myVarName +
-                        sprintf "%sfor (size_t %s = %s; %s <= %s; %s++) {\n"
+                        sprintf "%sfor (idx_t %s = %s; %s <= %s; %s++) {\n"
                             spc sumIdxVar firstVal sumIdxVar lastVal sumIdxVar +
                         iterCalcCode +
                         sprintf "%s  %s += %s;\n" spc myVarName iterResVarName +
@@ -207,11 +205,14 @@ module CudaElemExpr =
         let tmplArgs = [for a=0 to nArgs-1 do yield sprintf "typename Ta%d" a]
         let retType = match expr with UElemExpr (_, _, tn) -> cppType tn
         let funcArgs = [
-            for d=0 to nTrgtDims-1 do yield sprintf "const size_t p%d" d
+            for d=0 to nTrgtDims-1 do yield sprintf "const idx_t p%d" d
             for a=0 to nArgs-1 do yield sprintf "const Ta%d &a%d" a a
         ]
-        let functorCode =
-            sprintf "template <%s>\n" (tmplArgs |> String.concat ", ") +
+        let functorCode =    
+            let tmpl =         
+                if List.isEmpty tmplArgs then ""
+                else sprintf "template <%s>\n" (tmplArgs |> String.concat ", ") 
+            tmpl +
             sprintf "struct %s {\n" name +
             sprintf "  _dev %s operator() (%s) const {\n" retType (funcArgs |> String.concat ", ") +
             calcCode +

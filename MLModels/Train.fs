@@ -188,7 +188,7 @@ module Train =
             member this.SaveModel path = modelInstance.SavePars path
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
-                and set (value) = modelInstance.ParameterValues.[Fill] <- value
+                and set (value) = modelInstance.ParameterValues <- value
             member this.InitOptState () = optState <- optimizer.InitialState optCfg modelInstance.ParameterValues
             member this.LoadOptState path = optState <- optimizer.LoadState path
             member this.SaveOptState path = optimizer.SaveState path optState    

@@ -138,6 +138,7 @@ module ArrayND =
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
             // slow element-wise fallback copy
+            printfn "Warning: fallback slow ArrayNDT.CopyTo is being used"
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
@@ -553,9 +554,11 @@ module ArrayND =
     let inline transpose a =
         relayout (ArrayNDLayout.transpose (layout a)) a
 
-    /// reorders the axes as specified
-    let inline reorderAxes (newOrder: int list) a =
-        relayout (ArrayNDLayout.reorderAxes newOrder (layout a)) a
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let inline permuteAxes (permut: int list) a =
+        relayout (ArrayNDLayout.permuteAxes permut (layout a)) a
 
     /// creates a view of an ArrayND
     let inline view ranges a =

@@ -107,6 +107,15 @@ module ConstSpec =
     let typeName (cs: ConstSpecT) =
         cs.TypeName
 
+    let zeroOfType (typ: System.Type) =
+        0 |> convTo typ |> ofValue
+
+    let oneOfType (typ: System.Type) =
+        1 |> convTo typ |> ofValue
+
+    let twoOfType (typ: System.Type) =
+        1 |> convTo typ |> ofValue
+
 
 [<AutoOpen>]
 /// variable specification types

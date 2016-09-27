@@ -234,9 +234,9 @@ module CudaExecUnit =
                 [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0] rv))]
             | _ -> dfltSrcWithNoViewReq
         | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq
-        | UUnaryOp (SwapDim (ax1, ax2)) ->
+        | UUnaryOp (PermuteAxes perm) ->
             match trgtDfltChReq with
-            | Some rv -> [dfltChReq (Some (ArrayND.swapDim ax1 ax2 rv))]
+            | Some rv -> [dfltChReq (Some (ArrayND.permuteAxes (Permutation.invert perm) rv))]
             | _ -> dfltSrcWithNoViewReq
 
         // variable access
@@ -452,8 +452,8 @@ module CudaExecUnit =
             else dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
             dfltChTrgt (ArrayND.broadcastToShape trgtShape srcsDfltCh.[0]) srcsDfltChShared.[0]
-        | UUnaryOp (SwapDim (ax1, ax2)) ->
-            dfltChTrgt (ArrayND.swapDim ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
+        | UUnaryOp (PermuteAxes perm) ->
+            dfltChTrgt (ArrayND.permuteAxes perm srcsDfltCh.[0]) srcsDfltChShared.[0]
 
         // variable access
         | UUnaryOp (StoreToVar _) -> 
@@ -538,19 +538,19 @@ module CudaExecUnit =
             RetType="void"
             ArgTypes=List.map (fun (a: ICudaArgTmpl) -> a.CPPTypeName) argTmpls
         }    
-        [LaunchKernel(cFuncTmpl, workDim, argTmpls)]
+        [LaunchKernel (cFuncTmpl, workDim, argTmpls)]
 
-    /// returns the CUDA work dimensions for an element-wise or elements operation
+    /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
         | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
         | 0 -> (1, 1, 1)
         | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
-        | 2 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], 1)
-        | 3 -> ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[2])
+        | 2 -> ((ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0], 1)
+        | 3 -> ((ArrayND.shape trgt).[2], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0])
         | d ->
-            let rest = {2 .. d-1} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
-            ((ArrayND.shape trgt).[0], (ArrayND.shape trgt).[1], rest)
+            let rest = {0 .. d-3} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
+            ((ArrayND.shape trgt).[d-1], (ArrayND.shape trgt).[d-2], rest)
 
     /// returns the C++ template instantiation code for the given template and argument list
     let cppTemplateInstantiation tmpl args =
@@ -627,8 +627,10 @@ module CudaExecUnit =
         let opTmplArgs = 
             srcViews
             |> List.map (fun (manikin: ArrayNDManikinT) -> manikin.CPPType)
-            |> String.concat ", "
-        let opTypeName = sprintf "%s<%s>" opName opTmplArgs
+            |> String.concat ", "       
+        let opTypeName = 
+            if opTmplArgs = "" then opName
+            else sprintf "%s<%s>" opName opTmplArgs
 
         let funcName, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews
         let workDims = workDimForElemwise trgt false
@@ -645,11 +647,11 @@ module CudaExecUnit =
             match rngs, rngManikins with
             | SRSDynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
                 // for dynamic range pass pointer to result of expression calculating the index
-                (SizeTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                (IdxTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rrngManikins 
             | SRSSymStartSymEnd _ :: rrngs, _ ->
                 // symbolic range has already been applied, pass null (meaning no offset to add)
-                (SizeTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
+                (IdxTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rngManikins 
             | [], [] -> []
             | _ -> failwith "invalid dynamic range specification"
@@ -660,10 +662,10 @@ module CudaExecUnit =
 
     let execItemsForCopyFromDynamicSubtensor trgt src rngs rngManikins =
         // C++ signature is:
-        //template <typename TTarget, typename TBaseSrc, typename TDynSrc, size_t nDims,
+        //template <typename TTarget, typename TBaseSrc, typename TDynSrc, idx_t nDims,
         //          TElemwise1Ary<IdEOp_t, TTarget, TDynSrc>::type copyFun>
         //_dev void copyFromDynamicSubtensor(TTarget &trgt,  
-        //                                   const TBaseSrc &baseSrc, const Array<size_t, nDims> &srcIdx)
+        //                                   const TBaseSrc &baseSrc, const Array<idx_t, nDims> &srcIdx)
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
         let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
@@ -804,7 +806,7 @@ module CudaExecUnit =
         // we need to swap axes so that the axes the summation is performed over comes last
         let nd = ArrayND.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.reorderAxes axOrder src
+        let srcAdj = ArrayND.permuteAxes axOrder src
 
         // initial value is zero for summation
         let initial = 
@@ -871,7 +873,6 @@ module CudaExecUnit =
         match op with 
         // tensor creation
         | ULeafOp (Identity _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
-        | ULeafOp (Zeros _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
         | ULeafOp (ScalarConst cs) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue (sv, _)) -> 
             let value = Convert.ChangeType(SizeSpec.eval sv, dfltChTrgt.DataType)
@@ -958,7 +959,7 @@ module CudaExecUnit =
                 copyExecItems dfltChTrgt srcsDfltCh.[0]
             else []
         | UUnaryOp (DoBroadcast _) -> []
-        | UUnaryOp (SwapDim _) -> []
+        | UUnaryOp (PermuteAxes _) -> []
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->

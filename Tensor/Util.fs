@@ -121,6 +121,11 @@ module UtilTypes =
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
 
+    /// convert given value to specified type and return as obj
+    let convTo (typ: System.Type) value =
+        Convert.ChangeType(box value, typ)
+
+    /// convert given value to type 'T
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
@@ -189,8 +194,9 @@ module Util =
         match typ with
         | _ when typ = typeof<double>   -> "double"
         | _ when typ = typeof<single>   -> "float"
-        | _ when typ = typeof<int>      -> "int"
-        | _ when typ = typeof<byte>     -> "char"
+        | _ when typ = typeof<int32>    -> "int"
+        | _ when typ = typeof<uint32>   -> "unsigned int"
+        | _ when typ = typeof<byte>     -> "unsigned char"
         | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
 
@@ -222,4 +228,63 @@ module Util =
             // InvalidOperationException is thrown when process does not have a console or 
             // input is redirected from a file.
             None
+
+    /// matches integral values (e.g. 2, 2.0 or 2.0f, etc.)
+    let (|Integral|_|) (x: 'T) =
+        match typeof<'T> with
+        | t when t = typeof<int> ->
+            Some (x |> box |> unbox<int>)
+        | t when t = typeof<byte> ->
+            Some (x |> box |> unbox<byte> |> int)
+        | t when t = typeof<float> ->
+            let f = x |> box |> unbox<float>
+            if abs (f % 1.0) < System.Double.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | t when t = typeof<single> ->
+            let f = x |> box |> unbox<single>
+            if abs (f % 1.0f) < System.Single.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | _ -> None
+
+/// Permutation utilities
+module Permutation =
+    
+    /// true if the given list is a permutation of the numbers 0 to perm.Length-1
+    let is (perm: int list) =
+        let nd = perm.Length
+        Set perm = Set [0 .. nd-1]
+
+    let private check (perm: int list) =
+        if not (is perm) then
+            failwithf "%A is not a permutation" perm
+
+    /// the length of the given permutation
+    let length (perm: int list) =
+        check perm
+        perm.Length
+
+    /// true if then given permutation is the identity permutation
+    let isIdentity (perm: int list) =
+        check perm
+        perm = [0 .. (length perm)-1]
+
+    /// inverts the given permutation
+    let invert (perm: int list) =
+        check perm
+        List.indexed perm
+        |> List.sortBy (fun (i, p) -> p)
+        |> List.map (fun (i, p) -> i)
+    
+    /// returns the permutation that would result in applying perm1 after perm2    
+    let chain (perm1: int list) (perm2: int list) =
+        check perm1
+        check perm2
+        perm2 |> List.permute (fun i -> perm1.[i])
+
+    /// permutes the list using the given permutation
+    let apply (perm: int list) lst =
+        check perm
+        lst |> List.permute (fun i -> perm.[i])
 

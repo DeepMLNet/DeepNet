@@ -6,22 +6,37 @@ open Basics
 module DerivTypes =
     open Expr
 
-    /// map containing the Jacobian for each variable
-    type DerivT = Map<VarSpecT, ExprT>
+    /// Jacobians for each variable
+    type DerivT = {
+        /// the expression the derivative was calculated of
+        Expr:       ExprT
+        /// the Jacobians w.r.t. the variables occuring in the expression
+        Jacobians:  Map<VarSpecT, ExprT>
+    }
 
 
+/// derivative calculation
 module Deriv =
     open Expr
 
-    /// merges to derivative maps
+    /// merges two derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
-        (aGrads, bGrads)
-        ||> Map.fold (fun m v vg -> match Map.tryFind v m with
-                                    | Some ovg -> m |> Map.add v (vg + ovg)
-                                    | None -> m |> Map.add v vg) 
+        if aGrads.Expr <> bGrads.Expr then
+            failwith "derivatives must belong to same expression"
+        let jacs =
+            (aGrads.Jacobians, bGrads.Jacobians)
+            ||> Map.fold (fun m v vg -> match Map.tryFind v m with
+                                        | Some ovg -> m |> Map.add v (vg + ovg)
+                                        | None -> m |> Map.add v vg) 
+        {Expr=aGrads.Expr; Jacobians=jacs}
+
+    /// empty derivatives for expression
+    let private empty expr =
+        {Expr=expr; Jacobians=Map.empty}
 
     /// reverse accumulation autodifferentiation of an expression
-    let rec reverseDiffStep (expr: ExprT) (eg: ExprT) : DerivT =    
+    let rec private reverseDiffStep (baseExpr: ExprT) (expr: ExprT) (eg: ExprT) : DerivT =    
+        let rds = reverseDiffStep baseExpr
         let exprShp = expr.Shape
         let funElems = eg.Shape.[0]  
 
@@ -46,9 +61,9 @@ module Deriv =
 
         /// total derivates given op's derivates
         let totalDerivates es des =
-            (Map.empty, List.zip es des)
+            (empty baseExpr, List.zip es des)
             ||> List.fold (fun totGrad (e, de) ->
-                let eGrad = reverseDiffStep e de
+                let eGrad = rds e de
                 merge totGrad eGrad)
 
         /// logic op failure
@@ -65,48 +80,51 @@ module Deriv =
         match expr with
         | Leaf(op) ->                  
             match op with
-            | Zeros _ -> Map.empty
-            | ScalarConst _ -> Map.empty
-            | SizeValue _ -> Map.empty
-            | Identity _ -> Map.empty
-            | Var v -> Map.empty |> Map.add v eg
+            | ScalarConst _ -> empty baseExpr
+            | SizeValue _ -> empty baseExpr
+            | Identity _ -> empty baseExpr
+            | Var v -> {empty baseExpr with Jacobians=Map [v, eg]}
 
         | Unary(op, a) ->
             match op with
-            | Negate -> -eg |> reverseDiffStep a
-            | Abs -> egExpanded * padLeft (signt a) |> collapse |> reverseDiffStep a
-            | SignT -> Map.empty
-            | Log -> egExpanded * padLeft (a ** (-one)) |> collapse |> reverseDiffStep a
-            | Log10 -> eg |> reverseDiffStep (log a / log (scalar 10))
-            | Exp -> egExpanded * padLeft (exp a) |> collapse |> reverseDiffStep a
-            | Sin -> egExpanded * padLeft (cos a) |> collapse |> reverseDiffStep a
-            | Cos -> egExpanded * padLeft (-sin a) |> collapse |> reverseDiffStep a
-            | Tan -> egExpanded * padLeft (one + (tan a)**two) |> collapse |> reverseDiffStep a
-            | Asin -> egExpanded * padLeft (one / sqrtt (one - a**two)) |> collapse |> reverseDiffStep a
-            | Acos -> egExpanded * padLeft (-one / sqrtt (one - a**two)) |> collapse |> reverseDiffStep a
-            | Atan -> egExpanded * padLeft (one / (one + a**two)) |> collapse |> reverseDiffStep a
-            | Sinh -> egExpanded * padLeft (cosh a) |> collapse |> reverseDiffStep a
-            | Cosh -> egExpanded * padLeft (sinh a) |> collapse |> reverseDiffStep a
-            | Tanh -> egExpanded * padLeft (one - (tanh a)**two) |> collapse |> reverseDiffStep a
-            | Sqrt -> egExpanded * padLeft (one / (two * sqrtt a)) |> collapse |> reverseDiffStep a
-            | Ceil -> Map.empty
-            | Floor -> Map.empty
-            | Round -> Map.empty
-            | Truncate -> Map.empty
+            | Negate -> -eg |> rds a
+            | Abs -> egExpanded * padLeft (signt a) |> collapse |> rds a
+            | SignT -> empty baseExpr
+            | Log -> egExpanded * padLeft (a ** (-one)) |> collapse |> rds a
+            | Log10 -> eg |> rds (log a / log (scalar 10))
+            | Exp -> egExpanded * padLeft (exp a) |> collapse |> rds a
+            | Sin -> egExpanded * padLeft (cos a) |> collapse |> rds a
+            | Cos -> egExpanded * padLeft (-sin a) |> collapse |> rds a
+            | Tan -> egExpanded * padLeft (one + (tan a)**two) |> collapse |> rds a
+            | Asin -> egExpanded * padLeft (one / sqrtt (one - a**two)) |> collapse |> rds a
+            | Acos -> egExpanded * padLeft (-one / sqrtt (one - a**two)) |> collapse |> rds a
+            | Atan -> egExpanded * padLeft (one / (one + a**two)) |> collapse |> rds a
+            | Sinh -> egExpanded * padLeft (cosh a) |> collapse |> rds a
+            | Cosh -> egExpanded * padLeft (sinh a) |> collapse |> rds a
+            | Tanh -> egExpanded * padLeft (one - (tanh a)**two) |> collapse |> rds a
+            | Sqrt -> egExpanded * padLeft (one / (two * sqrtt a)) |> collapse |> rds a
+            | Ceil -> empty baseExpr
+            | Floor -> empty baseExpr
+            | Round -> empty baseExpr
+            | Truncate -> empty baseExpr
             
             | Not -> failLogic op
 
-            | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
-            | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
-            | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> reverseDiffStep a
-            | SwapDim (ax1, ax2) -> egExpanded |> swapDim (ax1 + 1) (ax2 + 1) |> collapse |> reverseDiffStep a
+            | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> rds a
+            | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> rds a
+            | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> rds a
+            | PermuteAxes perm -> 
+                let backPerm = Permutation.invert perm
+                let egePerm = 
+                    0 :: List.map (fun p -> p + 1) backPerm
+                egExpanded |> permuteAxes egePerm |> collapse |> rds a
 
             | Subtensor srs ->
                 let agExpanded = zeros (funElems :: (shapeOf a))
                 setSubtensor agExpanded.[SRSAll :: srs] egExpanded
                 |> collapse 
-                |> reverseDiffStep a
-            | Reshape ss -> eg |> reverseDiffStep a
+                |> rds a
+            | Reshape ss -> eg |> rds a
             | DoBroadcast ss -> 
                 let mutable egUnbroadcasted = egExpanded
                 for ax, (eSize, aSize) in List.indexed (List.zip ss (shapeOf a)) do
@@ -115,19 +133,19 @@ module Deriv =
                     | _, SizeSpecT.Broadcast ->
                         egUnbroadcasted <- egUnbroadcasted |> sumKeepingAxis (ax + 1)
                     | _ -> ()
-                egUnbroadcasted |> collapse |> reverseDiffStep a
+                egUnbroadcasted |> collapse |> rds a
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
-                        |> collapse |> reverseDiffStep a
+                        |> collapse |> rds a
             | SumAxis ax -> 
                 let eeg = egExpanded 
                 let bca = eeg |> reshape (shapeOf eeg |> ShapeSpec.insertBroadcastAxis (ax + 1))
                 let ael = (shapeOf a).[ax]
                 let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
-                bc |> collapse |> reverseDiffStep a
-            | StoreToVar _ -> eg |> reverseDiffStep a
+                bc |> collapse |> rds a
+            | StoreToVar _ -> eg |> rds a
 
             | NullifyJacobian ->
-                Expr.zerosLike eg |> reverseDiffStep a
+                Expr.zerosLike eg |> rds a
             | AssumeJacobian jac ->
                 let jacBc =
                     match eg.Shape.[0], jac.Shape.[0] with
@@ -137,13 +155,13 @@ module Deriv =
                     | _ -> 
                         failwithf "cannot broadcast specified Jacobian of shape %A to required 
                                    Jacobian shape %A" jac.Shape eg.Shape
-                jacBc |> reverseDiffStep a
+                jacBc |> rds a
 
-            | Print _ -> eg |> reverseDiffStep a
-            | Dump _ -> eg |> reverseDiffStep a
-            | Annotated _ -> eg |> reverseDiffStep a
+            | Print _ -> eg |> rds a
+            | Dump _ -> eg |> rds a
+            | Annotated _ -> eg |> rds a
             | CheckFinite name ->
-                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) |> reverseDiffStep a
+                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) |> rds a
 
         | Binary(op, a, b) ->
             let inline (.+) da db = totalDerivates [a; b] [da; db]
@@ -153,15 +171,15 @@ module Deriv =
             | Substract -> eg .+ (-eg)
             | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
                           ((egExpanded * (padLeft a)) |> collapse)
-            | Divide -> eg |> reverseDiffStep (a * b ** (-one))
+            | Divide -> eg |> rds (a * b ** (-one))
             | Modulo -> 
                 failwith "Modulo gradient is broken"
                 eg .+ (padLeft (-truncate (a / b)) |> collapse) 
             | Power -> (egExpanded * padLeft (b * a**(b - one)) |> collapse) .+ 
                        (egExpanded * padLeft (a**b * log a) |> collapse)
             
-            | MaxElemwise -> eg |> reverseDiffStep (ifThenElse (a >>>> b) a b)
-            | MinElemwise -> eg |> reverseDiffStep (ifThenElse (a <<<< b) a b)
+            | MaxElemwise -> eg |> rds (ifThenElse (a >>>> b) a b)
+            | MinElemwise -> eg |> rds (ifThenElse (a <<<< b) a b)
 
             | Equal
             | Less
@@ -232,22 +250,26 @@ module Deriv =
                             let ipd = ip |> Interpolator.getDerivativeOfInterpolator d 
                             yield egExpanded * padLeft (Expr.interpolate ipd es)]
                     totalDerivates es des
-                | InterpolateToLeft -> Map.empty
+                | InterpolateToLeft -> empty baseExpr
 
             | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
 
-    /// reverse accumulation autodifferentiation of an expression
+    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
     let compute (expr: ExprT) : DerivT =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
-        reverseDiffStep expr eg
+        reverseDiffStep expr expr eg
 
     /// extracts the Jacobian of the given variable
-    let ofVar var (varDiffs: DerivT) =
-        match varDiffs |> Map.tryFind (extractVar var) with
+    let ofVar var (deriv: DerivT) =
+        match deriv.Jacobians |> Map.tryFind (extractVar var) with
         | Some d -> d
-        | None -> failwithf "the variable %A is not present in the expression" (extractVar var)
+        | None when Debug.FailIfVarNotInDerivative -> 
+            failwithf "the variable %A is not present in the expression" (extractVar var)
+        | None -> Expr.zerosOfSameType var [Expr.nElems deriv.Expr ; Expr.nElems var]
+            
+        
 
 
 

@@ -67,15 +67,11 @@ module MultiGPLayer =
         //        l[gp]
         //        s[gp, trn_smpl]
         // output cov[gp, trn_smpl1, trn_smpl2]
-        let gp = ElemExpr.idx 0   
-        let trn_smpl1 = ElemExpr.idx 1
-        let trn_smpl2 = ElemExpr.idx 2
-        let l = ElemExpr.argElem 0
-        let x = ElemExpr.argElem 1
-        let s = ElemExpr.argElem 2
+        let gp, trn_smpl1, trn_smpl2 = ElemExpr.idx3   
+        let l, x, s = ElemExpr.arg3<single>
         let kse =
             exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) ) +
-            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.zero)
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.scalar 0.0f)
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
 
@@ -91,10 +87,10 @@ module MultiGPLayer =
         let smpl = ElemExpr.idx 0
         let gp = ElemExpr.idx 1
         let trn_smpl = ElemExpr.idx 2
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
         let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
@@ -115,10 +111,10 @@ module MultiGPLayer =
         let gp = ElemExpr.idx 1
         let trn_smpl1 = ElemExpr.idx 2
         let trn_smpl2 = ElemExpr.idx 3
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         let L1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp]) )
         let L2a = ( m [smpl; gp] - (x [gp; trn_smpl1] + x [gp; trn_smpl2])/2.0f )***2.0f / ((l [gp])***2.0f + 2.0f * s [smpl; gp; gp])
@@ -142,10 +138,10 @@ module MultiGPLayer =
         let gp2 = ElemExpr.idx 2
         let t1 = ElemExpr.idx 3
         let t2 = ElemExpr.idx 4
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
@@ -160,7 +156,7 @@ module MultiGPLayer =
         let sq2Dnm = s[smpl;gp1;gp2]***2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
         let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.scalar 0.0f) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
     ///Elementwise Matrix needed for calculation of the covarance prediction.
@@ -177,10 +173,10 @@ module MultiGPLayer =
         let gp2 = ElemExpr.idx 2
         let t1 = ElemExpr.idx 3
         let t2 = ElemExpr.idx 4
-        let m = ElemExpr.argElem 0
-        let s = ElemExpr.argElem 1
-        let l = ElemExpr.argElem 2
-        let x = ElemExpr.argElem 3
+        let m = ElemExpr.argElem<single> 0
+        let s = ElemExpr.argElem<single> 1
+        let l = ElemExpr.argElem<single> 2
+        let x = ElemExpr.argElem<single> 3
 
         // Mathematica: k = gp1  l = gp2   i=t1   j=t2
 
@@ -192,7 +188,7 @@ module MultiGPLayer =
 
         let Tdnm = sqrt ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
 
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.zero) (Tnom / Tdnm)
+        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.scalar 0.0f) (Tnom / Tdnm)
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
@@ -205,8 +201,8 @@ module MultiGPLayer =
         let smpl = ElemExpr.idx 0
         let gp1 = ElemExpr.idx 1
         let gp2 = ElemExpr.idx 2
-        let c = ElemExpr.argElem 0
-        let v = ElemExpr.argElem 1
+        let c = ElemExpr.argElem<single> 0
+        let v = ElemExpr.argElem<single> 1
 
         let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
         Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
@@ -219,16 +215,18 @@ module MultiGPLayer =
         let nGps = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
+        let mu = mu |> Expr.checkFinite "mu"
+        let sigma = sigma |> Expr.checkFinite "sigma"
+
         let lengthscales = !pars.Lengthscales
         let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
-
         let trnX = !pars.TrnX
         let trnX = trnX |> Expr.checkFinite "trnX"
         let trnSigma = !pars.TrnSigma
         let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
 
         // Kk [gp, trn_smpl1, trn_smpl2]
-        let Kk = Kk nGps nTrnSmpls !pars.Lengthscales !pars.TrnX !pars.TrnSigma
+        let Kk = Kk nGps nTrnSmpls lengthscales trnX trnSigma
         let Kk = Kk |> Expr.checkFinite "Kk"
 //        let Kk = Kk |> Expr.dump "Kk"
         
@@ -237,7 +235,7 @@ module MultiGPLayer =
 //        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let lk = lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
 //        let lk = lk |> Expr.dump "lk"
         
@@ -257,7 +255,7 @@ module MultiGPLayer =
         let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
-        let L = L nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
 
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
@@ -295,7 +293,7 @@ module MultiGPLayer =
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let T = Tnew nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
+        let T = Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
 //        let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta

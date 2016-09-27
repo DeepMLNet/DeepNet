@@ -56,17 +56,21 @@ module ElemExprHostEval =
         conv<'T> (sign x)
 
     /// evaluates the specified element of an element expression
-    let evalElement (expr: ElemExprT) (args: ArrayNDT<'T> list) (idxs: ShapeSpecT) =
+    let evalElement (expr: ElemExprT) (args: ArrayNDT<'T> list) (idxs: ShapeSpecT) : 'T =
+        let retType = (ElemExpr.typeName expr).Type
+        if retType <> typeof<'T> then
+            failwithf "elements expression of type %A does not match eval function of type %A"
+                retType typeof<'T>                    
 
         let rec doEval symVals expr = 
             match expr with
             | Leaf (op) ->
                 match op with
                 | Const v -> v.GetConvertedValue()
-                | SizeValue ss ->
+                | SizeValue (ss, _) ->
                     let sv = ss |> SizeSpec.substSymbols symVals |> SizeSpec.eval
                     conv<'T> sv
-                | ArgElement (Arg n, argIdxs) ->
+                | ArgElement ((Arg n, argIdxs), _) ->
                     let argIdxs = ShapeSpec.substSymbols symVals argIdxs
                     let argIdxsVal = ShapeSpec.eval argIdxs
                     args.[n] |> ArrayND.get argIdxsVal

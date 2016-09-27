@@ -266,12 +266,12 @@ module ArgTemplates =
                 // currently this cannot be passed as an argument
                 failwith "passing ArrayNDSDArg is not implemented"
 
-    type SizeTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
+    type IdxTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
         do 
             match manikinOpt with
             | Some manikin ->
-                if manikin.DataType <> typeof<int> then 
-                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type int"
+                if manikin.DataType <> typeof<uint32> then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. uint32"
                 if ArrayND.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
                 if ArrayND.offset manikin <> 0 then 
@@ -279,7 +279,7 @@ module ArgTemplates =
             | None -> ()
 
         interface ICudaArrayMemberArgTmpl<IntPtr> with
-            member this.CPPTypeName = "size_t *"
+            member this.CPPTypeName = "idx_t *"
             member this.GetArg env =
                 match manikinOpt with
                 | Some manikin ->
@@ -314,16 +314,6 @@ module ArgTemplates =
                     | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
                     | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData
                 storage.DevicePointer |> CudaSup.getIntPtr |> box
-
-    type SizeTArgTmpl (value: int) =
-        interface ICudaArgTmpl with
-            member this.CPPTypeName = "size_t"
-            member this.GetArg env strm = box (nativeint value) 
-
-//    type CUdeviceptrArrayArgTmpl (MemManikinT) =
-//        interface ICudaArgTmpl with
-//            member this.CPPTypeName = "CUdeviceptr **"
-//            member this.GetArg env strm = box (nativeint value) 
 
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with

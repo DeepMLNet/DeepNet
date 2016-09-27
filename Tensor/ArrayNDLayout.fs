@@ -296,12 +296,14 @@ module ArrayNDLayout =
         if nd < 2 then failwithf "cannot transpose non-matrix of shape %A" (shape a)
         swapDim (nd-2) (nd-1) a
 
-    /// reorders the axes as specified
-    let inline reorderAxes (newOrder: int list) a =
-        if nDims a <> List.length newOrder then
-            failwithf "permutation %A should have same rank as shape %A" newOrder (shape a)
-        {a with Shape = List.permute (fun i -> newOrder.[i]) a.Shape;
-                Stride = List.permute (fun i -> newOrder.[i]) a.Stride;}
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let inline permuteAxes (permut: int list) a =
+        if nDims a <> List.length permut then
+            failwithf "permutation %A must have same rank as shape %A" permut (shape a)
+        {a with Shape = List.permute (fun i -> permut.[i]) a.Shape;
+                Stride = List.permute (fun i -> permut.[i]) a.Stride;}
 
     /// creates a subview layout
     let rec view ranges a =

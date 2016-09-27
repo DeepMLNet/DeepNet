@@ -531,6 +531,12 @@ module ShapeSpec =
          List.length sa = List.length sb &&
             List.forall2 SizeSpec.equalWithBroadcastability sa sb
 
+    /// Permutes the axes as specified.
+    let permuteAxes (permut: int list) (sa: ShapeSpecT) : ShapeSpecT =
+        if nDim sa <> List.length permut then
+            failwithf "permutation %A must have same rank as shape %A" permut sa
+        sa |> List.permute (fun i -> permut.[i])
+
     /// evaluates shape to numeric shape, if possible
     let tryEval (sa: ShapeSpecT) : NShapeSpecT option =
         let c = List.map (SizeSpec.tryEval) sa

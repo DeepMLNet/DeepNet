@@ -33,15 +33,15 @@ module Expr =
     [<StructuralComparison; StructuralEquality>]
     type LeafOpT =
 
+        // ==== scalars ============
+        /// scalar of given value
+        | ScalarConst of value:ConstSpecT
+        /// scalar of the given size
+        | SizeValue of value:SizeSpecT * typ:TypeNameT
+
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | Identity of SizeSpecT * TypeNameT
-        /// zero tensor of given shape       
-        | Zeros of ShapeSpecT * TypeNameT                  
-        /// scalar of given value
-        | ScalarConst of ConstSpecT
-        /// scalar of the given size
-        | SizeValue of SizeSpecT * TypeNameT
+        | Identity of shape:SizeSpecT * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -96,8 +96,8 @@ module Expr =
         | Reshape of ShapeSpecT         
         /// broadcast tensor; element count may change
         | DoBroadcast of ShapeSpecT       
-        /// swaps two dimensions of a tensor
-        | SwapDim of int * int          
+        /// permutes the axes of the tensor
+        | PermuteAxes of perm:int list
         /// subtensor 
         | Subtensor of ExprRngsSpecT
 
@@ -168,7 +168,7 @@ module Expr =
         /// evaluate all subexpressions but discard them
         | Discard        
         /// elementwise calculated tensor
-        | Elements of ShapeSpecT * ElemExpr.ElemExprT
+        | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
         /// extension op
@@ -275,7 +275,6 @@ module Expr =
         | Greater
         | GreaterEqual
         | NotEqual     
-        | IfThenElse _
         | And
         | Or
             -> Some ()
@@ -313,10 +312,9 @@ module Expr =
     /// Returns the type of the given expression.
     let rec typename expr =
         match expr with
-        | Leaf (Identity (ss, tn)) -> tn
-        | Leaf (Zeros (sa, tn)) -> tn
+        | Leaf (Identity (_, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
-        | Leaf (SizeValue (ss, tn)) -> tn
+        | Leaf (SizeValue (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
         | Binary (Equal, _, _)
@@ -327,9 +325,12 @@ module Expr =
         | Binary (NotEqual, _, _)
             -> TypeName.ofType<bool>
 
-        | Unary (op, a) -> typename a
-        | Binary (op, a, b) -> typename a
-        | Nary (op, es) -> typename (List.head es)
+        | Nary (Elements (_, elemExpr), _) 
+            -> ElemExpr.typeName elemExpr
+
+        | Unary (_, a) -> typename a
+        | Binary (_, a, b) -> typename a
+        | Nary (_, es) -> typename (List.head es)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -340,8 +341,7 @@ module Expr =
         match expr with
 
         // tensor creation
-        | Leaf(Identity (ss, tn)) -> ShapeSpec.matrix ss ss
-        | Leaf(Zeros (ss, tn)) -> ss
+        | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
 
@@ -386,7 +386,7 @@ module Expr =
         // shape operations
         | Unary(Reshape(ss), _) -> ss
         | Unary(DoBroadcast(ss), _) -> ss
-        | Unary(SwapDim(ax1, ax2), a) -> shapeOf a |> ShapeSpec.swap ax1 ax2
+        | Unary(PermuteAxes perm, a) -> shapeOf a |> ShapeSpec.permuteAxes perm
         | Unary(Subtensor(srs), a) ->
             (srs, shapeOf a)
             ||> List.map2 (fun sr shp ->
@@ -525,9 +525,11 @@ module Expr =
                         match sa.[dim], ss.[dim] with
                         | SizeSpecT.Broadcast, _ -> ()
                         | ssa, ssb -> ssa .= ssb
-                | SwapDim(ax1, ax2) when 
-                        not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 < nda) ->
-                    failwithf "cannot swap axis %d with axis %d of array with shape %A" ax1 ax2 sa
+                | PermuteAxes perm -> 
+                    if nda <> List.length perm then
+                        failwithf "permutation %A must have same rank as shape %A" perm sa
+                    if not (Permutation.is perm) then
+                        failwithf "%A is not a valid permutation of an %d-dimensional tensor" perm nda
                 | StoreToVar vs ->
                     sa ..= (VarSpec.shape vs)
                 | Diag(ax1, ax2) ->
@@ -607,7 +609,10 @@ module Expr =
                         (opBeingChecked()) (es |> List.map (typename >> TypeName.getType))
 
                 match op with
-                | Elements (trgtShp, elemExpr) -> ElemExpr.checkArgShapes elemExpr ss trgtShp
+                | Elements (trgtShp, elemExpr) -> 
+                    let tns = es |> List.map typename
+                    ElemExpr.check elemExpr |> ignore
+                    ElemExpr.checkCompatibility elemExpr ss tns trgtShp
                 | Interpolate ip ->
                     let nDims = ip.MinArg.Length
                     if nDims < 1 then
@@ -640,7 +645,6 @@ module Expr =
 
         match expr with
         | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
-        | Leaf (Zeros (ss, tn)) -> Leaf (Zeros (sShp ss, tn))
         | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
         | Leaf _ -> expr
@@ -665,7 +669,6 @@ module Expr =
     let rec canEvalAllSymSizes (expr: ExprT) =
         match expr with
         | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
-        | Leaf (Zeros (ss, tn)) -> ShapeSpec.canEval ss
         | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
         | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
         | Leaf _ -> true
@@ -713,6 +716,28 @@ module Expr =
 
         doSubst part replacement expr |> check
 
+    /// counts operators, not counting repeating subexpressions
+    let countUniqueOps expr  =
+        let visited = HashSet<ExprT> (HashIdentity.Structural)
+        let rec doCount expr =
+            if visited.Contains expr then 0
+            else
+                visited.Add expr |> ignore
+                match expr with
+                | Leaf _ -> 1
+                | Unary (_, a) -> 1 + doCount a
+                | Binary (_, a, b) -> 1 + doCount a + doCount b
+                | Nary (_, es) -> 1 + List.sumBy doCount es
+        doCount expr
+
+    /// counts operators, including repeating subexpressions
+    let rec countOps expr  =
+        match expr with
+        | Leaf _ -> 1
+        | Unary (_, a) -> 1 + countOps a
+        | Binary (_, a, b) -> 1 + countOps a + countOps b
+        | Nary (_, es) -> 1 + List.sumBy countOps es
+
     /// scalar constant of given value
     let scalar f = 
         Leaf (ScalarConst (ConstSpec.ofValue f)) |> check
@@ -741,9 +766,25 @@ module Expr =
     let sizeValueOfSameType expr size = 
         Leaf (SizeValue (size, typename expr)) |> check
 
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let permuteAxes perm a =
+        Unary (PermuteAxes perm, a) |> check
+
     /// swaps two dimensions of a tensor
     let swapDim ax1 ax2 a = 
-        Unary (SwapDim(ax1, ax2), a) |> check
+        a |> checkAxis ax1
+        a |> checkAxis ax2
+        if ax1 = ax2 then a
+        else
+            let perm = 
+                [0 .. nDims a - 1]
+                |> List.map (function
+                             | d when d=ax1 -> ax2
+                             | d when d=ax2 -> ax1
+                             | d -> d)
+            a |> permuteAxes perm
 
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.
@@ -933,18 +974,26 @@ module Expr =
     let identityOfSameType expr size =
         Leaf(Identity(size, typename expr)) |> check
 
+    /// tensor of given shape filled with specified value
+    let filled (shp: ShapeSpecT) value =
+        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
+        scalar value
+        |> reshape bcShp
+        |> broadcast shp
+
     /// zero tensor of given shape
     [<RequiresExplicitTypeArguments>]
-    let zeros<'T> ss =
-        Leaf(Zeros(ss, TypeName.ofType<'T>)) |> check
+    let zeros<'T> (shp: ShapeSpecT) =
+        filled shp (conv<'T> 0)
 
     /// zero tensor of given shape and same type as given expression
-    let zerosOfSameType expr ss =
-        Leaf(Zeros(ss, typename expr)) |> check
+    let zerosOfSameType expr shp =
+        let zero = System.Convert.ChangeType (box 0, (typename expr).Type)
+        filled shp zero
 
     /// zero tensor with same shape and type as given tensor
-    let zerosLike a = 
-        Leaf (Zeros(shapeOf a, typename a)) |> check
+    let zerosLike expr = 
+        zerosOfSameType expr expr.Shape
 
     /// variable of given name and shape
     [<RequiresExplicitTypeArguments>]

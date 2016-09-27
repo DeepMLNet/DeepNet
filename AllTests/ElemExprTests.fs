@@ -19,8 +19,8 @@ let ``Eval: simple`` () =
     printfn "======= Testing evaluation:"
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
 
     let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
@@ -48,7 +48,7 @@ let ``Eval: sum`` () =
     let js = SizeSpec.fix 3
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
+    let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
 
@@ -74,8 +74,8 @@ let ``Deriv: 1`` () =
     let ks = SizeSpec.symbol "ks"
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [ks] 2
 
@@ -97,8 +97,8 @@ let ``Deriv: 2`` () =
     let k = ElemExpr.idx 0   
     let l = ElemExpr.idx 1
 
-    let x = ElemExpr.argElem 0
-    let y = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [l; k]
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [ks; ls] 2
 
@@ -118,7 +118,7 @@ let ``Deriv: sum`` () =
     let js = SizeSpec.fix 3
 
     let k = ElemExpr.idx 0   
-    let x = ElemExpr.argElem 0
+    let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [is] 1
@@ -141,8 +141,8 @@ let ``Eval and deriv: KSE`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1    
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1    
     let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
 
@@ -177,15 +177,15 @@ let ``Codegen: KSE`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1
     let kse = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
     let dKse = ElemExprDeriv.buildDerivElemExpr kse [nGps; nSmpls; nSmpls] 2
     let dKsedX, dKsedL = dKse.[0], dKse.[1]
 
-    let uKse = UElemExpr.toUElemFunc kse 3 2 TypeName.ofType<single>
-    let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1) TypeName.ofType<single>
-    let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1) TypeName.ofType<single>
+    let uKse = UElemExpr.toUElemFunc kse 3 2 
+    let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1) 
+    let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1) 
     let kseCode = CudaElemExpr.generateFunctor "KSE" uKse
     let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX 
     let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL 
@@ -207,8 +207,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<float> 0
+    let l = ElemExpr.argElem<float> 1
     let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0) / (2.0 * (l [gp])***2.0) )
 
     let xTensor = Expr.var<double> "xTensor" [nGps; nSmpls] 
@@ -264,8 +264,8 @@ let ``Eval and deriv: KSE in Expr on CUDA`` () =
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
 
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<single> 0
+    let l = ElemExpr.argElem<single> 1
     let kseExpr = exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) )
 
     let xTensor = Expr.var<single> "xTensor" [nGps; nSmpls] 
@@ -299,8 +299,8 @@ let kseElemExpr () =
     let gp = ElemExpr.idx 0   
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
-    let x = ElemExpr.argElem 0
-    let l = ElemExpr.argElem 1
+    let x = ElemExpr.argElem<single> 0
+    let l = ElemExpr.argElem<single> 1
     exp (- ((x [gp; smpl1] - x [gp; smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) )
 
 [<Fact>]
@@ -362,10 +362,10 @@ let ``Eval and derive: lkse`` () =
     let gp = ElemExpr.idx 0
     let smpl = ElemExpr.idx 1
 
-    let mu = ElemExpr.argElem 0
-    let sigma = ElemExpr.argElem 1
-    let x = ElemExpr.argElem 2
-    let l = ElemExpr.argElem 3
+    let mu = ElemExpr.argElem<float> 0
+    let sigma = ElemExpr.argElem<float> 1
+    let x = ElemExpr.argElem<float> 2
+    let l = ElemExpr.argElem<float> 3
     let lkse = sqrt( l[gp]***2.0 / (l[gp]***2.0 + sigma[gp;gp]) ) * exp(- ((mu[gp]- x[gp;smpl])***2.0) / (2.0 * (l[gp]***2.0 + sigma[gp;gp])) )
     let dLkse = ElemExprDeriv.buildDerivElemExpr lkse [nGps;nSmpls] 4
 

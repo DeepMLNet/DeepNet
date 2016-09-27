@@ -91,7 +91,7 @@ module ModelContextTypes =
         member this.WrtFlat expr = 
             let expr = this.Subst expr
             let derivs = Deriv.compute expr
-            match derivs |> Map.tryFind (Expr.extractVar this.Flat) with
+            match derivs.Jacobians |> Map.tryFind (Expr.extractVar this.Flat) with
             | Some deriv -> deriv
             | None -> 
                 printfn "Warning: ParameterSet %s does not occur in expression for differentiation." name
@@ -400,7 +400,9 @@ module ModelContextTypes =
         member this.ParameterStorage = parameterStorage
 
         /// numeric flat parameter vector
-        member this.ParameterValues = this.ParameterStorage.Flat
+        member this.ParameterValues 
+            with get () = this.ParameterStorage.Flat
+            and set value = this.ParameterStorage.Flat <- value
 
         /// Compile environment.
         member this.CompileEnv = compileEnv

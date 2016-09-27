@@ -143,8 +143,7 @@ module UExpr =
                 | Expr.Nary (Expr.Elements (resShape, elemExpr), se) ->
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se
-                    let tn = Expr.typename expr
-                    extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs tn)) se
+                    extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->

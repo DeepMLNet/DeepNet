@@ -98,15 +98,15 @@ module Compile =
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath)
         let baseCmplrArgs = [
-            "--std=c++11"
-            "-DWIN32_LEAN_AND_MEAN"
-            "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
-            sprintf "--gpu-architecture=%s" CudaSup.nvccArch
-        ]
-        let dbgArgs = 
-            if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
-            else []
-        let baseCmplrArgs = baseCmplrArgs @ dbgArgs
+            yield "--std=c++11"
+            yield "-DWIN32_LEAN_AND_MEAN"
+            yield "-Xcudafe"; yield "--diag_suppress=declared_but_not_referenced"
+            yield sprintf "--gpu-architecture=%s" CudaSup.nvccArch
+            if Debug.FastKernelMath then yield "--use_fast_math"
+            if Debug.RestrictKernels then yield "--restrict"
+            if Debug.DebugCompile then yield "--device-debug"
+            if Debug.DebugCompile || Debug.GenerateLineInfo then yield "--generate-line-info"
+        ] 
         let cmplrArgs = 
             baseCmplrArgs @ [ 
                 sprintf "--include-path=\"%s\"" compileDir
@@ -115,17 +115,18 @@ module Compile =
         let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
-            | Some ptx -> ptx
-            | None ->
+            | Some ptx when not Debug.DisableKernelCache -> ptx
+            | _ ->
                 let sw = Stopwatch.StartNew ()
-                if Debug.TraceCompile then
+                if Debug.TraceCompile || Debug.DebugCompile || Debug.GenerateLineInfo ||
+                        Debug.KeepCompileDir || Debug.DisableKernelCache then
                     printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
                     printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
                     printfn "%s" log
-                    exit 1
+                    failwithf "nvrtc compile error: %s" log
                 if Debug.TraceCompile then
                     let log = cmplr.GetLogAsString()
                     printf "%s" log
@@ -312,6 +313,7 @@ module CudaExprWorkspaceTypes =
 
         #if !CUDA_DUMMY
         /// CUDA launch sizes for specified WorkDims
+        let sw = Stopwatch.StartNew ()
         let kernelLaunchDims =
             kernelDistinctLaunches
             |> Set.toSeq
@@ -708,16 +710,19 @@ module CudaExprWorkspaceTypes =
 
                     // cleanup CUDA resources
                     execCalls recipe.DisposeCalls
-                    Compile.unloadCudaCode krnlModHndl
+                    if krnlModHndl <> Unchecked.defaultof<CUmodule> then
+                        Compile.unloadCudaCode krnlModHndl
                     CudaSup.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
                 match cLibHndl, cCompileDir with
                 | Some cLibHndl, Some cCompileDir ->
                     Compile.unloadCppCode cLibHndl
-                    Compile.removeCompileDir cCompileDir
+                    if not Debug.KeepCompileDir then
+                        Compile.removeCompileDir cCompileDir
                 | _ -> ()
-                Compile.removeCompileDir krnlCompileDir
+                if not Debug.KeepCompileDir && krnlCompileDir <> null then
+                    Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 
         override this.Finalize() =
@@ -746,10 +751,11 @@ module CudaExprWorkspaceTypes =
                 // For now we synchronize the whole context to make sure that data transfers
                 // from and to the GPU do not overlap with the computation that may involve
                 // the targets/sources of these transfers as input/output variables.
-                CudaSup.context.Synchronize () 
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
                 execCalls recipe.ExecCalls
-                CudaSup.context.Synchronize () 
-
+                if not Debug.DisableStreams then
+                    CudaSup.context.Synchronize () 
 
             )
 

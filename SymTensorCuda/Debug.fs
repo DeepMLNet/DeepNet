@@ -3,10 +3,10 @@
 
 module Debug =
     /// redirects all stream calls to the null stream
-    let mutable DisableStreams = false
+    let mutable DisableStreams = true
 
     /// disables all events
-    let mutable DisableEvents = false
+    let mutable DisableEvents = true
 
     /// synchronizes the CUDA context after each call to detect errors
     let mutable SyncAfterEachCudaCall = false
@@ -16,6 +16,21 @@ module Debug =
 
     /// compiles kernels with debug information and no optimizations
     let mutable DebugCompile = false
+
+    /// enable the use of fast math operations in kernels
+    let mutable FastKernelMath = false
+
+    /// tells nvrtc that all pointers are restricted
+    let mutable RestrictKernels = true
+
+    /// compiles kernels with source line-number information (for nVidia profiler)
+    let mutable GenerateLineInfo = false
+
+    /// keeps the compile temporary directory 
+    let mutable KeepCompileDir = false
+
+    /// disables the caching of CUDA kernels
+    let mutable DisableKernelCache = false
 
     /// prints timing information during CUDA function compilation
     let mutable Timing = false
