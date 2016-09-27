@@ -103,9 +103,12 @@ module Compile =
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced"
             sprintf "--gpu-architecture=%s" CudaSup.nvccArch
         ]
-        let dbgArgs = 
-            if Debug.DebugCompile then ["--device-debug"; "--generate-line-info"]
-            else []
+        let dbgArgs = [
+            if Debug.DebugCompile then 
+                yield "--device-debug"
+            if Debug.DebugCompile || Debug.GenerateLineInfo then
+                yield "--generate-line-info"
+        ] 
         let baseCmplrArgs = baseCmplrArgs @ dbgArgs
         let cmplrArgs = 
             baseCmplrArgs @ [ 
@@ -115,10 +118,11 @@ module Compile =
         let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
         let ptx =
             match krnlPtxCache.TryGet cacheKey with
-            | Some ptx -> ptx
-            | None ->
+            | Some ptx when not Debug.DisableKernelCache -> ptx
+            | _ ->
                 let sw = Stopwatch.StartNew ()
-                if Debug.TraceCompile then
+                if Debug.TraceCompile || Debug.DebugCompile || Debug.GenerateLineInfo ||
+                        Debug.KeepCompileDir || Debug.DisableKernelCache then
                     printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
@@ -716,9 +720,10 @@ module CudaExprWorkspaceTypes =
                 match cLibHndl, cCompileDir with
                 | Some cLibHndl, Some cCompileDir ->
                     Compile.unloadCppCode cLibHndl
-                    Compile.removeCompileDir cCompileDir
+                    if not Debug.KeepCompileDir then
+                        Compile.removeCompileDir cCompileDir
                 | _ -> ()
-                if krnlCompileDir <> null then
+                if not Debug.KeepCompileDir && krnlCompileDir <> null then
                     Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 

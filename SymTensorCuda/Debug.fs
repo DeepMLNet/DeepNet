@@ -17,6 +17,15 @@ module Debug =
     /// compiles kernels with debug information and no optimizations
     let mutable DebugCompile = false
 
+    /// compiles kernels with source line-number information (for nVidia profiler)
+    let mutable GenerateLineInfo = false
+
+    /// keeps the compile temporary directory 
+    let mutable KeepCompileDir = false
+
+    /// disables the caching of CUDA kernels
+    let mutable DisableKernelCache = false
+
     /// prints timing information during CUDA function compilation
     let mutable Timing = false
 

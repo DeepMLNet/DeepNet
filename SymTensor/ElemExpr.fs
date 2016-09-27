@@ -87,10 +87,14 @@ module ElemExpr =
         typeName expr |> ignore
         expr
 
+    /// a constant value given by a ConstSpec
+    let constSpec cs =
+        Leaf (Const cs) |> check
+
     /// a constant value
     let scalar f =
-        Leaf (Const (ConstSpec.ofValue f)) |> check
-              
+        f |> ConstSpec.ofValue |> constSpec              
+
     type ElemExprT with
 
         // elementwise unary

@@ -69,8 +69,6 @@ module Optimizer =
 
         | _ -> failwith "not an elements expression"
 
-
-
     /// pulls summations out of elements expressions
     let rec pullSumOutOfElements elements =
         match elements with
@@ -153,6 +151,43 @@ module Optimizer =
 
         | _ -> failwith "not an elements expression"
 
+    /// optimizes an element expression
+    and optimizeElemExpr (elemExpr: ElemExprT) =
+        match elemExpr with
+
+        | ElemExpr.Binary (ElemExpr.Power, a, ElemExpr.Leaf (ElemExpr.Const cs)) ->
+            // replace powers with integral exponents less than 5 with iterated multiplications
+            let p = 
+                match cs with
+                | ConstInt x -> Some x
+                | ConstDouble (Util.Integral x) -> Some x
+                | ConstSingle (Util.Integral x) -> Some x
+                | _ -> None
+
+            let rec repMul cnt arg =
+                match cnt with
+                | 0 -> ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type)
+                | 1 -> arg
+                | _ when cnt > 0 ->
+                    arg * repMul (cnt - 1) arg
+                | _ when cnt < 0 ->
+                    ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type) / repMul (-cnt) arg
+                | _ -> failwith "impossible"
+
+            match p with
+            | Some p when abs p < 5 -> repMul p a
+            | _ -> elemExpr                
+
+        | ElemExpr.Leaf _ -> elemExpr
+        | ElemExpr.Unary (op, a) -> ElemExpr.Unary(op, optimizeElemExpr a)
+        | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, optimizeElemExpr a, optimizeElemExpr b)
+
+    /// optimizes elements expression in an expression
+    and optimizeElements elements =
+        match elements with
+        | Nary (Elements (resShape, elemExpr), args) ->           
+            Nary (Elements (resShape, optimizeElemExpr elemExpr), args)
+        | _ -> failwith "not an elements expression"
 
     and leafOpToElemOp op =
         match op with
@@ -221,7 +256,9 @@ module Optimizer =
         match expr with
         | Leaf op ->
             match leafOpToElemOp op with
-            | Some elemOp -> Expr.elements shp (ElemExpr.Leaf elemOp) []
+            | Some elemOp -> 
+                Expr.elements shp (ElemExpr.Leaf elemOp) []
+                |> optimizeElements
             | None -> expr
         
         | Unary (op, aExpr) ->
@@ -230,6 +267,7 @@ module Optimizer =
                 let aElemExpr, aArgs = getArgElemExpr aExpr        
                 let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
                 Expr.elements shp elemExpr aArgs
+                |> optimizeElements
             | None -> expr
                     
         | Binary (op, aExpr, bExpr) ->
@@ -241,10 +279,12 @@ module Optimizer =
                     joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
                 let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
                 Expr.elements shp elemExpr abArgs
+                |> optimizeElements
             | None -> expr
 
-        // TODO: if we are an ElemExpr, merge with children
         | Nary (Elements (_, elemExpr), args) ->
+            // TODO: if we are an ElemExpr, merge with children
+            //printf "could combine two elemexprs"
             expr
 
         | Nary _ -> expr
@@ -308,6 +348,7 @@ module Optimizer =
                 | Nary (Elements (resShape, elemExpr), args) ->
                     let args = args |> List.map optimize
                     Nary (Elements (resShape, elemExpr), args)
+                    |> optimizeElements
                     |> pullSumOutOfElements
                     |> broadcastInsignificantElementsAxes
 

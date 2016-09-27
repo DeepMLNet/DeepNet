@@ -103,7 +103,7 @@ for dims = 0 to maxDims do
     else
         wrt "template <size_t offset_, %s>" (ad |>> prn "size_t stride%d" |> cw ", ")
     wrt "struct StrideStatic%dD {" dims
-    wrt "   char mDummy; // FIX: if struct is empty, MSVC and NVCC see different struct sizes"
+    wrt "   char mDummy; // WORKAROUND: if struct is empty, MSVC and NVCC see different struct sizes"
     wrt "  	_dev size_t stride(const size_t dim) const {"
     wrt "      switch (dim) {"
     for d in ad do
@@ -177,65 +177,44 @@ for dims = 0 to maxDims do
     wrt ""
 
     let elementwiseLoop withPosArray fBody =
-        wrt "" 
         if dims > 3 then
             let restElements = 
                 {2 .. dims - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
-            wrt "    const size_t itersRest = divCeil(%s, gridDim.z * blockDim.z);" restElements
+            wrt " const size_t restElems = %s;" restElements
+            wrt " for (size_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {"
         if dims = 3 then
-            wrt "    const size_t iters2 = divCeil(trgt.shape(2), gridDim.z * blockDim.z);"
+            wrt " for (size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z; pos2 < trgt.shape(2); pos2 += gridDim.z * blockDim.z) {"
         if dims >= 2 then
-            wrt "    const size_t iters1 = divCeil(trgt.shape(1), gridDim.y * blockDim.y);"
+            wrt " for (size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y; pos1 < trgt.shape(1); pos1 += gridDim.y * blockDim.y) {"
         if dims >= 1 then
-            wrt "    const size_t iters0 = divCeil(trgt.shape(0), gridDim.x * blockDim.x);"
+            wrt " for (size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {"
 
         if dims > 3 then
-            wrt "    for (size_t iterRest = 0; iterRest < itersRest; iterRest++) {"
-        if dims = 3 then
-            wrt "    for (size_t iter2 = 0; iter2 < iters2; iter2++) {"
-        if dims >= 2 then
-            wrt "    for (size_t iter1 = 0; iter1 < iters1; iter1++) {"
-        if dims >= 1 then
-            wrt "    for (size_t iter0 = 0; iter0 < iters0; iter0++) {"
-
-        if dims > 3 then
-            wrt "    size_t posRest = threadIdx.z + blockIdx.z * blockDim.z + iterRest * (gridDim.z * blockDim.z);"
-            wrt "    const size_t incr2 = 1;"
-            for d = 3 to dims - 1 do
-                wrt "    const size_t incr%d = incr%d * trgt.shape(%d);" d (d-1) (d-1)
+            wrt " size_t pos2 = posR;"
             for d = dims - 1 downto 2 do
-                wrt "    const size_t pos%d = posRest / incr%d;" d d
-                wrt "    posRest -= pos%d * incr%d;" d d
-        if dims = 3 then
-            wrt "    const size_t pos2 = threadIdx.z + blockIdx.z * blockDim.z + iter2 * (gridDim.z * blockDim.z);"
-        if dims >= 2 then
-            wrt "    const size_t pos1 = threadIdx.y + blockIdx.y * blockDim.y + iter1 * (gridDim.y * blockDim.y);"
-        if dims >= 1 then
-            wrt "    const size_t pos0 = threadIdx.x + blockIdx.x * blockDim.x + iter0 * (gridDim.x * blockDim.x);"
-    
-            wrt "    if (%s) {"
-                (ad |>> (fun i -> prn "(pos%d < trgt.shape(%d))" i i) |> cw " && ")
+                let incr = 
+                    {2 .. d - 1} |> Seq.map (sprintf "trgt.shape(%d)") |> combineWith " * "
+                if d > 2 then
+                    wrt " const size_t pos%d = pos2 / (%s);" d incr
+                    wrt " pos2 -= pos%d * (%s);" d incr
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
             if dims >= 1 then
-                wrt "    const size_t pos[] {%s};" (poses |> cw ", ")
+                wrt " const size_t pos[] {%s};" (poses |> cw ", ")
             else
-                wrt "    const size_t *pos = nullptr;"
+                wrt " const size_t *pos = nullptr;"
 
         wrt ""
         fBody dims
         wrt ""
 
         if dims >= 1 then
-            wrt "    }"
-
-        if dims >= 1 then
-            wrt "    }"
+            wrt " }"
         if dims >= 2 then
-            wrt "    }"
+            wrt " }"
         if dims >= 3 then
-            wrt "    }"   
+            wrt " }"   
 
 
     let elementwiseWrapper ary withIndexes =
@@ -300,18 +279,11 @@ for dims = 0 to maxDims do
         elementsWrapper ary 
 
 let elementwiseHeterogenousLoop fBody =
-    wrt "" 
-    wrt "    const size_t iters = divCeil(trgt.size(), gridDim.x * blockDim.x);" 
-    wrt "    for (size_t iter = 0; iter < iters; iter++) {"
-    wrt "    const size_t idx = threadIdx.x + blockIdx.x * blockDim.x + iter * (gridDim.x * blockDim.x);"   
-    wrt "    if (idx < trgt.size()) {"
-
+    wrt " for (size_t idx = threadIdx.x + blockIdx.x * blockDim.x; idx < trgt.size(); idx += gridDim.x * blockDim.x) {"
     wrt ""
     fBody ()
     wrt ""
-
-    wrt "    }"
-    wrt "    }"
+    wrt " }"
 
 let elementwiseHeterogenousWrapper ary =
     let srcTmpl = 

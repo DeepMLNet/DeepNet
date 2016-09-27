@@ -228,6 +228,24 @@ module Util =
             // input is redirected from a file.
             None
 
+    /// matches integral values (e.g. 2, 2.0 or 2.0f, etc.)
+    let (|Integral|_|) (x: 'T) =
+        match typeof<'T> with
+        | t when t = typeof<int> ->
+            Some (x |> box |> unbox<int>)
+        | t when t = typeof<byte> ->
+            Some (x |> box |> unbox<byte> |> int)
+        | t when t = typeof<float> ->
+            let f = x |> box |> unbox<float>
+            if abs (f % 1.0) < System.Double.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | t when t = typeof<single> ->
+            let f = x |> box |> unbox<single>
+            if abs (f % 1.0f) < System.Single.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | _ -> None
 
 /// Permutation utilities
 module Permutation =
