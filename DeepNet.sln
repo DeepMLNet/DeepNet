@@ -62,7 +62,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SmoothADP", "TestExes\Smoot
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TrainFromConfig", "TestExes\TrainFromConfig\TrainFromConfig.fsproj", "{BBFB43C1-9B12-4B60-98C8-F8038B8B2985}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelPlots", "ModelPlots\ModelPlots.fsproj", "{B9FBBC94-4C02-434D-AFBE-AE7F14F308F8}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelPlots", "TestExes\ModelPlots\ModelPlots.fsproj", "{B9FBBC94-4C02-434D-AFBE-AE7F14F308F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
