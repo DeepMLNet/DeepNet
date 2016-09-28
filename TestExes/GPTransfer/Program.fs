@@ -19,7 +19,7 @@ module Program =
     let classificationData = classificationDataHost.ToCuda()
 
 
-    let parsReg = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [7;8];IntTreatment=CsvLoader.IntAsNumerical}
+    let parsReg = {CsvLoader.DefaultParameters with CsvLoader.TargetCols = [8];IntTreatment=CsvLoader.IntAsNumerical}
     let fullRegressionData = CsvLoader.loadFile parsReg "abalone.txt" 
     let fullRegressionDataset = Dataset.FromSamples fullRegressionData
     let regressionData = TrnValTst.Of(fullRegressionDataset).ToCuda()
@@ -456,7 +456,7 @@ module Program =
 //        TestFunctions.testDatasetParser()
 
 //        regressionMLP ()
-//        regressionGPTransferUnit ()
+        regressionGPTransferUnit ()
 
 //        Dump.start "gptraindump.h5"
 //        Dump.prefix <- sprintf "pre"
@@ -465,7 +465,7 @@ module Program =
 //        classificationMLMGP ()
 //        Dump.stop()
 //        TestFunctions.testMultiGPLayer DevHost
-        TestFunctions.testMultiGPLayer DevCuda
+//        TestFunctions.testMultiGPLayer DevCuda
             
 //        TestFunctions.TestGPTransferUnit DevHost
 //        TestFunctions.TestGPTransferUnit DevCuda

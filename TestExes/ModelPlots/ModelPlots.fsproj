@@ -153,6 +153,11 @@
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\GPTransfer\GPTransfer.fsproj">
+      <Name>GPTransfer</Name>
+      <Project>{1df45c82-0128-48db-a107-c606024176bf}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
