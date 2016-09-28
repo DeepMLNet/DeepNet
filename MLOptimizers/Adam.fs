@@ -46,9 +46,7 @@ module Adam =
 open Adam
 
 type Adam<'T when 'T: equality and 'T: comparison> 
-                                (loss:  ExprT,
-                                 pars:  ExprT,
-                                 dev:   IDevice) =
+        (loss:  ExprT, pars:  ExprT, dev:   IDevice) =
 
     do Util.checkProperType<'T> ()
 
@@ -73,7 +71,10 @@ type Adam<'T when 'T: equality and 'T: comparison>
     let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
     let rpState = VarRecord<State<'T>, StateExpr> (state, dev)
 
-    member this.DefaultCfg : Cfg<'T> = {
+    static member New loss pars dev =
+        Adam (loss, pars, dev) :> IOptimizer<'T, Cfg<'T>, State<'T>>
+
+    static member DefaultCfg : Cfg<'T> = {
         Step        = conv<'T> 2e-4
         Momentum    = conv<'T> 0.0
         Decay       = conv<'T> (1.0 - 1e-8)
@@ -132,7 +133,7 @@ type Adam<'T when 'T: equality and 'T: comparison>
         rpCfg.PublishLoc mb
         rpState.PublishLoc mb
 
-    interface IOptimizer<Cfg<'T>, State<'T>> with
+    interface IOptimizer<'T, Cfg<'T>, State<'T>> with
         member this.OptStepExpr = this.Minimize
         member this.Use f = this.Use f
         member this.CfgWithLearningRate learningRate cfg = {cfg with Step=conv<'T> learningRate}

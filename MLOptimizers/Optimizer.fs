@@ -8,7 +8,7 @@ open SymTensor
 module OptimizerTypes =
 
     /// Optimizer.
-    type IOptimizer<'OptCfg, 'OptState> =
+    type IOptimizer<'T, 'OptCfg, 'OptState> =
 
         /// Expression performing one optimization step.
         abstract member OptStepExpr: ExprT

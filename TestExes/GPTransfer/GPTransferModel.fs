@@ -387,7 +387,7 @@ module GPTransferUnit =
         NInput:    SizeSpecT
 
         /// number of units, i.e. number of GPs = Number of outputs
-        NOutput:       SizeSpecT
+        NOutput:   SizeSpecT
 
         /// number of training samples for each GP
         NTrnSmpls:  SizeSpecT
@@ -398,7 +398,7 @@ module GPTransferUnit =
     type Pars = {
         // WeightLayer
         WeightL:        WeightLayer.Pars
-        //MultiGPLayer
+        // MultiGPLayer
         MultiGPL:       MultiGPLayer.Pars
         /// hyper-parameters
         HyperPars:      HyperPars

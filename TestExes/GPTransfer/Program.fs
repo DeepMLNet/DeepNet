@@ -50,8 +50,7 @@ module Program =
 
         ArrayND.ifThenElse (predClass ==== targetClass) (ArrayNDHost.scalar 0.0f) (ArrayNDHost.scalar 1.0f)
         |> ArrayND.sum
-        |> ArrayND.value
-
+        |> ArrayND.value 
 
     ///Calculates the number of errors in one dataset
     let setClassificationErrors batchSize (modelPred: ArrayNDT<single> -> ArrayNDT<single>) (inSeq: seq<CsvLoader.CsvSample>) =
@@ -137,9 +136,8 @@ module Program =
         let loss = loss |> Expr.checkFinite "loss"
         let loss = loss |> Expr.dump "loss"
         // optimizer
-        let opt = Adam<single> (loss, mi.ParameterVector, dev)
+        //let opt = Adam<single> (loss, mi.ParameterVector, dev)
         //let opt = GradientDescent<single> (loss, mi.ParameterVector, dev)
-        let optCfg = opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -147,7 +145,7 @@ module Program =
             |> VarEnv.add target smpl.Target
 
         let trainable =
-            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+            Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
         
         //let batchSize = 500
         let batchSize = Int32.MaxValue
@@ -212,8 +210,6 @@ module Program =
         let pred_fun =  mi.Func pred |> arg1 input 
 
         // optimizer
-        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
-        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -222,7 +218,7 @@ module Program =
         
         let batchSize = 500
         let trainable =
-            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+            Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
         let trainCfg : Train.Cfg = {Train.defaultCfg with   BatchSize          = batchSize
                                                             Termination        = Train.ItersWithoutImprovement 100
@@ -287,8 +283,7 @@ module Program =
         let pred_fun =  mi.Func pred.T |> arg1 input 
         
         // optimizer
-        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
-        let optCfg =opt.DefaultCfg
+
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -296,7 +291,7 @@ module Program =
             |> VarEnv.add target smpl.Target
 
         let trainable =
-            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+            Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
         let batchSize = 500
         let trainCfg= {Train.defaultCfg with   BatchSize          = batchSize
                                                Termination        = Train.ItersWithoutImprovement 100
@@ -358,8 +353,6 @@ module Program =
         let loss = LossLayer.loss LossLayer.MSE pred.T target.T
 
         // optimizer
-        let opt =  Adam<single> (loss, mi.ParameterVector, dev)
-        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -367,7 +360,7 @@ module Program =
             |> VarEnv.add target smpl.Target
 
         let trainable =
-            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+            Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = 500
                                                 Termination        = Train.ItersWithoutImprovement 100
@@ -419,8 +412,6 @@ module Program =
         let loss = MLP.loss mlp input.T target.T
 
         // optimizer
-        let opt =  Adam<single> (loss, mi.ParameterVector, DevCuda)
-        let optCfg =opt.DefaultCfg
 
         let smplVarEnv (smpl: CsvLoader.CsvSample) =
             VarEnv.empty
@@ -428,7 +419,7 @@ module Program =
             |> VarEnv.add target smpl.Target
 
         let trainable =
-            Train.trainableFromLossExpr mi loss smplVarEnv opt optCfg
+            Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
         let trainCfg = {Train.defaultCfg with   BatchSize          = 500
                                                 Termination        = Train.ItersWithoutImprovement 100

@@ -86,15 +86,21 @@
     </None>
     <None Include="App.config" />
     <Content Include="packages.config" />
+    <None Include="DefaultConfig.yaml">
+      <Link>DefaultConfig.yaml</Link>
+    </None>
+    <Content Include="ConfigTmpl.xml" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Argu">
-      <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\Argu.2.1\lib\net40\Argu.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Configuration">
       <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\FSharp.Configuration.dll</HintPath>
       <Private>True</Private>
+    </Reference>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">

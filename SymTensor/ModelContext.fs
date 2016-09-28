@@ -314,11 +314,17 @@ module ModelContextTypes =
         /// Variable locations
         member this.VarLocs = varLocs
 
-        /// instantiates the model with numeric sizes for all size symbols and initializes the parameter values
-        member this.Instantiate (device: IDevice, ?canDelay: bool) =
+        /// instantiates the model with numeric sizes for all size symbols and initializes 
+        /// the parameter values
+        member this.Instantiate (device: IDevice, ?sizeValues: Map<SizeSpecT, int>, ?canDelay: bool) =
             let canDelay = defaultArg canDelay true
+            let sizeValues = defaultArg sizeValues Map.empty
             if isSubModule then failwith "a submoule cannot be instantiated"
             if instantiated then failwith "this model has already been instantiated"
+
+            // set sizes
+            for KeyValue(size, value) in sizeValues do
+                this.SetSize size value
 
             // Check that SymSizes that are required for ParameterStorage instantiation can
             // be evaluated to a numeric value.
@@ -385,6 +391,9 @@ module ModelContextTypes =
                                               VarLocs   = varLocs}
 
         let useParStorage = parameterStorage.Use
+
+        /// the device this model instance is stored on
+        member this.Device = device
 
         /// ParameterSet of this module's (and all submodules') parameteres
         member this.ParameterSet = parameterSet
