@@ -79,21 +79,14 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils.fs" />
-    <Compile Include="ConfigToModel.fs" />
+    <Compile Include="ConfigLoader.fs" />
     <Compile Include="Program.fs" />
-    <None Include="config.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Include="App.config" />
     <Content Include="packages.config" />
-    <None Include="DefaultConfig.yaml">
-      <Link>DefaultConfig.yaml</Link>
-    </None>
-    <Content Include="ConfigTmpl.xml" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Argu">
-      <HintPath>..\..\packages\Argu.2.1\lib\net40\Argu.dll</HintPath>
+      <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Configuration">
       <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\FSharp.Configuration.dll</HintPath>
