@@ -173,6 +173,7 @@ module Train =
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
+        let loss = modelInstance.Use loss
         let opt = optNew loss modelInstance.ParameterVector modelInstance.Device
         let lossFn = modelInstance.Func loss << varEnvBuilder
         let lossOptFn = modelInstance.Func (loss, opt.OptStepExpr) |> opt.Use << varEnvBuilder

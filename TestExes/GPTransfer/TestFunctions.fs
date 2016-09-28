@@ -134,10 +134,10 @@ module TestFunctions =
         let trn_t_val = trn_t_host  |> post device
         let trn_sigma_val = trn_sigma_host  |> post device
 
-        mi.ParameterStorage.[!mgp.Lengthscales] <- ls_val
-        mi.ParameterStorage.[!mgp.TrnX] <- trn_x_val
-        mi.ParameterStorage.[!mgp.TrnT] <- trn_t_val
-        mi.ParameterStorage.[!mgp.TrnSigma] <- trn_sigma_val
+        mi.ParameterStorage.[mgp.Lengthscales] <- ls_val
+        mi.ParameterStorage.[mgp.TrnX] <- trn_x_val
+        mi.ParameterStorage.[mgp.TrnT] <- trn_t_val
+        mi.ParameterStorage.[mgp.TrnSigma] <- trn_sigma_val
 
         let transMean,transCov = WeightLayer.transform w (inp_mean,inp_cov)
         let transTestFn1 =  mi.Func transMean |> arg2 inp_mean inp_cov
@@ -171,10 +171,10 @@ module TestFunctions =
                 Pred_Cov = pred_cov}
 
             //print inputs and predictions
-            printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
-            printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
-            printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
-            printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
+            printfn "Lengthscales=\n%A" mi.ParameterStorage.[mgp.Lengthscales]
+            printfn "TrnX=\n%A" mi.ParameterStorage.[mgp.TrnX]
+            printfn "TrnT=\n%A" mi.ParameterStorage.[mgp.TrnT]
+            printfn "TrnSigma=\n%A" mi.ParameterStorage.[mgp.TrnSigma]
             printfn ""
             printfn "inp_mean=\n%A" inp_mean_val
             printfn "inp_cov=\n%A" inp_cov_val

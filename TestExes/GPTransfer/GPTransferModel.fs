@@ -19,13 +19,13 @@ module MultiGPLayer =
 
     type Pars = {
         /// GP lengthscales: [gp]
-        Lengthscales:       ExprT ref
+        Lengthscales:       ExprT 
         /// x values of GP training samples:         [gp, trn_smpl]
-        TrnX:               ExprT ref
+        TrnX:               ExprT 
         /// target values of GP training samples:    [gp, trn_smpl]
-        TrnT:               ExprT ref
+        TrnT:               ExprT 
         /// standard deviation of GP target values:  [gp, trn_smpl]
-        TrnSigma:           ExprT ref
+        TrnSigma:           ExprT 
         /// hyper-parameters
         HyperPars:          HyperPars
     }
@@ -218,11 +218,11 @@ module MultiGPLayer =
         let mu = mu |> Expr.checkFinite "mu"
         let sigma = sigma |> Expr.checkFinite "sigma"
 
-        let lengthscales = !pars.Lengthscales
+        let lengthscales = pars.Lengthscales
         let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
-        let trnX = !pars.TrnX
+        let trnX = pars.TrnX
         let trnX = trnX |> Expr.checkFinite "trnX"
-        let trnSigma = !pars.TrnSigma
+        let trnSigma = pars.TrnSigma
         let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
 
         // Kk [gp, trn_smpl1, trn_smpl2]
@@ -240,7 +240,7 @@ module MultiGPLayer =
 //        let lk = lk |> Expr.dump "lk"
         
         // trnT [gp, trn_smpl]
-        let trnT = !pars.TrnT
+        let trnT = pars.TrnT
         let trnT = trnT |> Expr.checkFinite "trnT"
 
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
@@ -346,7 +346,7 @@ module WeightLayer =
     /// Weight layer parameters.
     type Pars = {
         /// expression for the weights [nGPs,nInput]
-        Weights:        ExprT ref
+        Weights:        ExprT 
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -368,7 +368,7 @@ module WeightLayer =
     let transform pars (mu,sigma) =
         //[smpl,inp] .* [inp,gp] 
         //=>[smpl,gp]
-        let newMu = mu .* (!pars.Weights).T
+        let newMu = mu .* pars.Weights.T
         //[1*,gp,inp] .* [smpl,inp,inp] => [smpl,gp,inp]
         //[smpl,gp,inp] .* [1*,inp,gp] => [smpl,gp,gp]
         //[1*,gp,inp] .* [smpl,inp,inp] .* [1*,inp,gp]
@@ -376,9 +376,9 @@ module WeightLayer =
         let nGps = pars.HyperPars.NOutput
         let nInput = pars.HyperPars.NInput
         let bc = SizeSpec.broadcastable
-        let newSigma =  (Expr.reshape [bc;nGps;nInput] !pars.Weights) .*
+        let newSigma =  (Expr.reshape [bc;nGps;nInput] pars.Weights) .*
                         sigma .*
-                        (Expr.reshape [bc;nInput;nGps] (!pars.Weights).T)
+                        (Expr.reshape [bc;nInput;nGps] pars.Weights.T)
         newMu, newSigma
 
 module GPTransferUnit = 

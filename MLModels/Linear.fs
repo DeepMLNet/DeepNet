@@ -5,7 +5,7 @@ open SymTensor
 module LinearRegression =
 
     type Pars = {
-        Weights:    ExprT ref
+        Weights:    ExprT 
     }
 
     let pars (mc: ModelBuilder<_>) nIn nOut =
@@ -18,7 +18,7 @@ module LinearRegression =
     let pred (pars: Pars) (input: ExprT) =
         // input [smpl, inUnit]
         // pred  [smpl, outInit]
-        input .* (!pars.Weights).T
+        input .* pars.Weights.T
 
     let loss pars (input: ExprT) (target: ExprT) =
         let pred = pred pars input

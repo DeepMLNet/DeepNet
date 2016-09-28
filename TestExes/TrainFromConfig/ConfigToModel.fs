@@ -66,12 +66,14 @@ module ConfigToModel =
         let fullDataset = Dataset.FromSamples fullData
         let datset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
         
+        // build model
+        let 
+
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 
                                  Map [nInput,  fullDataset.[0].Input.NElems
                                       nOutput, fullDataset.[0].Target.NElems]) 
 
-        // build 
 
         ()
 
