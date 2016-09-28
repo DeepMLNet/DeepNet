@@ -1,6 +1,5 @@
 ﻿namespace TrainFromConfig
 
-
 open Datasets
 open Models
 open Optimizers
@@ -32,7 +31,7 @@ module Main =
 
         // build model
         let cfgPath = results.GetResult <@Config_Path@>
-        let mi, prenFn, trainFn = ConfigLoader.buildModel cfgPath
+        let mi, predFn, trainFn = ConfigLoader.buildModel cfgPath
    
         // start training
         let result = trainFn ()

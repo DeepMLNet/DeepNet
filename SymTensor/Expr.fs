@@ -665,33 +665,47 @@ module Expr =
         | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
+
+    let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
+        let subTest = testEvalAllSymSizes failIfNot
+        let evalable =
+            match expr with
+            | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
+            | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
+            | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
+            | Leaf _ -> true
+
+            | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && subTest a
+            | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && subTest a
+            | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && subTest a
+            | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && subTest a
+            | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
+            | Unary (op, a) -> subTest a
+
+            | Binary (SetSubtensor srs, a, b) -> 
+                SimpleRangesSpec.canEvalSymbols srs && subTest a && subTest b
+            | Binary (IfThenElse c, a, b) ->
+                subTest c && subTest a && subTest b 
+            | Binary (op, a, b) -> subTest a && subTest b
+
+            | Nary (Elements (trgtShp, elemExpr), es) -> 
+                ShapeSpec.canEval trgtShp && 
+                ElemExpr.canEvalAllSymSizes elemExpr && 
+                List.forall subTest es
+            | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall subTest es
+            | Nary (op, es) -> List.forall subTest es
+        if failIfNot && not evalable then
+            failwithf "expression %A contains a symbolic size that cannot be evaluated to \
+                       a numeric value" expr
+        evalable
+
     /// true if all shapes in the expression can be evaluated to numeric shapes
-    let rec canEvalAllSymSizes (expr: ExprT) =
-        match expr with
-        | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
-        | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
-        | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
-        | Leaf _ -> true
+    let canEvalAllSymSizes (expr: ExprT) =
+        testEvalAllSymSizes false expr
 
-        | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
-        | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && canEvalAllSymSizes a
-        | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && canEvalAllSymSizes a
-        | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a
-        | Unary (AssumeJacobian jac, a) -> canEvalAllSymSizes jac && canEvalAllSymSizes a
-        | Unary (op, a) -> canEvalAllSymSizes a
-
-        | Binary (SetSubtensor srs, a, b) -> 
-            SimpleRangesSpec.canEvalSymbols srs && canEvalAllSymSizes a && canEvalAllSymSizes b
-        | Binary (IfThenElse c, a, b) ->
-            canEvalAllSymSizes c && canEvalAllSymSizes a && canEvalAllSymSizes b 
-        | Binary (op, a, b) -> canEvalAllSymSizes a && canEvalAllSymSizes b
-
-        | Nary (Elements (trgtShp, elemExpr), es) -> 
-            ShapeSpec.canEval trgtShp && 
-            ElemExpr.canEvalAllSymSizes elemExpr && 
-            List.forall canEvalAllSymSizes es
-        | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall canEvalAllSymSizes es
-        | Nary (op, es) -> List.forall canEvalAllSymSizes es
+    /// fails if the expression contains a shape that cannot be evaluated to a numeric shape
+    let failOnNotEvalableSymSize (expr: ExprT) =
+        testEvalAllSymSizes true expr |> ignore
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
     let check (expr: ExprT) : ExprT =

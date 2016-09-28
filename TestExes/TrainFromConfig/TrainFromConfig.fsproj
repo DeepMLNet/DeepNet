@@ -51,6 +51,7 @@
     <DocumentationFile>bin\Debug\GPTNN.XML</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
+    <StartArguments>..\..\Cfgs\ExampleCfg.fsx</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>
@@ -83,24 +84,22 @@
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
+    <None Include="Cfgs\ExampleCfg.fsx">
+      <Link>ExampleCfg.fsx</Link>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Argu">
       <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
     </Reference>
-    <Reference Include="FSharp.Configuration">
-      <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\FSharp.Configuration.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="FSharp.Data.DesignTime">
+      <HintPath>..\..\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
     </Reference>
     <Reference Include="ManagedCuda">
       <HintPath>..\..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="SharpYaml">
-      <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\SharpYaml.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />

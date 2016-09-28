@@ -221,3 +221,4 @@ ModelManifest.xml
 /TestData.h5
 /TrainData.h5
 /TestExes/GPTransfer/pydump.h5
+/TestExes/TrainFromConfig/Cfgs/result.json
