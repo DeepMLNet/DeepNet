@@ -593,10 +593,14 @@ module ArrayND =
     let inline zerosLike a =
         newCOfSameType (shape a) a
 
-    /// fills the specified ArrayND with ones
-    let inline fillWithOnes (a: #ArrayNDT<'T>) =
+    /// fills with the specified constant
+    let fillConst value a =
         for idx in allIdx a do
-            set idx (ArrayNDT<'T>.One) a
+            a |> set idx value
+
+    /// fills the specified ArrayND with ones
+    let fillWithOnes (a: #ArrayNDT<'T>) =
+        a |> fillConst ArrayNDT<'T>.One
 
     /// ArrayND of specified shape and same type as a filled with ones.
     let inline onesOfSameType shp a =
@@ -655,7 +659,7 @@ module ArrayND =
         if a.NDims <> 1 then invalidArg "a" "tensor must be one dimensional"
         if a.NElems < 2 then invalidArg "a" "tensor must have at least two elements"
         let step = (stop - start) / conv<'T> (a.NElems - 1)
-        a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)
+        a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)       
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.

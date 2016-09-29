@@ -300,6 +300,12 @@ module ArrayNDHost =
         ArrayND.fillWithOnes a
         a
 
+    /// ArrayNDHostT of given shape filled with the given value.
+    let filled shape (value: 'T) : ArrayNDHostT<'T> =
+        let a = newC shape
+        a |> ArrayND.fillConst value
+        a       
+
     /// ArrayNDHostT identity matrix
     let identity<'T> size : ArrayNDHostT<'T> =
         let a = zeros [size; size]

@@ -89,6 +89,9 @@
     <None Include="Cfgs\ExampleCfg.fsx">
       <Link>ExampleCfg.fsx</Link>
     </None>
+    <None Include="Cfgs\GPCfg.fsx">
+      <Link>GPCfg.fsx</Link>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Argu">
@@ -97,6 +100,14 @@
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\..\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
     </Reference>
+    <Reference Include="FsPickler">
+      <HintPath>..\..\packages\FsPickler.2.1.0\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FsPickler.Json">
+      <HintPath>..\..\packages\FsPickler.Json.2.1.0\lib\net45\FsPickler.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="ManagedCuda">
       <HintPath>..\..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
@@ -104,9 +115,15 @@
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\MLDatasets\MLDatasets.fsproj">

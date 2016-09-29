@@ -27,8 +27,10 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
+                 MinIters  = Some 10000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 
+    SaveParsDuringTraining = false
 }
 

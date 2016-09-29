@@ -83,6 +83,8 @@ module Train =
         BatchSize:                      int
         /// number of iterations between evaluation of the loss
         LossRecordInterval:             int
+        /// function that is called after loss has been evaluated
+        LossRecordFunc:                 TrainingLog.Entry -> unit
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -110,6 +112,7 @@ module Train =
         Seed                        = 1
         BatchSize                   = 10000
         LossRecordInterval          = 10
+        LossRecordFunc              = fun _ -> ()
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
         TargetLoss                  = None
@@ -279,6 +282,7 @@ module Train =
                 }
                 let log = log |> TrainingLog.record entry trainable.ModelParameters
                 printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
+                cfg.LossRecordFunc entry
 
                 // check termination criteria
                 let mutable faith = Continue
