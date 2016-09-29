@@ -222,3 +222,7 @@ ModelManifest.xml
 /TrainData.h5
 /TestExes/GPTransfer/pydump.h5
 /TestExes/TrainFromConfig/Cfgs/result.json
+/TestExes/GPAct/Cfgs/mod0.cu
+/TestExes/GPAct/Cfgs/result.json
+/TestExes/GPAct/Cfgs/mod2.cu
+/TestExes/GPAct/Cfgs/mod1.cu

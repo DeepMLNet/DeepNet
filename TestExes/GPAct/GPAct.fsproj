@@ -8,11 +8,11 @@
     <ProjectGuid>bbfb43c1-9b12-4b60-98c8-f8038b8b2985</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>GPTNN</RootNamespace>
-    <AssemblyName>TrainFromConfig</AssemblyName>
+    <AssemblyName>GPAct</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>TrainFromConfig</Name>
+    <Name>GPAct</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -80,7 +80,9 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="GPTransferModel.fs" />
     <Compile Include="ConfigLoader.fs" />
+    <Compile Include="TestFunctions.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
@@ -135,11 +137,6 @@
     <ProjectReference Include="..\..\Tensor\Tensor.fsproj">
       <Name>Tensor</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\GPTransfer\GPTransfer.fsproj">
-      <Name>GPTransfer</Name>
-      <Project>{1df45c82-0128-48db-a107-c606024176bf}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

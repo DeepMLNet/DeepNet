@@ -5,7 +5,7 @@ open SymTensor.Compiler.Cuda
 open RProvider
 open RProvider.ggplot2
 open Basics
-open GPTransfer
+open GPAct
 open System
 
 

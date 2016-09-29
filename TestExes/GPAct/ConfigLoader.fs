@@ -1,4 +1,4 @@
-﻿namespace TrainFromConfig
+﻿namespace GPAct
 
 open System.IO
 
@@ -8,7 +8,6 @@ open Optimizers
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
-open GPTransfer
 
 
 [<AutoOpen>]
@@ -17,7 +16,7 @@ module ConfigTypes =
 
     type Layer = 
         | NeuralLayer of NeuralLayer.HyperPars
-        | GPTransferLayer of GPTransferUnit.HyperPars
+        | GPTransferLayer of GPActivationLayer.HyperPars
 
     type FeedForwardModel = {
         Layers:     Layer list
@@ -72,15 +71,15 @@ module ConfigLoader =
         
         // build model
         let predMean, predVar = 
-            ((input, InputLayer.cov input), List.indexed cfg.Model.Layers)
+            ((input, GPUtils.covZero input), List.indexed cfg.Model.Layers)
             ||> Seq.fold (fun (mean, var) (layerIdx, layer) ->
                 match layer with
                 | NeuralLayer hp ->
                     let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
-                    NeuralLayer.pred pars mean, InputLayer.cov mean // TODO: implement variance prop
+                    NeuralLayer.pred pars mean, GPUtils.covZero mean // TODO: implement variance prop
                 | GPTransferLayer hp ->
-                    let pars = GPTransferUnit.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
-                    GPTransferUnit.pred pars (mean, var))
+                    let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
+                    GPActivationLayer.pred pars (mean, var))
 
         // build loss
         let loss = LossLayer.loss cfg.Model.Loss predMean target

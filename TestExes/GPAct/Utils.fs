@@ -1,4 +1,4 @@
-﻿namespace TrainFromConfig
+﻿namespace GPAct
 
 open System.Text.RegularExpressions
 

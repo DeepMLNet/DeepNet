@@ -153,9 +153,9 @@
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\GPTransfer\GPTransfer.fsproj">
-      <Name>GPTransfer</Name>
-      <Project>{1df45c82-0128-48db-a107-c606024176bf}</Project>
+    <ProjectReference Include="..\GPAct\GPAct.fsproj">
+      <Name>GPAct</Name>
+      <Project>{bbfb43c1-9b12-4b60-98c8-f8038b8b2985}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
