@@ -18,7 +18,7 @@ module PlotTests =
         
         let seed = 1
         let rand = Random seed
-        let ntraining = 100
+        let ntraining = 10
         let ninput = 20
 
         let trn_x_list =  (TestFunctions.randomSortedListOfLength rand (-5.0f,-1.0f) (ntraining/2)) @  (TestFunctions.randomSortedListOfLength rand (1.0f,5.0f) (ntraining/2))
@@ -26,7 +26,7 @@ module PlotTests =
         let trn_t_list = trn_x_list |>  TestFunctions.randPolynomial rand
         let trn_t_host = trn_t_list |> ArrayNDHost.ofList
 
-        let sigmaNs_host = (ArrayNDHost.ones<single> [ntraining]) * sqrt 0.05f
+        let sigmaNs_host = (ArrayNDHost.ones<single> [ntraining]) * sqrt 0.005f
 
         //transfer train parametters to device (Host or GPU)
         let trn_x_val = trn_x_host  |> TestFunctions.post DevCuda
