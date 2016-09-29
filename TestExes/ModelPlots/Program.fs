@@ -10,5 +10,5 @@ module Program =
     [<EntryPoint>]
     let main argv = 
         ApplicationTests.testPlot ()
-        GPTransferPlot.GPTransferTest DevCuda
+//        GPTransferPlot.GPTransferTest DevCuda
         0 // return an integer exit code

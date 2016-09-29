@@ -2,9 +2,9 @@
 open ArrayNDNS
 open SymTensor
 open RProvider
-open RProvider
 open RProvider.graphics
 open RProvider.ggplot2
+open RTools
 
 module ApplicationTests =
     let i = ignore
@@ -16,19 +16,18 @@ module ApplicationTests =
         let xrev = x |> List.rev
         printfn "x = %A" x
         printfn "y = %A" y
-//        let data = R.data_frame(x,y)
-        R.plot(x, y) |> i
         namedParams [   
-            "x", box x; 
-            "y", box y; 
-            "type", box "l"; 
-            "col", box "red";
-            "ylim", box [-2; 15]]
+            "x", box x;
+             "y", box y;
+             "col", box "red";
+             "type", box "n"]
         |> R.plot |> i
         namedParams [   
             "x", box (x @ xrev);
-            "y", box (ydown@ yup);
-            "col", box "skyblue"]
-        |> R.polygon |> i
+             "y", box (ydown@ yup);
+             "col", box "skyblue";
+             "border" , box "NA"]
+        |> R.polygon |>i  
+        R.lines2 (x, y, "black")
         ()
 

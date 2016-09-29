@@ -54,3 +54,4 @@ module GaussianProcess =
         let mean = K_starT .* Kinv .* y
         let cov = K_starstar - K_starT .* Kinv .* K_star
         mean,cov
+

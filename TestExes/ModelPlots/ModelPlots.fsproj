@@ -138,6 +138,11 @@
       <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\RPlotTools\RPlotTools.fsproj">
+      <Name>RPlotTools</Name>
+      <Project>{bdb5d832-bc10-4b8f-bde0-7142646aa9cf}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\SymTensorCuda\SymTensorCuda.fsproj">
       <Name>SymTensorCuda</Name>
       <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
