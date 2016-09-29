@@ -1,12 +1,12 @@
 ﻿#load "../../../DeepNet.fsx"
 #I "../bin/Debug"
-#r "TrainFromConfig.exe"
+#r "GPAct.exe"
 
 open Basics
 open Models
 open Datasets
 open Optimizers
-open TrainFromConfig
+open GPAct
 
 
 
