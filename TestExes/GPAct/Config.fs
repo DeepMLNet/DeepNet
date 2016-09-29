@@ -97,7 +97,9 @@ module ConfigLoader =
                     let name = sprintf "GPTransferLayer%d" layerIdx
                     let pars = GPActivationLayer.pars (mb.Module name) hp
                     gpLayers <- gpLayers |> Map.add name pars
-                    GPActivationLayer.pred pars (mean, var))
+                    let predMean, predVar = GPActivationLayer.pred pars (mean, var)
+                    predMean, GPUtils.covZero predMean 
+                )
 
         // build loss
         let loss = LossLayer.loss cfg.Model.Loss predMean target
