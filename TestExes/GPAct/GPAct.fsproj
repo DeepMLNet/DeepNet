@@ -80,9 +80,9 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils.fs" />
-    <Compile Include="GPTransferModel.fs" />
-    <Compile Include="ConfigLoader.fs" />
-    <Compile Include="TestFunctions.fs" />
+    <Compile Include="Model.fs" />
+    <Compile Include="Config.fs" />
+    <Compile Include="Test.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
