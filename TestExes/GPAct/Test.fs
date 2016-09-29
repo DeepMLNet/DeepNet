@@ -219,8 +219,9 @@ module TestFunctions =
         let nTrnSmpls    = mb.Size "nTrnSmpls"
 
         let gptu = 
-           GPActivationLayer.pars (mb.Module "GPTU") {GPActivationLayer.defaultHyperPars with
-                                                       NInput = nInputs; NOutput = nGPs; NTrnSmpls = nTrnSmpls}
+           GPActivationLayer.pars (mb.Module "GPTU") 
+                {WeightTransform = {WeightTransform.defaultHyperPars with NInput=nInputs; NOutput=nGPs}
+                 Activation      = {GPActivation.defaultHyperPars with NGPs=nGPs; NTrnSmpls=nTrnSmpls}}
 
         let inp_mean = mb.Var "inp_mean"  [nSmpls; nInputs]
         let pred     = mb.Var "Pred"      [nSmpls; nGPs]

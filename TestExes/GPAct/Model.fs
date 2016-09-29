@@ -6,7 +6,46 @@ open Basics
 open Models
 
 
+[<AutoOpen>]
+module GPUtilsTypes =
+
+    /// initialization types
+    type InitMethod =
+        /// constant value
+        | Const of value:single
+        /// linear spaced
+        | Linspaced of first:single * last:single
+        /// random
+        | Random of lower:single * upper:single
+        /// identity matrix
+        | IdentityMatrix
+        /// fan-in/out optimal random weight matrix for neurons
+        | FanOptimal
+
+
 module GPUtils =
+
+    /// calculates initialization values
+    let initVals initType seed shp =
+        let rng = System.Random seed            
+        match initType with
+        | Const value -> ArrayNDHost.filled shp value
+        | Linspaced (first, last) -> 
+            ArrayNDHost.linSpaced first last shp.[1]
+            |> ArrayND.padLeft
+            |> ArrayND.replicate 0 shp.[0]
+        | Random (lower, upper) ->
+            rng.UniformArrayND (lower, upper) shp
+        | IdentityMatrix ->
+            match shp with
+            | [n; m] when n = m -> ArrayNDHost.identity n
+            | _ -> failwith "need square matrix shape for identity matrix initialization"
+        | FanOptimal ->
+            let fanOut = shp.[0] |> single
+            let fanIn = shp.[1] |> single
+            let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
+            rng.UniformArrayND (-r, r) shp
+
     /// Allows the gradient to pass if trainable is true.
     let gate trainable expr =
         if trainable then expr else Expr.assumeZeroDerivative expr
@@ -26,19 +65,26 @@ open GPUtils
 /// propagates normal distributions through non-linearities described by GPs
 module GPActivation =
 
+    /// Hyper-parameters
     type HyperPars = {
         /// number of GPs, equals number of outputs and inputs
-        NGPs:                  SizeSpecT
+        NGPs:                   SizeSpecT
 
         /// number of training points for each GP
-        NTrnSmpls:             SizeSpecT
+        NTrnSmpls:              SizeSpecT
 
-        LengthscalesTrainable: bool
-        TrnXTrainable:         bool
-        TrnTTrainable:         bool
-        TrnSigmaTrainable:     bool
+        LengthscalesTrainable:  bool
+        TrnXTrainable:          bool
+        TrnTTrainable:          bool
+        TrnSigmaTrainable:      bool
+
+        LengthscalesInit:       InitMethod
+        TrnXInit:               InitMethod
+        TrnTInit:               InitMethod
+        TrnSigmaInit:           InitMethod
     }
 
+    /// default hyper-parameters
     let defaultHyperPars = {
         NGPs                  = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
@@ -46,8 +92,13 @@ module GPActivation =
         TrnXTrainable         = true
         TrnTTrainable         = true
         TrnSigmaTrainable     = true
+        LengthscalesInit      = Const 0.4f
+        TrnXInit              = Linspaced (-2.0f, 2.0f)
+        TrnTInit              = Linspaced (-2.0f, 2.0f)
+        TrnSigmaInit          = Const (sqrt 0.1f)
     }
 
+    /// Parameter expressions.
     type Pars = {
         /// GP lengthscales: [gp]
         Lengthscales:       ExprT 
@@ -60,37 +111,17 @@ module GPActivation =
         /// hyper-parameters
         HyperPars:          HyperPars
     }
-
-    let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
-         let rng = System.Random seed
-         //Right now: all GPs equal
-         ArrayNDHost.ones<single> shp
-
-    let internal initTrnX seed (shp: int list) : ArrayNDHostT<single> = 
-        let n_gps = shp.[0]
-        let n_trn = shp.[1]
-        let rng = System.Random seed
-        //Right now: all GPs equal
-        let oneTrn = rng.SortedUniformArrayND (-5.0f,5.0f) [1;n_trn]
-        oneTrn |> ArrayND.replicate 0 n_gps
-
-    let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
-        ArrayNDHost.ones<single> shp
-
-    let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<single> = 
-        (ArrayNDHost.ones<single> shp) * sqrt 0.1f
-   
-
+     
+    /// creates parameters
     let pars (mb: ModelBuilder<_>) hp = {
-        Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               initLengthscales) 
-        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], initTrnX)
-        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], initTrnT)
-        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], initTrnSigma)
+        Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit) 
+        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
+        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
+        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
         HyperPars      = hp
     }
 
-
-    ///The covariance Matrices of the training vectors with themselves 
+        ///The covariance Matrices of the training vectors with themselves 
     ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
         // Kse element expression
@@ -341,18 +372,23 @@ module WeightTransform =
 
     type HyperPars = {
         /// number of inputs
-        NInput:     SizeSpecT 
+        NInput:         SizeSpecT 
 
         /// number of outputs
-        NOutput:    SizeSpecT
+        NOutput:        SizeSpecT
 
-        Trainable:  bool
+        Trainable:      bool
+
+        WeightsInit:    InitMethod
+        BiasInit:       InitMethod
     }
 
     let defaultHyperPars = {
-        NInput     = SizeSpec.fix 0
-        NOutput    = SizeSpec.fix 0
-        Trainable  = true
+        NInput          = SizeSpec.fix 0
+        NOutput         = SizeSpec.fix 0
+        Trainable       = true
+        WeightsInit     = FanOptimal
+        BiasInit        = Const 0.0f
     }
 
     /// Weight layer parameters.
@@ -365,20 +401,9 @@ module WeightTransform =
         HyperPars:      HyperPars
     }
 
-    let internal initWeights seed (shp: int list) : ArrayNDHostT<single> = 
-        let fanOut = shp.[0] |> single
-        let fanIn = shp.[1] |> single
-        let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
-        let rng = System.Random seed      
-        rng.SeqSingle(-r, r)
-        |> ArrayNDHost.ofSeqWithShape shp
-
-    let internal initBias seed (shp: int list) : ArrayNDHostT<single> = 
-        ArrayNDHost.zeros shp
-
     let pars (mb: ModelBuilder<_>) hp = {
-        Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
-        Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
+        Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], GPUtils.initVals hp.WeightsInit)
+        Bias      = mb.Param ("Bias",    [hp.NOutput],            GPUtils.initVals hp.BiasInit)
         HyperPars = hp
     }
 
@@ -404,32 +429,13 @@ module WeightTransform =
 module GPActivationLayer = 
 
     type HyperPars = {
-        /// number of inputs
-        NInput:    SizeSpecT
-
-        /// number of outputs (equals number of GPs)
-        NOutput:   SizeSpecT
-
-        /// number of training samples for each GP
-        NTrnSmpls:  SizeSpecT
-
-        WeightsTrainable:      bool
-        LengthscalesTrainable: bool
-        TrnXTrainable:         bool
-        TrnTTrainable:         bool
-        TrnSigmaTrainable:     bool        
+        WeightTransform: WeightTransform.HyperPars
+        Activation:      GPActivation.HyperPars
     }
 
     let defaultHyperPars = {
-        NInput     = SizeSpec.fix 0
-        NOutput    = SizeSpec.fix 0
-        NTrnSmpls  = SizeSpec.fix 10
-
-        WeightsTrainable       = true
-        LengthscalesTrainable  = true
-        TrnXTrainable          = true
-        TrnTTrainable          = true
-        TrnSigmaTrainable      = true
+        WeightTransform = WeightTransform.defaultHyperPars
+        Activation      = GPActivation.defaultHyperPars
     }
 
     type Pars = {
@@ -441,22 +447,14 @@ module GPActivationLayer =
         HyperPars:       HyperPars
     }
 
-    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
-        WeightTransform = WeightTransform.pars (mb.Module "WeightTransform") {
-            NInput    = hp.NInput
-            NOutput   = hp.NOutput
-            Trainable = hp.WeightsTrainable
+    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = 
+        if hp.Activation.NGPs <> hp.WeightTransform.NOutput then
+            failwith "number of GPs must equal number of output units in weight transform"
+        {
+            WeightTransform = WeightTransform.pars (mb.Module "WeightTransform") hp.WeightTransform
+            Activation = GPActivation.pars (mb.Module "Activation") hp.Activation
+            HyperPars = hp
         }
-        Activation = GPActivation.pars (mb.Module "Activation") {
-            NGPs                  = hp.NOutput
-            NTrnSmpls             = hp.NTrnSmpls
-            LengthscalesTrainable = hp.LengthscalesTrainable
-            TrnXTrainable         = hp.TrnXTrainable
-            TrnTTrainable         = hp.TrnTTrainable
-            TrnSigmaTrainable     = hp.TrnSigmaTrainable
-        }
-        HyperPars = hp
-    }
 
     /// Propagates the input normal distribution through a weight matrix and activation
     /// functions described by GPs.

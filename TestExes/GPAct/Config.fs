@@ -1,6 +1,7 @@
 ﻿namespace GPAct
 
 open System.IO
+open Nessos.FsPickler.Json
 
 open Datasets
 open Models
@@ -16,7 +17,7 @@ module ConfigTypes =
 
     type Layer = 
         | NeuralLayer of NeuralLayer.HyperPars
-        | GPTransferLayer of GPActivationLayer.HyperPars
+        | GPActivationLayer of GPActivationLayer.HyperPars
 
     type FeedForwardModel = {
         Layers:     Layer list
@@ -33,10 +34,11 @@ module ConfigTypes =
         | Adam of Adam.Cfg<single>
 
     type Cfg = {
-        Model:      FeedForwardModel
-        Data:       CsvDataCfg
-        Optimizer:  Optimizer
-        Training:   Train.Cfg
+        Model:                  FeedForwardModel
+        Data:                   CsvDataCfg
+        Optimizer:              Optimizer
+        Training:               Train.Cfg
+        SaveParsDuringTraining: bool
     }
 
 
@@ -60,9 +62,17 @@ module ConfigLoader =
         let input  = mb.Var "Input"  [nBatch; nInput]
         let target = mb.Var "Target" [nBatch; nOutput]
 
+        // load config
         NInput <- (fun () -> nInput)
         NOutput <- (fun () -> nOutput)
+        let cfgPath = Path.GetFullPath cfgPath
         let cfg : Cfg = Config.loadAndChdir cfgPath
+
+        // dump config as JSON
+        let json = FsPickler.CreateJsonSerializer(indent=true, omitHeader=true)
+        let cfgDumpPath = Path.ChangeExtension (cfgPath, "json")
+        use cfgDump = File.CreateText cfgDumpPath
+        json.Serialize (cfgDump, cfg)
 
         // load data
         let fullData = CsvLoader.loadFile cfg.Data.Parameters cfg.Data.Path
@@ -77,7 +87,7 @@ module ConfigLoader =
                 | NeuralLayer hp ->
                     let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
                     NeuralLayer.pred pars mean, GPUtils.covZero mean // TODO: implement variance prop
-                | GPTransferLayer hp ->
+                | GPActivationLayer hp ->
                     let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
                     GPActivationLayer.pred pars (mean, var))
 
@@ -104,8 +114,14 @@ module ConfigLoader =
                 Train.trainableFromLossExpr mi loss smplVarEnv Adam.New cfg
 
         // build training function
+        let mutable trainCfg = cfg.Training
+        if cfg.SaveParsDuringTraining then
+            let savePars (state: TrainingLog.Entry) =
+                let filename = sprintf "Pars%05d.h5" state.Iter
+                mi.SavePars filename
+            trainCfg <- {trainCfg with LossRecordFunc = savePars}
         let trainFn () = 
-            Train.train trainable dataset cfg.Training
+            Train.train trainable dataset trainCfg
 
         mi, predFn, trainFn
 
