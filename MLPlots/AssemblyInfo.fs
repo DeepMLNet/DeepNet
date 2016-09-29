@@ -7,12 +7,14 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("MLPlots")>]
-[<assembly: AssemblyDescription("")>]
+[<assembly: AssemblyTitle("Deep.Net plots")>]
+[<assembly: AssemblyDescription("Plotting routines for Deep.Net models")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
-[<assembly: AssemblyProduct("MLPlots")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
+[<assembly: AssemblyCompany("Deep.Net developers")>]
+[<assembly: AssemblyProduct("Deep.Net")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net Developers. Licensed under the Apache 2.0 license. \
+                               Includes HDF5 binaries that are licensed under the terms specified at
+                               https://www.hdfgroup.org/HDF5/doc/Copyright.html")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 

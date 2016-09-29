@@ -57,9 +57,6 @@ type Dataset<'S> (fieldStorages: IArrayNDT list) =
             |> List.transpose
         partitionedFieldStorages |> List.map Dataset<'S>
 
-    /// Partitions this dataset using the given ratios.
-    static member Partition (this: Dataset<'S>, ratios) = this.Partition ratios
-
     /// Returns a record of type 'S containing the sample with the given index.
     member this.Item 
         with get (smpl: int) =
@@ -254,6 +251,20 @@ type Dataset<'S> (fieldStorages: IArrayNDT list) =
         Dataset<'S> fieldStorages
 
  
+ module Dataset =
+
+    /// Partitions this dataset using the given ratios.
+    let partition ratios (ds: Dataset<'S>) = 
+        ds.Partition ratios
+
+    /// Returns a sequence of batches with the given size of this dataset.         
+    let batches batchSize (ds: Dataset<'S>) =
+        ds.Batches batchSize
+
+    /// Number of samples.
+    let nSamples (ds: Dataset<'s>) =
+        ds.NSamples
+
 
 /// A training/validation/test partitioning of a dataset.
 [<StructuredFormatDisplay("{Pretty}")>]
@@ -316,5 +327,12 @@ type TrnValTst<'S> = {
         Val = Dataset.Load (filename + "-Val.h5")
         Tst = Dataset.Load (filename + "-Tst.h5")
     }
+
+module TrnValTst =
+    /// Applies the given function to the training, validation and test partions
+    /// and return the results as a tuple (trn, val, tst).
+    let apply f trnValTst = 
+        f trnValTst.Trn, f trnValTst.Val, f trnValTst.Tst
+
                 
 

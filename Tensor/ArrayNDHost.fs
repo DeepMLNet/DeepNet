@@ -45,15 +45,19 @@ module ArrayNDHostTypes =
         | t when t = typeof<double> -> doubleFn () 
         | t -> failwithf "unsupported data type for BLAS operation: %A" t
 
+    /// type-neutral interface to ArrayNDHostT<'T>
     type IArrayNDHostT =
         inherit IArrayNDT
         abstract Pin: unit -> PinnedMemoryT
         abstract DataObj: obj
         abstract DataSizeInBytes: int
 
+    /// an ArrayNDT that can be copied to an ArrayNDHostT
+    type IToArrayNDHostT<'T> =
+        abstract ToHost: unit -> ArrayNDHostT<'T>
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
-    type ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
+    and ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
                            data:        'T []) = 
         inherit ArrayNDT<'T>(layout)
         
@@ -81,6 +85,9 @@ module ArrayNDHostTypes =
             member this.Pin () = this.Pin ()
             member this.DataObj = box data
             member this.DataSizeInBytes = this.DataSizeInBytes
+
+        interface IToArrayNDHostT<'T> with
+            member this.ToHost () = this
 
         override this.Location = LocHost
 
@@ -316,6 +323,14 @@ module ArrayNDHost =
         let a = newC<'T> [nElems]
         ArrayND.fillLinSpaced start stop a
         a          
+
+    /// If the specified tensor is on a device, copies it to the host and returns the copy.
+    /// If the tensor is already on the host, this does nothing.
+    let fetch (a: #ArrayNDT<'T>) : ArrayNDHostT<'T> =
+        match box a with
+        | :? ArrayNDHostT<'T> as a -> a
+        | :? IToArrayNDHostT<'T> as a -> a.ToHost ()
+        | _ -> failwithf "the type %A is not copyable to the host" (a.GetType())
 
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.

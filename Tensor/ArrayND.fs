@@ -920,6 +920,22 @@ module ArrayND =
     let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
         ifTrue.IfThenElse cond ifFalse :?> 'B
 
+    /// converts the from one data type to another
+    let convert (a: #ArrayNDT<'T>) : ArrayNDT<'C> =
+        a |> mapTC (fun v -> conv<'C> v)
+
+    /// converts to int
+    let int (a: #ArrayNDT<'T>) : ArrayNDT<int> =
+        convert a
+
+    /// converts to float
+    let float (a: #ArrayNDT<'T>) : ArrayNDT<float> =
+        convert a
+
+    /// converts to single
+    let single (a: #ArrayNDT<'T>) : ArrayNDT<single> =
+        convert a
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
@@ -953,6 +969,15 @@ module ArrayND =
     /// element-wise sum over given axis
     let sumAxis dim a = 
         axisReduce sum dim a
+
+    /// mean 
+    let mean (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
+        sum a / scalarOfSameType a (conv<'T> (nElems a)) :?> 'A
+
+    /// mean over given axis
+    let meanAxis dim a = 
+        axisReduce mean dim a
     
     let inline private productImpl (a: ArrayNDT<'T>) =
         allElems a 
