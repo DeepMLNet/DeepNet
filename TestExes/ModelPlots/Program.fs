@@ -9,6 +9,6 @@ open RProvider.ggplot2
 module Program =
     [<EntryPoint>]
     let main argv = 
-        ApplicationTests.testPlot ()
-//        GPTransferPlot.GPTransferTest DevCuda
+//        ApplicationTests.testPlot ()
+        PlotTests.GPTransferTest ()
         0 // return an integer exit code

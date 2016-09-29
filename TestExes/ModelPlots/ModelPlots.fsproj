@@ -78,8 +78,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="ApplicationTests.fs" />
-    <Compile Include="GPTransferPlot.fs" />
+    <Compile Include="PlotTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
@@ -136,6 +135,11 @@
     <ProjectReference Include="..\..\MLOptimizers\MLOptimizers.fsproj">
       <Name>MLOptimizers</Name>
       <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\MLPlots\MLPlots.fsproj">
+      <Name>MLPlots</Name>
+      <Project>{853082be-359e-4f7e-b35c-7b10c8bd3970}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\RPlotTools\RPlotTools.fsproj">
