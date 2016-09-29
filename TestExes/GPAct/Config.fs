@@ -3,12 +3,14 @@
 open System.IO
 open Nessos.FsPickler.Json
 
+open Basics
 open Datasets
 open Models
 open Optimizers
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
+open MLPlots
 
 
 [<AutoOpen>]
@@ -39,6 +41,7 @@ module ConfigTypes =
         Optimizer:              Optimizer
         Training:               Train.Cfg
         SaveParsDuringTraining: bool
+        PlotGPsDuringTraining:  bool
     }
 
 
@@ -75,11 +78,14 @@ module ConfigLoader =
         json.Serialize (cfgDump, cfg)
 
         // load data
-        let fullData = CsvLoader.loadFile cfg.Data.Parameters cfg.Data.Path
+        let fullData = 
+            CsvLoader.loadFile cfg.Data.Parameters cfg.Data.Path
+            |> Seq.shuffle 100
         let fullDataset = Dataset.FromSamples fullData
         let dataset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
         
         // build model
+        let mutable gpLayers = Map.empty
         let predMean, predVar = 
             ((input, GPUtils.covZero input), List.indexed cfg.Model.Layers)
             ||> Seq.fold (fun (mean, var) (layerIdx, layer) ->
@@ -88,7 +94,9 @@ module ConfigLoader =
                     let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
                     NeuralLayer.pred pars mean, GPUtils.covZero mean // TODO: implement variance prop
                 | GPActivationLayer hp ->
-                    let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
+                    let name = sprintf "GPTransferLayer%d" layerIdx
+                    let pars = GPActivationLayer.pars (mb.Module name) hp
+                    gpLayers <- gpLayers |> Map.add name pars
                     GPActivationLayer.pred pars (mean, var))
 
         // build loss
@@ -113,13 +121,27 @@ module ConfigLoader =
             | Adam cfg ->
                 Train.trainableFromLossExpr mi loss smplVarEnv Adam.New cfg
 
-        // build training function
-        let mutable trainCfg = cfg.Training
-        if cfg.SaveParsDuringTraining then
-            let savePars (state: TrainingLog.Entry) =
+        let lossRecordFn (state: TrainingLog.Entry) =
+            if cfg.SaveParsDuringTraining then
                 let filename = sprintf "Pars%05d.h5" state.Iter
                 mi.SavePars filename
-            trainCfg <- {trainCfg with LossRecordFunc = savePars}
+            
+            if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
+                for KeyValue (name, pars) in gpLayers do
+                    let gpPars = pars.Activation
+                    for gp=0 to mi.[gpPars.Lengthscales].Shape.[0] - 1 do
+                        let ls = mi.[gpPars.Lengthscales].[gp] |> ArrayND.value
+                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls, 1.0f)}
+                        savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
+                            GPPlots.simplePlot (hps, 
+                                                mi.[gpPars.TrnSigma].[gp, *],
+                                                mi.[gpPars.TrnX].[gp, *],
+                                                mi.[gpPars.TrnT].[gp, *],
+                                                50, -5.0f, 5.0f, -5.0f, 5.0f)
+                        )
+
+        // build training function
+        let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
         let trainFn () = 
             Train.train trainable dataset trainCfg
 

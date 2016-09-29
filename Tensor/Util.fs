@@ -7,6 +7,8 @@ open System.Runtime.InteropServices
 open System.Collections.Concurrent
 open FSharp.Reflection
 
+
+
 module Seq = 
 
     /// every n-th element of the given sequence
@@ -20,6 +22,19 @@ module Seq =
             while nextN n do
               // Retrun each nth element
               yield en.Current }
+
+    /// shuffles a finite sequence using the given seed
+    let shuffle seed (input:seq<_>) =
+        let rand = System.Random seed
+
+        let swap (a: _[]) x y =
+            let tmp = a.[x]
+            a.[x] <- a.[y]
+            a.[y] <- tmp
+
+        let a = Array.ofSeq input
+        Array.iteri (fun i _ -> swap a i (rand.Next(i, Array.length a))) a        
+        a |> Seq.ofArray
 
 
 module List =

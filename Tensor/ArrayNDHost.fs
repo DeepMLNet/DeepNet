@@ -338,6 +338,10 @@ module ArrayNDHost =
         | :? IToArrayNDHostT<'T> as a -> a.ToHost ()
         | _ -> failwithf "the type %A is not copyable to the host" (a.GetType())
 
+    /// converts the from one data type to another
+    let convert (a: ArrayNDHostT<'T>) : ArrayNDHostT<'C> =
+        a |> ArrayND.convert :> ArrayNDT<'C> :?> ArrayNDHostT<'C>
+
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.
     let ofArray (data: 'T []) =

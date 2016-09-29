@@ -1,5 +1,5 @@
-﻿#load "../../../DeepNet.fsx"
-#I "../bin/Debug"
+﻿#load "../../../../DeepNet.fsx"
+#I "../../bin/Debug"
 #r "GPAct.exe"
 
 open Basics
@@ -10,18 +10,20 @@ open Optimizers
 open GPAct
 
 
+let nHidden = SizeSpec.fix 30
+
 
 let cfg = {
 
     Model = {Layers = [GPActivationLayer 
                         {WeightTransform = {WeightTransform.defaultHyperPars with
                                              NInput                = ConfigLoader.NInput()
-                                             NOutput               = ConfigLoader.NOutput()
+                                             NOutput               = nHidden
                                              Trainable             = true
                                              WeightsInit           = FanOptimal
                                              BiasInit              = Const 0.0f}
                          Activation      = {GPActivation.defaultHyperPars with
-                                             NGPs                  = ConfigLoader.NOutput()
+                                             NGPs                  = nHidden
                                              NTrnSmpls             = SizeSpec.fix 10
                                              LengthscalesTrainable = true
                                              TrnXTrainable         = true
@@ -30,10 +32,16 @@ let cfg = {
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-2.0f, 2.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.01f)}}]
+                                             TrnSigmaInit          = Const (sqrt 0.01f)}}
+                       
+                       NeuralLayer
+                         {NInput        = nHidden
+                          NOutput       = ConfigLoader.NOutput()
+                          TransferFunc  = NeuralLayer.Identity}
+                      ]
              Loss   = LossLayer.MSE}
 
-    Data = {Path       = "../../../Data/UCI/abalone.txt"
+    Data = {Path       = "../../../../Data/UCI/abalone.txt"
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [8]
                            IntTreatment     = CsvLoader.IntAsNumerical
@@ -48,6 +56,6 @@ let cfg = {
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
-    PlotGPsDuringTraining  = true
+    PlotGPsDuringTraining  = false
 }
 
