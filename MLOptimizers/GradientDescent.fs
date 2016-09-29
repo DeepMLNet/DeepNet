@@ -26,9 +26,7 @@ module GradientDescent =
 open GradientDescent
 
 type GradientDescent<'T when 'T: equality and 'T: comparison> 
-                                            (loss:   ExprT,
-                                             pars:   ExprT,    
-                                             dev:    IDevice) =
+        (loss:   ExprT, pars:   ExprT, dev:    IDevice) =
 
     do Util.checkProperType<'T> ()
 
@@ -42,6 +40,9 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
 
     let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
     let rpState = VarRecord<State<'T>, StateExpr> (state, dev)
+
+    static member New loss pars dev =
+        GradientDescent (loss, pars, dev) :> IOptimizer<'T, Cfg<'T>, State<'T>>
 
     member this.DefaultCfg : Cfg<'T> = {
         Step        = conv<'T> 1e-4
@@ -62,7 +63,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
         rpCfg.PublishLoc mb
         rpState.PublishLoc mb
 
-    interface IOptimizer<Cfg<'T>, State<'T>> with
+    interface IOptimizer<'T, Cfg<'T>, State<'T>> with
         member this.OptStepExpr = this.Minimize
         member this.Use f = this.Use f
         member this.CfgWithLearningRate learningRate cfg = {cfg with Step=conv<'T> learningRate}

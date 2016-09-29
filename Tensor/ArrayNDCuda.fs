@@ -235,8 +235,12 @@ module ArrayNDCudaTypes =
             member this.ToHost () = this.ToHost () :> IArrayNDHostT
             member this.Storage = this.Storage :> ICudaStorage
 
+        interface IToArrayNDHostT<'T> with
+            member this.ToHost () = this.ToHost ()
+
         override this.Invert () =
             failwith "not implemented"
+
 
 
 module ArrayNDCuda = 

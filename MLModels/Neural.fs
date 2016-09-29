@@ -49,6 +49,8 @@ module NeuralLayer =
     type TransferFuncs =
         /// tanh transfer function
         | Tanh
+        /// sigmoid transfer function
+        | Sigmoid
         /// soft-max transfer function
         | SoftMax
         /// no transfer function
@@ -67,9 +69,9 @@ module NeuralLayer =
     /// Neural layer parameters.
     type Pars<'T> = {
         /// expression for the weights
-        Weights:        ExprT ref
+        Weights:        ExprT 
         /// expression for the biases
-        Bias:           ExprT ref
+        Bias:           ExprT 
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -109,9 +111,11 @@ module NeuralLayer =
         // bias    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
-        let activation = input .* (!pars.Weights).T + !pars.Bias
+        let activation = input .* pars.Weights.T + pars.Bias
+        let one = Expr.scalarOfSameType activation 1
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
+        | Sigmoid  -> one / (one + exp (-activation))
         | SoftMax  -> exp activation / Expr.sumKeepingAxis 1 (exp activation)
         | Identity -> activation
 

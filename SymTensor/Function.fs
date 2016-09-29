@@ -183,7 +183,7 @@ module Func =
 
     type private UExprGenT = {
         Generate:               SymSizeEnvT -> UExprT
-        UVarSpecsAndEvalable:   SymSizeEnvT -> Set<VarSpecT> * bool       
+        UVarSpecsAndEvalable:   bool -> SymSizeEnvT -> Set<VarSpecT> * bool       
     }
 
     let private uExprGenerate baseExpr symSizes =
@@ -210,9 +210,10 @@ module Func =
         
         uExpr
 
-    let private uExprVarSpecsAndEvalable baseExpr symSizes =
+    let private uExprVarSpecsAndEvalable baseExpr failIfNotEvalable symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes 
         let vars = Expr.extractVars expr 
+        if failIfNotEvalable then Expr.failOnNotEvalableSymSize expr
         vars, Expr.canEvalAllSymSizes expr
 
     type private CompileResultT = {
@@ -234,7 +235,7 @@ module Func =
             // substitute symbol sizes into expressions and convert to unified expressions
             let vars, sizeAvail = 
                 baseExprGens 
-                |> List.map (fun gen -> gen.UVarSpecsAndEvalable compileEnv.SymSizes) 
+                |> List.map (fun gen -> gen.UVarSpecsAndEvalable failIfImpossible compileEnv.SymSizes) 
                 |> List.unzip
             let neededVars = Set.unionMany vars            
 

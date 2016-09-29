@@ -117,7 +117,7 @@ module SizeMultinomTypes =
     open SizeProductTypes
 
     // symbolic multinomial
-    [<StructuredFormatDisplay("{PrettyString}")>]
+    [<StructuredFormatDisplay("{Pretty}")>]
     type SizeMultinomT (products: Map<SizeProductT, int>) =
         let products = products |> Map.filter (fun _ fac -> fac <> 0)
 
@@ -163,14 +163,16 @@ module SizeMultinomTypes =
             |> Seq.concat
             |> Set.ofSeq
 
-        member this.PrettyString =
-            products
-            |> Map.toSeq
-            |> Seq.map (fun (p, f) -> 
-                if SizeProduct.isEmpty p then sprintf "%d" f
-                elif f = 1 then sprintf "%A" p
-                else sprintf "%d * %A" f p)
-            |> String.concat " + "
+        member this.Pretty =
+            if Map.isEmpty products then "0"
+            else
+                products
+                |> Map.toSeq
+                |> Seq.map (fun (p, f) -> 
+                    if SizeProduct.isEmpty p then sprintf "%d" f
+                    elif f = 1 then sprintf "%A" p
+                    else sprintf "%d * %A" f p)
+                |> String.concat " + "
         
         override this.Equals(otherObj) =
             match otherObj with
@@ -192,7 +194,7 @@ module SizeSpecTypes =
     open SizeMultinomTypes
 
     /// symbolic size specification of a dimension (axis)
-    [<StructuredFormatDisplay ("{PrettyString}")>]
+    [<StructuredFormatDisplay ("{Pretty}")>]
     [<StructuralEquality; StructuralComparison>]
     type SizeSpecT =
         | Base of BaseSizeT               // fixed size or symbol
@@ -206,6 +208,7 @@ module SizeSpecTypes =
                 match m.Products |> Map.toList with
                 | [SizeProduct.SingleSymbol s, f] when f = 1 -> Base (Sym s)
                 | [SizeProduct.Empty, f] -> Base (Fixed f)
+                | [] -> Base (Fixed 0)
                 | _ -> ss
             | _ -> ss
 
@@ -287,7 +290,7 @@ module SizeSpecTypes =
         member this.ContainsSymbol sym =
             this.ContainedSizeSymbols.Contains sym
 
-        member this.PrettyString =
+        member this.Pretty =
             match this with
             | Base b -> sprintf "%A" b
             | Broadcast -> "1*"

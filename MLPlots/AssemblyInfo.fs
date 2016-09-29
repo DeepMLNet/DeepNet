@@ -1,4 +1,4 @@
-﻿namespace GPTNN.AssemblyInfo
+﻿namespace MLPlots.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,12 +7,14 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("GPTNN")>]
-[<assembly: AssemblyDescription("")>]
+[<assembly: AssemblyTitle("Deep.Net plots")>]
+[<assembly: AssemblyDescription("Plotting routines for Deep.Net models")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
-[<assembly: AssemblyProduct("GPTNN")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2016")>]
+[<assembly: AssemblyCompany("Deep.Net developers")>]
+[<assembly: AssemblyProduct("Deep.Net")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net Developers. Licensed under the Apache 2.0 license. \
+                               Includes HDF5 binaries that are licensed under the terms specified at
+                               https://www.hdfgroup.org/HDF5/doc/Copyright.html")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
@@ -22,7 +24,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("bbfb43c1-9b12-4b60-98c8-f8038b8b2985")>]
+[<assembly: Guid("853082be-359e-4f7e-b35c-7b10c8bd3970")>]
 
 // Version information for an assembly consists of the following four values:
 // 

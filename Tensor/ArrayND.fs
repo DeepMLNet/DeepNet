@@ -593,10 +593,14 @@ module ArrayND =
     let inline zerosLike a =
         newCOfSameType (shape a) a
 
-    /// fills the specified ArrayND with ones
-    let inline fillWithOnes (a: #ArrayNDT<'T>) =
+    /// fills with the specified constant
+    let fillConst value a =
         for idx in allIdx a do
-            set idx (ArrayNDT<'T>.One) a
+            a |> set idx value
+
+    /// fills the specified ArrayND with ones
+    let fillWithOnes (a: #ArrayNDT<'T>) =
+        a |> fillConst ArrayNDT<'T>.One
 
     /// ArrayND of specified shape and same type as a filled with ones.
     let inline onesOfSameType shp a =
@@ -655,7 +659,7 @@ module ArrayND =
         if a.NDims <> 1 then invalidArg "a" "tensor must be one dimensional"
         if a.NElems < 2 then invalidArg "a" "tensor must have at least two elements"
         let step = (stop - start) / conv<'T> (a.NElems - 1)
-        a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)
+        a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)       
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
@@ -920,6 +924,22 @@ module ArrayND =
     let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
         ifTrue.IfThenElse cond ifFalse :?> 'B
 
+    /// converts the from one data type to another
+    let convert (a: #ArrayNDT<'T>) : ArrayNDT<'C> =
+        a |> mapTC (fun v -> conv<'C> v)
+
+    /// converts to int
+    let int (a: #ArrayNDT<'T>) : ArrayNDT<int> =
+        convert a
+
+    /// converts to float
+    let float (a: #ArrayNDT<'T>) : ArrayNDT<float> =
+        convert a
+
+    /// converts to single
+    let single (a: #ArrayNDT<'T>) : ArrayNDT<single> =
+        convert a
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
@@ -953,6 +973,15 @@ module ArrayND =
     /// element-wise sum over given axis
     let sumAxis dim a = 
         axisReduce sum dim a
+
+    /// mean 
+    let mean (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
+        sum a / scalarOfSameType a (conv<'T> (nElems a)) :?> 'A
+
+    /// mean over given axis
+    let meanAxis dim a = 
+        axisReduce mean dim a
     
     let inline private productImpl (a: ArrayNDT<'T>) =
         allElems a 

@@ -78,8 +78,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="ApplicationTests.fs" />
-    <Compile Include="GPTransferPlot.fs" />
+    <Compile Include="PlotTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
@@ -138,6 +137,16 @@
       <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\MLPlots\MLPlots.fsproj">
+      <Name>MLPlots</Name>
+      <Project>{853082be-359e-4f7e-b35c-7b10c8bd3970}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\RPlotTools\RPlotTools.fsproj">
+      <Name>RPlotTools</Name>
+      <Project>{bdb5d832-bc10-4b8f-bde0-7142646aa9cf}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\SymTensorCuda\SymTensorCuda.fsproj">
       <Name>SymTensorCuda</Name>
       <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
@@ -151,6 +160,11 @@
     <ProjectReference Include="..\..\Tensor\Tensor.fsproj">
       <Name>Tensor</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\GPAct\GPAct.fsproj">
+      <Name>GPAct</Name>
+      <Project>{bbfb43c1-9b12-4b60-98c8-f8038b8b2985}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

@@ -1,4 +1,4 @@
-﻿namespace GPTransfer.AssemblyInfo
+﻿namespace GPAct.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,12 +7,12 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("GPTransfer")>]
+[<assembly: AssemblyTitle("GPAct")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Deep.Net Developers")>]
-[<assembly: AssemblyProduct("GPTransfer")>]
-[<assembly: AssemblyCopyright("Copyright © Deep.Net Developers 2016")>]
+[<assembly: AssemblyCompany("Marcus Basalla, Sebastian Urban")>]
+[<assembly: AssemblyProduct("GP activation")>]
+[<assembly: AssemblyCopyright("")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
@@ -22,7 +22,7 @@ open System.Runtime.InteropServices
 [<assembly: ComVisible(false)>]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[<assembly: Guid("1df45c82-0128-48db-a107-c606024176bf")>]
+[<assembly: Guid("bbfb43c1-9b12-4b60-98c8-f8038b8b2985")>]
 
 // Version information for an assembly consists of the following four values:
 // 

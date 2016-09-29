@@ -83,6 +83,8 @@ module Train =
         BatchSize:                      int
         /// number of iterations between evaluation of the loss
         LossRecordInterval:             int
+        /// function that is called after loss has been evaluated
+        LossRecordFunc:                 TrainingLog.Entry -> unit
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -110,6 +112,7 @@ module Train =
         Seed                        = 1
         BatchSize                   = 10000
         LossRecordInterval          = 10
+        LossRecordFunc              = fun _ -> ()
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
         TargetLoss                  = None
@@ -170,18 +173,20 @@ module Train =
             (modelInstance: ModelInstance<'T>) 
             (loss: ExprT) 
             (varEnvBuilder: 'Smpl -> VarEnvT)
-            (optimizer: IOptimizer<'OptCfg, 'OptState>)
+            (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
+        let loss = modelInstance.Use loss
+        let opt = optNew loss modelInstance.ParameterVector modelInstance.Device
         let lossFn = modelInstance.Func loss << varEnvBuilder
-        let lossOptFn = modelInstance.Func (loss, optimizer.OptStepExpr) |> optimizer.Use << varEnvBuilder
+        let lossOptFn = modelInstance.Func (loss, opt.OptStepExpr) |> opt.Use << varEnvBuilder
 
-        let mutable optState = optimizer.InitialState optCfg modelInstance.ParameterValues
+        let mutable optState = opt.InitialState optCfg modelInstance.ParameterValues
     
         {new ITrainable<'Smpl, 'T> with
             member this.Loss sample = lossFn sample |> ArrayND.value |> conv<float>
             member this.Optimize learningRate sample = 
-                let loss, _ = lossOptFn sample (optimizer.CfgWithLearningRate learningRate optCfg) optState
+                let loss, _ = lossOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
                 lazy (ArrayND.value loss |> conv<float>)
             member this.InitModel seed = modelInstance.InitPars seed
             member this.LoadModel path = modelInstance.LoadPars path
@@ -189,9 +194,9 @@ module Train =
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
                 and set (value) = modelInstance.ParameterValues <- value
-            member this.InitOptState () = optState <- optimizer.InitialState optCfg modelInstance.ParameterValues
-            member this.LoadOptState path = optState <- optimizer.LoadState path
-            member this.SaveOptState path = optimizer.SaveState path optState    
+            member this.InitOptState () = optState <- opt.InitialState optCfg modelInstance.ParameterValues
+            member this.LoadOptState path = optState <- opt.LoadState path
+            member this.SaveOptState path = opt.SaveState path optState    
         }
         
 
@@ -277,6 +282,7 @@ module Train =
                 }
                 let log = log |> TrainingLog.record entry trainable.ModelParameters
                 printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
+                cfg.LossRecordFunc entry
 
                 // check termination criteria
                 let mutable faith = Continue

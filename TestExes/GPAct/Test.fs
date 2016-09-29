@@ -1,4 +1,4 @@
-﻿namespace GPTransfer
+﻿namespace GPAct
 
 open ArrayNDNS
 open SymTensor
@@ -78,10 +78,12 @@ module TestFunctions =
         let nTrnSmpls = mb.Size "nTrnSmpls"
         
         let w =
-            WeightLayer.pars (mb.Module "WL") {NInput = nGPs; NOutput = nGPs}
+            WeightTransform.pars (mb.Module "WL") {WeightTransform.defaultHyperPars with
+                                                    NInput = nGPs; NOutput = nGPs}
 
         let mgp = 
-            MultiGPLayer.pars (mb.Module "MGP") {NGPs=nGPs; NTrnSmpls=nTrnSmpls}
+            GPActivation.pars (mb.Module "MGP") {GPActivation.defaultHyperPars with
+                                                  NGPs=nGPs; NTrnSmpls=nTrnSmpls}
         let inp_mean = mb.Var "inp_mean"  [nSmpls; nGPs]
         let inp_cov  = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
         mb.SetSize nGPs      ngps
@@ -90,7 +92,7 @@ module TestFunctions =
 
         //model outputs
 //        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
-        let pred_mean,pred_cov = MultiGPLayer.pred mgp (inp_mean, inp_cov)
+        let pred_mean,pred_cov = GPActivation.pred mgp (inp_mean, inp_cov)
 //        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
         
 
@@ -134,15 +136,15 @@ module TestFunctions =
         let trn_t_val = trn_t_host  |> post device
         let trn_sigma_val = trn_sigma_host  |> post device
 
-        mi.ParameterStorage.[!mgp.Lengthscales] <- ls_val
-        mi.ParameterStorage.[!mgp.TrnX] <- trn_x_val
-        mi.ParameterStorage.[!mgp.TrnT] <- trn_t_val
-        mi.ParameterStorage.[!mgp.TrnSigma] <- trn_sigma_val
+        mi.ParameterStorage.[mgp.Lengthscales] <- ls_val
+        mi.ParameterStorage.[mgp.TrnX] <- trn_x_val
+        mi.ParameterStorage.[mgp.TrnT] <- trn_t_val
+        mi.ParameterStorage.[mgp.TrnSigma] <- trn_sigma_val
 
-        let transMean,transCov = WeightLayer.transform w (inp_mean,inp_cov)
+        let transMean,transCov = WeightTransform.transform w (inp_mean,inp_cov)
         let transTestFn1 =  mi.Func transMean |> arg2 inp_mean inp_cov
         let transTestFn2 =  mi.Func transCov  |> arg2 inp_mean inp_cov
-        let initLMean,initLCov = InputLayer.transform inp_mean
+        let initLMean,initLCov = inp_mean, GPUtils.covZero inp_mean
         let initTestFn1 =  mi.Func initLMean |> arg1 inp_mean
         let initTestFn2 =  mi.Func initLCov |> arg1 inp_mean
         ///run GpTransferModel with random test inputs
@@ -171,10 +173,10 @@ module TestFunctions =
                 Pred_Cov = pred_cov}
 
             //print inputs and predictions
-            printfn "Lengthscales=\n%A" mi.ParameterStorage.[!mgp.Lengthscales]
-            printfn "TrnX=\n%A" mi.ParameterStorage.[!mgp.TrnX]
-            printfn "TrnT=\n%A" mi.ParameterStorage.[!mgp.TrnT]
-            printfn "TrnSigma=\n%A" mi.ParameterStorage.[!mgp.TrnSigma]
+            printfn "Lengthscales=\n%A" mi.ParameterStorage.[mgp.Lengthscales]
+            printfn "TrnX=\n%A" mi.ParameterStorage.[mgp.TrnX]
+            printfn "TrnT=\n%A" mi.ParameterStorage.[mgp.TrnT]
+            printfn "TrnSigma=\n%A" mi.ParameterStorage.[mgp.TrnSigma]
             printfn ""
             printfn "inp_mean=\n%A" inp_mean_val
             printfn "inp_cov=\n%A" inp_cov_val
@@ -217,7 +219,9 @@ module TestFunctions =
         let nTrnSmpls    = mb.Size "nTrnSmpls"
 
         let gptu = 
-           GPTransferUnit.pars (mb.Module "GPTU") {NInput = nInputs; NOutput = nGPs; NTrnSmpls = nTrnSmpls}
+           GPActivationLayer.pars (mb.Module "GPTU") 
+                {WeightTransform = {WeightTransform.defaultHyperPars with NInput=nInputs; NOutput=nGPs}
+                 Activation      = {GPActivation.defaultHyperPars with NGPs=nGPs; NTrnSmpls=nTrnSmpls}}
 
         let inp_mean = mb.Var "inp_mean"  [nSmpls; nInputs]
         let pred     = mb.Var "Pred"      [nSmpls; nGPs]
@@ -230,7 +234,7 @@ module TestFunctions =
 
         let mi = mb.Instantiate device
 
-        let pred_mean, pred_cov = GPTransferUnit.pred gptu (InputLayer.transform inp_mean)
+        let pred_mean, pred_cov = GPActivationLayer.pred gptu (inp_mean, GPUtils.covZero inp_mean)
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
 
 //        let loss =  -target * log pred |> Expr.sumAxis 0 |> Expr.mean

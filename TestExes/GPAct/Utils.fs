@@ -1,14 +1,7 @@
-﻿namespace TrainFromConfig
+﻿namespace GPAct
 
-open FSharp.Configuration
-open Datasets
-open Models
-open Optimizers
-open ArrayNDNS
-open SymTensor
-open SymTensor.Compiler.Cuda
 open System.Text.RegularExpressions
-open GPTransfer
+
 
 [<AutoOpen>]
 module Utils =

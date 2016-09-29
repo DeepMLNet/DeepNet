@@ -3,11 +3,12 @@
 namespace ModelPlots
 open ArrayNDNS
 open SymTensor
+open SymTensor.Compiler.Cuda
 open RProvider
 open RProvider.ggplot2
 module Program =
     [<EntryPoint>]
     let main argv = 
-        ApplicationTests.testPlot ()
-        printfn "%A" argv
+//        ApplicationTests.testPlot ()
+        PlotTests.GPTransferTest ()
         0 // return an integer exit code

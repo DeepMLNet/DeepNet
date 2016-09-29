@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>1df45c82-0128-48db-a107-c606024176bf</ProjectGuid>
+    <ProjectGuid>bbfb43c1-9b12-4b60-98c8-f8038b8b2985</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>GPTransfer</RootNamespace>
-    <AssemblyName>GPTransfer</AssemblyName>
+    <RootNamespace>GPTNN</RootNamespace>
+    <AssemblyName>GPAct</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>GPTransfer</Name>
+    <Name>GPAct</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,9 +22,9 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>bin\Debug\GPTransfer.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <PlatformTarget>x64</PlatformTarget>
+    <DocumentationFile>bin\Debug\GPTNN.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -33,8 +33,8 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>bin\Release\GPTransfer.XML</DocumentationFile>
+    <PlatformTarget>x64</PlatformTarget>
+    <DocumentationFile>bin\Release\GPTNN.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
@@ -48,10 +48,10 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\GPTransfer.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <DocumentationFile>bin\Debug\GPTNN.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
-    <EnableUnmanagedDebugging>true</EnableUnmanagedDebugging>
+    <StartArguments>..\..\Cfgs\ExampleCfg.fsx</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>
@@ -60,7 +60,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\GPTransfer.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\GPTNN.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
@@ -78,17 +78,36 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <None Include="App.config" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="GPTransferModel.fs" />
-    <Compile Include="TestFunctions.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Model.fs" />
+    <Compile Include="Config.fs" />
+    <Compile Include="Test.fs" />
     <Compile Include="Program.fs" />
-    <Content Include="abalone.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <None Include="App.config" />
+    <Content Include="packages.config" />
+    <None Include="Cfgs\ExampleCfg.fsx">
+      <Link>ExampleCfg.fsx</Link>
+    </None>
+    <None Include="Cfgs\GPCfg.fsx">
+      <Link>GPCfg.fsx</Link>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Data.TypeProviders" />
+    <Reference Include="Argu">
+      <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharp.Data.DesignTime">
+      <HintPath>..\..\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
+    </Reference>
+    <Reference Include="FsPickler">
+      <HintPath>..\..\packages\FsPickler.2.1.0\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FsPickler.Json">
+      <HintPath>..\..\packages\FsPickler.Json.2.1.0\lib\net45\FsPickler.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="ManagedCuda">
       <HintPath>..\..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
     </Reference>
@@ -96,21 +115,17 @@
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\..\AllTests\AllTests.fsproj">
-      <Name>AllTests</Name>
-      <Project>{d5cd7ec0-fb57-4cba-89e8-43e101d23ced}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
-      <Name>DeepNet</Name>
-      <Project>{7c53d1c7-8ed2-4e04-8f2d-cf0384c51f33}</Project>
-      <Private>True</Private>
-    </ProjectReference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\MLDatasets\MLDatasets.fsproj">
       <Name>MLDatasets</Name>
       <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>

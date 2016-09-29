@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>bbfb43c1-9b12-4b60-98c8-f8038b8b2985</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>GPTNN</RootNamespace>
-    <AssemblyName>TrainFromConfig</AssemblyName>
+    <ProjectGuid>853082be-359e-4f7e-b35c-7b10c8bd3970</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>MLPlots</RootNamespace>
+    <AssemblyName>MLPlots</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>TrainFromConfig</Name>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Name>MLPlots</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,9 +22,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>x64</PlatformTarget>
-    <DocumentationFile>bin\Debug\GPTNN.XML</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
+    <DocumentationFile>bin\Debug\MLPlots.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -33,9 +31,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>x64</PlatformTarget>
-    <DocumentationFile>bin\Release\GPTNN.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <DocumentationFile>bin\Release\MLPlots.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -48,8 +44,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\GPTNN.XML</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
+    <DocumentationFile>bin\Debug\MLPlots.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
@@ -59,8 +54,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\GPTNN.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <DocumentationFile>bin\Release\MLPlots.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <Choose>
@@ -79,69 +73,65 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils.fs" />
-    <Compile Include="ConfigToModel.fs" />
-    <Compile Include="Program.fs" />
-    <None Include="config.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Include="App.config" />
+    <Compile Include="GPPlots.fs" />
+    <None Include="Script.fsx" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Argu">
-      <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Configuration">
-      <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\FSharp.Configuration.dll</HintPath>
+    <Reference Include="DynamicInterop">
+      <HintPath>..\packages\DynamicInterop.0.7.4\lib\net40\DynamicInterop.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
-    <Reference Include="SharpYaml">
-      <HintPath>..\..\packages\FSharp.Configuration.0.6.2\lib\net40\SharpYaml.dll</HintPath>
+    <Reference Include="RDotNet">
+      <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="RDotNet.FSharp">
+      <HintPath>..\packages\R.NET.Community.FSharp.1.6.5\lib\net40\RDotNet.FSharp.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="RDotNet.NativeLibrary">
+      <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.NativeLibrary.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="RProvider">
+      <HintPath>..\packages\RProvider.1.1.20\lib\net40\RProvider.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="RProvider.Runtime">
+      <HintPath>..\packages\RProvider.1.1.20\lib\net40\RProvider.Runtime.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\MLDatasets\MLDatasets.fsproj">
-      <Name>MLDatasets</Name>
-      <Project>{4e45833f-2658-465e-bb71-03400bba5534}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\MLModels\MLModels.fsproj">
+    <ProjectReference Include="..\MLModels\MLModels.fsproj">
       <Name>MLModels</Name>
       <Project>{28168025-4211-4de2-bb66-b267378f74a7}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\MLOptimizers\MLOptimizers.fsproj">
-      <Name>MLOptimizers</Name>
-      <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
+    <ProjectReference Include="..\RPlotTools\RPlotTools.fsproj">
+      <Name>RPlotTools</Name>
+      <Project>{bdb5d832-bc10-4b8f-bde0-7142646aa9cf}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\SymTensorCuda\SymTensorCuda.fsproj">
+    <ProjectReference Include="..\SymTensorCuda\SymTensorCuda.fsproj">
       <Name>SymTensorCuda</Name>
       <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\SymTensor\SymTensor.fsproj">
+    <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
       <Name>SymTensor</Name>
       <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\Tensor\Tensor.fsproj">
+    <ProjectReference Include="..\Tensor\Tensor.fsproj">
       <Name>Tensor</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\GPTransfer\GPTransfer.fsproj">
-      <Name>GPTransfer</Name>
-      <Project>{1df45c82-0128-48db-a107-c606024176bf}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

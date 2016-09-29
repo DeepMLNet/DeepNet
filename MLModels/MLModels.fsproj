@@ -67,6 +67,8 @@
     <Compile Include="Neural.fs" />
     <Compile Include="Config.fs" />
     <Compile Include="Train.fs" />
+    <Compile Include="Quality.fs" />
+    <Compile Include="GaussianProcess.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj">

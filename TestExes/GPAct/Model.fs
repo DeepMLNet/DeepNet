@@ -1,65 +1,127 @@
-﻿namespace GPTransfer
+﻿namespace GPAct
 
 open ArrayNDNS
 open SymTensor
-open System
 open Basics
 open Models
 
-module MultiGPLayer =
 
+[<AutoOpen>]
+module GPUtilsTypes =
+
+    /// initialization types
+    type InitMethod =
+        /// constant value
+        | Const of value:single
+        /// linear spaced
+        | Linspaced of first:single * last:single
+        /// random
+        | Random of lower:single * upper:single
+        /// identity matrix
+        | IdentityMatrix
+        /// fan-in/out optimal random weight matrix for neurons
+        | FanOptimal
+
+
+module GPUtils =
+
+    /// calculates initialization values
+    let initVals initType seed shp =
+        let rng = System.Random seed            
+        match initType with
+        | Const value -> ArrayNDHost.filled shp value
+        | Linspaced (first, last) -> 
+            ArrayNDHost.linSpaced first last shp.[1]
+            |> ArrayND.padLeft
+            |> ArrayND.replicate 0 shp.[0]
+        | Random (lower, upper) ->
+            rng.UniformArrayND (lower, upper) shp
+        | IdentityMatrix ->
+            match shp with
+            | [n; m] when n = m -> ArrayNDHost.identity n
+            | _ -> failwith "need square matrix shape for identity matrix initialization"
+        | FanOptimal ->
+            let fanOut = shp.[0] |> single
+            let fanIn = shp.[1] |> single
+            let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
+            rng.UniformArrayND (-r, r) shp
+
+    /// Allows the gradient to pass if trainable is true.
+    let gate trainable expr =
+        if trainable then expr else Expr.assumeZeroDerivative expr
+
+    /// creates a zero covariance matrix for the given input.
+    let covZero input =
+        // input [smpl, unit]
+        let nSmpls = (Expr.shapeOf input).[0]
+        let nInput = (Expr.shapeOf input).[1]
+        // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
+        // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
+        Expr.zeros<single> [nSmpls; nInput; nInput]
+
+
+open GPUtils
+
+/// propagates normal distributions through non-linearities described by GPs
+module GPActivation =
+
+    /// Hyper-parameters
     type HyperPars = {
-        /// number of units, i.e. number of GPs = Number of outputs
-        NGPs:       SizeSpecT
+        /// number of GPs, equals number of outputs and inputs
+        NGPs:                   SizeSpecT
 
-        /// number of training samples for each GP
-        NTrnSmpls:  SizeSpecT
+        /// number of training points for each GP
+        NTrnSmpls:              SizeSpecT
 
+        LengthscalesTrainable:  bool
+        TrnXTrainable:          bool
+        TrnTTrainable:          bool
+        TrnSigmaTrainable:      bool
+
+        LengthscalesInit:       InitMethod
+        TrnXInit:               InitMethod
+        TrnTInit:               InitMethod
+        TrnSigmaInit:           InitMethod
     }
 
+    /// default hyper-parameters
+    let defaultHyperPars = {
+        NGPs                  = SizeSpec.fix 0
+        NTrnSmpls             = SizeSpec.fix 10
+        LengthscalesTrainable = true
+        TrnXTrainable         = true
+        TrnTTrainable         = true
+        TrnSigmaTrainable     = true
+        LengthscalesInit      = Const 0.4f
+        TrnXInit              = Linspaced (-2.0f, 2.0f)
+        TrnTInit              = Linspaced (-2.0f, 2.0f)
+        TrnSigmaInit          = Const (sqrt 0.1f)
+    }
+
+    /// Parameter expressions.
     type Pars = {
         /// GP lengthscales: [gp]
-        Lengthscales:       ExprT ref
+        Lengthscales:       ExprT 
         /// x values of GP training samples:         [gp, trn_smpl]
-        TrnX:               ExprT ref
+        TrnX:               ExprT 
         /// target values of GP training samples:    [gp, trn_smpl]
-        TrnT:               ExprT ref
+        TrnT:               ExprT 
         /// standard deviation of GP target values:  [gp, trn_smpl]
-        TrnSigma:           ExprT ref
+        TrnSigma:           ExprT 
         /// hyper-parameters
         HyperPars:          HyperPars
     }
-
-    let internal initLengthscales seed (shp: int list) : ArrayNDHostT<single> = 
-         let rng = System.Random seed
-         //Right now: all GPs equal
-         ArrayNDHost.ones<single> shp
-
-    let internal initTrnX seed (shp: int list) : ArrayNDHostT<single> = 
-        let n_gps = shp.[0]
-        let n_trn = shp.[1]
-        let rng = System.Random seed
-        //Right now: all GPs equal
-        let oneTrn = rng.SortedUniformArrayND (-5.0f,5.0f) [1;n_trn]
-        oneTrn |> ArrayND.replicate 0 n_gps
-
-    let internal initTrnT seed (shp: int list) : ArrayNDHostT<single> = 
-        ArrayNDHost.ones<single> shp
-
-    let internal initTrnSigma seed (shp: int list) : ArrayNDHostT<single> = 
-        (ArrayNDHost.ones<single> shp) * sqrt 0.1f
-    
-
+     
+    /// creates parameters
     let pars (mb: ModelBuilder<_>) hp = {
-        Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               initLengthscales)
-        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], initTrnX)
-        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], initTrnT)
-        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], initTrnSigma)
+        Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit) 
+        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
+        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
+        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
         HyperPars      = hp
     }
 
-
-    ///The covariance Matrices of the training vectors with themselves 
+        ///The covariance Matrices of the training vectors with themselves 
     ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
         // Kse element expression
@@ -124,40 +186,6 @@ module MultiGPLayer =
 
         Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
-    ///Elementwise Matrix needed for calculation of the covarance prediction.
-    let Told nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
-        // T element expression
-        // inputs  l[gp]
-        //         x[gp, trn_smpl]
-        //         m[smpl, gp]        -- mu
-        //         s[smpl, gp1, gp2]  -- Sigma
-        // output  T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
-
-        let smpl = ElemExpr.idx 0
-        let gp1 = ElemExpr.idx 1
-        let gp2 = ElemExpr.idx 2
-        let t1 = ElemExpr.idx 3
-        let t2 = ElemExpr.idx 4
-        let m = ElemExpr.argElem<single> 0
-        let s = ElemExpr.argElem<single> 1
-        let l = ElemExpr.argElem<single> 2
-        let x = ElemExpr.argElem<single> 3
-
-        // Mathematica: k = gp1  l = gp2   i=t1   j=t2
-
-        let eNom = (x[gp2;t2]-m[smpl;gp2])***2.f * (l[gp1]***2.f+s[smpl;gp1;gp1]) + (x[gp1;t1]-m[smpl;gp1]) * 
-                   ( 2.f * (m[smpl;gp2]-x[gp2;t2]) * s[smpl;gp1;gp2] + (x[gp1;t1]-m[smpl;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) ) 
-        let eDnm = 2.f * ( (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2]) - s[smpl;gp1;gp2]***2.f )
-        let e = exp(-eNom / eDnm)
-        let Tnom = e * l[gp1] * l[gp2]
-
-        let sq1 = s[smpl;gp1;gp1] * s[smpl;gp2;gp2] - s[smpl;gp1;gp2]***2.f
-        let sq2Nom = s[smpl;gp1;gp2]***2.f - (l[gp1]***2.f + s[smpl;gp1;gp1]) * (l[gp2]***2.f + s[smpl;gp2;gp2])
-        let sq2Dnm = s[smpl;gp1;gp2]***2.f - s[smpl;gp1;gp1] * s[smpl;gp2;gp2]
-        let Tdnm = sqrt (sq1 * sq2Nom / sq2Dnm)
-
-        let T = ElemExpr.ifThenElse gp1 gp2 (ElemExpr.scalar 0.0f) (Tnom / Tdnm)
-        Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
     ///Elementwise Matrix needed for calculation of the covarance prediction.
     let Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
@@ -192,9 +220,8 @@ module MultiGPLayer =
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
-
+    /// replace covariance matrix diagonal by specified variance
     let setCovDiag nSmpls nGps cov var =
-        // replace covariance matrix diagonal by variance
         // inputs  cov[smpl, gp1, gp2]
         //         var[smpl, gp
         // output  cov[smpl, gp1, gp2]
@@ -207,52 +234,62 @@ module MultiGPLayer =
         let cv = ElemExpr.ifThenElse gp1 gp2 (v[smpl; gp1]) (c[smpl; gp1; gp2])
         Expr.elements [nSmpls; nGps; nGps] cv [cov; var]
 
+
     ///Predicted mean and covariance from input mean and covariance.
     let pred pars (mu, sigma) =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
-        let nSmpls = (Expr.shapeOf mu).[0]
-        let nGps = pars.HyperPars.NGPs
+        let nSmpls    = (Expr.shapeOf mu).[0]
+        let nGps      = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
 
-        let mu = mu |> Expr.checkFinite "mu"
+        // check inputs
+        let mu    = mu    |> Expr.checkFinite "mu"
         let sigma = sigma |> Expr.checkFinite "sigma"
 
-        let lengthscales = !pars.Lengthscales
-        let lengthscales = lengthscales |> Expr.checkFinite "lengthscales"
-        let trnX = !pars.TrnX
-        let trnX = trnX |> Expr.checkFinite "trnX"
-        let trnSigma = !pars.TrnSigma
-        let trnSigma = trnSigma |> Expr.checkFinite "trnSigma"
-
+        // check parameters and gate gradients
+        let lengthscales = 
+            pars.Lengthscales 
+            |> gate pars.HyperPars.LengthscalesTrainable
+            |> Expr.checkFinite "Lengthscales"
+        let trnX = 
+            pars.TrnX
+            |> gate pars.HyperPars.TrnXTrainable
+            |> Expr.checkFinite "TrnX"
+        // trnT [gp, trn_smpl]
+        let trnT = 
+            pars.TrnT
+            |> gate pars.HyperPars.TrnTTrainable
+            |> Expr.checkFinite "TrnT"
+        let trnSigma = 
+            pars.TrnSigma
+            |> gate pars.HyperPars.TrnSigmaTrainable
+            |> Expr.checkFinite "TrnSigma"
+           
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nGps nTrnSmpls lengthscales trnX trnSigma
         let Kk = Kk |> Expr.checkFinite "Kk"
-//        let Kk = Kk |> Expr.dump "Kk"
+        //let Kk = Kk |> Expr.dump "Kk"
         
         let Kk_inv = Expr.invert Kk
         let Kk_inv = Kk_inv |> Expr.checkFinite "Kk_inv"
-//        let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
+        //let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
         let lk = lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
-//        let lk = lk |> Expr.dump "lk"
+        //let lk = lk |> Expr.dump "lk"
         
-        // trnT [gp, trn_smpl]
-        let trnT = !pars.TrnT
-        let trnT = trnT |> Expr.checkFinite "trnT"
-
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
         let beta = Kk_inv .* trnT
-//        let beta = beta |> Expr.dump "beta"
+        //let beta = beta |> Expr.dump "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
         let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
         let pred_mean = pred_mean |> Expr.checkFinite "pred_mean"
-        let pred_mean = pred_mean |> Expr.dump "pred_mean"
+        //let pred_mean = pred_mean |> Expr.dump "pred_mean"
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
@@ -263,10 +300,7 @@ module MultiGPLayer =
         let betaBetaT = 
             Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
-//        let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
-
-//        let d_betaBetaT = Deriv.compute betaBetaT 
-//        printfn "d_betaBetaT=\n%A" d_betaBetaT
+        //let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
@@ -274,27 +308,27 @@ module MultiGPLayer =
         let lkLkT =
             Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
             Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
-//        let lkLkT = lkLkT |> Expr.dump "lkLkT"
+        //let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
-//        let var1 = var1 |> Expr.dump "var1"
+        //let var1 = var1 |> Expr.dump "var1"
         
         // Tr( lkLkT .* betaBeta.T ) 
         // [smpl, gp, trn_smpl, trn_smpl] .* [1*, gp, trn_smpl, trn_smpl] 
         //  ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
-//        let var2 = var2 |> Expr.dump "var2"
+        //let var2 = var2 |> Expr.dump "var2"
 
         let pred_var = 1.0f - var1 - var2
-//        let pred_var = pred_var |> Expr.dump "pred_var"
+        //let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
         let T = Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
-//        let T = T |> Expr.dump "T"
+        //let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta
         // beta[gp, trn_smpl]
@@ -311,7 +345,7 @@ module MultiGPLayer =
         // [smpl, gp1, gp2, 1, 1] ==> [smpl, gp1, gp2]
         let betaTbeta =
             betaTbeta |> Expr.reshape [nSmpls; nGps; nGps]   
-//        let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
+        //let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
 
         // calculate m_k * m_l
         // [smpl, gp1, 1*] * [smpl, 1*, gp2]
@@ -319,154 +353,114 @@ module MultiGPLayer =
         let mkml = 
             (Expr.reshape [nSmpls; nGps; bc] pred_mean) *
             (Expr.reshape [nSmpls; bc; nGps] pred_mean)
-//        let mkml = mkml |> Expr.dump "mkml"
+        //let mkml = mkml |> Expr.dump "mkml"
 
         /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
         let pred_cov_without_var = betaTbeta - mkml
-//        let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
+        //let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
         let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
-        let pred_cov = pred_cov |> Expr.dump "pred_cov"
+        //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        pred_mean , pred_cov
+        pred_mean, pred_cov
 
 
 
-/// [["nInput"; "nBatch"]; ["nInput"; "nHidden"]]
-module WeightLayer =
+/// Propagates a normal distribution through a weight matrix.
+module WeightTransform =
+
     type HyperPars = {
         /// number of inputs
-        NInput:     SizeSpecT 
+        NInput:         SizeSpecT 
 
-        /// number of units, i.e. number of GPs = Number of outputs
-        NOutput:       SizeSpecT
+        /// number of outputs
+        NOutput:        SizeSpecT
+
+        Trainable:      bool
+
+        WeightsInit:    InitMethod
+        BiasInit:       InitMethod
+    }
+
+    let defaultHyperPars = {
+        NInput          = SizeSpec.fix 0
+        NOutput         = SizeSpec.fix 0
+        Trainable       = true
+        WeightsInit     = FanOptimal
+        BiasInit        = Const 0.0f
     }
 
     /// Weight layer parameters.
     type Pars = {
-        /// expression for the weights [nGPs,nInput]
-        Weights:        ExprT ref
+        /// weights [nOutput, nInput]
+        Weights:        ExprT 
+        /// bias [nOutput]
+        Bias:           ExprT
         /// hyper-parameters
         HyperPars:      HyperPars
     }
-
-    let internal initWeights seed (shp: int list) : ArrayNDHostT<single> = 
-        let fanOut = shp.[0] |> single
-        let fanIn = shp.[1] |> single
-        let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
-        let rng = System.Random seed
-        
-        rng.SeqSingle(-r, r)
-        |> ArrayNDHost.ofSeqWithShape shp
 
     let pars (mb: ModelBuilder<_>) hp = {
-        Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
+        Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], GPUtils.initVals hp.WeightsInit)
+        Bias      = mb.Param ("Bias",    [hp.NOutput],            GPUtils.initVals hp.BiasInit)
         HyperPars = hp
     }
 
-    let transform pars (mu,sigma) =
-        //[smpl,inp] .* [inp,gp] 
-        //=>[smpl,gp]
-        let newMu = mu .* (!pars.Weights).T
-        //[1*,gp,inp] .* [smpl,inp,inp] => [smpl,gp,inp]
-        //[smpl,gp,inp] .* [1*,inp,gp] => [smpl,gp,gp]
-        //[1*,gp,inp] .* [smpl,inp,inp] .* [1*,inp,gp]
-        //=> [smpl,gp,gp]
+    /// Mean and variance after multiplication with the weight matrix.
+    let transform pars (mu, sigma) =
+        // [smpl,inp] .* [inp,out] + [out]
+        // => [smpl,gp]
+        let newMu = mu .* pars.Weights.T + pars.Bias
+        // [1*,gp,inp] .* [smpl,inp,inp] => [smpl,gp,inp]
+        // [smpl,gp,inp] .* [1*,inp,gp] => [smpl,gp,gp]
+        // [1*,gp,inp] .* [smpl,inp,inp] .* [1*,inp,gp]
+        // => [smpl,gp,gp]
         let nGps = pars.HyperPars.NOutput
         let nInput = pars.HyperPars.NInput
-        let bc = SizeSpec.broadcastable
-        let newSigma =  (Expr.reshape [bc;nGps;nInput] !pars.Weights) .*
+        let newSigma =  (Expr.reshape [SizeSpec.broadcastable; nGps; nInput] pars.Weights) .*
                         sigma .*
-                        (Expr.reshape [bc;nInput;nGps] (!pars.Weights).T)
+                        (Expr.reshape [SizeSpec.broadcastable; nInput; nGps] pars.Weights.T)
         newMu, newSigma
 
-module GPTransferUnit = 
+
+/// Layer that propagates its input normal distribution through a weight matrix and activation
+/// functions described by GPs.
+module GPActivationLayer = 
+
     type HyperPars = {
-        /// number of inputs
-        NInput:    SizeSpecT
-
-        /// number of units, i.e. number of GPs = Number of outputs
-        NOutput:       SizeSpecT
-
-        /// number of training samples for each GP
-        NTrnSmpls:  SizeSpecT
-
+        WeightTransform: WeightTransform.HyperPars
+        Activation:      GPActivation.HyperPars
     }
 
-        /// Weight layer parameters.
+    let defaultHyperPars = {
+        WeightTransform = WeightTransform.defaultHyperPars
+        Activation      = GPActivation.defaultHyperPars
+    }
+
     type Pars = {
-        // WeightLayer
-        WeightL:        WeightLayer.Pars
-        //MultiGPLayer
-        MultiGPL:       MultiGPLayer.Pars
+        /// weight transform parameters
+        WeightTransform: WeightTransform.Pars
+        /// GP activation function parameters
+        Activation:      GPActivation.Pars
         /// hyper-parameters
-        HyperPars:      HyperPars
+        HyperPars:       HyperPars
     }
 
-    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
-        WeightL = WeightLayer.pars (mb.Module "WeigltL") 
-            {NInput = hp.NInput; NOutput = hp.NOutput}
-        MultiGPL = MultiGPLayer.pars (mb.Module "MultiGPL")
-            {NGPs = hp.NOutput; NTrnSmpls = hp.NTrnSmpls}
-        HyperPars = hp
-    }
+    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = 
+        if hp.Activation.NGPs <> hp.WeightTransform.NOutput then
+            failwith "number of GPs must equal number of output units in weight transform"
+        {
+            WeightTransform = WeightTransform.pars (mb.Module "WeightTransform") hp.WeightTransform
+            Activation = GPActivation.pars (mb.Module "Activation") hp.Activation
+            HyperPars = hp
+        }
 
-    let pred (pars: Pars) input = 
-        let in_mean, in_cov = input
-//        let in_mean = in_mean|> Expr.dump "in_mean"
-//        let in_cov = in_cov |> Expr.dump "in_cov"
-        let w_mean,w_cov = WeightLayer.transform pars.WeightL (in_mean,in_cov)
-//        let w_mean = w_mean |> Expr.dump "w_mean"
-//        let w_cov = w_cov |> Expr.dump "w_cov"
-        let p_mean,p_cov = MultiGPLayer.pred pars.MultiGPL (w_mean,w_cov)
-//        let p_mean = p_mean |> Expr.dump "p_mean"
-//        let p_cov = p_cov |> Expr.dump "p_cov"
-        p_mean, p_cov
+    /// Propagates the input normal distribution through a weight matrix and activation
+    /// functions described by GPs.
+    let pred (pars: Pars) (meanIn, covIn) = 
+        let meanTf, covTf  = WeightTransform.transform pars.WeightTransform (meanIn, covIn)
+        let meanAct,covAct = GPActivation.pred pars.Activation (meanTf, covTf)
+        meanAct, covAct
 
 
-module InputLayer=
-
-    let cov input =
-
-        let nSmpls = (Expr.shapeOf input).[0]
-        let nInput = (Expr.shapeOf input).[1]
-        // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
-        // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
-        Expr.zeros<single> [nSmpls; nInput; nInput]
-
-    let transform input  =
-        input, (cov input)
-
-module MLGPT = 
-    
-    type HyperPars = {
-        /// a list of the hyper parameters of the layers
-        Layers: GPTransferUnit.HyperPars list
-        /// the loss measure
-        LossMeasure: LossLayer.Measures
-    }
-
-    type Pars<'T> = {
-        /// a lsit of the parameters of the GPTransfer Layers
-        Layers:     GPTransferUnit.Pars list
-        /// hyper-parameters
-        HyperPars:  HyperPars 
-    }
-
-    let pars (mb: ModelBuilder<_>) (hp:HyperPars) = {
-        Layers = hp.Layers
-        |>List.mapi (fun idx gphp -> 
-                    GPTransferUnit.pars (mb.Module (sprintf "Layer%d" idx)) gphp)
-        HyperPars = hp
-    } 
-    
-    let pred (pars: Pars<'T>) input = 
-        let inputDist = InputLayer.transform input
-        (inputDist, pars.Layers)
-        ||> List.fold (fun inp p -> GPTransferUnit.pred p inp)
-
-
-    let loss pars input target =
-        let predmu,predSigma = (pred pars input)
-        LossLayer.loss pars.HyperPars.LossMeasure predmu.T (Expr.transpose target)
