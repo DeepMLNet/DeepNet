@@ -149,12 +149,21 @@ module ConfigLoader =
             if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
                 let gpLayers = gpLayers |> Map.map (fun name pars -> 
                     let gpPars = pars.Activation
-                    [mi.[gpPars.Lengthscales]|> ArrayND.copy
-                     mi.[gpPars.TrnSigma]|> ArrayND.copy
-                     mi.[gpPars.TrnX]|> ArrayND.copy
-                     mi.[gpPars.TrnT]|> ArrayND.copy])     
-                for KeyValue (name, pars) in gpLayers do
-                    let plot = async{
+//                    let l = ArrayNDHost.fetch  mi.[gpPars.Lengthscales]
+//                    let s = ArrayNDHost.fetch  mi.[gpPars.TrnSigma]
+//                    let x = ArrayNDHost.fetch  mi.[gpPars.TrnX]
+//                    let t = ArrayNDHost.fetch  mi.[gpPars.TrnT]
+                    let l = ArrayND.newCOfType  mi.[gpPars.Lengthscales].Shape mi.[gpPars.Lengthscales]
+                    let s = ArrayND.newCOfType  mi.[gpPars.TrnSigma].Shape mi.[gpPars.TrnSigma]
+                    let x = ArrayND.newCOfType  mi.[gpPars.TrnX].Shape mi.[gpPars.TrnX]
+                    let t = ArrayND.newCOfType  mi.[gpPars.TrnT].Shape mi.[gpPars.TrnT]
+                    ArrayND.copyTo mi.[gpPars.Lengthscales] l
+                    ArrayND.copyTo mi.[gpPars.TrnSigma] s
+                    ArrayND.copyTo mi.[gpPars.TrnX] x
+                    ArrayND.copyTo mi.[gpPars.TrnT] t
+                    [l;s;x;t])     
+                let plots = async{
+                    for KeyValue (name, pars) in gpLayers do
                         for gp=0 to pars.[0].Shape.[0] - 1 do
                             let ls = pars.[0].[gp] |> ArrayND.value
                             let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls, 1.0f)}
@@ -165,8 +174,9 @@ module ConfigLoader =
                                                     pars.[3].[gp, *],
                                                     50, -5.0f, 5.0f, -5.0f, 5.0f)
                             )  
-                            }
-                    Async.RunSynchronously plot
+                    }
+//                plots()
+                Async.RunSynchronously   plots
 
         // build training function
         let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
