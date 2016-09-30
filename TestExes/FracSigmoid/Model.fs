@@ -14,7 +14,7 @@ module TableLayer =
         /// number of outputs
         NOutput:        SizeSpecT
         /// transfer (activation) function
-        Table:          FracSigmoidTable
+        Info:           Info
     }
 
     type Pars = {
@@ -50,12 +50,26 @@ module TableLayer =
 
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = 
         // create interpolator
-        let tbl = hp.Table
-        let info = tbl.Info
-        let points = tbl.Points |> ArrayNDCuda.toDev
+        let info = hp.Info
+        let tbl = FracSigmoidTable.generate info
+        let dIps =
+            match tbl.DPoints with
+            | Some (dPntsdN, dPntsdX) ->
+                printfn "Using provided derivatives."
+                let dIpdN =
+                    Interpolator.create (ArrayNDCuda.toDev dPntsdN) 
+                        [info.NMin; info.XMin] [info.NMax; info.XMax]
+                        [Nearest; Nearest] InterpolateLinearaly None
+                let dIpdX =
+                    Interpolator.create (ArrayNDCuda.toDev dPntsdX) 
+                        [info.NMin; info.XMin] [info.NMax; info.XMax]
+                        [Nearest; Nearest] InterpolateLinearaly None
+                Some [dIpdN; dIpdX]
+            | None -> None   
         let ip = 
-            Interpolator.create points [info.NMin; info.XMin] [info.NMax; info.XMax]
-                [Nearest; Nearest] InterpolateLinearaly None   
+            Interpolator.create (ArrayNDCuda.toDev tbl.Points)  
+                [info.NMin; info.XMin] [info.NMax; info.XMax]
+                [Nearest; Nearest] InterpolateLinearaly dIps   
 
         {
             Weights      = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)

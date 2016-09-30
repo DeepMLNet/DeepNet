@@ -163,27 +163,30 @@ module Program =
 
         match results.GetSubCommand () with
         | Generate args ->
-            let info = {
-                NMin     = args.GetResult <@ NMin @>
-                NMax     = args.GetResult <@ NMax @>
-                NPoints  = args.GetResult <@ NPoints @>
-                XMin     = args.GetResult <@ XMin @>
-                XMax     = args.GetResult <@ XMax @>
-                XPoints  = args.GetResult <@ XPoints @>
-            }         
-            printfn "Building FracExp interpolation table for\n%A" info
-            let tbl = FracSigmoidTable.generate info
-
-            // save the table
-            let path = (args.GetResult <@ Filename @>)
-            use hdf = HDF5.OpenWrite path
-            tbl |> FracSigmoidTable.save hdf "FracSigmoid"
-            printfn "Saved to %s" (Path.GetFullPath path)
+            ()
+//            let info = {
+//                NMin     = args.GetResult <@ NMin @>
+//                NMax     = args.GetResult <@ NMax @>
+//                NPoints  = args.GetResult <@ NPoints @>
+//                XMin     = args.GetResult <@ XMin @>
+//                XMax     = args.GetResult <@ XMax @>
+//                XPoints  = args.GetResult <@ XPoints @>
+//                Function = FracSigmoid
+//            }         
+//            printfn "Building FracExp interpolation table for\n%A" info
+//            let tbl = FracSigmoidTable.generate info
+//
+//            // save the table
+//            let path = (args.GetResult <@ Filename @>)
+//            use hdf = HDF5.OpenWrite path
+//            tbl |> FracSigmoidTable.save hdf "FracSigmoid"
+//            printfn "Saved to %s" (Path.GetFullPath path)
 
         | Train args ->
             let cfgFile = args.GetResult <@ CfgFile @>
             let mi, predFn, trainFn = buildModel cfgFile
             let tr = trainFn ()
             printfn "%A" tr.Best
+            printfn "Used config was %s" cfgFile
 
         0

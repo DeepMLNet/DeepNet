@@ -625,10 +625,6 @@ module Expr =
                         failwith "MinArg of interpolator must be smaller than MaxArg"
                     if ip.Resolution |> List.exists ((>) 0.0) then
                         failwith "Resolution of interpolator must be positive"
-                    match ip.Derivative with
-                    | Some d when d.NDims <> nDims ->
-                        failwith "Dimensionality of derivative interpolator must match dimensionality of interpolator"
-                    | _ -> ()
                     for s in ss do 
                         s ..= ss.Head
                 | ExtensionOp eop -> eop.CheckArgs ss

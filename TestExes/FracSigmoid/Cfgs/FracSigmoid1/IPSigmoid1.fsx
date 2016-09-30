@@ -11,13 +11,18 @@ open FracSigmoid
 open ArrayNDNS
 
 
-let hdf = HDF5.OpenRead "../../Tables/FracSigmoid1.h5"
-let name = "FracSigmoid"
-let table = FracSigmoidTable.load hdf name
-printfn "Using table\n%A" table.Info
-
 let nHidden1 = SizeSpec.fix 30
-let nHidden2 = SizeSpec.fix 30
+
+let info = {
+    NMin    =  0.0
+    NMax    =  1.0
+    NPoints = 10
+    XMin    = -10.0
+    XMax    =  10.0
+    XPoints = 50000
+    Function = Sigmoid
+    WithDeriv = true
+}
 
 
 let cfg = {
@@ -26,17 +31,16 @@ let cfg = {
                        TableLayer
                          {NInput        = Program.NInput()
                           NOutput       = nHidden1
-                          Table         = table}
+                          Info          = info}
                       
-                       TableLayer
-                         {NInput        = nHidden1
-                          NOutput       = nHidden2
-                          Table         = table}
-
                        NeuralLayer
-                         {NInput        = nHidden2
-                          NOutput       = Program.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                         {NeuralLayer.defaultHyperPars with
+                           NInput        = nHidden1
+                           NOutput       = Program.NOutput()
+                           TransferFunc  = NeuralLayer.Identity
+                           WeightsTrainable = false
+                           BiasTrainable    = false
+                           }
                       ]
              Loss   = LossLayer.MSE}
 
@@ -47,11 +51,11 @@ let cfg = {
                            CategoryEncoding = CsvLoader.OneHot
                            Missing          = CsvLoader.SkipRow}}        
                                             
-    //Optimizer = Adam Adam.DefaultCfg
-    Optimizer = GradientDescent GradientDescent.DefaultCfg
+    Optimizer = Adam Adam.DefaultCfg
+    //Optimizer = GradientDescent GradientDescent.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 10000
+                 //MinIters  = Some 10000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 

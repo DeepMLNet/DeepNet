@@ -59,12 +59,25 @@ module NeuralLayer =
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
-        NInput:         SizeSpecT
+        NInput:           SizeSpecT
         /// number of outputs
-        NOutput:        SizeSpecT
+        NOutput:          SizeSpecT
         /// transfer (activation) function
-        TransferFunc:   TransferFuncs
+        TransferFunc:     TransferFuncs
+        /// weights trainable
+        WeightsTrainable: bool
+        /// bias trainable
+        BiasTrainable:    bool
     }
+
+    let defaultHyperPars = {
+        NInput           = SizeSpec.fix 0
+        NOutput          = SizeSpec.fix 0
+        TransferFunc     = Tanh
+        WeightsTrainable = true
+        BiasTrainable    = true
+    }
+
 
     /// Neural layer parameters.
     type Pars<'T> = {
@@ -111,7 +124,13 @@ module NeuralLayer =
         // bias    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
-        let activation = input .* pars.Weights.T + pars.Bias
+        let weights = 
+            if pars.HyperPars.WeightsTrainable then pars.Weights 
+            else Expr.assumeZeroDerivative pars.Weights
+        let bias = 
+            if pars.HyperPars.BiasTrainable then pars.Bias
+            else Expr.assumeZeroDerivative pars.Bias
+        let activation = input .* weights.T + bias
         let one = Expr.scalarOfSameType activation 1
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation

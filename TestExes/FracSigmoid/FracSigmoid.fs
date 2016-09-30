@@ -55,6 +55,10 @@ module FracSigmoid =
 [<AutoOpen>]
 module FracSigmoidTableTypes =
 
+    type InterpolatedFunction =
+        | FracSigmoid
+        | Sigmoid
+
     type Info = {
         NMin:       float
         NMax:       float
@@ -62,11 +66,14 @@ module FracSigmoidTableTypes =
         XMin:       float
         XMax:       float
         XPoints:    int
+        Function:   InterpolatedFunction
+        WithDeriv:  bool
     }
 
     type FracSigmoidTable = {
         /// [nIdx, xIdx]
         Points:     ArrayNDHostT<single>
+        DPoints:    (ArrayNDHostT<single> * ArrayNDHostT<single>) option
         Info:       Info
     }
 
@@ -74,6 +81,8 @@ module FracSigmoidTableTypes =
 module FracSigmoidTable =
      
     let generate (info: Info) =
+        printfn "Generating interpolation table for\n%A" info
+
         let xMin, xMax = info.XMin, info.XMax
         let xPoints = info.XPoints
 
@@ -84,27 +93,66 @@ module FracSigmoidTable =
         let ns = ArrayNDHost.linSpaced nMin nMax nPoints |> ArrayNDHost.toArray
 
         // idx = nIdx * xPoints + xIdx
-        let tblFlat = 
+        let tbl = 
             Array.Parallel.init (nPoints * xPoints) (fun idx ->
                 let xIdx = idx % xPoints
                 let nIdx = idx / xPoints
                 let x, n = xs.[xIdx], ns.[nIdx] 
-                FracSigmoid.fracSigmoid n x
+
+                match info.Function with
+                | FracSigmoid -> FracSigmoid.fracSigmoid n x
+                | Sigmoid -> FracSigmoid.sigmoid x
             )
-        let tbl = tblFlat |> ArrayNDHost.ofArray |> ArrayND.reshape [nPoints; xPoints]
+            |> ArrayNDHost.ofArray 
+            |> ArrayND.reshape [nPoints; xPoints]
+            |> ArrayND.convert :> ArrayNDT<single> :?> ArrayNDHostT<single>
+
+        let dtbls = 
+            if info.WithDeriv then
+                let dTbldN = 
+                    Array.Parallel.init (nPoints * xPoints) (fun idx ->
+                        let xIdx = idx % xPoints
+                        let nIdx = idx / xPoints
+                        let x, n = xs.[xIdx], ns.[nIdx] 
+
+                        match info.Function with
+                        | FracSigmoid -> failwith "todo"
+                        | Sigmoid -> 0.0
+                    )
+                    |> ArrayNDHost.ofArray 
+                    |> ArrayND.reshape [nPoints; xPoints]
+                    |> ArrayND.convert :> ArrayNDT<single> :?> ArrayNDHostT<single>
+                let dTbldX = 
+                    Array.Parallel.init (nPoints * xPoints) (fun idx ->
+                        let xIdx = idx % xPoints
+                        let nIdx = idx / xPoints
+                        let x, n = xs.[xIdx], ns.[nIdx] 
+
+                        match info.Function with
+                        | FracSigmoid -> failwith "todo"
+                        | Sigmoid -> FracSigmoid.dSigmoid x
+                    )
+                    |> ArrayNDHost.ofArray 
+                    |> ArrayND.reshape [nPoints; xPoints]
+                    |> ArrayND.convert :> ArrayNDT<single> :?> ArrayNDHostT<single>
+                Some (dTbldN, dTbldX)
+            else None
 
         {
-            Points = tbl |> ArrayND.convert :> ArrayNDT<single> :?> ArrayNDHostT<single>
+            Points = tbl 
+            DPoints = dtbls
             Info   = info
         }
 
-    let save hdf name (tbl: FracSigmoidTable) =
-        tbl.Points |> ArrayNDHDF.write hdf name
-        hdf.SetRecord (name, tbl.Info)
-
-    let load hdf name =
-        {
-            Points = ArrayNDHDF.read hdf name
-            Info   = hdf.GetRecord name
-        }
+//    let save hdf name (tbl: FracSigmoidTable) =
+//        tbl.Points |> ArrayNDHDF.write hdf name
+//        tbl.DPoints |> ArrayNDHDF.write hdf ("d" + name)
+//        hdf.SetRecord (name, tbl.Info)
+//
+//    let load hdf name =
+//        {
+//            Points  = ArrayNDHDF.read hdf name
+//            DPoints = Some (ArrayNDHDF.read hdf ("d" + name))
+//            Info    = hdf.GetRecord name
+//        }
 
