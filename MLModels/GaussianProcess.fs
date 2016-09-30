@@ -61,7 +61,7 @@ module GaussianProcess =
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
 
-    let regression (pars:Pars) x y sigmaNs x_star =
+    let predict (pars:Pars) x y sigmaNs x_star =
         let covMat z z' =
             match pars with
             | LinPars _ -> linearCovariance z z'
@@ -75,4 +75,7 @@ module GaussianProcess =
         let mean = K_starT .* Kinv .* y
         let cov = K_starstar - K_starT .* Kinv .* K_star
         mean,cov
-
+    /// WARNING: NOT YET IMPLEMENTED, ONLY A RIMINDER FOR LATER IMPLEMENTATION!
+    /// !!! CALLING THIS FUNCTION WILL ONLY CAUSE AN ERROR !!!
+    let logMarginalLiklihood (pars:Pars) x y sigmaNs x_sta =
+        failwith "TODO: implement logMarginalLikelihood"

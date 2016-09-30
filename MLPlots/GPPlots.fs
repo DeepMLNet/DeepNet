@@ -27,7 +27,7 @@ type GPPlots =
                                  Map[nTrnSmpls, trnX.NElems
                                      nInput,    nPoints])
 
-        let mean, cov = GaussianProcess.regression pars x t sigNs inp      
+        let mean, cov = GaussianProcess.predict pars x t sigNs inp      
         let stdev = cov |> Expr.diag |> Expr.sqrtt
         
         let meanCovStdFn = mi.Func (mean, cov, stdev) |> arg4 x t sigNs inp
