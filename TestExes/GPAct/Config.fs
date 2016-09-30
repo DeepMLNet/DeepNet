@@ -133,7 +133,7 @@ module ConfigLoader =
                     let gpPars = pars.Activation
                     for gp=0 to mi.[gpPars.Lengthscales].Shape.[0] - 1 do
                         let ls = mi.[gpPars.Lengthscales].[gp] |> ArrayND.value
-                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls, 1.0f)}
+                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential}
                         savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
                             GPPlots.simplePlot (hps, 
                                                 mi.[gpPars.TrnSigma].[gp, *],
