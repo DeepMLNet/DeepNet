@@ -10,6 +10,8 @@ open System
 open Models
 open RProvider.graphics
 open MLPlots
+open RTools
+open RProvider
 module PlotTests =
  
     let save = savePlot 400 600 Environment.CurrentDirectory
@@ -54,4 +56,38 @@ module PlotTests =
 
     ()
 
-
+    let multiplotTest () =
+        let x = [-5.0 .. 5.0]
+        let y = List.map (fun x -> x**2.0) x
+        let negx = List.map (fun x -> -x) x
+        let negy = List.map (fun x -> -x) y
+        let plots = ["0deg", fun () -> namedParams[
+                                            "x", box x
+                                            "y", box y]
+                                            |> R.plot
+                                            |> ignore
+                     "90deg", fun () -> namedParams[
+                                            "x", box y
+                                            "y", box x]
+                                            |> R.plot
+                                            |> ignore
+                     "270deg", fun () ->namedParams[
+                                            "x", box negy
+                                            "y", box negx]
+                                            |> R.plot
+                                            |> ignore
+                     "180deg", fun () -> namedParams[
+                                            "x", box negx
+                                            "y", box negy]
+                                            |> R.plot
+                                            |> ignore
+                    ]
+        namedParams [
+            "mfrow", box [2;2]]
+        |> R.par |> ignore
+        plots |> List.map (fun (title,plot)-> 
+                plot ()
+                namedParams [
+                    "main", box title]
+                |>R.title|> ignore
+                ) |> ignore

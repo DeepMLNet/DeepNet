@@ -10,5 +10,6 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 //        ApplicationTests.testPlot ()
+        PlotTests.multiplotTest () 
         PlotTests.GPTransferTest ()
         0 // return an integer exit code
