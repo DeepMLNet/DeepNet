@@ -107,16 +107,29 @@ module UtilTypes =
     [<Measure>]
     type elements
 
+    type System.Collections.Generic.HashSet<'T> with
+        member this.LockedContains key =
+            lock this (fun () -> this.Contains key)
+
+        member this.LockedAdd key =
+            lock this (fun () -> this.Add key)
+
     type System.Collections.Generic.Dictionary<'TKey, 'TValue> with
         member this.TryFind key =
             let value = ref (Unchecked.defaultof<'TValue>)
             if this.TryGetValue (key, value) then Some !value
             else None
 
+        member this.LockedTryFind key =
+            lock this (fun () -> this.TryFind key)
+
         member this.GetOrDefault key dflt =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
+
+        member this.LockedAdd (key, value) =
+            lock this (fun () -> this.Add (key, value))
 
     type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
         member this.TryFind key =
@@ -135,6 +148,7 @@ module UtilTypes =
             else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+    type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
 
     /// convert given value to specified type and return as obj
     let convTo (typ: System.Type) value =

@@ -44,7 +44,7 @@ module GaussianProcess =
         match hp.Kernel with
         | Linear -> LinPars {HyperPars = hp}
         | SquaredExponential (l,s)-> SEPars { Lengthscale = mb.Param ("Lengthscale" , [], initLengthscale l)
-                                              SignalVariance = mb.Param ("Lengthscale" , [], initSignalVariance s)
+                                              SignalVariance = mb.Param ("SignalVariance" , [], initSignalVariance s)
                                               HyperPars = hp}
     
 

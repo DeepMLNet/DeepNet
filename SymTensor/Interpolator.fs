@@ -79,13 +79,12 @@ module Interpolator =
             Outside = outside
             Derivative = derivative
         }
-        lock tablesOfInterpolators
-            (fun () -> tablesOfInterpolators.Add (ip, tbl))        
+        tablesOfInterpolators.LockedAdd (ip, tbl)
         ip
 
     /// Gets the function value table for the specified one-dimensional interpolator as an IArrayNDT.
     let getInterpolatorTableAsIArrayNDT ip =
-        match tablesOfInterpolators.TryFind ip with
+        match tablesOfInterpolators.LockedTryFind ip with
         | Some ip -> ip
         | None -> failwithf "interpolator %A is unknown" ip
 
@@ -101,7 +100,7 @@ module Interpolator =
             match ip.Derivative with
             | Some ipd -> ipd  // use provided derivative table
             | None ->          // create derivative table by numeric differentiation
-                match derivativeOfInterpolators.TryFind ip with
+                match derivativeOfInterpolators.LockedTryFind ip with
                 | Some ipd -> ipd
                 | None ->
                     let tbl = getInterpolatorTable ip                 

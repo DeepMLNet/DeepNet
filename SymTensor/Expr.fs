@@ -484,7 +484,7 @@ module Expr =
 
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT) =
-        if not (checkedExprs.Contains expr) then
+        if not (checkedExprs.LockedContains expr) then
             let mutable shapesBeingChecked = []
             let mutable opBeingChecked = fun () -> ""
             let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
@@ -634,7 +634,7 @@ module Expr =
                 | ExtensionOp eop -> eop.CheckArgs ss
                 | _ -> ()
 
-            checkedExprs.Add expr |> ignore
+            checkedExprs.LockedAdd expr |> ignore
 
     /// substitues the given symbol sizes into the expression
     let rec substSymSizes symSizes (expr: ExprT) =
