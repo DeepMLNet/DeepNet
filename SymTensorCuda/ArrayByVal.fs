@@ -25,21 +25,22 @@ module PassArrayByVal =
         match Map.tryFind typeName arrayStructTypes with
         | Some typ -> typ
         | None ->
-            // define new value type with attribute [<Struct; StructLayout(LayoutKind.Sequential)>]
-            let tb = modBuilder.DefineType(typeName, 
-                                           TypeAttributes.Public ||| TypeAttributes.SequentialLayout,
-                                           typeof<ValueType>);
+            lock modBuilder (fun () ->
+                // define new value type with attribute [<Struct; StructLayout(LayoutKind.Sequential)>]
+                let tb = modBuilder.DefineType(typeName, 
+                                               TypeAttributes.Public ||| TypeAttributes.SequentialLayout,
+                                               typeof<ValueType>);
 
-            // define public fields "DataXXX" of type valueType
-            for i = 0 to size - 1 do
-                let fn = sprintf "Data%d" i
-                tb.DefineField(fn, valueType, FieldAttributes.Public) |> ignore
+                // define public fields "DataXXX" of type valueType
+                for i = 0 to size - 1 do
+                    let fn = sprintf "Data%d" i
+                    tb.DefineField(fn, valueType, FieldAttributes.Public) |> ignore
 
-            // create defined type and cache it
-            let typ = tb.CreateType()
-            arrayStructTypes <- arrayStructTypes |> Map.add typeName typ
-            typ
-
+                // create defined type and cache it
+                let typ = tb.CreateType()
+                arrayStructTypes <- arrayStructTypes |> Map.add typeName typ
+                typ
+            )
 
     /// passes an array by value to a native method
     let passArrayByValue (data: 'T []) =

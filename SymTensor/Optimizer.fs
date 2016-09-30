@@ -292,7 +292,7 @@ module Optimizer =
 
     /// Optimizes an expression.
     and optimize (expr: ExprT) : ExprT =
-        match optimized.TryFind expr with
+        match optimized.LockedTryFind expr with
         | Some opt -> opt 
         | None ->
             let opt = 
@@ -361,7 +361,7 @@ module Optimizer =
             // try to combine elementwise operations into an element expression
             let opt = combineIntoElements opt
 
-            optimized.[opt] <- opt
+            optimized.LockedSet (expr, opt)
             opt
 
 

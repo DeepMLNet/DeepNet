@@ -58,7 +58,7 @@ module ArrayNDHostTypes =
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
     and ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
-                           data:        'T []) = 
+                          data:        'T []) = 
         inherit ArrayNDT<'T>(layout)
         
         let fastLayout = FastLayout.ofLayout layout

@@ -131,6 +131,9 @@ module UtilTypes =
         member this.LockedAdd (key, value) =
             lock this (fun () -> this.Add (key, value))
 
+        member this.LockedSet (key, value) =
+            lock this (fun () -> this.[key] <- value)
+
     type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
         member this.TryFind key =
             let value = ref (Unchecked.defaultof<'TValue>)
