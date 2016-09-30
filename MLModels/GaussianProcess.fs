@@ -11,7 +11,7 @@ module GaussianProcess =
         /// linear kernel
         | Linear
         /// squared exponential kernel
-        | SquaredExponential
+        | SquaredExponential of single*single
     
     /// GP hyperparameters
     type HyperPars = {
@@ -30,11 +30,11 @@ module GaussianProcess =
         HyperPars:  HyperPars
         }
 
-    let internal initLengthscale seed (shp: int list) : ArrayNDHostT<single> =
-        ArrayNDHost.scalar 1.0f
+    let internal initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
+        ArrayNDHost.scalar l
     
-    let internal initSignalVariance seed (shp: int list) : ArrayNDHostT<single> =
-        ArrayNDHost.scalar 1.0f
+    let internal initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
+        ArrayNDHost.scalar s
 
     type Pars = LinPars of ParsLinear | SEPars of  ParsSE
 
@@ -43,9 +43,9 @@ module GaussianProcess =
     let pars (mb: ModelBuilder<_>) (hp:HyperPars) = 
         match hp.Kernel with
         | Linear -> LinPars {HyperPars = hp}
-        | SquaredExponential -> SEPars { Lengthscale = mb.Param ("Lengthscale" , [], initLengthscale)
-                                         SignalVariance = mb.Param ("Lengthscale" , [], initSignalVariance)
-                                         HyperPars = hp}
+        | SquaredExponential (l,s)-> SEPars { Lengthscale = mb.Param ("Lengthscale" , [], initLengthscale l)
+                                              SignalVariance = mb.Param ("Lengthscale" , [], initSignalVariance s)
+                                              HyperPars = hp}
     
 
     /// calculates Matrix between two vectors using linear kernel

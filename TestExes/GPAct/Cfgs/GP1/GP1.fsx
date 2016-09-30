@@ -51,11 +51,11 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 10000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
-    PlotGPsDuringTraining  = false
+    PlotGPsDuringTraining  = true
 }
 

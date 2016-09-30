@@ -41,13 +41,13 @@ type GPPlots =
     /// Returns a function (unit -> unit) which starts the plot when applied
     static member simplePlot (hyperPars, trnSigmas: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
                               ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
+        
         let nPoints = defaultArg nPoints 20
         let trnDist = ArrayND.max trnX - ArrayND.min trnX |> ArrayND.value
         let minValue = defaultArg minX ((trnX |> ArrayND.min |> ArrayND.value) - trnDist * 0.1f)
         let maxValue = defaultArg maxX ((trnX |> ArrayND.max |> ArrayND.value) + trnDist * 0.1f)
 
-        let sX, sMean, _, sStd = 
-            GPPlots.predictGP hyperPars trnSigmas trnX trnT (minValue, maxValue) nPoints
+        let sX, sMean, sCov, sStd = GPPlots.predictGP hyperPars trnSigmas trnX trnT (minValue, maxValue) nPoints
         
         let sX = sX |> toFloatList 
         let sMean = sMean |> toFloatList 

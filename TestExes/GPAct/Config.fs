@@ -128,19 +128,45 @@ module ConfigLoader =
                 let filename = sprintf "Pars%05d.h5" state.Iter
                 mi.SavePars filename
             
+//            if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
+//                for KeyValue (name, pars) in gpLayers do
+//                    let gpPars = pars.Activation
+//                    let lengthscales    = mi.[gpPars.Lengthscales]|> ArrayND.copy
+//                    let trainSigma      = mi.[gpPars.TrnSigma]|> ArrayND.copy
+//                    let trainX          = mi.[gpPars.TrnX]|> ArrayND.copy
+//                    let trainY          = mi.[gpPars.TrnT]|> ArrayND.copy
+//                    for gp=0 to lengthscales.Shape.[0] - 1 do
+//                        let ls = lengthscales.[gp] |> ArrayND.value
+//                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential}
+//                        savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
+//                            GPPlots.simplePlot (hps, 
+//                                                trainSigma.[gp, *],
+//                                                trainX.[gp, *],
+//                                                trainY.[gp, *],
+//                                                50, -5.0f, 5.0f, -5.0f, 5.0f)
+//                        )  
+            
             if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
-                for KeyValue (name, pars) in gpLayers do
+                let gpLayers = gpLayers |> Map.map (fun name pars -> 
                     let gpPars = pars.Activation
-                    for gp=0 to mi.[gpPars.Lengthscales].Shape.[0] - 1 do
-                        let ls = mi.[gpPars.Lengthscales].[gp] |> ArrayND.value
-                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential}
-                        savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
-                            GPPlots.simplePlot (hps, 
-                                                mi.[gpPars.TrnSigma].[gp, *],
-                                                mi.[gpPars.TrnX].[gp, *],
-                                                mi.[gpPars.TrnT].[gp, *],
-                                                50, -5.0f, 5.0f, -5.0f, 5.0f)
-                        )
+                    [mi.[gpPars.Lengthscales]|> ArrayND.copy
+                     mi.[gpPars.TrnSigma]|> ArrayND.copy
+                     mi.[gpPars.TrnX]|> ArrayND.copy
+                     mi.[gpPars.TrnT]|> ArrayND.copy])     
+                for KeyValue (name, pars) in gpLayers do
+                    let plot = async{
+                        for gp=0 to pars.[0].Shape.[0] - 1 do
+                            let ls = pars.[0].[gp] |> ArrayND.value
+                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls, 1.0f)}
+                            savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
+                                GPPlots.simplePlot (hps, 
+                                                    pars.[1].[gp, *],
+                                                    pars.[2].[gp, *],
+                                                    pars.[3].[gp, *],
+                                                    50, -5.0f, 5.0f, -5.0f, 5.0f)
+                            )  
+                            }
+                    Async.RunSynchronously plot
 
         // build training function
         let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
