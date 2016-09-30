@@ -123,34 +123,12 @@ module ConfigLoader =
             | Adam cfg ->
                 Train.trainableFromLossExpr mi loss smplVarEnv Adam.New cfg
 
+        let mutable plotInProgress = false
         let lossRecordFn (state: TrainingLog.Entry) =
             if cfg.SaveParsDuringTraining then
                 let filename = sprintf "Pars%05d.h5" state.Iter
                 mi.SavePars filename
-            
-//            if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
-//                for KeyValue (name, pars) in gpLayers do
-//                    let gpPars = pars.Activation
-//                    let lengthscales    = mi.[gpPars.Lengthscales]|> ArrayND.copy
-//                    let trainSigma      = mi.[gpPars.TrnSigma]|> ArrayND.copy
-//                    let trainX          = mi.[gpPars.TrnX]|> ArrayND.copy
-//                    let trainY          = mi.[gpPars.TrnT]|> ArrayND.copy
-//                    let plots = []
-//                    let plots = [0..lengthscales.Shape.[0] - 1] |> List.map (fun gp ->
-//                        let ls = lengthscales.[gp] |> ArrayND.value
-//                        let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f)}
-//                        let name = sprintf "node %d" gp
-//                        let plot = fun () ->
-//                                        GPPlots.simplePlot (hps, 
-//                                                            trainSigma.[gp, *],
-//                                                            trainX.[gp, *],
-//                                                            trainY.[gp, *],
-//                                                            50, -5.0f, 5.0f, -5.0f, 5.0f)
-//                        name,plot)
-//                    savePlot 600 600 "." (sprintf "%s-%05d.pdf" name state.Iter) (fun () ->
-//                        plotgrid 5 plots
-//                        )  
-            
+                      
             if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
                 let gpLayers = gpLayers |> Map.map (fun name pars -> 
                     let gpPars = pars.Activation
@@ -172,8 +150,11 @@ module ConfigLoader =
                                                     t.[gp, *],
                                                     50, -5.0f, 5.0f, -5.0f, 5.0f)
                             )  
-                    }
-                Async.Start plots
+                    plotInProgress <- false
+                }
+                if not plotInProgress then
+                    plotInProgress <- true
+                    Async.Start plots
 
         // build training function
         let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        

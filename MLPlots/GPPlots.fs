@@ -5,6 +5,7 @@ open Models
 open ArrayNDNS
 open SymTensor
 open RProvider
+open RTools
 
 type GPPlots = 
     
@@ -61,35 +62,37 @@ type GPPlots =
         let minY = defaultArg minY (List.min lowerStdev - abs (List.average lowerStdev) |> single) |> float
         let maxY = defaultArg maxY (List.max upperStdev + abs (List.average lowerStdev) |> single) |> float
         
-        namedParams [   
-             "x", box sX
-             "y", box sMean
-             "ylim", box [minY; maxY]
-             "col", box "red"
-             "type", box "n"
-             "xlab", box "x"
-             "ylab", box "y"]
-        |> R.plot |> ignore
-        namedParams [   
-             "x", box (sX @ revX)
-             "y", box (lowerStdev @ upperStdev)
-             "col", box "beige"
-             "border" , box "NA"]
-        |> R.polygon |>ignore
-        namedParams [ 
-            "x", box sX
-            "y", box sMean
-            "col", box "black"
-            "type", box "l"
-            "size", box 2]
-        |> R.lines |>ignore
-        namedParams [ 
-            "x", box trainX
-            "y", box trainT
-            "col", box "red"
-            "type", box "p"
-            "size", box 2]
-        |> R.lines |>ignore
+        R.lock (fun () ->
+            namedParams [   
+                 "x", box sX
+                 "y", box sMean
+                 "ylim", box [minY; maxY]
+                 "col", box "red"
+                 "type", box "n"
+                 "xlab", box "x"
+                 "ylab", box "y"]
+            |> R.plot |> ignore
+            namedParams [   
+                 "x", box (sX @ revX)
+                 "y", box (lowerStdev @ upperStdev)
+                 "col", box "beige"
+                 "border" , box "NA"]
+            |> R.polygon |>ignore
+            namedParams [ 
+                "x", box sX
+                "y", box sMean
+                "col", box "black"
+                "type", box "l"
+                "size", box 2]
+            |> R.lines |>ignore
+            namedParams [ 
+                "x", box trainX
+                "y", box trainT
+                "col", box "red"
+                "type", box "p"
+                "size", box 2]
+            |> R.lines |>ignore
+        )
 
         ()
 
