@@ -816,6 +816,19 @@ module Expr =
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
         Binary (op, ba, bb) |> check
 
+    /// pads and broadcasts all arguments to same shape if possible
+    let broadcastToSameMany es =
+        let ss = es |> List.map shapeOf
+        let ps = ShapeSpec.padToSameMany ss
+        let bs = ShapeSpec.broadcastToSameMany false ps
+        List.zip3 es ps bs
+        |> List.map (fun (e, p, b) -> e |> reshapeIfNecessary p |> broadcastIfNecessary b)
+
+    /// pads and broadcasts `a` and `b` to same shape if possible
+    let broadcastToSame a b =
+        match broadcastToSameMany [a; b] with
+        | [bcA; bcB] -> bcA, bcB
+        | _ -> failwith "impossible"
 
     // elementwise operators
     type ExprT with
@@ -853,6 +866,7 @@ module Expr =
         static member (/) (a: ExprT, b: ExprT) = constructElementwise Divide a b
         static member (%) (a: ExprT, b: ExprT) = constructElementwise Modulo a b
         static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b    
+        static member ( *** ) (a: ExprT, b: ExprT) = a ** b
 
         // element-wise binary logic
         static member (&&&&) (a: ExprT, b: ExprT) = constructElementwise And a b
@@ -873,6 +887,7 @@ module Expr =
         static member (/) (a: ExprT, b: System.IComparable) = a / (scalar b)
         static member (%) (a: ExprT, b: System.IComparable) = a % (scalar b)
         static member Pow (a: ExprT, b: System.IComparable) = a ** (scalar b)
+        static member ( *** ) (a: ExprT, b: System.IComparable) = a ** (scalar b)
         static member (====) (a: ExprT, b: System.IComparable) = constructElementwise Equal a (scalar b)
         static member (<<<<) (a: ExprT, b: System.IComparable) = constructElementwise Less a (scalar b)
         static member (<<==) (a: ExprT, b: System.IComparable) = constructElementwise LessEqual a (scalar b)
@@ -886,6 +901,7 @@ module Expr =
         static member (/) (a: System.IComparable, b: ExprT) = (scalar a) / b
         static member (%) (a: System.IComparable, b: ExprT) = (scalar a) % b
         static member Pow (a: System.IComparable, b: ExprT) = (scalar a) ** b
+        static member ( *** ) (a: System.IComparable, b: ExprT) = (scalar a) ** b
         static member (====) (a: System.IComparable, b: ExprT) = constructElementwise Equal (scalar a) b
         static member (<<<<) (a: System.IComparable, b: ExprT) = constructElementwise Less (scalar a) b
         static member (<<==) (a: System.IComparable, b: ExprT) = constructElementwise LessEqual (scalar a) b
@@ -1290,20 +1306,25 @@ module Expr =
         else a |> check
 
     /// Element-wise n-dimensional interpolation using the specified interpolator.
-    /// The interpolator is created using the createInterpolator function.
+    /// The interpolator is created using the Interpolator.create function.
     let interpolate interpolator e =
+        let e = broadcastToSameMany e
         Nary (Interpolate interpolator, e) |> check
 
     /// Element-wise one-dimensional interpolation using the specified interpolator.
-    /// The interpolator is created using the createInterpolator function.
+    /// The interpolator is created using the Interpolator.create function.
     let interpolate1D interpolator a =
         interpolate interpolator [a]
 
-    /// Element-wise one-dimensional interpolation using the specified interpolator.
-    /// The interpolator is created using the createInterpolator function.
+    /// Element-wise two-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the Interpolator.create function.
     let interpolate2D interpolator a b =
         interpolate interpolator [a; b]
 
+    /// Element-wise three-dimensional interpolation using the specified interpolator.
+    /// The interpolator is created using the Interpolator.create function.
+    let interpolate3D interpolator a b c =
+        interpolate interpolator [a; b; c]
    
 
 

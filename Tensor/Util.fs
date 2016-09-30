@@ -161,7 +161,9 @@ module UtilTypes =
     /// Default value for options. Returns b if a is None, else the value of a.
     let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
 
-    let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
+    let allBindingFlags = 
+        BindingFlags.Public ||| BindingFlags.NonPublic ||| 
+        BindingFlags.Static ||| BindingFlags.Instance
 
     type private GenericMethodDescT = {
         ContainingType:     string
@@ -171,9 +173,9 @@ module UtilTypes =
 
     let private genericMethodCache = ConcurrentDictionary<GenericMethodDescT, MethodInfo> ()
 
-    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// Calls the specified method on the type 'U with the specified generic type arguments
     /// and the specified arguments in tupled form. Return value is of type 'R.
-    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+    let callGenericInst<'U, 'R> (instance: obj) (methodName: string) (genericTypeArgs: System.Type list) args =
         let gmd = {
             ContainingType  = typeof<'U>.AssemblyQualifiedName
             MethodName      = methodName
@@ -185,12 +187,20 @@ module UtilTypes =
             | Some m -> m
             | None ->
                 let gm = typeof<'U>.GetMethod (methodName, allBindingFlags)
+                if gm = null then
+                    failwithf "cannot find method %s on type %A" methodName typeof<'U>
                 let m = gm.MakeGenericMethod (List.toArray genericTypeArgs)
                 genericMethodCache.[gmd] <- m
                 m
 
         let args = FSharpValue.GetTupleFields args
-        m.Invoke(null, args) :?> 'R       
+        m.Invoke (instance, args) :?> 'R       
+
+    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// and the specified arguments in tupled form. Return value is of type 'R.
+    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+        callGenericInst<'U, 'R> null methodName genericTypeArgs args
+
 
 module Util =
 
