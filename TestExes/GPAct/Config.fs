@@ -140,16 +140,20 @@ module ConfigLoader =
                 let plots = async {
                     Cuda.CudaSup.setContext ()
                     for KeyValue (name, (l, s, x, t)) in gpLayers do
-                        for gp=0 to l.Shape.[0] - 1 do
+                        let plots = [0..l.Shape.[0] - 1] |> List.map (fun gp ->
                             let ls = l.[gp] |> ArrayND.value
-                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls, 1.0f)}
-                            savePlot 600 600 "." (sprintf "%s-%d-%05d.pdf" name gp state.Iter) (fun () ->
-                                GPPlots.simplePlot (hps, 
-                                                    s.[gp, *],
-                                                    x.[gp, *],
-                                                    t.[gp, *],
-                                                    50, -5.0f, 5.0f, -5.0f, 5.0f)
-                            )  
+                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f)}
+                            let name = sprintf "node %d" gp
+                            let plot = fun () ->
+                                            GPPlots.simplePlot (hps, 
+                                                                s.[gp, *],
+                                                                x.[gp, *],
+                                                                t.[gp, *],
+                                                                50, -5.0f, 5.0f, -5.0f, 5.0f)
+                            name,plot)
+                        savePlot 1200 900 "." (sprintf "%s-%05d.pdf" name state.Iter) (fun () ->
+                            plotgrid 5 plots
+                            ) 
                     plotInProgress <- false
                 }
                 if not plotInProgress then
