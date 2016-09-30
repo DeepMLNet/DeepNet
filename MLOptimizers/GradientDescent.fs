@@ -44,7 +44,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
     static member New loss pars dev =
         GradientDescent (loss, pars, dev) :> IOptimizer<'T, Cfg<'T>, State<'T>>
 
-    member this.DefaultCfg : Cfg<'T> = {
+    static member DefaultCfg : Cfg<'T> = {
         Step        = conv<'T> 1e-4
     }
 

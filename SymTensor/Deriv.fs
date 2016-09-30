@@ -247,8 +247,8 @@ module Deriv =
                 | InterpolateLinearaly ->
                     let des = 
                         [for d=0 to es.Length-1 do
-                            let ipd = ip |> Interpolator.getDerivativeOfInterpolator d 
-                            yield egExpanded * padLeft (Expr.interpolate ipd es)]
+                            let ipd = ip |> Interpolator.getDerivative d 
+                            yield egExpanded * padLeft (Expr.interpolate ipd es) |> collapse]
                     totalDerivates es des
                 | InterpolateToLeft -> empty baseExpr
 

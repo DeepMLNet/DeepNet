@@ -584,7 +584,7 @@ module ArgTemplates =
                                 compileEnv:   CudaCompileEnvT) =
 
         let tbl = 
-            match Interpolator.getInterpolatorTableAsIArrayNDT ip with
+            match Interpolator.getTableAsIArrayNDT ip with
             | :? IArrayNDCudaT as tbl -> tbl
             | _ -> failwith "interpolation table must be stored on CUDA device"
     
