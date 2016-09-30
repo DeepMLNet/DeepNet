@@ -83,7 +83,7 @@ module Interpolator =
         ip
 
     /// Gets the function value table for the specified one-dimensional interpolator as an IArrayNDT.
-    let getInterpolatorTableAsIArrayNDT ip =
+    let getTableAsIArrayNDT ip =
         match tables.LockedTryFind ip with
         | Some ip -> ip
         | None -> failwithf "interpolator %A is unknown" ip
