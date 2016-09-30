@@ -11,7 +11,7 @@ module GaussianProcess =
         /// linear kernel
         | Linear
         /// squared exponential kernel
-        | SquaredExponential of l:single*sign:single
+        | SquaredExponential of l:single * sign:single
     
     /// GP hyperparameters
     type HyperPars = {
@@ -30,12 +30,10 @@ module GaussianProcess =
         x .* y
     
     /// calculates Matrix between two vectors using linear kernel
-    let squaredExpCovariance (l:single,sigf:single) (x:ExprT) (y:ExprT) =
-        let x_smpl  = ElemExpr.idx 0
-        let y_smpl  = ElemExpr.idx 1
-        let xvec       = ElemExpr.argElem<single> 0
-        let yvec       = ElemExpr.argElem<single> 1
-        let kse = sigf * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/(2.0f * l **2.0f))
+    let squaredExpCovariance (l:single, sigf:single) (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec = ElemExpr.arg2<single>
+        let kse = sigf * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/ (2.0f * l**2.0f))
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y]

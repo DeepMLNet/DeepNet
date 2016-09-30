@@ -448,6 +448,11 @@ module ModelContextTypes =
                 let seed = rng.Next ()
                 this.InitPar seed ps
 
+        /// value for a given parameter
+        member this.Item
+            with get (par: ExprT) : ArrayNDT<'T> = this.ParameterStorage.[par]
+            and set (par: ExprT) (value: ArrayNDT<'T>) = this.ParameterStorage.[par] <- value
+
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT) =

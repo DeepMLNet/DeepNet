@@ -40,7 +40,7 @@ module Main =
         SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
         //SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
-        SymTensor.Compiler.Cuda.Debug.DumpCode <- true
+        //SymTensor.Compiler.Cuda.Debug.DumpCode <- true
         //SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
         SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
