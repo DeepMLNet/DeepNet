@@ -42,8 +42,8 @@ module CudaElemExpr =
         match SizeSpec.tryEval ss with
         | Some v -> sprintf "%d" v
         | None ->
-            match SizeSpec.simplify ss with
-            | Base (Fixed c) -> sprintf "%d" c
+            match SizeSpec.simplify ss with 
+            | Base (Fixed c) -> sprintf "%d" c.IntValue
             | Base (Sym sym) -> sizeSymVars.[sym]
             | Broadcast -> "1"
             | Multinom m ->
@@ -55,7 +55,7 @@ module CudaElemExpr =
                     |> Seq.map (fun (sym, pow) ->
                         [for p=0 to pow-1 do yield sizeSymVars.[sym]]
                         |> String.concat "*")
-                    |> Seq.append (Seq.singleton (sprintf "%d" fac))
+                    |> Seq.append (Seq.singleton (sprintf "%d" fac.IntValue))
                     |> String.concat " * ")
                 |> String.concat " + "
 

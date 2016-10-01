@@ -67,9 +67,9 @@ module VarEnv =
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-                    | Base (Sym sym) -> env |> SymSizeEnv.add sym (Base (Fixed svVal))
+                    | Base (Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
                     | Base (Fixed f) -> 
-                        if f = svVal then env
+                        if f .= svVal then env
                         else failShape ()
                     | Broadcast ->
                         if 1 = svVal then env
