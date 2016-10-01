@@ -50,7 +50,7 @@ let build device batch =
     printfn "loss is:\n%A" loss
 
     // optimizer (with parameters)
-    let opt = GradientDescent<single> (loss, mi.ParameterVector, device)
+    let opt = GradientDescent<single> (loss |> mi.Use, mi.ParameterVector, device)
     let optCfg = {GradientDescent.Step=1e-3f}
     opt.PublishLoc mi
 
@@ -85,7 +85,7 @@ let train device samples iters =
     printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
         optFun tstImgs tstLbls optCfg optState |> ignore
-        //printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
+        printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
     let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss
