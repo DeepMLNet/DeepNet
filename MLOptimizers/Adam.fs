@@ -49,6 +49,7 @@ type Adam<'T when 'T: equality and 'T: comparison>
         (loss:  ExprT, pars:  ExprT, dev:   IDevice) =
 
     do Util.checkProperType<'T> ()
+    do if loss.NDims <> 0 then failwith "loss must be a scalar"
 
     let cfg = {
         CfgExpr.Step        = Expr.var<'T> "Adam.Cfg.Step"          []

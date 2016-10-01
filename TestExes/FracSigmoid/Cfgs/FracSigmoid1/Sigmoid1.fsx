@@ -18,14 +18,18 @@ let cfg = {
 
     Model = {Layers = [
                        NeuralLayer
-                         {NInput        = Program.NInput()
-                          NOutput       = nHidden1
-                          TransferFunc  = NeuralLayer.Sigmoid}
+                         {NeuralLayer.defaultHyperPars with
+                           NInput        = Program.NInput()
+                           NOutput       = nHidden1
+                           TransferFunc  = NeuralLayer.Sigmoid}
                       
                        NeuralLayer
-                         {NInput        = nHidden1
-                          NOutput       = Program.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                         {NeuralLayer.defaultHyperPars with
+                           NInput        = nHidden1
+                           NOutput       = Program.NOutput()
+                           TransferFunc  = NeuralLayer.Identity
+                           WeightsTrainable = true
+                           BiasTrainable    = true}
                       ]
              Loss   = LossLayer.MSE}
 
@@ -41,6 +45,7 @@ let cfg = {
 
     Training = {Train.defaultCfg with 
                  //MinIters  = Some 10000
+                 BestOn    = Training
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 

@@ -12,6 +12,11 @@ open SymTensor
 open Optimizers
 
 
+type Partition =
+    | Training
+    | Validation
+
+
 /// Training history module.
 module TrainingLog =
 
@@ -25,21 +30,28 @@ module TrainingLog =
 
     type Log<'P> = {
         MinImprovement:     float
+        BestOn:             Partition
         Best:               (Entry * ArrayNDT<'P>) option
         History:            Entry list
     }
 
-    let create minImprovement =
-        {MinImprovement=minImprovement; Best=None; History=[]}
+    let create minImprovement bestOn =
+        {MinImprovement=minImprovement; BestOn=bestOn; Best=None; History=[]}
+
+    let relevantLoss bestOn (entry: Entry) =
+        match bestOn with
+        | Training -> entry.TrnLoss
+        | Validation -> entry.ValLoss
 
     let record (entry: Entry) parVals (log: Log<_>) =
         let best =
             match log.Best with
             | None -> Some (entry, parVals)
-            | Some (bestEntry, _) when entry.ValLoss <= bestEntry.ValLoss - log.MinImprovement ->
+            | Some (bestEntry, _) when
+                    (relevantLoss log.BestOn entry) 
+                     <= (relevantLoss log.BestOn bestEntry) - log.MinImprovement ->
                 Some (entry, ArrayND.copy parVals)
             | _ -> log.Best
-
         {log with Best=best; History=entry :: log.History}
 
     let lastIter (log: Log<_>) =
@@ -89,6 +101,8 @@ module Train =
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
         MinImprovement:                 float
+        /// partition to use for determination of best loss
+        BestOn:                         Partition
         /// target loss that should lead to termination of training
         TargetLoss:                     float option
         /// minimum training iterations
@@ -115,6 +129,7 @@ module Train =
         LossRecordFunc              = fun _ -> ()
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
+        BestOn                      = Validation
         TargetLoss                  = None
         MinIters                    = Some 100
         MaxIters                    = None
@@ -150,9 +165,9 @@ module Train =
     /// Interface for a trainable model.
     type ITrainable<'Smpl, 'T> =
         /// Loss of given sample.
-        abstract member Loss: sample:'Smpl -> float
+        abstract member Losses: sample:'Smpl -> float list
         /// Perform an optimization step with the given learning rate and sample and return the loss.
-        abstract member Optimize: learningRate:float -> sample:'Smpl -> float Lazy
+        abstract member Optimize: learningRate:float -> sample:'Smpl -> Lazy<float list>
         /// Initializes the model using the given random seed.
         abstract member InitModel: seed:int -> unit
         /// Load model parameters from specified file.
@@ -168,26 +183,28 @@ module Train =
         /// Save optimizer state to specified file.
         abstract member SaveOptState: path: string -> unit
 
-    /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
-    let trainableFromLossExpr
+    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
+    let trainableFromLossExprs
             (modelInstance: ModelInstance<'T>) 
-            (loss: ExprT) 
+            (losses: ExprT list) 
             (varEnvBuilder: 'Smpl -> VarEnvT)
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
-        let loss = modelInstance.Use loss
-        let opt = optNew loss modelInstance.ParameterVector modelInstance.Device
-        let lossFn = modelInstance.Func loss << varEnvBuilder
-        let lossOptFn = modelInstance.Func (loss, opt.OptStepExpr) |> opt.Use << varEnvBuilder
+        let losses = losses |> List.map modelInstance.Use 
+        let mainLoss = losses.Head
+        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device
+        let lossesFn = modelInstance.Func losses << varEnvBuilder
+        let lossesOptFn = modelInstance.Func (losses @ [opt.OptStepExpr]) |> opt.Use << varEnvBuilder
 
         let mutable optState = opt.InitialState optCfg modelInstance.ParameterValues
     
         {new ITrainable<'Smpl, 'T> with
-            member this.Loss sample = lossFn sample |> ArrayND.value |> conv<float>
+            member this.Losses sample = lossesFn sample |> List.map (ArrayND.value >> conv<float>)
             member this.Optimize learningRate sample = 
-                let loss, _ = lossOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
-                lazy (ArrayND.value loss |> conv<float>)
+                let lossesAndOpt = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
+                let losses = lossesAndOpt |> List.take (lossesAndOpt.Length - 1)
+                lazy (losses |> List.map (ArrayND.value >> conv<float>))
             member this.InitModel seed = modelInstance.InitPars seed
             member this.LoadModel path = modelInstance.LoadPars path
             member this.SaveModel path = modelInstance.SavePars path
@@ -198,7 +215,10 @@ module Train =
             member this.LoadOptState path = optState <- opt.LoadState path
             member this.SaveOptState path = opt.SaveState path optState    
         }
-        
+
+    /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
+    let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
+        trainableFromLossExprs modelInstance [loss] varEnvBuilder optNew optCfg
 
     type private CheckpointFiles (cfg: Cfg) = 
         let dir = Path.GetFullPath cfg.CheckpointDir.Value    
@@ -272,17 +292,41 @@ module Train =
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
-                // compute and log validation & test 
+
+                let multiAvg lls =
+                    let mutable n = 1
+                    lls
+                    |> Seq.reduce (fun ll1 ll2 ->
+                        n <- n + 1
+                        List.zip ll1 ll2
+                        |> List.map (fun (l1, l2) -> l1 + l2))
+                    |> List.map (fun l -> l / float n)
+
+                let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
+                let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
+                let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
+
+                // compute and log primary validation & test loss
                 let entry = {
                     TrainingLog.Iter    = iter
-                    TrainingLog.TrnLoss = trnLosses |> List.averageBy (fun v -> v.Force())
-                    TrainingLog.ValLoss = valBatches |> Seq.map trainable.Loss |> Seq.average
-                    TrainingLog.TstLoss = tstBatches |> Seq.map trainable.Loss |> Seq.average
+                    TrainingLog.TrnLoss = multiTrnLosses.Head
+                    TrainingLog.ValLoss = multiValLosses.Head
+                    TrainingLog.TstLoss = multiTstLosses.Head
                     TrainingLog.LearningRate = learningRate
                 }
                 let log = log |> TrainingLog.record entry trainable.ModelParameters
-                printfn "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f" iter entry.TrnLoss entry.ValLoss entry.TstLoss
+                printf "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f   " iter entry.TrnLoss entry.ValLoss entry.TstLoss
                 cfg.LossRecordFunc entry
+
+                // print secondary losses
+                match multiTrnLosses, multiValLosses, multiTstLosses with
+                | _::secTrnLosses, _::secValLosses, _::secTstLosses ->
+                    printf "("
+                    for secTrnLoss, secValLoss, secTstLoss in 
+                            List.zip3 secTrnLosses secValLosses secTstLosses do
+                        printf "trn=%7.4f  val=%7.4f  tst=%7.4f; " secTrnLoss secValLoss secTstLoss
+                    printfn ")"
+                | _ -> printfn ""
 
                 // check termination criteria
                 let mutable faith = Continue
@@ -376,12 +420,13 @@ module Train =
                         trainable.LoadModel cp.BestModelFile
                         Some (bestEntry, trainable.ModelParameters |> ArrayND.copy)
                     | None -> None
-                let log = {TrainingLog.create cfg.MinImprovement with Best = best; History = state.History}
+                let log = {TrainingLog.create cfg.MinImprovement cfg.BestOn with 
+                            Best=best; History=state.History}
                 trainable.LoadOptState cp.OptStateFile
                 trainable.LoadModel cp.ModelFile
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
-                TrainingLog.create cfg.MinImprovement, cfg.LearningRates, TimeSpan.Zero, Continue
+                TrainingLog.create cfg.MinImprovement cfg.BestOn, cfg.LearningRates, TimeSpan.Zero, Continue
         
         // train
         let log, duration, faith = 
@@ -435,9 +480,7 @@ module Train =
             Duration            = duration
         }
         
-                                  
-
-        
+                                   
         
 
 

@@ -453,6 +453,10 @@ module ModelContextTypes =
             with get (par: ExprT) : ArrayNDT<'T> = this.ParameterStorage.[par]
             and set (par: ExprT) (value: ArrayNDT<'T>) = this.ParameterStorage.[par] <- value
 
+        member this.Func (resultLoc: ArrayLocT, exprs: ExprT list) =
+            let exprs = exprs |> List.map this.Use 
+            Func.makeMany<'T> (compileSpec resultLoc) exprs << useParStorage
+
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT) =
@@ -473,6 +477,9 @@ module ModelContextTypes =
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
             Func.make3<'T, 'T, 'T> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+
+        member this.Func (exprs: ExprT list) =
+            this.Func (device.DefaultLoc, exprs)
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.

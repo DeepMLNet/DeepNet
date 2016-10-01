@@ -366,7 +366,17 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>
 
-    //let makeMany factory ()
+    let makeMany<'T> factory (exprs: ExprT list) =
+        exprs |> List.iter (checkType<'T> "all")
+        let exprsGen =
+            exprs
+            |> List.map (fun expr -> 
+                {Generate=uExprGenerate expr; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr})
+        let evalAll = evalWrapper factory exprsGen
+        fun (varEnv: VarEnvT) ->
+            let reses = evalAll varEnv
+            reses |> List.map (fun res -> res :?> ArrayNDT<'T>)
+
 
 [<AutoOpen>]
 module FuncTypes = 

@@ -48,8 +48,28 @@ module FracSigmoid =
                 calc (iter + 1) (z * dSigmoidFixPoint)
         calc 0 y
 
+    let inline dXi x =
+        let rec calc iter prod z =
+            if iter > maxIters then
+                System.Double.MaxValue
+            elif abs (z - sigmoidFixPoint) <= rInner then
+                prod
+            else
+                calc (iter + 1) ((1.0 - sigmoid z) * sigmoid z / dSigmoidFixPoint) (sigmoid z)
+        calc 0 1.0 x
+
+    let inline dXiInv y =
+        1.0 / dXi (xiInv y)
+
     let inline fracSigmoid n x =
         xiInv (dSigmoidFixPoint ** n * xi x)
+
+    let inline dFracSigmoidDX n x =
+        dXiInv (dSigmoidFixPoint ** n * xi x) * dSigmoidFixPoint ** n * dXi x
+
+    let inline dFracSigmoidDN n x =
+        dXiInv (dSigmoidFixPoint ** n * xi x) * dSigmoidFixPoint ** n * xi x * log dSigmoidFixPoint
+
         
 
 [<AutoOpen>]
@@ -116,7 +136,7 @@ module FracSigmoidTable =
                         let x, n = xs.[xIdx], ns.[nIdx] 
 
                         match info.Function with
-                        | FracSigmoid -> failwith "todo"
+                        | FracSigmoid -> FracSigmoid.dFracSigmoidDN n x
                         | Sigmoid -> 0.0
                     )
                     |> ArrayNDHost.ofArray 
@@ -129,7 +149,7 @@ module FracSigmoidTable =
                         let x, n = xs.[xIdx], ns.[nIdx] 
 
                         match info.Function with
-                        | FracSigmoid -> failwith "todo"
+                        | FracSigmoid -> FracSigmoid.dFracSigmoidDX n x
                         | Sigmoid -> FracSigmoid.dSigmoid x
                     )
                     |> ArrayNDHost.ofArray 

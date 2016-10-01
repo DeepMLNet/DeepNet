@@ -15,6 +15,8 @@ module TableLayer =
         NOutput:        SizeSpecT
         /// transfer (activation) function
         Info:           Info
+        FracTrainable:  bool
+        FracInit:       single
     }
 
     type Pars = {
@@ -30,7 +32,7 @@ module TableLayer =
         HyperPars:      HyperPars
     }
 
-    let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
+    let internal initWeights (hp: HyperPars) seed (shp: int list) : ArrayNDHostT<'T> = 
         let fanOut = shp.[0] |> float
         let fanIn = shp.[1] |> float
         let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
@@ -40,13 +42,11 @@ module TableLayer =
         |> Seq.map conv<'T>
         |> ArrayNDHost.ofSeqWithShape shp
         
-    let internal initBias seed (shp: int list) : ArrayNDHostT<'T> =
-        Seq.initInfinite (fun _ -> conv<'T> 0)
-        |> ArrayNDHost.ofSeqWithShape shp
+    let internal initBias (hp: HyperPars) seed (shp: int list) =
+        ArrayNDHost.filled shp 0.0f
 
-    let internal initFrac seed (shp: int list) : ArrayNDHostT<'T> =
-        Seq.initInfinite (fun _ -> conv<'T> 0)
-        |> ArrayNDHost.ofSeqWithShape shp
+    let internal initFrac (hp: HyperPars) seed (shp: int list) =
+        ArrayNDHost.filled shp hp.FracInit
 
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = 
         // create interpolator
@@ -72,9 +72,10 @@ module TableLayer =
                 [Nearest; Nearest] InterpolateLinearaly dIps   
 
         {
-            Weights      = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
-            Bias         = mb.Param ("Bias",    [hp.NOutput],            initBias)
-            Frac         = mb.Param ("Frac",    [hp.NOutput],            initFrac)
+            Weights      = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights hp)
+            Bias         = mb.Param ("Bias",    [hp.NOutput],            initBias hp)
+            Frac         = mb.Param ("Frac",    [],                      initFrac hp)
+            //Frac         = mb.Param ("Frac",    [hp.NOutput],            initFrac hp)
             Interpolator = ip
             HyperPars    = hp
         }
@@ -85,6 +86,9 @@ module TableLayer =
         // frac    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
+        let frac =
+            if pars.HyperPars.FracTrainable then pars.Frac
+            else Expr.assumeZeroDerivative pars.Frac
         let activation = input .* pars.Weights.T + pars.Bias
-        Expr.interpolate2D pars.Interpolator (pars.Frac *** 2.0f) activation
+        Expr.interpolate2D pars.Interpolator (frac *** 2.0f + 0.0001f) activation
 

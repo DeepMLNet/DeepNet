@@ -14,14 +14,14 @@ open ArrayNDNS
 let nHidden1 = SizeSpec.fix 30
 
 let info = {
-    NMin    =  0.0
-    NMax    = 1.0
+    NMin    = 0.0
+    NMax    = 1.1
     NPoints = 1000
     XMin    = -10.0
     XMax    =  10.0
     XPoints = 5000
-    Function = Sigmoid
-    WithDeriv = true
+    Function = FracSigmoid
+    WithDeriv = false
 }
 
 
@@ -32,8 +32,8 @@ let cfg = {
                          {NInput        = Program.NInput()
                           NOutput       = nHidden1
                           Info          = info
-                          FracTrainable = false
-                          FracInit      = 0.0f                          
+                          FracTrainable = true
+                          FracInit      = 0.0f
                           }
                       
                        NeuralLayer

@@ -78,7 +78,7 @@ struct SignTEOp_t
 {
 	_dev float operator() (float a) const
 	{
-		return a > 0.0f ? 1.0f : 0.0f;
+		return signt(a);
 	}
 };
 
