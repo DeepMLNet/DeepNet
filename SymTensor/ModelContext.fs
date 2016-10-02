@@ -76,6 +76,7 @@ module ModelContextTypes =
             |> Seq.map (fun (var, expr) -> expr, var)
             |> Map.ofSeq
           
+        member this.Name = name
         member this.Parameters = pars
         member this.Shapes = shapes
         member this.StartIdxs = startIdxs
@@ -179,6 +180,14 @@ module ModelContextTypes =
             for KeyValue(vs, vsView) in parameterVals do
                 let value = device.ToHost vsView
                 ArrayNDHDF.write hdf vs.Name value
+
+        /// prints the shapes of all parameters contained in this ParameterStorage
+        member this.PrintShapes () =
+            printfn "ParameterStorage for %s contains the parameters:" parameterSet.Name
+            for par, value in 
+                    parameterVals |> Map.toList |> List.sortBy fst do
+                printfn "%-50s %A" (par.Name + ": ") value.Shape
+
 
     /// A model builder.
     [<StructuredFormatDisplay("{PrettyString}")>]

@@ -168,6 +168,8 @@ module Train =
         abstract member Losses: sample:'Smpl -> float list
         /// Perform an optimization step with the given learning rate and sample and return the loss.
         abstract member Optimize: learningRate:float -> sample:'Smpl -> Lazy<float list>
+        /// Prints information about the model.
+        abstract member PrintInfo: unit -> unit
         /// Initializes the model using the given random seed.
         abstract member InitModel: seed:int -> unit
         /// Load model parameters from specified file.
@@ -205,6 +207,7 @@ module Train =
                 let lossesAndOpt = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
                 let losses = lossesAndOpt |> List.take (lossesAndOpt.Length - 1)
                 lazy (losses |> List.map (ArrayND.value >> conv<float>))
+            member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
             member this.InitModel seed = modelInstance.InitPars seed
             member this.LoadModel path = modelInstance.LoadPars path
             member this.SaveModel path = modelInstance.SavePars path
@@ -278,6 +281,7 @@ module Train =
         // initialize model parameters
         printfn "Initializing model parameters for training"
         trainable.InitModel cfg.Seed
+        trainable.PrintInfo ()
 
         /// training function
         let rec doTrain iter learningRate log =
@@ -471,7 +475,10 @@ module Train =
                 log, duration, faith
 
         let bestEntry, _ = TrainingLog.best log
-        printfn "Training completed after %d iterations in %A because %A" bestEntry.Iter duration faith
+        printfn "Training completed after %d iterations in %A because %A with best losses:" 
+            bestEntry.Iter duration faith
+        printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
+            bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
 
         {
             History             = List.rev log.History

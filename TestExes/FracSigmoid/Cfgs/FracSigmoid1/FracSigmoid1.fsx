@@ -31,6 +31,7 @@ let cfg = {
                        TableLayer
                          {NInput        = Program.NInput()
                           NOutput       = nHidden1
+                          NFrac         = SizeSpec.fix 4
                           Info          = info
                           FracTrainable = true
                           FracInit      = 0.0f
