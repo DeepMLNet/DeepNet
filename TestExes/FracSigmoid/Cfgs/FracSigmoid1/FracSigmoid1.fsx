@@ -62,7 +62,10 @@ let cfg = {
                  //MinIters  = Some 10000
                  BestOn    = Training
                  BatchSize = System.Int32.MaxValue
-                 MaxIters  = None}
+                 MaxIters  = None
+                 CheckpointDir = Some "."
+                 
+                 }
 
     SaveParsDuringTraining = false
 }

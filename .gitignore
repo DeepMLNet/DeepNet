@@ -222,12 +222,20 @@ ModelManifest.xml
 /TrainData.h5
 /TestExes/GPTransfer/pydump.h5
 /TestExes/TrainFromConfig/Cfgs/result.json
+
 /TestExes/GPAct/Cfgs/*.json
 /TestExes/GPAct/Cfgs/*/*.cu
 /TestExes/GPAct/Cfgs/*/*.json
 /TestExes/GPAct/Cfgs/*/*.h5
 /TestExes/GPAct/Cfgs/*/*.pdf
 /TestExes/GPAct/Cfgs/*/*.png
+
+/TestExes/FracSigmoid/Cfgs/*.json
+/TestExes/FracSigmoid/Cfgs/*/*.cu
+/TestExes/FracSigmoid/Cfgs/*/*.json
+/TestExes/FracSigmoid/Cfgs/*/*.h5
+/TestExes/FracSigmoid/Cfgs/*/*.pdf
+/TestExes/FracSigmoid/Cfgs/*/*.png
 
 
 
