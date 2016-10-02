@@ -15,6 +15,8 @@ module TableLayer =
         NOutput:        SizeSpecT
         /// transfer (activation) function
         Info:           Info
+        /// number of fractional parameters
+        NFrac:          SizeSpecT
         FracTrainable:  bool
         FracInit:       single
     }
@@ -74,8 +76,7 @@ module TableLayer =
         {
             Weights      = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights hp)
             Bias         = mb.Param ("Bias",    [hp.NOutput],            initBias hp)
-            Frac         = mb.Param ("Frac",    [],                      initFrac hp)
-            //Frac         = mb.Param ("Frac",    [hp.NOutput],            initFrac hp)
+            Frac         = mb.Param ("Frac",    [hp.NFrac],              initFrac hp)
             Interpolator = ip
             HyperPars    = hp
         }
@@ -89,6 +90,7 @@ module TableLayer =
         let frac =
             if pars.HyperPars.FracTrainable then pars.Frac
             else Expr.assumeZeroDerivative pars.Frac
+        let frac = Expr.replicateTo 0 pars.HyperPars.NOutput frac
         let activation = input .* pars.Weights.T + pars.Bias
         Expr.interpolate2D pars.Interpolator (frac *** 2.0f + 0.0001f) activation
 
