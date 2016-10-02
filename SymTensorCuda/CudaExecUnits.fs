@@ -286,14 +286,19 @@ module CudaExecUnit =
         | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
 
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) -> 
-            // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
+            // "a" can be evaluated into requested manikin if it is not broadcasted, 
+            // but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
-            inplaceFirstSrcReq
+            match trgtDfltChReq with
+            | Some req when not (ArrayND.isBroadcasted req) -> inplaceFirstSrcReq
+            | _ -> dfltSrcWithNoViewReq            
 
         | UNaryOp (Expr.Elements _) -> needExtra op
         | UExtraOp (Elements _) -> dfltSrcWithNoViewReq            
@@ -337,7 +342,8 @@ module CudaExecUnit =
         /// True if specified manikin overlaps with any channel of any source.
         let overlappingWithAnySrc (rv: ArrayNDManikinT) =
             srcs
-            |> List.exists (Map.exists (fun ch (view, shared) -> ArrayND.overlapping rv view))
+            |> List.exists (Map.exists (fun ch (view, shared) -> 
+                                            ArrayNDManikin.maybeOverlapping rv view))
 
         /// default channel target that shares no elements with any srcView 
         let dfltChOutplaceTrgt () =
@@ -509,7 +515,7 @@ module CudaExecUnit =
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) ->
-            if not (srcsDfltChShared.[0]) then 
+            if not (srcsDfltChShared.[0]) && not (ArrayND.isBroadcasted srcsDfltCh.[0]) then 
                 dfltChTrgt srcsDfltCh.[0] false
             else dfltChOutplaceTrgt ()
 
@@ -1078,7 +1084,8 @@ module CudaExecUnit =
             // copy "a" if necessary
             let copyItems = 
                 if dfltChTrgt <> srcsDfltCh.[0] then 
-                    copyExecItems dfltChTrgt srcsDfltCh.[0] else []
+                    copyExecItems dfltChTrgt srcsDfltCh.[0] 
+                else []
             // copy "b" into a
             let setItems =
                 execItemsForCopyToDynamicSubtensor dfltChTrgt srs 

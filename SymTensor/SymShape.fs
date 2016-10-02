@@ -134,6 +134,16 @@ module Frac =
         if frac.Dnm = 1 then Some frac.Nom
         else None
 
+    let roundTowardZero (f: FracT) =
+        FracT (f.Nom / f.Dnm)
+
+    let roundAwayFromZero (f: FracT) =
+        if f.Nom % f.Dnm = 0 then
+            FracT (f.Nom / f.Dnm)
+        elif f.Nom > 0 then
+            FracT (f.Nom / f.Dnm + 1)
+        else
+            FracT (f.Nom / f.Dnm - 1)
 
 //[<AutoOpen>]
 module SizeProductTypes = 

@@ -224,7 +224,9 @@ module Trace =
                 out "Event index: %d" idx
                 match evnt with
                 | ExprEvaled (uexpr, res, msg) ->
-                    out "Expression: %A" (uexpr |> UExpr.toExpr)
+                    match UExpr.tryToExpr uexpr with
+                    | Some expr -> out "Expression: %A" expr
+                    | None -> out "Unified expression: %A" uexpr
                     out "Result:\n%A" res
                     out "Message: %s" msg
                 out ""

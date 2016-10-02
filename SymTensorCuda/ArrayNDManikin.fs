@@ -162,6 +162,9 @@ module ArrayNDManikin =
             | _ -> false
         else false
 
-            
+    /// true if a and b may overlap
+    let maybeOverlapping a b =    
+        storage a = storage b
+
 
         

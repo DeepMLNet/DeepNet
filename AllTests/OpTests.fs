@@ -131,6 +131,50 @@ let ``Replicate`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
+let ``ReplicateTo on CUDA`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory expr0 expr1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let av0, av1 = fns av
+    printfn "a=\n%A" av 
+    printfn "repTo 0 7 a=\n%A" av0
+    printfn "repTo 1 5 a=\n%A" av1
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Derivative of ReplicateTo on CUDA`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
+    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory da0 da1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let dav0, dav1 = fns av
+    printfn "a=\n%A" av 
+    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
+    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+
+[<Fact>]
+let ``Derivative of ReplicateTo on host`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
+    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory da0 da1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let dav0, dav1 = fns av
+    printfn "a=\n%A" av 
+    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
+    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Trace compare: max, min`` () =
     requireEqualTracesWithRandomData [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c]  ->
         Expr.minElemwise (Expr.maxElemwise a b) c

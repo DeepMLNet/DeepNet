@@ -188,10 +188,15 @@ module Func =
 
     let private uExprGenerate baseExpr symSizes =
         let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
+        let substExpr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
+        if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
+   
+        let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Optimizing expression..." 
         let optimizedExpr = 
-            if Debug.DisableOptimizer then baseExpr
-            else Optimizer.optimize baseExpr
+            if Debug.DisableOptimizer then substExpr
+            else Optimizer.optimize substExpr
         if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
         if Debug.PrintOptimizerStatistics then
             printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 
@@ -199,19 +204,14 @@ module Func =
                 (Expr.countUniqueOps baseExpr) (Expr.countUniqueOps optimizedExpr)
 
         let sw = Stopwatch.StartNew ()
-        if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
-        let substExpr = optimizedExpr |> Expr.substSymSizes symSizes
-        if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
-
-        let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Converting to UExpr..."
-        let uExpr = UExpr.toUExpr substExpr
+        let uExpr = UExpr.toUExpr optimizedExpr
         if Debug.Timing then printfn "Converting to UExpr took %A" sw.Elapsed
         
         uExpr
 
     let private uExprVarSpecsAndEvalable baseExpr failIfNotEvalable symSizes =
-        let expr = baseExpr |> Expr.substSymSizes symSizes 
+        let expr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
         let vars = Expr.extractVars expr 
         if failIfNotEvalable then Expr.failOnNotEvalableSymSize expr
         vars, Expr.canEvalAllSymSizes expr

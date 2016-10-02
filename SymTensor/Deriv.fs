@@ -35,8 +35,8 @@ module Deriv =
         {Expr=expr; Jacobians=Map.empty}
 
     /// reverse accumulation autodifferentiation of an expression
-    let rec private reverseDiffStep (baseExpr: ExprT) (expr: ExprT) (eg: ExprT) : DerivT =    
-        let rds = reverseDiffStep baseExpr
+    let rec reverseDiff (baseExpr: ExprT) (expr: ExprT) (eg: ExprT) : DerivT =    
+        let rds = reverseDiff baseExpr
         let exprShp = expr.Shape
         let funElems = eg.Shape.[0]  
 
@@ -134,6 +134,8 @@ module Deriv =
                         egUnbroadcasted <- egUnbroadcasted |> sumKeepingAxis (ax + 1)
                     | _ -> ()
                 egUnbroadcasted |> collapse |> rds a
+            | Held (derivsShp, heldOp) -> 
+                Unary(Held (shapeOf a :: derivsShp, heldOp), eg) |> rds a                
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
                         |> collapse |> rds a
             | SumAxis ax -> 
@@ -259,7 +261,7 @@ module Deriv =
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
     let compute (expr: ExprT) : DerivT =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
-        reverseDiffStep expr expr eg
+        reverseDiff expr expr eg
 
     /// extracts the Jacobian of the given variable
     let ofVar var (deriv: DerivT) =

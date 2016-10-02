@@ -135,6 +135,8 @@ module UExpr =
                     extra (Subtensor usr) (a :: dynExprs)
                 | Expr.Unary (Expr.NullifyJacobian, a) -> toUExprRec a
                 | Expr.Unary (Expr.AssumeJacobian _, a) -> toUExprRec a
+                | Expr.Unary (Expr.Held (_, heldOp), a) ->
+                    failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
                 | Expr.Binary (Expr.SetSubtensor sr, a, b) ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr   
                     extra (SetSubtensor usr) (a :: b :: dynExprs)
@@ -173,7 +175,6 @@ module UExpr =
         }        
         toUExprRec caches expr
 
-
     /// Returns the generating expression of a unified expression.
     /// Only works if the unified expression was created using the toUExpr function.
     let toExprOfType (UExpr (uop, subUExprs, {TargetType=tn; Expr=exprOpt})) : ExprT =
@@ -181,11 +182,18 @@ module UExpr =
         | Some exprObj -> unbox exprObj 
         | None -> failwith "UExpr was not created from an Expr"
 
-    /// Converts a unified expression to an expression of the correct type.
+    /// Converts a unified expression to an expression if the unified expression
+    /// was created using the toUExpr function. Otherwise returns None.
+    let tryToExpr (UExpr (_, _, {Expr=exprOpt})) : ExprT option =
+        match exprOpt with
+        | Some exprObj -> Some (unbox exprObj)
+        | None -> None
+
+    /// Converts a unified expression to an expression.
     /// Only works if the unified expression was created using the toUExpr function.
-    let toExpr (UExpr (_, _, {TargetType=tn; Expr=exprOpt}) as uexpr) : ExprT =
-        match exprOpt with 
-        | Some exprObj -> unbox exprObj 
+    let toExpr uExpr =
+        match tryToExpr uExpr with 
+        | Some expr -> expr
         | None -> failwith "UExpr was not created from an Expr"
 
     /// the op of the given unified expression

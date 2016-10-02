@@ -114,10 +114,18 @@ module Expr =
         | Print of string
         /// dumps the value into the given dataset in the active HDF5 dump file
         | Dump of string
-        /// checks the value for NaNs and infinities, outputs their location and stops the computation
+        /// checks the value for NaNs and infinities, outputs their location and 
+        /// stops the computation
         | CheckFinite of string
         /// annotation (no influence on value)
         | Annotated of string       
+        /// an open that will expand into an expression once symbolic sizes have
+        /// been substituted
+        | Held of derivsShp:ShapeSpecT list * op:UnaryHeldOpT
+
+    and UnaryHeldOpT =
+        /// replicates the axes to the specified size
+        | ReplicateTo of dim:int * size:SizeSpecT
 
     and ExprRngSpecT = SimpleRangeSpecT<ExprT>
     and ExprRngsSpecT = SimpleRangesSpecT<ExprT>
@@ -393,6 +401,8 @@ module Expr =
                  match sr with
                  | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
                  | SRSDynStartSymSize (_, size) -> size)
+        | Unary(Held (derivShp :: _, heldOp), a) -> [(shapeOf a).[0]; ShapeSpec.nElem derivShp]
+        | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
@@ -559,6 +569,8 @@ module Expr =
                     if (shapeOf jac).[1] <> nElems expr then
                         failwithf "Jacobian shape %A must have %A elements in second dimension" 
                             (shapeOf jac) (nElems expr)
+                | Held ([], ReplicateTo (dim, s)) -> 
+                    a |> checkAxis dim
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -649,6 +661,11 @@ module Expr =
         | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
         | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
         | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
+        | Unary (Held (derivsShp, heldOp), a) ->
+            let substOp =
+                match heldOp with
+                | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
+            Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
         | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
@@ -662,6 +679,7 @@ module Expr =
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
 
+    /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
         let subTest = testEvalAllSymSizes failIfNot
         let evalable =
@@ -675,6 +693,11 @@ module Expr =
             | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && subTest a
             | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && subTest a
             | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && subTest a
+            | Unary (Held (derivsShp, heldOp), a) ->
+                let canEvalOp =
+                    match heldOp with 
+                    | ReplicateTo (dim, s) -> SizeSpec.canEval s
+                List.forall ShapeSpec.canEval derivsShp && canEvalOp && subTest a
             | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
             | Unary (op, a) -> subTest a
 
@@ -969,6 +992,12 @@ module Expr =
         |> broadcast (a.Shape |> ShapeSpec.insertAxis dim reps)
         |> reshape (a.Shape |> List.set dim (reps * a.Shape.[dim]))
 
+    /// Replicates the tensor along the given axis, so that after replication it has
+    /// the specified `size`. If `size` is not a multiple of the current size of the
+    /// tensor along the specified axis, the last replication is truncated appropriately.
+    let replicateTo dim size a =
+        Unary (Held ([], ReplicateTo (dim, size)), a) |> check
+
     /// summaiton of all elements
     let sum a = Unary(Sum, a) |> check
 
@@ -1025,6 +1054,10 @@ module Expr =
     [<RequiresExplicitTypeArguments>]
     let var<'T> name (ss: ShapeSpecT) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> check
+
+    /// variable of given name, type and shape
+    let varOfType name typ (ss: ShapeSpecT) = 
+        Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> check
 
     /// annotated expression
     let annotate ano a = 
@@ -1322,6 +1355,8 @@ module Expr =
     let interpolate3D interpolator a b c =
         interpolate interpolator [a; b; c]
    
+
+
 
 
 [<AutoOpen>]

@@ -428,10 +428,6 @@ module ArrayND =
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
 
-    /// true if a and b have at least one element in common
-    let inline overlapping a b = 
-        false // TODO
-
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
     let inline newCOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newC shp) :?> 'A
