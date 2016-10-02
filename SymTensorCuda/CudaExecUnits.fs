@@ -503,6 +503,8 @@ module CudaExecUnit =
         | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()  
         
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
@@ -1071,6 +1073,8 @@ module CudaExecUnit =
             execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
 
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) ->
             if SimpleRangesSpec.isDynamic srs then 

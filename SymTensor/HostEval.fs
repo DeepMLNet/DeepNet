@@ -124,6 +124,8 @@ module HostEval =
                             failwithf "Infinity or NaN encountered in %s" name
                         av
                     | Annotated _-> av  
+                    | Held (_, heldOp) ->
+                        failwithf "the held op %A must be expanded before evaluation" heldOp
                     |> box |> unbox              
                 | Binary(op, a, b) ->
                     let av, bv = subEval a, subEval b
