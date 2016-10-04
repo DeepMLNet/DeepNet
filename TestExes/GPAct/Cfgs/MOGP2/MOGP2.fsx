@@ -73,6 +73,6 @@ let cfg = {
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
-    PlotGPsDuringTraining  = false
+    PlotGPsDuringTraining  = true
 }
 

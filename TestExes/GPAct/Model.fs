@@ -271,8 +271,8 @@ module GPActivation =
         let Kk = Kk |> Expr.checkFinite "Kk"
         //let Kk = Kk |> Expr.dump "Kk"
         
-        let Kk_inv = Expr.invert Kk
-        let Kk_inv = Kk_inv |> Expr.checkFinite "Kk_inv"
+        let KkInv = Expr.invert Kk
+        let KkInv = KkInv |> Expr.checkFinite "Kk_inv"
         //let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
@@ -282,14 +282,22 @@ module GPActivation =
         
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
-        let beta = Kk_inv .* trnT
+        let beta = KkInv .* trnT
         //let beta = beta |> Expr.dump "beta"
 
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
-        let pred_mean = lk * Expr.padLeft beta |> Expr.sumAxis 2
-        let pred_mean = pred_mean |> Expr.checkFinite "pred_mean"
+        let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
+        let predMean = predMean |> Expr.checkFinite "pred_mean"
         //let pred_mean = pred_mean |> Expr.dump "pred_mean"
+
+//        let trnXFirst = trnX.T.[1] |> Expr.broadcast [nSmpls;nGps]
+//        let trnXLast = trnX.T.[trnX.Shape.[1] - 1] |> Expr.broadcast [nSmpls;nGps]
+//        let trnTFirst = trnX.T.[0] |> Expr.broadcast [nSmpls;nGps]
+//        let trnTLast = trnX.T.[trnX.Shape.[1] - 1] |> Expr.broadcast [nSmpls;nGps]
+//
+//        let predMean = Expr.ifThenElse (mu >>>> trnXFirst) predMean trnTFirst
+//        let predMean = Expr.ifThenElse (mu <<<< trnXLast) predMean trnTFirst
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
@@ -313,7 +321,7 @@ module GPActivation =
         // Tr( (Kk_inv - betaBetaT) .*  L )
         // ([1*, gp, trn_smpl1, trn_smpl2] - [1*, gp, trn_smpl, trn_smpl]) .* [smpl, gp, trn_smpl1, trn_smpl2]
         //   ==> Tr ([smpl, gp, trn_smpl1, trn_smpl2]) ==> [smpl, gp]
-        let var1 = Expr.padLeft (Kk_inv - betaBetaT) .* L  |> Expr.trace
+        let var1 = Expr.padLeft (KkInv - betaBetaT) .* L  |> Expr.trace
         //let var1 = var1 |> Expr.dump "var1"
         
         // Tr( lkLkT .* betaBeta.T ) 
@@ -322,7 +330,7 @@ module GPActivation =
         let var2 = lkLkT .* (Expr.padLeft betaBetaT) |> Expr.trace
         //let var2 = var2 |> Expr.dump "var2"
 
-        let pred_var = 1.0f - var1 - var2
+        let predVar = 1.0f - var1 - var2
         //let pred_var = pred_var |> Expr.dump "pred_var"
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
@@ -351,19 +359,19 @@ module GPActivation =
         // [smpl, gp1, 1*] * [smpl, 1*, gp2]
         // ==> [smpl, gp1, gp2]
         let mkml = 
-            (Expr.reshape [nSmpls; nGps; bc] pred_mean) *
-            (Expr.reshape [nSmpls; bc; nGps] pred_mean)
+            (Expr.reshape [nSmpls; nGps; bc] predMean) *
+            (Expr.reshape [nSmpls; bc; nGps] predMean)
         //let mkml = mkml |> Expr.dump "mkml"
 
         /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
-        let pred_cov_without_var = betaTbeta - mkml
+        let predCovWithoutVar = betaTbeta - mkml
         //let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
-        let pred_cov = setCovDiag nSmpls nGps pred_cov_without_var pred_var
+        let predCov = setCovDiag nSmpls nGps predCovWithoutVar predVar
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        pred_mean, pred_cov
+        predMean, predCov
 
 
 

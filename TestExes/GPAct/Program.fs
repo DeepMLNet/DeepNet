@@ -42,7 +42,7 @@ module Main =
         //SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
         //SymTensor.Compiler.Cuda.Debug.DumpCode <- true
         //SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
-        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
+//        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
 
         // parsing command line input
