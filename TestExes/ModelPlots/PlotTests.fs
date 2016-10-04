@@ -43,7 +43,9 @@ module PlotTests =
         let sigmaNs_val2 = sigmaNsVal
         printfn "Trn_x =\n%A" trnXHost
         printfn "Trn_t =\n%A" trnTHost
-        let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f)}
+        let zeroMean (x:ExprT) = Expr.zerosLike x
+        let tanHMean (x:ExprT) = tanh x
+        let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f);GaussianProcess.MeanFunction = tanHMean}
         let range = (-0.5f,0.5f)
         let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput
         printfn "Sample points =\n%A" smpls

@@ -139,10 +139,11 @@ module ConfigLoader =
                     l, s, x, t)     
                 let plots = async {
                     Cuda.CudaSup.setContext ()
+                    let zeroMean (x:ExprT) = Expr.zerosLike x
                     for KeyValue (name, (l, s, x, t)) in gpLayers do
                         let plots = [0..l.Shape.[0] - 1] |> List.map (fun gp ->
                             let ls = l.[gp] |> ArrayND.value
-                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f)}
+                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = zeroMean}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
                                             GPPlots.simplePlot (hps, 
