@@ -119,7 +119,7 @@ module Expr =
         | CheckFinite of string
         /// annotation (no influence on value)
         | Annotated of string       
-        /// an open that will expand into an expression once symbolic sizes have
+        /// an op that will expand into an expression once symbolic sizes have
         /// been substituted
         | Held of derivsShp:ShapeSpecT list * op:UnaryHeldOpT
 
@@ -179,10 +179,50 @@ module Expr =
         | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
+        /// iterative execution of an expression
+        | Loop of spec:LoopSpecT * output:LoopPortT
         /// extension op
         | ExtensionOp of IOp
-   
-   
+     
+    and LoopPortT = string
+
+
+    and SequenceArgSliceT = {
+        ArgIdx:     int
+        SliceDim:   int
+    }
+
+    and InitialValuesT = 
+        | InitialZero
+        | InitialArg of argIdx:int
+
+    and PreviousPortT = {
+        Port:          LoopPortT
+        Delay:         SizeSpecT
+        Initial:       InitialValuesT
+    }
+
+    and LoopInputT = 
+        | ConstArg of argIdx:int
+        | SequenceArgSlice of SequenceArgSliceT
+        | PreviousPort of PreviousPortT
+        | IterationIndex
+        | IterationsRemaining
+
+    and LoopValueT = {
+        Expr:       ExprT
+        SliceDim:   int
+    }
+
+    and LoopSpecT = {
+        Length:     SizeSpecT
+        Vars:       Map<VarSpecT, LoopInputT>   
+        Ports:      Map<LoopPortT, LoopValueT>
+    }
+
+
+
+
     /// A mathematical operation in an expression.
     /// This models a mathematical function or operator that takes one or more tensors
     /// and returns one tensor.
@@ -1355,8 +1395,15 @@ module Expr =
     let interpolate3D interpolator a b c =
         interpolate interpolator [a; b; c]
    
+    let loop spec port inputs =
+        Nary (Loop (spec, port), inputs) |> check
 
 
+    let reverseAxis dim (a: ExprT) : ExprT =
+        failwith "TODO"
+
+    let concat dim es =
+        failwith "TODO"
 
 
 [<AutoOpen>]

@@ -15,6 +15,19 @@ module DerivTypes =
     }
 
 
+    type internal LoopDerivT = {
+        Port:        LoopPortT
+        Slice:       FullExprRngsSpecT
+        ReverseAxis: int option
+    }
+
+
+    type internal PortContentsT = {
+        DerivWrt:   ResizeArray<VarSpecT>
+        ValueOf:    VarSpecT option
+        SliceDim:   int
+    }
+
 /// derivative calculation
 module Deriv =
     open Expr
@@ -254,24 +267,327 @@ module Deriv =
                     totalDerivates es des
                 | InterpolateToLeft -> empty baseExpr
 
+            | Loop (spec, output) ->
+                
+
+                failwith "TODO"
+
             | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
 
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    let compute (expr: ExprT) : DerivT =
+    and compute (expr: ExprT) : DerivT =
         let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
         reverseDiff expr expr eg
 
-    /// extracts the Jacobian of the given variable
-    let ofVar var (deriv: DerivT) =
-        match deriv.Jacobians |> Map.tryFind (extractVar var) with
+    and ofVarSpec var (deriv: DerivT) =
+        match deriv.Jacobians |> Map.tryFind var with
         | Some d -> d
         | None when Debug.FailIfVarNotInDerivative -> 
-            failwithf "the variable %A is not present in the expression" (extractVar var)
-        | None -> Expr.zerosOfSameType var [Expr.nElems deriv.Expr ; Expr.nElems var]
-            
+            failwithf "the variable %A is not present in the expression" var
+        | None -> 
+            let varExpr = Expr.makeVar var
+            Expr.zerosOfSameType varExpr [Expr.nElems deriv.Expr; Expr.nElems varExpr]
+
+    /// extracts the Jacobian of the given variable
+    and ofVar var deriv =
+        ofVarSpec (extractVar var) deriv           
         
+
+
+    and loopDeriv (funElems: SizeSpecT) (dOutputs: Map<LoopPortT, ExprT>) 
+            (originalArgs: ExprT list) (spec: LoopSpecT) =
+
+        let portType p =
+            spec.Ports.[p].Expr.Type
+
+        let portSliceShape p =
+            spec.Ports.[p].Expr.Shape |> ShapeSpec.withoutAxis spec.Ports.[p].SliceDim
+
+        let portSliceElems p =
+            p |> portSliceShape |> ShapeSpec.nElem
+
+        let args = ResizeArray<ExprT> originalArgs
+        let addArg expr =
+            match args |> Seq.tryFindIndex ((=) expr) with
+            | Some idx -> idx
+            | None ->
+                let idx = args.Count
+                args.Add expr
+                idx
+
+        // step 1: assign variables to (incoming) Jacobians of all ports        
+
+        /// map from variable representing a derivative to the loop input specification
+        let varInputSpecs = Dictionary<VarSpecT, LoopInputT> ()
+
+        /// map from a loop output to the variable representing its derivative
+        let dOutputVars = Dictionary<LoopPortT, VarSpecT> ()
+
+        /// map from a loop PreviousPort to the variables representing its derivative sources
+        let dPreviousVars = Dictionary<PreviousPortT, VarSpecT> ()
+
+        let dConstArgSumVars = Dictionary<int, VarSpecT> ()
+
+        /// map from a loop port to the value it must contain
+        let portContents = Dictionary<LoopPortT, PortContentsT> ()
+
+        /// map from argument index to the loop ports containing its derivative summands
+        let argIdxDerivs = Dictionary<int, System.Collections.Generic.HashSet<LoopDerivT>> ()
+
+
+
+        // go through loop outputs and create variables representing their derivatives
+        for KeyValue (outPort, dExpr) in dOutputs do
+            // create variable for incoming Jacobian
+            let value = spec.Ports.[outPort]
+            let dName = sprintf "d_%s" outPort
+            let dVar =
+                VarSpec.create dName value.Expr.Type (funElems :: value.Expr.Shape)
+            dOutputVars.[outPort] <- dVar
+
+            // create variable input specification:
+            // source of incoming Jacobian is sequence of derivatives of the loop output
+            let sas = {
+                ArgIdx = addArg dOutputs.[outPort]
+                SliceDim = value.SliceDim
+            }
+            varInputSpecs.Add (dVar, SequenceArgSlice sas)         
+               
+
+
+        // go through loop variables and create corresponding derivative variables and ports
+        for KeyValue (usingVar, li) in spec.Vars do
+            let liType = usingVar.Type
+            let liShape = usingVar.Shape
+            let liElems = ShapeSpec.nElem usingVar.Shape
+            let liDims = ShapeSpec.nDim usingVar.Shape
+
+            match li with
+            | ConstArg argIdx ->
+                // create a variable for the sum of the accumulated Jacobian so far
+                let dAccumName = sprintf "dSum_ConstArg%d[-1]" argIdx
+                let dAccumVar = VarSpec.create dAccumName liType [funElems; liElems]
+
+                // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
+                let dPortName = sprintf "dSum_ConstArg%d" argIdx
+                if not (portContents.ContainsKey dPortName) then
+                    portContents.[dPortName] <- {DerivWrt=ResizeArray<_>(); ValueOf=Some dAccumVar; SliceDim=liDims+1}
+                portContents.[dPortName].DerivWrt.Add usingVar
+
+                // create variable input specification:
+                // source is accumulated Jacobian w.r.t. ConstArg argIdx in previous derivative loop iteration
+                let dpp = {
+                    Port = dPortName
+                    Delay = SizeSpec.one
+                    Initial = InitialZero
+                }
+                varInputSpecs.Add (dAccumVar, PreviousPort dpp)
+
+                // set Jacobian w.r.t. input argument argIdx specification
+                let slice = [
+                    yield RSAll                         // function element axis
+                    for d=0 to liDims-1 do yield RSAll  // derivative axes
+                    yield RSSymElem (spec.Length - 1)   // sequence slice axis
+                ]
+                argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=None} |> ignore
+
+            | SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
+                // a sequence arg slice is an input variable and thus outputs a gradient
+                // it thus needs a loop port 
+
+                // create loop port exposing the step Jacobian w.r.t. the sequence slice
+                let dPortName = sprintf "d_SeqArg%d_%d" argIdx sliceDim
+                if not (portContents.ContainsKey dPortName) then
+                    portContents.[dPortName] <- {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1}
+                portContents.[dPortName].DerivWrt.Add usingVar
+                
+                // set Jacobian w.r.t. input argument argIdx specification
+                let slice = [
+                    yield RSAll                                 // function element axis
+                    for d=0 to sliceDim-1 do yield RSAll        // derivative axes
+                    yield RSAll                                 // sequence slice axis
+                    for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
+                ]
+                argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
+
+            | PreviousPort pp ->
+                // create loop port exposing the derivative w.r.t. the PreviousPort
+                let dPortName = sprintf "d_%s[%A]" pp.Port pp.Delay
+                if not (portContents.ContainsKey dPortName) then
+                    let sliceDim = spec.Ports.[pp.Port].SliceDim
+                    portContents.Add (dPortName, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim})
+                portContents.[dPortName].DerivWrt.Add usingVar
+
+                // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
+                let dVar = VarSpec.create dPortName liType (funElems :: liShape)
+                dPreviousVars.[pp] <- dVar
+
+                // create corresponding variable input specification:
+                // source is Jacobian calculated w.r.t. the PreviousPort in previous derivative loop iteration
+                let dpp = {
+                    Port = dPortName
+                    Delay = pp.Delay
+                    Initial = InitialZero
+                }
+                varInputSpecs.Add (dVar, PreviousPort dpp)                                 
+
+                // check initial value
+                match pp.Initial with
+                | InitialArg argIdx ->
+                    // If initial value(s) is specified by a sequence argument,
+                    // we need to output the Jacboian w.r.t. to the initial sequence argument.
+                    // It is available in the last "Delay" steps of the derivative loop port.
+                    let sliceDim = spec.Ports.[pp.Port].SliceDim
+                    let slice = [
+                        yield RSAll                                 // function element axis
+                        for d=0 to sliceDim-1 do yield RSAll        // derivative axes
+                        yield RSSymStartSymEnd                      // sequence slice axis
+                            (Some (spec.Length - pp.Delay),
+                             Some (spec.Length - 1))                
+                        for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
+                    ]
+                    argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
+                | InitialZero -> 
+                    // For zero initial value, no Jacobian propagation needs to be done.
+                    ()
+                                               
+            | IterationIndex 
+            | IterationsRemaining -> 
+                // iteration index is an intergral constant
+                ()        
+
+            
+        /// derivatives of all ports w.r.t. all variables
+        let portDerivs =
+            spec.Ports
+            |> Map.toSeq
+            |> Seq.map (fun (port, value) ->              
+                // build expression for incoming Jacobian, i.e. Jacobian w.r.t. this port
+                // shape is: [funElems; <shape of value.Expr>]
+                let incomingExpandedJacobian = 
+                    seq { 
+                        // derivative coming from external use of port's output slice
+                        match dOutputVars.TryFind port with
+                        | Some dVar -> yield Expr.makeVar dVar
+                        | None -> ()
+
+                        // derivatives coming from PreviousPort uses of this port 
+                        for dpv in dPreviousVars do
+                            let previousPort, dVar = dpv.Key, dpv.Value
+                            if previousPort.Port = port then yield Expr.makeVar dVar
+                    } |> Seq.reduce (+)
+                    
+                // collapse Jacobian
+                let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
+
+                // calculate Jacobians w.r.t. all variables
+                reverseDiff value.Expr value.Expr incomingJacobian)    
+            |> Seq.reduce merge
+
+
+        // go through portContents and create actual port contents
+        let ports =
+            portContents
+            |> Seq.map (fun pc ->
+                let port, {DerivWrt=derivWrts; ValueOf=valueOf; SliceDim=sliceDim} = pc.Key, pc.Value
+                let expr = 
+                    seq {
+                        // obtain Jacobians
+                        for wrt in derivWrts do
+                            let wrtJacobian = portDerivs |> ofVarSpec wrt
+                            let wrtExpandedJacobian = wrtJacobian |> Expr.reshape (funElems :: wrt.Shape)
+                            yield wrtExpandedJacobian
+                   
+                        // obtain value, if any
+                        match valueOf with
+                        | Some vs -> yield Expr.makeVar vs
+                        | None -> ()
+                    } |> Seq.reduce (+)
+                port, {Expr=expr; SliceDim=sliceDim})
+            |> Map.ofSeq
+
+
+        // create variable specification
+        let varsFromDeriv = 
+            varInputSpecs
+            |> Seq.map (fun vis -> vis.Key, vis.Value)
+            |> Map.ofSeq
+
+        // need to map original vars
+        // 1. ConstArg stays as is
+        // 2. SequenceArgSlice gets remapped to reversed SequeceArgSlice
+        // 3. PreviousPort gets remapped to output sequence of original op with appropriate delay and reversed
+        // 4. IterationIndex gets remapped to IterationsRemaining
+        // 5. IterationsRemaining gets remapped to IterationIndex
+
+        let originalVars =
+            spec.Vars
+            |> Map.map (fun vs li ->
+                match li with
+                | ConstArg _ -> li
+                | SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
+                    let revExpr = Expr.reverseAxis sliceDim args.[argIdx]
+                    SequenceArgSlice {ArgIdx=addArg revExpr; SliceDim=sliceDim}
+                | PreviousPort pp ->
+                    let portOutput = Expr.loop spec pp.Port originalArgs
+                    let portExpr = spec.Ports.[pp.Port].Expr
+                    let sliceDim = spec.Ports.[pp.Port].SliceDim
+
+                    let initialValues =
+                        match pp.Initial with
+                        | InitialZero -> 
+                            let initialShp = portOutput.Shape |> ShapeSpec.set sliceDim pp.Delay
+                            Expr.zerosOfSameType portExpr initialShp
+                        | InitialArg initialArgIdx ->
+                            originalArgs.[initialArgIdx]
+
+                    let portSeq = Expr.concat sliceDim [initialValues; portOutput]
+                    let revPortSeq = portSeq |> Expr.reverseAxis sliceDim
+
+                    let delaySlice : FullExprRngsSpecT = [
+                        for d=0 to sliceDim-1 do yield RSAll 
+                        yield RSSymStartSymEnd (Some pp.Delay, None)
+                        for d=sliceDim to portExpr.NDims-1 do yield RSAll
+                    ]
+                    let delayedPortSeq = revPortSeq.[delaySlice]
+
+                    SequenceArgSlice {ArgIdx=addArg delayedPortSeq; SliceDim=sliceDim}
+                | IterationIndex -> IterationsRemaining
+                | IterationsRemaining -> IterationIndex)
+
+        let vars = Map.join originalVars varsFromDeriv
+
+        let dSpec = {
+            Length = spec.Length
+            Vars   = vars
+            Ports  = ports
+        }
+
+        // build derivatives w.r.t. our arguments
+        let argIdxDerivExprs = 
+            argIdxDerivs 
+            |> Seq.map (fun aid -> 
+                let argIdx, loopDerivs = aid.Key, aid.Value
+                let dExpr =
+                    loopDerivs
+                    |> Seq.map (fun {Port=port; Slice=slice; ReverseAxis=reverseAxis} ->
+                        let loopOutput = Expr.loop dSpec port (List.ofSeq args)
+                        let sliced = loopOutput.[slice]
+                        match reverseAxis with
+                        | Some ax -> sliced |> Expr.reverseAxis ax
+                        | None -> sliced)
+                    |> Seq.reduce (+)
+                argIdx, dExpr)
+            |> Map.ofSeq
+
+        let derivExprs = [
+            for a=0 to originalArgs.Length-1 do
+                yield argIdxDerivExprs.[a]
+        ]
+
+        derivExprs
 
 
 

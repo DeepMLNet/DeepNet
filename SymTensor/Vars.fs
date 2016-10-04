@@ -127,11 +127,15 @@ module VarSpecTypes =
         Name:      string
         Shape:     ShapeSpecT
         TypeName:  TypeNameT
-    }
+    } with
+        member this.Type = TypeName.getType this.TypeName
         
 
 /// variable specification
 module VarSpec =
+
+    let create name typ shape : VarSpecT =
+        {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
 
     /// create variable specifation by name and shape and type
     let inline ofNameShapeAndTypeName name shape typeName : VarSpecT =
