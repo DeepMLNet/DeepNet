@@ -146,7 +146,7 @@ module ConfigLoader =
                             let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = zeroMean}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
-                                            GPPlots.simplePlot (hps, 
+                                            GPPlots.Plots.simplePlot (hps, 
                                                                 s.[gp, *],
                                                                 x.[gp, *],
                                                                 t.[gp, *],

@@ -30,16 +30,12 @@ module PlotTests =
 
         let sigmaNs_host = (ArrayNDHost.ones<single> [ntraining]) * sqrt 0.001f
 
-        let newArray (ary:ArrayNDT<single>)=
-            let aNew = ArrayND.newCOfType  ary.Shape ary
-            ArrayND.copyTo ary aNew
-            aNew
         //transfer train parametters to device (Host or GPU)
         let trnXVal = trnXHost  |> TestFunctions.post DevCuda
         let trnTVal = trnTHost  |> TestFunctions.post DevCuda
         let sigmaNsVal = sigmaNs_host  |> TestFunctions.post DevCuda
-        let trn_x_val2 = newArray trnXVal
-        let trn_t_val2 = newArray trnTVal
+        let trn_x_val2 = ArrayND.copy trnXVal
+        let trn_t_val2 = ArrayND.copy trnTVal
         let sigmaNs_val2 = sigmaNsVal
         printfn "Trn_x =\n%A" trnXHost
         printfn "Trn_t =\n%A" trnTHost
@@ -47,12 +43,12 @@ module PlotTests =
         let tanHMean (x:ExprT) = tanh x
         let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f);GaussianProcess.MeanFunction = tanHMean}
         let range = (-0.5f,0.5f)
-        let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput
+        let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.Plots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput
         printfn "Sample points =\n%A" smpls
         printfn "Sampled means =\n%A" mean_smpls
         printfn "Sampled Covariances =\n%A" cov_smpls
         printfn "Sampled StanderdDeviations =\n%A" stdev_smpls
-        let gpTestPlot = fun () -> GPPlots.simplePlot (hyperPars, sigmaNsVal, trnXVal, trnTVal,ninput)
+        let gpTestPlot = fun () -> GPPlots.Plots.simplePlot (hyperPars, sigmaNsVal, trnXVal, trnTVal,ninput)
         gpTestPlot ()
         save "GPTestplot1.png" gpTestPlot
 

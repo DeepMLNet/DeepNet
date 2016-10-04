@@ -135,7 +135,7 @@ module TestFunctions =
         let trn_x_val = trn_x_host  |> post device
         let trn_t_val = trn_t_host  |> post device
         let trn_sigma_val = trn_sigma_host  |> post device
-
+        let x = mi.ParameterStorage.[mgp.Lengthscales]
         mi.ParameterStorage.[mgp.Lengthscales] <- ls_val
         mi.ParameterStorage.[mgp.TrnX] <- trn_x_val
         mi.ParameterStorage.[mgp.TrnT] <- trn_t_val
