@@ -289,15 +289,8 @@ module GPActivation =
         // ==> pred_mean [smpl, gp]
         let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
         let predMean = predMean |> Expr.checkFinite "pred_mean"
-        //let pred_mean = pred_mean |> Expr.dump "pred_mean"
+        //let predMean = pred_mean |> Expr.dump "pred_mean"
 
-//        let trnXFirst = trnX.T.[1] |> Expr.broadcast [nSmpls;nGps]
-//        let trnXLast = trnX.T.[trnX.Shape.[1] - 1] |> Expr.broadcast [nSmpls;nGps]
-//        let trnTFirst = trnX.T.[0] |> Expr.broadcast [nSmpls;nGps]
-//        let trnTLast = trnX.T.[trnX.Shape.[1] - 1] |> Expr.broadcast [nSmpls;nGps]
-//
-//        let predMean = Expr.ifThenElse (mu >>>> trnXFirst) predMean trnTFirst
-//        let predMean = Expr.ifThenElse (mu <<<< trnXLast) predMean trnTFirst
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
