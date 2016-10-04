@@ -20,6 +20,7 @@ module ConfigTypes =
     type Layer = 
         | NeuralLayer of NeuralLayer.HyperPars
         | GPActivationLayer of GPActivationLayer.HyperPars
+        | MeanOnlyGPLayer of MeanOnlyGPLayer.HyperPars
 
     type FeedForwardModel = {
         Layers:     Layer list
@@ -85,6 +86,7 @@ module ConfigLoader =
         let dataset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
         
         // build model
+        let mutable meanOnlyGPLayers = Map.empty
         let mutable gpLayers = Map.empty
         let predMean, predVar = 
             ((input, GPUtils.covZero input), List.indexed cfg.Model.Layers)
@@ -99,6 +101,11 @@ module ConfigLoader =
                     gpLayers <- gpLayers |> Map.add name pars
                     let predMean, predVar = GPActivationLayer.pred pars (mean, var)
                     predMean, GPUtils.covZero predMean 
+                | MeanOnlyGPLayer hp ->
+                    let name = (sprintf "MeanOnlyGPLayer%d" layerIdx)
+                    let pars = MeanOnlyGPLayer.pars (mb.Module name) hp
+                    meanOnlyGPLayers <- meanOnlyGPLayers |> Map.add name pars
+                    MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean
                 )
 
         // build loss
@@ -136,14 +143,24 @@ module ConfigLoader =
                     let s = mi.[gpPars.TrnSigma] |> ArrayND.copy
                     let x = mi.[gpPars.TrnX] |> ArrayND.copy
                     let t = mi.[gpPars.TrnT] |> ArrayND.copy
-                    l, s, x, t)     
+                    let meanFct = (fun x -> Expr.zerosLike x)
+                    l, s, x, t, meanFct)
+                let moGPLayers  = meanOnlyGPLayers |> Map.map (fun name pars -> 
+                    let l = mi.[pars.Lengthscales] |> ArrayND.copy
+                    let s = mi.[pars.TrnSigma] |> ArrayND.copy
+                    let x = mi.[pars.TrnX] |> ArrayND.copy
+                    let t = mi.[pars.TrnT] |> ArrayND.copy
+                    let meanFct = pars.HyperPars.MeanFunction
+                    l, s, x, t, meanFct)
+                let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
+                    Map(Seq.concat [ (Map.toSeq p) ; (Map.toSeq q) ])
+                let gpLayers = join gpLayers moGPLayers       
                 let plots = async {
                     Cuda.CudaSup.setContext ()
-                    let zeroMean (x:ExprT) = Expr.zerosLike x
-                    for KeyValue (name, (l, s, x, t)) in gpLayers do
+                    for KeyValue (name, (l, s, x, t, meanFct)) in gpLayers do
                         let plots = [0..l.Shape.[0] - 1] |> List.map (fun gp ->
                             let ls = l.[gp] |> ArrayND.value
-                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = zeroMean}
+                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = meanFct}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
                                             GPPlots.Plots.simplePlot (hps, 

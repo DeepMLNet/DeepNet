@@ -31,10 +31,10 @@ module GaussianProcess =
         HyperPars:  HyperPars
         }
 
-    let internal initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
+    let  initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
         ArrayNDHost.scalar l
     
-    let internal initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
+    let  initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
         ArrayNDHost.scalar s
 
     type Pars = LinPars of ParsLinear | SEPars of  ParsSE
