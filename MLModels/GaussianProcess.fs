@@ -17,6 +17,7 @@ module GaussianProcess =
     type HyperPars = {
         Kernel :        Kernel
         MeanFunction:   (ExprT -> ExprT)
+        Monotonicity: bool
         }
     
     /// GP parameters with linear kernel
@@ -61,30 +62,43 @@ module GaussianProcess =
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
-
+    /// Prediction of mean and covariance of input data xstar given train inputs x and targets y
     let predict (pars:Pars) x y sigmaNs xStar =
         let covMat z z' =
             match pars with
             | LinPars _ -> linearCovariance z z'
             | SEPars parsSE  -> squaredExpCovariance (parsSE.Lengthscale,parsSE.SignalVariance) z z'
-        let K           = (covMat x x) + Expr.diagMat sigmaNs
-        let KInv        = Expr.invert K
-        let KStar      = covMat x xStar
-        let KStarT     = Expr.transpose KStar
-        let KStarstar  = covMat xStar xStar
+        let k           = (covMat x x) + Expr.diagMat sigmaNs
+        let kInv        = Expr.invert k
+        let kStar      = covMat x xStar
+        let kStarT     = Expr.transpose kStar
+        let kStarstar  = covMat xStar xStar
         
-        let meanFkt = 
+        let meanFkt,monotonicity = 
             match pars with
-            | LinPars parsLin -> parsLin.HyperPars.MeanFunction
-            | SEPars parsSE -> parsSE.HyperPars.MeanFunction
+            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity
+            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity
         
         let meanX = meanFkt x
         let meanXStar = meanFkt xStar
-        let mean = meanXStar + KStarT .* KInv .* (y - meanX)
-        let cov = KStarstar - KStarT .* KInv .* KStar
-        mean,cov
+        //TODO: integrate mean function, different ways of placing virtual derivative points
+        if monotonicity then 
+            ///locations of the virtual derivative points on training points
+            let xm = x
+            let vu = 1e06f
+            let kFf = k
+            let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
+            let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
+
+            let mean = meanXStar + kStarT .* kInv .* (y - meanX)
+            let cov = kStarstar - kStarT .* kInv .* kStar
+            mean,cov
+        else
+            let mean = meanXStar + kStarT .* kInv .* (y - meanX)
+            let cov = kStarstar - kStarT .* kInv .* kStar
+            mean,cov
 
     /// WARNING: NOT YET IMPLEMENTED, ONLY A RIMINDER FOR LATER IMPLEMENTATION!
     /// !!! CALLING THIS FUNCTION WILL ONLY CAUSE AN ERROR !!!
-    let logMarginalLiklihood (pars:Pars) x y sigmaNs x_sta =
+    let logMarginalLiklihood (pars:Pars) x y sigmaNs xStar =
         failwith "TODO: implement logMarginalLikelihood"
