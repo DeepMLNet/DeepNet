@@ -47,9 +47,9 @@ module Deriv =
     let private empty expr =
         {Expr=expr; Jacobians=Map.empty}
 
-    /// reverse accumulation autodifferentiation of an expression
-    let rec reverseDiff (baseExpr: ExprT) (expr: ExprT) (eg: ExprT) : DerivT =    
-        let rds = reverseDiff baseExpr
+
+    /// calculates the Jacobian of all arguments of an expression given the Jacobian of the expression
+    let rec private reverseDiffStep (expr: ExprT) (eg: ExprT) : List<ExprT * ExprT> =    
         let exprShp = expr.Shape
         let funElems = eg.Shape.[0]  
 
@@ -64,24 +64,20 @@ module Deriv =
                 (shapeOf eg).[1] (ShapeSpec.nElem (shapeOf expr))
 
         /// expands the second dimension of the the Jacobian into the shape of this expression
-        let egExpanded =
-            eg |> reshape (funElems :: (shapeOf expr))
+        let egExp = eg |> reshape (funElems :: (shapeOf expr))
 
         /// flattens all but the first dimension into one dimension
         let collapse g =
             let wrtElems = (shapeOf g).[1..] |> ShapeSpec.nElem
             g |> reshape [funElems; wrtElems]
 
-        /// total derivates given op's derivates
-        let totalDerivates es des =
-            (empty baseExpr, List.zip es des)
-            ||> List.fold (fun totGrad (e, de) ->
-                let eGrad = rds e de
-                merge totGrad eGrad)
-
         /// logic op failure
         let failLogic op =
             failwithf "cannot calculate derivative of logic or comparison operation %A" op
+
+        /// zero Jacobian
+        let zeroJacobian wrt =
+            Expr.zerosOfSameType wrt [funElems; wrt.NElems]
 
         // useful numbers
         let zero = Expr.zeroOfSameType expr
@@ -91,110 +87,110 @@ module Deriv =
         let zeros = Expr.zerosOfSameType expr
 
         match expr with
-        | Leaf(op) ->                  
-            match op with
-            | ScalarConst _ -> empty baseExpr
-            | SizeValue _ -> empty baseExpr
-            | Identity _ -> empty baseExpr
-            | Var v -> {empty baseExpr with Jacobians=Map [v, eg]}
+        | Leaf(op) -> List.empty            
 
         | Unary(op, a) ->
             match op with
-            | Negate -> -eg |> rds a
-            | Abs -> egExpanded * padLeft (signt a) |> collapse |> rds a
-            | SignT -> empty baseExpr
-            | Log -> egExpanded * padLeft (a ** (-one)) |> collapse |> rds a
-            | Log10 -> eg |> rds (log a / log (scalar 10))
-            | Exp -> egExpanded * padLeft (exp a) |> collapse |> rds a
-            | Sin -> egExpanded * padLeft (cos a) |> collapse |> rds a
-            | Cos -> egExpanded * padLeft (-sin a) |> collapse |> rds a
-            | Tan -> egExpanded * padLeft (one + (tan a)**two) |> collapse |> rds a
-            | Asin -> egExpanded * padLeft (one / sqrtt (one - a**two)) |> collapse |> rds a
-            | Acos -> egExpanded * padLeft (-one / sqrtt (one - a**two)) |> collapse |> rds a
-            | Atan -> egExpanded * padLeft (one / (one + a**two)) |> collapse |> rds a
-            | Sinh -> egExpanded * padLeft (cosh a) |> collapse |> rds a
-            | Cosh -> egExpanded * padLeft (sinh a) |> collapse |> rds a
-            | Tanh -> egExpanded * padLeft (one - (tanh a)**two) |> collapse |> rds a
-            | Sqrt -> egExpanded * padLeft (one / (two * sqrtt a)) |> collapse |> rds a
-            | Ceil -> empty baseExpr
-            | Floor -> empty baseExpr
-            | Round -> empty baseExpr
-            | Truncate -> empty baseExpr
+            | Negate -> -eg 
+            | Abs -> egExp * padLeft (signt a) |> collapse 
+            | SignT -> zeroJacobian a
+            | Log -> egExp * padLeft (a ** (-one)) |> collapse 
+            | Log10 -> egExp * padLeft (a ** (-one) / log (scalar 10)) |> collapse
+            | Exp -> egExp * padLeft (exp a) |> collapse 
+            | Sin -> egExp * padLeft (cos a) |> collapse 
+            | Cos -> egExp * padLeft (-sin a) |> collapse 
+            | Tan -> egExp * padLeft (one + (tan a)**two) |> collapse 
+            | Asin -> egExp * padLeft (one / sqrtt (one - a**two)) |> collapse 
+            | Acos -> egExp * padLeft (-one / sqrtt (one - a**two)) |> collapse 
+            | Atan -> egExp * padLeft (one / (one + a**two)) |> collapse 
+            | Sinh -> egExp * padLeft (cosh a) |> collapse 
+            | Cosh -> egExp * padLeft (sinh a) |> collapse 
+            | Tanh -> egExp * padLeft (one - (tanh a)**two) |> collapse 
+            | Sqrt -> egExp * padLeft (one / (two * sqrtt a)) |> collapse 
+            | Ceil -> zeroJacobian a
+            | Floor -> zeroJacobian a
+            | Round -> zeroJacobian a
+            | Truncate -> zeroJacobian a
             
             | Not -> failLogic op
 
-            | Diag (ax1, ax2) -> egExpanded |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse |> rds a
-            | DiagMat (ax1, ax2) -> egExpanded |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse |> rds a
-            | Invert -> -(padLeft expr.T) .* egExpanded .* (padLeft expr.T) |> collapse |> rds a
+            | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
+            | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
+            | Invert -> -(padLeft expr.T) .* egExp .* (padLeft expr.T) |> collapse 
             | PermuteAxes perm -> 
                 let backPerm = Permutation.invert perm
                 let egePerm = 
                     0 :: List.map (fun p -> p + 1) backPerm
-                egExpanded |> permuteAxes egePerm |> collapse |> rds a
-
+                egExp |> permuteAxes egePerm |> collapse 
             | Subtensor srs ->
                 let agExpanded = zeros (funElems :: (shapeOf a))
-                setSubtensor agExpanded.[SRSAll :: srs] egExpanded
+                setSubtensor agExpanded.[SRSAll :: srs] egExp
                 |> collapse 
-                |> rds a
-            | Reshape ss -> eg |> rds a
+            | Reshape ss -> eg 
             | DoBroadcast ss -> 
-                let mutable egUnbroadcasted = egExpanded
+                let mutable egUnbroadcasted = egExp
                 for ax, (eSize, aSize) in List.indexed (List.zip ss (shapeOf a)) do
                     match eSize, aSize with
                     | SizeSpecT.Broadcast, SizeSpecT.Broadcast -> ()
                     | _, SizeSpecT.Broadcast ->
                         egUnbroadcasted <- egUnbroadcasted |> sumKeepingAxis (ax + 1)
                     | _ -> ()
-                egUnbroadcasted |> collapse |> rds a
+                egUnbroadcasted |> collapse 
             | Held (derivsShp, heldOp) -> 
-                Unary(Held (shapeOf a :: derivsShp, heldOp), eg) |> rds a                
+                Unary(Held (shapeOf a :: derivsShp, heldOp), eg)                
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
-                        |> collapse |> rds a
+                        |> collapse 
             | SumAxis ax -> 
-                let eeg = egExpanded 
+                let eeg = egExp 
                 let bca = eeg |> reshape (shapeOf eeg |> ShapeSpec.insertBroadcastAxis (ax + 1))
                 let ael = (shapeOf a).[ax]
                 let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
-                bc |> collapse |> rds a
-            | StoreToVar _ -> eg |> rds a
+                bc |> collapse 
+            | StoreToVar _ -> eg 
 
-            | NullifyJacobian ->
-                Expr.zerosLike eg |> rds a
+            | NullifyJacobian -> Expr.zerosLike eg 
             | AssumeJacobian jac ->
-                let jacBc =
-                    match eg.Shape.[0], jac.Shape.[0] with
-                    | fl, jl when fl = jl -> jac
-                    | fl, jl when jl = SizeSpec.broadcastable ->
-                        jac |> Expr.broadcast [fl; jac.Shape.[1]]
-                    | _ -> 
-                        failwithf "cannot broadcast specified Jacobian of shape %A to required 
-                                   Jacobian shape %A" jac.Shape eg.Shape
-                jacBc |> rds a
+                match eg.Shape.[0], jac.Shape.[0] with
+                | fl, jl when fl = jl -> jac
+                | fl, jl when jl = SizeSpec.broadcastable ->
+                    jac |> Expr.broadcast [fl; jac.Shape.[1]]
+                | _ -> 
+                    failwithf "cannot broadcast specified Jacobian of shape %A to required 
+                                Jacobian shape %A" jac.Shape eg.Shape
 
-            | Print _ -> eg |> rds a
-            | Dump _ -> eg |> rds a
-            | Annotated _ -> eg |> rds a
+            | Print _ -> eg 
+            | Dump _ -> eg 
+            | Annotated _ -> eg 
             | CheckFinite name ->
-                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) |> rds a
+                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) 
+
+            |> fun da -> [a, da]
 
         | Binary(op, a, b) ->
-            let inline (.+) da db = totalDerivates [a; b] [da; db]
+
+            let ifThenElseJac cond a b =
+                let egZeros = zerosLike egExp
+                let da = ifThenElse (padLeft cond) egExp egZeros |> collapse
+                let db = ifThenElse (padLeft cond) egZeros egExp |> collapse
+                [a, da; b, db]
+
+            let inline (.+) da db = [a, da; b, db]
 
             match op with            
             | Add -> eg .+ eg
             | Substract -> eg .+ (-eg)
-            | Multiply -> ((egExpanded * (padLeft b)) |> collapse) .+
-                          ((egExpanded * (padLeft a)) |> collapse)
-            | Divide -> eg |> rds (a * b ** (-one))
+            | Multiply -> ((egExp * (padLeft b)) |> collapse) .+
+                          ((egExp * (padLeft a)) |> collapse)
+            | Divide -> ((egExp * padLeft (b**(-one))) |> collapse) .+
+                        ((egExp * padLeft (-a * b**(-two))) |> collapse)
             | Modulo -> 
                 failwith "Modulo gradient is broken"
-                eg .+ (padLeft (-truncate (a / b)) |> collapse) 
-            | Power -> (egExpanded * padLeft (b * a**(b - one)) |> collapse) .+ 
-                       (egExpanded * padLeft (a**b * log a) |> collapse)
+                eg .+ (egExp * padLeft (-truncate (a / b)) |> collapse) 
+            | Power -> (egExp * padLeft (b * a**(b - one)) |> collapse) .+ 
+                       (egExp * padLeft (a**b * log a) |> collapse)
             
-            | MaxElemwise -> eg |> rds (ifThenElse (a >>>> b) a b)
-            | MinElemwise -> eg |> rds (ifThenElse (a <<<< b) a b)
+            | MaxElemwise -> ifThenElseJac (a >>>> b) a b
+            | MinElemwise -> ifThenElseJac (a <<<< b) a b
 
             | Equal
             | Less
@@ -208,11 +204,7 @@ module Deriv =
             | Or 
                 -> failLogic op
 
-            | IfThenElse cond ->
-                let egZeros = zerosLike egExpanded
-                let da = ifThenElse (padLeft cond) egExpanded egZeros |> collapse
-                let db = ifThenElse (padLeft cond) egZeros egExpanded |> collapse
-                da .+ db
+            | IfThenElse cond -> ifThenElseJac cond a b
 
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
@@ -235,69 +227,49 @@ module Deriv =
                 let aShp = shapeOf a
                 let nd = ShapeSpec.nDim aShp
                 let batchShp = aShp.[0..nd-3]
-                let egT = egExpanded.T |> collapse
+                let egT = egExp.T |> collapse
                 let daT = mxWrtX (b.T) (a.T) (expr.T) egT
                 let da = daT |> reshape ([funElems] @ batchShp @ [aShp.[nd-1]; aShp.[nd-2]]) |> transpose |> collapse
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"
             | SetSubtensor sr ->
-                let bgExpanded = egExpanded.[SRSAll::sr]
-                let agExpanded = setSubtensor egExpanded.[SRSAll::sr] (zerosLike bgExpanded)
+                let bgExpanded = egExp.[SRSAll::sr]
+                let agExpanded = setSubtensor egExp.[SRSAll::sr] (zerosLike bgExpanded)
                 (agExpanded |> collapse) .+ (bgExpanded |> collapse)
 
         | Nary(op, es) ->
             match op with
             | Elements (resShape, elemExpr) ->
-                let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape (es.Length)
-                let des = 
-                    List.zip es desElemExprs
-                    |> List.map (fun (e, deElemExpr) -> 
-                        let deShp = funElems :: (shapeOf e)
-                        let deArgs = es @ [egExpanded]
-                        Expr.elements deShp deElemExpr deArgs |> collapse)
-                totalDerivates es des
+                let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape es.Length
+                List.zip es desElemExprs
+                |> List.map (fun (e, deElemExpr) -> 
+                    let deShp = funElems :: (shapeOf e)
+                    let deArgs = es @ [egExp]
+                    e, Expr.elements deShp deElemExpr deArgs |> collapse)
             | Interpolate ip -> 
                 match ip.Mode with
                 | InterpolateLinearaly ->
-                    let des = 
-                        [for d=0 to es.Length-1 do
-                            let ipd = ip |> Interpolator.getDerivative d 
-                            yield egExpanded * padLeft (Expr.interpolate ipd es) |> collapse]
-                    totalDerivates es des
-                | InterpolateToLeft -> empty baseExpr
+                    List.indexed es
+                    |> List.map (fun (d, e) ->
+                        let ipd = ip |> Interpolator.getDerivative d 
+                        e, egExp * padLeft (Expr.interpolate ipd es) |> collapse)
+                | InterpolateToLeft -> 
+                    es |> List.map (fun e -> e, zeroJacobian e)
 
-            | Loop (spec, output) ->
-                
-
+            | Channel (Loop spec, output) ->              
                 failwith "TODO"
 
-            | ExtensionOp eop -> eop.Deriv eg es |> totalDerivates es                
+            | ExtensionOp eop -> 
+                let des = eop.Deriv eg es     
+                List.zip es des          
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
+    /// derivative of loop expression
+    and private loopDeriv (dOutputs: Map<LoopPortT, ExprT>) (originalArgs: ExprT list) (spec: LoopSpecT) =
 
-    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    and compute (expr: ExprT) : DerivT =
-        let eg = shapeOf expr |> ShapeSpec.nElem |> identityOfSameType expr
-        reverseDiff expr expr eg
-
-    and ofVarSpec var (deriv: DerivT) =
-        match deriv.Jacobians |> Map.tryFind var with
-        | Some d -> d
-        | None when Debug.FailIfVarNotInDerivative -> 
-            failwithf "the variable %A is not present in the expression" var
-        | None -> 
-            let varExpr = Expr.makeVar var
-            Expr.zerosOfSameType varExpr [Expr.nElems deriv.Expr; Expr.nElems varExpr]
-
-    /// extracts the Jacobian of the given variable
-    and ofVar var deriv =
-        ofVarSpec (extractVar var) deriv           
-        
-
-
-    and loopDeriv (funElems: SizeSpecT) (dOutputs: Map<LoopPortT, ExprT>) 
-            (originalArgs: ExprT list) (spec: LoopSpecT) =
+        let funElems = 
+            dOutputs |> Map.toSeq |> Seq.head |> fun (port, dExpr) -> dExpr.Shape.[0]
 
         let portType p =
             spec.Ports.[p].Expr.Type
@@ -336,8 +308,6 @@ module Deriv =
         /// map from argument index to the loop ports containing its derivative summands
         let argIdxDerivs = Dictionary<int, System.Collections.Generic.HashSet<LoopDerivT>> ()
 
-
-
         // go through loop outputs and create variables representing their derivatives
         for KeyValue (outPort, dExpr) in dOutputs do
             // create variable for incoming Jacobian
@@ -355,8 +325,6 @@ module Deriv =
             }
             varInputSpecs.Add (dVar, SequenceArgSlice sas)         
                
-
-
         // go through loop variables and create corresponding derivative variables and ports
         for KeyValue (usingVar, li) in spec.Vars do
             let liType = usingVar.Type
@@ -483,7 +451,7 @@ module Deriv =
                 let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
 
                 // calculate Jacobians w.r.t. all variables
-                reverseDiff value.Expr value.Expr incomingJacobian)    
+                value.Expr |> computeWithRootJacobian incomingJacobian)    
             |> Seq.reduce merge
 
 
@@ -582,12 +550,133 @@ module Deriv =
                 argIdx, dExpr)
             |> Map.ofSeq
 
-        let derivExprs = [
+        [
             for a=0 to originalArgs.Length-1 do
-                yield argIdxDerivExprs.[a]
+                yield originalArgs.[a], argIdxDerivExprs.[a]
         ]
+        
+    /// computes the Jacobians of the arguments of a multi-channel op given the Jacobians
+    /// w.r.t. all channels of the multi-channel op
+    and private multiChannelDiffStep (mcOp: MultiChannelOpUsageT) (eg: Map<ChannelT, ExprT>) : List<ExprT * ExprT> =
+        match mcOp with
+        | Loop spec, args -> loopDeriv eg args spec
 
-        derivExprs
+    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
+    and computeWithRootJacobian (rootJacobian: ExprT) (rootExpr: ExprT) : DerivT =
 
+        // build expression info and unify common subexpressions
+        let exprInfo = ExprInfoT rootExpr
+        let rootExpr = exprInfo.Expr
+
+        /// map from an expression to the sum of incoming Jacobians
+        let incomingJacobian = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+        /// map from an expression to the set of dependants that transmitted Jacobian to the expression
+        let receivedJacobiansFrom = Dictionary<ExprT, HashSet<ExprT>> (HashIdentity.Reference)
+        /// expressions that have received Jacobians from all their dependants
+        let exprsWithFullJacobian = Queue<ExprT> ()
+
+        let multiChannelOpJacobians = Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
+        let multiChannelOpsWithFullJacobians = Queue<MultiChannelOpUsageT> ()
+
+        /// adds the specified Jacobian coming from `source` to `target`
+        let transmitJacobian source target jacobian =
+            let neededSources = exprInfo.Dependants target
+
+            // add jacobian
+            match incomingJacobian.TryFind target with
+            | Some j -> incomingJacobian.[target] <- j + jacobian
+            | None -> incomingJacobian.[target] <- jacobian
+
+            // add to received set
+            if not (receivedJacobiansFrom.ContainsKey target) then
+                receivedJacobiansFrom.[target] <- HashSet<ExprT> (HashIdentity.Structural)
+            match source with
+            | Choice1Of2 exprSource -> 
+                if receivedJacobiansFrom.[target].Contains exprSource then
+                    failwithf "Jacobian from %A to %A was already transmitted" exprSource target
+                if not (neededSources.Contains exprSource) then
+                    failwithf "%A received Jacobian from non-dependant %A" target exprSource
+                receivedJacobiansFrom.[target].Add exprSource |> ignore
+            | Choice2Of2 mcopSource ->
+                neededSources
+                |> Seq.filter (function 
+                               | Nary (Channel (op, channel), es) when (op, es) = mcopSource -> true
+                               | _ -> false)
+                |> Seq.iter (fun src -> receivedJacobiansFrom.[target].Add src |> ignore)
+
+            // check if target has received all Jacobians
+            let receivedSources = receivedJacobiansFrom.[target] |> Set.ofSeq
+            if receivedSources = neededSources then exprsWithFullJacobian.Enqueue target
+
+        let transmitJacobians src jacobians =
+            jacobians
+            |> List.groupBy (fun (target, _) -> target)
+            |> List.iter (fun (target, jacs) ->
+                let jacSum = jacs |> List.map (fun (_, jac) -> jac) |> List.reduce (+)
+                transmitJacobian src target jacSum)            
+
+        let transmitMultiChannelOpJacobian mcOp channel jacobian =
+            // add jacobian
+            if not (multiChannelOpJacobians.ContainsKey mcOp) then
+                multiChannelOpJacobians.[mcOp] <- Dictionary<ChannelT, ExprT> (HashIdentity.Structural)
+            let mcoj = multiChannelOpJacobians.[mcOp]
+            mcoj.[channel] <- jacobian
+
+            // check if multi-channel op has received Jacobians on all its channels
+            let received = Set.ofSeq mcoj.Keys
+            let needed = exprInfo.UsedChannels mcOp
+            if received = needed then multiChannelOpsWithFullJacobians.Enqueue mcOp
+
+        // set Jacobian of root node
+        incomingJacobian.[rootExpr] <- rootJacobian
+        exprsWithFullJacobian.Enqueue rootExpr
+
+        // process Jacobians in loop
+        let mutable varJacs = Map.empty
+        while exprsWithFullJacobian.Count > 0 || multiChannelOpsWithFullJacobians.Count > 0 do
+
+            if exprsWithFullJacobian.Count > 0 then
+                let expr = exprsWithFullJacobian.Dequeue ()
+
+                // propagate Jacobians
+                match expr with
+                | Nary (Channel (op, channel), es) ->
+                    transmitMultiChannelOpJacobian (op, es) channel incomingJacobian.[expr]
+                | _ ->
+                    reverseDiffStep expr incomingJacobian.[expr] |> transmitJacobians (Choice1Of2 expr)
+
+                // extract variable Jacobians
+                match expr with
+                | Leaf (Var vs) -> varJacs <- varJacs |> Map.add vs incomingJacobian.[expr]
+                | _ -> ()
+
+            if multiChannelOpsWithFullJacobians.Count > 0 then
+                let mcOp = multiChannelOpsWithFullJacobians.Dequeue ()
+                let channelJacs = multiChannelOpJacobians.[mcOp] |> Map.ofDictionary               
+                multiChannelDiffStep mcOp channelJacs |> transmitJacobians (Choice2Of2 mcOp)
+        
+        {
+            Expr      = rootExpr
+            Jacobians = varJacs
+        }    
+
+    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
+    and compute (rootExpr: ExprT) : DerivT =
+        let rootJac = shapeOf rootExpr |> ShapeSpec.nElem |> identityOfSameType rootExpr
+        computeWithRootJacobian rootJac rootExpr
+
+    /// extracts the Jacobian of the given VarSpecT
+    and ofVarSpec var (deriv: DerivT) =
+        match deriv.Jacobians |> Map.tryFind var with
+        | Some d -> d
+        | None when Debug.FailIfVarNotInDerivative -> 
+            failwithf "the variable %A is not present in the expression" var
+        | None -> 
+            let varExpr = Expr.makeVar var
+            Expr.zerosOfSameType varExpr [Expr.nElems deriv.Expr; Expr.nElems varExpr]
+
+    /// extracts the Jacobian of the given variable
+    and ofVar var deriv =
+        ofVarSpec (extractVar var) deriv                  
 
 

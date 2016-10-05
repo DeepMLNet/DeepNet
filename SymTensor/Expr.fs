@@ -179,13 +179,20 @@ module Expr =
         | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
-        /// iterative execution of an expression
-        | Loop of spec:LoopSpecT * output:LoopPortT
+        /// use specified channel of a multi-channel op
+        | Channel of channelOp:MultiChannelOpT * channel:ChannelT
         /// extension op
         | ExtensionOp of IOp
+
+    /// a channel of a multi-channel op
+    and ChannelT = string
+
+    /// an n-ary op with multiple output channels
+    and MultiChannelOpT =
+        /// iterative execution of an expression
+        | Loop of spec:LoopSpecT    
      
     and LoopPortT = string
-
 
     and SequenceArgSliceT = {
         ArgIdx:     int
@@ -1396,7 +1403,7 @@ module Expr =
         interpolate interpolator [a; b; c]
    
     let loop spec port inputs =
-        Nary (Loop (spec, port), inputs) |> check
+        Nary (Channel (Loop spec, port), inputs) |> check
 
 
     let reverseAxis dim (a: ExprT) : ExprT =

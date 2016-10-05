@@ -61,6 +61,7 @@
     <Compile Include="ElemExprHostEval.fs" />
     <Compile Include="Interpolator.fs" />
     <Compile Include="Expr.fs" />
+    <Compile Include="ExprInfo.fs" />
     <Compile Include="ElemExprDeriv.fs" />
     <Compile Include="Deriv.fs" />
     <Compile Include="Hold.fs" />

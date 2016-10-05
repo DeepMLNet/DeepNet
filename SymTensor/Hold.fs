@@ -43,7 +43,7 @@ module Hold =
                 Unary (op, eg)
             | relExpr ->
                 // release occured, calculate derivative of released expression
-                let dWrt = eg |> Deriv.reverseDiff relExpr relExpr |> Deriv.ofVar wrt
+                let dWrt = Deriv.computeWithRootJacobian eg relExpr |> Deriv.ofVar wrt
                 if dWrt |> Expr.contains wrt then
                     failwithf "held op %A must not contain their input value in their derivative" heldOp
                 dWrt

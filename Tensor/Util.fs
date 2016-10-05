@@ -151,6 +151,8 @@ module UtilTypes =
             else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+    type HashSet<'T> = System.Collections.Generic.HashSet<'T>
+    type Queue<'T> = System.Collections.Generic.Queue<'T>
     type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
 
     /// convert given value to specified type and return as obj
@@ -162,7 +164,10 @@ module UtilTypes =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
     /// Default value for options. Returns b if a is None, else the value of a.
-    let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
+    let inline (|?) (a: 'a option) b = 
+        match a with
+        | Some v -> v
+        | None -> b
 
     let allBindingFlags = 
         BindingFlags.Public ||| BindingFlags.NonPublic ||| 
