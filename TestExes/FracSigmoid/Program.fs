@@ -26,6 +26,7 @@ type GenerateArgs =
 
 type TrainArgs =
     | [<MainCommand; ExactlyOnce; Last; Mandatory>] CfgFile of filename:string
+    | Restart
     with
     interface IArgParserTemplate with member s.Usage = "self-explaining"
 
@@ -80,7 +81,7 @@ module Program =
     let mutable NInput = notLoading
     let mutable NOutput = notLoading
 
-    let buildModel cfgPath =
+    let buildModel restart cfgPath =
 
         let mb = ModelBuilder<single> "FracSigmoid"
         let nBatch  = mb.Size "nBatch"
@@ -161,7 +162,7 @@ module Program =
                 mi.SavePars filename
             
         // build training function
-        let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
+        let trainCfg = {cfg.Training with LossRecordFunc=lossRecordFn; DiscardCheckpoint=restart}        
         let trainFn () = 
             Train.train trainable dataset trainCfg
 
@@ -199,9 +200,10 @@ module Program =
 
         | Train args ->
             let cfgFile = args.GetResult <@ CfgFile @>
-            let mi, predFn, trainFn = buildModel cfgFile
+            let restart = args.Contains <@ Restart @>
+            let mi, predFn, trainFn = buildModel restart cfgFile
             let tr = trainFn ()
-            printfn "%A" tr.Best
+            printfn "%A" tr.Best 
             printfn "Used config was %s" cfgFile
 
         0
