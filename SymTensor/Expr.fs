@@ -696,7 +696,7 @@ module Expr =
                     checkExpr c
                     if c.Type <> typeof<bool> then
                         failwith "condition of IfThenElse must be expression of type bool"
-                    if c.Shape ..<> sa || sa ..= sb then
+                    if c.Shape ..<> sa || sa ..<> sb then
                         failwithf "shape of condition %A and both argument shapes %A and %A must be equal"
                             c.Shape sa sb                    
                 | BinaryElemwiseOp ->
