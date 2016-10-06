@@ -599,7 +599,8 @@ module Expr =
                 failwith "Expression type cannot be object."
 
             let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
-                List.forall2 (.=) sa sb
+                if sa.Length = sb.Length then List.forall2 (.=) sa sb
+                else false
             let (..<>) sa sb = not (sa ..= sb)
             let reqBool op a =
                 if typename a <> TypeName.ofType<bool> then

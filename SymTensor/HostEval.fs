@@ -188,11 +188,9 @@ module HostEval =
                                        : Map<ChannelT, ArrayNDHostT<'R>> =
 
             /// RngAll in all dimensions but specified one
-            let rngAllBut ary dim dimSlice = [
-                for d=0 to dim-1 do yield RngAll
-                yield dimSlice
-                for d=dim to (ArrayND.nDims ary) - 1 do yield RngAll
-            ]
+            let rngAllBut ary dim dimSlice = 
+                List.replicate (ArrayND.nDims ary) RngAll
+                |> List.set dim dimSlice
 
             // initialize outputs
             let outputs =
