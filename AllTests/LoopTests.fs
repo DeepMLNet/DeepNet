@@ -87,8 +87,8 @@ let ``Build complicated loop 1`` () =
 
     let resultA = Expr.loop loopSpec chA [initialA; initialB; seqA; constAExt]
     let resultB = Expr.loop loopSpec chB [initialA; initialB; seqA; constAExt]
-    printfn "resultA:\n%A" resultA
-    printfn "resultB:\n%A" resultB
+    //printfn "resultA:\n%A" resultA
+    //printfn "resultB:\n%A" resultB
 
     let symSizes = Map [SizeSpec.extractSymbol nIters, SizeSpec.fix 5
                         SizeSpec.extractSymbol m,      SizeSpec.fix 3 
@@ -168,8 +168,39 @@ let ``Derivative of complicated loop 1`` () =
     printfn "dConstAExt=\n%A" dConstAExtV.Full
 
     
+[<Fact>]
+let ``Derivative compare: Complicated loop 1`` () =
+    randomDerivativeCheck 1e-4 [[1; 3; 2]; [3; 2; 2]; [2; 5; 3]; [2]] 
+        (fun [initialA; initialB; seqA; constAExt] ->
+            let nIters = SizeSpec.fix 5
+            let m = SizeSpec.fix 3
+            let n = SizeSpec.fix 2
+            let delayA = SizeSpec.fix 1
+            let delayB = SizeSpec.fix 2
 
+            let prevA = Expr.var<float> "prevA" [m; n]
+            let prevB = Expr.var<float> "prevB" [m; n]
+            let sliceA = Expr.var<float> "sliceA" [n; m]
+            let constA = Expr.var<float> "constA" [n]
 
+            let chA = "A"
+            let chAExpr = prevA + 1.0 + sliceA.T
+            let chB = "B"
+            let chBExpr = prevB + prevA + constA
+
+            let loopSpec = {
+                Expr.Length = nIters
+                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; Initial=Expr.InitialArg 0}
+                                 Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; Initial=Expr.InitialArg 1}
+                                 Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
+                                 Expr.extractVar constA, Expr.ConstArg 3]
+                Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
+                                     chB, {LoopValueT.Expr=chBExpr; LoopValueT.SliceDim=2}]    
+            }
+            let resultA = Expr.loop loopSpec chA [initialA; initialB; seqA; constAExt]
+            let resultB = Expr.loop loopSpec chB [initialA; initialB; seqA; constAExt]
+            Expr.sum resultA + Expr.sum resultB            
+        )
 
 
 
