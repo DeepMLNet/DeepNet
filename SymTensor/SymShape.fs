@@ -322,6 +322,8 @@ module SizeSpecTypes =
                 | _ -> ss
             | _ -> ss
 
+        static member get_Zero () = Base (Fixed Frac.zero)
+
         static member (~-) (ssa: SizeSpecT) =
             match ssa with
             | Base (Fixed Frac.Zero) -> ssa
@@ -452,6 +454,12 @@ module SizeSpec =
     /// broadcastable size one
     let broadcastable =
         Broadcast
+
+    /// extracts the size symbol
+    let extractSymbol s =
+        match s with
+        | Base (Sym sym) -> sym
+        | _ -> failwith "specified SizeSpec is not a symbol"
 
     /// substitute the symbols into the SizeSpec and simplifies it
     let rec substSymbols symVals ss =

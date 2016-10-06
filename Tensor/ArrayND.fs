@@ -34,6 +34,9 @@ module ArrayNDTypes =
     /// ArrayND of any type
     type IArrayNDT =
         abstract Layout:            ArrayNDLayoutT
+        abstract Shape:             int list
+        abstract NDims:             int
+        abstract NElems:            int
         abstract CPPType:           string
         abstract NewView:           ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
@@ -313,7 +316,10 @@ module ArrayND =
 
         interface IArrayNDT with
             member this.Layout = this.Layout
-            member this.CPPType = this.CPPType         
+            member this.CPPType = this.CPPType   
+            member this.Shape = this.Shape
+            member this.NDims = this.NDims
+            member this.NElems = this.NElems      
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
             member this.NewOfType layout typ = 
@@ -554,7 +560,11 @@ module ArrayND =
     /// Each entry in the specified permutation specifies the *new* position of 
     /// the corresponding axis, i.e. to which position the axis should move.
     let inline permuteAxes (permut: int list) a =
-        relayout (ArrayNDLayout.permuteAxes permut (layout a)) a
+        a |> relayout (layout a |> ArrayNDLayout.permuteAxes permut)
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        a |> relayout (layout a |> ArrayNDLayout.reverseAxis ax)        
 
     /// creates a view of an ArrayND
     let inline view ranges a =

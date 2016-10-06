@@ -17,6 +17,7 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
+
     /// evaluation functions
     type private EvalT =       
 
@@ -105,6 +106,7 @@ module HostEval =
                     | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                     | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                     | PermuteAxes perm -> ArrayND.permuteAxes perm av
+                    | ReverseAxis ax -> ArrayND.reverseAxis ax av
                     | Subtensor sr -> av.[rngEval sr]
                     | StoreToVar vs -> 
                         // TODO: stage variable write to avoid overwrite of used variables
@@ -171,12 +173,87 @@ module HostEval =
                         let nResShape = shapeEval resShape
                         ElemExprHostEval.eval elemExpr esv nResShape    
                     | Interpolate ip -> esv |> Interpolator.interpolate ip 
+                    | Channel (Loop spec, channel) -> 
+                        let channelValues = EvalT.LoopEval (evalEnv, spec, esv)
+                        channelValues.[channel]                       
                     | ExtensionOp eop -> eop.EvalSimple esv 
                     |> box |> unbox
 
             if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) res
             res
+
+        /// evaluates all channels of a loop
+        static member LoopEval<'T, 'R> (evalEnv: EvalEnvT, spec: LoopSpecT, args: ArrayNDHostT<'T> list) 
+                                       : Map<ChannelT, ArrayNDHostT<'R>> =
+
+            /// RngAll in all dimensions but specified one
+            let rngAllBut ary dim dimSlice = [
+                for d=0 to dim-1 do yield RngAll
+                yield dimSlice
+                for d=dim to (ArrayND.nDims ary) - 1 do yield RngAll
+            ]
+
+            // initialize outputs
+            let outputs =
+                spec.Channels
+                |> Map.map (fun ch lv ->
+                    lv.Expr.Shape 
+                    |> ShapeSpec.insertAxis lv.SliceDim spec.Length
+                    |> ShapeSpec.eval
+                    |> ArrayNDHost.zeros)
+
+            // perform loop
+            let nIters = SizeSpec.eval spec.Length
+            for iter=0 to nIters-1 do
+                // build variable environment
+                let iterVarEnv : VarEnvT =
+                    spec.Vars
+                    |> Map.map (fun vs li ->
+                        match li with
+                        | ConstArg idx -> 
+                            args.[idx] :> IArrayNDT
+                        | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
+                            let slice = rngAllBut args.[idx] dim (RngElem iter)
+                            args.[idx].[slice] :> IArrayNDT
+                        | PreviousChannel {Channel=ch; Delay=delay; Initial=initial} ->
+                            let delay = SizeSpec.eval delay
+                            let dim = spec.Channels.[ch].SliceDim
+                            let prvIter = iter - delay
+                            if prvIter >= 0 then
+                                let slice = rngAllBut outputs.[ch] dim (RngElem prvIter)
+                                outputs.[ch].[slice] :> IArrayNDT
+                            else
+                                match initial with
+                                | InitialZero -> 
+                                    spec.Channels.[ch].Expr.Shape
+                                    |> ShapeSpec.eval
+                                    |> ArrayNDHost.zeros :> IArrayNDT
+                                | InitialArg idx ->
+                                    let initialIter = args.[idx].Shape.[dim] + prvIter
+                                    let slice = rngAllBut args.[idx] dim (RngElem initialIter)
+                                    args.[idx].[slice] :> IArrayNDT
+                        | IterationIndex -> 
+                            ArrayNDHost.scalar iter :> IArrayNDT
+                        | IterationsRemaining -> 
+                            ArrayNDHost.scalar (nIters - iter - 1) :> IArrayNDT
+                    )
+
+                // check shapes and types
+                for KeyValue(vs, value) in iterVarEnv do
+                    if ShapeSpec.eval vs.Shape <> value.Shape then
+                        failwithf "loop variable %A got shape %A" vs value.Shape
+                    if vs.Type <> value.DataType then
+                        failwithf "loop variable %A got data type %A" vs value.DataType
+
+                // calculate and store channel values
+                let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
+                for KeyValue(ch, lv) in spec.Channels do
+                    let slice = rngAllBut outputs.[ch] lv.SliceDim (RngElem iter)
+                    outputs.[ch].[slice] <- EvalT.Eval (iterEvalEnv, lv.Expr)
+
+            // return outputs
+            outputs                          
             
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.

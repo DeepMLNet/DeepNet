@@ -304,8 +304,14 @@ module ArrayNDLayout =
     let permuteAxes (permut: int list) a =
         if nDims a <> List.length permut then
             failwithf "permutation %A must have same rank as shape %A" permut (shape a)
-        {a with Shape = List.permute (fun i -> permut.[i]) a.Shape;
-                Stride = List.permute (fun i -> permut.[i]) a.Stride;}
+        {a with Shape = List.permute (fun i -> permut.[i]) a.Shape
+                Stride = List.permute (fun i -> permut.[i]) a.Stride}
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        checkAxis ax a
+        {a with Offset = a.Offset + (a.Shape.[ax] - 1) * a.Stride.[ax]
+                Stride = a.Stride |> List.set ax (-a.Stride.[ax])}
 
     /// creates a subview layout
     let rec view ranges a =
