@@ -160,7 +160,7 @@ module ConfigLoader =
                     for KeyValue (name, (l, s, x, t, meanFct)) in gpLayers do
                         let plots = [0..l.Shape.[0] - 1] |> List.map (fun gp ->
                             let ls = l.[gp] |> ArrayND.value
-                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = meanFct}
+                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = meanFct;GaussianProcess.Monotonicity = None}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
                                             GPPlots.Plots.simplePlot (hps, 

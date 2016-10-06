@@ -1,0 +1,16 @@
+// Warning: generated file; your changes could be lost when a new file is generated.
+#I __SOURCE_DIRECTORY__
+#load "load-references-debug.fsx"
+#load "../AssemblyInfo.fs"
+      "../Util.fs"
+      "../MKL.fs"
+      "../ArrayNDLayout.fs"
+      "../FastLayout.fs"
+      "../ArrayND.fs"
+      "../ArrayNDHost.fs"
+      "../ArrayNDHostReg.fs"
+      "../ArrayNDCuda.fs"
+      "../HDF5.fs"
+      "../ArrayNDHDF.fs"
+      "../NumpyFiles.fs"
+      "../Random.fs"
