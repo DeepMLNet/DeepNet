@@ -366,6 +366,36 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>
 
+    let make4<'T0, 'T1, 'T2, 'T3> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
+        checkType<'T2> "third" expr2
+        checkType<'T3> "fourth" expr3
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen]        
+        fun (varEnv: VarEnvT) ->
+            let res = evalAll varEnv
+            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>
+
+    let make5<'T0, 'T1, 'T2, 'T3, 'T4> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) (expr4: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
+        checkType<'T2> "third" expr2
+        checkType<'T3> "fourth" expr3
+        checkType<'T4> "fifth" expr4
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let expr4gen = {Generate=uExprGenerate expr4; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr4}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen; expr4gen]        
+        fun (varEnv: VarEnvT) ->
+            let res = evalAll varEnv
+            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>, res.[4] :?> ArrayNDT<'T4>
+
     let makeMany<'T> factory (exprs: ExprT list) =
         exprs |> List.iter (checkType<'T> "all")
         let exprsGen =

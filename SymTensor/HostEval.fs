@@ -226,7 +226,7 @@ module HostEval =
                                 | InitialZero -> 
                                     spec.Channels.[ch].Expr.Shape
                                     |> ShapeSpec.eval
-                                    |> ArrayNDHost.zeros :> IArrayNDT
+                                    |> ArrayNDHost.zeros<'R> :> IArrayNDT
                                 | InitialArg idx ->
                                     let initialIter = args.[idx].Shape.[dim] + prvIter
                                     let slice = rngAllBut args.[idx] dim (RngElem initialIter)
@@ -240,9 +240,9 @@ module HostEval =
                 // check shapes and types
                 for KeyValue(vs, value) in iterVarEnv do
                     if ShapeSpec.eval vs.Shape <> value.Shape then
-                        failwithf "loop variable %A got shape %A" vs value.Shape
+                        failwithf "loop variable %A got value with shape %A" vs value.Shape
                     if vs.Type <> value.DataType then
-                        failwithf "loop variable %A got data type %A" vs value.DataType
+                        failwithf "loop variable %A got value with data type %A" vs value.DataType
 
                 // calculate and store channel values
                 let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}

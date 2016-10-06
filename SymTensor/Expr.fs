@@ -1402,8 +1402,8 @@ module Expr =
                 match rngs, shps with
                 | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape
                 | RSDynElem e :: rngs, _::shps -> splitFRS rngs shps (SRSDynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
-                | RSSymStartSymEnd (so, fo) :: rngs, shp::shps -> 
-                    let size = (fo |? shp) - (so |? SizeSpec.zero) + 1
+                | RSSymStartSymEnd (so, fo) :: rngs, size::shps -> 
+                    let size = (fo |? (size-1)) - (so |? SizeSpec.zero) + 1
                     splitFRS rngs shps (SRSSymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
                 | RSDynStartSymSize (s, size) :: rngs, _::shps ->
                     splitFRS rngs shps (SRSDynStartSymSize (s, size)::simpleRs) (size::newShape)
@@ -1572,11 +1572,9 @@ module Expr =
             ((zerosOfSameType es.Head shp, SizeSpec.zero), es)
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
-                let slice = [
-                    for d=0 to dim-1 do yield RSAll
-                    yield RSSymStartSymEnd (Some pos, Some (pos + len - 1))
-                    for d=dim to e.NDims-1 do yield RSAll
-                ]
+                let slice : FullExprRngsSpecT = 
+                    List.replicate e.NDims RSAll
+                    |> List.set dim (RSSymStartSymEnd (Some pos, Some (pos + len - 1)))
                 setSubtensor concatSoFar.[slice] e, pos + len)
         concatenated
 

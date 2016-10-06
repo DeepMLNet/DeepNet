@@ -53,10 +53,7 @@ let ``Simple loop`` () =
     printfn "result value=\n%A" resultVal 
 
 
-[<Fact>]
-let ``Complicated loop 1`` () =
-    // adding one every iteration to channel A
-    
+let ``Build complicated loop 1`` () =
     let nIters = SizeSpec.symbol "nIters"
     let m = SizeSpec.symbol "m"
     let n = SizeSpec.symbol "n"
@@ -66,7 +63,7 @@ let ``Complicated loop 1`` () =
     let prevA = Expr.var<single> "prevA" [m; n]
     let initialA = Expr.var<single> "initialA" [delayA; m; n]
     let prevB = Expr.var<single> "prevB" [m; n]
-    let initialB = Expr.var<single> "initialA" [m; n; delayB]
+    let initialB = Expr.var<single> "initialB" [m; n; delayB]
     let sliceA = Expr.var<single> "sliceA" [n; m]
     let seqA = Expr.var<single> "seqA" [n; nIters; m]
     let constA = Expr.var<single> "constA" [n]
@@ -102,23 +99,77 @@ let ``Complicated loop 1`` () =
     let resultA = resultA |> Expr.substSymSizes symSizes
     let resultB = resultB |> Expr.substSymSizes symSizes   
 
-    let resultFn = 
-        Func.make2<single, single> DevHost.DefaultFactory resultA resultB 
-        |> arg4 initialA initialB seqA constAExt
+    let initialA = initialA |> Expr.substSymSizes symSizes
+    let initialB = initialB |> Expr.substSymSizes symSizes
+    let seqA = seqA |> Expr.substSymSizes symSizes
+    let constAExt = constAExt |> Expr.substSymSizes symSizes
 
+    resultA, resultB, initialA, initialB, seqA, constAExt
+
+
+let ``Values for complicated loop 1`` () =
     let initialAv = ArrayNDHost.zeros<single> [1; 3; 2]
     let initialBv = ArrayNDHost.ones<single>  [3; 2; 2]
     let seqAv     = ArrayNDHost.linSpaced 0.0f 50.0f (5 * 3 * 2) |> ArrayND.reshape [2; 5; 3]
     let constAv   = ArrayNDHost.ofList [3.0f; 7.0f] 
-
     printfn "initialAv=\n%A" initialAv
     printfn "initialBv=\n%A" initialBv
     printfn "seqAv=\n%A" seqAv
     printfn "constAv=\n%A" constAv
+    initialAv, initialBv, seqAv, constAv
+   
 
+[<Fact>]
+let ``Complicated loop 1`` () =   
+    let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
+
+    let resultFn = 
+        Func.make2<single, single> DevHost.DefaultFactory resultA resultB 
+        |> arg4 initialA initialB seqA constAExt
+
+    let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
     let resultAv, resultBv = resultFn initialAv initialBv seqAv constAv
     printfn "resultAv=\n%A" resultAv
     printfn "resultBv=\n%A" resultBv
+
+
+[<Fact>]
+let ``Derivative of complicated loop 1`` () =   
+    let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
+
+    let result = Expr.sum resultA + Expr.sum resultB
+    let dResult = Deriv.compute result
+    let dInitialA = dResult |> Deriv.ofVar initialA
+    let dInitialB = dResult |> Deriv.ofVar initialB
+    let dSeqA = dResult |> Deriv.ofVar seqA
+    let dConstAExt = dResult |> Deriv.ofVar constAExt
+
+//    printfn "result:\n%A" result
+//    printfn "dresult / dInitialA:\n%A" dInitialA
+//    printfn "dresult / dInitialB:\n%A" dInitialB
+//    printfn "dresult / dSeqA:\n%A" dSeqA
+//    printfn "dresult / dConstAExt:\n%A" dConstAExt
+
+    let resultFn = 
+        Func.make5<single, single, single, single, single> DevHost.DefaultFactory 
+            result dInitialA dInitialB dSeqA dConstAExt
+        |> arg4 initialA initialB seqA constAExt
+
+    let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
+    let resultV, dInitialAV, dInitialBV, dSeqAV, dConstAExtV = resultFn initialAv initialBv seqAv constAv
+    let dInitialAV = dInitialAV |> ArrayND.reshape initialAv.Shape
+    let dInitialBV = dInitialBV |> ArrayND.reshape initialBv.Shape
+    let dSeqAV = dSeqAV |> ArrayND.reshape seqAv.Shape
+    let dConstAExtV = dConstAExtV |> ArrayND.reshape constAv.Shape
+    printfn "resultV=\n%A" resultV
+    printfn "dInitialAV=\n%A" dInitialAV.Full
+    printfn "dInitialBV=\n%A" dInitialBV.Full
+    printfn "dSeqA=\n%A" dSeqAV.Full
+    printfn "dConstAExt=\n%A" dConstAExtV.Full
+
+    
+
+
 
 
 

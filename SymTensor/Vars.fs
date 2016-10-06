@@ -122,13 +122,14 @@ module ConstSpec =
 module VarSpecTypes =
 
     /// variable specification: has a name, type and shape specificaiton
-    [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
+    [<StructuredFormatDisplay("{Pretty}")>]
     type VarSpecT = {
         Name:      string
         Shape:     ShapeSpecT
         TypeName:  TypeNameT
     } with
         member this.Type = TypeName.getType this.TypeName
+        member this.Pretty = sprintf "%s %s%A" this.Type.Name this.Name this.Shape
         
 
 /// variable specification

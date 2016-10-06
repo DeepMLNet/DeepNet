@@ -8,8 +8,8 @@ module DerivTypes =
 
     /// Jacobians for each variable
     type DerivT = {
-        /// the expression the derivative was calculated of
-        Expr:       ExprT
+        /// the number of elements of the function the derivative is taken of
+        FunElems:   SizeSpecT
         /// the Jacobians w.r.t. the variables occuring in the expression
         Jacobians:  Map<VarSpecT, ExprT>
     }
@@ -34,18 +34,19 @@ module Deriv =
 
     /// merges two derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
-        if aGrads.Expr <> bGrads.Expr then
-            failwith "derivatives must belong to same expression"
+        if aGrads.FunElems <> bGrads.FunElems then
+            failwithf "cannot merge derivatives with different number of function elements: %A and %A"
+                aGrads.FunElems bGrads.FunElems
         let jacs =
             (aGrads.Jacobians, bGrads.Jacobians)
             ||> Map.fold (fun m v vg -> match Map.tryFind v m with
                                         | Some ovg -> m |> Map.add v (vg + ovg)
                                         | None -> m |> Map.add v vg) 
-        {Expr=aGrads.Expr; Jacobians=jacs}
+        {FunElems=aGrads.FunElems; Jacobians=jacs}
 
     /// empty derivatives for expression
     let private empty expr =
-        {Expr=expr; Jacobians=Map.empty}
+        {FunElems=Expr.nElems expr; Jacobians=Map.empty}
 
 
     /// calculates the Jacobian of all arguments of an expression given the Jacobian of the expression
@@ -270,8 +271,15 @@ module Deriv =
     /// derivative of loop expression
     and private loopDeriv (dOutputs: Map<ChannelT, ExprT>) (originalArgs: ExprT list) (spec: LoopSpecT) =
 
+        /// number of elments of the function we take the derivative of
         let funElems = 
-            dOutputs |> Map.toSeq |> Seq.head |> fun (port, dExpr) -> dExpr.Shape.[0]
+            match Map.toList dOutputs with
+            | (ch0, dExpr0) :: rds ->
+                for ch, dExpr in rds do
+                    if dExpr.Shape.[0] <> dExpr0.Shape.[0] then
+                        failwith "inconsistent number of derivative function elements"
+                dExpr0.Shape.[0]
+            | [] -> failwith "output derivatives invalid"
 
         let portType p =
             spec.Channels.[p].Expr.Type
@@ -282,7 +290,10 @@ module Deriv =
         let portSliceElems p =
             p |> portSliceShape |> ShapeSpec.nElem
 
+        /// argument of the derivative loop expression
         let args = ResizeArray<ExprT> originalArgs
+
+        /// adds an argument to the derivative loop expression and returns its index
         let addArg expr =
             match args |> Seq.tryFindIndex ((=) expr) with
             | Some idx -> idx
@@ -290,8 +301,6 @@ module Deriv =
                 let idx = args.Count
                 args.Add expr
                 idx
-
-        // step 1: assign variables to (incoming) Jacobians of all ports        
 
         /// map from variable representing a derivative to the loop input specification
         let varInputSpecs = Dictionary<VarSpecT, LoopInputT> ()
@@ -302,13 +311,22 @@ module Deriv =
         /// map from a loop PreviousPort to the variables representing its derivative sources
         let dPreviousVars = Dictionary<PreviousChannelT, VarSpecT> ()
 
-        let dConstArgSumVars = Dictionary<int, VarSpecT> ()
-
         /// map from a loop port to the value it must contain
         let portContents = Dictionary<ChannelT, PortContentsT> ()
 
         /// map from argument index to the loop ports containing its derivative summands
-        let argIdxDerivs = Dictionary<int, System.Collections.Generic.HashSet<LoopDerivT>> ()
+        let argIdxDerivs = Dictionary<int, HashSet<LoopDerivT>> ()
+        for idx=0 to originalArgs.Length-1 do
+            argIdxDerivs.[idx] <- HashSet<_> ()
+
+        // expand all incoming Jacobians
+        let dOutputs =
+            dOutputs
+            |> Map.map (fun ch dCh ->
+                let expShp = 
+                    spec.Channels.[ch].Expr.Shape 
+                    |> ShapeSpec.insertAxis spec.Channels.[ch].SliceDim spec.Length
+                dCh |> Expr.reshape (funElems :: expShp))
 
         // go through loop outputs and create variables representing their derivatives
         for KeyValue (outPort, dExpr) in dOutputs do
@@ -323,7 +341,7 @@ module Deriv =
             // source of incoming Jacobian is sequence of derivatives of the loop output
             let sas = {
                 ArgIdx = addArg dOutputs.[outPort]
-                SliceDim = value.SliceDim
+                SliceDim = value.SliceDim + 1
             }
             varInputSpecs.Add (dVar, SequenceArgSlice sas)         
                
@@ -387,7 +405,7 @@ module Deriv =
                 let dPortName = sprintf "d_%s[%A]" pp.Channel pp.Delay
                 if not (portContents.ContainsKey dPortName) then
                     let sliceDim = spec.Channels.[pp.Channel].SliceDim
-                    portContents.Add (dPortName, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim})
+                    portContents.Add (dPortName, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1})
                 portContents.[dPortName].DerivWrt.Add usingVar
 
                 // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
@@ -535,12 +553,16 @@ module Deriv =
             Channels  = ports
         }
 
+        //printfn " ================================== derivative spec is\n%A" dSpec
+
         // build derivatives w.r.t. our arguments
         let argIdxDerivExprs = 
             argIdxDerivs 
             |> Seq.map (fun aid -> 
                 let argIdx, loopDerivs = aid.Key, aid.Value
-                let dExpr =
+                
+                // sum over ports producing derivative and reverse if necessary
+                let dExprExpanded =
                     loopDerivs
                     |> Seq.map (fun {Port=port; Slice=slice; ReverseAxis=reverseAxis} ->
                         let loopOutput = Expr.loop dSpec port (List.ofSeq args)
@@ -549,13 +571,17 @@ module Deriv =
                         | Some ax -> sliced |> Expr.reverseAxis ax
                         | None -> sliced)
                     |> Seq.reduce (+)
+
+                // collapse Jacobian
+                let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
+                let dExpr = dExprExpanded |> Expr.reshape [funElems; wrtElems]
+
                 argIdx, dExpr)
             |> Map.ofSeq
 
-        [
-            for a=0 to originalArgs.Length-1 do
-                yield originalArgs.[a], argIdxDerivExprs.[a]
-        ]
+        // output mapping from original argument to its derivative
+        [for a=0 to originalArgs.Length-1 do
+                yield originalArgs.[a], argIdxDerivExprs.[a]]
         
     /// computes the Jacobians of the arguments of a multi-channel op given the Jacobians
     /// w.r.t. all channels of the multi-channel op
@@ -658,7 +684,7 @@ module Deriv =
                 multiChannelDiffStep mcOp channelJacs |> transmitJacobians (Choice2Of2 mcOp)
         
         {
-            Expr      = rootExpr
+            FunElems  = rootExpr.NElems
             Jacobians = varJacs
         }    
 
@@ -675,7 +701,7 @@ module Deriv =
             failwithf "the variable %A is not present in the expression" var
         | None -> 
             let varExpr = Expr.makeVar var
-            Expr.zerosOfSameType varExpr [Expr.nElems deriv.Expr; Expr.nElems varExpr]
+            Expr.zerosOfSameType varExpr [deriv.FunElems; Expr.nElems varExpr]
 
     /// extracts the Jacobian of the given variable
     and ofVar var deriv =
