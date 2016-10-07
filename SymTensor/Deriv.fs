@@ -281,15 +281,6 @@ module Deriv =
                 dExpr0.Shape.[0]
             | [] -> failwith "output derivatives invalid"
 
-        let portType p =
-            spec.Channels.[p].Expr.Type
-
-        let portSliceShape p =
-            spec.Channels.[p].Expr.Shape |> ShapeSpec.withoutAxis spec.Channels.[p].SliceDim
-
-        let portSliceElems p =
-            p |> portSliceShape |> ShapeSpec.nElem
-
         /// argument of the derivative loop expression
         let args = ResizeArray<ExprT> originalArgs
 
@@ -448,7 +439,6 @@ module Deriv =
             | IterationsRemaining -> 
                 // iteration index is an intergral constant
                 ()        
-
             
         /// derivatives of all ports w.r.t. all variables
         let portDerivs =
@@ -477,7 +467,6 @@ module Deriv =
                 value.Expr |> computeWithRootJacobian incomingJacobian)    
             |> Seq.reduce merge
 
-
         // go through portContents and create actual port contents
         let ports =
             portContents
@@ -499,29 +488,27 @@ module Deriv =
                 port, {Expr=expr; SliceDim=sliceDim})
             |> Map.ofSeq
 
-
         // create variable specification
         let varsFromDeriv = 
             varInputSpecs
             |> Seq.map (fun vis -> vis.Key, vis.Value)
             |> Map.ofSeq
 
-        // need to map original vars
-        // 1. ConstArg stays as is
-        // 2. SequenceArgSlice gets remapped to reversed SequeceArgSlice
-        // 3. PreviousPort gets remapped to output sequence of original op with appropriate delay and reversed
-        // 4. IterationIndex gets remapped to IterationsRemaining
-        // 5. IterationsRemaining gets remapped to IterationIndex
-
+        // adapt original vars of loop
         let originalVars =
             spec.Vars
             |> Map.map (fun vs li ->
                 match li with
-                | ConstArg _ -> li
+                | ConstArg _ -> 
+                    // constant arguments needs no adaption
+                    li
                 | SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
+                    // sequence arguments must be reversed
                     let revExpr = Expr.reverseAxis sliceDim args.[argIdx]
                     SequenceArgSlice {ArgIdx=addArg revExpr; SliceDim=sliceDim}
                 | PreviousChannel pp ->
+                    // previous channel accesses the reversed output of the orignal loop
+                    // with appropriate slicing to account for the delay
                     let portOutput = Expr.loop spec pp.Channel originalArgs
                     let portExpr = spec.Channels.[pp.Channel].Expr
                     let sliceDim = spec.Channels.[pp.Channel].SliceDim
@@ -545,18 +532,20 @@ module Deriv =
                     let delayedPortSeq = revPortSeq.[delaySlice]
 
                     SequenceArgSlice {ArgIdx=addArg delayedPortSeq; SliceDim=sliceDim}
-                | IterationIndex -> IterationsRemaining
-                | IterationsRemaining -> IterationIndex)
+                | IterationIndex -> 
+                    // iteration index and iterations remaining are swapped
+                    IterationsRemaining
+                | IterationsRemaining -> 
+                    // iteration index and iterations remaining are swapped
+                    IterationIndex)
 
-        let vars = Map.join originalVars varsFromDeriv
-
+        // build loop specification for derivative loop
         let dSpec = {
-            Length = spec.Length
-            Vars   = vars
+            Length    = spec.Length
+            Vars      = Map.join originalVars varsFromDeriv
             Channels  = ports
         }
-
-        //printfn " ================================== derivative spec is\n%A" dSpec
+        //printfn "derivative loop spec is\n%A" dSpec
 
         // build derivatives w.r.t. our arguments
         let argIdxDerivExprs = 
@@ -578,7 +567,6 @@ module Deriv =
                 // collapse Jacobian
                 let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
                 let dExpr = dExprExpanded |> Expr.reshape [funElems; wrtElems]
-
                 argIdx, dExpr)
             |> Map.ofSeq
 
