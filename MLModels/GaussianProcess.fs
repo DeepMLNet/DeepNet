@@ -31,9 +31,8 @@ module ExpectationPropagation =
         let mu = sigma |> Expr.diag |> Expr.zerosLike
         let muSite = mu 
         let covSite = mu 
-        let update (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) (idx:int)= 
+        let updateStep (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT)= 
             let cov = Expr.diag sigma
-            let size = Expr.nElems cov
             let covMinus = 1.0f / (1.0f / cov - 1.0f / covSite)
             let muMinus = covMinus*(1.0f/cov * mu - 1.0f/covSite * muSite)
             let z = muMinus / (vu * sqrt(1 + covMinus / (vu ** 2.0f)))
@@ -43,22 +42,25 @@ module ExpectationPropagation =
             let covHatf2 = z + normPdfZ/  normCdfZ
             let covHat = covMinus - covHatf1 * covHatf2
             let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
-            let fixedIndex = Base(Fixed idx)
-            let i = ElemExpr.idx1
-            let covH,muH,c,m,covS, muS = ElemExpr.arg6<single>
-            let covSUpd = ElemExpr.ifThenElse i fixedIndex (1.0f / (1.0f / covH[i] - 1.0f / c[i])) (covS[i])
-            let muSUpd = ElemExpr.ifThenElse i fixedIndex (covS[i] * (1.0f / covH[i]*muH[i] - 1.0f / c[i]) * m[i]) (muS[i])
-            let covSite = Expr.elements [size] covSUpd [covHat;muHat;cov;mu;covSite;muSite]
-            let muSite = Expr.elements [size] muSUpd [covHat;muHat;cov;mu;covSite;muSite]
+            let covSUpd = 1.0f / (1.0f / covHat - 1.0f / cov)
+            let muSUpd = (covSUpd * (1.0f / covHat*muHat - 1.0f / cov) * mu)
+            let covSite = covSUpd 
+            let muSite =  muSUpd
             let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/covSite)) |> Expr.invert
             let mu = sigma.*(Expr.diagMat (1.0f/covSite)).*muSite
             sigma,mu,covSite,muSite
-        let updateAt = update (sigma,mu,covSite,muSite)
+        let mSE (x:ExprT) (y:ExprT) = LossLayer.loss LossLayer.MSE x y
         ///TODO: implement optimiyation step
-        let rec optimiye (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
-            sigma,mu,covSite,muSite
-        updateAt 1
-
+        let optimize (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
+            let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
+            let limit = 1e04f
+            let sigmaConverged = (mSE sigma newSigma) <<<< limit
+            let muConverged = (mSE mu newMu) <<<< limit
+            let covSiteConverged = (mSE newCovSite covSite) <<<< limit
+            let muSiteConverged = (mSE newMuSite muSite) <<<< limit
+            let cond = sigmaConverged &&&& muConverged &&&& covSiteConverged &&&& muSiteConverged
+            newSigma,newMu,newCovSite,newMuSite
+        optimize (sigma,mu, muSite,covSite)
 module GaussianProcess =
     
     /// Kernek
