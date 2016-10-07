@@ -670,7 +670,7 @@ module Expr =
                     if (shapeOf jac).[1] <> nElems expr then
                         failwithf "Jacobian shape %A must have %A elements in second dimension" 
                             (shapeOf jac) (nElems expr)
-                | ReverseAxis ax when not (0 <= ax && ax <= nda) ->
+                | ReverseAxis ax when not (0 <= ax && ax < nda) ->
                     failwithf "cannot reverse non-existant axis %d of array with shape %A" ax sa
                 | Held ([], ReplicateTo (dim, s)) -> 
                     a |> checkAxis dim

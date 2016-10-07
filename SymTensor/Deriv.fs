@@ -319,14 +319,17 @@ module Deriv =
         for idx=0 to originalArgs.Length-1 do
             argIdxDerivs.[idx] <- HashSet<_> ()
 
-        // expand all incoming Jacobians
+        // expand and reverse all incoming Jacobians
         let dOutputs =
             dOutputs
             |> Map.map (fun ch dCh ->
+                let sliceDim = spec.Channels.[ch].SliceDim
                 let expShp = 
-                    spec.Channels.[ch].Expr.Shape 
-                    |> ShapeSpec.insertAxis spec.Channels.[ch].SliceDim spec.Length
-                dCh |> Expr.reshape (funElems :: expShp))
+                    (funElems :: spec.Channels.[ch].Expr.Shape)
+                    |> ShapeSpec.insertAxis (sliceDim + 1) spec.Length
+                dCh 
+                |> Expr.reshape expShp
+                |> Expr.reverseAxis (sliceDim + 1))
 
         // go through loop outputs and create variables representing their derivatives
         for KeyValue (outPort, dExpr) in dOutputs do

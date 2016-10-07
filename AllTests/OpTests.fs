@@ -384,3 +384,20 @@ let ``Check finite on CUDA failing`` () =
 let ``Check finite on CUDA passing`` () =
     printfn "passing:"
     checkFiniteOpTest 1.0f 0.5f
+
+
+
+[<Fact>]
+let ``ReverseAxis on host`` () =
+    let a = Expr.var<int> "a" [SizeSpec.fix 3; SizeSpec.fix 2]
+    let expr0 = Expr.reverseAxis 0 a
+    let expr1 = Expr.reverseAxis 1 a
+    let fn = Func.make2<int, int> DevHost.DefaultFactory expr0 expr1 |> arg1 a
+
+    let av = [0 .. 5] |> ArrayNDHost.ofList |> ArrayND.reshape [3; 2]
+    printfn "av=\n%A" av
+
+    let rav0, rav1 = fn av
+    printfn "rev 0 av=\n%A" rav0
+    printfn "rev 1 av=\n%A" rav1
+

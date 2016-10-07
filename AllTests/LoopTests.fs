@@ -203,4 +203,27 @@ let ``Derivative compare: Complicated loop 1`` () =
         )
 
 
+[<Fact>]
+let ``Derivative compare: Simple loop 1`` () =
+    randomDerivativeCheck 1e-4 [[1; 2]] 
+        (fun [initialA] ->
+            let nIters = SizeSpec.fix 3
+            let n = SizeSpec.fix 2
+            let delayA = SizeSpec.fix 1
+
+            let prevA = Expr.var<float> "prevA" [n]
+
+            let chA = "A"
+            let chAExpr = 2.0 * prevA + 1.0
+
+            let loopSpec = {
+                Expr.Length = nIters
+                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; Initial=Expr.InitialArg 0}]
+                Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}]
+            }
+            let resultA = Expr.loop loopSpec chA [initialA]
+            Expr.sum resultA
+        )
+
+
 
