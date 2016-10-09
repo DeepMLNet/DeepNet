@@ -11,6 +11,75 @@ open ArrayNDNS
 open ArrayNDNS.ArrayND
 
 
+/// functions for loop evaluation
+module LoopEval =
+    open Expr
+
+    type LoopChannelInfoT = {
+        SliceDim:   int
+        Shape:      NShapeSpecT
+        Zero:       IArrayNDT
+        Output:     IArrayNDT
+    }
+
+    /// builds inputs and outputs for one loop iteration 
+    let buildInOut (iter: int) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
+                   (vars: Map<VarSpecT, LoopInputT>)
+                   (args: IArrayNDT list) (channels: Map<ChannelT, LoopChannelInfoT>)
+                   : VarEnvT * Map<ChannelT, IArrayNDT> =
+
+        /// RngAll in all dimensions but specified one
+        let rngAllBut ary dim dimSlice = 
+            List.replicate (ArrayND.nDims ary) RngAll
+            |> List.set dim dimSlice
+
+        // build variable environment for value sources
+        let srcVarEnv = 
+            vars
+            |> Map.map (fun vs li ->
+                // get value for variable
+                let value = 
+                    match li with
+                    | ConstArg idx -> 
+                        args.[idx] 
+                    | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
+                        let slice = rngAllBut args.[idx] dim (RngElem iter)
+                        args.[idx].[slice] 
+                    | PreviousChannel {Channel=ch; Delay=delay; Initial=initial} ->
+                        let delay = SizeSpec.eval delay
+                        let dim = channels.[ch].SliceDim
+                        let prvIter = iter - delay
+                        if prvIter >= 0 then
+                            let slice = rngAllBut channels.[ch].Output dim (RngElem prvIter)
+                            channels.[ch].Output.[slice]
+                        else
+                            match initial with
+                            | InitialZero -> 
+                                channels.[ch].Zero |> ArrayND.broadcastToShape channels.[ch].Shape
+                            | InitialArg idx ->
+                                let initialIter = args.[idx].Shape.[dim] + prvIter
+                                let slice = rngAllBut args.[idx] dim (RngElem initialIter)
+                                args.[idx].[slice] 
+                    | IterationIndex -> iterAry
+                    | IterationsRemaining -> itersRemainingAry
+
+                // check type and shape
+                if ShapeSpec.eval vs.Shape <> value.Shape then
+                    failwithf "loop variable %A got value with shape %A" vs value.Shape
+                if vs.Type <> value.DataType then
+                    failwithf "loop variable %A got value with data type %A" vs value.DataType
+                    
+                value)
+
+        // slice outputs into channel targets
+        let targets =
+            channels |> Map.map (fun ch lci ->
+                let slice = rngAllBut lci.Output lci.SliceDim (RngElem iter)
+                lci.Output.[slice])
+
+        srcVarEnv, targets
+
+
 module HostEval =
     open Expr
 

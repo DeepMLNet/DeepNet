@@ -29,9 +29,6 @@ module ExecUnitsTypes =
     /// a channel id
     type ChannelIdT = string
 
-    /// id of default channel
-    let dfltChId = "#"
-
     /// manikins representing the data in each channel
     type ChannelManikinsT = Map<ChannelIdT, ArrayNDManikinT>
 
@@ -82,10 +79,10 @@ module ExecUnitsTypes =
     }
 
     type SrcReqsArgs = {
-        TargetShape:        NShapeSpecT
         TargetRequest:      ChannelReqsT
         Op:                 UOpT
-        SrcShapes:          NShapeSpecT list 
+        Metadata:           UMetadata
+        SrcShapes:          Map<ChannelT, NShapeSpecT> list 
     }
 
     /// record containing functions called by the ExecUnitT generator
@@ -390,9 +387,6 @@ module ExecUnit =
         // number of occurrences of subexpressions
         let exprOccurrences = UExpr.subExprOccurrences expr
 
-        // calculates the numeric shape
-        let numShapeOf expr = UExpr.shapeOf expr |> ShapeSpec.eval 
-
         // execution units
         let execUnits = ResizeArray<ExecUnitT<'e>>()
         let mutable execUnitIdCnt = 0
@@ -527,10 +521,10 @@ module ExecUnit =
             if List.isEmpty srcs then onMaybeCompleted ()
             else
                 let srcReqStorages = 
-                    gen.SrcReqs {TargetShape=numShapeOf erqExpr
-                                 TargetRequest=erqChannelReqs
+                    gen.SrcReqs {TargetRequest=erqChannelReqs
                                  Op=op
-                                 SrcShapes=List.map numShapeOf srcs}
+                                 Metadata=metadata
+                                 SrcShapes=List.map UExpr.channelShapes srcs}
                 for src, srcReqStorage in List.zip srcs srcReqStorages do
                     submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
                         subreqResults.[src] <- res

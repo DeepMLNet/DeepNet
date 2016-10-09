@@ -443,7 +443,7 @@ module ArrayND =
         a.NewOfType (ArrayNDLayout.newC shp) 
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newFOfSameType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+    let inline newFOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newF shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
@@ -451,7 +451,7 @@ module ArrayND =
         a.NewOfType (ArrayNDLayout.newF shp) 
 
     /// creates a new ArrayND with existing data but new layout
-    let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
+    let inline relayout newLayout (a: 'A when 'A :> IArrayNDT)  =
         a.NewView newLayout :?> 'A
 
     /// checks that two ArrayNDs have the same shape

@@ -294,14 +294,13 @@ module Func =
             // start tracing
             Trace.startExprEval compileRes.Exprs compiler.Name
 
-            // evaluate using compiled function
-            let evalEnv = EvalEnv.create varEnv 
-            let res = compileRes.Eval evalEnv
-
-            // stop tracing
-            Trace.endExprEval ()
-
-            res
+            try
+                // evaluate using compiled function
+                let evalEnv = EvalEnv.create varEnv 
+                compileRes.Eval evalEnv
+            finally
+                // stop tracing
+                Trace.endExprEval ()
 
         // If all size symbols and variable storage locations are known, then we can immediately compile
         // the expression. Otherwise we have to wait for a VarEnv to infer the missing sizes and locations.

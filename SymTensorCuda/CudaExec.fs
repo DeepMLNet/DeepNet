@@ -258,18 +258,17 @@ module CudaExprWorkspaceTypes =
     type CudaExprWorkspace (recipe: CudaRecipeT) =
         let mutable disposed = false
 
-        //do if Debug.DisableStreams then printfn "CudaExprWorkspace: redirecting all streams to null stream"
-
         /// execution environment
         let execEnv = {
-            Stream         = new Dictionary<StreamT, CudaStream>()
-            Event          = new Dictionary<EventObjectT, CudaEvent>()
-            InternalMem    = new Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>()
-            RegHostMem     = new Dictionary<MemAllocManikinT, RegHostMemT>()
+            Stream         = Dictionary<_, _>()
+            Event          = Dictionary<_, _>()
+            InternalMem    = Dictionary<_, _>()
+            RegHostMem     = Dictionary<_, _>()
             ExternalVar    = Map.empty
             HostVar        = Map.empty
-            TextureObject  = new Dictionary<TextureObjectT, CudaTexObjectAndArray>()
+            TextureObject  = Dictionary<_, _>()
             ConstantValues = recipe.ConstantValues
+            SubWorkspaces  = Dictionary<_, _>()
         }
 
         /// all kernel calls
@@ -462,6 +461,15 @@ module CudaExprWorkspaceTypes =
                         execEnv.TextureObject.[tex].TexArray.Dispose()
                         execEnv.TextureObject.Remove(tex) |> ignore
 
+                // sub-workspace management
+                | SubWorkspaceNew sws ->
+                    if Debug.TraceCalls then printfn "Creating sub-workspace %A" sws
+                    execEnv.SubWorkspaces.[sws] <- new CudaExprWorkspace (recipe.SubRecipes.[sws])
+                | SubWorkspaceDispose sws ->
+                    if Debug.TraceCalls then printfn "Disposing sub-workspace %A" sws
+                    (execEnv.SubWorkspaces.[sws] :> System.IDisposable).Dispose ()
+                    execEnv.SubWorkspaces.Remove sws |> ignore
+
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
                     // instantiate args
@@ -613,9 +621,78 @@ module CudaExprWorkspaceTypes =
                         if Debug.TraceCalls then
                             printfn "Initializing BLAS pointer array on stream %d" strm
 
+                // loop
+                | ExecItem (InitLoopZeros info, strm) ->
+                    if Debug.TraceCalls then
+                        printfn "Initializing loop zeros for sub-workspace %d" info.Workspace
+
+                    for KeyValue(ch, ci) in info.Channels do
+                        let zeroDevMem, _ = CudaExecEnv.getDevMemForManikin execEnv ci.ZeroManikin
+                        let zero = convTo ci.ZeroManikin.DataType 0
+                        let zeroHostMem = GCHandle.Alloc (zero, GCHandleType.Pinned)
+                        zeroDevMem.CopyToDevice (zeroHostMem.AddrOfPinnedObject(), 
+                                                 SizeT 0, 
+                                                 SizeT 0,
+                                                 SizeT (Marshal.SizeOf ci.ZeroManikin.DataType))
+                        zeroHostMem.Free()
+
+                | ExecItem (ExecLoop info, strm) ->
+                    if Debug.TraceCalls then 
+                        printfn "Starting loop on stream %d using sub-workspace %d" strm info.Workspace
+
+                    // arrays for iteration indices
+                    let iterAry = CudaExecEnv.getArrayNDForManikin execEnv info.IterManikin
+                    let iterMem, _ = CudaExecEnv.getDevMemForManikin execEnv info.IterManikin
+                    let iterRemAry = CudaExecEnv.getArrayNDForManikin execEnv info.ItersRemainingManikin
+                    let iterRemMem, _ = CudaExecEnv.getDevMemForManikin execEnv info.ItersRemainingManikin
+
+                    // iterate
+                    for iter=0 to info.Length-1 do
+                        if Debug.TraceCalls then 
+                            printfn "Loop iteration %d / %d on stream %d" iter (info.Length-1) strm
+
+                        // set iteration and iterations remaining
+                        iterMem.MemsetAsync (uint32 iter, getStream strm)
+                        iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1), getStream strm)
+
+                        // get argument VarEnv and channel outputs
+                        let lcis = 
+                            info.Channels
+                            |> Map.map (fun ch ci -> 
+                                {
+                                    LoopEval.SliceDim = ci.SliceDim
+                                    LoopEval.Shape    = ci.Shape
+                                    LoopEval.Zero     = CudaExecEnv.getArrayNDForManikin execEnv ci.ZeroManikin
+                                    LoopEval.Output   = CudaExecEnv.getArrayNDForManikin execEnv ci.Target
+                                })
+                        let args = 
+                            info.Args 
+                            |> List.map (fun manikin -> 
+                                manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> IArrayNDT)
+                        let srcVarEnv, resTrgts =
+                            LoopEval.buildInOut iter iterAry iterRemAry info.Vars args lcis
+
+                        // add result variables to VarEnv
+                        let chVars = recipe.SubRecipes.[info.Workspace].ChannelVars
+                        let varEnv =
+                            (srcVarEnv, resTrgts)
+                            ||> Map.fold (fun varEnv ch trgt ->
+                                match chVars.[ch] with
+                                | Some var -> varEnv |> VarEnv.addVarSpec var trgt
+                                | None -> varEnv)
+
+                        // execute loop contents
+                        let ws = info.Workspace |> CudaExecEnv.getSubworkspace execEnv
+                        ws.Eval varEnv
+
+                    if Debug.TraceCalls then 
+                        printfn "Loop finished on stream %d using sub-workspace %d" strm info.Workspace
+
+                // extension 
                 | ExecItem (ExtensionExecItem eei, strm) ->
                     eei.Execute execEnv strm
 
+                // misc
                 | ExecItem (PrintWithMsg (msg, res), strm) ->
                     CudaSup.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
@@ -729,14 +806,18 @@ module CudaExprWorkspaceTypes =
             if not disposed then
                 (this :> System.IDisposable).Dispose()
 
-        /// Evaluate expression.
-        member this.Eval (externalVar: Map<VarSpecT, IArrayNDT>,
-                          hostVar:     Map<VarSpecT, IArrayNDT>) =
+        /// evaluates the workspace using the specified variable environment
+        member this.Eval (varEnv: VarEnvT) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
             CudaSup.checkContext ()
 
-            lock this (fun () ->
+            // partition variables depending on location
+            let vsLoc = VarEnv.valueLocations varEnv
+            let externalVar, hostVar = 
+                varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = LocDev)
 
+            lock this (fun () ->
+                // prepare environment
                 execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
                 execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
 
@@ -756,7 +837,9 @@ module CudaExprWorkspaceTypes =
                 execCalls recipe.ExecCalls
                 if not Debug.DisableStreams then
                     CudaSup.context.Synchronize () 
-
             )
+
+        interface ICudaExprWorkspace with
+            member this.Eval varEnv = this.Eval varEnv
 
 
