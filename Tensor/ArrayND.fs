@@ -68,6 +68,8 @@ module ArrayND =
     [<AbstractClass>]
     [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
+        do ArrayNDLayout.check layout
+
         /// layout
         member this.Layout = layout
 

@@ -57,6 +57,8 @@ module Types =
         ChannelAllocators:          Map<ChannelT, unit -> IArrayNDT>
         /// storage location of variables
         VarStorLoc:                 Map<VarSpecT, ArrayLocT>
+        /// optional stride specification for variables
+        VarStrides:                 Map<VarSpecT, int list>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
         /// texture objects
@@ -154,22 +156,6 @@ module Types =
         inherit System.Attribute()     
         member this.CPPFuncName = cppFuncName
 
-    /// forward interface for CudaRecipeT
-    type ICudaRecipe =
-        interface end
-
-///// forward declarations from CudaEval module
-//module CudaEvalFW =
-//    let mutable buildRecipe : 
-//        CompileEnvT -> UExprT list ->
-//        ICudaRecipe * VarSpecT option list * (unit -> IArrayNDT) list
-//            = failwith "not initializaed"
-//
-//    // call initializer
-//    do   
-//        Activator.CreateInstance(Type.GetType("SymTensor.Compiler.Cuda.CudaEval.InitT"))
-//        |> ignore
-
 /// methods for manipulating the CUDA compile environment
 module CudaCompileEnv =
 
@@ -198,6 +184,12 @@ module CudaCompileEnv =
         env.SubWorkspaces.Add recipeDesc
         env.SubWorkspaces.Count
 
+    /// Gets the strides for an external variable.
+    /// If no strides were specified, then continguous row-major strides are assumed.
+    let strideForVar (var: VarSpecT) (env: CudaCompileEnvT) =
+        match env.VarStrides |> Map.tryFind var with
+        | Some strides -> strides
+        | None -> ArrayNDLayout.cStride (ShapeSpec.eval var.Shape)
 
 module CudaExecEnv = 
 
@@ -213,15 +205,26 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im], 0
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            if ArrayND.isC ev then 
-                ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
-            else failwithf "external variable %A was expected to be contiguous" vs
+            ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
         | MemConst mc -> 
             let ary = env.ConstantValues.[mc]
             ary.Storage.ByteData, 0            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+        // check that shapes and strides match for external variables
+        match manikin.Storage with
+        | MemExternal vs ->
+            let ev = env.ExternalVar.[vs]
+            if ev.Layout.Shape <> manikin.Layout.Shape then
+                failwithf "variable %A was expected to have shape %A but the specified value has shape %A" 
+                          vs manikin.Layout.Shape ev.Layout.Shape
+            if ev.Layout.Stride <> manikin.Layout.Stride then
+                failwithf "variable %A was expected to have strides %A but the specified value has strides %A" 
+                          vs manikin.Layout.Stride ev.Layout.Stride
+        | _ -> ()
+
+        // return memory
         getDevMem env manikin.Storage
 
     /// gets host memory for an external reference

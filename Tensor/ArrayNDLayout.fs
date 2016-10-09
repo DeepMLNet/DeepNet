@@ -8,11 +8,11 @@ module ArrayNDLayoutTypes =
     // layout (shape, offset, stride) of an ArrayND
     type ArrayNDLayoutT = {
         /// shape
-        Shape: int list;
+        Shape:  int list
         /// offset in elements
-        Offset: int;
+        Offset: int
         /// stride in elements
-        Stride: int list;
+        Stride: int list
     }
 
     /// range specification
@@ -31,6 +31,14 @@ module ArrayNDLayoutTypes =
 
 
 module ArrayNDLayout =
+
+    /// checks that the layout is valid
+    let inline check a =
+        if a.Shape.Length <> a.Stride.Length then
+            failwithf "shape and stride must have same number of entries: %A" a
+        for s in a.Shape do
+            if s < 0 then failwithf "shape cannot have negative entries: %A" a
+
     /// checks that the given index is valid for the given shape
     let inline checkIndex shp idx =
         if List.length shp <> List.length idx then

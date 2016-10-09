@@ -22,6 +22,34 @@ module LoopEval =
         Output:     IArrayNDT
     }
 
+    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: IArrayNDT list) 
+                     (channels: Map<ChannelT, LoopChannelInfoT>) (targets: Map<ChannelT, IArrayNDT>)
+                     : VarStridesT * Map<ChannelT, int list> =
+
+        let varStrides = 
+            vars |> Map.map (fun vs li ->
+                match li with
+                | ConstArg idx -> 
+                    args.[idx].Layout.Stride
+                | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
+                    args.[idx].Layout.Stride |> List.without dim
+                | PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
+                    // check that initial value has same stride as channel target
+                    let sliceDim = channels.[ch].SliceDim
+                    let chStride = targets.[ch].Layout.Stride |> List.without sliceDim
+                    let ivStride = args.[ivIdx].Layout.Stride |> List.without sliceDim
+                    if chStride <> ivStride then
+                        failwithf "channel slice strides %A are different from initial value slice strides %A 
+                                   for loop variable %A" chStride ivStride vs
+                    chStride
+                | IterationIndex
+                | IterationsRemaining -> [])
+
+        let channelStrides =
+            channels |> Map.map (fun ch lv -> targets.[ch].Layout.Stride |> List.without lv.SliceDim)
+
+        varStrides, channelStrides
+
     /// builds inputs and outputs for one loop iteration 
     let buildInOut (iter: int) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
                    (vars: Map<VarSpecT, LoopInputT>)
@@ -45,7 +73,7 @@ module LoopEval =
                     | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
                         let slice = rngAllBut args.[idx] dim (RngElem iter)
                         args.[idx].[slice] 
-                    | PreviousChannel {Channel=ch; Delay=delay; Initial=initial} ->
+                    | PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
                         let delay = SizeSpec.eval delay
                         let dim = channels.[ch].SliceDim
                         let prvIter = iter - delay
@@ -53,13 +81,9 @@ module LoopEval =
                             let slice = rngAllBut channels.[ch].Output dim (RngElem prvIter)
                             channels.[ch].Output.[slice]
                         else
-                            match initial with
-                            | InitialZero -> 
-                                channels.[ch].Zero |> ArrayND.broadcastToShape channels.[ch].Shape
-                            | InitialArg idx ->
-                                let initialIter = args.[idx].Shape.[dim] + prvIter
-                                let slice = rngAllBut args.[idx] dim (RngElem initialIter)
-                                args.[idx].[slice] 
+                            let initialIter = args.[ivIdx].Shape.[dim] + prvIter
+                            let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
+                            args.[ivIdx].[slice] 
                     | IterationIndex -> iterAry
                     | IterationsRemaining -> itersRemainingAry
 
@@ -283,7 +307,7 @@ module HostEval =
                         | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
                             let slice = rngAllBut args.[idx] dim (RngElem iter)
                             args.[idx].[slice] :> IArrayNDT
-                        | PreviousChannel {Channel=ch; Delay=delay; Initial=initial} ->
+                        | PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
                             let delay = SizeSpec.eval delay
                             let dim = spec.Channels.[ch].SliceDim
                             let prvIter = iter - delay
@@ -291,15 +315,9 @@ module HostEval =
                                 let slice = rngAllBut outputs.[ch] dim (RngElem prvIter)
                                 outputs.[ch].[slice] :> IArrayNDT
                             else
-                                match initial with
-                                | InitialZero -> 
-                                    spec.Channels.[ch].Expr.Shape
-                                    |> ShapeSpec.eval
-                                    |> ArrayNDHost.zeros<'R> :> IArrayNDT
-                                | InitialArg idx ->
-                                    let initialIter = args.[idx].Shape.[dim] + prvIter
-                                    let slice = rngAllBut args.[idx] dim (RngElem initialIter)
-                                    args.[idx].[slice] :> IArrayNDT
+                                let initialIter = args.[ivIdx].Shape.[dim] + prvIter
+                                let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
+                                args.[ivIdx].[slice] :> IArrayNDT
                         | IterationIndex -> 
                             ArrayNDHost.scalar iter :> IArrayNDT
                         | IterationsRemaining -> 

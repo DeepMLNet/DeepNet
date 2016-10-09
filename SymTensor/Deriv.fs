@@ -293,6 +293,12 @@ module Deriv =
                 args.Add expr
                 idx
 
+        /// adds an argument with a value full of zeros for use with initial value of a PreviousChannel
+        let addZeroInitialArg channelShp channelType sliceDim delay =
+            let shp = channelShp |> ShapeSpec.insertAxis sliceDim delay
+            let zeroExpr = Expr.zerosOfType channelType shp
+            addArg zeroExpr
+
         /// map from variable representing a derivative to the loop input specification
         let varInputSpecs = Dictionary<VarSpecT, LoopInputT> ()
 
@@ -361,9 +367,9 @@ module Deriv =
                 // create variable input specification:
                 // source is accumulated Jacobian w.r.t. ConstArg argIdx in previous derivative loop iteration
                 let dpp = {
-                    Channel = dPortName
-                    Delay = SizeSpec.one
-                    Initial = InitialZero
+                    Channel    = dPortName
+                    Delay      = SizeSpec.one
+                    InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (liDims+1) SizeSpec.one
                 }
                 varInputSpecs.Add (dAccumVar, PreviousChannel dpp)
 
@@ -397,8 +403,8 @@ module Deriv =
             | PreviousChannel pp ->
                 // create loop port exposing the derivative w.r.t. the PreviousPort
                 let dPortName = sprintf "d_%s[%A]" pp.Channel pp.Delay
-                if not (portContents.ContainsKey dPortName) then
-                    let sliceDim = spec.Channels.[pp.Channel].SliceDim
+                let sliceDim = spec.Channels.[pp.Channel].SliceDim
+                if not (portContents.ContainsKey dPortName) then                    
                     portContents.Add (dPortName, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1})
                 portContents.[dPortName].DerivWrt.Add usingVar
 
@@ -409,31 +415,25 @@ module Deriv =
                 // create corresponding variable input specification:
                 // source is Jacobian calculated w.r.t. the PreviousPort in previous derivative loop iteration
                 let dpp = {
-                    Channel = dPortName
-                    Delay = pp.Delay
-                    Initial = InitialZero
+                    Channel    = dPortName
+                    Delay      = pp.Delay
+                    InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (sliceDim+1) pp.Delay
                 }
                 varInputSpecs.Add (dVar, PreviousChannel dpp)                                 
 
-                // check initial value
-                match pp.Initial with
-                | InitialArg argIdx ->
-                    // If initial value(s) is specified by a sequence argument,
-                    // we need to output the Jacboian w.r.t. to the initial sequence argument.
-                    // It is available in the last "Delay" steps of the derivative loop port.
-                    let sliceDim = spec.Channels.[pp.Channel].SliceDim
-                    let slice = [
-                        yield RSAll                                 // function element axis
-                        for d=0 to sliceDim-1 do yield RSAll        // derivative axes
-                        yield RSSymStartSymEnd                      // sequence slice axis
-                            (Some (spec.Length - pp.Delay),
-                             Some (spec.Length - 1))                
-                        for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
-                    ]
-                    argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
-                | InitialZero -> 
-                    // For zero initial value, no Jacobian propagation needs to be done.
-                    ()
+                // We need to output the Jacboian w.r.t. to the initial sequence argument.
+                // It is available in the last "Delay" steps of the derivative loop port.
+                let sliceDim = spec.Channels.[pp.Channel].SliceDim
+                let slice = [
+                    yield RSAll                                 // function element axis
+                    for d=0 to sliceDim-1 do yield RSAll        // derivative axes
+                    yield RSSymStartSymEnd                      // sequence slice axis
+                        (Some (spec.Length - pp.Delay),
+                            Some (spec.Length - 1))                
+                    for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
+                ]
+                argIdxDerivs.[pp.InitialArg].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
+
                                                
             | IterationIndex 
             | IterationsRemaining -> 
@@ -513,14 +513,7 @@ module Deriv =
                     let portExpr = spec.Channels.[pp.Channel].Expr
                     let sliceDim = spec.Channels.[pp.Channel].SliceDim
 
-                    let initialValues =
-                        match pp.Initial with
-                        | InitialZero -> 
-                            let initialShp = portOutput.Shape |> ShapeSpec.set sliceDim pp.Delay
-                            Expr.zerosOfSameType portExpr initialShp
-                        | InitialArg initialArgIdx ->
-                            originalArgs.[initialArgIdx]
-
+                    let initialValues = originalArgs.[pp.InitialArg]
                     let portSeq = Expr.concat sliceDim [initialValues; portOutput]
                     let revPortSeq = portSeq |> Expr.reverseAxis sliceDim
 

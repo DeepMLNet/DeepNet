@@ -16,6 +16,9 @@ module VarEnvTypes =
     /// specification of variable storage locations
     type VarLocsT = Map<VarSpecT, ArrayLocT>
 
+    /// specification of variable strides
+    type VarStridesT = Map<VarSpecT, int list>
+
 
 /// Variable value collection.
 module VarEnv = 
@@ -123,6 +126,7 @@ module EnvTypes =
     type CompileEnvT = {
         SymSizes:           SymSizeEnvT
         VarLocs:            VarLocsT
+        VarStrides:         VarStridesT
         ResultLoc:          ArrayLocT
         CanDelay:           bool
     }
@@ -171,10 +175,11 @@ module CompileEnv =
 
     /// empty compile environment
     let empty = {
-        VarLocs   = Map.empty 
-        ResultLoc = LocHost
-        SymSizes  = SymSizeEnv.empty
-        CanDelay  = true
+        VarLocs    = Map.empty 
+        VarStrides = Map.empty
+        ResultLoc  = LocHost
+        SymSizes   = SymSizeEnv.empty
+        CanDelay   = true
     }
 
  

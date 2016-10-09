@@ -493,6 +493,7 @@ module CudaRecipe =
             ChannelVars          = resInfos |> Map.map (fun _ ri -> ri.Var)
             ChannelAllocators    = resInfos |> Map.map (fun _ ri -> ri.Allocator)
             VarStorLoc           = varLocs
+            VarStrides           = compileEnv.VarStrides
             ElemFuncsOpNames     = Map.empty    
             TextureObjects       = ResizeArray<_>()
             InterpolatorTextures = Dictionary<_, _>()

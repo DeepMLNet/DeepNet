@@ -127,6 +127,11 @@ module ArrayNDManikin =
         let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, storage) 
 
+    /// creates a new ArrayNDManikinT with specified strides and using the specified storage
+    let external storage shape stride =
+        let layout = {Shape=shape; Stride=stride; Offset=0}
+        ArrayNDManikinT (layout, storage)
+
     /// storage
     let storage (ary: ArrayNDManikinT) =
         ary.Storage

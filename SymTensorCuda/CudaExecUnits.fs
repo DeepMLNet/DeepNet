@@ -442,11 +442,13 @@ module CudaExecUnit =
         | ULeafOp (Var vs) ->       
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
-                // we assume that all device input vars are contiguous
-                dfltChTrgt (ArrayNDManikin.externalC (MemExternal vs) (trgtDfltChShape())) true
+                // create manikin for external variable
+                let shp = vs.Shape |> ShapeSpec.eval
+                let stride = compileEnv |> CudaCompileEnv.strideForVar vs
+                dfltChTrgt (ArrayNDManikin.external (MemExternal vs) shp stride) true
             | LocHost ->
-                // will transfer variable from host to device during execution
-                // need contiguous memory for that
+                // We will transfer variable from host to device during execution.
+                // We allocate contiguous device memory for that.
                 match trgtDefChReq () with
                 | Some rv when ArrayND.isC rv -> dfltChTrgt rv false
                 | _ -> 

@@ -201,6 +201,7 @@ module ModelContextTypes =
         let mutable symSizes = []
         let mutable symSizeEnv = SymSizeEnv.empty
         let mutable varLocs : VarLocsT = Map.empty
+        let mutable varStrides : VarStridesT = Map.empty
         let mutable instantiated = false
 
         let toSizeSpec (name: string) =            
@@ -214,6 +215,10 @@ module ModelContextTypes =
                 | :? int as f when f >= 0 -> SizeSpec.fix f
                 | r -> failwithf "size must be either a size symbol name (string), \
                                   a fixed size (positive integer) or -1 for broadcast, but got %A" r)
+
+        let checkVar var =
+            if not (vars |> Set.contains var) then
+                failwithf "this ModelBuilder does not contain the variable %A" var
 
         let defaultInitializer (seed: int) (shp: int list) =
             let rng = Random(seed)
@@ -304,17 +309,29 @@ module ModelContextTypes =
 
         /// sets the location of the given variable
         member this.SetLoc var loc =
-            varLocs <- varLocs |> Map.add (Expr.extractVar var) loc
+            let vs = Expr.extractVar var
+            checkVar vs
+            varLocs <- varLocs |> Map.add vs loc
 
-        /// Infers localtion symbolic size by matching a variables symbolic shape to the shape
-        /// of the given variable value.
+        /// sets the stride of the given variable
+        member this.SetStride var stride =
+            let vs = Expr.extractVar var
+            checkVar vs
+            varStrides <- varStrides |> Map.add vs stride            
+
+        /// Infers variable location, variable strides and symbolic sizes by 
+        /// matching a symbolic variable to the given value.
         member this.UseTmplVal var (value: ArrayNDT<'T>) =
-            VarEnv.empty 
-            |> VarEnv.add var value
-            |> VarEnv.inferSymSizes symSizeEnv
-            |> fun ss -> symSizeEnv <- ss
+            // infer symbolic sizes
+            let inferredSizes = 
+                VarEnv.empty 
+                |> VarEnv.add var value
+                |> VarEnv.inferSymSizes symSizeEnv
+            symSizeEnv <- Map.join symSizeEnv inferredSizes
 
+            // infer location and strides
             varLocs <- varLocs |> Map.add (Expr.extractVar var) (ArrayND.location value)
+            varStrides <- varStrides |> Map.add (Expr.extractVar var) (ArrayND.stride value)
 
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
@@ -348,15 +365,22 @@ module ModelContextTypes =
                 failwithf "Cannot instantiate model because size symbols %A have no value."
                     (missingSymSizes |> Set.toList)
 
-            // apply default variable location
-            let mutable varLocs = varLocs
-            for var in vars do
-                if not (varLocs |> Map.containsKey var) then
-                    varLocs <- varLocs |> Map.add var device.DefaultLoc
+            // apply default variable location to variables with unspecified location
+            let varLocs = 
+                (varLocs, vars)
+                ||> Set.fold (fun varLocs var ->
+                    match varLocs |> Map.tryFind var with
+                    | Some _ -> varLocs
+                    | None -> varLocs |> Map.add var device.DefaultLoc)
 
             // create compile environement
-            let compileEnv =
-                {SymSizes=symSizeEnv; VarLocs=varLocs; ResultLoc=device.DefaultLoc; CanDelay=canDelay}
+            let compileEnv = {
+                SymSizes   = symSizeEnv
+                VarLocs    = varLocs
+                VarStrides = varStrides
+                ResultLoc  = device.DefaultLoc
+                CanDelay   = canDelay
+            }
 
             // instantiate
             instantiated <- true

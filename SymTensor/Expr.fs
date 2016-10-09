@@ -206,21 +206,14 @@ module Expr =
         SliceDim:   int
     }
 
-    /// an initial value for a variable using a previous channel output
-    and InitialValuesT = 
-        /// initial value is zero
-        | InitialZero
-        /// initial value is specified by given loop argument
-        | InitialArg of argIdx:int
-
     /// references a loop channel of a previous iteration
     and PreviousChannelT = {
         /// the channel to use
         Channel:       ChannelT
         /// the delay, must be at least one
         Delay:         SizeSpecT
-        /// the initial value
-        Initial:       InitialValuesT
+        /// the index of the argument specifying the initial values
+        InitialArg:    int
     }
 
     /// a loop variable value specification
@@ -779,7 +772,8 @@ module Expr =
                             let reqShp = vs.Shape |> ShapeSpec.insertAxis dim spec.Length
                             if reqShp ..<> ss.[idx] then
                                 failwithf "sequence argument variable %A requires argument shape %A but was given %A" vs reqShp ss.[idx]
-                        | PreviousChannel {Channel=prvCh; Delay=delay; Initial=iv} ->
+                        | PreviousChannel {Channel=prvCh; Delay=delay; InitialArg=ivIdx} ->
+                            // check previous channel
                             match spec.Channels |> Map.tryFind prvCh with
                             | Some chVal -> 
                                 if vs.TypeName <> chVal.Expr.TypeName then
@@ -788,16 +782,15 @@ module Expr =
                                     failwithf "previous channel variable %A was given channel of shape %A" vs chVal.Expr.Shape                                
                             | None -> 
                                 failwithf "previous channel %A for variable %A does not exist" prvCh vs
-                            match iv with
-                            | InitialArg idx ->
-                                checkArg idx
-                                if es.[idx].TypeName <> vs.TypeName then
-                                    failwithf "previous channel variable %A was given initial value of type %A" vs es.[idx].Type
-                                let sliceDim = spec.Channels.[prvCh].SliceDim
-                                let reqShp = vs.Shape |> ShapeSpec.insertAxis sliceDim delay
-                                if reqShp ..<> ss.[idx] then
-                                    failwithf "previous channel variable %A needs initial value of shape %A but was given %A" vs reqShp ss.[idx]                                
-                            | InitialZero -> ()
+                            
+                            // check initial value arg
+                            checkArg ivIdx
+                            if es.[ivIdx].TypeName <> vs.TypeName then
+                                failwithf "previous channel variable %A was given initial value of type %A" vs es.[ivIdx].Type
+                            let sliceDim = spec.Channels.[prvCh].SliceDim
+                            let reqShp = vs.Shape |> ShapeSpec.insertAxis sliceDim delay
+                            if reqShp ..<> ss.[ivIdx] then
+                                failwithf "previous channel variable %A needs initial value of shape %A but was given %A" vs reqShp ss.[ivIdx]                                
                         | IterationIndex 
                         | IterationsRemaining -> 
                             if vs.TypeName <> TypeName.ofType<int> then
@@ -1234,6 +1227,10 @@ module Expr =
     let zeros<'T> (shp: ShapeSpecT) =
         filled shp (conv<'T> 0)
 
+    /// zero tensor of given type and shape
+    let zerosOfType typ shp =
+        filled shp (convTo typ 0)
+
     /// zero tensor of given shape and same type as given expression
     let zerosOfSameType expr shp =
         let zero = System.Convert.ChangeType (box 0, (typename expr).Type)
@@ -1593,7 +1590,6 @@ module ExprTypes =
     type ChannelT = Expr.ChannelT
     type UnaryHeldOpT = Expr.UnaryHeldOpT
     type SequenceArgSliceT = Expr.SequenceArgSliceT
-    type InitialValuesT = Expr.InitialValuesT
     type PreviousChannelT = Expr.PreviousChannelT
     type LoopInputT = Expr.LoopInputT
     type LoopValueT = Expr.LoopValueT
