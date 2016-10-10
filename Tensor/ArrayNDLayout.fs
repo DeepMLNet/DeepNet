@@ -89,32 +89,42 @@ module ArrayNDLayout =
     let inline allIdxOfDim dim a =
         { 0 .. a.Shape.[dim] - 1}
 
-    /// computes the stride given the shape for the ArrayND to be continguous (row-major)
-    let rec cStride (shape: int list) =
-        match shape with
-        | [] -> []
-        | [l] -> [1]
-        | l::(lp::lrest) ->
-            match cStride (lp::lrest) with 
-            | sp::srest -> (lp*sp)::sp::srest
-            | [] -> failwith "unexpected"    
-
-    /// computes the stride given the shape for the ArrayND to be in Fortran order (column-major)
-    let fStride (shape: int list) =
-        let rec buildStride elemsLeft shape =
-            match shape with
+    /// Computes the strides for the given shape using the specified ordering.
+    /// The axis that is first in the ordering gets stride 1.
+    /// The resulting strides will be independent of the shape of the axis 
+    /// that appears last in the ordering.
+    /// A C-order stride corresponds to the ordering: [n; n-1; ...; 2; 1; 0].
+    /// A Fortran-order stride corresponds to the ordering: [0; 1; 2; ...; n-1; n].
+    let orderedStride (shape: int list) (order: int list) =
+        if not (Permutation.is order) then
+            failwithf "the stride order %A is not a permutation" order
+        if order.Length <> shape.Length then
+            failwithf "the stride order %A is incompatible with the shape %A" order shape
+        let rec build cumElems order =
+            match order with
+            | o :: os -> cumElems :: build (cumElems * shape.[o]) os
             | [] -> []
-            | l :: ls ->
-                elemsLeft :: buildStride (l * elemsLeft) ls
-        buildStride 1 shape
+        build 1 order |> List.permute (fun i -> order.[i])
 
-    /// a contiguous (row-major) ArrayND layout of the given shape 
+    /// computes the stride given the shape for the ArrayND to be in C-order (row-major)
+    let cStride (shape: int list) =
+        orderedStride shape (List.rev [0 .. shape.Length-1])
+
+    /// computes the stride given the shape for the ArrayND to be in Fortran-order (column-major)
+    let fStride (shape: int list) =
+        orderedStride shape [0 .. shape.Length-1]
+
+    /// a ArrayND layout of the given shape and stride order
+    let newOrdered shp strideOrder =
+        {Shape=shp; Stride=orderedStride shp strideOrder; Offset=0}
+
+    /// a C-order (row-major) ArrayND layout of the given shape 
     let newC shp =
-        {Shape=shp; Stride=cStride shp; Offset=0;}
+        {Shape=shp; Stride=cStride shp; Offset=0}
 
-    /// a Fortran (column-major) ArrayND layout of the given shape 
+    /// a Fortran-order (column-major) ArrayND layout of the given shape 
     let newF shp =
-        {Shape=shp; Stride=fStride shp; Offset=0;}
+        {Shape=shp; Stride=fStride shp; Offset=0}
 
     /// an ArrayND layout for an empty (zero elements) vector (1D)
     let emptyVector =

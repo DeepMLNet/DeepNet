@@ -407,11 +407,15 @@ module Expr =
         | Nary (Elements (_, elemExpr), _) 
             -> ElemExpr.typeName elemExpr
         | Nary (Channel (Loop spec, channel), _)
-            -> typename spec.Channels.[channel].Expr
+            -> loopOutputTypeNames spec |> Map.find channel 
 
         | Unary (_, a) -> typename a
         | Binary (_, a, b) -> typename a
         | Nary (_, es) -> typename (List.head es)
+
+    /// data type of loop otuput
+    and internal loopOutputTypeNames (spec: LoopSpecT) =
+        spec.Channels |> Map.map (fun ch lv -> typename lv.Expr)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -485,7 +489,6 @@ module Expr =
         | Unary(Annotated(_), a) -> shapeOf a
         | Unary(Held (derivShp :: _, heldOp), a) -> [(shapeOf a).[0]; ShapeSpec.nElem derivShp]
 
-
         // binary elementwise
         | Binary (Add, a, _)                         
         | Binary (Substract, a, _)                     
@@ -525,11 +528,14 @@ module Expr =
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
         | Nary(Elements (resShape, elemExpr), _) -> resShape
         | Nary(Interpolate _, es) -> shapeOf es.Head
-        | Nary(Channel (Loop spec, channel), es) ->
-            let chValue = spec.Channels.[channel]
-            let sliceShp = shapeOf chValue.Expr
-            sliceShp |> ShapeSpec.insertAxis chValue.SliceDim spec.Length
+        | Nary(Channel (Loop spec, channel), es) -> loopOutputShapes spec |> Map.find channel
         | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
+
+    /// Returns the shapes of the outputs of the loop channels.
+    and internal loopOutputShapes (spec: LoopSpecT) =
+        spec.Channels
+        |> Map.map (fun ch lv ->
+            shapeOf lv.Expr |> ShapeSpec.insertAxis lv.SliceDim spec.Length)
 
     /// number of elements of given expression
     let nElems expr =

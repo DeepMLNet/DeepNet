@@ -367,19 +367,32 @@ module ModelContextTypes =
 
             // apply default variable location to variables with unspecified location
             let varLocs = 
-                (varLocs, vars)
-                ||> Set.fold (fun varLocs var ->
-                    match varLocs |> Map.tryFind var with
-                    | Some _ -> varLocs
-                    | None -> varLocs |> Map.add var device.DefaultLoc)
+                if canDelay then varLocs
+                else
+                    (varLocs, vars)
+                    ||> Set.fold (fun varLocs var ->
+                        match varLocs |> Map.tryFind var with
+                        | Some _ -> varLocs
+                        | None -> varLocs |> Map.add var device.DefaultLoc)
+
+            // apply row-major strides to variables with unspecified strides
+            let varStrides = 
+                if canDelay then varStrides
+                else
+                    (varStrides, vars)
+                    ||> Set.fold (fun varStrides var ->
+                        match varStrides |> Map.tryFind var, ShapeSpec.tryEval var.Shape with
+                        | None, Some nShape -> varStrides |> Map.add var (ArrayNDLayout.cStride nShape)
+                        | _, _ -> varStrides)
 
             // create compile environement
             let compileEnv = {
-                SymSizes   = symSizeEnv
-                VarLocs    = varLocs
-                VarStrides = varStrides
-                ResultLoc  = device.DefaultLoc
-                CanDelay   = canDelay
+                SymSizes       = symSizeEnv
+                VarLocs        = varLocs
+                VarStrides     = varStrides
+                ChannelStrides = Map.empty
+                ResultLoc      = device.DefaultLoc
+                CanDelay       = canDelay
             }
 
             // instantiate
@@ -414,9 +427,13 @@ module ModelContextTypes =
             let varLocs =
                 compileEnv.VarLocs
                 |> Map.add psVar (ArrayND.location psVal)
+            let varStrides =
+                compileEnv.VarStrides
+                |> Map.add psVar (ArrayND.stride psVal)
 
-            device.Compiler, {compileEnv with ResultLoc = resultLoc;
-                                              VarLocs   = varLocs}
+            device.Compiler, {compileEnv with ResultLoc  = resultLoc
+                                              VarLocs    = varLocs
+                                              VarStrides = varStrides}
 
         let useParStorage = parameterStorage.Use
 
@@ -453,14 +470,22 @@ module ModelContextTypes =
         /// sets the location of the given variable
         member this.SetLoc var loc =
             let uvs = Expr.extractVar var 
-
             match compileEnv.VarLocs |> Map.tryFind uvs with
             | Some prvLoc when prvLoc <> loc ->
                 failwithf "cannot change location of variable %A from %A to %A after model instantiation"
                     uvs prvLoc loc
             | _ -> ()
-
             compileEnv <- {compileEnv with VarLocs = compileEnv.VarLocs |> Map.add uvs loc}
+
+        /// sets the stride of the given variable
+        member this.SetStride var stride =
+            let uvs = Expr.extractVar var 
+            match compileEnv.VarStrides |> Map.tryFind uvs with
+            | Some prvStride when prvStride <> stride ->
+                failwithf "cannot change stride of variable %A from %A to %A after model instantiation"
+                    uvs prvStride stride
+            | _ -> ()
+            compileEnv <- {compileEnv with VarStrides = compileEnv.VarStrides |> Map.add uvs stride}
 
         /// Load parameter values.
         member this.LoadPars filename = this.ParameterStorage.Load filename

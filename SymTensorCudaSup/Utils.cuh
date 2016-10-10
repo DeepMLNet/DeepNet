@@ -34,7 +34,7 @@ template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, floa
 #endif
 
 
-typedef unsigned int idx_t;
+typedef int idx_t;
 
 
 template <typename T>

@@ -15,16 +15,20 @@ open ArrayNDNS.ArrayND
 module LoopEval =
     open Expr
 
+    /// channel information for loop execution
     type LoopChannelInfoT = {
-        SliceDim:   int
         Shape:      NShapeSpecT
-        Zero:       IArrayNDT
-        Output:     IArrayNDT
+        SliceDim:   int
+        Target:     IArrayNDT
     }
 
+
+    /// build strides information for loop sources and targets
     let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: IArrayNDT list) 
-                     (channels: Map<ChannelT, LoopChannelInfoT>) (targets: Map<ChannelT, IArrayNDT>)
-                     : VarStridesT * Map<ChannelT, int list> =
+                     (channels: Map<ChannelT, LoopChannelInfoT>) 
+                     : VarStridesT * ChannelStridesT * int list option list =
+
+        let mutable argRequiredStrideOrder = List.replicate args.Length None
 
         let varStrides = 
             vars |> Map.map (fun vs li ->
@@ -36,19 +40,39 @@ module LoopEval =
                 | PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
                     // check that initial value has same stride as channel target
                     let sliceDim = channels.[ch].SliceDim
-                    let chStride = targets.[ch].Layout.Stride |> List.without sliceDim
+                    let chStride = channels.[ch].Target.Layout.Stride |> List.without sliceDim
                     let ivStride = args.[ivIdx].Layout.Stride |> List.without sliceDim
                     if chStride <> ivStride then
-                        failwithf "channel slice strides %A are different from initial value slice strides %A 
-                                   for loop variable %A" chStride ivStride vs
+                        // Stride mismatch. 
+                        // Check that copying argument to temporary array would
+                        // result in matching strides.
+                        let shp = args.[ivIdx].Shape
+                        let strideOrder = 
+                            [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
+                        let ivCopyStride = 
+                            ArrayNDLayout.orderedStride args.[ivIdx].Shape strideOrder
+                            |> List.without sliceDim
+                        if chStride <> ivCopyStride then 
+                            printfn "Loop stride problem:"
+                            printfn "Channel %s:\n%A" ch channels.[ch]
+                            printfn "Initial value layout:\n%A" args.[ivIdx].Layout
+                            printfn "Copy stride:    %A" ivCopyStride
+                            printfn "Channel stride: %A" chStride
+                            failwithf "channel %A slice strides %A are different from initial \
+                                       value slice strides %A for loop variable %A and copying \
+                                       to a temporary array would not help" 
+                                      ch chStride ivStride vs
+                        // request copy to C-strided temporary array
+                        argRequiredStrideOrder <- 
+                            argRequiredStrideOrder |> List.set ivIdx (Some strideOrder)
                     chStride
                 | IterationIndex
                 | IterationsRemaining -> [])
 
         let channelStrides =
-            channels |> Map.map (fun ch lv -> targets.[ch].Layout.Stride |> List.without lv.SliceDim)
+            channels |> Map.map (fun ch lv -> lv.Target.Layout.Stride |> List.without lv.SliceDim)
 
-        varStrides, channelStrides
+        varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
     let buildInOut (iter: int) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
@@ -78,8 +102,8 @@ module LoopEval =
                         let dim = channels.[ch].SliceDim
                         let prvIter = iter - delay
                         if prvIter >= 0 then
-                            let slice = rngAllBut channels.[ch].Output dim (RngElem prvIter)
-                            channels.[ch].Output.[slice]
+                            let slice = rngAllBut channels.[ch].Target dim (RngElem prvIter)
+                            channels.[ch].Target.[slice]
                         else
                             let initialIter = args.[ivIdx].Shape.[dim] + prvIter
                             let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
@@ -98,10 +122,11 @@ module LoopEval =
         // slice outputs into channel targets
         let targets =
             channels |> Map.map (fun ch lci ->
-                let slice = rngAllBut lci.Output lci.SliceDim (RngElem iter)
-                lci.Output.[slice])
+                let slice = rngAllBut lci.Target lci.SliceDim (RngElem iter)
+                lci.Target.[slice])
 
         srcVarEnv, targets
+
 
 
 module HostEval =
@@ -280,65 +305,41 @@ module HostEval =
         static member LoopEval<'T, 'R> (evalEnv: EvalEnvT, spec: LoopSpecT, args: ArrayNDHostT<'T> list) 
                                        : Map<ChannelT, ArrayNDHostT<'R>> =
 
-            /// RngAll in all dimensions but specified one
-            let rngAllBut ary dim dimSlice = 
-                List.replicate (ArrayND.nDims ary) RngAll
-                |> List.set dim dimSlice
+            let args = args |> List.map (fun arg -> arg :> IArrayNDT)
 
-            // initialize outputs
-            let outputs =
+            // iteration index variables
+            let nIters = SizeSpec.eval spec.Length
+            let iterAry = ArrayNDHost.zeros<int> []
+            let itersRemAry = ArrayNDHost.zeros<int> []
+
+            // create channel information
+            let channelInfos =
                 spec.Channels
                 |> Map.map (fun ch lv ->
-                    lv.Expr.Shape 
-                    |> ShapeSpec.insertAxis lv.SliceDim spec.Length
-                    |> ShapeSpec.eval
-                    |> ArrayNDHost.zeros)
+                    let sliceShp = lv.Expr.Shape |> ShapeSpec.eval
+                    let targetShp = sliceShp |> List.insert lv.SliceDim nIters
+                    {
+                        LoopEval.Shape    = sliceShp
+                        LoopEval.SliceDim = lv.SliceDim
+                        LoopEval.Target   = ArrayNDHost.zeros<'R> targetShp :> IArrayNDT
+                    })
 
             // perform loop
-            let nIters = SizeSpec.eval spec.Length
-            for iter=0 to nIters-1 do
-                // build variable environment
-                let iterVarEnv : VarEnvT =
-                    spec.Vars
-                    |> Map.map (fun vs li ->
-                        match li with
-                        | ConstArg idx -> 
-                            args.[idx] :> IArrayNDT
-                        | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
-                            let slice = rngAllBut args.[idx] dim (RngElem iter)
-                            args.[idx].[slice] :> IArrayNDT
-                        | PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
-                            let delay = SizeSpec.eval delay
-                            let dim = spec.Channels.[ch].SliceDim
-                            let prvIter = iter - delay
-                            if prvIter >= 0 then
-                                let slice = rngAllBut outputs.[ch] dim (RngElem prvIter)
-                                outputs.[ch].[slice] :> IArrayNDT
-                            else
-                                let initialIter = args.[ivIdx].Shape.[dim] + prvIter
-                                let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
-                                args.[ivIdx].[slice] :> IArrayNDT
-                        | IterationIndex -> 
-                            ArrayNDHost.scalar iter :> IArrayNDT
-                        | IterationsRemaining -> 
-                            ArrayNDHost.scalar (nIters - iter - 1) :> IArrayNDT
-                    )
-
-                // check shapes and types
-                for KeyValue(vs, value) in iterVarEnv do
-                    if ShapeSpec.eval vs.Shape <> value.Shape then
-                        failwithf "loop variable %A got value with shape %A" vs value.Shape
-                    if vs.Type <> value.DataType then
-                        failwithf "loop variable %A got value with data type %A" vs value.DataType
+            for iter=0 to nIters-1 do               
+                // set iteration indices
+                iterAry.[[]] <- iter
+                itersRemAry.[[]] <- nIters - iter - 1
 
                 // calculate and store channel values
+                let iterVarEnv, iterChannelEnv =
+                    LoopEval.buildInOut iter iterAry itersRemAry spec.Vars args channelInfos
                 let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
                 for KeyValue(ch, lv) in spec.Channels do
-                    let slice = rngAllBut outputs.[ch] lv.SliceDim (RngElem iter)
-                    outputs.[ch].[slice] <- EvalT.Eval (iterEvalEnv, lv.Expr)
+                    (iterChannelEnv.[ch] :?> ArrayNDHostT<'R>).[Fill] <- 
+                        EvalT.Eval (iterEvalEnv, lv.Expr)
 
             // return outputs
-            outputs                          
+            channelInfos |> Map.map (fun ch ci -> ci.Target :?> ArrayNDHostT<'R>)                          
             
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.

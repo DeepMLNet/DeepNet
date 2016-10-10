@@ -61,8 +61,8 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
         f |> rpState.Use |> rpCfg.Use
 
     member this.PublishLoc mb =
-        rpCfg.PublishLoc mb
-        rpState.PublishLoc mb
+        rpCfg.PublishLocAndStride mb
+        rpState.PublishLocAndStride mb
 
     interface IOptimizer<'T, Cfg<'T>, State<'T>> with
         member this.OptStepExpr = this.Minimize

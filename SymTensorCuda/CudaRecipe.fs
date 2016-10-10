@@ -55,6 +55,8 @@ module CudaRecipeTypes =
     type CudaRecipeT = {
         ChannelVars:        Map<ChannelT, VarSpecT option>
         ChannelAllocators:  Map<ChannelT, unit -> IArrayNDT>
+        VarStrides:         VarStridesT
+        VarStorLoc:         VarLocsT
         KernelCode:         string
         CPPCode:            string
         InitCalls:          CudaCallT list
@@ -332,9 +334,10 @@ module CudaRecipe =
         [for cmd in initItems do
             yield! callsForExecItem cmd cache 0]
 
-    type private ResultInfo = {
+    type private ResultInfoT = {
         TransferUExpr:  UExprT
         Var:            VarSpecT option
+        Stride:         int list option
         Allocator:      unit -> IArrayNDT
     }
 
@@ -402,6 +405,8 @@ module CudaRecipe =
         {
             ChannelVars       = cudaCompileEnv.ChannelVars
             ChannelAllocators = cudaCompileEnv.ChannelAllocators
+            VarStrides        = cudaCompileEnv.VarStrides
+            VarStorLoc        = cudaCompileEnv.VarStorLoc
             KernelCode        = kernelModuleHeader + TmplInstCache.getCodeForDomain KernelFunc tmplInstCache
             CPPCode           = cppModuleHeader + TmplInstCache.getCodeForDomain CPPFunc tmplInstCache
             InitCalls         = initCalls
@@ -448,6 +453,7 @@ module CudaRecipe =
                     {
                         TransferUExpr = UExpr (UUnaryOp (Expr.StoreToVar resVar), [uexpr], metadata)
                         Var           = Some resVar
+                        Stride        = compileEnv.ChannelStrides |> Map.tryFind channel
                         Allocator     = resAllocator
                     }
                 else
@@ -455,17 +461,23 @@ module CudaRecipe =
                     {
                         TransferUExpr = uexpr
                         Var           = None
+                        Stride        = None
                         Allocator     = resAllocator
                     }
                 )
 
-        /// result variable locations
-        let resVarLocs = 
-            (Map.empty, resInfos)
-            ||> Map.fold (fun locs ch resInfo ->
+        /// result variable locations and strides
+        let resVarLocs, resVarStrides = 
+            ((Map.empty, Map.empty), resInfos)
+            ||> Map.fold (fun (locs, strides) ch resInfo ->
                 match resInfo.Var with
-                | Some vs -> locs |> Map.add vs compileEnv.ResultLoc
-                | None -> locs)
+                | Some vs -> 
+                    let locs = locs |> Map.add vs compileEnv.ResultLoc
+                    let strides = match resInfo.Stride with
+                                  | Some stride -> strides |> Map.add vs stride
+                                  | None -> strides  
+                    locs, strides                                
+                | None -> locs, strides)
 
         /// unified expression containing all expressions to evaluate
         let mergedUexpr =
@@ -485,15 +497,12 @@ module CudaRecipe =
                         ChannelShape = Map [dfltChId, [0]]
                         Expr         = None})                       
 
-        // build variable locations
-        let varLocs = Map.join compileEnv.VarLocs resVarLocs
-
         // compile expression and create workspace
         let cudaCompileEnv = {
             ChannelVars          = resInfos |> Map.map (fun _ ri -> ri.Var)
             ChannelAllocators    = resInfos |> Map.map (fun _ ri -> ri.Allocator)
-            VarStorLoc           = varLocs
-            VarStrides           = compileEnv.VarStrides
+            VarStorLoc           = Map.join compileEnv.VarLocs resVarLocs
+            VarStrides           = Map.join compileEnv.VarStrides resVarStrides
             ElemFuncsOpNames     = Map.empty    
             TextureObjects       = ResizeArray<_>()
             InterpolatorTextures = Dictionary<_, _>()

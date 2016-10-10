@@ -41,6 +41,10 @@ let build device batch =
     mc.SetSize nInput 784
     mc.SetSize nTarget 10
 
+    // set strides
+    mc.SetStride input (ArrayNDLayout.cStride [batch; 784])
+    mc.SetStride target (ArrayNDLayout.cStride [batch; 10])
+
     // instantiate model
     let mi = mc.Instantiate (device, canDelay=false)
 

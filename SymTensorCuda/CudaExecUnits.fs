@@ -14,18 +14,10 @@ open UExprTypes
 [<AutoOpen>]
 module CudaExecUnitTypes =
 
-    /// channel information for loop execution
-    type ExecLoopChannelInfoT = {
-        Shape:                 NShapeSpecT
-        SliceDim:              int
-        ZeroManikin:           ArrayNDManikinT
-        Target:                ArrayNDManikinT
-    }
-
     /// information for executing a loop
     type ExecLoopInfoT = {
         Length:                int
-        Channels:              Map<ChannelT, ExecLoopChannelInfoT>
+        Channels:              Map<ChannelT, LoopEval.LoopChannelInfoT>
         Vars:                  Map<VarSpecT, LoopInputT>
         Workspace:             SubWorkspaceT
         Args:                  ArrayNDManikinT list
@@ -64,7 +56,6 @@ module CudaExecUnitTypes =
         // pointer array creation for CUBLAS batch calls
         | BlasInitPointerArray  of BlasTransposedMatrixBatchTmpl
         // loop
-        | InitLoopZeros         of ExecLoopInfoT
         | ExecLoop              of ExecLoopInfoT
         // misc
         | Trace                 of UExprT * ArrayNDManikinT
@@ -566,10 +557,14 @@ module CudaExecUnit =
             let srcManikin, srcShared = srcs.[0].[channel]
             dfltChTrgt srcManikin srcShared
 
-        | UExtraOp (Loop loopspec) ->            
+        | UExtraOp (Loop loopspec) ->      
+            // Create targets with strides so that the slice dimension is the slowest, thus
+            // the loop length does not affect the stride.
             trgtShapes
             |> Map.map (fun ch shp ->
-                ArrayNDManikin.newC memAllocator trgtTypenames.[ch] shp, false)
+                let sliceDim = loopspec.Channels.[ch].SliceDim
+                let strideOrder = [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
+                ArrayNDManikin.newOrdered memAllocator trgtTypenames.[ch] shp strideOrder, false)
 
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) -> 
@@ -1154,33 +1149,56 @@ module CudaExecUnit =
         | UExtraOp (Channel _) -> []
 
         | UExtraOp (Loop loopSpec) ->
+            // build channel infos
             let channelInfos = 
                 loopSpec.Channels 
                 |> Map.map (fun ch lv ->
                     {
-                        Shape       = UExpr.dfltChShape lv.UExpr
-                        SliceDim    = lv.SliceDim
-                        ZeroManikin = ArrayNDManikin.newC memAllocator (UExpr.dfltChTypename lv.UExpr) []                    
-                        Target      = trgtChs.[ch]
+                        LoopEval.Shape       = UExpr.dfltChShape lv.UExpr
+                        LoopEval.SliceDim    = lv.SliceDim
+                        LoopEval.Target      = trgtChs.[ch] :> IArrayNDT
                     })
+
+            // obtain stride information
+            let srcs = srcsDfltCh() |> List.map (fun s -> s :> IArrayNDT)
+            let argStrides, chStrides, srcReqStrideOrder = 
+                LoopEval.buildStrides loopSpec.Vars srcs channelInfos 
+
+            // copy sources to temporary variable if necessary to match strides
+            let copiedSrcs, copyItems =   
+                ([], List.zip srcs srcReqStrideOrder)
+                ||> List.mapFold (fun copyItems (src, reqOrder) ->
+                    let src = src :?> ArrayNDManikinT
+                    match reqOrder with
+                    | Some order ->
+                        let tmp = ArrayNDManikin.newOrdered memAllocator src.TypeName src.Shape order
+                        let copyItems = copyItems @ copyExecItems tmp src
+                        tmp, copyItems
+                    | None -> src, copyItems)
+
+            // create recipe description for sub-workspace that will evaluate one
+            // loop iteration
             let recipeDesc = {
-                CompileEnv  = {SymSizes   = SymSizeEnv.empty                                
-                               VarLocs    = loopSpec.Vars |> Map.map (fun _ _ -> LocDev)
-                               ResultLoc  = LocDev
-                               CanDelay   = false}
+                CompileEnv  = {SymSizes       = SymSizeEnv.empty  
+                               VarLocs        = loopSpec.Vars |> Map.map (fun _ _ -> LocDev)
+                               VarStrides     = argStrides      
+                               ChannelStrides = chStrides                        
+                               ResultLoc      = LocDev
+                               CanDelay       = false}
                 UExprs      = loopSpec.Channels |> Map.map (fun ch lv -> lv.UExpr) 
             }
+
+            // emit loop executor
             let execLoopInfo = {
                 Length                = loopSpec.Length
                 Channels              = channelInfos
                 Vars                  = loopSpec.Vars
                 Workspace             = compileEnv |> CudaCompileEnv.newSubrecipe recipeDesc
-                Args                  = srcsDfltCh ()
+                Args                  = copiedSrcs
                 IterManikin           = ArrayNDManikin.newC memAllocator TypeName.ofType<int> []
                 ItersRemainingManikin = ArrayNDManikin.newC memAllocator TypeName.ofType<int> []
             }
-            submitInit [InitLoopZeros execLoopInfo]
-            [ExecLoop execLoopInfo]
+            copyItems @ [ExecLoop execLoopInfo]
 
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) ->

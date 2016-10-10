@@ -9,13 +9,7 @@ open SymTensor
 open SymTensor.Compiler.Cuda
 open TestUtils
 
-
-
-
-[<Fact>]
-let ``Simple loop`` () =
-    // adding one every iteration to channel A
-    
+let ``Simple loop`` (device: IDevice) =
     let nIters = SizeSpec.symbol "nIters"
     let m = SizeSpec.symbol "m"
     let n = SizeSpec.symbol "n"
@@ -29,7 +23,7 @@ let ``Simple loop`` () =
     let loopSpec = {
         Expr.Length = nIters
         Expr.Vars = Map [Expr.extractVar prevA, 
-                         Expr.PreviousChannel {Channel=ch; Delay=SizeSpec.fix 1; Initial=Expr.InitialArg 0}]
+                         Expr.PreviousChannel {Channel=ch; Delay=SizeSpec.fix 1; InitialArg=0}]
         Expr.Channels = Map [ch,
                             {LoopValueT.Expr=chExpr; LoopValueT.SliceDim=0}]    
     }
@@ -44,13 +38,22 @@ let ``Simple loop`` () =
     let result = result |> Expr.substSymSizes symSizes
     printfn "result after substitution:\n%A" result
 
-    let resultFn = Func.make<single> DevHost.DefaultFactory result |> arg1 initialA
-
+    let resultFn = Func.make<single> device.DefaultFactory result |> arg1 initialA
+    
     let initialAv = ArrayNDHost.zeros<single> [1; 3; 2]
     printfn "initialAv=\n%A" initialAv
 
     let resultVal = resultFn initialAv
     printfn "result value=\n%A" resultVal 
+
+[<Fact>]
+let ``Simple loop on host`` () =
+    ``Simple loop`` DevHost
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Simple loop on CUDA`` () =
+    ``Simple loop`` DevCuda
 
 
 let ``Build complicated loop 1`` () =
@@ -76,8 +79,8 @@ let ``Build complicated loop 1`` () =
 
     let loopSpec = {
         Expr.Length = nIters
-        Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; Initial=Expr.InitialArg 0}
-                         Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; Initial=Expr.InitialArg 1}
+        Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
+                         Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
                          Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
                          Expr.extractVar constA, Expr.ConstArg 3]
         Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
@@ -117,14 +120,12 @@ let ``Values for complicated loop 1`` () =
     printfn "seqAv=\n%A" seqAv
     printfn "constAv=\n%A" constAv
     initialAv, initialBv, seqAv, constAv
-   
 
-[<Fact>]
-let ``Complicated loop 1`` () =   
+let ``Complicated loop 1`` (device: IDevice) =   
     let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
 
     let resultFn = 
-        Func.make2<single, single> DevHost.DefaultFactory resultA resultB 
+        Func.make2<single, single> device.DefaultFactory resultA resultB 
         |> arg4 initialA initialB seqA constAExt
 
     let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
@@ -132,9 +133,16 @@ let ``Complicated loop 1`` () =
     printfn "resultAv=\n%A" resultAv
     printfn "resultBv=\n%A" resultBv
 
+[<Fact>]
+let ``Complicated loop 1 on host`` () =   
+    ``Complicated loop 1`` DevHost
 
 [<Fact>]
-let ``Derivative of complicated loop 1`` () =   
+[<Trait("Category", "Skip_CI")>]
+let ``Complicated loop 1 on CUDA`` () =   
+    ``Complicated loop 1`` DevCuda
+
+let ``Derivative of complicated loop 1`` (device: IDevice) =   
     let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
 
     let result = Expr.sum resultA + Expr.sum resultB
@@ -151,7 +159,7 @@ let ``Derivative of complicated loop 1`` () =
 //    printfn "dresult / dConstAExt:\n%A" dConstAExt
 
     let resultFn = 
-        Func.make5<single, single, single, single, single> DevHost.DefaultFactory 
+        Func.make5<single, single, single, single, single> device.DefaultFactory 
             result dInitialA dInitialB dSeqA dConstAExt
         |> arg4 initialA initialB seqA constAExt
 
@@ -168,6 +176,16 @@ let ``Derivative of complicated loop 1`` () =
     printfn "dConstAExt=\n%A" dConstAExtV.Full
 
     
+[<Fact>]
+let ``Derivative of complicated loop 1 on host`` () =   
+    ``Derivative of complicated loop 1`` DevHost
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Derivative of complicated loop 1 on CUDA`` () =   
+    ``Derivative of complicated loop 1`` DevCuda
+
+
 [<Fact>]
 let ``Derivative compare: Complicated loop 1`` () =
     randomDerivativeCheck 1e-4 [[1; 3; 2]; [3; 2; 2]; [2; 5; 3]; [2]] 
@@ -190,8 +208,8 @@ let ``Derivative compare: Complicated loop 1`` () =
 
             let loopSpec = {
                 Expr.Length = nIters
-                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; Initial=Expr.InitialArg 0}
-                                 Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; Initial=Expr.InitialArg 1}
+                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
+                                 Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
                                  Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
                                  Expr.extractVar constA, Expr.ConstArg 3]
                 Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
@@ -218,7 +236,7 @@ let ``Derivative compare: Simple loop 1`` () =
 
             let loopSpec = {
                 Expr.Length = nIters
-                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; Initial=Expr.InitialArg 0}]
+                Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}]
                 Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}]
             }
             let resultA = Expr.loop loopSpec chA [initialA]

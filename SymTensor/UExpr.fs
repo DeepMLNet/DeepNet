@@ -168,10 +168,8 @@ module UExpr =
                                          {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
                     }
                     let uLoopMetadata = {
-                        ChannelType  = loopSpec.Channels
-                                       |> Map.map (fun _ lv -> lv.Expr.TypeName)
-                        ChannelShape = loopSpec.Channels
-                                       |> Map.map (fun _ lv -> lv.Expr.Shape |> ShapeSpec.eval)
+                        ChannelType  = Expr.loopOutputTypeNames loopSpec
+                        ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> ShapeSpec.eval shp)
                         Expr         = None
                     }
                     let uLoop = UExpr (UExtraOp (Loop uLoopSpec), se |> List.map toUExprRec, uLoopMetadata)

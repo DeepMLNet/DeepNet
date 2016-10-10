@@ -129,7 +129,7 @@ module VarSpecTypes =
         TypeName:  TypeNameT
     } with
         member this.Type = TypeName.getType this.TypeName
-        member this.Pretty = sprintf "%s %s%A" this.Type.Name this.Name this.Shape
+        member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
         
 
 /// variable specification

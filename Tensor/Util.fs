@@ -64,10 +64,16 @@ module List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
-    /// transposes a list list
+    /// transposes a list of lists
     let rec transpose = function
         | (_::_)::_ as m -> List.map List.head m :: transpose (List.map List.tail m)
         | _ -> []
+
+    /// swaps the elements at the specified positions
+    let swap elem1 elem2 lst =
+        lst
+        |> set elem1 lst.[elem2]
+        |> set elem2 lst.[elem1]
 
 
 module Map = 

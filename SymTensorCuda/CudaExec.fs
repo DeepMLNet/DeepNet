@@ -123,10 +123,11 @@ module Compile =
                     printfn "nvrtc %s %s" (cmplrArgs |> String.concat " ") modPath 
                 try cmplr.Compile (Array.ofList cmplrArgs)
                 with :? NVRTC.NVRTCException as cmplrError ->
-                    printfn "Compile error:"
+                    //printfn "Compile error:"
                     let log = cmplr.GetLogAsString()
-                    printfn "%s" log
-                    failwithf "nvrtc compile error: %s" log
+                    let log = log.Replace ("\n\n", "\n")
+                    //printfn "%s" log
+                    failwithf "nvrtc compile error:\n%s" log
                 if Debug.TraceCompile then
                     let log = cmplr.GetLogAsString()
                     printf "%s" log
@@ -467,8 +468,11 @@ module CudaExprWorkspaceTypes =
                     execEnv.SubWorkspaces.[sws] <- new CudaExprWorkspace (recipe.SubRecipes.[sws])
                 | SubWorkspaceDispose sws ->
                     if Debug.TraceCalls then printfn "Disposing sub-workspace %A" sws
-                    (execEnv.SubWorkspaces.[sws] :> System.IDisposable).Dispose ()
-                    execEnv.SubWorkspaces.Remove sws |> ignore
+                    match execEnv.SubWorkspaces.TryFind sws with
+                    | Some sw -> 
+                        (sw :> System.IDisposable).Dispose()
+                        execEnv.SubWorkspaces.Remove sws |> ignore
+                    | None -> ()
 
                 // execution control
                 | LaunchCKernel (krnl, workDim, smemSize, strm, argTmpls) ->
@@ -622,20 +626,6 @@ module CudaExprWorkspaceTypes =
                             printfn "Initializing BLAS pointer array on stream %d" strm
 
                 // loop
-                | ExecItem (InitLoopZeros info, strm) ->
-                    if Debug.TraceCalls then
-                        printfn "Initializing loop zeros for sub-workspace %d" info.Workspace
-
-                    for KeyValue(ch, ci) in info.Channels do
-                        let zeroDevMem, _ = CudaExecEnv.getDevMemForManikin execEnv ci.ZeroManikin
-                        let zero = convTo ci.ZeroManikin.DataType 0
-                        let zeroHostMem = GCHandle.Alloc (zero, GCHandleType.Pinned)
-                        zeroDevMem.CopyToDevice (zeroHostMem.AddrOfPinnedObject(), 
-                                                 SizeT 0, 
-                                                 SizeT 0,
-                                                 SizeT (Marshal.SizeOf ci.ZeroManikin.DataType))
-                        zeroHostMem.Free()
-
                 | ExecItem (ExecLoop info, strm) ->
                     if Debug.TraceCalls then 
                         printfn "Starting loop on stream %d using sub-workspace %d" strm info.Workspace
@@ -655,16 +645,11 @@ module CudaExprWorkspaceTypes =
                         iterMem.MemsetAsync (uint32 iter, getStream strm)
                         iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1), getStream strm)
 
-                        // get argument VarEnv and channel outputs
-                        let lcis = 
-                            info.Channels
-                            |> Map.map (fun ch ci -> 
-                                {
-                                    LoopEval.SliceDim = ci.SliceDim
-                                    LoopEval.Shape    = ci.Shape
-                                    LoopEval.Zero     = CudaExecEnv.getArrayNDForManikin execEnv ci.ZeroManikin
-                                    LoopEval.Output   = CudaExecEnv.getArrayNDForManikin execEnv ci.Target
-                                })
+                        // obtain real ArrayNDCudaTs for array manikins
+                        let lcis = info.Channels |> Map.map (fun ch ci -> 
+                            {ci with 
+                              LoopEval.Target = 
+                                   CudaExecEnv.getArrayNDForManikin execEnv (ci.Target :?> ArrayNDManikinT)})
                         let args = 
                             info.Args 
                             |> List.map (fun manikin -> 
@@ -815,6 +800,17 @@ module CudaExprWorkspaceTypes =
             let vsLoc = VarEnv.valueLocations varEnv
             let externalVar, hostVar = 
                 varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = LocDev)
+
+            // check the shapes and strides of external variables match with recipe
+            for KeyValue(vs, ev) in externalVar do              
+                if ev.Layout.Shape <> ShapeSpec.eval vs.Shape then
+                    failwithf "variable %A was expected to have shape %A but the specified value has shape %A" 
+                              vs (ShapeSpec.eval vs.Shape) ev.Layout.Shape
+                match recipe.VarStrides.TryFind vs with
+                | Some rcptStride when ev.Layout.Stride <> rcptStride ->
+                    failwithf "variable %A was expected to have strides %A but the specified value has strides %A" 
+                              vs rcptStride ev.Layout.Stride
+                | _ -> ()
 
             lock this (fun () ->
                 // prepare environment

@@ -181,15 +181,15 @@ module CudaCompileEnv =
 
     /// adds a sub-workspace using the specified recipe description
     let newSubrecipe (recipeDesc: CudaRecipeDescT) (env: CudaCompileEnvT) : SubWorkspaceT =
+        let id = env.SubWorkspaces.Count
         env.SubWorkspaces.Add recipeDesc
-        env.SubWorkspaces.Count
+        id
 
     /// Gets the strides for an external variable.
-    /// If no strides were specified, then continguous row-major strides are assumed.
     let strideForVar (var: VarSpecT) (env: CudaCompileEnvT) =
         match env.VarStrides |> Map.tryFind var with
         | Some strides -> strides
-        | None -> ArrayNDLayout.cStride (ShapeSpec.eval var.Shape)
+        | None -> failwithf "no strides were specified for variable %A" var
 
 module CudaExecEnv = 
 
@@ -212,19 +212,6 @@ module CudaExecEnv =
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
-        // check that shapes and strides match for external variables
-        match manikin.Storage with
-        | MemExternal vs ->
-            let ev = env.ExternalVar.[vs]
-            if ev.Layout.Shape <> manikin.Layout.Shape then
-                failwithf "variable %A was expected to have shape %A but the specified value has shape %A" 
-                          vs manikin.Layout.Shape ev.Layout.Shape
-            if ev.Layout.Stride <> manikin.Layout.Stride then
-                failwithf "variable %A was expected to have strides %A but the specified value has strides %A" 
-                          vs manikin.Layout.Stride ev.Layout.Stride
-        | _ -> ()
-
-        // return memory
         getDevMem env manikin.Storage
 
     /// gets host memory for an external reference
@@ -321,8 +308,8 @@ module ArgTemplates =
         do 
             match manikinOpt with
             | Some manikin ->
-                if manikin.DataType <> typeof<uint32> then 
-                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. uint32"
+                if manikin.DataType <> typeof<int32> then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. int32"
                 if ArrayND.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
                 if ArrayND.offset manikin <> 0 then 
