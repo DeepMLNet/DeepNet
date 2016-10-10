@@ -39,7 +39,7 @@ mb.SetSize nHidden 100
 let mi = mb.Instantiate DevCuda
 
 // loss expression
-let loss = MLP.loss mlp input.T target.T
+let loss = MLP.loss mlp input target
 
 let smplVarEnv (smpl: MnistT) =
     VarEnv.empty
