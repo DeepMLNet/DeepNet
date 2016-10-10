@@ -59,6 +59,8 @@ module CudaExecUnitTypes =
         | ExecLoop              of ExecLoopInfoT
         // misc
         | Trace                 of UExprT * ArrayNDManikinT
+        | TraceEnteringLoop     of UExprT
+        | TraceLeavingLoop      of UExprT
         | PrintWithMsg          of string * ArrayNDManikinT
         | DumpValue             of string * ArrayNDManikinT
         | CheckNonFiniteCounter of string * ArrayNDManikinT
@@ -1238,22 +1240,28 @@ module CudaExecUnit =
         | UExtraOp (ExtensionExtraOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 
+    /// returns the execution units for tracing becore execution of the op items
+    let tracePreItemsForExpr compileEnv {TraceItemsForExprArgs.Expr=uexpr} =
+        match uexpr with
+        | UExpr (UExtraOp (Loop _), _, _) -> [TraceEnteringLoop uexpr]
+        | _ -> []
                 
-    /// returns the execution units for tracing the result
-    let traceItemsForExpr compileEnv {MemAllocator=memAllocator
-                                      Target=trgtChs
-                                      Expr=uexpr} =
-        /// Default channel of target.
-        let defaultChTrgt = trgtChs.[dfltChId]
-
-        [Trace (uexpr, defaultChTrgt)]
-
+    /// returns the execution units for tracing the result after execution of the op items
+    let tracePostItemsForExpr compileEnv {Target=trgtChs; Expr=uexpr} =
+        match uexpr with
+        | UExpr (UExtraOp (Loop _), _, _) -> [TraceLeavingLoop uexpr]
+        | _ ->
+            // do tracing of default channel, when available
+            match trgtChs.TryFind dfltChId with
+            | Some dfltChTrgt -> [Trace (uexpr, dfltChTrgt)]
+            | None -> []
 
     /// generates CUDA execution units that will evaluate the given unified expression
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
         ExecUnit.exprToExecUnits {
             ExecItemsForOp=execItemsForOp compileEnv
-            TraceItemsForExpr=traceItemsForExpr compileEnv
+            TracePreItemsForExpr=tracePreItemsForExpr compileEnv
+            TracePostItemsForExpr=tracePostItemsForExpr compileEnv
             TrgtGivenSrcs=trgtGivenSrcs compileEnv
             SrcReqs=srcReqs compileEnv
         } 

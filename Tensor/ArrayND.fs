@@ -64,6 +64,9 @@ module ArrayNDTypes =
 
 module ArrayND =
 
+    /// true if warning about fallback copy was shown
+    let mutable internal SlowCopyWarningShown = false
+
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
     [<StructuredFormatDisplay("{Pretty}")>]
@@ -143,7 +146,10 @@ module ArrayND =
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
             // slow element-wise fallback copy
-            printfn "Warning: fallback slow ArrayNDT.CopyTo is being used"
+            if not SlowCopyWarningShown then
+                printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
+                         (this message is only shown once)"
+                SlowCopyWarningShown <- true
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]

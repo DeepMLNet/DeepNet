@@ -142,6 +142,11 @@ let ``Complicated loop 1 on host`` () =
 let ``Complicated loop 1 on CUDA`` () =   
     ``Complicated loop 1`` DevCuda
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Complicated loop 1`` () =   
+    requireEqualTraces ``Complicated loop 1``
+
 let ``Derivative of complicated loop 1`` (device: IDevice) =   
     let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
 

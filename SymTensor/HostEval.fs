@@ -135,7 +135,6 @@ module HostEval =
     /// if true, intermediate results are printed during evaluation.
     let mutable debug = false
 
-
     /// evaluation functions
     type private EvalT =       
 
@@ -292,7 +291,9 @@ module HostEval =
                         ElemExprHostEval.eval elemExpr esv nResShape    
                     | Interpolate ip -> esv |> Interpolator.interpolate ip 
                     | Channel (Loop spec, channel) -> 
+                        if Trace.isActive () then Trace.enteringLoop (expr |> UExpr.toUExpr) 
                         let channelValues = EvalT.LoopEval (evalEnv, spec, esv)
+                        if Trace.isActive () then Trace.leavingLoop (expr |> UExpr.toUExpr) 
                         channelValues.[channel]                       
                     | ExtensionOp eop -> eop.EvalSimple esv 
                     |> box |> unbox
@@ -325,7 +326,9 @@ module HostEval =
                     })
 
             // perform loop
-            for iter=0 to nIters-1 do               
+            for iter=0 to nIters-1 do            
+                if Trace.isActive () then Trace.setLoopIter iter
+                   
                 // set iteration indices
                 iterAry.[[]] <- iter
                 itersRemAry.[[]] <- nIters - iter - 1

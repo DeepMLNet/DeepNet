@@ -88,7 +88,8 @@ module ExecUnitsTypes =
     /// record containing functions called by the ExecUnitT generator
     type ExecUnitsGeneratorT<'e> = {
         ExecItemsForOp:         ExecItemsForOpArgs<'e> -> 'e list
-        TraceItemsForExpr:      TraceItemsForExprArgs -> 'e list
+        TracePreItemsForExpr:   TraceItemsForExprArgs -> 'e list
+        TracePostItemsForExpr:  TraceItemsForExprArgs -> 'e list
         TrgtGivenSrcs:          TrgtGivenSrcsArgs -> ChannelManikinsAndSharedT
         SrcReqs:                SrcReqsArgs -> ChannelReqsT list
     }
@@ -481,16 +482,21 @@ module ExecUnit =
 
                     // generate execution items
                     let items = 
-                        gen.ExecItemsForOp {MemAllocator=newMemory
-                                            Target=extractChannels trgtChannelsAndShared
-                                            Op=op
-                                            Metadata=metadata
-                                            Srcs=srcChannelsAndShared
-                                            SubmitInitItems=submitInitItems}
+                        if Trace.isActive () then 
+                            gen.TracePreItemsForExpr {MemAllocator=newMemory
+                                                      Target=extractChannels trgtChannelsAndShared
+                                                      Expr=erqExpr}
+                            else []
+                        @ gen.ExecItemsForOp {MemAllocator=newMemory
+                                              Target=extractChannels trgtChannelsAndShared
+                                              Op=op
+                                              Metadata=metadata
+                                              Srcs=srcChannelsAndShared
+                                              SubmitInitItems=submitInitItems}
                         @ if Trace.isActive () then 
-                            gen.TraceItemsForExpr {MemAllocator=newMemory
-                                                   Target=extractChannels trgtChannelsAndShared
-                                                   Expr=erqExpr}
+                            gen.TracePostItemsForExpr {MemAllocator=newMemory
+                                                       Target=extractChannels trgtChannelsAndShared
+                                                       Expr=erqExpr}
                             else []
 
                     // extract manikin from all channels
@@ -609,5 +615,6 @@ module ExecUnit =
             MemAllocs = memAllocs |> List.ofSeq
             InitItems = initItems |> List.ofSeq
         }
+
 
 

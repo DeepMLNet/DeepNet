@@ -18,6 +18,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513
 	ProjectSection(SolutionItems) = preProject
 		Misc\DebugCode.txt = Misc\DebugCode.txt
 		Misc\OldCode.txt = Misc\OldCode.txt
+		Misc\Script1.fsx = Misc\Script1.fsx
+		Misc\Script2.fsx = Misc\Script2.fsx
 		Misc\TODO.txt = Misc\TODO.txt
 	EndProjectSection
 EndProject

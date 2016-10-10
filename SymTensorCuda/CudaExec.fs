@@ -640,6 +640,8 @@ module CudaExprWorkspaceTypes =
                     for iter=0 to info.Length-1 do
                         if Debug.TraceCalls then 
                             printfn "Loop iteration %d / %d on stream %d" iter (info.Length-1) strm
+                        if Trace.isActive () then 
+                            Trace.setLoopIter iter
 
                         // set iteration and iterations remaining
                         iterMem.MemsetAsync (uint32 iter, getStream strm)
@@ -738,6 +740,9 @@ module CudaExprWorkspaceTypes =
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"
                         | Some pc -> sprintf "previous call: %A" pc                        
                     Trace.exprEvaledWithMsg uexpr resHost msg
+
+                | ExecItem (TraceEnteringLoop uexpr, _) -> Trace.enteringLoop uexpr
+                | ExecItem (TraceLeavingLoop uexpr, _) -> Trace.leavingLoop uexpr
 
                 previousCall <- Some call
 
