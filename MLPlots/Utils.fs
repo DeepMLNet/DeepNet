@@ -28,16 +28,14 @@ module Utils =
             R.dev_off () |> ig
         )
 
-    let plotgrid perRow (plots:list<string*(unit-> unit)>) = 
+    let plotgrid (plots:list<string*(unit-> unit)>) = 
         R.lock (fun () ->
-            let nPlots = List.length plots
+            let nPlots = List.length plots |> float
             let shape = 
-                if nPlots <perRow then
-                    [nPlots;1]
-                else if nPlots % perRow = 0 then
-                    [perRow;nPlots/perRow ]
-                else
-                    [perRow;nPlots/perRow + 1]
+                let side1 = ceil(sqrt nPlots)
+                let side2 =  ceil(nPlots/side1)
+                let side1,side2 = (int side1), (int side2)
+                [side2;side1]
             R.par2 ("mfrow", shape)
             R.par2 ("mar",box [1.0;1.0;1.0;1.0])
             |> R.par |> ig

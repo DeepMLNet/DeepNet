@@ -175,7 +175,7 @@ module ConfigLoader =
                                                                 50, -5.0f, 5.0f, -5.0f, 5.0f)
                             name,plot)
                         savePlot 1200 900 "." (sprintf "%s-%05d.pdf" name state.Iter) (fun () ->
-                            plotgrid 5 plots
+                            plotgrid plots
                             ) 
                     plotInProgress <- false
                 }
