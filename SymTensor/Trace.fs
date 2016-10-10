@@ -12,6 +12,8 @@ open UExprTypes
 
 module Trace =
 
+    let mutable WithMessage = false
+
     type LoopIter = {
         LoopExpr:       UExprT
         Iter:           int
@@ -224,8 +226,8 @@ module Trace =
                                         a.Name (Seq.findIndex ((=) aEvent) ae.Trace)
                                         b.Name (Seq.findIndex ((=) bEvent) be.Trace)
                                     printfn ""
-                                    if aMsg.Length > 0 then printfn "%s message: %s" a.Name aMsg
-                                    if bMsg.Length > 0 then printfn "%s message: %s" b.Name bMsg
+                                    if WithMessage && aMsg.Length > 0 then printfn "%s message: %s" a.Name aMsg
+                                    if WithMessage && bMsg.Length > 0 then printfn "%s message: %s" b.Name bMsg
                                     printfn ""
                                     printfn "%s result:\n%A\n" a.Name aRes
                                     printfn "%s result:\n%A\n" b.Name bRes
@@ -279,7 +281,7 @@ module Trace =
                     | None -> out "Unified expression: %A" uexpr
                     out "Loop stack: %A" (ls |> List.map (fun l -> l.Iter))
                     out "Result:\n%A" res
-                    out "Message: %s" msg
+                    if WithMessage then out "Message: %s" msg
                 out ""
 
             out "==== End of trace ===="

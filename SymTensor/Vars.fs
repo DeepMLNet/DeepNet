@@ -130,6 +130,7 @@ module VarSpecTypes =
     } with
         member this.Type = TypeName.getType this.TypeName
         member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
+        member this.NShape = this.Shape |> ShapeSpec.eval
         
 
 /// variable specification

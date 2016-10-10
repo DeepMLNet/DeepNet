@@ -38,9 +38,10 @@ module LoopEval =
                 | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
                     args.[idx].Layout.Stride |> List.without dim
                 | PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
-                    // check that initial value has same stride as channel target
                     let sliceDim = channels.[ch].SliceDim
                     let chStride = channels.[ch].Target.Layout.Stride |> List.without sliceDim
+
+                    // check that initial value has same stride as channel target
                     let ivStride = args.[ivIdx].Layout.Stride |> List.without sliceDim
                     if chStride <> ivStride then
                         // Stride mismatch. 

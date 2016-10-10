@@ -265,8 +265,9 @@ module CudaExecUnit =
             match cudaEnv.VarStorLoc |> Map.find vs with
             | LocDev -> 
                 // request to store directly into external var
-                // we assume that all device input vars are continguous
-                [dfltChReq (Some (ArrayNDManikin.externalC (MemExternal vs) srcShapes.[0].[dfltChId]))]
+                let shp = vs.Shape |> ShapeSpec.eval
+                let stride = cudaEnv |> CudaCompileEnv.strideForVar vs
+                [dfltChReq (Some (ArrayNDManikin.external (MemExternal vs) shp stride))]
             | LocHost -> dfltSrcWithNoViewReq ()
             | loc -> unsupLoc loc
 
@@ -433,20 +434,24 @@ module CudaExecUnit =
         match op with
         // variable access
         | ULeafOp (Var vs) ->       
-            match compileEnv.VarStorLoc |> Map.find vs with
+           match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
                 // create manikin for external variable
-                let shp = vs.Shape |> ShapeSpec.eval
                 let stride = compileEnv |> CudaCompileEnv.strideForVar vs
-                dfltChTrgt (ArrayNDManikin.external (MemExternal vs) shp stride) true
+                dfltChTrgt (ArrayNDManikin.external (MemExternal vs) vs.NShape stride) true
             | LocHost ->
+                // check that host variable has C-stride
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                if not (ArrayNDLayout.isC hvLayout) then
+                    failwithf "host variable %A must be in C-order" vs
+
                 // We will transfer variable from host to device during execution.
                 // We allocate contiguous device memory for that.
                 match trgtDefChReq () with
                 | Some rv when ArrayND.isC rv -> dfltChTrgt rv false
                 | _ -> 
-                    dfltChTrgt (ArrayNDManikin.newC memAllocator 
-                                    (trgtDfltChType()) (trgtDfltChShape())) false    
+                    dfltChTrgt (ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape) false    
             | loc -> unsupLoc loc     
                            
         // tensor creation
@@ -963,8 +968,8 @@ module CudaExecUnit =
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev -> []
             | LocHost -> 
-                // we assume that host variable has continguous stride and zero offset
-                let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape (dfltChTrgt()))
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt()))]       
             | loc -> unsupLoc loc
 
@@ -1043,9 +1048,6 @@ module CudaExecUnit =
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
-            let varShp, varType = 
-                ArrayND.shape (firstSrcDfltCh()), (firstSrcDfltCh()).TypeName
-
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev when (firstSrcDfltCh()).Storage = (MemExternal vs) ->
                 // Source was evaluated directly into the variable storage.
@@ -1054,22 +1056,27 @@ module CudaExecUnit =
             | LocDev  -> 
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
-                // We assume that all device vars are continguous.
-                let dv = ArrayNDManikin.externalC (MemExternal vs) varShp
+                let varStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let dv = ArrayNDManikin.external (MemExternal vs) vs.NShape varStride
                 copyExecItems dv (firstSrcDfltCh())
             | LocHost ->            
                 let copyItems, memcpySrc = 
                     if ArrayND.isC (firstSrcDfltCh()) then 
-                        // Source is contiguous. Can directly copy to host.
+                        // Source has C-strides. Can directly copy to host.
                         [], firstSrcDfltCh()
                     else
-                        // Need to copy to temporary contiguous storage first.
-                        let tmp = ArrayNDManikin.newC memAllocator varType varShp
+                        // Need to copy to temporary C-stride storage first.
+                        let tmp = ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape
                         copyExecItems tmp (firstSrcDfltCh()), tmp
 
-                // We assume that all host vars are continguous.
-                // trgtView has contingous stride
-                let hv = ArrayNDManikin.externalC (MemExternal vs) varShp
+                // check that host variable has C-stride
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                if not (ArrayNDLayout.isC hvLayout) then
+                    failwithf "host variable %A must be in C-order" vs
+
+                // copy
+                let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | loc -> unsupLoc loc         
                                  

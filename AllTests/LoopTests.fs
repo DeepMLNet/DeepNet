@@ -74,9 +74,9 @@ let ``Build complicated loop 1`` () =
     let constAExt = Expr.var<single> "constAExt" [n]
 
     let chA = "A"
-    let chAExpr = prevA + 1.0f + sliceA.T
+    let chAExpr = prevA + sliceA.T + 0.1f
     let chB = "B"
-    let chBExpr = prevB + prevA + constA
+    let chBExpr = prevB + prevA + constA + 0.01f
 
     let loopSpec = {
         Expr.Length = nIters
@@ -114,8 +114,8 @@ let ``Build complicated loop 1`` () =
 let ``Values for complicated loop 1`` () =
     let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1; 3; 2]
     let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3; 2; 2]
-    let seqAv     = ArrayNDHost.linSpaced 0.0f 50.0f (5 * 3 * 2) |> ArrayND.reshape [2; 5; 3]
-    let constAv   = ArrayNDHost.ofList [3.0f; 7.0f] 
+    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [2; 5; 3]
+    let constAv   = ArrayNDHost.ofList [0.001f; 0.0001f] 
     printfn "initialAv=\n%A" initialAv
     printfn "initialBv=\n%A" initialBv
     printfn "seqAv=\n%A" seqAv

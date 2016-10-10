@@ -472,10 +472,12 @@ module CudaRecipe =
             ||> Map.fold (fun (locs, strides) ch resInfo ->
                 match resInfo.Var with
                 | Some vs -> 
-                    let locs = locs |> Map.add vs compileEnv.ResultLoc
-                    let strides = match resInfo.Stride with
-                                  | Some stride -> strides |> Map.add vs stride
-                                  | None -> strides  
+                    let stride = 
+                        match resInfo.Stride with
+                        | Some stride -> stride
+                        | None -> ArrayNDLayout.cStride vs.NShape
+                    let locs = locs |> Map.add vs compileEnv.ResultLoc                    
+                    let strides = strides |> Map.add vs stride
                     locs, strides                                
                 | None -> locs, strides)
 
