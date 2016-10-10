@@ -1243,7 +1243,7 @@ module CudaExecUnit =
     /// returns the execution units for tracing becore execution of the op items
     let tracePreItemsForExpr compileEnv {TraceItemsForExprArgs.Expr=uexpr} =
         match uexpr with
-        | UExpr (UExtraOp (Loop _), _, _) -> [TraceEnteringLoop uexpr]
+        | UExpr (UExtraOp (Loop loopSpec), _, _) -> [TraceEnteringLoop uexpr]
         | _ -> []
                 
     /// returns the execution units for tracing the result after execution of the op items

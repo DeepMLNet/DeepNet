@@ -36,6 +36,16 @@ module Seq =
         Array.iteri (fun i _ -> swap a i (rand.Next(i, Array.length a))) a        
         a |> Seq.ofArray
 
+    /// sequence counting from given value to infinity
+    let countingFrom from = seq {
+        let mutable i = from
+        while true do
+            yield i
+            i <- i + 1
+    }
+
+    /// sequence counting from zero to infinity
+    let counting = countingFrom 0
 
 module List =
     /// sets element with index elem to given value

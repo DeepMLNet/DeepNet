@@ -160,13 +160,7 @@ module UExpr =
                     extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
                 | Expr.Nary (Expr.Channel (Expr.Loop loopSpec, channel), se) ->
                     // build separate loop op
-                    let uLoopSpec = {
-                        Length   = SizeSpec.eval loopSpec.Length
-                        Vars     = loopSpec.Vars
-                        Channels = loopSpec.Channels 
-                                   |> Map.map (fun ch lv ->
-                                         {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
-                    }
+                    let uLoopSpec = loopSpecToULoopSpec loopSpec
                     let uLoopMetadata = {
                         ChannelType  = Expr.loopOutputTypeNames loopSpec
                         ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> ShapeSpec.eval shp)
@@ -205,6 +199,16 @@ module UExpr =
             UExprs          = Dictionary<UExprT, UExprT>(HashIdentity.Structural)        
         }        
         toUExprRec caches expr
+
+    /// converts a loop specification to an unified loop specification
+    and loopSpecToULoopSpec (loopSpec: LoopSpecT) = 
+        {
+            Length   = SizeSpec.eval loopSpec.Length
+            Vars     = loopSpec.Vars
+            Channels = loopSpec.Channels 
+                        |> Map.map (fun ch lv ->
+                                {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
+        }        
 
     /// Converts a unified expression to an expression if the unified expression
     /// was created using the toUExpr function. Otherwise returns None.

@@ -291,9 +291,9 @@ module HostEval =
                         ElemExprHostEval.eval elemExpr esv nResShape    
                     | Interpolate ip -> esv |> Interpolator.interpolate ip 
                     | Channel (Loop spec, channel) -> 
-                        if Trace.isActive () then Trace.enteringLoop (expr |> UExpr.toUExpr) 
+                        if Trace.isActive () then Trace.enteringLoop (expr |> UExpr.toUExpr |> Trace.extractLoop)
                         let channelValues = EvalT.LoopEval (evalEnv, spec, esv)
-                        if Trace.isActive () then Trace.leavingLoop (expr |> UExpr.toUExpr) 
+                        if Trace.isActive () then Trace.leavingLoop (expr |> UExpr.toUExpr |> Trace.extractLoop)
                         channelValues.[channel]                       
                     | ExtensionOp eop -> eop.EvalSimple esv 
                     |> box |> unbox

@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -111,8 +112,8 @@ let ``Build complicated loop 1`` () =
 
 
 let ``Values for complicated loop 1`` () =
-    let initialAv = ArrayNDHost.zeros<single> [1; 3; 2]
-    let initialBv = ArrayNDHost.ones<single>  [3; 2; 2]
+    let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1; 3; 2]
+    let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3; 2; 2]
     let seqAv     = ArrayNDHost.linSpaced 0.0f 50.0f (5 * 3 * 2) |> ArrayND.reshape [2; 5; 3]
     let constAv   = ArrayNDHost.ofList [3.0f; 7.0f] 
     printfn "initialAv=\n%A" initialAv

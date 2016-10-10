@@ -23,6 +23,7 @@ module Trace =
         | ExprEvaled of UExprT * LoopStack * IArrayNDT * string
         | EnteringLoop of UExprT
         | LeavingLoop of UExprT
+        | LoopIteration of LoopIter
 
     type ExprEvaluation = {
         Id:             int
@@ -135,6 +136,9 @@ module Trace =
 
     let enteringLoop uexpr =
         if isActive () then
+            match uexpr with
+            | UExpr (UExtraOp (Loop _), _, _) -> ()
+            | _ -> failwithf "not a loop expression: %A" uexpr
             activeLoopStack.Value.Push {LoopExpr=uexpr; Iter=0}
             let ee = getActiveExpr ()
             ee.Trace.Add (EnteringLoop uexpr)
@@ -149,8 +153,12 @@ module Trace =
             ee.Trace.Add (LeavingLoop uexpr)
 
     let setLoopIter iter =
-        if activeLoopStack.Value.Count = 0 then failwith "no loop active"
-        activeLoopStack.Value.Push ({activeLoopStack.Value.Pop() with Iter=iter})
+        if isActive () then
+            if activeLoopStack.Value.Count = 0 then failwith "no loop active"
+            let loopIter = {activeLoopStack.Value.Pop() with Iter=iter}
+            activeLoopStack.Value.Push loopIter
+            let ee = getActiveExpr ()
+            ee.Trace.Add (LoopIteration loopIter)
 
     let loopStack () : LoopStack =
         activeLoopStack.Value.ToArray() |> List.ofArray |> List.rev
@@ -211,7 +219,7 @@ module Trace =
                                 if diffs < maxDiffs then
                                     printfn ""
                                     printfn "Difference in expression:\n%A" uexpr
-                                    printfn "Loop stack: %A" aLs
+                                    printfn "Loop stack: %A" (aLs |> List.map (fun l -> l.Iter))
                                     printfn "%s index: %d    %s index: %d" 
                                         a.Name (Seq.findIndex ((=) aEvent) ae.Trace)
                                         b.Name (Seq.findIndex ((=) bEvent) be.Trace)
@@ -262,13 +270,14 @@ module Trace =
             for idx, evnt in Seq.indexed exprEval.Trace do
                 out "Event index: %d" idx
                 match evnt with
-                | EnteringLoop uexpr -> out "Entering loop: %A" uexpr
-                | LeavingLoop uexpr -> out "Leaving loop: %A" uexpr
+                | EnteringLoop uexpr -> out "Entering loop:\n%A" uexpr
+                | LeavingLoop uexpr -> out "Leaving loop:\n%A" uexpr
+                | LoopIteration li -> out "Performing loop iteration %d" li.Iter
                 | ExprEvaled (uexpr, ls, res, msg) ->
                     match UExpr.tryToExpr uexpr with
                     | Some expr -> out "Expression: %A" expr
                     | None -> out "Unified expression: %A" uexpr
-                    out "Loop stack: %A" ls
+                    out "Loop stack: %A" (ls |> List.map (fun l -> l.Iter))
                     out "Result:\n%A" res
                     out "Message: %s" msg
                 out ""
@@ -282,4 +291,9 @@ module Trace =
 
     let dumpActiveTrace file =
         getActiveTraceSession () |> dump file
+
+    let extractLoop uexpr =
+        match uexpr with
+        | UExpr (UExtraOp (Channel _), [UExpr (UExtraOp (Loop _), _, _) as uLoop], _) -> uLoop
+        | _ -> failwith "not a loop channel expression"
 
