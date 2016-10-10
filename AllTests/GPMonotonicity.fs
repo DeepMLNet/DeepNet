@@ -33,7 +33,8 @@ let ``On Artificial Examples`` () =
     let zeroMean x = Expr.zerosLike x
     let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f);
                                                 GaussianProcess.MeanFunction = zeroMean;
-                                                GaussianProcess.Monotonicity = None}
+                                                GaussianProcess.Monotonicity = None;
+                                                GaussianProcess.CutOutsideRange = false}
     let pars1 = GaussianProcess.pars (mb.Module "GaussianProcess") hyperPars1
     let hyperPars2 = {hyperPars1 with GaussianProcess.Monotonicity = Some 1e-6f}
     let pars2 = GaussianProcess.pars (mb.Module "GaussianProcess") hyperPars2

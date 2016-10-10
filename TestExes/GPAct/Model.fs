@@ -73,6 +73,8 @@ module GPActivation =
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
 
+        CutOutsideRange:        bool
+
         LengthscalesTrainable:  bool
         TrnXTrainable:          bool
         TrnTTrainable:          bool
@@ -82,12 +84,15 @@ module GPActivation =
         TrnXInit:               InitMethod
         TrnTInit:               InitMethod
         TrnSigmaInit:           InitMethod
+
+
     }
 
     /// default hyper-parameters
     let defaultHyperPars = {
         NGPs                  = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
+        CutOutsideRange      = false
         LengthscalesTrainable = true
         TrnXTrainable         = true
         TrnTTrainable         = true
@@ -290,7 +295,17 @@ module GPActivation =
         let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
         let predMean = predMean |> Expr.checkFinite "pred_mean"
         //let predMean = pred_mean |> Expr.dump "pred_mean"
+        let predMean = 
+            if pars.HyperPars.CutOutsideRange then
+                let xFirst = trnX.[0..nGps- 1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tFirst = trnT.[0..nGps-1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xLast = trnX.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tLast = trnT.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
 
+                let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
+                Expr.ifThenElse (mu >>>> xLast) tLast predMean
+            else
+                predMean
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
@@ -480,6 +495,8 @@ module MeanOnlyGPLayer =
         ///Mean function for all GPs
         MeanFunction:           ExprT-> ExprT
 
+        CutOutsideRange:        bool
+
         LengthscalesTrainable:  bool
         TrnXTrainable:          bool
         TrnTTrainable:          bool
@@ -499,6 +516,7 @@ module MeanOnlyGPLayer =
         NInput                = SizeSpec.fix 0
         NGPs                  = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
+        CutOutsideRange       = false
         MeanFunction          = (fun x -> Expr.zerosLike x)
         LengthscalesTrainable = true
         TrnXTrainable         = true
@@ -579,4 +597,15 @@ module MeanOnlyGPLayer =
         let meanTrnX = pars.HyperPars.MeanFunction trnX
         let meanInput = pars.HyperPars.MeanFunction input
         let mean = meanInput + (KStarT .* KInv .* (trnT - meanTrnX)).T
+        let mean = 
+            if pars.HyperPars.CutOutsideRange then
+                let xFirst = trnX.[0..nGps- 1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tFirst = trnT.[0..nGps-1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xLast = trnX.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tLast = trnT.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+
+                let mean = Expr.ifThenElse (input <<<< xFirst) tFirst mean
+                Expr.ifThenElse (input >>>> xLast) tLast mean
+            else
+                mean
         mean

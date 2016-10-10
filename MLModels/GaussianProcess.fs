@@ -72,11 +72,20 @@ module GaussianProcess =
     
     /// GP hyperparameters
     type HyperPars = {
-        Kernel :        Kernel
-        MeanFunction:   (ExprT -> ExprT)
-        Monotonicity: single option
+        Kernel:             Kernel
+        MeanFunction:       (ExprT -> ExprT)
+        Monotonicity:       single option
+        CutOutsideRange:    bool
         }
     
+    ///the dafault hyperparameters
+    let defaultHyperPars ={
+        Kernel = SquaredExponential (1.0f,1.0f)
+        MeanFunction = (fun x -> Expr.zerosLike x)
+        Monotonicity = None
+        CutOutsideRange = false
+        }
+
     /// GP parameters with linear kernel
     type ParsLinear = {
         HyperPars:  HyperPars
@@ -121,7 +130,7 @@ module GaussianProcess =
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
 
     /// Prediction of mean and covariance of input data xstar given train inputs x and targets y
-    let predict (pars:Pars) x y sigmaNs xStar =
+    let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
         let covMat z z' =
             match pars with
             | LinPars _ -> linearCovariance z z'
@@ -132,32 +141,46 @@ module GaussianProcess =
         let kStarT     = Expr.transpose kStar
         let kStarstar  = covMat xStar xStar
         
-        let meanFkt,monotonicity = 
+        let meanFkt,monotonicity,cut = 
             match pars with
-            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity
-            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity
+            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity, parsLin.HyperPars.CutOutsideRange
+            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity,  parsSE.HyperPars.CutOutsideRange
         
         let meanX = meanFkt x
         let meanXStar = meanFkt xStar
         //TODO: integrate mean function, different ways of placing virtual derivative points
-        match monotonicity with
-        | Some vu ->
-            ///locations of the virtual derivative points on training points
-            let xm = x
-            let kFf = k
-            let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
-            let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
+        let mean,cov = 
+            match monotonicity with
+            | Some vu ->
+                ///locations of the virtual derivative points on training points
+                let xm = x
+                let kFf = k
+                let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
+                let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
 
-            let _,_,covSite,sigmaSite = ExpectationPropagation.ePResults k vu
-            let mean = meanXStar + kStarT .* kInv .* (y - meanX)
-            let cov = kStarstar - kStarT .* kInv .* kStar
+                let _,_,covSite,sigmaSite = ExpectationPropagation.ePResults k vu
+                let mean = meanXStar + kStarT .* kInv .* (y - meanX)
+                let cov = kStarstar - kStarT .* kInv .* kStar
             
-            mean,cov
-        | None ->
-            let mean = meanXStar + kStarT .* kInv .* (y - meanX)
-            let cov = kStarstar - kStarT .* kInv .* kStar
-            mean,cov
+                mean,cov
+            | None ->
+                let mean = meanXStar + kStarT .* kInv .* (y - meanX)
+                let cov = kStarstar - kStarT .* kInv .* kStar
+                mean,cov
+        let mean = 
+            if cut then
+                let nTrnSmpls =x.NElems
+                let nSmpls = xStar.NElems
+                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
 
+                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
+                Expr.ifThenElse (xStar >>>> xLast) yLast mean
+            else
+                mean
+        mean, cov
     /// WARNING: NOT YET IMPLEMENTED, ONLY A RIMINDER FOR LATER IMPLEMENTATION!
     /// !!! CALLING THIS FUNCTION WILL ONLY CAUSE AN ERROR !!!
     let logMarginalLiklihood (pars:Pars) x y sigmaNs xStar =

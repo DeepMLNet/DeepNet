@@ -38,7 +38,6 @@ module Utils =
                     [perRow;nPlots/perRow ]
                 else
                     [perRow;nPlots/perRow + 1]
-            printfn "Plot shape = %A" shape
             R.par2 ("mfrow", shape)
             R.par2 ("mar",box [1.0;1.0;1.0;1.0])
             |> R.par |> ig

@@ -144,23 +144,28 @@ module ConfigLoader =
                     let x = mi.[gpPars.TrnX] |> ArrayND.copy
                     let t = mi.[gpPars.TrnT] |> ArrayND.copy
                     let meanFct = (fun x -> Expr.zerosLike x)
-                    l, s, x, t, meanFct)
+                    let cut = pars.HyperPars.Activation.CutOutsideRange
+                    l, s, x, t, meanFct,cut)
                 let moGPLayers  = meanOnlyGPLayers |> Map.map (fun name pars -> 
                     let l = mi.[pars.Lengthscales] |> ArrayND.copy
                     let s = mi.[pars.TrnSigma] |> ArrayND.copy
                     let x = mi.[pars.TrnX] |> ArrayND.copy
                     let t = mi.[pars.TrnT] |> ArrayND.copy
                     let meanFct = pars.HyperPars.MeanFunction
-                    l, s, x, t, meanFct)
+                    let cut = pars.HyperPars.CutOutsideRange
+                    l, s, x, t, meanFct,cut)
                 let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
                     Map(Seq.concat [ (Map.toSeq p) ; (Map.toSeq q) ])
                 let gpLayers = join gpLayers moGPLayers       
                 let plots = async {
                     Cuda.CudaSup.setContext ()
-                    for KeyValue (name, (l, s, x, t, meanFct)) in gpLayers do
+                    for KeyValue (name, (l, s, x, t, meanFct,cut)) in gpLayers do
                         let plots = [0..l.Shape.[0] - 1] |> List.map (fun gp ->
                             let ls = l.[gp] |> ArrayND.value
-                            let hps = {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f);GaussianProcess.MeanFunction = meanFct;GaussianProcess.Monotonicity = None}
+                            let hps =  {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f)
+                                        GaussianProcess.MeanFunction = meanFct
+                                        GaussianProcess.Monotonicity = None
+                                        GaussianProcess.CutOutsideRange = cut}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
                                             GPPlots.Plots.simplePlot (hps, 
