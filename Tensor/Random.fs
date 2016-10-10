@@ -2,7 +2,7 @@
 
 open Basics
 open System
-
+open MathNet.Numerics.Distributions
 
 [<AutoOpen>]
 module RandomExtensions = 
@@ -23,6 +23,13 @@ module RandomExtensions =
         /// Generates an infinite sequence of random numbers between 0.0 and 1.0.
         member this.SeqSingle () =
             this.SeqDouble () |> Seq.map single
+        
+        member this.NormalDouble mean variance =
+            let normal = Normal.WithMeanVariance (mean, variance)
+            Seq.initInfinite (fun _ -> normal.Sample())
+        
+        member this.NormalSingle mean variance =
+            this.NormalDouble mean variance |> Seq.map single
 
         /// Generates an infinite sequence of random numbers within the given range.
         member this.SeqSingle (minValue: single, maxValue: single) =
@@ -48,5 +55,9 @@ module RandomExtensions =
             |> List.sort
             |> ArrayNDNS.ArrayNDHost.ofList
             |> ArrayNDNS.ArrayND.reshape shp
-
+        
+        member this.NormalArray (mean: 'T, variance: 'T) shp  =
+            let mean, variance = conv<float> mean, conv<float> variance
+            this.NormalDouble mean variance
+            |> ArrayNDNS.ArrayNDHost.ofSeqWithShape shp
 
