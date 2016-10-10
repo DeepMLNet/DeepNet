@@ -162,7 +162,7 @@ module MLP =
     /// Creates the parameters for the neural network in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
     /// See `NeuralLayer.pars` for documentation about the initialization.
-    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
+    let pars (mb: ModelBuilder<'T>) (hp: HyperPars) : Pars<'T> = {
         Layers = hp.Layers 
                  |> List.mapi (fun idx nhp -> 
                     NeuralLayer.pars (mb.Module (sprintf "Layer%d" idx)) nhp)
