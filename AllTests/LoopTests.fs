@@ -129,10 +129,15 @@ let ``Complicated loop 1`` (device: IDevice) =
         Func.make2<single, single> device.DefaultFactory resultA resultB 
         |> arg4 initialA initialB seqA constAExt
 
+    //let ses = Trace.startSession "cloop"
+
     let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
     let resultAv, resultBv = resultFn initialAv initialBv seqAv constAv
     printfn "resultAv=\n%A" resultAv
     printfn "resultBv=\n%A" resultBv
+
+    //let ts = ses.End ()
+    //ts |> Trace.dumpToFile "ComplicatedLoop1.txt"
 
 [<Fact>]
 let ``Complicated loop 1 on host`` () =   
@@ -190,6 +195,11 @@ let ``Derivative of complicated loop 1 on host`` () =
 [<Trait("Category", "Skip_CI")>]
 let ``Derivative of complicated loop 1 on CUDA`` () =   
     ``Derivative of complicated loop 1`` DevCuda
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Derivative of complicated loop 1`` () =   
+    requireEqualTraces ``Derivative of complicated loop 1``
 
 
 [<Fact>]

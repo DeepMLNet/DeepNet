@@ -57,6 +57,7 @@ module TypeName =
 module ConstSpecTypes =
 
     /// scalar constant value
+    [<StructuralEquality; StructuralComparison>]
     type ConstSpecT = 
         | ConstInt of int
         | ConstDouble of double

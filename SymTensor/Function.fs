@@ -195,11 +195,11 @@ module CompileEnv =
 module Func =
 
     type private UExprGenT = {
-        Generate:               SymSizeEnvT -> UExprT
+        Generate:               SymSizeEnvT -> UExpr.UExprCaches -> UExprT
         UVarSpecsAndEvalable:   bool -> SymSizeEnvT -> Set<VarSpecT> * bool       
     }
 
-    let private uExprGenerate baseExpr symSizes =
+    let private uExprGenerate baseExpr symSizes cache =
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
         let substExpr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
@@ -218,7 +218,7 @@ module Func =
 
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Converting to UExpr..."
-        let uExpr = UExpr.toUExpr optimizedExpr
+        let uExpr = UExpr.toUExprWithCache cache optimizedExpr
         if Debug.Timing then printfn "Converting to UExpr took %A" sw.Elapsed
         
         uExpr
@@ -280,9 +280,10 @@ module Func =
 
             // if everything is available, then compile
             if allSizesAvail && allLocsAvail && allStridesAvail then 
+                let uexprCache = UExpr.createCache ()
                 let uexprs = 
                     baseExprGens 
-                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes) 
+                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes uexprCache) 
                 Some {
                     Exprs=uexprs
                     CompileEnv=compileEnv

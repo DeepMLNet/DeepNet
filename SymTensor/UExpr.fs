@@ -124,7 +124,7 @@ module UExprRngsSpec =
 
 module UExpr =
 
-    type private UExprCaches = {
+    type UExprCaches = {
         UExprForExpr:       Dictionary<ExprT, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
     }
@@ -167,6 +167,13 @@ module UExpr =
                         Expr         = None
                     }
                     let uLoop = UExpr (UExtraOp (Loop uLoopSpec), se |> List.map toUExprRec, uLoopMetadata)
+
+                    // try to find loop in cache for reference equality guarantee
+                    let uLoop =
+                        match caches.UExprs.TryFind uLoop with
+                        | Some cached -> cached
+                        | None -> caches.UExprs.[uLoop] <- uLoop; uLoop
+
                     // and separate op to extract referenced channel
                     UExpr (UExtraOp (Channel channel), [uLoop], metadata)
                 | Expr.Unary (Expr.Held (_, heldOp), a) ->
@@ -184,21 +191,31 @@ module UExpr =
                 | Expr.Binary (op, a, b) -> UExpr (UBinaryOp op, [toUExprRec a; toUExprRec b], metadata)
                 | Expr.Nary (op, es) -> UExpr (UNaryOp op, es |> List.map toUExprRec, metadata)        
 
+            // try to find UExpr that was already produced before and reuse it to guarantee
+            // reference equality if structural equality holds
             let uExpr =
                 match caches.UExprs.TryFind uExpr with
                 | Some cached -> cached
-                | None -> uExpr
-
+                | None -> caches.UExprs.[uExpr] <- uExpr; uExpr
+           
             caches.UExprForExpr.[expr] <- uExpr     
             uExpr       
 
     /// converts an expression to a unified expression
-    and toUExpr (expr: ExprT) =
-        let caches = {
+    and toUExprWithCache caches (expr: ExprT) =
+        toUExprRec caches expr
+
+    /// creates an unified expression cache cache
+    and createCache () = 
+        {
             UExprForExpr    = Dictionary<ExprT, UExprT>(HashIdentity.Structural)
             UExprs          = Dictionary<UExprT, UExprT>(HashIdentity.Structural)        
-        }        
-        toUExprRec caches expr
+        }     
+
+    /// converts an expression to a unified expression
+    and toUExpr (expr: ExprT) =
+        let caches = createCache ()
+        toUExprWithCache caches expr
 
     /// converts a loop specification to an unified loop specification
     and loopSpecToULoopSpec (loopSpec: LoopSpecT) = 
@@ -208,7 +225,7 @@ module UExpr =
             Channels = loopSpec.Channels 
                         |> Map.map (fun ch lv ->
                                 {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
-        }        
+        }           
 
     /// Converts a unified expression to an expression if the unified expression
     /// was created using the toUExpr function. Otherwise returns None.
