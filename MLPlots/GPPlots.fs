@@ -90,7 +90,7 @@ module GPPlots =
             let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaNs sX
             sX, sMean, sCov, sStd
 
-        /// Plots a GAussian Process with covarianceKernel kernel, training noise Sigma trainVAlues trnX and trainTargets trnT.
+        /// Plots a Gaussian Process with covarianceKernel kernel, training noise Sigma trainVAlues trnX and trainTargets trnT.
         /// Step is the distance between two sample, smaller step => hihger plot smoothness and accuraccy, longer plot creation
         /// Returns a function (unit -> unit) which starts the plot when applied
         static member simplePlot (hyperPars, trnSigmas: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 

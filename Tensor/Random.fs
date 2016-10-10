@@ -56,7 +56,7 @@ module RandomExtensions =
             |> ArrayNDNS.ArrayNDHost.ofList
             |> ArrayNDNS.ArrayND.reshape shp
         
-        member this.NormalArray (mean: 'T, variance: 'T) shp  =
+        member this.NormalArrayND (mean: 'T, variance: 'T) shp  =
             let mean, variance = conv<float> mean, conv<float> variance
             this.NormalDouble mean variance
             |> ArrayNDNS.ArrayNDHost.ofSeqWithShape shp

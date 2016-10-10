@@ -149,7 +149,6 @@ module GaussianProcess =
             let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
 
             let _,_,covSite,sigmaSite = ExpectationPropagation.ePResults k vu
-            let muJoint = 
             let mean = meanXStar + kStarT .* kInv .* (y - meanX)
             let cov = kStarstar - kStarT .* kInv .* kStar
             
