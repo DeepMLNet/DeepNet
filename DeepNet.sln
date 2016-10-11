@@ -18,6 +18,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513
 	ProjectSection(SolutionItems) = preProject
 		Misc\DebugCode.txt = Misc\DebugCode.txt
 		Misc\OldCode.txt = Misc\OldCode.txt
+		Misc\Script1.fsx = Misc\Script1.fsx
+		Misc\Script2.fsx = Misc\Script2.fsx
 		Misc\TODO.txt = Misc\TODO.txt
 	EndProjectSection
 EndProject
@@ -63,6 +65,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ModelPlots", "TestExes\ModelPlots\ModelPlots.fsproj", "{B9FBBC94-4C02-434D-AFBE-AE7F14F308F8}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MLPlots", "MLPlots\MLPlots.fsproj", "{853082BE-359E-4F7E-B35C-7B10C8BD3970}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FracSigmoid", "TestExes\FracSigmoid\FracSigmoid.fsproj", "{ECED861C-1B3C-44AF-8EE0-04E423DDE021}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -180,6 +184,14 @@ Global
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|Any CPU.Build.0 = Release|Any CPU
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|x64.ActiveCfg = Release|Any CPU
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|x64.Build.0 = Release|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Debug|x64.ActiveCfg = Debug|x64
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Debug|x64.Build.0 = Debug|x64
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Release|x64.ActiveCfg = Release|Any CPU
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -201,5 +213,6 @@ Global
 		{BBFB43C1-9B12-4B60-98C8-F8038B8B2985} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 		{B9FBBC94-4C02-434D-AFBE-AE7F14F308F8} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970} = {74B877B5-D69A-4DA5-BE59-90A1E191BD22}
+		{ECED861C-1B3C-44AF-8EE0-04E423DDE021} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 	EndGlobalSection
 EndGlobal

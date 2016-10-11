@@ -17,6 +17,7 @@ _dev TDyn dynamicSubtensor(TBase &base, const TIdx &idx) {
 	return dyn;
 }
 
+
 template <typename TDyn, typename TBase, typename TIdx>
 _dev const TDyn dynamicSubtensor(const TBase &base, const TIdx &idx) {
 	return dynamicSubtensor(const_cast<TBase>(base), idx);

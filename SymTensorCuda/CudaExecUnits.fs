@@ -14,6 +14,17 @@ open UExprTypes
 [<AutoOpen>]
 module CudaExecUnitTypes =
 
+    /// information for executing a loop
+    type ExecLoopInfoT = {
+        Length:                int
+        Channels:              Map<ChannelT, LoopEval.LoopChannelInfoT>
+        Vars:                  Map<VarSpecT, LoopInputT>
+        Workspace:             SubWorkspaceT
+        Args:                  ArrayNDManikinT list
+        IterManikin:           ArrayNDManikinT
+        ItersRemainingManikin: ArrayNDManikinT
+    }
+
     /// A custom CUDA execution item.
     type ICudaExecItem =
         /// Asynchronously execute the item on the specified CUDA stream.
@@ -22,14 +33,14 @@ module CudaExecUnitTypes =
     /// a CUDA operation that will be assigned to and executed in a CUDA stream
     type CudaExecItemT =
         // memory operations
-        | MemcpyDtoD of IDevMemRngTmpl * IDevMemRngTmpl
-        | MemcpyHtoD of IHostMemRngTmpl * IDevMemRngTmpl
-        | MemcpyDtoH of IDevMemRngTmpl * IHostMemRngTmpl
+        | MemcpyDtoD   of IDevMemRngTmpl * IDevMemRngTmpl
+        | MemcpyHtoD   of IHostMemRngTmpl * IDevMemRngTmpl
+        | MemcpyDtoH   of IDevMemRngTmpl * IHostMemRngTmpl
         | MemsetSingle of single * IDevMemRngTmpl
         | MemsetUInt32 of uint32 * IDevMemRngTmpl
         // execution control
         | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
-        | CallCFunc of TmplInstT * System.Type * (ICudaArgTmpl list)
+        | CallCFunc    of TmplInstT * System.Type * (ICudaArgTmpl list)
         // CUBLAS calls 
         | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  
                       single * BlasTransposedMatrixTmpl * BlasTransposedMatrixTmpl * 
@@ -43,36 +54,40 @@ module CudaExecUnitTypes =
         | BlasGetriBatched of BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl *
                               BlasTransposedMatrixBatchTmpl * BlasIntArrayTmpl                            
         // pointer array creation for CUBLAS batch calls
-        | BlasInitPointerArray of BlasTransposedMatrixBatchTmpl
-        // extension item
-        | ExtensionExecItem of ICudaExecItem
+        | BlasInitPointerArray  of BlasTransposedMatrixBatchTmpl
+        // loop
+        | ExecLoop              of ExecLoopInfoT
         // misc
-        | Trace of UExprT * ArrayNDManikinT
-        | PrintWithMsg of string * ArrayNDManikinT
-        | DumpValue of string * ArrayNDManikinT
+        | Trace                 of UExprT * ArrayNDManikinT
+        | TraceEnteringLoop     of UExprT
+        | TraceLeavingLoop      of UExprT
+        | PrintWithMsg          of string * ArrayNDManikinT
+        | DumpValue             of string * ArrayNDManikinT
         | CheckNonFiniteCounter of string * ArrayNDManikinT
+        // extension item
+        | ExtensionExecItem     of ICudaExecItem
 
 
     type SrcReqsHelpersT = {
         /// Creates a channel request for the default channel.
         DfltChReq:               ArrayNDManikinT option -> ChannelReqsT
         /// The view request for the default channel of the target.
-        TrgtDfltChReq:           ArrayNDManikinT option
+        TrgtDfltChReq:           unit -> ArrayNDManikinT option
         /// Requests the default channel of all sources without
         /// a storage requests.
-        DfltSrcWithNoViewReq:    ChannelReqsT list
+        DfltSrcWithNoViewReq:    unit -> ChannelReqsT list
         /// Requests the default channel of the first source to be evaluated 
         /// into our requested target view of the the default channel.
-        InplaceFirstSrcReq:      ChannelReqsT list
+        InplaceFirstSrcReq:      unit -> ChannelReqsT list
     }
 
     type TrgtGivenSrcsHelpersT = {
         /// Default channels of all sources.
-        SrcsDfltCh:                         ArrayNDManikinT list
+        SrcsDfltCh:                         unit -> ArrayNDManikinT list
         /// Default channel is shared for all sources?
-        SrcsDfltChShared:                   bool list   
+        SrcsDfltChShared:                   unit -> bool list   
         /// The view request for the default channel of the target.
-        TrgtDefChReq:                       ArrayNDManikinT option
+        TrgtDefChReq:                       unit -> ArrayNDManikinT option
         /// Target for default channel.
         DfltChTrgt:                         ArrayNDManikinT -> bool -> ChannelManikinsAndSharedT
         // New allocated target for default channel.
@@ -92,11 +107,11 @@ module CudaExecUnitTypes =
 
     type ExecItemsHelpersT = {
         /// Default channels of all sources.
-        SrcsDfltCh:                         ArrayNDManikinT list
+        SrcsDfltCh:                         unit -> ArrayNDManikinT list
         /// Default channel is shared for all sources?
-        SrcsDfltChShared:                   bool list 
+        SrcsDfltChShared:                   unit -> bool list 
         /// Target for default channel.
-        DfltChTrgt:                         ArrayNDManikinT           
+        DfltChTrgt:                         unit -> ArrayNDManikinT           
         // Set pointer array values either during initialization (for allocated arrays)
         // or runtime (for variable arrays).
         AppendPointerArrayItems:            BlasTransposedMatrixBatchTmpl -> 
@@ -159,29 +174,31 @@ module CudaExecUnit =
 
     /// Computes desired source views given desired target view.
     /// There is no guarantee that the desired source views will be used.
-    let srcReqs cudaEnv ({TargetShape=trgtShape
-                          TargetRequest=reqChViews
+    let srcReqs cudaEnv ({TargetRequest=reqChViews
                           Op=op
+                          Metadata=metadata
                           SrcShapes=srcShapes} as args) : ChannelReqsT list =
+
+        /// number of arguments
         let nSrcs = List.length srcShapes
 
         /// Creates a channel request for the default channel.
         let dfltChReq view : ChannelReqsT = Map [dfltChId, view] 
 
         /// The view request for the default channel of the target.
-        let trgtDfltChReq = reqChViews.[dfltChId]
+        let trgtDfltChReq () = reqChViews.[dfltChId]
 
         /// Requests the default channel of all sources without
         /// a storage requests.
-        let dfltSrcWithNoViewReq = List.replicate nSrcs (dfltChReq None)
+        let dfltSrcWithNoViewReq () = List.replicate nSrcs (dfltChReq None)
 
         /// Requests the default channel of the first source to be evaluated 
         /// into our requested target view of the the default channel.
-        let inplaceFirstSrcReq =
+        let inplaceFirstSrcReq () =
             match nSrcs with
             | 0 -> []
-            | 1 -> [dfltChReq trgtDfltChReq]
-            | _ -> dfltChReq trgtDfltChReq :: List.replicate (nSrcs-1) (dfltChReq None)
+            | 1 -> [dfltChReq (trgtDfltChReq ())]
+            | _ -> dfltChReq (trgtDfltChReq ()) :: List.replicate (nSrcs-1) (dfltChReq None)
 
         let helpers = {
             DfltChReq               = dfltChReq
@@ -194,112 +211,127 @@ module CudaExecUnit =
         | ULeafOp _ -> []
 
         // unary element-wise
-        | UUnaryOp Negate -> inplaceFirstSrcReq                        
-        | UUnaryOp Abs -> inplaceFirstSrcReq
-        | UUnaryOp SignT -> inplaceFirstSrcReq
-        | UUnaryOp Log -> inplaceFirstSrcReq
-        | UUnaryOp Log10 -> inplaceFirstSrcReq                           
-        | UUnaryOp Exp -> inplaceFirstSrcReq                           
-        | UUnaryOp Sin -> inplaceFirstSrcReq
-        | UUnaryOp Cos -> inplaceFirstSrcReq
-        | UUnaryOp Tan -> inplaceFirstSrcReq
-        | UUnaryOp Asin -> inplaceFirstSrcReq
-        | UUnaryOp Acos -> inplaceFirstSrcReq
-        | UUnaryOp Atan -> inplaceFirstSrcReq
-        | UUnaryOp Sinh -> inplaceFirstSrcReq
-        | UUnaryOp Cosh -> inplaceFirstSrcReq
-        | UUnaryOp Tanh -> inplaceFirstSrcReq
-        | UUnaryOp Sqrt -> inplaceFirstSrcReq
-        | UUnaryOp Ceil -> inplaceFirstSrcReq
-        | UUnaryOp Floor -> inplaceFirstSrcReq
-        | UUnaryOp Round -> inplaceFirstSrcReq
-        | UUnaryOp Truncate -> inplaceFirstSrcReq
+        | UUnaryOp Negate -> inplaceFirstSrcReq ()                       
+        | UUnaryOp Abs -> inplaceFirstSrcReq ()
+        | UUnaryOp SignT -> inplaceFirstSrcReq ()
+        | UUnaryOp Log -> inplaceFirstSrcReq ()
+        | UUnaryOp Log10 -> inplaceFirstSrcReq ()                          
+        | UUnaryOp Exp -> inplaceFirstSrcReq ()                           
+        | UUnaryOp Sin -> inplaceFirstSrcReq ()
+        | UUnaryOp Cos -> inplaceFirstSrcReq ()
+        | UUnaryOp Tan -> inplaceFirstSrcReq ()
+        | UUnaryOp Asin -> inplaceFirstSrcReq ()
+        | UUnaryOp Acos -> inplaceFirstSrcReq ()
+        | UUnaryOp Atan -> inplaceFirstSrcReq ()
+        | UUnaryOp Sinh -> inplaceFirstSrcReq ()
+        | UUnaryOp Cosh -> inplaceFirstSrcReq ()
+        | UUnaryOp Tanh -> inplaceFirstSrcReq ()
+        | UUnaryOp Sqrt -> inplaceFirstSrcReq ()
+        | UUnaryOp Ceil -> inplaceFirstSrcReq ()
+        | UUnaryOp Floor -> inplaceFirstSrcReq ()
+        | UUnaryOp Round -> inplaceFirstSrcReq ()
+        | UUnaryOp Truncate -> inplaceFirstSrcReq ()
 
         // unary element-wise logic      
-        | UUnaryOp Not -> inplaceFirstSrcReq
+        | UUnaryOp Not -> inplaceFirstSrcReq ()
 
         // tensor ops
-        | UUnaryOp (Diag _) -> dfltSrcWithNoViewReq
-        | UUnaryOp (DiagMat _) -> dfltSrcWithNoViewReq
-        | UUnaryOp Invert -> dfltSrcWithNoViewReq  
+        | UUnaryOp (Diag _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (DiagMat _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp Invert -> dfltSrcWithNoViewReq () 
                 
         // reductions
-        | UUnaryOp Sum -> dfltSrcWithNoViewReq
-        | UUnaryOp (SumAxis _) -> dfltSrcWithNoViewReq
+        | UUnaryOp Sum -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (SumAxis _) -> dfltSrcWithNoViewReq ()
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
-            match trgtDfltChReq with
+            match trgtDfltChReq () with
             | Some rv when ArrayND.isC rv ->
-                [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0] rv))]
-            | _ -> dfltSrcWithNoViewReq
-        | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq
+                [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0].[dfltChId] rv))]
+            | _ -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (PermuteAxes perm) ->
-            match trgtDfltChReq with
+            match trgtDfltChReq () with
             | Some rv -> [dfltChReq (Some (ArrayND.permuteAxes (Permutation.invert perm) rv))]
-            | _ -> dfltSrcWithNoViewReq
+            | _ -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (ReverseAxis ax) ->
+            match trgtDfltChReq () with
+            | Some rv -> [dfltChReq (Some (ArrayND.reverseAxis ax rv))]
+            | _ -> dfltSrcWithNoViewReq ()
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match cudaEnv.VarStorLoc |> Map.find vs with
             | LocDev -> 
                 // request to store directly into external var
-                // we assume that all device input vars are continguous
-                [dfltChReq (Some (ArrayNDManikin.externalC (MemExternal vs) srcShapes.[0]))]
-            | LocHost -> dfltSrcWithNoViewReq
+                let shp = vs.Shape |> ShapeSpec.eval
+                let stride = cudaEnv |> CudaCompileEnv.strideForVar vs
+                [dfltChReq (Some (ArrayNDManikin.external (MemExternal vs) shp stride))]
+            | LocHost -> dfltSrcWithNoViewReq ()
             | loc -> unsupLoc loc
 
         // misc
-        | UUnaryOp (Print _) -> inplaceFirstSrcReq
-        | UUnaryOp (Dump _) -> inplaceFirstSrcReq
-        | UUnaryOp (Annotated _) -> inplaceFirstSrcReq
-        | UUnaryOp (CheckFinite _) -> inplaceFirstSrcReq
+        | UUnaryOp (Print _) -> inplaceFirstSrcReq ()
+        | UUnaryOp (Dump _) -> inplaceFirstSrcReq ()
+        | UUnaryOp (Annotated _) -> inplaceFirstSrcReq ()
+        | UUnaryOp (CheckFinite _) -> inplaceFirstSrcReq ()
 
         // binary element-wise
-        | UBinaryOp Add -> inplaceFirstSrcReq
-        | UBinaryOp Substract -> inplaceFirstSrcReq
-        | UBinaryOp Multiply -> inplaceFirstSrcReq
-        | UBinaryOp Divide -> inplaceFirstSrcReq
-        | UBinaryOp Modulo -> inplaceFirstSrcReq
-        | UBinaryOp Power -> inplaceFirstSrcReq
-        | UBinaryOp MaxElemwise -> inplaceFirstSrcReq
-        | UBinaryOp MinElemwise -> inplaceFirstSrcReq
+        | UBinaryOp Add -> inplaceFirstSrcReq ()
+        | UBinaryOp Substract -> inplaceFirstSrcReq ()
+        | UBinaryOp Multiply -> inplaceFirstSrcReq ()
+        | UBinaryOp Divide -> inplaceFirstSrcReq ()
+        | UBinaryOp Modulo -> inplaceFirstSrcReq ()
+        | UBinaryOp Power -> inplaceFirstSrcReq ()
+        | UBinaryOp MaxElemwise -> inplaceFirstSrcReq ()
+        | UBinaryOp MinElemwise -> inplaceFirstSrcReq ()
 
         // binary element-wise comparison
-        | UBinaryOp Equal -> dfltSrcWithNoViewReq
-        | UBinaryOp Less -> dfltSrcWithNoViewReq
-        | UBinaryOp LessEqual -> dfltSrcWithNoViewReq
-        | UBinaryOp Greater -> dfltSrcWithNoViewReq
-        | UBinaryOp GreaterEqual -> dfltSrcWithNoViewReq   
-        | UBinaryOp NotEqual -> dfltSrcWithNoViewReq   
+        | UBinaryOp Equal -> dfltSrcWithNoViewReq ()
+        | UBinaryOp Less -> dfltSrcWithNoViewReq ()
+        | UBinaryOp LessEqual -> dfltSrcWithNoViewReq ()
+        | UBinaryOp Greater -> dfltSrcWithNoViewReq ()
+        | UBinaryOp GreaterEqual -> dfltSrcWithNoViewReq ()   
+        | UBinaryOp NotEqual -> dfltSrcWithNoViewReq ()  
 
         // binary elment-wise logic
-        | UBinaryOp And -> inplaceFirstSrcReq
-        | UBinaryOp Or -> inplaceFirstSrcReq
+        | UBinaryOp And -> inplaceFirstSrcReq ()
+        | UBinaryOp Or -> inplaceFirstSrcReq ()
 
         // matrix/tensor operations
-        | UBinaryOp Dot -> dfltSrcWithNoViewReq
-        | UBinaryOp TensorProduct -> dfltSrcWithNoViewReq  
+        | UBinaryOp Dot -> dfltSrcWithNoViewReq ()
+        | UBinaryOp TensorProduct -> dfltSrcWithNoViewReq ()  
 
         // nary
-        | UNaryOp Discard -> dfltSrcWithNoViewReq
-        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq
+        | UNaryOp Discard -> dfltSrcWithNoViewReq ()
+        | UNaryOp (Interpolate _) -> inplaceFirstSrcReq ()
 
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
+        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UExtraOp (Channel ch) -> [Map [ch, trgtDfltChReq()]]
+
+        | UExtraOp (Loop _) -> dfltSrcWithNoViewReq ()
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
-        | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq
+        | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq ()
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) -> 
-            // "a" can be evaluated into requested manikin, but "b" (the replacement value) must be placed
+            // "a" can be evaluated into requested manikin if it is not broadcasted, 
+            // but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
-            inplaceFirstSrcReq
+            match trgtDfltChReq () with
+            | Some req when not (ArrayND.isBroadcasted req) -> inplaceFirstSrcReq ()
+            | _ -> dfltSrcWithNoViewReq ()            
 
         | UNaryOp (Expr.Elements _) -> needExtra op
-        | UExtraOp (Elements _) -> dfltSrcWithNoViewReq            
+        | UExtraOp (Elements _) -> dfltSrcWithNoViewReq ()           
 
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
-        | UExtraOp IfThenElse -> inplaceFirstSrcReq
+        | UExtraOp IfThenElse -> inplaceFirstSrcReq ()
 
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
@@ -313,18 +345,28 @@ module CudaExecUnit =
     let trgtGivenSrcs compileEnv ({MemAllocator=memAllocator
                                    TargetRequest=reqChViews
                                    Op=op
-                                   Metadata={TargetType=typ
-                                             TargetNShape=trgtShape}
+                                   Metadata={ChannelType=trgtTypenames
+                                             ChannelShape=trgtShapes
+                                             Expr=expr}
                                    Srcs=srcs} as args) =
 
+        /// Default channel shape of target.
+        let trgtDfltChShape () = trgtShapes.[dfltChId]
+        /// Default channel type of target.
+        let trgtDfltChType () = trgtTypenames.[dfltChId]
+
         /// Default channels of all sources.
-        let srcsDfltCh, srcsDfltChShared =
-            srcs
-            |> List.map (fun srcChs -> srcChs.[dfltChId])
-            |> List.unzip
+        let srcsDfltCh () = srcs |> List.map (fun srcChs -> fst srcChs.[dfltChId])
+        /// Default channel shared of all sources.
+        let srcsDfltChShared () = srcs |> List.map (fun srcChs -> snd srcChs.[dfltChId])
+
+        /// Default channel of first source.
+        let firstSrcDfltCh () = (srcsDfltCh()).[0]
+        /// Default channel shared of first source.
+        let firstSrcDfltChShared () = (srcsDfltChShared()).[0]
 
         /// The view request for the default channel of the target.
-        let trgtDefChReq = reqChViews.[dfltChId]
+        let trgtDefChReq () = reqChViews.[dfltChId]
 
         /// Target for default channel.
         let dfltChTrgt view shared : ChannelManikinsAndSharedT =
@@ -332,34 +374,48 @@ module CudaExecUnit =
 
         // New allocated target for default channel.
         let newDfltChTrgt () = 
-            dfltChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false        
+            dfltChTrgt (ArrayNDManikin.newC memAllocator 
+                            (trgtDfltChType()) (trgtDfltChShape())) false        
 
         /// True if specified manikin overlaps with any channel of any source.
         let overlappingWithAnySrc (rv: ArrayNDManikinT) =
             srcs
-            |> List.exists (Map.exists (fun ch (view, shared) -> ArrayND.overlapping rv view))
+            |> List.exists (Map.exists (fun ch (view, shared) -> 
+                                            ArrayNDManikin.maybeOverlapping rv view))
 
         /// default channel target that shares no elements with any srcView 
         let dfltChOutplaceTrgt () =
-            match trgtDefChReq with
-            | Some rv when not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+            match trgtDefChReq () with
+            | Some rv when not (overlappingWithAnySrc rv) && 
+                           not (ArrayND.isBroadcasted rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId] 
+                -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
              
         /// default channel target that shares no elements with any srcView and can be used for BLAS
         let dfltChOutplaceBlasTrgt () = 
-            match trgtDefChReq with
+            match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
-                           not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+                           not (overlappingWithAnySrc rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId] 
+                -> dfltChTrgt rv false
             | _ -> 
-                dfltChTrgt (ArrayNDManikin.newBlasTarget memAllocator typ trgtShape) false
+                dfltChTrgt (ArrayNDManikin.newBlasTarget memAllocator 
+                                (trgtDfltChType()) (trgtDfltChShape())) false
 
         /// default channel target that shares no elements with any srcView and the transpose of which can be used for BLAS
         let dfltChOutplaceTransposedBlasTrgt () = 
-            match trgtDefChReq with
+            match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv.T && 
-                           not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+                           not (overlappingWithAnySrc rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId]
+                -> dfltChTrgt rv false
             | _ -> 
-                dfltChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false  
+                dfltChTrgt (ArrayNDManikin.newC memAllocator 
+                                (trgtDfltChType()) (trgtDfltChShape())) false  
 
         /// Default channel target that reuses the default channel of a srcView, 
         /// if it may be overwritten. Otherwise uses defaultChOutplaceTrgt.
@@ -367,7 +423,8 @@ module CudaExecUnit =
             match srcs 
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
-                                    view.TypeName = typ &&
+                                    view.TypeName = trgtTypenames.[dfltChId] &&
+                                    view.Shape = trgtShapes.[dfltChId] &&
                                     not (ArrayND.isBroadcasted view) && 
                                     not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]
@@ -388,16 +445,24 @@ module CudaExecUnit =
         match op with
         // variable access
         | ULeafOp (Var vs) ->       
-            match compileEnv.VarStorLoc |> Map.find vs with
+           match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev ->
-                // we assume that all device input vars are contiguous
-                dfltChTrgt (ArrayNDManikin.externalC (MemExternal vs) trgtShape) true
+                // create manikin for external variable
+                let stride = compileEnv |> CudaCompileEnv.strideForVar vs
+                dfltChTrgt (ArrayNDManikin.external (MemExternal vs) vs.NShape stride) true
             | LocHost ->
-                // will transfer variable from host to device during execution
-                // need contiguous memory for that
-                match trgtDefChReq with
+                // check that host variable has C-stride
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                if not (ArrayNDLayout.isC hvLayout) then
+                    failwithf "host variable %A must be in C-order" vs
+
+                // We will transfer variable from host to device during execution.
+                // We allocate contiguous device memory for that.
+                match trgtDefChReq () with
                 | Some rv when ArrayND.isC rv -> dfltChTrgt rv false
-                | _ -> dfltChTrgt (ArrayNDManikin.newC memAllocator typ trgtShape) false    
+                | _ -> 
+                    dfltChTrgt (ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape) false    
             | loc -> unsupLoc loc     
                            
         // tensor creation
@@ -430,13 +495,13 @@ module CudaExecUnit =
 
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
-            dfltChTrgt (ArrayND.diagAxis ax1 ax2 srcsDfltCh.[0]) srcsDfltChShared.[0]
+            dfltChTrgt (ArrayND.diagAxis ax1 ax2 (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (DiagMat (ax1, ax2)) -> dfltChOutplaceTrgt ()
         | UUnaryOp Invert -> 
             // If source will be transposed, then target will also be transposed.
             // Thus, in this case, we must request an array the transpose of which 
             // can be used as a BLAS target.
-            match blasArgOperation srcsDfltCh.[0] srcsDfltChShared.[0] true with
+            match blasArgOperation (firstSrcDfltCh()) (firstSrcDfltChShared()) true with
             | BlasArgTranspose -> dfltChOutplaceBlasTrgt ()
             | _ -> dfltChOutplaceTransposedBlasTrgt ()
 
@@ -447,13 +512,15 @@ module CudaExecUnit =
         // shape operations
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
-            if ArrayND.isC srcsDfltCh.[0] then
-                dfltChTrgt (ArrayND.reshapeView trgtShape srcsDfltCh.[0]) srcsDfltChShared.[0] 
+            if ArrayND.isC (firstSrcDfltCh()) then
+                dfltChTrgt (ArrayND.reshapeView (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared()) 
             else dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
-            dfltChTrgt (ArrayND.broadcastToShape trgtShape srcsDfltCh.[0]) srcsDfltChShared.[0]
+            dfltChTrgt (ArrayND.broadcastToShape (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (PermuteAxes perm) ->
-            dfltChTrgt (ArrayND.permuteAxes perm srcsDfltCh.[0]) srcsDfltChShared.[0]
+            dfltChTrgt (ArrayND.permuteAxes perm (firstSrcDfltCh())) (firstSrcDfltChShared())
+        | UUnaryOp (ReverseAxis ax) ->
+            dfltChTrgt (ArrayND.reverseAxis ax (firstSrcDfltCh())) (firstSrcDfltChShared())
 
         // variable access
         | UUnaryOp (StoreToVar _) -> 
@@ -461,10 +528,10 @@ module CudaExecUnit =
             newDfltChTrgt ()
 
         // misc
-        | UUnaryOp (Print _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
-        | UUnaryOp (Dump _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
-        | UUnaryOp (Annotated _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
-        | UUnaryOp (CheckFinite _) -> dfltChTrgt srcsDfltCh.[0] srcsDfltChShared.[0]
+        | UUnaryOp (Print _) -> dfltChTrgt (firstSrcDfltCh()) (firstSrcDfltChShared())
+        | UUnaryOp (Dump _) -> dfltChTrgt (firstSrcDfltCh()) (firstSrcDfltChShared())
+        | UUnaryOp (Annotated _) -> dfltChTrgt (firstSrcDfltCh()) (firstSrcDfltChShared())
+        | UUnaryOp (CheckFinite _) -> dfltChTrgt (firstSrcDfltCh()) (firstSrcDfltChShared())
 
         // binary element-wise
         | UBinaryOp Add -> dfltChInplaceOvrwrtTrgt ()
@@ -497,6 +564,26 @@ module CudaExecUnit =
         | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()  
         
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
+        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UExtraOp (Channel channel) ->
+            if srcs.Length <> 1 then 
+                failwith "channel op requires exactly one source"     
+            if not (srcs.[0].ContainsKey channel) then
+                failwithf "channel %s does not exist in %A" channel expr
+            let srcManikin, srcShared = srcs.[0].[channel]
+            dfltChTrgt srcManikin srcShared
+
+        | UExtraOp (Loop loopspec) ->      
+            // Create targets with strides so that the slice dimension is the slowest, thus
+            // the loop length does not affect the stride.
+            trgtShapes
+            |> Map.map (fun ch shp ->
+                let sliceDim = loopspec.Channels.[ch].SliceDim
+                let strideOrder = [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
+                ArrayNDManikin.newOrdered memAllocator trgtTypenames.[ch] shp strideOrder, false)
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
@@ -505,12 +592,12 @@ module CudaExecUnit =
             else
                 // symbolic sub-tensors use a view of the src 
                 let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
-                dfltChTrgt (srcsDfltCh.[0].[rng] :?> ArrayNDManikinT) srcsDfltChShared.[0]
+                dfltChTrgt ((firstSrcDfltCh()).[rng] :?> ArrayNDManikinT) (firstSrcDfltChShared())
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) ->
-            if not (srcsDfltChShared.[0]) then 
-                dfltChTrgt srcsDfltCh.[0] false
+            if not (firstSrcDfltChShared()) && not (ArrayND.isBroadcasted (firstSrcDfltCh())) then 
+                dfltChTrgt (firstSrcDfltCh()) false
             else dfltChOutplaceTrgt ()
 
         | UNaryOp (Expr.Elements _) -> needExtra op
@@ -847,14 +934,22 @@ module CudaExecUnit =
                                     SubmitInitItems=submitInit} as args) =
 
         /// Default channel of target.
-        let dfltChTrgt = trgtChs.[dfltChId]
+        let dfltChTrgt () = trgtChs.[dfltChId]
+        /// Default channel shape of target.
+        let trgtDfltChShape () = metadata.ChannelShape.[dfltChId]
+        /// Default channel type of target.
+        let trgtDfltChType () = metadata.ChannelType.[dfltChId]
 
         /// Default channels of all sources.
-        let srcsDfltCh, srcsDfltChShared =
-            srcsAndShared
-            |> List.map (fun srcChs -> srcChs.[dfltChId])
-            |> List.unzip
+        let srcsDfltCh () = srcsAndShared |> List.map (fun srcChs -> fst srcChs.[dfltChId])
+        /// Default channel shared of all sources.
+        let srcsDfltChShared () = srcsAndShared |> List.map (fun srcChs -> snd srcChs.[dfltChId])
     
+        /// Default channel of first source.
+        let firstSrcDfltCh () = (srcsDfltCh()).[0]
+        /// Default channel shared of first source.
+        let firstSrcDfltChShared () = (srcsDfltChShared()).[0]
+
         // set pointer array values either during initialization (for allocated arrays)
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
@@ -872,68 +967,68 @@ module CudaExecUnit =
 
         match op with 
         // tensor creation
-        | ULeafOp (Identity _) -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
-        | ULeafOp (ScalarConst cs) -> execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
+        | ULeafOp (Identity _) -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
+        | ULeafOp (ScalarConst cs) -> execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue (sv, _)) -> 
-            let value = Convert.ChangeType(SizeSpec.eval sv, dfltChTrgt.DataType)
+            let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
             let cs = ConstSpec.ofValue value
-            execItemsForElemwise dfltChTrgt (ConstEOpArgTmpl cs) [] 
+            execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
 
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with
             | LocDev -> []
             | LocHost -> 
-                // we assume that host variable has continguous stride and zero offset
-                let hv = ArrayNDManikin.externalC (MemExternal vs) (ArrayND.shape dfltChTrgt)
-                [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt))]       
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
+                [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt()))]       
             | loc -> unsupLoc loc
 
         // unary element-wise
-        | UUnaryOp Negate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("NegateEOp_t", false)) srcsDfltCh
-        | UUnaryOp Abs -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AbsEOp_t", false)) srcsDfltCh
-        | UUnaryOp SignT -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("SignTEOp_t", false)) srcsDfltCh
-        | UUnaryOp Log -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LogEOp_t", false)) srcsDfltCh
-        | UUnaryOp Log10 -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("Log10EOp_t", false)) srcsDfltCh
-        | UUnaryOp Exp -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ExpEOp_t", false)) srcsDfltCh
-        | UUnaryOp Sin -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("SinEOp_t", false)) srcsDfltCh
-        | UUnaryOp Cos -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("CosEOp_t", false)) srcsDfltCh
-        | UUnaryOp Tan -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TanEOp_t", false)) srcsDfltCh
-        | UUnaryOp Asin -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AsinEOp_t", false)) srcsDfltCh
-        | UUnaryOp Acos -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AcosEOp_t", false)) srcsDfltCh
-        | UUnaryOp Atan -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AtanEOp_t", false)) srcsDfltCh
-        | UUnaryOp Sinh -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("SinhEOp_t", false)) srcsDfltCh
-        | UUnaryOp Cosh -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("CoshEOp_t", false)) srcsDfltCh
-        | UUnaryOp Tanh -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TanhEOp_t", false)) srcsDfltCh
-        | UUnaryOp Sqrt -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("SqrtEOp_t", false)) srcsDfltCh
-        | UUnaryOp Ceil -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("CeilEOp_t", false)) srcsDfltCh
-        | UUnaryOp Floor -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("FloorEOp_t", false)) srcsDfltCh
-        | UUnaryOp Round -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("RoundEOp_t", false)) srcsDfltCh
-        | UUnaryOp Truncate -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("TruncateEOp_t", false)) srcsDfltCh
+        | UUnaryOp Negate -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NegateEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Abs -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AbsEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp SignT -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("SignTEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Log -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("LogEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Log10 -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("Log10EOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Exp -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("ExpEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Sin -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("SinEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Cos -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CosEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Tan -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("TanEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Asin -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AsinEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Acos -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AcosEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Atan -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AtanEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Sinh -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("SinhEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Cosh -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CoshEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Tanh -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("TanhEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Sqrt -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("SqrtEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Ceil -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CeilEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Floor -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("FloorEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Round -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("RoundEOp_t", false)) (srcsDfltCh())
+        | UUnaryOp Truncate -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("TruncateEOp_t", false)) (srcsDfltCh())
 
         // unary element-wise logic      
-        | UUnaryOp Not -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("NotEOp_t", false)) srcsDfltCh
+        | UUnaryOp Not -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NotEOp_t", false)) (srcsDfltCh())
 
         // reductions
-        | UUnaryOp Sum -> execItemsForSum memAllocator dfltChTrgt srcsDfltCh.[0]
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax dfltChTrgt srcsDfltCh.[0]
+        | UUnaryOp Sum -> execItemsForSum memAllocator (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax (dfltChTrgt()) (firstSrcDfltCh())
 
         // tensor ops
         | UUnaryOp (Diag _) -> []
         | UUnaryOp (DiagMat (ax1, ax2)) ->
-            let trgtDiag = ArrayND.diagAxis ax1 ax2 dfltChTrgt
-            let zeroItems = execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
-            let copyItems = copyExecItems trgtDiag srcsDfltCh.[0]
+            let trgtDiag = ArrayND.diagAxis ax1 ax2 (dfltChTrgt())
+            let zeroItems = execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
+            let copyItems = copyExecItems trgtDiag (firstSrcDfltCh())
             zeroItems @ copyItems
         | UUnaryOp Invert ->
-            let aView, _, aCopyItems, _ = blasArg memAllocator srcsDfltCh.[0] srcsDfltChShared.[0] true
+            let aView, _, aCopyItems, _ = blasArg memAllocator (firstSrcDfltCh()) (firstSrcDfltChShared()) true
 
             let tView =
                 // If the source is transposed by us then the target must be transposed by us 
                 // as well to preserve orientation. The blasTarget function always transposes.
-                match blasArgOperation srcsDfltCh.[0] srcsDfltChShared.[0] true with
-                | BlasArgTranspose -> blasTarget dfltChTrgt
-                | _ -> blasTarget (ArrayND.transpose dfltChTrgt)
+                match blasArgOperation (firstSrcDfltCh()) (firstSrcDfltChShared()) true with
+                | BlasArgTranspose -> blasTarget (dfltChTrgt())
+                | _ -> blasTarget (ArrayND.transpose (dfltChTrgt()))
 
             // allocate variables and initialize pointer arrays
             let aArg = BlasTransposedMatrixBatchTmpl (aView, memAllocator)
@@ -955,82 +1050,85 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->
-            if dfltChTrgt <> srcsDfltCh.[0] then 
-                copyExecItems dfltChTrgt srcsDfltCh.[0]
+            if dfltChTrgt() <> firstSrcDfltCh() then 
+                copyExecItems (dfltChTrgt()) (firstSrcDfltCh())
             else []
         | UUnaryOp (DoBroadcast _) -> []
         | UUnaryOp (PermuteAxes _) -> []
+        | UUnaryOp (ReverseAxis _) -> []
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
-            let varShp, varType = 
-                ArrayND.shape srcsDfltCh.[0], srcsDfltCh.[0].TypeName
-
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev when srcsDfltCh.[0].Storage = (MemExternal vs) ->
+            | LocDev when (firstSrcDfltCh()).Storage = (MemExternal vs) ->
                 // Source was evaluated directly into the variable storage.
                 // No copy necessary.
                 []
             | LocDev  -> 
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
-                // We assume that all device vars are continguous.
-                let dv = ArrayNDManikin.externalC (MemExternal vs) varShp
-                copyExecItems dv srcsDfltCh.[0]
+                let varStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let dv = ArrayNDManikin.external (MemExternal vs) vs.NShape varStride
+                copyExecItems dv (firstSrcDfltCh())
             | LocHost ->            
                 let copyItems, memcpySrc = 
-                    if ArrayND.isC srcsDfltCh.[0] then 
-                        // Source is contiguous. Can directly copy to host.
-                        [], srcsDfltCh.[0]
+                    if ArrayND.isC (firstSrcDfltCh()) then 
+                        // Source has C-strides. Can directly copy to host.
+                        [], firstSrcDfltCh()
                     else
-                        // Need to copy to temporary contiguous storage first.
-                        let tmp = ArrayNDManikin.newC memAllocator varType varShp
-                        copyExecItems tmp srcsDfltCh.[0], tmp
+                        // Need to copy to temporary C-stride storage first.
+                        let tmp = ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape
+                        copyExecItems tmp (firstSrcDfltCh()), tmp
 
-                // We assume that all host vars are continguous.
-                // trgtView has contingous stride
-                let hv = ArrayNDManikin.externalC (MemExternal vs) varShp
+                // check that host variable has C-stride
+                let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                if not (ArrayNDLayout.isC hvLayout) then
+                    failwithf "host variable %A must be in C-order" vs
+
+                // copy
+                let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | loc -> unsupLoc loc         
                                  
         // misc
-        | UUnaryOp (Print msg) -> [PrintWithMsg (msg, srcsDfltCh.[0])]
-        | UUnaryOp (Dump name) -> [DumpValue (name, srcsDfltCh.[0])]
+        | UUnaryOp (Print msg) -> [PrintWithMsg (msg, firstSrcDfltCh())]
+        | UUnaryOp (Dump name) -> [DumpValue (name, firstSrcDfltCh())]
         | UUnaryOp (CheckFinite name) ->
             let nonFiniteCount = ArrayNDManikin.newC memAllocator TypeName.ofType<int> [1]
             let initItems = [MemsetUInt32 (0u, ArrayNDDevMemRngTmpl nonFiniteCount)]
-            let countItems = execItemsForElemwise dfltChTrgt (CheckFiniteIEOpArgTmpl (nonFiniteCount, name)) srcsDfltCh
+            let countItems = execItemsForElemwise (dfltChTrgt()) (CheckFiniteIEOpArgTmpl (nonFiniteCount, name)) (srcsDfltCh())
             let checkItems = [CheckNonFiniteCounter (name, nonFiniteCount)]
             initItems @ countItems @ checkItems
         | UUnaryOp (Annotated _) -> []
 
         // binary element-wise
-        | UBinaryOp Add ->         execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AddEOp_t",       false)) srcsDfltCh
-        | UBinaryOp Substract ->   execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("SubstractEOp_t", false)) srcsDfltCh
-        | UBinaryOp Multiply ->    execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) srcsDfltCh
-        | UBinaryOp Divide ->      execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("DivideEOp_t",    false)) srcsDfltCh
-        | UBinaryOp Modulo ->      execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("ModuloEOp_t",    false)) srcsDfltCh
-        | UBinaryOp Power ->       execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("PowerEOp_t",     false)) srcsDfltCh
-        | UBinaryOp MaxElemwise -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("MaxEOp_t",       false)) srcsDfltCh
-        | UBinaryOp MinElemwise -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("MinEOp_t",       false)) srcsDfltCh
+        | UBinaryOp Add ->         execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AddEOp_t",       false)) (srcsDfltCh())
+        | UBinaryOp Substract ->   execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("SubstractEOp_t", false)) (srcsDfltCh())
+        | UBinaryOp Multiply ->    execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("MultiplyEOp_t",  false)) (srcsDfltCh())
+        | UBinaryOp Divide ->      execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("DivideEOp_t",    false)) (srcsDfltCh())
+        | UBinaryOp Modulo ->      execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("ModuloEOp_t",    false)) (srcsDfltCh())
+        | UBinaryOp Power ->       execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("PowerEOp_t",     false)) (srcsDfltCh())
+        | UBinaryOp MaxElemwise -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("MaxEOp_t",       false)) (srcsDfltCh())
+        | UBinaryOp MinElemwise -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("MinEOp_t",       false)) (srcsDfltCh())
 
         // binary element-wise comparison
-        | UBinaryOp Equal ->        execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("EqualEOp_t",        false)) srcsDfltCh
-        | UBinaryOp Less ->         execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LessEOp_t",         false)) srcsDfltCh
-        | UBinaryOp LessEqual ->    execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("LessEqualEOp_t",    false)) srcsDfltCh
-        | UBinaryOp Greater ->      execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("GreaterEOp_t",      false)) srcsDfltCh
-        | UBinaryOp GreaterEqual -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("GreaterEqualEOp_t", false)) srcsDfltCh   
-        | UBinaryOp NotEqual ->     execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("NotEqualEOp_t",     false)) srcsDfltCh   
+        | UBinaryOp Equal ->        execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("EqualEOp_t",        false)) (srcsDfltCh())
+        | UBinaryOp Less ->         execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("LessEOp_t",         false)) (srcsDfltCh())
+        | UBinaryOp LessEqual ->    execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("LessEqualEOp_t",    false)) (srcsDfltCh())
+        | UBinaryOp Greater ->      execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("GreaterEOp_t",      false)) (srcsDfltCh())
+        | UBinaryOp GreaterEqual -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("GreaterEqualEOp_t", false)) (srcsDfltCh())   
+        | UBinaryOp NotEqual ->     execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NotEqualEOp_t",     false)) (srcsDfltCh())   
 
         // binary elment-wise logic
-        | UBinaryOp And -> execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("AndEOp_t", false)) srcsDfltCh
-        | UBinaryOp Or ->  execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("OrEOp_t",  false)) srcsDfltCh
+        | UBinaryOp And -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("AndEOp_t", false)) (srcsDfltCh())
+        | UBinaryOp Or ->  execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("OrEOp_t",  false)) (srcsDfltCh())
 
         // matrix/tensor operations
         | UBinaryOp Dot -> 
-            let aView, aOp, aCopyItems, aShared = blasArg memAllocator srcsDfltCh.[0] srcsDfltChShared.[0] false
-            let bView, bOp, bCopyItems, bShared = blasArg memAllocator srcsDfltCh.[1] srcsDfltChShared.[1] false
-            let tView = blasTarget dfltChTrgt
+            let aView, aOp, aCopyItems, aShared = blasArg memAllocator (srcsDfltCh()).[0] (srcsDfltChShared()).[0] false
+            let bView, bOp, bCopyItems, bShared = blasArg memAllocator (srcsDfltCh()).[1] (srcsDfltChShared()).[1] false
+            let tView = blasTarget (dfltChTrgt())
         
             let blasItems =    
                 match aView.NDims with
@@ -1062,36 +1160,94 @@ module CudaExecUnit =
         // nary
         | UNaryOp Discard -> []
         | UNaryOp (Interpolate ip) -> 
-            execItemsForElemwise dfltChTrgt (InterpolateEOpArgTmpl (ip, compileEnv)) srcsDfltCh
+            execItemsForElemwise (dfltChTrgt()) (InterpolateEOpArgTmpl (ip, compileEnv)) (srcsDfltCh())
 
         // extra
+        | UUnaryOp (Expr.Held _) -> needExtra op
+
+        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UExtraOp (Channel _) -> []
+
+        | UExtraOp (Loop loopSpec) ->
+            // build channel infos
+            let channelInfos = 
+                loopSpec.Channels 
+                |> Map.map (fun ch lv ->
+                    {
+                        LoopEval.Shape       = UExpr.dfltChShape lv.UExpr
+                        LoopEval.SliceDim    = lv.SliceDim
+                        LoopEval.Target      = trgtChs.[ch] :> IArrayNDT
+                    })
+
+            // obtain stride information
+            let srcs = srcsDfltCh() |> List.map (fun s -> s :> IArrayNDT)
+            let argStrides, chStrides, srcReqStrideOrder = 
+                LoopEval.buildStrides loopSpec.Vars srcs channelInfos 
+
+            // copy sources to temporary variable if necessary to match strides
+            let copiedSrcs, copyItems =   
+                ([], List.zip srcs srcReqStrideOrder)
+                ||> List.mapFold (fun copyItems (src, reqOrder) ->
+                    let src = src :?> ArrayNDManikinT
+                    match reqOrder with
+                    | Some order ->
+                        let tmp = ArrayNDManikin.newOrdered memAllocator src.TypeName src.Shape order
+                        let copyItems = copyItems @ copyExecItems tmp src
+                        tmp, copyItems
+                    | None -> src, copyItems)
+
+            // create recipe description for sub-workspace that will evaluate one
+            // loop iteration
+            let recipeDesc = {
+                CompileEnv  = {SymSizes       = SymSizeEnv.empty  
+                               VarLocs        = loopSpec.Vars |> Map.map (fun _ _ -> LocDev)
+                               VarStrides     = argStrides      
+                               ChannelStrides = chStrides                        
+                               ResultLoc      = LocDev
+                               CanDelay       = false}
+                UExprs      = loopSpec.Channels |> Map.map (fun ch lv -> lv.UExpr) 
+            }
+
+            // emit loop executor
+            let execLoopInfo = {
+                Length                = loopSpec.Length
+                Channels              = channelInfos
+                Vars                  = loopSpec.Vars
+                Workspace             = compileEnv |> CudaCompileEnv.newSubrecipe recipeDesc
+                Args                  = copiedSrcs
+                IterManikin           = ArrayNDManikin.newC memAllocator TypeName.ofType<int> []
+                ItersRemainingManikin = ArrayNDManikin.newC memAllocator TypeName.ofType<int> []
+            }
+            copyItems @ [ExecLoop execLoopInfo]
+
         | UUnaryOp (Expr.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) ->
             if SimpleRangesSpec.isDynamic srs then 
                 // copy dynamic subtensor out of the src
-                execItemsForCopyFromDynamicSubtensor dfltChTrgt 
-                    srcsDfltCh.[0] srs (List.tail srcsDfltCh)
+                execItemsForCopyFromDynamicSubtensor (dfltChTrgt())
+                    (firstSrcDfltCh()) srs (List.tail (srcsDfltCh()))
             else [] // symbolic subtensor uses a slice of the src view
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor srs) ->
             // copy "a" if necessary
             let copyItems = 
-                if dfltChTrgt <> srcsDfltCh.[0] then 
-                    copyExecItems dfltChTrgt srcsDfltCh.[0] else []
+                if (dfltChTrgt()) <> (srcsDfltCh()).[0] then 
+                    copyExecItems (dfltChTrgt()) (srcsDfltCh()).[0] 
+                else []
             // copy "b" into a
             let setItems =
-                execItemsForCopyToDynamicSubtensor dfltChTrgt srs 
-                    (List.skip 2 srcsDfltCh) srcsDfltCh.[1]
+                execItemsForCopyToDynamicSubtensor (dfltChTrgt()) srs 
+                    (List.skip 2 (srcsDfltCh())) (srcsDfltCh()).[1]
             copyItems @ setItems
 
         | UNaryOp (Expr.Elements _) -> needExtra op
         | UExtraOp (Elements (_, elemFunc)) ->
-            execItemsForElements compileEnv dfltChTrgt elemFunc srcsDfltCh
+            execItemsForElements compileEnv (dfltChTrgt()) elemFunc (srcsDfltCh())
 
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse ->  
-            execItemsForElemwise dfltChTrgt (NoArgEOpArgTmpl("IfThenElseEOp_t", false)) srcsDfltCh   
+            execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("IfThenElseEOp_t", false)) (srcsDfltCh())
 
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
@@ -1102,22 +1258,28 @@ module CudaExecUnit =
         | UExtraOp (ExtensionExtraOp eop) -> 
             (toCudaUOp eop).ExecItems compileEnv args helpers
 
+    /// returns the execution units for tracing becore execution of the op items
+    let tracePreItemsForExpr compileEnv {TraceItemsForExprArgs.Expr=uexpr} =
+        match uexpr with
+        | UExpr (UExtraOp (Loop loopSpec), _, _) -> [TraceEnteringLoop uexpr]
+        | _ -> []
                 
-    /// returns the execution units for tracing the result
-    let traceItemsForExpr compileEnv {MemAllocator=memAllocator
-                                      Target=trgtChs
-                                      Expr=uexpr} =
-        /// Default channel of target.
-        let defaultChTrgt = trgtChs.[dfltChId]
-
-        [Trace (uexpr, defaultChTrgt)]
-
+    /// returns the execution units for tracing the result after execution of the op items
+    let tracePostItemsForExpr compileEnv {Target=trgtChs; Expr=uexpr} =
+        match uexpr with
+        | UExpr (UExtraOp (Loop _), _, _) -> [TraceLeavingLoop uexpr]
+        | _ ->
+            // do tracing of default channel, when available
+            match trgtChs.TryFind dfltChId with
+            | Some dfltChTrgt -> [Trace (uexpr, dfltChTrgt)]
+            | None -> []
 
     /// generates CUDA execution units that will evaluate the given unified expression
     let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
         ExecUnit.exprToExecUnits {
             ExecItemsForOp=execItemsForOp compileEnv
-            TraceItemsForExpr=traceItemsForExpr compileEnv
+            TracePreItemsForExpr=tracePreItemsForExpr compileEnv
+            TracePostItemsForExpr=tracePostItemsForExpr compileEnv
             TrgtGivenSrcs=trgtGivenSrcs compileEnv
             SrcReqs=srcReqs compileEnv
         } 

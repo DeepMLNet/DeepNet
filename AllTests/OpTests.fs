@@ -131,6 +131,50 @@ let ``Replicate`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
+let ``ReplicateTo on CUDA`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory expr0 expr1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let av0, av1 = fns av
+    printfn "a=\n%A" av 
+    printfn "repTo 0 7 a=\n%A" av0
+    printfn "repTo 1 5 a=\n%A" av1
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Derivative of ReplicateTo on CUDA`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
+    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
+    let fns = Func.make2<single, single> DevCuda.DefaultFactory da0 da1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let dav0, dav1 = fns av
+    printfn "a=\n%A" av 
+    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
+    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+
+[<Fact>]
+let ``Derivative of ReplicateTo on host`` () =
+    let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 3]
+    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6) a
+    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7) a
+    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
+    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
+    let fns = Func.make2<single, single> DevHost.DefaultFactory da0 da1 |> arg1 a
+    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
+    let dav0, dav1 = fns av
+    printfn "a=\n%A" av 
+    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
+    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Trace compare: max, min`` () =
     requireEqualTracesWithRandomData [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c]  ->
         Expr.minElemwise (Expr.maxElemwise a b) c
@@ -207,7 +251,7 @@ let ``Interpolate1D: simple test`` device =
     let minVal = 1.0
     let maxVal = 6.0
 
-    let ip = Interpolator.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
+    let ip = Interpolator.create tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp = Expr.var<single> "inp" [nSmpls]
@@ -234,7 +278,7 @@ let ``Interpolate2D: simple test`` device =
     let minVal = [0.0; 0.0]
     let maxVal = [2.0; 2.0]
 
-    let ip = Interpolator.createInterpolator tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
+    let ip = Interpolator.create tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp1 = Expr.var<single> "inp1" [nSmpls]
@@ -281,7 +325,7 @@ let ``Interpolate1D: derivative test`` device =
     let minVal = 1.0
     let maxVal = 6.0
 
-    let ip = Interpolator.createInterpolator tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
+    let ip = Interpolator.create tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
 
     let nSmpls = SizeSpec.symbol "nSmpls"
     let inp = Expr.var<single> "inp" [nSmpls]
@@ -340,3 +384,20 @@ let ``Check finite on CUDA failing`` () =
 let ``Check finite on CUDA passing`` () =
     printfn "passing:"
     checkFiniteOpTest 1.0f 0.5f
+
+
+
+[<Fact>]
+let ``ReverseAxis on host`` () =
+    let a = Expr.var<int> "a" [SizeSpec.fix 3; SizeSpec.fix 2]
+    let expr0 = Expr.reverseAxis 0 a
+    let expr1 = Expr.reverseAxis 1 a
+    let fn = Func.make2<int, int> DevHost.DefaultFactory expr0 expr1 |> arg1 a
+
+    let av = [0 .. 5] |> ArrayNDHost.ofList |> ArrayND.reshape [3; 2]
+    printfn "av=\n%A" av
+
+    let rav0, rav1 = fn av
+    printfn "rev 0 av=\n%A" rav0
+    printfn "rev 1 av=\n%A" rav1
+

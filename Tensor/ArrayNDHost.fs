@@ -58,7 +58,7 @@ module ArrayNDHostTypes =
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
     and ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
-                           data:        'T []) = 
+                          data:        'T []) = 
         inherit ArrayNDT<'T>(layout)
         
         let fastLayout = FastLayout.ofLayout layout
@@ -337,6 +337,10 @@ module ArrayNDHost =
         | :? ArrayNDHostT<'T> as a -> a
         | :? IToArrayNDHostT<'T> as a -> a.ToHost ()
         | _ -> failwithf "the type %A is not copyable to the host" (a.GetType())
+
+    /// converts the from one data type to another
+    let convert (a: ArrayNDHostT<'T>) : ArrayNDHostT<'C> =
+        a |> ArrayND.convert :> ArrayNDT<'C> :?> ArrayNDHostT<'C>
 
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.

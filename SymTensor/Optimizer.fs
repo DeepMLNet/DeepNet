@@ -292,7 +292,7 @@ module Optimizer =
 
     /// Optimizes an expression.
     and optimize (expr: ExprT) : ExprT =
-        match optimized.TryFind expr with
+        match optimized.LockedTryFind expr with
         | Some opt -> opt 
         | None ->
             let opt = 
@@ -341,7 +341,7 @@ module Optimizer =
                                                   Unary (Reshape _ as lopb, b))
                 | Binary (BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
                                                   Unary (DoBroadcast _ as lopb, b))
-                            when lopa = lopb ->
+                            when lopa = lopb && shapeOf a = shapeOf b ->
                     optimize (Unary (lopa, Binary (op, a, b)))
 
                 // optimize elements expressions
@@ -361,8 +361,8 @@ module Optimizer =
             // try to combine elementwise operations into an element expression
             let opt = combineIntoElements opt
 
-            optimized.[opt] <- opt
-            opt
+            optimized.LockedSet (expr, opt)
+            opt |> Expr.check
 
 
 

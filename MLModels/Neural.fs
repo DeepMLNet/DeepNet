@@ -37,6 +37,10 @@ module LossLayer =
             -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
+            //let maxVal = Expr.scalarOfSameType pred 1000
+            //let minVal = Expr.scalarOfSameType pred 1e-5
+            //let pred = Expr.minElemwise pred maxVal
+            //let pred = Expr.maxElemwise pred minVal
             -target * log pred
             |> Expr.sumAxis 1
             |> Expr.mean
@@ -59,12 +63,25 @@ module NeuralLayer =
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
-        NInput:         SizeSpecT
+        NInput:           SizeSpecT
         /// number of outputs
-        NOutput:        SizeSpecT
+        NOutput:          SizeSpecT
         /// transfer (activation) function
-        TransferFunc:   TransferFuncs
+        TransferFunc:     TransferFuncs
+        /// weights trainable
+        WeightsTrainable: bool
+        /// bias trainable
+        BiasTrainable:    bool
     }
+
+    let defaultHyperPars = {
+        NInput           = SizeSpec.fix 0
+        NOutput          = SizeSpec.fix 0
+        TransferFunc     = Tanh
+        WeightsTrainable = true
+        BiasTrainable    = true
+    }
+
 
     /// Neural layer parameters.
     type Pars<'T> = {
@@ -111,12 +128,19 @@ module NeuralLayer =
         // bias    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
-        let activation = input .* pars.Weights.T + pars.Bias
+        let weights = 
+            if pars.HyperPars.WeightsTrainable then pars.Weights 
+            else Expr.assumeZeroDerivative pars.Weights
+        let bias = 
+            if pars.HyperPars.BiasTrainable then pars.Bias
+            else Expr.assumeZeroDerivative pars.Bias
+        let activation = input .* weights.T + bias
         let one = Expr.scalarOfSameType activation 1
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
         | Sigmoid  -> one / (one + exp (-activation))
-        | SoftMax  -> exp activation / Expr.sumKeepingAxis 1 (exp activation)
+        | SoftMax  -> 
+            exp activation / (Expr.sumKeepingAxis 1 (exp activation))
         | Identity -> activation
 
 
@@ -143,7 +167,7 @@ module MLP =
     /// Creates the parameters for the neural network in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
     /// See `NeuralLayer.pars` for documentation about the initialization.
-    let pars (mb: ModelBuilder<_>) (hp: HyperPars) = {
+    let pars (mb: ModelBuilder<'T>) (hp: HyperPars) : Pars<'T> = {
         Layers = hp.Layers 
                  |> List.mapi (fun idx nhp -> 
                     NeuralLayer.pars (mb.Module (sprintf "Layer%d" idx)) nhp)

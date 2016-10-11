@@ -219,41 +219,6 @@ module ElemExpr =
     [<RequiresExplicitTypeArguments>]
     let arg7<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4, argElem<'T> 5, argElem<'T> 6
 
-//    type Argument1D<'T> (pos: int) =       
-//        member this.Item with get (i0) : ElemExprT = argElem<'T> pos [i0]
-//    type Argument2D<'T> (pos: int) =       
-//        member this.Item with get (i0, i1) : ElemExprT = argElem<'T> pos [i0; i1]
-//    type Argument3D<'T> (pos: int) =       
-//        member this.Item with get (i0, i1, i2) : ElemExprT = argElem<'T> pos [i0; i1; i2]
-//    type Argument4D<'T> (pos: int) =       
-//        member this.Item with get (i0, i1, i2, i3) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3]
-//    type Argument5D<'T> (pos: int) =       
-//        member this.Item with get (i0, i1, i2, i3, i4) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4]
-//    type Argument6D<'T> (pos: int) =       
-//        member this.Item with get (i0, i1, i2, i3, i4, i5) : ElemExprT = argElem<'T> pos [i0; i1; i2; i3; i4; i5]
-//
-//    /// scalar argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg0D<'T> pos = argElem<'T> pos []
-//    /// 1-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg1D<'T> pos = Argument1D<'T> pos
-//    /// 2-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg2D<'T> pos = Argument2D<'T> pos
-//    /// 3-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg3D<'T> pos = Argument3D<'T> pos
-//    /// 4-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg4D<'T> pos = Argument4D<'T> pos
-//    /// 5-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg5D<'T> pos = Argument5D<'T> pos
-//    /// 6-dimensional argument at given position
-//    [<RequiresExplicitTypeArguments>] 
-//    let arg6D<'T> pos = Argument6D<'T> pos
-
     /// extract ArgElementSpec from element expression
     let extractArg expr =
         match expr with

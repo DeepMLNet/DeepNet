@@ -29,6 +29,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
         (loss:   ExprT, pars:   ExprT, dev:    IDevice) =
 
     do Util.checkProperType<'T> ()
+    do if loss.NDims <> 0 then failwith "loss must be a scalar"
 
     let cfg = {
         CfgExpr.Step        = Expr.var<'T> "GradientDescent.Cfg.Step" []
@@ -44,7 +45,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
     static member New loss pars dev =
         GradientDescent (loss, pars, dev) :> IOptimizer<'T, Cfg<'T>, State<'T>>
 
-    member this.DefaultCfg : Cfg<'T> = {
+    static member DefaultCfg : Cfg<'T> = {
         Step        = conv<'T> 1e-4
     }
 
@@ -60,8 +61,8 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
         f |> rpState.Use |> rpCfg.Use
 
     member this.PublishLoc mb =
-        rpCfg.PublishLoc mb
-        rpState.PublishLoc mb
+        rpCfg.PublishLocAndStride mb
+        rpState.PublishLocAndStride mb
 
     interface IOptimizer<'T, Cfg<'T>, State<'T>> with
         member this.OptStepExpr = this.Minimize

@@ -47,6 +47,13 @@ let ``Max, min`` () =
         Expr.minElemwise (Expr.maxElemwise a b) c
     )
 
+[<Fact>]
+let ``ReplicateTo`` () =
+    randomDerivativeCheck 1e-4 [[7; 5]] (fun [a]  ->
+        a |> Expr.replicateTo 0 (SizeSpec.fix 21) |> Expr.replicateTo 1 (SizeSpec.fix 13)
+    )
+
+
 
 let ``Max, min output`` (device: IDevice) =
     let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 2]

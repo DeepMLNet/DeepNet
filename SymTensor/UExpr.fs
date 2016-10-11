@@ -11,6 +11,9 @@ open Expr
 [<AutoOpen>]
 module UExprTypes = 
 
+    /// default channel
+    let dfltChId : ChannelT = "#"
+
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpecT<int>
     type UExprRngsSpecT = SimpleRangesSpecT<int>
@@ -19,36 +22,47 @@ module UExprTypes =
     type IUOp =
         inherit System.IComparable
 
-    /// ops that only occurs in unified expressions
-    type UExtraOpT =
+    /// metadata for an unified expression
+    type UMetadata = {
+        /// the data type of the result channels
+        ChannelType:   Map<ChannelT, TypeNameT>
+        /// the numeric shape of the result channels
+        ChannelShape:  Map<ChannelT, NShapeSpecT>
+        /// the generating expression, if created from one
+        Expr:          Expr.ExprT option
+    }
+
+    type ULoopValueT = {
+        UExpr:      UExprT
+        SliceDim:   int
+    }
+
+    and ULoopSpecT = {
+        Length:     int
+        Vars:       Map<VarSpecT, LoopInputT>
+        Channels:   Map<ChannelT, ULoopValueT>
+    }
+
+    /// ops that have special handling
+    and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
         | Elements of ShapeSpecT * UElemExpr.UElemFuncT
         | IfThenElse
+        | Loop of ULoopSpecT
+        | Channel of ChannelT
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
-    type UOpT =
+    and UOpT =
         | ULeafOp of Expr.LeafOpT
         | UUnaryOp of Expr.UnaryOpT
         | UBinaryOp of Expr.BinaryOpT
         | UNaryOp of Expr.NaryOpT
         | UExtraOp of UExtraOpT
 
-    /// metadata for an unified expression
-    type UMetadata = {
-        /// the data type of the result of the generating expression
-        TargetType:     TypeNameT
-        /// the symbolic shape of the result of the generating expression
-        TargetShape:    ShapeSpecT
-        /// the numeric shape of the result of the generating expression
-        TargetNShape:   NShapeSpecT
-        /// the generating expression, if created from one
-        Expr:           Expr.ExprT option
-    }
-
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    
-    type [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
+    and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
         UExprT = 
         | UExpr of UOpT * (UExprT list) * UMetadata
 
@@ -60,6 +74,13 @@ module UExprTypes =
             | UExpr (UBinaryOp uop, subs, _) -> sprintf "{%A} (%A, %A)" uop subs.[0] subs.[1]
             | UExpr (UNaryOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
             | UExpr (UExtraOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
+
+        member this.Op = match this with UExpr (op, _, _) -> op
+        member this.Args = match this with UExpr (_, args, _) -> args
+        member this.Metadata = match this with UExpr (_, _, metadata) -> metadata
+        member this.ChannelType = this.Metadata.ChannelType
+        member this.ChannelShape = this.Metadata.ChannelShape
+        member this.Expr = this.Metadata.Expr       
 
     /// An IOp that can be converted to an unified expression for compilation.
     type ICompilableOp =
@@ -103,7 +124,7 @@ module UExprRngsSpec =
 
 module UExpr =
 
-    type private UExprCaches = {
+    type UExprCaches = {
         UExprForExpr:       Dictionary<ExprT, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
     }
@@ -113,18 +134,11 @@ module UExpr =
         | Some cached -> cached
         | None ->
             let toUExprRec = toUExprRec caches
-
             let metadata = {
-                TargetType       = Expr.typename expr 
-                TargetShape      = Expr.shapeOf expr
-                TargetNShape     = Expr.shapeOf expr |> ShapeSpec.eval
-                Expr             = Some expr
+                ChannelType     = Map [dfltChId, Expr.typename expr]
+                ChannelShape    = Map [dfltChId, Expr.shapeOf expr |> ShapeSpec.eval]
+                Expr            = Some expr
             }
-
-            let leaf uop        = UExpr (ULeafOp uop, [], metadata)
-            let unary uop a     = UExpr (UUnaryOp uop, [toUExprRec a], metadata)
-            let binary uop a b  = UExpr (UBinaryOp uop, [toUExprRec a; toUExprRec b], metadata)
-            let nary uop se     = UExpr (UNaryOp uop, se |> List.map toUExprRec, metadata)
             let extra uop se    = UExpr (UExtraOp uop, se |> List.map toUExprRec, metadata)
 
             let uExpr =
@@ -144,61 +158,110 @@ module UExpr =
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se
                     extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
+                | Expr.Nary (Expr.Channel (Expr.Loop loopSpec, channel), se) ->
+                    // build separate loop op
+                    let uLoopSpec = loopSpecToULoopSpec loopSpec
+                    let uLoopMetadata = {
+                        ChannelType  = Expr.loopOutputTypeNames loopSpec
+                        ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> ShapeSpec.eval shp)
+                        Expr         = None
+                    }
+                    let uLoop = UExpr (UExtraOp (Loop uLoopSpec), se |> List.map toUExprRec, uLoopMetadata)
+
+                    // try to find loop in cache for reference equality guarantee
+                    let uLoop =
+                        match caches.UExprs.TryFind uLoop with
+                        | Some cached -> cached
+                        | None -> caches.UExprs.[uLoop] <- uLoop; uLoop
+
+                    // and separate op to extract referenced channel
+                    UExpr (UExtraOp (Channel channel), [uLoop], metadata)
+                | Expr.Unary (Expr.Held (_, heldOp), a) ->
+                    failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->
                         let makeOneUop uop = extra (ExtensionExtraOp uop) se
                         eop.ToUExpr expr makeOneUop
-                    | _ -> nary (Expr.ExtensionOp eop) se
-
+                    | _ -> UExpr (UNaryOp (Expr.ExtensionOp eop), se |> List.map toUExprRec, metadata) 
+                    
                 // all other ops are just copied over
-                | Expr.Leaf op -> leaf op
-                | Expr.Unary (op, a) -> unary op a
-                | Expr.Binary (op, a, b) -> binary op a b
-                | Expr.Nary (op, es) -> nary op es           
+                | Expr.Leaf op -> UExpr (ULeafOp op, [], metadata)
+                | Expr.Unary (op, a) -> UExpr (UUnaryOp op, [toUExprRec a], metadata)
+                | Expr.Binary (op, a, b) -> UExpr (UBinaryOp op, [toUExprRec a; toUExprRec b], metadata)
+                | Expr.Nary (op, es) -> UExpr (UNaryOp op, es |> List.map toUExprRec, metadata)        
 
+            // try to find UExpr that was already produced before and reuse it to guarantee
+            // reference equality if structural equality holds
             let uExpr =
                 match caches.UExprs.TryFind uExpr with
                 | Some cached -> cached
-                | None -> uExpr
-
+                | None -> caches.UExprs.[uExpr] <- uExpr; uExpr
+           
             caches.UExprForExpr.[expr] <- uExpr     
             uExpr       
 
     /// converts an expression to a unified expression
-    let toUExpr (expr: ExprT) =
-        let caches = {
+    and toUExprWithCache caches (expr: ExprT) =
+        expr
+        |> Expr.check
+        |> toUExprRec caches 
+
+    /// creates an unified expression cache cache
+    and createCache () = 
+        {
             UExprForExpr    = Dictionary<ExprT, UExprT>(HashIdentity.Structural)
             UExprs          = Dictionary<UExprT, UExprT>(HashIdentity.Structural)        
-        }        
-        toUExprRec caches expr
+        }     
 
+    /// converts an expression to a unified expression
+    and toUExpr (expr: ExprT) =
+        let caches = createCache ()
+        toUExprWithCache caches expr
 
-    /// Returns the generating expression of a unified expression.
+    /// converts a loop specification to an unified loop specification
+    and loopSpecToULoopSpec (loopSpec: LoopSpecT) = 
+        {
+            Length   = SizeSpec.eval loopSpec.Length
+            Vars     = loopSpec.Vars
+            Channels = loopSpec.Channels 
+                        |> Map.map (fun ch lv ->
+                                {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
+        }           
+
+    /// Converts a unified expression to an expression if the unified expression
+    /// was created using the toUExpr function. Otherwise returns None.
+    let tryToExpr (UExpr (_, _, {Expr=exprOpt})) : ExprT option =
+        match exprOpt with
+        | Some exprObj -> Some (unbox exprObj)
+        | None -> None
+
+    /// Converts a unified expression to an expression.
     /// Only works if the unified expression was created using the toUExpr function.
-    let toExprOfType (UExpr (uop, subUExprs, {TargetType=tn; Expr=exprOpt})) : ExprT =
-        match exprOpt with 
-        | Some exprObj -> unbox exprObj 
-        | None -> failwith "UExpr was not created from an Expr"
-
-    /// Converts a unified expression to an expression of the correct type.
-    /// Only works if the unified expression was created using the toUExpr function.
-    let toExpr (UExpr (_, _, {TargetType=tn; Expr=exprOpt}) as uexpr) : ExprT =
-        match exprOpt with 
-        | Some exprObj -> unbox exprObj 
+    let toExpr uExpr =
+        match tryToExpr uExpr with 
+        | Some expr -> expr
         | None -> failwith "UExpr was not created from an Expr"
 
     /// the op of the given unified expression
-    let inline opOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = op
+    let op (UExpr(op, _, _)) = 
+        op
 
-    /// the type of the given unified expression
-    let inline typeOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = TypeName.getType tn
+    /// the type of the default channel of the given unified expression
+    let dfltChType (UExpr(_, _, {ChannelType=ct})) = 
+        ct.[dfltChId].Type
 
-    /// the type of the given unified expression
-    let inline typenameOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = tn
+    /// the type of the default channel of the given unified expression
+    let dfltChTypename (UExpr(_, _, {ChannelType=ct})) = 
+        ct.[dfltChId]
 
-    /// the shape of the given unified expression
-    let inline shapeOf (UExpr(op, se, {TargetType=tn; TargetShape=shp})) = shp
+    /// the shape of the default channel of the given unified expression
+    let dfltChShape (UExpr(_, _, {ChannelShape=cs})) = 
+        cs.[dfltChId]
+
+    /// the shape of all channels of the given unified expression
+    let channelShapes (UExpr(_, _, {ChannelShape=cs})) =
+        cs
 
     /// counts unique subexpressions in a unified expression
     let countUniqueOps uexpr  =

@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Runtime.InteropServices
+open FSharp.Reflection
 open HDF.PInvoke
 
  
@@ -15,19 +16,23 @@ module HDF5Support =
     do
         H5.``open`` () |> check |> ignore
 
-    let hdfType<'T> =        
-        if   typeof<'T> = typeof<bool> then H5T.NATIVE_UINT8
-        elif typeof<'T> = typeof<int8> then H5T.NATIVE_INT8
-        elif typeof<'T> = typeof<int16> then H5T.NATIVE_INT16
-        elif typeof<'T> = typeof<int32> then H5T.NATIVE_INT32
-        elif typeof<'T> = typeof<int64> then H5T.NATIVE_INT64
-        elif typeof<'T> = typeof<uint8> then H5T.NATIVE_UINT8
-        elif typeof<'T> = typeof<uint16> then H5T.NATIVE_UINT16
-        elif typeof<'T> = typeof<uint32> then H5T.NATIVE_UINT32
-        elif typeof<'T> = typeof<uint64> then H5T.NATIVE_UINT64
-        elif typeof<'T> = typeof<single> then H5T.NATIVE_FLOAT
-        elif typeof<'T> = typeof<double> then H5T.NATIVE_DOUBLE
-        else failwithf "unknown type for HDF5: %A" typeof<'T>
+    let hdfTypeInst t =        
+        if   t = typeof<bool> then H5T.NATIVE_UINT8
+        elif t = typeof<int8> then H5T.NATIVE_INT8
+        elif t = typeof<int16> then H5T.NATIVE_INT16
+        elif t = typeof<int32> then H5T.NATIVE_INT32
+        elif t = typeof<int64> then H5T.NATIVE_INT64
+        elif t = typeof<uint8> then H5T.NATIVE_UINT8
+        elif t = typeof<uint16> then H5T.NATIVE_UINT16
+        elif t = typeof<uint32> then H5T.NATIVE_UINT32
+        elif t = typeof<uint64> then H5T.NATIVE_UINT64
+        elif t = typeof<single> then H5T.NATIVE_FLOAT
+        elif t = typeof<double> then H5T.NATIVE_DOUBLE
+        elif t = typeof<string> then H5T.C_S1
+        else failwithf "unknown type for HDF5: %A" t
+
+    let hdfType<'T> =  
+        hdfTypeInst typeof<'T>
 
     let hdfShape shape =
         shape |> List.map uint64 |> List.toArray
@@ -69,6 +74,9 @@ module HDF5Types =
             if List.exists ((>) 0) shape then
                 failwithf "shape %A has negative elements" shape
 
+        let checkDisposed () =
+            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
+
         /// opens a HDF5 file for reading
         new (path: string) = new HDF5 (path, HDF5Read)
 
@@ -102,7 +110,7 @@ module HDF5Types =
             
         /// Checks whether an object (array or group) with the given name exists.
         member this.Exists (name: string) =
-            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
+            checkDisposed ()
             let rec exists prefix dirs =
                 match dirs with
                 | [] -> true
@@ -116,6 +124,7 @@ module HDF5Types =
         /// Creates the given group path. All necessary parent groups are created automatically.
         /// If the group with the given path already exists, nothing happens.
         member this.CreateGroups (path: string) =
+            checkDisposed ()
             let rec create prefix dirs =
                 match dirs with
                 | [] -> ()
@@ -130,6 +139,7 @@ module HDF5Types =
 
         /// Create all necessary parent groups for the given path.
         member private this.CreateParentGroups (path: string) =
+            checkDisposed ()
             match HDF5.SplitPath path with
             | [] -> ()
             | [_] -> ()
@@ -140,8 +150,7 @@ module HDF5Types =
 
         /// Write data array using specified name and shape.
         member this.Write (name: string, data: 'T array, shape: int list) =
-            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
-
+            checkDisposed ()
             if mode <> HDF5Overwrite then
                 failwithf "HDF5 file %s is opened for reading" path
             checkShape data shape
@@ -161,8 +170,7 @@ module HDF5Types =
 
         /// Read data array using specified name. Returns tuple of data and shape.
         member this.Read<'T> (name: string) =            
-            if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
-
+            checkDisposed ()
             if not (this.Exists name) then
                 failwithf "HDF5 dataset %s does not exist in file %s" name path
             let dataHnd = H5D.``open`` (fileHnd, name) |> check
@@ -191,5 +199,104 @@ module HDF5Types =
 
             data, shape |> intShape
 
+        /// Sets the HDF5 attribute with the specified `atrName` on object specified by `name`.
+        member this.SetAttribute (name: string, atrName: string, value: 'T) =
+            checkDisposed ()
+            if not (this.Exists name) then
+                failwithf "HDF5 object %s does not exist in file %s" name path
+
+            let elementType, data =
+                if typeof<'T>.IsArray then typeof<'T>.GetElementType(), box value :?> Array
+                else 
+                    let ary = Array.CreateInstance(typeof<'T>, 1)
+                    ary.SetValue (value, 0)
+                    typeof<'T>, ary
+
+            let typeHnd = H5T.copy (hdfTypeInst elementType) |> check
+            let shapeHnd = H5S.create_simple (1, [|uint64 data.Length|], [|uint64 data.Length|]) |> check
+
+            if H5A.exists_by_name (fileHnd, name, atrName) > 0 then
+                H5A.delete_by_name (fileHnd, name, atrName) |> check |> ignore
+            let atrHnd = H5A.create_by_name (fileHnd, name, atrName, typeHnd, shapeHnd) |> check
+
+            let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
+            H5A.write (atrHnd, typeHnd, gcHnd.AddrOfPinnedObject()) |> check |> ignore
+            gcHnd.Free ()
+
+            H5A.close atrHnd |> check |> ignore
+            H5S.close shapeHnd |> check |> ignore
+            H5T.close typeHnd |> check |> ignore
+
+        /// Gets the HDF5 attribute with the specified `name` on object specified by `path`.
+        member this.GetAttribute (name: string, atrName: string) : 'T =
+            checkDisposed ()
+            if not (this.Exists name) then
+                failwithf "HDF5 object %s does not exist in file %s" name path
+            if not (H5A.exists_by_name (fileHnd, name, atrName) > 0) then
+                failwithf "HDF5 attribute %s does not exist on object %s in file %s" atrName name path
+
+            let elementType =
+                if typeof<'T>.IsArray then typeof<'T>.GetElementType()
+                else typeof<'T>
+
+            let atrHnd = H5A.open_by_name (fileHnd, name, atrName) |> check
+            let typeHnd = H5A.get_type atrHnd |> check
+            let shapeHnd = H5A.get_space (atrHnd) |> check
+
+            if H5T.equal (hdfTypeInst elementType, typeHnd) = 0 then
+                failwithf "HDF5 attribute %s on object %s has other type than %A" atrName name elementType
+
+            if H5S.is_simple (shapeHnd) = 0 then
+                failwithf "HDF5 attribute %s on object %s is not simple" atrName name
+            let nDims = H5S.get_simple_extent_ndims (shapeHnd) |> check
+            if nDims <> 1 then
+                failwithf "HDF5 attribute %s on object %s is not of rank 1" atrName name
+            let shape : uint64 array = Array.zeroCreate nDims
+            let maxShape : uint64 array = Array.zeroCreate nDims
+            H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
+            let nElems = shape.[0] |> int
+            if nElems <> 1 && not typeof<'T>.IsArray then
+                failwithf "HDF5 attribute %s on object %s has %d elements, but a scalar is expected"
+                    atrName name nElems
+
+            let data = Array.CreateInstance(elementType, nElems)
+            let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
+            H5A.read (atrHnd, typeHnd, gcHnd.AddrOfPinnedObject()) |> check |> ignore
+            gcHnd.Free()
+
+            H5A.close atrHnd |> check |> ignore
+            H5S.close shapeHnd |> check |> ignore
+            H5T.close typeHnd |> check |> ignore
+
+            if typeof<'T>.IsArray then
+                box data :?> 'T
+            else
+                data.GetValue(0) :?> 'T
+
+        /// Attaches the specified record as attributes to the object with `name`.
+        member this.SetRecord (name: string, record: 'R) =
+            if not (FSharpType.IsRecord typeof<'R>) then
+                failwith "must specify a value of record type"
+            for fi, value in Array.zip (FSharpType.GetRecordFields typeof<'R>) 
+                                       (FSharpValue.GetRecordFields record) do
+                callGenericInst<HDF5, unit> this "SetAttribute" [fi.PropertyType]
+                    (name, fi.Name, value)
+
+        /// Reads the record attached as attributes to the object with `name`.
+        member this.GetRecord (name: string) : 'R =
+            if not (FSharpType.IsRecord typeof<'R>) then
+                failwith "must specify a value of record type"
+            let values =
+                FSharpType.GetRecordFields typeof<'R>
+                |> Array.map (fun fi ->
+                    callGenericInst<HDF5, obj> this "GetAttribute" [fi.PropertyType]
+                        (name, fi.Name)
+                )
+            FSharpValue.MakeRecord (typeof<'R>, values) :?> 'R
+
+
+            
+
+            
 
 

@@ -7,6 +7,8 @@ open System.Runtime.InteropServices
 open System.Collections.Concurrent
 open FSharp.Reflection
 
+
+
 module Seq = 
 
     /// every n-th element of the given sequence
@@ -21,6 +23,29 @@ module Seq =
               // Retrun each nth element
               yield en.Current }
 
+    /// shuffles a finite sequence using the given seed
+    let shuffle seed (input:seq<_>) =
+        let rand = System.Random seed
+
+        let swap (a: _[]) x y =
+            let tmp = a.[x]
+            a.[x] <- a.[y]
+            a.[y] <- tmp
+
+        let a = Array.ofSeq input
+        Array.iteri (fun i _ -> swap a i (rand.Next(i, Array.length a))) a        
+        a |> Seq.ofArray
+
+    /// sequence counting from given value to infinity
+    let countingFrom from = seq {
+        let mutable i = from
+        while true do
+            yield i
+            i <- i + 1
+    }
+
+    /// sequence counting from zero to infinity
+    let counting = countingFrom 0
 
 module List =
     /// sets element with index elem to given value
@@ -49,10 +74,16 @@ module List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
-    /// transposes a list list
+    /// transposes a list of lists
     let rec transpose = function
         | (_::_)::_ as m -> List.map List.head m :: transpose (List.map List.tail m)
         | _ -> []
+
+    /// swaps the elements at the specified positions
+    let swap elem1 elem2 lst =
+        lst
+        |> set elem1 lst.[elem2]
+        |> set elem2 lst.[elem1]
 
 
 module Map = 
@@ -92,16 +123,32 @@ module UtilTypes =
     [<Measure>]
     type elements
 
+    type System.Collections.Generic.HashSet<'T> with
+        member this.LockedContains key =
+            lock this (fun () -> this.Contains key)
+
+        member this.LockedAdd key =
+            lock this (fun () -> this.Add key)
+
     type System.Collections.Generic.Dictionary<'TKey, 'TValue> with
         member this.TryFind key =
             let value = ref (Unchecked.defaultof<'TValue>)
             if this.TryGetValue (key, value) then Some !value
             else None
 
+        member this.LockedTryFind key =
+            lock this (fun () -> this.TryFind key)
+
         member this.GetOrDefault key dflt =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
+
+        member this.LockedAdd (key, value) =
+            lock this (fun () -> this.Add (key, value))
+
+        member this.LockedSet (key, value) =
+            lock this (fun () -> this.[key] <- value)
 
     type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
         member this.TryFind key =
@@ -120,6 +167,9 @@ module UtilTypes =
             else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+    type HashSet<'T> = System.Collections.Generic.HashSet<'T>
+    type Queue<'T> = System.Collections.Generic.Queue<'T>
+    type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
 
     /// convert given value to specified type and return as obj
     let convTo (typ: System.Type) value =
@@ -130,9 +180,14 @@ module UtilTypes =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
     /// Default value for options. Returns b if a is None, else the value of a.
-    let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
+    let inline (|?) (a: 'a option) b = 
+        match a with
+        | Some v -> v
+        | None -> b
 
-    let allBindingFlags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static
+    let allBindingFlags = 
+        BindingFlags.Public ||| BindingFlags.NonPublic ||| 
+        BindingFlags.Static ||| BindingFlags.Instance
 
     type private GenericMethodDescT = {
         ContainingType:     string
@@ -142,9 +197,9 @@ module UtilTypes =
 
     let private genericMethodCache = ConcurrentDictionary<GenericMethodDescT, MethodInfo> ()
 
-    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// Calls the specified method on the type 'U with the specified generic type arguments
     /// and the specified arguments in tupled form. Return value is of type 'R.
-    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+    let callGenericInst<'U, 'R> (instance: obj) (methodName: string) (genericTypeArgs: System.Type list) args =
         let gmd = {
             ContainingType  = typeof<'U>.AssemblyQualifiedName
             MethodName      = methodName
@@ -156,12 +211,20 @@ module UtilTypes =
             | Some m -> m
             | None ->
                 let gm = typeof<'U>.GetMethod (methodName, allBindingFlags)
+                if gm = null then
+                    failwithf "cannot find method %s on type %A" methodName typeof<'U>
                 let m = gm.MakeGenericMethod (List.toArray genericTypeArgs)
                 genericMethodCache.[gmd] <- m
                 m
 
         let args = FSharpValue.GetTupleFields args
-        m.Invoke(null, args) :?> 'R       
+        m.Invoke (instance, args) :?> 'R       
+
+    /// Calls the specified static method on the type 'U with the specified generic type arguments
+    /// and the specified arguments in tupled form. Return value is of type 'R.
+    let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
+        callGenericInst<'U, 'R> null methodName genericTypeArgs args
+
 
 module Util =
 

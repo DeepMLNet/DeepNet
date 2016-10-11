@@ -26,7 +26,14 @@ type RColorMap =
     | Gray
 
 
+module RLock =
+    let rLock = obj ()
+
+
 type R () =  
+
+    static member lock fn =
+        lock RLock.rLock fn
 
     static member plot2 (?xlim, ?ylim, ?title, ?xlabel, ?ylabel) =
         RCall.empty

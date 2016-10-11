@@ -26,11 +26,11 @@ let cfg = {
                                              LengthscalesTrainable = true
                                              TrnXTrainable         = true
                                              TrnTTrainable         = true
-                                             TrnSigmaTrainable     = true
+                                             TrnSigmaTrainable     = false
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-2.0f, 2.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.1f)}}]
+                                             TrnSigmaInit          = Const (sqrt 0.01f)}}]
              Loss   = LossLayer.MSE}
 
     Data = {Path       = "../../../Data/UCI/abalone.txt"
@@ -48,5 +48,6 @@ let cfg = {
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
+    PlotGPsDuringTraining  = true
 }
 
