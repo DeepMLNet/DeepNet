@@ -324,13 +324,14 @@ module Train =
 
                 // print secondary losses
                 match multiTrnLosses, multiValLosses, multiTstLosses with
+                | [_], [_], [_] -> printfn ""
                 | _::secTrnLosses, _::secValLosses, _::secTstLosses ->
                     printf "("
                     for secTrnLoss, secValLoss, secTstLoss in 
                             List.zip3 secTrnLosses secValLosses secTstLosses do
                         printf "trn=%7.4f  val=%7.4f  tst=%7.4f; " secTrnLoss secValLoss secTstLoss
                     printfn ")"
-                | _ -> printfn ""
+                | _ -> failwith "inconsistent losses"
 
                 // check termination criteria
                 let mutable faith = Continue

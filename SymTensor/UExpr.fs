@@ -203,7 +203,9 @@ module UExpr =
 
     /// converts an expression to a unified expression
     and toUExprWithCache caches (expr: ExprT) =
-        toUExprRec caches expr
+        expr
+        |> Expr.check
+        |> toUExprRec caches 
 
     /// creates an unified expression cache cache
     and createCache () = 

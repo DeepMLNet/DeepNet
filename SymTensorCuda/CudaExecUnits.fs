@@ -386,14 +386,21 @@ module CudaExecUnit =
         /// default channel target that shares no elements with any srcView 
         let dfltChOutplaceTrgt () =
             match trgtDefChReq () with
-            | Some rv when not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+            | Some rv when not (overlappingWithAnySrc rv) && 
+                           not (ArrayND.isBroadcasted rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId] 
+                -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
              
         /// default channel target that shares no elements with any srcView and can be used for BLAS
         let dfltChOutplaceBlasTrgt () = 
             match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
-                           not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+                           not (overlappingWithAnySrc rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId] 
+                -> dfltChTrgt rv false
             | _ -> 
                 dfltChTrgt (ArrayNDManikin.newBlasTarget memAllocator 
                                 (trgtDfltChType()) (trgtDfltChShape())) false
@@ -402,7 +409,10 @@ module CudaExecUnit =
         let dfltChOutplaceTransposedBlasTrgt () = 
             match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv.T && 
-                           not (overlappingWithAnySrc rv) -> dfltChTrgt rv false
+                           not (overlappingWithAnySrc rv) &&
+                           rv.TypeName = trgtTypenames.[dfltChId] &&
+                           rv.Shape = trgtShapes.[dfltChId]
+                -> dfltChTrgt rv false
             | _ -> 
                 dfltChTrgt (ArrayNDManikin.newC memAllocator 
                                 (trgtDfltChType()) (trgtDfltChShape())) false  
@@ -414,6 +424,7 @@ module CudaExecUnit =
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
                                     view.TypeName = trgtTypenames.[dfltChId] &&
+                                    view.Shape = trgtShapes.[dfltChId] &&
                                     not (ArrayND.isBroadcasted view) && 
                                     not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]

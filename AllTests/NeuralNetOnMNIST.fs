@@ -30,7 +30,7 @@ let build device batch =
     // model parameters
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
                 {NeuralLayer.defaultHyperPars with
-                  NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
+                  NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.SoftMax}
      
     // input / output variables
     let input =  mc.Var "Input"  [batchSize; nInput]
@@ -50,7 +50,7 @@ let build device batch =
 
     // expressions
     let pred = NeuralLayer.pred pars input
-    let loss = LossLayer.loss LossLayer.MSE pred target
+    let loss = LossLayer.loss LossLayer.CrossEntropy pred target
     printfn "loss is:\n%A" loss
 
     // optimizer (with parameters)

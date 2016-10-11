@@ -174,17 +174,16 @@ module Trace =
         exprEvaledWithMsg uexpr res ""
 
     let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
-        let epsilon = 1e-4f
         match a.DataType, b.DataType with
         | ta, tb when ta <> tb -> false
+        | t, _ when t = typeof<float> ->
+            let a = a :?> ArrayNDT<float>
+            let b = b :?> ArrayNDT<float>
+            ArrayND.almostEqualWithTol 1e-5 1e-5 a b |> ArrayND.value
         | t, _ when t = typeof<single> ->
             let a = a :?> ArrayNDT<single>
             let b = b :?> ArrayNDT<single>
-            let diff = abs (a - b)
-            if ArrayND.nElems diff > 0 then
-                let maxDiff = ArrayND.max diff |> ArrayND.value
-                maxDiff <= epsilon
-            else true
+            ArrayND.almostEqualWithTol 1e-5f 1e-5f a b |> ArrayND.value
         | t, _ when t = typeof<bool> ->
             let a = a :?> ArrayNDT<bool>
             let b = b :?> ArrayNDT<bool>

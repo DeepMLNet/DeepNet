@@ -4,78 +4,79 @@ open Models
 open Datasets
 open Optimizers
 
-open Microsoft.VisualStudio.Profiler
 
-//DataCollection.StopProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
-DataCollection.StopProfile (ProfileLevel.Process, DataCollection.CurrentId) |> ignore
-//DataCollection.StopProfile (ProfileLevel.Thread, DataCollection.CurrentId) |> ignore
+[<EntryPoint>]
+let main argv =
 
-let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
-            |> TrnValTst.ToCuda
+    //let device = DevHost
+    let device = DevCuda
 
-let mb = ModelBuilder<single> "NeuralNetModel"
+    let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
 
-// define symbolic sizes
-let nBatch  = mb.Size "nBatch"
-let nInput  = mb.Size "nInput"
-let nClass  = mb.Size "nClass"
-let nHidden = mb.Size "nHidden"
+    let mnist = if device = DevCuda then TrnValTst.ToCuda mnist else mnist
 
-// define model parameters
-let mlp = 
-    MLP.pars (mb.Module "MLP") 
-        { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=NeuralLayer.Tanh}
-                    {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=NeuralLayer.SoftMax}]
-          LossMeasure = LossLayer.CrossEntropy }
+    let mb = ModelBuilder<single> "NeuralNetModel"
 
-// define variables
-let input  : ExprT = mb.Var "Input"  [nBatch; nInput]
-let target : ExprT = mb.Var "Target" [nBatch; nClass]
+    // define symbolic sizes
+    let nBatch  = mb.Size "nBatch"
+    let nInput  = mb.Size "nInput"
+    let nClass  = mb.Size "nClass"
+    let nHidden = mb.Size "nHidden"
 
-// instantiate model
-mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]
-mb.SetSize nClass mnist.Trn.[0].Lbl.Shape.[0]
-mb.SetSize nHidden 100
-let mi = mb.Instantiate DevCuda
+    // define model parameters
+    let mlp = 
+        MLP.pars (mb.Module "MLP") 
+            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=NeuralLayer.Tanh}
+                        {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=NeuralLayer.SoftMax}]
+              LossMeasure = LossLayer.CrossEntropy }
 
-// loss expression
-let loss = MLP.loss mlp input target
+    // define variables
+    let input  : ExprT = mb.Var "Input"  [nBatch; nInput]
+    let target : ExprT = mb.Var "Target" [nBatch; nClass]
 
-let smplVarEnv (smpl: MnistT) =
-    VarEnv.empty
-    |> VarEnv.add input smpl.Img
-    |> VarEnv.add target smpl.Lbl
+    // instantiate model
+    mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]
+    mb.SetSize nClass mnist.Trn.[0].Lbl.Shape.[0]
+    mb.SetSize nHidden 100
+    let mi = mb.Instantiate device
 
-let trainable =
-    Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
+    // loss expression
+    let loss = MLP.loss mlp input target
+    //let loss = loss |> Expr.checkFinite "loss"
 
-let trainCfg : Train.Cfg = {    
-    Train.defaultCfg with
-        Seed               = 100   
-        BatchSize          = 10000 
-        LossRecordInterval = 10                                   
-        Termination        = Train.ItersWithoutImprovement 100
-        MinImprovement     = 1e-7  
-        TargetLoss         = None  
-        MinIters           = Some 100 
-        MaxIters           = None  
-        LearningRates      = [1e-3; 1e-4; 1e-5]                               
-        CheckpointDir      = None  
-        DiscardCheckpoint  = false 
-        DumpPrefix         = None
-} 
+    let smplVarEnv (smpl: MnistT) =
+        VarEnv.empty
+        |> VarEnv.add input smpl.Img
+        |> VarEnv.add target smpl.Lbl
 
+    let trainable =
+        //Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
+        Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
-
-//Debug.Timing <- true
-//Debug.TraceCompile <- true
-
-//DataCollection.StartProfile (ProfileLevel.Global, DataCollection.CurrentId) |> ignore
-//DataCollection.StartProfile (ProfileLevel.Process, DataCollection.CurrentId) |> ignore
-//DataCollection.StartProfile (ProfileLevel.Thread, DataCollection.CurrentId) |> ignore
+    let trainCfg : Train.Cfg = {    
+        Train.defaultCfg with
+            Seed               = 100   
+            //BatchSize          = 10 
+            BatchSize          = 10000 
+            LossRecordInterval = 10                                   
+            Termination        = Train.ItersWithoutImprovement 100
+            MinImprovement     = 1e-7  
+            TargetLoss         = None  
+            MinIters           = Some 100 
+            MaxIters           = None  
+            LearningRates      = [1e-3; 1e-4; 1e-5]                               
+    } 
 
 
-let result = Train.train trainable mnist trainCfg
+    //Debug.Timing <- true
+    //Debug.TraceCompile <- true
 
+//    let ts = Trace.startSession "LearnMnist"
 
-()
+    let result = Train.train trainable mnist trainCfg
+
+//    let ts = ts.End ()
+//    ts |> Trace.dumpToFile "LearnMNIST.txt"
+
+    0
+
