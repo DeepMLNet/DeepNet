@@ -139,8 +139,13 @@ module GaussianProcess =
 
     /// calculates Matrix between two vectors using linear kernel
     let linearCovariance (x:ExprT) (y:ExprT) =
-        x .* y
-    
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec = ElemExpr.arg2<single>
+        let klin = xvec[x_smpl] * yvec[y_smpl]
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] klin [x; y]
+
     /// calculates Matrix between two vectors using linear kernel
     let squaredExpCovariance (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
