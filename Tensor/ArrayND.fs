@@ -180,6 +180,11 @@ module ArrayND =
                 this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
             | _ -> failwith "impossible"
 
+        /// broadcast the list of arrays to the same shape if possible
+        static member BroadcastToSameMany (arys: 'A list when 'A :> ArrayNDT<'T>) =
+            let layouts = ArrayNDLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
+            List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
+
         /// broadcasts this array to the given shape if possible
         member this.BroadcastToShape shp = 
             let l = ArrayNDLayout.broadcastToShape shp this.Layout
@@ -241,7 +246,35 @@ module ArrayND =
             let res = this.NewOfSameType (ArrayNDLayout.newC ifVal.Shape)
             ifVal.IfThenElseImpl cond elseVal res
             res
+
+        abstract IndexedSetImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        default this.IndexedSetImpl indices src =
+            for trgtIdx in ArrayNDLayout.allIdx this.Layout do
+                let srcIdx = 
+                    indices 
+                    |> List.mapi (fun dim idx ->
+                        match idx with
+                        | Some di -> di.[trgtIdx]
+                        | None -> trgtIdx.[dim])
+                this.[trgtIdx] <- src.[srcIdx]
      
+        /// Sets the values of this array by selecting from the sources array according to the specified
+        /// indices. If an index array is set to None then the target index is used as the source index.
+        member this.IndexedSet (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+            if src.GetType() <> this.GetType() then
+                failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
+                    (this.GetType()) (src.GetType())
+            match indices |> List.tryPick id with
+            | Some ih ->
+                if ih.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
+                    failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
+                        (this.GetType()) (indices.GetType())
+            | None -> ()
+            if src.NDims <> indices.Length then
+                failwithf "must specify an index array for each dimension of src"
+            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape this.Shape))
+            this.IndexedSetImpl indices src
+
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
@@ -254,23 +287,15 @@ module ArrayND =
             member this.GetEnumerator() =
                 (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
 
+        /// converts .Net item/ranges to RangeT list
         member internal this.ToRng (allArgs: obj []) =
             let rec toRng (args: obj list) =
                 match args with
                 // direct range specification
                 | [:? (RangeT list) as rngs] -> rngs
-
                 // slices
                 | (:? (int option) as so) :: (:? (int option) as fo)  :: rest ->
                     Rng (so, fo) :: toRng rest
-                //  Rng (Some so.Value, Some fo.Value) :: toRng rest
-                //| (:? (int option) as so) :: null                     :: rest ->
-                //    Rng (Some so.Value, None) :: toRng rest
-                //| null                    :: (:? (int option) as fo)  :: rest ->
-                //    Rng (None, Some fo.Value) :: toRng rest
-                //| null                    :: null                     :: rest ->            
-                //    Rng (None, None) :: toRng rest
-
                 // items
                 | (:? int as i)           :: rest ->
                     RngElem i :: toRng rest
@@ -278,13 +303,11 @@ module ArrayND =
                     match sa with
                     | NewAxis -> RngNewAxis :: toRng rest
                     | Fill    -> RngAllFill :: toRng rest
-
+                // special cases
                 | [] -> []
                 | _  -> failwithf "invalid item/slice specification: %A" allArgs 
 
-            allArgs 
-            |> Array.toList
-            |> toRng
+            allArgs |> Array.toList |> toRng
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             this.View (this.ToRng allArgs) 
@@ -520,6 +543,10 @@ module ArrayND =
         let la, lb = ArrayNDLayout.broadcastToSame (layout a) (layout b)
         relayout la a, relayout lb b
 
+    /// broadcasts all arrays to have the same shape
+    let inline broadcastToSameMany arys =
+        ArrayNDT<_>.BroadcastToSameMany arys
+
     /// broadcasts to have the same size in the given dimensions
     let inline broadcastToSameInDims dims a b =
         let la, lb = ArrayNDLayout.broadcastToSameInDims dims (layout a) (layout b)
@@ -633,6 +660,30 @@ module ArrayND =
             for i = 0 to n - 1 do
                 set [i; i] ArrayNDT<'T>.One a
         | _ -> invalidArg "a" "need a quadratic matrix"
+
+    /// Creates a new ArrayNDT by selecting elements from `src` according to the specified `indices`.
+    /// `indices` must be a list of ArrayNDTs, one per dimension of `src`. 
+    /// If None is specified instead of an array in an dimension, the source index will match the 
+    /// target index in that dimension.
+    /// The result will have the shape of the (broadcasted) index arrays.
+    let select indices (src: #ArrayNDT<'T>) =
+        let someIndices = indices |> List.choose id
+        if List.isEmpty someIndices then
+            failwith "need to specify at least one index array"
+        let bcSomeIndices = broadcastToSameMany someIndices
+        let rec rebuild idxs repIdxs =
+            match idxs, repIdxs with
+            | Some idx :: rIdxs, repIdx :: rRepIdxs ->
+                Some repIdx :: rebuild rIdxs rRepIdxs
+            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
+            | [], [] -> []
+            | _ -> failwith "unbalanced idxs"
+        let bcIndices = rebuild indices bcSomeIndices
+        let trgtShp = bcSomeIndices.Head.Shape
+        let trgt = newCOfSameType trgtShp src
+        trgt.IndexedSet bcIndices src
+        trgt
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element-wise operations
