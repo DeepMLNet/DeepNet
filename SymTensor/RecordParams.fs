@@ -9,8 +9,11 @@ open ArrayNDNS
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLoc<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (mi: ModelInstance<'T>) =
+    static member PublishLocStride<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (stride: int list option) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
+        match stride with
+        | Some stride -> mi.SetStride expr stride
+        | None -> ()
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
         ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
@@ -112,15 +115,21 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
     member this.Use (f: VarEnvT -> 'R) =
         fun (ve: VarEnvT) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
 
-    /// publishes the locations of the used variables to the given ModelInstance
-    member this.PublishLoc (model: ModelInstance<'T>) =
+    /// publishes the locations and strides of the used variables to the given ModelInstance
+    member this.PublishLocAndStride (model: ModelInstance<'T>) =        
         fieldInfos
         |> Seq.iter (fun fi ->
+            let loc = dev.DefaultLoc
+            let shp = 
+                fi.VarSpec.Shape 
+                |> SymSizeEnv.substShape model.CompileEnv.SymSizes
+                |> ShapeSpec.tryEval
+            let stride = Option.map ArrayNDLayout.cStride shp
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLoc", allBindingFlags)
+                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLocStride", allBindingFlags)
                 let m = mi.MakeGenericMethod typeof<'T>
-                m.Invoke(null, [|fi.Expr; dev.DefaultLoc; model|]) |> ignore
+                m.Invoke(null, [|fi.Expr; loc; stride; model|]) |> ignore
         )
 
     /// Saves the record values as a HDF5 file.

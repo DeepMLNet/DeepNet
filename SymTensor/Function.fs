@@ -16,6 +16,12 @@ module VarEnvTypes =
     /// specification of variable storage locations
     type VarLocsT = Map<VarSpecT, ArrayLocT>
 
+    /// specification of variable strides
+    type VarStridesT = Map<VarSpecT, int list>
+
+    /// specification of channel strides
+    type ChannelStridesT = Map<ChannelT, int list>
+
 
 /// Variable value collection.
 module VarEnv = 
@@ -67,9 +73,9 @@ module VarEnv =
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-                    | Base (Sym sym) -> env |> SymSizeEnv.add sym (Base (Fixed svVal))
+                    | Base (Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
                     | Base (Fixed f) -> 
-                        if f = svVal then env
+                        if f .= svVal then env
                         else failShape ()
                     | Broadcast ->
                         if 1 = svVal then env
@@ -100,8 +106,12 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> TypeName.ofObject vVal)
 
     /// gets the locations of the variable value arrays
-    let valueLocations (varEnv: VarEnvT) =
+    let valueLocations (varEnv: VarEnvT) : VarLocsT =
         varEnv |> Map.map (fun _ vVal -> ArrayND.location vVal)
+
+    /// gets the strides of the variable value arrays
+    let valueStrides (varEnv: VarEnvT) : VarStridesT =
+        varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
     let ofSeq (entries: (Expr.ExprT * ArrayNDT<'T>) seq) =
@@ -119,10 +129,11 @@ module EnvTypes =
     }
 
     /// Information necessary to compile an expression.
-    /// Currently this contains the variable locations.
     type CompileEnvT = {
         SymSizes:           SymSizeEnvT
         VarLocs:            VarLocsT
+        VarStrides:         VarStridesT
+        ChannelStrides:     ChannelStridesT
         ResultLoc:          ArrayLocT
         CanDelay:           bool
     }
@@ -171,10 +182,12 @@ module CompileEnv =
 
     /// empty compile environment
     let empty = {
-        VarLocs   = Map.empty 
-        ResultLoc = LocHost
-        SymSizes  = SymSizeEnv.empty
-        CanDelay  = true
+        VarLocs         = Map.empty 
+        VarStrides      = Map.empty
+        ChannelStrides  = Map.empty
+        ResultLoc       = LocHost
+        SymSizes        = SymSizeEnv.empty
+        CanDelay        = true
     }
 
  
@@ -182,16 +195,21 @@ module CompileEnv =
 module Func =
 
     type private UExprGenT = {
-        Generate:               SymSizeEnvT -> UExprT
+        Generate:               SymSizeEnvT -> UExpr.UExprCaches -> UExprT
         UVarSpecsAndEvalable:   bool -> SymSizeEnvT -> Set<VarSpecT> * bool       
     }
 
-    let private uExprGenerate baseExpr symSizes =
+    let private uExprGenerate baseExpr symSizes cache =
+        let sw = Stopwatch.StartNew ()
+        if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
+        let substExpr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
+        if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
+   
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Optimizing expression..." 
         let optimizedExpr = 
-            if Debug.DisableOptimizer then baseExpr
-            else Optimizer.optimize baseExpr
+            if Debug.DisableOptimizer then substExpr
+            else Optimizer.optimize substExpr
         if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
         if Debug.PrintOptimizerStatistics then
             printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 
@@ -199,19 +217,14 @@ module Func =
                 (Expr.countUniqueOps baseExpr) (Expr.countUniqueOps optimizedExpr)
 
         let sw = Stopwatch.StartNew ()
-        if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
-        let substExpr = optimizedExpr |> Expr.substSymSizes symSizes
-        if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
-
-        let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Converting to UExpr..."
-        let uExpr = UExpr.toUExpr substExpr
+        let uExpr = UExpr.toUExprWithCache cache optimizedExpr
         if Debug.Timing then printfn "Converting to UExpr took %A" sw.Elapsed
         
         uExpr
 
     let private uExprVarSpecsAndEvalable baseExpr failIfNotEvalable symSizes =
-        let expr = baseExpr |> Expr.substSymSizes symSizes 
+        let expr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
         let vars = Expr.extractVars expr 
         if failIfNotEvalable then Expr.failOnNotEvalableSymSize expr
         vars, Expr.canEvalAllSymSizes expr
@@ -244,29 +257,33 @@ module Func =
             if failIfImpossible && not allSizesAvail then
                 failwith "cannot compile expression because not all symbolic sizes could be resolved"
 
-            // substitute symbol sizes into variable locations
-            let varLocs =
-                compileEnv.VarLocs
+            // substitute symbol sizes into variable locations and strides
+            let substVarSizes varMap =
+                varMap
                 |> Map.toSeq
-                |> Seq.map (fun (vs, loc) -> (vs |> VarSpec.substSymSizes compileEnv.SymSizes, loc))
+                |> Seq.map (fun (vs, value) -> (vs |> VarSpec.substSymSizes compileEnv.SymSizes, value))
                 |> Map.ofSeq
-            let compileEnv = {compileEnv with VarLocs=varLocs}
+            let compileEnv = {compileEnv with VarLocs=substVarSizes compileEnv.VarLocs
+                                              VarStrides=substVarSizes compileEnv.VarStrides}
 
-            // check that all necessary variable locations are available
-            let allKnownLocs = 
-                varLocs
-                |> Map.toSeq
-                |> Seq.map (fun (vs, _) -> vs)
-                |> Set.ofSeq
-            let allLocsAvail = Set.isEmpty (neededVars - allKnownLocs)
-            if failIfImpossible && not allLocsAvail then
-                failwithf "cannot compile expression because location of variable(s) %A is missing"                
-                    (neededVars - allKnownLocs |> Set.toList)
+            // check that all necessary variable locations and strides are available
+            let checkMissing varMap what =
+                let allKnown = 
+                    varMap |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
+                let allAvail = Set.isEmpty (neededVars - allKnown)
+                if failIfImpossible && not allAvail then
+                    failwithf "cannot compile expression because %s of variable(s) %A is missing"                
+                        what (neededVars - allKnown |> Set.toList)
+                allAvail
+            let allLocsAvail = checkMissing compileEnv.VarLocs "location"
+            let allStridesAvail = checkMissing compileEnv.VarStrides "strides"
 
-            if allSizesAvail && allLocsAvail then 
+            // if everything is available, then compile
+            if allSizesAvail && allLocsAvail && allStridesAvail then 
+                let uexprCache = UExpr.createCache ()
                 let uexprs = 
                     baseExprGens 
-                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes) 
+                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes uexprCache) 
                 Some {
                     Exprs=uexprs
                     CompileEnv=compileEnv
@@ -279,29 +296,34 @@ module Func =
         let performEval compileRes varEnv = 
             // substitute and check symbol sizes
             let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileRes.CompileEnv.SymSizes
+            let varLocs = varEnv |> VarEnv.valueLocations 
+            let varStrides = varEnv |> VarEnv.valueStrides 
 
-            // check that variable locations match with compile environment
-            let varLocs = VarEnv.valueLocations varEnv
+            // check that variable locations and strides match with compile environment
             for vs in compileRes.NeededVars do
-                match varLocs |> Map.tryFind vs with
-                | Some loc when loc <> VarSpec.findByName vs compileRes.CompileEnv.VarLocs ->
-                    failwithf "variable %A was expected to be in location %A but a value in \
-                               location %A was specified" vs compileRes.CompileEnv.VarLocs.[vs] loc
-                | Some _ -> ()
-                | None -> 
+                if not (varLocs.ContainsKey vs) then
                     failwithf "cannot evaluate expression because value for variable %A is missing" vs
+                
+                let cmplLoc = VarSpec.findByName vs compileRes.CompileEnv.VarLocs
+                if varLocs.[vs] <> cmplLoc then
+                    failwithf "variable %A was expected to be in location %A but a value in \
+                               location %A was specified" vs cmplLoc varLocs.[vs]
+
+                let cmplStrides = VarSpec.findByName vs compileRes.CompileEnv.VarStrides
+                if varStrides.[vs] <> cmplStrides then
+                    failwithf "variable %A was expected to have strides %A but a value with \
+                               strides %A was specified" vs cmplStrides varStrides.[vs]
 
             // start tracing
             Trace.startExprEval compileRes.Exprs compiler.Name
 
-            // evaluate using compiled function
-            let evalEnv = EvalEnv.create varEnv 
-            let res = compileRes.Eval evalEnv
-
-            // stop tracing
-            Trace.endExprEval ()
-
-            res
+            try
+                // evaluate using compiled function
+                let evalEnv = EvalEnv.create varEnv 
+                compileRes.Eval evalEnv
+            finally
+                // stop tracing
+                Trace.endExprEval ()
 
         // If all size symbols and variable storage locations are known, then we can immediately compile
         // the expression. Otherwise we have to wait for a VarEnv to infer the missing sizes and locations.
@@ -310,18 +332,20 @@ module Func =
         | None ->
             let mutable variants = Map.empty
             fun varEnv ->
-                // infer size symbols from variables and substitute into expression and variables
-                let symSizes = VarEnv.inferSymSizes baseCompileEnv.SymSizes varEnv
-                let varLocs = VarEnv.valueLocations varEnv
-                let compileEnv = {baseCompileEnv with SymSizes = symSizes
-                                                      VarLocs  = Map.join baseCompileEnv.VarLocs varLocs}
+                // infer information from VarEnv
+                let compileEnv = 
+                    {baseCompileEnv with SymSizes   = varEnv |> VarEnv.inferSymSizes baseCompileEnv.SymSizes 
+                                         VarLocs    = varEnv |> VarEnv.valueLocations
+                                         VarStrides = varEnv |> VarEnv.valueStrides}
 
                 // compile and cache compiled function if necessary
                 if not (Map.containsKey compileEnv variants) then 
-                    if Debug.PrintInstantiations then printfn "Instantiating new function variant for %A" compileEnv
+                    if Debug.PrintInstantiations then 
+                        printfn "Instantiating new function variant for %A" compileEnv
                     variants <- variants |> Map.add compileEnv (tryCompile compileEnv true).Value
                 else
-                    if Debug.PrintInstantiations then printfn "Using cached function variant for %A" compileEnv
+                    if Debug.PrintInstantiations then 
+                        printfn "Using cached function variant for %A" compileEnv
 
                 // evaluate
                 performEval variants.[compileEnv] varEnv
@@ -366,7 +390,47 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>
 
-    //let makeMany factory ()
+    let make4<'T0, 'T1, 'T2, 'T3> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
+        checkType<'T2> "third" expr2
+        checkType<'T3> "fourth" expr3
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen]        
+        fun (varEnv: VarEnvT) ->
+            let res = evalAll varEnv
+            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>
+
+    let make5<'T0, 'T1, 'T2, 'T3, 'T4> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) (expr4: ExprT) =    
+        checkType<'T0> "first" expr0
+        checkType<'T1> "second" expr1
+        checkType<'T2> "third" expr2
+        checkType<'T3> "fourth" expr3
+        checkType<'T4> "fifth" expr4
+        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let expr4gen = {Generate=uExprGenerate expr4; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr4}   
+        let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen; expr4gen]        
+        fun (varEnv: VarEnvT) ->
+            let res = evalAll varEnv
+            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>, res.[4] :?> ArrayNDT<'T4>
+
+    let makeMany<'T> factory (exprs: ExprT list) =
+        exprs |> List.iter (checkType<'T> "all")
+        let exprsGen =
+            exprs
+            |> List.map (fun expr -> 
+                {Generate=uExprGenerate expr; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr})
+        let evalAll = evalWrapper factory exprsGen
+        fun (varEnv: VarEnvT) ->
+            let reses = evalAll varEnv
+            reses |> List.map (fun res -> res :?> ArrayNDT<'T>)
+
 
 [<AutoOpen>]
 module FuncTypes = 

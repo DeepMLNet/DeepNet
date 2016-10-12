@@ -36,6 +36,16 @@ module Seq =
         Array.iteri (fun i _ -> swap a i (rand.Next(i, Array.length a))) a        
         a |> Seq.ofArray
 
+    /// sequence counting from given value to infinity
+    let countingFrom from = seq {
+        let mutable i = from
+        while true do
+            yield i
+            i <- i + 1
+    }
+
+    /// sequence counting from zero to infinity
+    let counting = countingFrom 0
 
 module List =
     /// sets element with index elem to given value
@@ -64,10 +74,16 @@ module List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
-    /// transposes a list list
+    /// transposes a list of lists
     let rec transpose = function
         | (_::_)::_ as m -> List.map List.head m :: transpose (List.map List.tail m)
         | _ -> []
+
+    /// swaps the elements at the specified positions
+    let swap elem1 elem2 lst =
+        lst
+        |> set elem1 lst.[elem2]
+        |> set elem2 lst.[elem1]
 
 
 module Map = 
@@ -151,6 +167,8 @@ module UtilTypes =
             else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+    type HashSet<'T> = System.Collections.Generic.HashSet<'T>
+    type Queue<'T> = System.Collections.Generic.Queue<'T>
     type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
 
     /// convert given value to specified type and return as obj
@@ -162,7 +180,10 @@ module UtilTypes =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
     /// Default value for options. Returns b if a is None, else the value of a.
-    let inline (|?) (a: 'a option) b = if a.IsSome then a.Value else b
+    let inline (|?) (a: 'a option) b = 
+        match a with
+        | Some v -> v
+        | None -> b
 
     let allBindingFlags = 
         BindingFlags.Public ||| BindingFlags.NonPublic ||| 

@@ -40,10 +40,25 @@ module Types =
         Descriptor:                BasicTypes.CudaTextureDescriptor
     }
 
+    /// sub-workspace id
+    type SubWorkspaceT = int
+
+    /// description of how to build a CUDA recipe
+    type CudaRecipeDescT = {
+        CompileEnv:                 CompileEnvT
+        UExprs:                     Map<ChannelT, UExprT>
+    }
+
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
+        /// variables storing the results of the expressions
+        ChannelVars:                Map<ChannelT, VarSpecT option>
+        /// function to allocate new storage for the result
+        ChannelAllocators:          Map<ChannelT, unit -> IArrayNDT>
         /// storage location of variables
         VarStorLoc:                 Map<VarSpecT, ArrayLocT>
+        /// optional stride specification for variables
+        VarStrides:                 Map<VarSpecT, int list>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
         /// texture objects
@@ -52,6 +67,8 @@ module Types =
         InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
         /// values for constants
         ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
+        /// recipe descriptions for sub-workspaces (e.g. loop iteration)
+        SubWorkspaces:              ResizeArray<CudaRecipeDescT>
     }
 
     /// function domain (kernel only or host code that may call kernels)
@@ -91,6 +108,12 @@ module Types =
         TexArray:               IDisposable
     }
 
+    /// forward declared interface for CudaExprWorkspace
+    type ICudaExprWorkspace =
+        inherit IDisposable
+        /// evaluates the workspace using the specified variable environment
+        abstract Eval: VarEnvT -> unit
+
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {
         Stream:                 Dictionary<StreamT, CudaStream>
@@ -101,6 +124,7 @@ module Types =
         mutable HostVar:        Map<VarSpecT, IArrayNDHostT>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
         ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
+        SubWorkspaces:          Dictionary<SubWorkspaceT, ICudaExprWorkspace>
     }
     
     /// CUDA device memory range
@@ -117,7 +141,6 @@ module Types =
         LengthInBytes:          int
     }
 
-
     /// BLAS transpose operation
     type BlasTransposeOpT =
         | BlasId
@@ -133,11 +156,11 @@ module Types =
         inherit System.Attribute()     
         member this.CPPFuncName = cppFuncName
 
-
+/// methods for manipulating the CUDA compile environment
 module CudaCompileEnv =
 
     /// creates a new texture object
-    let newTextureObject (env: CudaCompileEnvT) contents descriptor =
+    let newTextureObject contents descriptor (env: CudaCompileEnvT) =
         if not (ArrayND.isC contents && contents.Layout.Offset = 0) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
@@ -147,7 +170,8 @@ module CudaCompileEnv =
         env.TextureObjects.Add texObj
         texObj
 
-    let newConstant (env: CudaCompileEnvT) (value: IArrayNDCudaT) =   
+    /// creates a new constant
+    let newConstant (value: IArrayNDCudaT) (env: CudaCompileEnvT) =   
         let mc : MemConstManikinT = {
             Id = env.ConstantValues.Keys.Count
             TypeName = TypeName.ofTypeInst value.DataType
@@ -155,6 +179,17 @@ module CudaCompileEnv =
         env.ConstantValues.Add (mc, value)
         ArrayNDManikinT (value.Layout, MemConst mc)
 
+    /// adds a sub-workspace using the specified recipe description
+    let newSubrecipe (recipeDesc: CudaRecipeDescT) (env: CudaCompileEnvT) : SubWorkspaceT =
+        let id = env.SubWorkspaces.Count
+        env.SubWorkspaces.Add recipeDesc
+        id
+
+    /// Gets the strides for an external variable.
+    let strideForVar (var: VarSpecT) (env: CudaCompileEnvT) =
+        match env.VarStrides |> Map.tryFind var with
+        | Some strides -> strides
+        | None -> failwithf "no strides were specified for variable %A" var
 
 module CudaExecEnv = 
 
@@ -170,9 +205,7 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im], 0
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            if ArrayND.isC ev then 
-                ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
-            else failwithf "external variable %A was expected to be contiguous" vs
+            ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
         | MemConst mc -> 
             let ary = env.ConstantValues.[mc]
             ary.Storage.ByteData, 0            
@@ -197,11 +230,15 @@ module CudaExecEnv =
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
-        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ (manikin.Layout)
+        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ manikin.Layout
 
     /// gets a CudaTexObject
     let getTextureObj (env: CudaExecEnvT) (tex: TextureObjectT) =
         env.TextureObject.[tex].TexObject
+
+    /// gets a sub-workspace
+    let getSubworkspace (env: CudaExecEnvT) (ws: SubWorkspaceT) =
+        env.SubWorkspaces.[ws]
 
 
 [<AutoOpen>]
@@ -250,6 +287,7 @@ module ArgTemplates =
     /// ArrayND argument template
     type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
         // TShape is ShapeStaicXD and TStride is StrideStaticXD.
+        member this.Manikin = manikin
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env strm =
@@ -270,8 +308,8 @@ module ArgTemplates =
         do 
             match manikinOpt with
             | Some manikin ->
-                if manikin.DataType <> typeof<uint32> then 
-                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. uint32"
+                if manikin.DataType <> typeof<int32> then 
+                    failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. int32"
                 if ArrayND.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
                 if ArrayND.offset manikin <> 0 then 
@@ -598,7 +636,7 @@ module ArgTemplates =
             if compileEnv.InterpolatorTextures.ContainsKey ip then
                 compileEnv.InterpolatorTextures.[ip], false, None
             else
-                let tblCnst = CudaCompileEnv.newConstant compileEnv tbl
+                let tblCnst = compileEnv |> CudaCompileEnv.newConstant tbl
                 let rec adrModeForDim dim =
                     if dim >= ip.NDims then adrModeForDim (dim - 1)
                     else 
@@ -612,7 +650,7 @@ module ArgTemplates =
                 let desc =
                     CudaTextureDescriptor (adrModeForDim 0, adrModeForDim 1, adrModeForDim 2, 
                                            filterMode, CUTexRefSetFlags.None)
-                let t = CudaCompileEnv.newTextureObject compileEnv tblCnst desc
+                let t = compileEnv |> CudaCompileEnv.newTextureObject tblCnst desc
                 compileEnv.InterpolatorTextures.Add (ip, t)
                 t, true, Some tblCnst
 

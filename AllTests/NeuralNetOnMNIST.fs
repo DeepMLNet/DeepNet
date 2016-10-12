@@ -29,7 +29,8 @@ let build device batch =
 
     // model parameters
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
-                {NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Tanh}
+                {NeuralLayer.defaultHyperPars with
+                  NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.SoftMax}
      
     // input / output variables
     let input =  mc.Var "Input"  [batchSize; nInput]
@@ -40,16 +41,20 @@ let build device batch =
     mc.SetSize nInput 784
     mc.SetSize nTarget 10
 
+    // set strides
+    mc.SetStride input (ArrayNDLayout.cStride [batch; 784])
+    mc.SetStride target (ArrayNDLayout.cStride [batch; 10])
+
     // instantiate model
     let mi = mc.Instantiate (device, canDelay=false)
 
     // expressions
     let pred = NeuralLayer.pred pars input
-    let loss = LossLayer.loss LossLayer.MSE pred target
+    let loss = LossLayer.loss LossLayer.CrossEntropy pred target
     printfn "loss is:\n%A" loss
 
     // optimizer (with parameters)
-    let opt = GradientDescent<single> (loss, mi.ParameterVector, device)
+    let opt = GradientDescent<single> (loss |> mi.Use, mi.ParameterVector, device)
     let optCfg = {GradientDescent.Step=1e-3f}
     opt.PublishLoc mi
 
@@ -84,7 +89,7 @@ let train device samples iters =
     printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
         optFun tstImgs tstLbls optCfg optState |> ignore
-        //printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
+        printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
     let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
     printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss

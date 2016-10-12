@@ -14,98 +14,27 @@ module CudaEval =
 
     /// CUDA GPU expression evaluator
     let cudaEvaluator (compileEnv: CompileEnvT) (uexprs: UExprT list)  =
-          
-        // add storage op for results
-        let transferUExprs, resVars, resAllocators = 
-            uexprs
-            |> List.mapi (fun i (UExpr (_, _, {TargetType=tn; TargetShape=shp}) as uexpr) ->
-                let nshp = ShapeSpec.eval shp
-                let layout = ArrayNDLayout.newC nshp
+        let channels = uexprs |> List.mapi (fun i _ -> sprintf "EXPR%d" i)
+        let channelExprs = List.zip channels uexprs |> Map.ofList
 
-                // create result storage allocator
-                let resAllocator = fun () ->
-                    match compileEnv.ResultLoc with
-                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> IArrayNDT
-                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> IArrayNDT  
-                    | l -> failwithf "CUDA cannot work with result location %A" l      
-
-                if List.fold (*) 1 nshp > 0 then
-                    // expression has data that needs to be stored       
-                    // create variable that will be inserted into expression
-                    let resVarName = sprintf "__RESULT%d__" i
-                    let resVar = 
-                        {VarSpecT.Name=resVarName; Shape=shp; TypeName=tn}
-
-                    // insert StoreToVar op in expression
-                    (UExpr (UUnaryOp (Expr.StoreToVar resVar), [uexpr], 
-                            {TargetType=tn; TargetShape=shp; TargetNShape=nshp; Expr=None}), 
-                     Some resVar, resAllocator)
-                else
-                    // no data needs to be transferred back
-                    uexpr, None, resAllocator)
-            |> List.unzip3
-
-        /// result variable locations
-        let resVarLocs = 
-            (Map.empty, resVars)
-            ||> Seq.fold (fun locs resVar ->
-                match resVar with
-                | Some vs -> locs |> Map.add vs compileEnv.ResultLoc
-                | None -> locs)
-
-        /// unified expression containing all expressions to evaluate
-        let mergedUexpr =
-            match transferUExprs with
-            | [] -> UExpr (UNaryOp Expr.Discard, [], 
-                           {TargetType=TypeName.ofType<int>
-                            TargetShape=ShapeSpec.emptyVector
-                            TargetNShape=[0]
-                            Expr=None})
-            | [uexpr] -> uexpr
-            | UExpr (_, _, {TargetType=tn}) :: _ ->
-                UExpr (UNaryOp Expr.Discard, transferUExprs, 
-                       {TargetType=tn
-                        TargetShape=ShapeSpec.emptyVector
-                        TargetNShape=[0]
-                        Expr=None})                       
-
-        // build variable locations
-        let varLocs = Map.join compileEnv.VarLocs resVarLocs
-
-        // compile expression and create workspace
-        let cudaCompileEnv = {
-            VarStorLoc           = varLocs
-            ElemFuncsOpNames     = Map.empty    
-            TextureObjects       = ResizeArray<TextureObjectT>()
-            InterpolatorTextures = Dictionary<InterpolatorT, TextureObjectT>()
-            ConstantValues       = Dictionary<MemConstManikinT, IArrayNDCudaT>()
-        }
-        let rcpt = CudaRecipe.build cudaCompileEnv mergedUexpr
+        // build recipe and create workspace
+        let rcpt = CudaRecipe.buildFromDesc {CompileEnv=compileEnv; UExprs=channelExprs}
         let workspace = new CudaExprWorkspace (rcpt)
 
+        // evaluator
         fun (evalEnv: EvalEnvT) ->           
             // create arrays for results and add them to VarEnv
-            let resArrays = resAllocators |> List.map (fun a -> a())
+            let resArrays = rcpt.ChannelAllocators |> Map.map (fun _ alloc -> alloc ())
             let varEnv =
-                (resVars, resArrays)
-                ||> List.zip
-                |> List.fold (fun varEnv (var, value) -> 
-                        match var with
-                        | Some vs -> varEnv |> VarEnv.addVarSpec vs value
-                        | None -> varEnv)
-                    evalEnv.VarEnv               
-
-            // partition variables depending on location
-            let vsLoc = VarEnv.valueLocations varEnv
-            let devVars, hostVars =
-                varEnv
-                |> Map.partition (fun vs _ -> vsLoc.[vs] = LocDev)
+                (evalEnv.VarEnv, channels)
+                ||> List.fold (fun varEnv ch -> 
+                                    match rcpt.ChannelVars.[ch] with
+                                    | Some vs -> varEnv |> VarEnv.addVarSpec vs resArrays.[ch]
+                                    | None -> varEnv)
 
             // evaluate
-            workspace.Eval (devVars, hostVars)
-            resArrays
-
-       
+            workspace.Eval varEnv
+            channels |> List.map (fun ch -> resArrays.[ch])
 
 
 [<AutoOpen>]

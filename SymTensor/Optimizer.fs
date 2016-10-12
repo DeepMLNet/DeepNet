@@ -341,7 +341,7 @@ module Optimizer =
                                                   Unary (Reshape _ as lopb, b))
                 | Binary (BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
                                                   Unary (DoBroadcast _ as lopb, b))
-                            when lopa = lopb ->
+                            when lopa = lopb && shapeOf a = shapeOf b ->
                     optimize (Unary (lopa, Binary (op, a, b)))
 
                 // optimize elements expressions
@@ -362,7 +362,7 @@ module Optimizer =
             let opt = combineIntoElements opt
 
             optimized.LockedSet (expr, opt)
-            opt
+            opt |> Expr.check
 
 
 

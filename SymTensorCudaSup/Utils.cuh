@@ -34,7 +34,7 @@ template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, floa
 #endif
 
 
-typedef unsigned int idx_t;
+typedef int idx_t;
 
 
 template <typename T>
@@ -49,6 +49,11 @@ _dev T max(const T a, const T b)
 	return a > b ? a : b;
 }
 
+template <typename T>
+_dev T signt(const T a)
+{
+	return (a >= ((T)0)) ? ((T)1) : ((T)-1);
+}
 
 _dev idx_t divCeil(const idx_t a, const idx_t b)
 {

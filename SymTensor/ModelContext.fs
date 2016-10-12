@@ -76,6 +76,7 @@ module ModelContextTypes =
             |> Seq.map (fun (var, expr) -> expr, var)
             |> Map.ofSeq
           
+        member this.Name = name
         member this.Parameters = pars
         member this.Shapes = shapes
         member this.StartIdxs = startIdxs
@@ -180,6 +181,14 @@ module ModelContextTypes =
                 let value = device.ToHost vsView
                 ArrayNDHDF.write hdf vs.Name value
 
+        /// prints the shapes of all parameters contained in this ParameterStorage
+        member this.PrintShapes () =
+            printfn "ParameterStorage for %s contains the parameters:" parameterSet.Name
+            for par, value in 
+                    parameterVals |> Map.toList |> List.sortBy fst do
+                printfn "%-50s %A" (par.Name + ": ") value.Shape
+
+
     /// A model builder.
     [<StructuredFormatDisplay("{PrettyString}")>]
     type ModelBuilder<'T when 'T: equality and 'T: comparison> 
@@ -192,6 +201,7 @@ module ModelContextTypes =
         let mutable symSizes = []
         let mutable symSizeEnv = SymSizeEnv.empty
         let mutable varLocs : VarLocsT = Map.empty
+        let mutable varStrides : VarStridesT = Map.empty
         let mutable instantiated = false
 
         let toSizeSpec (name: string) =            
@@ -205,6 +215,10 @@ module ModelContextTypes =
                 | :? int as f when f >= 0 -> SizeSpec.fix f
                 | r -> failwithf "size must be either a size symbol name (string), \
                                   a fixed size (positive integer) or -1 for broadcast, but got %A" r)
+
+        let checkVar var =
+            if not (vars |> Set.contains var) then
+                failwithf "this ModelBuilder does not contain the variable %A" var
 
         let defaultInitializer (seed: int) (shp: int list) =
             let rng = Random(seed)
@@ -295,17 +309,29 @@ module ModelContextTypes =
 
         /// sets the location of the given variable
         member this.SetLoc var loc =
-            varLocs <- varLocs |> Map.add (Expr.extractVar var) loc
+            let vs = Expr.extractVar var
+            checkVar vs
+            varLocs <- varLocs |> Map.add vs loc
 
-        /// Infers localtion symbolic size by matching a variables symbolic shape to the shape
-        /// of the given variable value.
+        /// sets the stride of the given variable
+        member this.SetStride var stride =
+            let vs = Expr.extractVar var
+            checkVar vs
+            varStrides <- varStrides |> Map.add vs stride            
+
+        /// Infers variable location, variable strides and symbolic sizes by 
+        /// matching a symbolic variable to the given value.
         member this.UseTmplVal var (value: ArrayNDT<'T>) =
-            VarEnv.empty 
-            |> VarEnv.add var value
-            |> VarEnv.inferSymSizes symSizeEnv
-            |> fun ss -> symSizeEnv <- ss
+            // infer symbolic sizes
+            let inferredSizes = 
+                VarEnv.empty 
+                |> VarEnv.add var value
+                |> VarEnv.inferSymSizes symSizeEnv
+            symSizeEnv <- Map.join symSizeEnv inferredSizes
 
+            // infer location and strides
             varLocs <- varLocs |> Map.add (Expr.extractVar var) (ArrayND.location value)
+            varStrides <- varStrides |> Map.add (Expr.extractVar var) (ArrayND.stride value)
 
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
@@ -339,15 +365,35 @@ module ModelContextTypes =
                 failwithf "Cannot instantiate model because size symbols %A have no value."
                     (missingSymSizes |> Set.toList)
 
-            // apply default variable location
-            let mutable varLocs = varLocs
-            for var in vars do
-                if not (varLocs |> Map.containsKey var) then
-                    varLocs <- varLocs |> Map.add var device.DefaultLoc
+            // apply default variable location to variables with unspecified location
+            let varLocs = 
+                if canDelay then varLocs
+                else
+                    (varLocs, vars)
+                    ||> Set.fold (fun varLocs var ->
+                        match varLocs |> Map.tryFind var with
+                        | Some _ -> varLocs
+                        | None -> varLocs |> Map.add var device.DefaultLoc)
+
+            // apply row-major strides to variables with unspecified strides
+            let varStrides = 
+                if canDelay then varStrides
+                else
+                    (varStrides, vars)
+                    ||> Set.fold (fun varStrides var ->
+                        match varStrides |> Map.tryFind var, ShapeSpec.tryEval var.Shape with
+                        | None, Some nShape -> varStrides |> Map.add var (ArrayNDLayout.cStride nShape)
+                        | _, _ -> varStrides)
 
             // create compile environement
-            let compileEnv =
-                {SymSizes=symSizeEnv; VarLocs=varLocs; ResultLoc=device.DefaultLoc; CanDelay=canDelay}
+            let compileEnv = {
+                SymSizes       = symSizeEnv
+                VarLocs        = varLocs
+                VarStrides     = varStrides
+                ChannelStrides = Map.empty
+                ResultLoc      = device.DefaultLoc
+                CanDelay       = canDelay
+            }
 
             // instantiate
             instantiated <- true
@@ -381,9 +427,13 @@ module ModelContextTypes =
             let varLocs =
                 compileEnv.VarLocs
                 |> Map.add psVar (ArrayND.location psVal)
+            let varStrides =
+                compileEnv.VarStrides
+                |> Map.add psVar (ArrayND.stride psVal)
 
-            device.Compiler, {compileEnv with ResultLoc = resultLoc;
-                                              VarLocs   = varLocs}
+            device.Compiler, {compileEnv with ResultLoc  = resultLoc
+                                              VarLocs    = varLocs
+                                              VarStrides = varStrides}
 
         let useParStorage = parameterStorage.Use
 
@@ -420,14 +470,22 @@ module ModelContextTypes =
         /// sets the location of the given variable
         member this.SetLoc var loc =
             let uvs = Expr.extractVar var 
-
             match compileEnv.VarLocs |> Map.tryFind uvs with
             | Some prvLoc when prvLoc <> loc ->
                 failwithf "cannot change location of variable %A from %A to %A after model instantiation"
                     uvs prvLoc loc
             | _ -> ()
-
             compileEnv <- {compileEnv with VarLocs = compileEnv.VarLocs |> Map.add uvs loc}
+
+        /// sets the stride of the given variable
+        member this.SetStride var stride =
+            let uvs = Expr.extractVar var 
+            match compileEnv.VarStrides |> Map.tryFind uvs with
+            | Some prvStride when prvStride <> stride ->
+                failwithf "cannot change stride of variable %A from %A to %A after model instantiation"
+                    uvs prvStride stride
+            | _ -> ()
+            compileEnv <- {compileEnv with VarStrides = compileEnv.VarStrides |> Map.add uvs stride}
 
         /// Load parameter values.
         member this.LoadPars filename = this.ParameterStorage.Load filename
@@ -453,6 +511,10 @@ module ModelContextTypes =
             with get (par: ExprT) : ArrayNDT<'T> = this.ParameterStorage.[par]
             and set (par: ExprT) (value: ArrayNDT<'T>) = this.ParameterStorage.[par] <- value
 
+        member this.Func (resultLoc: ArrayLocT, exprs: ExprT list) =
+            let exprs = exprs |> List.map this.Use 
+            Func.makeMany<'T> (compileSpec resultLoc) exprs << useParStorage
+
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
         member this.Func (resultLoc: ArrayLocT, expr0: ExprT) =
@@ -473,6 +535,9 @@ module ModelContextTypes =
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
             Func.make3<'T, 'T, 'T> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+
+        member this.Func (exprs: ExprT list) =
+            this.Func (device.DefaultLoc, exprs)
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.

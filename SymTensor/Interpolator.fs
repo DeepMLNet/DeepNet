@@ -41,7 +41,7 @@ module InterpolatorTypes =
             /// extrapolation behaviour
             Outside:    OutsideInterpolatorRangeT list
             /// interpolator for derivative
-            Derivative: InterpolatorT option
+            Derivative: InterpolatorT list option
         }        
         
         member this.NDims = List.length this.Resolution
@@ -54,20 +54,31 @@ module Interpolator =
     /// interpolator tables
     let private tables = new Dictionary<InterpolatorT, IArrayNDT>()
 
-    /// interpolator derivatives
-    let private derivatives = new Dictionary<InterpolatorT, InterpolatorT>()
+    /// numerically calculated derivatives
+    let private numDerivatives = new Dictionary<InterpolatorT, InterpolatorT list>()
 
     /// Creates an n-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
     let create (tbl: ArrayNDT<'T>) (minArg: float list) (maxArg: float list) 
                (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
-               (derivative: InterpolatorT option) =
+               (derivative: InterpolatorT list option) =
+        
+        // check arguments
         let nDims = minArg.Length
         if maxArg.Length <> nDims || outside.Length <> nDims then
             failwith "minArg, maxArg and outside have inconsistent lengths"
         if tbl.NDims <> nDims then failwith "interpolation table has wrong number of dimensions"
         if tbl.Shape |> List.exists (fun e -> e < 2) then failwith "interpolation table must contain at least 2 entries"
+        match derivative with
+        | Some ds -> 
+            if ds.Length <> nDims then
+                failwith "must specify one derivative w.r.t. each input dimension"
+            ds |> List.iter (fun d -> 
+                if d.NDims <> nDims then failwith "derivatives must have same number of dimensions")
+        | None -> ()
+
+        // create interpolator
         let ip = {
             Id = tables.Count
             TypeName = TypeName.ofType<'T>
@@ -79,6 +90,8 @@ module Interpolator =
             Outside = outside
             Derivative = derivative
         }
+
+        // store interpolation table
         tables.LockedAdd (ip, tbl)
         ip
 
@@ -97,48 +110,54 @@ module Interpolator =
             if not (0 <= derivDim && derivDim < ip.NDims) then
                 invalidArg "derivDim" "derivative dimension out of range"
 
-            match ip.Derivative with
-            | Some ipd -> ipd  // use provided derivative table
-            | None ->          // create derivative table by numeric differentiation
-                match derivatives.LockedTryFind ip with
-                | Some ipd -> ipd
-                | None ->
-                    let tbl = getTable ip    
+            let ipds = 
+                match ip.Derivative with
+                | Some ipds -> ipds  // use provided derivative tables
+                | None ->            // create derivative table by numeric differentiation
+                    match numDerivatives.LockedTryFind ip with
+                    | Some ipds -> ipds // use cached derivate table
+                    | None ->           // build derivative tables
+                        let tbl = getTable ip    
 
-                    // hack to work around slow ArrayNDCuda operations
-                    let tbl, wasOnDev = 
-                        match tbl with
-                        | :? ArrayNDHostT<'T> -> tbl, false
-                        | _ -> ArrayNDHost.fetch tbl :> ArrayNDT<'T>, true
-                        //| _ -> failwith "unknown storage location"
+                        // hack to work around slow ArrayNDCuda operations
+                        let tbl, wasOnDev = 
+                            match tbl with
+                            | :? ArrayNDHostT<'T> -> tbl, false
+                            | _ -> ArrayNDHost.fetch tbl :> ArrayNDT<'T>, true
 
-                    let diffTbl =
-                        match ip.Mode with
-                        | InterpolateLinearaly ->
-                            let diffTbl = 
-                                ArrayND.diffAxis derivDim tbl / 
-                                ArrayND.scalarOfSameType tbl (conv<'T> ip.Resolution.[derivDim]) 
-                            let zeroShp =
-                                [for d, s in List.indexed tbl.Shape do
-                                    if d = derivDim then yield 1
-                                    else yield s]
-                            let zero = ArrayND.zerosOfSameType zeroShp diffTbl
-                            ArrayND.concat derivDim [diffTbl; zero]
-                        | InterpolateToLeft ->
-                            ArrayND.zerosLike tbl
+                        let ipds = 
+                            [0 .. ip.NDims-1]
+                            |> List.map (fun dd -> 
+                                let diffTbl =
+                                    match ip.Mode with
+                                    | InterpolateLinearaly ->
+                                        let diffTbl = 
+                                            ArrayND.diffAxis dd tbl / 
+                                            ArrayND.scalarOfSameType tbl (conv<'T> ip.Resolution.[dd]) 
+                                        let zeroShp =
+                                            [for d, s in List.indexed tbl.Shape do
+                                                if d = dd then yield 1
+                                                else yield s]
+                                        let zero = ArrayND.zerosOfSameType zeroShp diffTbl
+                                        ArrayND.concat dd [diffTbl; zero]
+                                    | InterpolateToLeft ->
+                                        ArrayND.zerosLike tbl
 
-                    // hack to work around slow ArrayNDCuda operations
-                    let diffTbl =
-                        if wasOnDev then ArrayNDCuda.toDevUntyped (box diffTbl :?> IArrayNDHostT) :?> ArrayNDT<'T>
-                        else diffTbl
+                                // hack to work around slow ArrayNDCuda operations
+                                let diffTbl =
+                                    if wasOnDev then ArrayNDCuda.toDevUntyped (box diffTbl :?> IArrayNDHostT) :?> ArrayNDT<'T>
+                                    else diffTbl
 
-                    let outside =
-                        [for d, o in List.indexed ip.Outside do
-                            if d = derivDim then yield Zero
-                            else yield o]
-                    let ipd = create diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
-                    derivatives.LockedAdd (ip, ipd)
-                    ipd
+                                let outside =
+                                    List.indexed ip.Outside
+                                    |> List.map (fun (d, o) -> if d = dd then Zero else o)
+                                create diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
+                            )
+
+                        // cache built tables
+                        numDerivatives.LockedAdd (ip, ipds)
+                        ipds
+            ipds.[derivDim]
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.

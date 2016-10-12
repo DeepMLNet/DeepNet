@@ -14,14 +14,14 @@ open ArrayNDNS
 let nHidden1 = SizeSpec.fix 30
 
 let info = {
-    NMin    = 0.0
-    NMax    = 1.1
+    NMin    =  0.0
+    NMax    = 1.0
     NPoints = 1000
     XMin    = -10.0
     XMax    =  10.0
     XPoints = 5000
-    Function = FracSigmoid
-    WithDeriv = false
+    Function = Sigmoid
+    WithDeriv = true
 }
 
 
@@ -31,10 +31,9 @@ let cfg = {
                        TableLayer
                          {NInput        = Program.NInput()
                           NOutput       = nHidden1
-                          NFrac         = SizeSpec.fix 4
                           Info          = info
-                          FracTrainable = true
-                          FracInit      = 0.0f
+                          FracTrainable = false
+                          FracInit      = 0.0f                          
                           }
                       
                        NeuralLayer
@@ -62,10 +61,7 @@ let cfg = {
                  //MinIters  = Some 10000
                  BestOn    = Training
                  BatchSize = System.Int32.MaxValue
-                 MaxIters  = None
-                 CheckpointDir = Some "."
-                 
-                 }
+                 MaxIters  = None}
 
     SaveParsDuringTraining = false
 }

@@ -100,6 +100,8 @@ module Expr =
         | PermuteAxes of perm:int list
         /// subtensor 
         | Subtensor of ExprRngsSpecT
+        /// reverses the tensor in the given dimension 
+        | ReverseAxis of dim:int
 
         // ==== variable storage ====
         /// variable write
@@ -114,12 +116,24 @@ module Expr =
         | Print of string
         /// dumps the value into the given dataset in the active HDF5 dump file
         | Dump of string
-        /// checks the value for NaNs and infinities, outputs their location and stops the computation
+        /// checks the value for NaNs and infinities, outputs their location and 
+        /// stops the computation
         | CheckFinite of string
         /// annotation (no influence on value)
         | Annotated of string       
+        /// an op that will expand into an expression once symbolic sizes have
+        /// been substituted
+        | Held of derivsShp:ShapeSpecT list * op:UnaryHeldOpT
 
+    /// an op that will expand into an expression once symbolic sizes have been substituted
+    and UnaryHeldOpT =
+        /// replicates the axes to the specified size
+        | ReplicateTo of dim:int * size:SizeSpecT
+
+    /// a simplified range specification of one dimension
     and ExprRngSpecT = SimpleRangeSpecT<ExprT>
+
+    /// a simplified range specification of all dimensions
     and ExprRngsSpecT = SimpleRangesSpecT<ExprT>
 
     /// ops with two exprs as arguments
@@ -171,10 +185,75 @@ module Expr =
         | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
+        /// use specified channel of a multi-channel op
+        | Channel of channelOp:MultiChannelOpT * channel:ChannelT
         /// extension op
         | ExtensionOp of IOp
-   
-   
+
+    /// a channel of a multi-channel op or loop
+    and ChannelT = string
+
+    /// an n-ary op with multiple output channels
+    and MultiChannelOpT =
+        /// iterative evaluation of one or multiple expresisons
+        | Loop of spec:LoopSpecT    
+     
+    /// a slice of an argument to the loop
+    and SequenceArgSliceT = {
+        /// the index of the argument
+        ArgIdx:     int
+        /// the dimension the loop is performed over
+        SliceDim:   int
+    }
+
+    /// references a loop channel of a previous iteration
+    and PreviousChannelT = {
+        /// the channel to use
+        Channel:       ChannelT
+        /// the delay, must be at least one
+        Delay:         SizeSpecT
+        /// the index of the argument specifying the initial values
+        InitialArg:    int
+    }
+
+    /// a loop variable value specification
+    and LoopInputT = 
+        /// provides the loop argument to all loop iterations
+        | ConstArg of argIdx:int
+        /// provides a slice of the loop argument to each loop iteration
+        | SequenceArgSlice of SequenceArgSliceT
+        /// provides the value of a loop channel from a previous loop iteration
+        | PreviousChannel of PreviousChannelT
+        /// provides the index of the current loop iteration (zero-based)
+        | IterationIndex
+        /// provides the number of remaining loop iterations after this iteration
+        | IterationsRemaining
+
+    /// the value of a loop channel
+    and LoopValueT = {
+        /// the expression to compute the loop channel;
+        /// it may only use variables defined in LoopSpecT.Vars
+        Expr:       ExprT
+        /// the dimension to concatenate the results along to produce the loop output
+        SliceDim:   int
+    }
+
+    /// A loop specification.
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    /// A loop can slice over its arguments and reference values computed in previous
+    /// loop iterations.
+    /// A loop can compute multiple values at once. Each computed values is referred to
+    /// as a channel.
+    and LoopSpecT = {
+        /// number of loop iterations
+        Length:     SizeSpecT
+        /// specifies the values of the variables used in the channel value expressions,
+        /// i.e. LoopValueT.Expr
+        Vars:       Map<VarSpecT, LoopInputT>   
+        /// specifies the values of the loop channels
+        Channels:   Map<ChannelT, LoopValueT>
+    }
+
     /// A mathematical operation in an expression.
     /// This models a mathematical function or operator that takes one or more tensors
     /// and returns one tensor.
@@ -327,10 +406,16 @@ module Expr =
 
         | Nary (Elements (_, elemExpr), _) 
             -> ElemExpr.typeName elemExpr
+        | Nary (Channel (Loop spec, channel), _)
+            -> loopOutputTypeNames spec |> Map.find channel 
 
         | Unary (_, a) -> typename a
         | Binary (_, a, b) -> typename a
         | Nary (_, es) -> typename (List.head es)
+
+    /// data type of loop otuput
+    and internal loopOutputTypeNames (spec: LoopSpecT) =
+        spec.Channels |> Map.map (fun ch lv -> typename lv.Expr)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -393,6 +478,8 @@ module Expr =
                  match sr with
                  | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
                  | SRSDynStartSymSize (_, size) -> size)
+        | Unary(ReverseAxis _, a) -> shapeOf a
+        | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
@@ -400,6 +487,7 @@ module Expr =
         | Unary(Dump _, a) -> shapeOf a
         | Unary(CheckFinite _, a) -> shapeOf a
         | Unary(Annotated(_), a) -> shapeOf a
+        | Unary(Held (derivShp :: _, heldOp), a) -> [(shapeOf a).[0]; ShapeSpec.nElem derivShp]
 
         // binary elementwise
         | Binary (Add, a, _)                         
@@ -440,7 +528,14 @@ module Expr =
         | Nary(Discard, _) -> ShapeSpec.emptyVector 
         | Nary(Elements (resShape, elemExpr), _) -> resShape
         | Nary(Interpolate _, es) -> shapeOf es.Head
+        | Nary(Channel (Loop spec, channel), es) -> loopOutputShapes spec |> Map.find channel
         | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
+
+    /// Returns the shapes of the outputs of the loop channels.
+    and internal loopOutputShapes (spec: LoopSpecT) =
+        spec.Channels
+        |> Map.map (fun ch lv ->
+            shapeOf lv.Expr |> ShapeSpec.insertAxis lv.SliceDim spec.Length)
 
     /// number of elements of given expression
     let nElems expr =
@@ -457,6 +552,19 @@ module Expr =
     /// Wraps the given op in a Broadcast op if its shape does not match ss.
     let broadcastIfNecessary ss expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
+
+    /// extract all variables from an expression
+    let rec extractVars expr =
+        match expr with
+        | Leaf (Var vs) -> Set.singleton vs
+        | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
+        | Binary (IfThenElse cond, a, b) -> 
+            Set.unionMany [extractVars cond; extractVars a; extractVars b]
+
+        | Leaf _ -> Set.empty
+        | Unary (_, a) -> extractVars a
+        | Binary (_, a, b) -> Set.union (extractVars a) (extractVars b)
+        | Nary (_, es) -> Set.unionMany (es |> List.map extractVars)
 
     type ExprT with
         /// symbolic shape
@@ -485,21 +593,18 @@ module Expr =
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT) =
         if not (checkedExprs.LockedContains expr) then
-            let mutable shapesBeingChecked = []
-            let mutable opBeingChecked = fun () -> ""
-            let (.=) (ssa: SizeSpecT) (ssb: SizeSpecT) =
-                if not (ssa .= ssb) then 
-                    failwithf "%s is incompatiables with shapes %A" 
-                        (opBeingChecked()) shapesBeingChecked
-            let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
-                List.iter2 (.=) sa sb
-            let reqBool a =
-                if typename a <> TypeName.ofType<bool> then
-                    failwithf "%s requires data type bool but got %A" 
-                        (opBeingChecked()) (typename a).Type
 
             if typename expr = TypeName.ofType<obj> then
                 failwith "Expression type cannot be object."
+
+            let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
+                if sa.Length = sb.Length then List.forall2 (.=) sa sb
+                else false
+            let (..<>) sa sb = not (sa ..= sb)
+            let reqBool op a =
+                if typename a <> TypeName.ofType<bool> then
+                    failwithf "logical operation %A requires data type bool but got %A" 
+                        op (typename a).Type
 
             match expr with 
             | Leaf op -> ()           
@@ -508,15 +613,14 @@ module Expr =
                 checkExpr a
                 let sa = shapeOf a
                 let nda = ShapeSpec.nDim sa
-                shapesBeingChecked <- [sa]
-                opBeingChecked <- fun () -> sprintf "%A" op
 
                 match op with
-                | Not -> reqBool a
+                | Not -> reqBool op a
                 | SumAxis(ax) when not (0 <= ax && ax < nda) ->
                     failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
-                    (ShapeSpec.nElem sa) .= (ShapeSpec.nElem ss) 
+                    if ShapeSpec.nElem sa .<> ShapeSpec.nElem ss then
+                        failwithf "reshape cannot change number of elements while reshaping from %A to %A" sa ss
                 | DoBroadcast(ss) -> 
                     if ShapeSpec.nDim ss <> nda then
                         failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
@@ -524,21 +628,26 @@ module Expr =
                     for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                         match sa.[dim], ss.[dim] with
                         | SizeSpecT.Broadcast, _ -> ()
-                        | ssa, ssb -> ssa .= ssb
+                        | ssa, ssb when ssa .<> ssb -> 
+                            failwithf "cannot broadcast from %A to %A because non-broadcast dimensions must not change" sa ss
+                        | _ -> ()
                 | PermuteAxes perm -> 
                     if nda <> List.length perm then
                         failwithf "permutation %A must have same rank as shape %A" perm sa
                     if not (Permutation.is perm) then
                         failwithf "%A is not a valid permutation of an %d-dimensional tensor" perm nda
                 | StoreToVar vs ->
-                    sa ..= (VarSpec.shape vs)
+                    if sa ..<> vs.Shape then
+                        failwithf "cannot store expression of shape %A into variable of shape %A" 
+                            sa vs.Shape
                 | Diag(ax1, ax2) ->
                     if not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 < nda) then
                         failwithf "cannot extract diagonal from non-existant axis %d or %d of array with shape %A" 
                             ax1 ax2 sa
                     if not (ax1 < ax2) then 
                         failwith "first axis for extracting diagonal must come before second axis"
-                    sa.[ax1] .= sa.[ax2]
+                    if sa.[ax1] .<> sa.[ax2] then
+                        failwithf "cannot extract diagonal along axes %d and %d from non-square matrix %A" ax1 ax2 sa
                 | DiagMat(ax1, ax2) ->
                     if not (0 <= ax1 && ax1 < nda && 0 <= ax2 && ax2 <= nda) then
                         failwithf "cannot build diagonal over non-existant axis %d or %d of array with shape %A" 
@@ -548,7 +657,8 @@ module Expr =
                 | Invert ->
                     if nda < 2 then
                         failwithf "need at least a matrix to invert but got shape %A" sa
-                    sa.[nda-2] .= sa.[nda-1]
+                    if sa.[nda-2] .<> sa.[nda-1] then
+                        failwithf "cannot invert non-square matrix %A along last two axes" sa 
                 | AssumeJacobian jac ->
                     checkExpr jac
                     if typename jac <> typename expr then
@@ -559,6 +669,10 @@ module Expr =
                     if (shapeOf jac).[1] <> nElems expr then
                         failwithf "Jacobian shape %A must have %A elements in second dimension" 
                             (shapeOf jac) (nElems expr)
+                | ReverseAxis ax when not (0 <= ax && ax < nda) ->
+                    failwithf "cannot reverse non-existant axis %d of array with shape %A" ax sa
+                | Held ([], ReplicateTo (dim, s)) -> 
+                    a |> checkAxis dim
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -566,33 +680,36 @@ module Expr =
                 checkExpr b
                 let sa, sb = shapeOf a, shapeOf b
                 let nda, ndb = ShapeSpec.nDim sa, ShapeSpec.nDim sb
-                shapesBeingChecked <- [sa; sb]
-                opBeingChecked <- fun () -> sprintf "%A" op
 
                 let ta, tb = typename a, typename b
                 if ta <> tb then
-                    failwithf "cannot apply binary operation %s to expressions of \
-                               different types %A and %A" (opBeingChecked()) ta.Type tb.Type
+                    failwithf "cannot apply binary operation %A to expressions of \
+                               different types %A and %A" op ta.Type tb.Type
 
                 match op with
                 | And
                 | Or ->
-                    reqBool a
-                    reqBool b
+                    reqBool op a
+                    reqBool op b
                 | IfThenElse c ->
                     checkExpr c
                     if c.Type <> typeof<bool> then
                         failwith "condition of IfThenElse must be expression of type bool"
-                    c.Shape ..= sa 
-                    sa ..= sb
+                    if c.Shape ..<> sa || sa ..<> sb then
+                        failwithf "shape of condition %A and both argument shapes %A and %A must be equal"
+                            c.Shape sa sb                    
                 | BinaryElemwiseOp ->
-                    sa ..= sb 
+                    if sa ..<> sb then
+                        failwithf "cannot apply element-wise operation %A to unequal shapes %A and %A" op sa sb
                 | Dot -> 
                     match nda, ndb with
-                    | 2, 2 -> sa.[1] .= sb.[0] 
+                    | 2, 2 -> 
+                        if sa.[1] .<> sb.[0] then
+                            failwithf "incompatible shapes for dot product: %A and %A" sa sb
                     | na, nb when na = nb -> 
-                        sa.[na-1] .= sb.[nb-2]
-                        for n = 0 to na - 3 do sa.[n] .= sb.[n]
+                        if sa.[na-1] .<> sb.[nb-2] || 
+                                [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
+                            failwithf "incompatible shapes for batched dot product: %A and %A" sa sb
                     | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
                 | TensorProduct when nda <> ndb ->
                     failwithf "cannot compute tensor product between arrays of shapes %A and %A" sa sb
@@ -601,12 +718,13 @@ module Expr =
             | Nary (op, es) ->
                 es |> List.iter checkExpr
                 let ss = es |> List.map shapeOf
-                shapesBeingChecked <- ss
-                opBeingChecked <- fun () -> sprintf "%A" op
 
                 if es |> List.exists (fun e -> typename e <> typename es.Head) then
-                    failwithf "cannot apply n-ary operation %s to expressions of different types %A"
-                        (opBeingChecked()) (es |> List.map (typename >> TypeName.getType))
+                    failwithf "cannot apply n-ary operation %A to expressions of different types %A"
+                        op (es |> List.map (typename >> TypeName.getType))
+                let checkArg idx =
+                    if not (0 <= idx && idx < es.Length) then
+                        failwithf "the zero-based index %d does not exist for %d specified arguments" idx es.Length
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> 
@@ -625,12 +743,66 @@ module Expr =
                         failwith "MinArg of interpolator must be smaller than MaxArg"
                     if ip.Resolution |> List.exists ((>) 0.0) then
                         failwith "Resolution of interpolator must be positive"
-                    match ip.Derivative with
-                    | Some d when d.NDims <> nDims ->
-                        failwith "Dimensionality of derivative interpolator must match dimensionality of interpolator"
-                    | _ -> ()
                     for s in ss do 
-                        s ..= ss.Head
+                        if s ..<> ss.Head then
+                            failwithf "all arguments to interpolator must have equal shape but got: %A" ss
+                | Channel (Loop spec, channel) ->
+                    // check that the referenced loop channel exists
+                    if not (spec.Channels |> Map.containsKey channel) then
+                        failwithf "specified loop channel %A does not exist" channel
+                    // check that all variables are defined
+                    let usedVars =
+                        Map.toSeq spec.Channels
+                        |> Seq.map (fun (_, lv) -> extractVars lv.Expr)
+                        |> Set.unionMany
+                    let specifiedVars = 
+                        Map.toSeq spec.Vars
+                        |> Seq.map (fun (var, _) -> var)
+                        |> Set.ofSeq
+                    if not (Set.isEmpty (usedVars - specifiedVars)) then
+                        failwithf "the variables %A were used in the loop but not defined"
+                            (usedVars - specifiedVars)
+                    // check that shapes of loop variables are correct and referenced arguments exist
+                    for KeyValue(vs, li) in spec.Vars do
+                        match li with
+                        | ConstArg idx -> 
+                            checkArg idx
+                            if es.[idx].TypeName <> vs.TypeName then
+                                failwithf "constant argument variable %A was given argument of type %A" vs es.[idx].Type
+                            if vs.Shape ..<> ss.[idx] then
+                                failwithf "constant argument variable %A was given argument of shape %A" vs ss.[idx]
+                        | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
+                            checkArg idx
+                            if es.[idx].TypeName <> vs.TypeName then
+                                failwithf "sequence argument variable %A was given argument of type %A" vs es.[idx].Type
+                            let reqShp = vs.Shape |> ShapeSpec.insertAxis dim spec.Length
+                            if reqShp ..<> ss.[idx] then
+                                failwithf "sequence argument variable %A requires argument shape %A but was given %A" vs reqShp ss.[idx]
+                        | PreviousChannel {Channel=prvCh; Delay=delay; InitialArg=ivIdx} ->
+                            // check previous channel
+                            match spec.Channels |> Map.tryFind prvCh with
+                            | Some chVal -> 
+                                if vs.TypeName <> chVal.Expr.TypeName then
+                                    failwithf "previous channel variable %A was given channel of type %A" vs chVal.Expr.Type
+                                if chVal.Expr.Shape ..<> vs.Shape then
+                                    failwithf "previous channel variable %A was given channel of shape %A" vs chVal.Expr.Shape                                
+                            | None -> 
+                                failwithf "previous channel %A for variable %A does not exist" prvCh vs
+                            
+                            // check initial value arg
+                            checkArg ivIdx
+                            if es.[ivIdx].TypeName <> vs.TypeName then
+                                failwithf "previous channel variable %A was given initial value of type %A" vs es.[ivIdx].Type
+                            let sliceDim = spec.Channels.[prvCh].SliceDim
+                            let reqShp = vs.Shape |> ShapeSpec.insertAxis sliceDim delay
+                            if reqShp ..<> ss.[ivIdx] then
+                                failwithf "previous channel variable %A needs initial value of shape %A but was given %A" vs reqShp ss.[ivIdx]                                
+                        | IterationIndex 
+                        | IterationsRemaining -> 
+                            if vs.TypeName <> TypeName.ofType<int> then
+                                failwithf "iteration index variable %A must be of type int" vs
+                            if vs.Shape ..<> [] then
+                                failwithf "iteration index variable %A must be scalar" vs
                 | ExtensionOp eop -> eop.CheckArgs ss
                 | _ -> ()
 
@@ -653,6 +825,11 @@ module Expr =
         | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
         | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
         | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
+        | Unary (Held (derivsShp, heldOp), a) ->
+            let substOp =
+                match heldOp with
+                | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
+            Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
         | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
@@ -662,10 +839,28 @@ module Expr =
 
         | Nary (Elements (trgtShp, elemExpr), es) -> 
             Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
+        | Nary (Channel (Loop spec, channel), es) ->
+            let substSpec = {
+                Length = sSize spec.Length
+                Vars = spec.Vars
+                       |> Map.toSeq
+                       |> Seq.map (fun (vs, li) ->
+                           let vs = {vs with Shape = sShp vs.Shape}
+                           let li = match li with
+                                    | PreviousChannel pc -> 
+                                        PreviousChannel {pc with Delay = sSize pc.Delay}
+                                    | _ -> li
+                           vs, li)
+                       |> Map.ofSeq
+                Channels = spec.Channels
+                           |> Map.map (fun ch lv -> {lv with Expr = sSub lv.Expr})
+            }
+            Nary (Channel (Loop substSpec, channel), es |> List.map sSub)
         | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
         | Nary (op, es) -> Nary (op, List.map sSub es)
 
 
+    /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
         let subTest = testEvalAllSymSizes failIfNot
         let evalable =
@@ -679,6 +874,11 @@ module Expr =
             | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && subTest a
             | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && subTest a
             | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && subTest a
+            | Unary (Held (derivsShp, heldOp), a) ->
+                let canEvalOp =
+                    match heldOp with 
+                    | ReplicateTo (dim, s) -> SizeSpec.canEval s
+                List.forall ShapeSpec.canEval derivsShp && canEvalOp && subTest a
             | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
             | Unary (op, a) -> subTest a
 
@@ -692,6 +892,16 @@ module Expr =
                 ShapeSpec.canEval trgtShp && 
                 ElemExpr.canEvalAllSymSizes elemExpr && 
                 List.forall subTest es
+            | Nary (Channel (Loop spec, channel), es) ->
+                (SizeSpec.canEval spec.Length) 
+                &&
+                (spec.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
+                    ShapeSpec.canEval vs.Shape &&
+                    match li with
+                    | PreviousChannel pc -> SizeSpec.canEval pc.Delay
+                    | _ -> true)) 
+                &&
+                (spec.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> subTest lv.Expr))                
             | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall subTest es
             | Nary (op, es) -> List.forall subTest es
         if failIfNot && not evalable then
@@ -713,6 +923,7 @@ module Expr =
         expr
 
     /// Replaces all occurences of "part" in "expr" with "replacement".
+    /// Does not replace subexpressions within loop channel value expressions.
     let subst part replacement expr =
         // TODO: currently does not substitues into Subtensor and SetSubtensor dyanmic range expression.
         let rec doSubst part replacement expr =       
@@ -973,6 +1184,12 @@ module Expr =
         |> broadcast (a.Shape |> ShapeSpec.insertAxis dim reps)
         |> reshape (a.Shape |> List.set dim (reps * a.Shape.[dim]))
 
+    /// Replicates the tensor along the given axis, so that after replication it has
+    /// the specified `size`. If `size` is not a multiple of the current size of the
+    /// tensor along the specified axis, the last replication is truncated appropriately.
+    let replicateTo dim size a =
+        Unary (Held ([], ReplicateTo (dim, size)), a) |> check
+
     /// summaiton of all elements
     let sum a = Unary(Sum, a) |> check
 
@@ -1016,6 +1233,10 @@ module Expr =
     let zeros<'T> (shp: ShapeSpecT) =
         filled shp (conv<'T> 0)
 
+    /// zero tensor of given type and shape
+    let zerosOfType typ shp =
+        filled shp (convTo typ 0)
+
     /// zero tensor of given shape and same type as given expression
     let zerosOfSameType expr shp =
         let zero = System.Convert.ChangeType (box 0, (typename expr).Type)
@@ -1029,6 +1250,10 @@ module Expr =
     [<RequiresExplicitTypeArguments>]
     let var<'T> name (ss: ShapeSpecT) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> check
+
+    /// variable of given name, type and shape
+    let varOfType name typ (ss: ShapeSpecT) = 
+        Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> check
 
     /// annotated expression
     let annotate ano a = 
@@ -1101,19 +1326,6 @@ module Expr =
         /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
         static member (.*) (a: ExprT, b: ExprT) = dot a b
         static member (%*) (a: ExprT, b: ExprT) = tensorProduct a b
-
-    /// extract all variables from an expression
-    let rec extractVars expr =
-        match expr with
-        | Leaf (Var vs) -> Set.singleton vs
-        | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
-        | Binary (IfThenElse cond, a, b) -> 
-            Set.unionMany [extractVars cond; extractVars a; extractVars b]
-
-        | Leaf _ -> Set.empty
-        | Unary (_, a) -> extractVars a
-        | Binary (_, a, b) -> Set.union (extractVars a) (extractVars b)
-        | Nary (_, es) -> Set.unionMany (es |> List.map extractVars)
 
     /// extract VarSpec from variable expression
     let extractVar expr = 
@@ -1193,8 +1405,8 @@ module Expr =
                 match rngs, shps with
                 | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape
                 | RSDynElem e :: rngs, _::shps -> splitFRS rngs shps (SRSDynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
-                | RSSymStartSymEnd (so, fo) :: rngs, shp::shps -> 
-                    let size = (fo |? shp) - (so |? SizeSpec.zero) + 1
+                | RSSymStartSymEnd (so, fo) :: rngs, size::shps -> 
+                    let size = (fo |? (size-1)) - (so |? SizeSpec.zero) + 1
                     splitFRS rngs shps (SRSSymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
                 | RSDynStartSymSize (s, size) :: rngs, _::shps ->
                     splitFRS rngs shps (SRSDynStartSymSize (s, size)::simpleRs) (size::newShape)
@@ -1326,6 +1538,49 @@ module Expr =
     let interpolate3D interpolator a b c =
         interpolate interpolator [a; b; c]
    
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    let loop spec channel inputs =
+        Nary (Channel (Loop spec, channel), inputs) |> check
+
+    /// reverses the tensor in the given dimension 
+    let reverseAxis dim (a: ExprT) : ExprT =
+        Unary (ReverseAxis dim, a) |> check
+
+    /// concatenates the sequence of tensors in the specified dimension
+    let concat dim (es: ExprT seq) =
+        // check that arguments are correctly sized
+        let es = List.ofSeq es
+        let shps = es |> List.map shapeOf
+        match es with
+        | [] -> failwithf "need at least one tensor to concatenate"
+        | h :: ts ->
+            if not (0 <= dim && dim < h.NDims) then
+                failwithf "cannot concatenate over non-existant dimension %d given shapes %A" dim shps
+            for t in ts do
+                if t.Type <> h.Type then
+                    failwithf "all arguments must have same type but got types %A" (es |> List.map (fun e -> e.Type))
+                if t.NDims <> h.NDims then
+                    failwithf "all arguments must have same number of dimensions but shapes %A were specifed" shps                        
+                for i, (sa, sb) in List.indexed (List.zip h.Shape t.Shape) do
+                    if i <> dim && sa .<> sb then
+                        failwithf "all arguments must have same shape expect in concatenation dimension %d but \
+                                   shapes %A were specified" dim shps
+                    
+        // calculate shape of concatenation
+        let totalElems = es |> Seq.sumBy (fun e -> e.Shape.[dim])
+        let shp = es.Head.Shape |> ShapeSpec.set dim totalElems
+
+        // build concatenation using iterative subtensor replacement
+        let concatenated, _ =
+            ((zerosOfSameType es.Head shp, SizeSpec.zero), es)
+            ||> List.fold (fun (concatSoFar, pos) e ->
+                let len = e.Shape.[dim]
+                let slice : FullExprRngsSpecT = 
+                    List.replicate e.NDims RSAll
+                    |> List.set dim (RSSymStartSymEnd (Some pos, Some (pos + len - 1)))
+                setSubtensor concatSoFar.[slice] e, pos + len)
+        concatenated
+
 
 
 [<AutoOpen>]
@@ -1337,6 +1592,14 @@ module ExprTypes =
     type NaryOpT = Expr.NaryOpT
     type IOp = Expr.IOp
     type ExprT = Expr.ExprT
+    type MultiChannelOpT = Expr.MultiChannelOpT
+    type ChannelT = Expr.ChannelT
+    type UnaryHeldOpT = Expr.UnaryHeldOpT
+    type SequenceArgSliceT = Expr.SequenceArgSliceT
+    type PreviousChannelT = Expr.PreviousChannelT
+    type LoopInputT = Expr.LoopInputT
+    type LoopValueT = Expr.LoopValueT
+    type LoopSpecT = Expr.LoopSpecT
 
     
 

@@ -26,6 +26,7 @@ type GenerateArgs =
 
 type TrainArgs =
     | [<MainCommand; ExactlyOnce; Last; Mandatory>] CfgFile of filename:string
+    | Restart
     with
     interface IArgParserTemplate with member s.Usage = "self-explaining"
 
@@ -80,7 +81,7 @@ module Program =
     let mutable NInput = notLoading
     let mutable NOutput = notLoading
 
-    let buildModel cfgPath =
+    let buildModel restart cfgPath =
 
         let mb = ModelBuilder<single> "FracSigmoid"
         let nBatch  = mb.Size "nBatch"
@@ -114,13 +115,28 @@ module Program =
                     NeuralLayer.pred pars value
                 | TableLayer hp ->
                     let name = sprintf "TableLayer%d" layerIdx
+                    printfn "Creating %s with %A" name hp
                     let pars = TableLayer.pars (mb.Module name) hp
                     tblLayers <- tblLayers |> Map.add name pars
                     TableLayer.pred pars value
                 )
 
         // build loss
-        let loss = LossLayer.loss cfg.Model.Loss pred target
+        let predLoss = LossLayer.loss cfg.Model.Loss pred target
+
+        // prevent n from leaving range
+        let fracLoss =
+            tblLayers
+            |> Map.toSeq
+            |> Seq.map (fun (name, pars) ->
+                let over = Expr.maxElemwise (Expr.scalar 0.0f) (abs pars.Frac - 1.01f)                
+                let under = Expr.maxElemwise (Expr.scalar 0.0f) (0.10f - abs pars.Frac)
+                Expr.sum over + Expr.sum under
+            )
+            |> Seq.fold (+) (Expr.scalar 0.0f)
+
+        let fracLoss = 1000.0f * fracLoss
+        let prmLoss = predLoss + fracLoss
 
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 
@@ -136,9 +152,9 @@ module Program =
         let trainable =
             match cfg.Optimizer with
             | GradientDescent cfg -> 
-                Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New cfg
+                Train.trainableFromLossExprs mi [prmLoss; predLoss; fracLoss] smplVarEnv GradientDescent.New cfg
             | Adam cfg ->
-                Train.trainableFromLossExpr mi loss smplVarEnv Adam.New cfg
+                Train.trainableFromLossExprs mi [prmLoss; predLoss; fracLoss] smplVarEnv Adam.New cfg
 
         let lossRecordFn (state: TrainingLog.Entry) =
             if cfg.SaveParsDuringTraining then
@@ -146,7 +162,7 @@ module Program =
                 mi.SavePars filename
             
         // build training function
-        let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
+        let trainCfg = {cfg.Training with LossRecordFunc=lossRecordFn; DiscardCheckpoint=restart}        
         let trainFn () = 
             Train.train trainable dataset trainCfg
 
@@ -163,27 +179,31 @@ module Program =
 
         match results.GetSubCommand () with
         | Generate args ->
-            let info = {
-                NMin     = args.GetResult <@ NMin @>
-                NMax     = args.GetResult <@ NMax @>
-                NPoints  = args.GetResult <@ NPoints @>
-                XMin     = args.GetResult <@ XMin @>
-                XMax     = args.GetResult <@ XMax @>
-                XPoints  = args.GetResult <@ XPoints @>
-            }         
-            printfn "Building FracExp interpolation table for\n%A" info
-            let tbl = FracSigmoidTable.generate info
-
-            // save the table
-            let path = (args.GetResult <@ Filename @>)
-            use hdf = HDF5.OpenWrite path
-            tbl |> FracSigmoidTable.save hdf "FracSigmoid"
-            printfn "Saved to %s" (Path.GetFullPath path)
+            ()
+//            let info = {
+//                NMin     = args.GetResult <@ NMin @>
+//                NMax     = args.GetResult <@ NMax @>
+//                NPoints  = args.GetResult <@ NPoints @>
+//                XMin     = args.GetResult <@ XMin @>
+//                XMax     = args.GetResult <@ XMax @>
+//                XPoints  = args.GetResult <@ XPoints @>
+//                Function = FracSigmoid
+//            }         
+//            printfn "Building FracExp interpolation table for\n%A" info
+//            let tbl = FracSigmoidTable.generate info
+//
+//            // save the table
+//            let path = (args.GetResult <@ Filename @>)
+//            use hdf = HDF5.OpenWrite path
+//            tbl |> FracSigmoidTable.save hdf "FracSigmoid"
+//            printfn "Saved to %s" (Path.GetFullPath path)
 
         | Train args ->
             let cfgFile = args.GetResult <@ CfgFile @>
-            let mi, predFn, trainFn = buildModel cfgFile
+            let restart = args.Contains <@ Restart @>
+            let mi, predFn, trainFn = buildModel restart cfgFile
             let tr = trainFn ()
-            printfn "%A" tr.Best
+            printfn "%A" tr.Best 
+            printfn "Used config was %s" cfgFile
 
         0

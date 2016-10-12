@@ -69,6 +69,7 @@
     <Compile Include="DerivTests.fs" />
     <Compile Include="ElemExprTests.fs" />
     <Compile Include="GPMonotonicity.fs" />
+    <Compile Include="LoopTests.fs" />
     <Content Include="App.config" />
     <None Include="TestData\NPZ1.npz">
       <Link>NPZ1.npz</Link>

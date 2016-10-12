@@ -57,6 +57,7 @@ module TypeName =
 module ConstSpecTypes =
 
     /// scalar constant value
+    [<StructuralEquality; StructuralComparison>]
     type ConstSpecT = 
         | ConstInt of int
         | ConstDouble of double
@@ -122,16 +123,22 @@ module ConstSpec =
 module VarSpecTypes =
 
     /// variable specification: has a name, type and shape specificaiton
-    [<StructuredFormatDisplay("\"{Name}\" {Shape}")>]
+    [<StructuredFormatDisplay("{Pretty}")>]
     type VarSpecT = {
         Name:      string
         Shape:     ShapeSpecT
         TypeName:  TypeNameT
-    }
+    } with
+        member this.Type = TypeName.getType this.TypeName
+        member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
+        member this.NShape = this.Shape |> ShapeSpec.eval
         
 
 /// variable specification
 module VarSpec =
+
+    let create name typ shape : VarSpecT =
+        {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
 
     /// create variable specifation by name and shape and type
     let inline ofNameShapeAndTypeName name shape typeName : VarSpecT =

@@ -34,6 +34,9 @@ module ArrayNDTypes =
     /// ArrayND of any type
     type IArrayNDT =
         abstract Layout:            ArrayNDLayoutT
+        abstract Shape:             int list
+        abstract NDims:             int
+        abstract NElems:            int
         abstract CPPType:           string
         abstract NewView:           ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
@@ -61,10 +64,15 @@ module ArrayNDTypes =
 
 module ArrayND =
 
+    /// true if warning about fallback copy was shown
+    let mutable internal SlowCopyWarningShown = false
+
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
     [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
+        do ArrayNDLayout.check layout
+
         /// layout
         member this.Layout = layout
 
@@ -138,7 +146,10 @@ module ArrayND =
         abstract CopyTo : ArrayNDT<'T> -> unit
         default this.CopyTo (dest: ArrayNDT<'T>) =
             // slow element-wise fallback copy
-//            printfn "Warning: fallback slow ArrayNDT.CopyTo is being used"
+            if not SlowCopyWarningShown then
+                printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
+                         (this message is only shown once)"
+                SlowCopyWarningShown <- true
             ArrayNDT<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
@@ -313,7 +324,10 @@ module ArrayND =
 
         interface IArrayNDT with
             member this.Layout = this.Layout
-            member this.CPPType = this.CPPType         
+            member this.CPPType = this.CPPType   
+            member this.Shape = this.Shape
+            member this.NDims = this.NDims
+            member this.NElems = this.NElems      
             member this.NewView layout = this.NewView layout :> IArrayNDT    
             member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
             member this.NewOfType layout typ = 
@@ -428,10 +442,6 @@ module ArrayND =
     /// true if the memory of the ArrayND is a contiguous block
     let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
 
-    /// true if a and b have at least one element in common
-    let inline overlapping a b = 
-        false // TODO
-
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
     let inline newCOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newC shp) :?> 'A
@@ -441,7 +451,7 @@ module ArrayND =
         a.NewOfType (ArrayNDLayout.newC shp) 
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newFOfSameType shp (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+    let inline newFOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
         a.NewOfSameType (ArrayNDLayout.newF shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
@@ -449,7 +459,7 @@ module ArrayND =
         a.NewOfType (ArrayNDLayout.newF shp) 
 
     /// creates a new ArrayND with existing data but new layout
-    let inline relayout newLayout (a: 'A when 'A :> ArrayNDT<'T>)  =
+    let inline relayout newLayout (a: 'A when 'A :> IArrayNDT)  =
         a.NewView newLayout :?> 'A
 
     /// checks that two ArrayNDs have the same shape
@@ -558,7 +568,11 @@ module ArrayND =
     /// Each entry in the specified permutation specifies the *new* position of 
     /// the corresponding axis, i.e. to which position the axis should move.
     let inline permuteAxes (permut: int list) a =
-        relayout (ArrayNDLayout.permuteAxes permut (layout a)) a
+        a |> relayout (layout a |> ArrayNDLayout.permuteAxes permut)
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        a |> relayout (layout a |> ArrayNDLayout.reverseAxis ax)        
 
     /// creates a view of an ArrayND
     let inline view ranges a =

@@ -19,24 +19,29 @@ let post device (x: ArrayNDT<'T>) =
     
 let compareTracesLock = obj ()
 
+let dumpTrace filename trace = 
+    let path = Path.GetFullPath filename
+    trace |> Trace.dumpToFile path
+    printfn "Dumped trace to %s" path
+
 let compareTraces func dump =
     printfn "Evaluating on CUDA device..."
     use traceHndl = Trace.startSession "CUDA"
     func DevCuda
     let cudaTrace = traceHndl.End()
-    if dump then
-        use tw = File.CreateText("CUDA.txt")
-        Trace.dump tw cudaTrace
+    if dump then cudaTrace |> dumpTrace "CUDA.txt"
 
     printfn "Evaluating on host..."
     use traceHndl = Trace.startSession "Host"
     func DevHost
     let hostTrace = traceHndl.End ()
-    if dump then
-        use tw = File.CreateText("Host.txt")
-        Trace.dump tw hostTrace
+    if dump then hostTrace |> dumpTrace "Host.txt"
 
-    Trace.compare hostTrace cudaTrace
+    let diffs = Trace.compare hostTrace cudaTrace
+    if diffs > 0 then
+        cudaTrace |> dumpTrace "UnequalCUDA.txt" 
+        hostTrace |> dumpTrace "UnequalHost.txt"
+    diffs
 
 let evalHostCuda func =
     printfn "Evaluating on host..."
@@ -72,6 +77,10 @@ let randomEval<'T, 'R> shps exprFn (dev: IDevice) =
     let fn = Func.make<'R> dev.DefaultFactory expr
     let varEnv = buildVarEnv<'T> vars shps rng dev
     fn varEnv |> ignore
+
+let requireEqualTraces evalFn =
+    compareTraces evalFn false
+    |> should equal 0
 
 let requireEqualTracesWithRandomData shps (exprFn: ExprT list -> ExprT) =
     compareTraces (randomEval<single, single> shps exprFn) false

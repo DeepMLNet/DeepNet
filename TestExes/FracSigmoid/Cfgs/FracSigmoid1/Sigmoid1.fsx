@@ -13,29 +13,15 @@ open ArrayNDNS
 
 let nHidden1 = SizeSpec.fix 30
 
-let info = {
-    NMin    = 0.0
-    NMax    = 1.1
-    NPoints = 1000
-    XMin    = -10.0
-    XMax    =  10.0
-    XPoints = 5000
-    Function = FracSigmoid
-    WithDeriv = false
-}
-
 
 let cfg = {
 
     Model = {Layers = [
-                       TableLayer
-                         {NInput        = Program.NInput()
-                          NOutput       = nHidden1
-                          NFrac         = SizeSpec.fix 4
-                          Info          = info
-                          FracTrainable = true
-                          FracInit      = 0.0f
-                          }
+                       NeuralLayer
+                         {NeuralLayer.defaultHyperPars with
+                           NInput        = Program.NInput()
+                           NOutput       = nHidden1
+                           TransferFunc  = NeuralLayer.Sigmoid}
                       
                        NeuralLayer
                          {NeuralLayer.defaultHyperPars with
@@ -43,8 +29,7 @@ let cfg = {
                            NOutput       = Program.NOutput()
                            TransferFunc  = NeuralLayer.Identity
                            WeightsTrainable = true
-                           BiasTrainable    = true
-                           }
+                           BiasTrainable    = true}
                       ]
              Loss   = LossLayer.MSE}
 
@@ -62,10 +47,7 @@ let cfg = {
                  //MinIters  = Some 10000
                  BestOn    = Training
                  BatchSize = System.Int32.MaxValue
-                 MaxIters  = None
-                 CheckpointDir = Some "."
-                 
-                 }
+                 MaxIters  = None}
 
     SaveParsDuringTraining = false
 }

@@ -37,12 +37,20 @@ module ArrayNDManikinTypes =
     /// Represents memory. 
     /// Memory can either be internal to this expression or external (passed in variable at runtime).
     /// Memory can either be on the host or the accelerator.
+    [<StructuredFormatDisplay("{Pretty}")>]
     type MemManikinT =
         | MemAlloc of MemAllocManikinT
         | MemExternal of VarSpecT
         | MemConst of MemConstManikinT
+        with 
+            member this.Pretty = 
+                match this with
+                | MemAlloc a -> sprintf "MemAlloc %d" a.Id
+                | MemExternal vs -> sprintf "MemExternal %A" vs
+                | MemConst c -> sprintf "MemConst %d" c.Id
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
+    [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
                           storage:          MemManikinT) = 
         inherit ArrayNDT<int> (layout)  // generic type does not matter since we do not store data
@@ -89,18 +97,26 @@ module ArrayNDManikinTypes =
         override this.Invert () = 
             failwith "ArrayNDManikin does not store data"
 
+        member this.Pretty = 
+            sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
+                storage layout.Shape layout.Stride
 
 module ArrayNDManikin =
     open ArrayND
 
-    /// creates a new MemoryManikinT and a new ArrayNDManikinT with contiguous layout
+    /// creates a new MemoryManikinT and a new ArrayNDManikinT with C-order
     let newC memAllocator typ shape = 
         let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
 
-    /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout
+    /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran-order
     let newF memAllocator typ shape = 
         let layout = ArrayNDLayout.newF shape
+        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+
+    /// creates a new MemoryManikinT and a new ArrayNDManikinT with specifed stride order
+    let newOrdered memAllocator typ shape strideOrder =
+        let layout = ArrayNDLayout.newOrdered shape strideOrder
         ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
 
     /// create a new MemoryManikinT and a new ArrayNDManikinT with layout suitable for being a BLAS target
@@ -126,6 +142,11 @@ module ArrayNDManikin =
     let externalC storage shape =
         let layout = ArrayNDLayout.newC shape
         ArrayNDManikinT (layout, storage) 
+
+    /// creates a new ArrayNDManikinT with specified strides and using the specified storage
+    let external storage shape stride =
+        let layout = {Shape=shape; Stride=stride; Offset=0}
+        ArrayNDManikinT (layout, storage)
 
     /// storage
     let storage (ary: ArrayNDManikinT) =
@@ -162,6 +183,9 @@ module ArrayNDManikin =
             | _ -> false
         else false
 
-            
+    /// true if a and b may overlap
+    let maybeOverlapping a b =    
+        storage a = storage b
+
 
         
