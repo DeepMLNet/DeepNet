@@ -114,7 +114,7 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (Expr.ExprT * ArrayNDT<'T>) seq) =
+    let ofSeq (entries: (ExprT * #IArrayNDT) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 

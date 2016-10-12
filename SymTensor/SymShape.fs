@@ -569,11 +569,21 @@ module ShapeSpec =
 
     let emptyVector : ShapeSpecT = [SizeSpec.zero]
 
+    /// pads shape by inserting broadcast dimension on the left
     let padLeft (sa: ShapeSpecT) : ShapeSpecT =
         (Broadcast)::sa
 
+    /// pads shape by inserting broadcast dimension on the right
     let padRight (sa: ShapeSpecT) : ShapeSpecT =
         sa @ [Broadcast]
+
+    /// pads shape from the left to specified number of dimensions
+    let padTo dims saIn =
+        let mutable sa = saIn
+        while nDim sa < dims do sa <- padLeft sa
+        if nDim sa <> dims then
+            failwithf "cannot pad higher-rank shape %A to %d dimensions" saIn dims
+        sa
 
     /// pads shapes from the left until they have same rank
     let rec padToSame sa sb =
@@ -595,6 +605,17 @@ module ShapeSpec =
         match sa.[dim] with
         | Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
+
+    let broadcastToShape (trgtShp: ShapeSpecT) (saIn: ShapeSpecT) : ShapeSpecT =
+        let mutable sa = saIn
+        if nDim sa <> nDim trgtShp then
+            failwithf "cannot broadcast shape %A to shape %A" saIn trgtShp
+        for d=0 to nDim trgtShp - 1 do
+            match sa.[d], trgtShp.[d] with
+            | al, bl when al = Broadcast -> sa <- broadcast sa d bl
+            | al, bl when al = bl -> ()
+            | _ -> failwithf "cannot broadcast shape %A to %A in dimension %d" sa trgtShp d
+        sa
 
     let broadcastToSameInDims dims mustEqual saIn sbIn =
         let mutable sa, sb = saIn, sbIn

@@ -70,6 +70,7 @@
     <Compile Include="Dump.fs" />
     <Compile Include="Trace.fs" />
     <Compile Include="Function.fs" />
+    <Compile Include="LoopEval.fs" />
     <Compile Include="HostEval.fs" />
     <Compile Include="ModelContext.fs" />
     <Compile Include="RecordParams.fs" />

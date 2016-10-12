@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -385,8 +386,6 @@ let ``Check finite on CUDA passing`` () =
     printfn "passing:"
     checkFiniteOpTest 1.0f 0.5f
 
-
-
 [<Fact>]
 let ``ReverseAxis on host`` () =
     let a = Expr.var<int> "a" [SizeSpec.fix 3; SizeSpec.fix 2]
@@ -401,3 +400,24 @@ let ``ReverseAxis on host`` () =
     printfn "rev 0 av=\n%A" rav0
     printfn "rev 1 av=\n%A" rav1
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Select 1`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+        let expr = a |> Expr.select [Some i0; Some i1]
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v i1v
+        printfn "a=\n%A" a
+        printfn "idxs=\n%A\n%A" i0v i1v
+        printfn "select idxs a=\n%A" sv
+    )
+    

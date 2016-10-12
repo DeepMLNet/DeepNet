@@ -248,32 +248,76 @@ module ArrayND =
             res
 
         abstract IndexedSetImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
-        default this.IndexedSetImpl indices src =
-            for trgtIdx in ArrayNDLayout.allIdx this.Layout do
+        default trgt.IndexedSetImpl indices src =
+            for trgtIdx in ArrayNDLayout.allIdx trgt.Layout do
                 let srcIdx = 
                     indices 
                     |> List.mapi (fun dim idx ->
                         match idx with
                         | Some di -> di.[trgtIdx]
                         | None -> trgtIdx.[dim])
-                this.[trgtIdx] <- src.[srcIdx]
+                trgt.[trgtIdx] <- src.[srcIdx]
      
+                       
         /// Sets the values of this array by selecting from the sources array according to the specified
         /// indices. If an index array is set to None then the target index is used as the source index.
-        member this.IndexedSet (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
-            if src.GetType() <> this.GetType() then
+        member trgt.IndexedSet (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+            if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
-                    (this.GetType()) (src.GetType())
+                    (trgt.GetType()) (src.GetType())
             match indices |> List.tryPick id with
             | Some ih ->
-                if ih.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
+                if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
                     failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
-                        (this.GetType()) (indices.GetType())
+                        (trgt.GetType()) (indices.GetType())
             | None -> ()
             if src.NDims <> indices.Length then
                 failwithf "must specify an index array for each dimension of src"
-            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape this.Shape))
-            this.IndexedSetImpl indices src
+            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
+            trgt.IndexedSetImpl indices src
+
+        abstract IndexedSumImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        default trgt.IndexedSumImpl indices src = 
+            let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
+            let addSingle a b = (a |> box |> unbox<single>) + (b |> box |> unbox<single>) |> box |> unbox<'T>
+            let addDouble a b = (a |> box |> unbox<double>) + (b |> box |> unbox<double>) |> box |> unbox<'T>
+            let addBool a b = ((a |> box |> unbox<bool>) || (b |> box |> unbox<bool>)) |> box |> unbox<'T>
+            let add =
+                match typeof<'T> with
+                | t when t=typeof<int> -> addInt
+                | t when t=typeof<single> -> addSingle
+                | t when t=typeof<double> -> addDouble
+                | t when t=typeof<bool> -> addBool
+                | t -> failwithf "unsupported type: %A" t
+            for srcIdx in ArrayNDLayout.allIdx src.Layout do
+                let trgtIdx =
+                    indices
+                    |> List.mapi (fun dim idx ->
+                        match idx with
+                        | Some di -> di.[srcIdx]
+                        | None -> srcIdx.[dim])
+                trgt.[trgtIdx] <- add trgt.[trgtIdx] src.[srcIdx]
+
+        /// Sets the values of this array by summing elements from the sources array into the elements
+        /// of this array specified by the indices.
+        /// If an index array is set to None then the target index is used as the source index.
+        member trgt.IndexedSum (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+            if src.GetType() <> trgt.GetType() then
+                failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
+                    (trgt.GetType()) (src.GetType())
+            match indices |> List.tryPick id with
+            | Some ih ->
+                if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
+                    failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
+                        (trgt.GetType()) (indices.GetType())
+                if ih.Shape <> src.Shape then
+                    failwithf "index arrays have shapes %A that do not match source shape %A"
+                        (indices |> List.map (Option.map (fun a -> a.Shape))) src.Shape
+            | None -> ()
+            if trgt.NDims <> indices.Length then
+                failwithf "must specify an index array for each dimension of the target"
+            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape src.Shape))
+            trgt.IndexedSumImpl indices src
 
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
@@ -682,6 +726,18 @@ module ArrayND =
         let trgtShp = bcSomeIndices.Head.Shape
         let trgt = newCOfSameType trgtShp src
         trgt.IndexedSet bcIndices src
+        trgt
+
+    /// Creates a new ArrayNDT of shape `trgtShp` by dispersing elements from `src` according to 
+    /// the specified `indices`.
+    /// `indices` must be a list of ArrayNDTs, one per dimension of `trgt` and of the same shape
+    /// (or broadcastable to) as `src`.
+    /// If None is specified instead of an array in an dimension, the source index will match the 
+    /// target index in that dimension.
+    let disperse indices trgtShp (src: #ArrayNDT<'T>) =
+        let bcIndices = indices |> List.map (Option.map (broadcastToShape src.Shape))
+        let trgt = newCOfSameType trgtShp src
+        trgt.IndexedSum bcIndices src
         trgt
 
 
