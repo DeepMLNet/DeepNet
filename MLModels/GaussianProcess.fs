@@ -56,10 +56,10 @@ module ExpectationPropagation =
         ///Update loop of the EP algorithm runs n iterations
         let optimize  n (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
             let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
-            let prevSigma = Expr.var<float> "prevSigma" (sigma.Shape)
-            let prevMu = Expr.var<float> "prevMu" (mu.Shape)
-            let prevCovSite = Expr.var<float> "prevCovSite" (covSite.Shape)
-            let prevMuSite = Expr.var<float> "prevMuSite" (muSite.Shape)
+            let prevSigma = Expr.var<single> "prevSigma" (sigma.Shape)
+            let prevMu = Expr.var<single> "prevMu" ([SizeSpec.fix 1;mu.Shape.[0]])
+            let prevCovSite = Expr.var<single> "prevCovSite" ([SizeSpec.fix 1;covSite.Shape.[0]])
+            let prevMuSite = Expr.var<single> "prevMuSite" ([SizeSpec.fix 1;muSite.Shape.[0]])
             let nIters = SizeSpec.fix n
             let delayCovSite = SizeSpec.fix 1
             let delayMuSite = SizeSpec.fix 2
@@ -69,21 +69,31 @@ module ExpectationPropagation =
             let chMuSite = "muSite"
             let chSigma = "sigma"
             let chMu = "mu"
+            let sigVar =  VarSpec.create "GP.GaussianProcess.SignalVariance" typeof<single> []
+            let ls =  VarSpec.create "GP.GaussianProcess.Lengthscale" typeof<single>[]
+            let x = VarSpec.create "GP.x" typeof<single>[SizeSpec.symbol "nTrnSmpls"]
+            let sigNs = VarSpec.create "GP.sigNs" typeof<single>[SizeSpec.symbol "nTrnSmpls"]
+
             let loopSpec = {
                 Expr.Length = nIters
                 Expr.Vars = Map [Expr.extractVar prevCovSite,  Expr.PreviousChannel {Channel=chCovSite; Delay=delayCovSite; InitialArg=0}
                                  Expr.extractVar prevMuSite,  Expr.PreviousChannel {Channel=chMuSite; Delay=delayMuSite; InitialArg=1}
                                  Expr.extractVar prevSigma, Expr.PreviousChannel {Channel=chSigma; Delay=delaySigma; InitialArg=2}
-                                 Expr.extractVar prevMu, Expr.PreviousChannel {Channel=chMu; Delay=delayMu; InitialArg=3}]
-                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=0}
+                                 Expr.extractVar prevMu, Expr.PreviousChannel {Channel=chMu; Delay=delayMu; InitialArg=3}
+                                 sigVar, Expr.ConstArg 4
+                                 ls, Expr.ConstArg 5
+                                 x, Expr.ConstArg 6
+                                 sigNs, Expr.ConstArg 7]
+                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=1}
                                      chMuSite, {LoopValueT.Expr=newMuSite; LoopValueT.SliceDim=0}
                                      chSigma, {LoopValueT.Expr=newSigma; LoopValueT.SliceDim=0}
                                      chMu, {LoopValueT.Expr=newMu; LoopValueT.SliceDim=0}]    
             }
-            let newCovSite = Expr.loop loopSpec chCovSite [covSite;muSite;sigma;mu]
-            let newMuSite = Expr.loop loopSpec chMuSite [covSite;muSite;sigma;mu]
-            let newSigma = Expr.loop loopSpec chSigma [covSite;muSite;sigma;mu]
-            let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu]
+            let covSite = Expr.reshape [SizeSpec.fix 1;covSite.Shape.[0]] covSite
+            let newCovSite = Expr.loop loopSpec chCovSite [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
+            let newMuSite = Expr.loop loopSpec chMuSite [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
+            let newSigma = Expr.loop loopSpec chSigma [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
+            let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
             newSigma,newMu,newCovSite,newMuSite
         optimize 5 (sigma,mu, covSite,muSite)
 
@@ -185,15 +195,22 @@ module GaussianProcess =
                 let xm = x
                 let kFf = k
                 let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
+                let kF'f = covMat xm x |> Deriv.compute |> Deriv.ofVar xm
                 let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
 
+
+                //TODO: covSite and muSite without EP algorithm
                 let _,_,covSite,muSite = ExpectationPropagation.monotonicityEP k vu
+                
+
+                
                 let xJoint = Expr.concat 0 [x;xm]
-                let kJoint = Expr.concat 1 [Expr.concat 0 [kFf;kFf'];Expr.concat 0 [kFf'.T;kF'f']]
+                let kJoint = Expr.concat 1 [Expr.concat 0 [kFf;kFf'];Expr.concat 0 [kF'f;kF'f']]
                 let muJoint = Expr.concat 0 [y;muSite]
                 let zeroMat = Expr.zerosLike kFf
-                let zeroMat' = Expr.zerosLike kFf'
-                let sigmaJoint =  Expr.concat 1 [Expr.concat 0 [zeroMat;zeroMat'];Expr.concat 0 [zeroMat'.T;(Expr.diagMat covSite)]]
+                let zeroMatFf' = Expr.zerosLike kFf'
+                let zeroMatF'f = Expr.zerosLike kF'f
+                let sigmaJoint =  Expr.concat 1 [Expr.concat 0 [zeroMat;zeroMatFf'];Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]]
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar
                 let meanXJoint = meanFct xJoint
