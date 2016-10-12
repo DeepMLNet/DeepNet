@@ -35,7 +35,9 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                          TransferFunc  = NeuralLayer.Identity
+                          WeightsTrainable = true
+                          BiasTrainable = true}
                       ]
              Loss   = LossLayer.MSE}
 

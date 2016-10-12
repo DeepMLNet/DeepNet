@@ -21,7 +21,7 @@ let cfg = {
                             NInput                = ConfigLoader.NInput()
                             NGPs                  = nHidden1
                             NTrnSmpls             = SizeSpec.fix 10
-                            MeanFunction          = (fun x -> Expr.zerosLike x)
+                            MeanFunction          = (fun x -> tanh x)
                             LengthscalesTrainable = true
                             TrnXTrainable         = true
                             TrnTTrainable         = true
@@ -38,7 +38,7 @@ let cfg = {
                             NInput                = nHidden1
                             NGPs                  = nHidden2
                             NTrnSmpls             = SizeSpec.fix 10
-                            MeanFunction          = (fun x -> Expr.zerosLike x)
+                            MeanFunction          = (fun x -> tanh x)
                             LengthscalesTrainable = true
                             TrnXTrainable         = true
                             TrnTTrainable         = true
@@ -54,7 +54,9 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden2
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                          TransferFunc  = NeuralLayer.Identity
+                          WeightsTrainable = true
+                          BiasTrainable = true}
                       ]
              Loss   = LossLayer.MSE}
 

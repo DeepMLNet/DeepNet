@@ -28,6 +28,7 @@ let cfg = {
                                              NGPs                  = nHidden1
                                              NTrnSmpls             = SizeSpec.fix 10
                                              LengthscalesTrainable = true
+                                             CutOutsideRange       = true
                                              TrnXTrainable         = true
                                              TrnTTrainable         = true
                                              TrnSigmaTrainable     = false
@@ -48,6 +49,7 @@ let cfg = {
                                              NTrnSmpls             = SizeSpec.fix 10
                                              LengthscalesTrainable = true
                                              TrnXTrainable         = true
+                                             CutOutsideRange       = true
                                              TrnTTrainable         = true
                                              TrnSigmaTrainable     = false
                                              LengthscalesInit      = Const 0.4f
@@ -58,7 +60,9 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden2
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                          TransferFunc  = NeuralLayer.Identity
+                          WeightsTrainable = true
+                          BiasTrainable = true}
                       ]
              Loss   = LossLayer.MSE}
 
@@ -72,11 +76,11 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 10000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
-    PlotGPsDuringTraining  = false
+    PlotGPsDuringTraining  = true
 }
 

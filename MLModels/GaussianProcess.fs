@@ -51,16 +51,38 @@ module ExpectationPropagation =
             sigma,mu,covSite,muSite
         let mSE (x:ExprT) (y:ExprT) = LossLayer.loss LossLayer.MSE x y
         ///TODO: implement optimiyation step
-        let optimize (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
+        let optimize  iters (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
             let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
-            let limit = 1e04f
-            let sigmaConverged = (mSE sigma newSigma) <<<< limit
-            let muConverged = (mSE mu newMu) <<<< limit
-            let covSiteConverged = (mSE newCovSite covSite) <<<< limit
-            let muSiteConverged = (mSE newMuSite muSite) <<<< limit
-            let cond = sigmaConverged &&&& muConverged &&&& covSiteConverged &&&& muSiteConverged
+            let prevSigma = Expr.var<float> "prevSigma" (sigma.Shape)
+            let prevMu = Expr.var<float> "prevMu" (mu.Shape)
+            let prevCovSite = Expr.var<float> "prevCovSite" (covSite.Shape)
+            let prevMuSite = Expr.var<float> "prevMuSite" (muSite.Shape)
+            let nIters = SizeSpec.fix iters
+            let delayCovSite = SizeSpec.fix 1
+            let delayMuSite = SizeSpec.fix 2
+            let delaySigma = SizeSpec.fix 3
+            let delayMu = SizeSpec.fix 4
+            let chCovSite = "covSite"
+            let chMuSite = "muSite"
+            let chSigma = "sigma"
+            let chMu = "mu"
+            let loopSpec = {
+                Expr.Length = nIters
+                Expr.Vars = Map [Expr.extractVar prevCovSite,  Expr.PreviousChannel {Channel=chCovSite; Delay=delayCovSite; InitialArg=0}
+                                 Expr.extractVar prevMuSite,  Expr.PreviousChannel {Channel=chMuSite; Delay=delayMuSite; InitialArg=1}
+                                 Expr.extractVar prevSigma, Expr.PreviousChannel {Channel=chSigma; Delay=delaySigma; InitialArg=2}
+                                 Expr.extractVar prevMu, Expr.PreviousChannel {Channel=chMu; Delay=delayMu; InitialArg=3}]
+                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=0}
+                                     chMuSite, {LoopValueT.Expr=newMuSite; LoopValueT.SliceDim=0}
+                                     chSigma, {LoopValueT.Expr=newSigma; LoopValueT.SliceDim=0}
+                                     chMu, {LoopValueT.Expr=newMu; LoopValueT.SliceDim=0}]    
+            }
+            let newCovSite = Expr.loop loopSpec chCovSite [covSite;muSite;sigma;mu]
+            let newMuSite = Expr.loop loopSpec chMuSite [covSite;muSite;sigma;mu]
+            let newSigma = Expr.loop loopSpec chSigma [covSite;muSite;sigma;mu]
+            let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu]
             newSigma,newMu,newCovSite,newMuSite
-        optimize (sigma,mu, muSite,covSite)
+        optimize 5 (sigma,mu, covSite,muSite)
 module GaussianProcess =
     
     /// Kernek
@@ -136,19 +158,15 @@ module GaussianProcess =
             | LinPars _ -> linearCovariance z z'
             | SEPars parsSE  -> squaredExpCovariance (parsSE.Lengthscale,parsSE.SignalVariance) z z'
         let k           = (covMat x x) + Expr.diagMat sigmaNs
-        let kInv        = Expr.invert k
-        let kStar      = covMat x xStar
-        let kStarT     = Expr.transpose kStar
         let kStarstar  = covMat xStar xStar
         
-        let meanFkt,monotonicity,cut = 
+        let meanFct,monotonicity,cut = 
             match pars with
             | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity, parsLin.HyperPars.CutOutsideRange
             | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity,  parsSE.HyperPars.CutOutsideRange
         
-        let meanX = meanFkt x
-        let meanXStar = meanFkt xStar
-        //TODO: integrate mean function, different ways of placing virtual derivative points
+        let meanX = meanFct x
+        let meanXStar = meanFct xStar
         let mean,cov = 
             match monotonicity with
             | Some vu ->
@@ -158,14 +176,25 @@ module GaussianProcess =
                 let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
                 let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
 
-                let _,_,covSite,sigmaSite = ExpectationPropagation.ePResults k vu
-                let mean = meanXStar + kStarT .* kInv .* (y - meanX)
-                let cov = kStarstar - kStarT .* kInv .* kStar
+                let _,_,covSite,muSite = ExpectationPropagation.ePResults k vu
+                let xJoint = Expr.concat 0 [x;xm]
+                let kJoint = Expr.concat 1 [Expr.concat 0 [kFf;kFf'];Expr.concat 0 [kFf'.T;kF'f']]
+                let muJoint = Expr.concat 0 [y;muSite]
+                let zeroMat = Expr.zerosLike kFf
+                let zeroMat' = Expr.zerosLike kFf'
+                let sigmaJoint =  Expr.concat 1 [Expr.concat 0 [zeroMat;zeroMat'];Expr.concat 0 [zeroMat'.T;(Expr.diagMat covSite)]]
+                let kInv = Expr.invert (kJoint + sigmaJoint)
+                let kStar = covMat xJoint xStar
+                let meanXJoint = meanFct xJoint
+                let mean = meanXStar + kStar.T .* kInv .* (muJoint - meanXJoint)
+                let cov = kStarstar - kStar.T .* kInv .* kStar
             
                 mean,cov
             | None ->
-                let mean = meanXStar + kStarT .* kInv .* (y - meanX)
-                let cov = kStarstar - kStarT .* kInv .* kStar
+                let kInv        = Expr.invert k
+                let kStar      = covMat x xStar
+                let mean = meanXStar + kStar.T .* kInv .* (y - meanX)
+                let cov = kStarstar - kStar.T .* kInv .* kStar
                 mean,cov
         let mean = 
             if cut then

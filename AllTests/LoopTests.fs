@@ -110,7 +110,7 @@ let ``Build complicated loop 1`` () =
 
     resultA, resultB, initialA, initialB, seqA, constAExt
 
-
+    
 let ``Values for complicated loop 1`` () =
     let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1; 3; 2]
     let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3; 2; 2]
