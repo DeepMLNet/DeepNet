@@ -12,7 +12,7 @@ open TestUtils
 open Models
 
 [<Fact>]
-let ``On Artificial Examples`` () =
+let ``Monotonicity on Artificial Examples`` () =
     let nSmpls = 100
     let nInp = 500
     let rand =  Random()
@@ -26,7 +26,7 @@ let ``On Artificial Examples`` () =
     let mb = ModelBuilder<single> "GP"
     let nTrnSmpls = mb.Size "nTrnSmpls"
     let nInput = mb.Size "nInput"
-    let sigNs = mb.Var "sigs" [nTrnSmpls]
+    let sigNs = mb.Var "sigNs" [nTrnSmpls]
     let x = mb.Var  "x" [nTrnSmpls]
     let t = mb.Var  "t" [nTrnSmpls]
     let inp = mb.Var  "inp" [nInput]

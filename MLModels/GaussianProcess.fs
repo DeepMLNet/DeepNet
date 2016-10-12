@@ -16,10 +16,10 @@ module ExpectationPropagation =
     let gaussianError (x:ExprT) = 
         
         let t = 1.0f/(1.0f+0.5f*abs(x))
-        let sum = -0.18628806f + 1.00002368 * t + 0.37409196 * t ***2.0f +
-                   0.09678418 * t *** 3.0f - 0.18628806 * t ***4.0f + 0.27886807 * t *** 5.0f -
-                   1.13520398 * t ***6.0f + 1.48851587 * t ***7.0f - 0.82215223 * t ***8.0f +
-                   0.17087277 * t ***9.0f
+        let sum = -0.18628806f + 1.00002368f * t + 0.37409196f * t ***2.0f +
+                   0.09678418f * t *** 3.0f - 0.18628806f * t ***4.0f + 0.27886807f * t *** 5.0f -
+                   1.13520398f * t ***6.0f + 1.48851587f * t ***7.0f - 0.82215223f * t ***8.0f +
+                   0.17087277f * t ***9.0f
         let tau = t * exp(-x***2.0f + sum)
         Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau-1.0f)
     
@@ -35,7 +35,7 @@ module ExpectationPropagation =
             let cov = Expr.diag sigma
             let covMinus = 1.0f / (1.0f / cov - 1.0f / covSite)
             let muMinus = covMinus*(1.0f/cov * mu - 1.0f/covSite * muSite)
-            let z = muMinus / (vu * sqrt(1 + covMinus / (vu ** 2.0f)))
+            let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
             let normPdfZ = standardNormalPDF z
             let normCdfZ  = standardNormalCDF z
             let covHatf1 = covMinus *** 2.0f * normPdfZ / (normCdfZ * (vu ** 2.0f + covMinus))
@@ -49,7 +49,6 @@ module ExpectationPropagation =
             let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/covSite)) |> Expr.invert
             let mu = sigma.*(Expr.diagMat (1.0f/covSite)).*muSite
             sigma,mu,covSite,muSite
-        let mSE (x:ExprT) (y:ExprT) = LossLayer.loss LossLayer.MSE x y
         ///TODO: implement optimiyation step
         let optimize  iters (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
             let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
@@ -167,6 +166,7 @@ module GaussianProcess =
         
         let meanX = meanFct x
         let meanXStar = meanFct xStar
+
         let mean,cov = 
             match monotonicity with
             | Some vu ->
