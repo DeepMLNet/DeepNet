@@ -31,7 +31,7 @@ let ``Monotonicity on Artificial Examples`` () =
     let t = mb.Var  "t" [nTrnSmpls]
     let inp = mb.Var  "inp" [nInput]
     let zeroMean x = Expr.zerosLike x
-    let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.Linear;
+    let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f);
                                                 GaussianProcess.MeanFunction = zeroMean;
                                                 GaussianProcess.Monotonicity = None;
                                                 GaussianProcess.CutOutsideRange = false}

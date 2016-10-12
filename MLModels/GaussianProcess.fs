@@ -27,10 +27,13 @@ module ExpectationPropagation =
     let standardNormalCDF (x:ExprT) =
         (1.0f + gaussianError(x/sqrt(2.0f)))/2.0f
     
-    let ePResults (sigma:ExprT)  (vu:single) =
+    /// Runs Expecattion Maximization algorithm for monotonicity
+    let monotonicityEP (sigma:ExprT)  (vu:single) =
         let mu = sigma |> Expr.diag |> Expr.zerosLike
         let muSite = mu 
         let covSite = mu 
+        
+        /// one update step of the EP algorithm
         let updateStep (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT)= 
             let cov = Expr.diag sigma
             let covMinus = 1.0f / (1.0f / cov - 1.0f / covSite)
@@ -49,14 +52,15 @@ module ExpectationPropagation =
             let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/covSite)) |> Expr.invert
             let mu = sigma.*(Expr.diagMat (1.0f/covSite)).*muSite
             sigma,mu,covSite,muSite
-        ///TODO: implement optimiyation step
-        let optimize  iters (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
+
+        ///Update loop of the EP algorithm runs n iterations
+        let optimize  n (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
             let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
             let prevSigma = Expr.var<float> "prevSigma" (sigma.Shape)
             let prevMu = Expr.var<float> "prevMu" (mu.Shape)
             let prevCovSite = Expr.var<float> "prevCovSite" (covSite.Shape)
             let prevMuSite = Expr.var<float> "prevMuSite" (muSite.Shape)
-            let nIters = SizeSpec.fix iters
+            let nIters = SizeSpec.fix n
             let delayCovSite = SizeSpec.fix 1
             let delayMuSite = SizeSpec.fix 2
             let delaySigma = SizeSpec.fix 3
@@ -82,6 +86,8 @@ module ExpectationPropagation =
             let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu]
             newSigma,newMu,newCovSite,newMuSite
         optimize 5 (sigma,mu, covSite,muSite)
+
+
 module GaussianProcess =
     
     /// Kernek
@@ -181,7 +187,7 @@ module GaussianProcess =
                 let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
                 let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
 
-                let _,_,covSite,muSite = ExpectationPropagation.ePResults k vu
+                let _,_,covSite,muSite = ExpectationPropagation.monotonicityEP k vu
                 let xJoint = Expr.concat 0 [x;xm]
                 let kJoint = Expr.concat 1 [Expr.concat 0 [kFf;kFf'];Expr.concat 0 [kFf'.T;kF'f']]
                 let muJoint = Expr.concat 0 [y;muSite]
