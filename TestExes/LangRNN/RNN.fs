@@ -23,6 +23,9 @@ module RecurrentLayer =
         RecurrentActivationFunc:    ActivationFunc
         /// output transfer (activation) function
         OutputActivationFunc:       ActivationFunc
+        /// if true the input is an integer specifying which element
+        /// of an equivalent one-hot input would be active
+        OneHotIndexInput:           bool
         /// input weights trainable
         InputWeightsTrainable:      bool
         /// recurrent weights trainable
@@ -42,6 +45,7 @@ module RecurrentLayer =
         NOutput                     = SizeSpec.fix 0
         RecurrentActivationFunc     = Tanh
         OutputActivationFunc        = SoftMax
+        OneHotIndexInput            = false
         InputWeightsTrainable       = true
         RecurrentWeightsTrainable   = true
         OutputWeightsTrainable      = true
@@ -95,7 +99,8 @@ module RecurrentLayer =
         // outputWeights    [outUnit, recUnit]
         // recurrentBias    [recUnit]
         // outputBias       [recUnit]
-        // input            [smpl, step, inUnit]
+        // input            [smpl, step]           - if OneHotIndexInput=true 
+        // input            [smpl, step, inUnit]   - if OneHotIndexInput=false
         // state            [smpl, step, recUnit]
         // output           [smpl, step, outUnit]
 
@@ -108,43 +113,41 @@ module RecurrentLayer =
 
         let nBatch = input.Shape.[0]
         let nSteps = input.Shape.[1]
+        let nRecurrent = pars.HyperPars.NRecurrent
 
         // build loop
-        let inputWeightsLoop     = Expr.var<single> "InputWeightsLoop"     inputWeights.Shape
-        let recurrentWeightsLoop = Expr.var<single> "RecurrentWeightsLoop" recurrentWeights.Shape
-        let outputWeightsLoop    = Expr.var<single> "OutputWeightsLoop"    outputWeights.Shape
-        let recurrentBiasLoop    = Expr.var<single> "RecurrentBiasLoop"    recurrentBias.Shape
-        let outputBiasLoop       = Expr.var<single> "OutputBiasLoop"       outputBias.Shape
-
-        let inputSlice  = Expr.var<single> "InputSlice"  [nBatch; pars.HyperPars.NInput]
-        let prevState   = Expr.var<single> "PrevState"   [nBatch; pars.HyperPars.NRecurrent]
-
+        let inputSlice = 
+            if pars.HyperPars.OneHotIndexInput then
+                Expr.var<single> "InputSlice"  [nBatch]
+            else
+                Expr.var<single> "InputSlice"  [nBatch; pars.HyperPars.NInput]
+        let prevState = 
+            Expr.var<single> "PrevState"   [nBatch; pars.HyperPars.NRecurrent]
         let state =
-            inputSlice .* inputWeightsLoop.T + prevState .* recurrentWeightsLoop.T + recurrentBiasLoop
+            let inpAct = // [smpl, recUnit]
+                if pars.HyperPars.OneHotIndexInput then
+                    // inputSlice [smpl] => bcInputSlice [smpl, recUnit*]
+                    let bcInputSlice = inputSlice |> Expr.padRight |> Expr.broadcast [nBatch; nRecurrent]
+                    inputWeights |> Expr.gather [None; Some bcInputSlice]
+                else
+                    inputSlice .* inputWeights.T
+            inpAct + prevState .* recurrentWeights.T + recurrentBias
             |> ActivationFunc.apply pars.HyperPars.RecurrentActivationFunc
         let output =
-            state .* outputWeightsLoop.T + outputBiasLoop
+            state .* outputWeights.T + outputBias
             |> ActivationFunc.apply pars.HyperPars.OutputActivationFunc
-
         let chState, chOutput = "State", "Output"
         let loopSpec = {
             Expr.Length = nSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar state, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=2}
-                             Expr.extractVar inputWeightsLoop,     Expr.ConstArg 2
-                             Expr.extractVar recurrentWeightsLoop, Expr.ConstArg 3
-                             Expr.extractVar outputWeightsLoop,    Expr.ConstArg 4
-                             Expr.extractVar recurrentBiasLoop,    Expr.ConstArg 5
-                             Expr.extractVar outputBiasLoop,       Expr.ConstArg 6]
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=2}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
                                  chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
         }
 
-        let initialState = Expr.zeros<single> state.Shape
-        let outputs = Expr.loop loopSpec chOutput [input; initialState; 
-                                                   inputWeights; recurrentWeights; outputWeights; 
-                                                   recurrentBias; outputBias]
+        let initialState = Expr.zeros<single> [nBatch; SizeSpec.fix 1; nRecurrent]
+        let outputs = Expr.loop loopSpec chOutput [input; initialState]
 
         outputs
 

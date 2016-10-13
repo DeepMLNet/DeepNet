@@ -1076,7 +1076,7 @@ module Expr =
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
         Binary (op, ba, bb) |> check
 
-    /// pads and broadcasts the argument to the given shape if possible
+    /// pads from the left and broadcasts the argument to the given shape if possible
     let broadcastToShape shp a =
         let sa = shapeOf a
         let psa = sa |> ShapeSpec.padTo (nDim shp)
