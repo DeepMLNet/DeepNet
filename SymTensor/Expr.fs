@@ -1618,10 +1618,7 @@ module Expr =
         interpolate interpolator [a; b; c]
    
     /// A loop provides iterative evaluation of one or multiple expresisons.
-//    let loop spec channel args =
-//        Nary (Channel (Loop spec, channel), args) |> check
-
-    let loopRaw spec channel args =
+    let loopNoLift spec channel args =
         Nary (Channel (Loop spec, channel), args) |> check
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
@@ -1684,7 +1681,7 @@ module Expr =
         let liftedChannels = spec.Channels |> Map.map (fun ch lv -> {lv with Expr = lift lv.Expr})
         let spec = {spec with Channels = liftedChannels; Vars = vars}            
 
-        loopRaw spec channel args
+        loopNoLift spec channel args
 
     /// reverses the tensor in the given dimension 
     let reverseAxis dim (a: ExprT) : ExprT =
