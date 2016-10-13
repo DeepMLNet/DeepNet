@@ -5,7 +5,7 @@ open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
 
-open MLModels
+open Models
 
 
 /// A layer of recurrent neurons with an output layer on top.
@@ -131,7 +131,8 @@ module RecurrentLayer =
                     inputWeights |> Expr.gather [None; Some bcInputSlice]
                 else
                     inputSlice .* inputWeights.T
-            inpAct + prevState .* recurrentWeights.T + recurrentBias
+            let recAct = prevState .* recurrentWeights.T
+            inpAct + recAct + recurrentBias
             |> ActivationFunc.apply pars.HyperPars.RecurrentActivationFunc
         let output =
             state .* outputWeights.T + outputBias
@@ -141,7 +142,7 @@ module RecurrentLayer =
             Expr.Length = nSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar state, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=2}]
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
                                  chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
         }

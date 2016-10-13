@@ -3,6 +3,12 @@
 open Basics
 open System.IO
 
+open ArrayNDNS
+open SymTensor
+open SymTensor.Compiler.Cuda
+open Models
+open Optimizers
+
 
 module Program =
 
@@ -29,6 +35,39 @@ module Program =
 
     let detokenize (wordForId: Map<int, string>) tokenizedSentences =
         tokenizedSentences |> Seq.map (List.map (fun id -> wordForId.[id]))
+
+    
+    let buildModel () =
+        let mb = ModelBuilder ("Lang")
+
+        let nBatch     = mb.Size "nBatch"
+        let nSteps     = mb.Size "nSteps"
+        let nWords     = mb.Size "nWords"
+        let nRecurrent = mb.Size "nRecurrent"
+
+        let input  = mb.Var<int> "Input"  [nBatch; nSteps]
+        let target = mb.Var<int> "Target" [nBatch; nSteps]
+        
+        let rnn = RecurrentLayer.pars (mb.Module "RNN") {
+            RecurrentLayer.defaultHyperPars with
+                NInput                  = nWords
+                NRecurrent              = nRecurrent
+                NOutput                 = nWords
+                RecurrentActivationFunc = Tanh
+                OutputActivationFunc    = SoftMax
+                OneHotIndexInput        = true
+        }
+
+        // pred [smpl, step, word] - probability of word
+        let pred = input |> RecurrentLayer.pred rnn
+
+        // [smpl, step]
+        let targetProb = pred |> Expr.gather [None; None; Some target]            
+        let stepLoss = -log targetProb 
+        let loss = Expr.mean stepLoss
+
+        pred, loss
+
 
     [<EntryPoint>]
     let main argv = 
@@ -57,6 +96,7 @@ module Program =
         //printfn "%A" (detokenizedSentences |> Seq.take 10 |> Seq.toList)
 
 
+        // build model
 
 
         0

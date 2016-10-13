@@ -1,4 +1,4 @@
-﻿namespace MLModels
+﻿namespace Models
 
 open ArrayNDNS
 open SymTensor

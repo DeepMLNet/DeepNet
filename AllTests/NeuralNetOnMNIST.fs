@@ -33,8 +33,8 @@ let build device batch =
                   NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.SoftMax}
      
     // input / output variables
-    let input =  mc.Var "Input"  [batchSize; nInput]
-    let target = mc.Var "Target" [batchSize; nTarget]
+    let input =  mc.Var<single> "Input"  [batchSize; nInput]
+    let target = mc.Var<single> "Target" [batchSize; nTarget]
 
     // set sizes
     mc.SetSize batchSize batch
