@@ -364,7 +364,7 @@ module Deriv =
             | ConstArg argIdx ->
                 // create a variable for the sum of the accumulated Jacobian so far
                 let dAccumName = sprintf "dSum_ConstArg%d[-1]" argIdx
-                let dAccumVar = VarSpec.create dAccumName liType [funElems; liElems]
+                let dAccumVar = VarSpec.create dAccumName liType (funElems :: liShape)
 
                 // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                 let dPortName = sprintf "dSum_ConstArg%d" argIdx
@@ -478,8 +478,8 @@ module Deriv =
         // go through portContents and create actual port contents
         let ports =
             portContents
-            |> Seq.map (fun pc ->
-                let port, {DerivWrt=derivWrts; ValueOf=valueOf; SliceDim=sliceDim} = pc.Key, pc.Value
+            |> Map.ofDictionary
+            |> Map.map (fun port {DerivWrt=derivWrts; ValueOf=valueOf; SliceDim=sliceDim} ->
                 let expr = 
                     seq {
                         // obtain Jacobians
@@ -493,8 +493,7 @@ module Deriv =
                         | Some vs -> yield Expr.makeVar vs
                         | None -> ()
                     } |> Seq.reduce (+)
-                port, {Expr=expr; SliceDim=sliceDim})
-            |> Map.ofSeq
+                {Expr=expr; SliceDim=sliceDim})
 
         // create variable specification
         let varsFromDeriv = 
@@ -551,9 +550,8 @@ module Deriv =
         // build derivatives w.r.t. our arguments
         let argIdxDerivExprs = 
             argIdxDerivs 
-            |> Seq.map (fun aid -> 
-                let argIdx, loopDerivs = aid.Key, aid.Value
-                
+            |> Map.ofDictionary
+            |> Map.map (fun argIdx loopDerivs ->                
                 // sum over ports producing derivative and reverse if necessary
                 let dExprExpanded =
                     loopDerivs
@@ -568,8 +566,7 @@ module Deriv =
                 // collapse Jacobian
                 let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
                 let dExpr = dExprExpanded |> Expr.reshape [funElems; wrtElems]
-                argIdx, dExpr)
-            |> Map.ofSeq
+                dExpr)
 
         // output mapping from original argument to its derivative
         [for a=0 to originalArgs.Length-1 do

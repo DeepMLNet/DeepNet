@@ -1618,8 +1618,73 @@ module Expr =
         interpolate interpolator [a; b; c]
    
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    let loop spec channel inputs =
-        Nary (Channel (Loop spec, channel), inputs) |> check
+//    let loop spec channel args =
+//        Nary (Channel (Loop spec, channel), args) |> check
+
+    let loopRaw spec channel args =
+        Nary (Channel (Loop spec, channel), args) |> check
+
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    let loop spec channel args =       
+        let mutable args = args
+        let mutable vars = spec.Vars
+
+        /// adds an argument and returns its index
+        let addArg (expr: ExprT) =
+            match args |> List.tryFindIndex ((=) expr) with
+            | Some argIdx -> argIdx
+            | None ->
+                let argIdx = args.Length
+                args <- args @ [expr]
+                argIdx
+
+        /// adds a constant variable, its required argument and returns the associated VarSpecT
+        let addConstVar (expr: ExprT) =
+            match vars |> Map.tryFindKey (fun vs lv ->
+                                           match lv with
+                                           | ConstArg argIdx when args.[argIdx] = expr -> true
+                                           | _ -> false) with
+            | Some vs -> vs
+            | None ->
+                let rec genName i =
+                    let name = sprintf "CONST%d" i
+                    match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
+                    | Some _ -> genName (i + 1)
+                    | None -> name
+                let vs = VarSpec.ofNameShapeAndTypeName (genName 0) expr.Shape expr.TypeName
+                let lv = ConstArg (addArg expr)
+                vars <- vars |> Map.add vs lv
+                vs
+
+        /// true if expr depends on any loop variable
+        let dependsOnLoopVars expr = 
+            vars |> Map.exists (fun vs _ -> expr |> contains (makeVar vs))
+
+        /// pulls out expression parts that do not depend on loop variables
+        let rec lift expr =
+            if not (dependsOnLoopVars expr) then
+                let vs = addConstVar expr
+                makeVar vs
+            else
+                match expr with                   
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+                | Unary (Scatter (indices, trgtShp), a) ->
+                    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (lift cond), lift a, lift b)
+
+                | Leaf _ -> expr
+                | Unary (op, a) -> Unary (op, lift a)
+                | Binary (op, a, b) -> Binary (op, lift a, lift b)
+                | Nary (op, es) -> Nary (op, es |> List.map lift)
+                
+        // lift constants out of loop
+        let liftedChannels = spec.Channels |> Map.map (fun ch lv -> {lv with Expr = lift lv.Expr})
+        let spec = {spec with Channels = liftedChannels; Vars = vars}            
+
+        loopRaw spec channel args
 
     /// reverses the tensor in the given dimension 
     let reverseAxis dim (a: ExprT) : ExprT =
