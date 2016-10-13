@@ -207,7 +207,7 @@ let ``Select`` () =
     let i0 = [1; 2; 0; 3] |> ArrayNDHost.ofList |> ArrayND.padRight |> ArrayND.broadcastDim 1 2
     let idxs = [Some i0; None]
 
-    let s = a |> ArrayND.select idxs
+    let s = a |> ArrayND.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -220,7 +220,7 @@ let ``Select 2`` () =
     let i0 = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
     let idxs = [Some i0; None]
 
-    let s = a |> ArrayND.select idxs
+    let s = a |> ArrayND.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -234,7 +234,7 @@ let ``Select 3`` () =
     let i1 = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
     let idxs = [Some i0; Some i1]
 
-    let s = a |> ArrayND.select idxs
+    let s = a |> ArrayND.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -250,7 +250,7 @@ let ``Disperse 1`` () =
     let idxs = [Some i0; Some i1]
     let shp = [3; 3]
 
-    let s = a |> ArrayND.disperse idxs shp
+    let s = a |> ArrayND.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp
@@ -266,7 +266,7 @@ let ``Disperse 2`` () =
     let idxs = [Some i0; None]
     let shp = [3; 3]
 
-    let s = a |> ArrayND.disperse idxs shp
+    let s = a |> ArrayND.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp
@@ -281,7 +281,7 @@ let ``Disperse 3`` () =
     let idxs = [None; None]
     let shp = [5; 3]
 
-    let s = a |> ArrayND.disperse idxs shp
+    let s = a |> ArrayND.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp

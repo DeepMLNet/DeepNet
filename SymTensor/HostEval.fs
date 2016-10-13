@@ -104,16 +104,16 @@ module HostEval =
                     | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                     | PermuteAxes perm -> ArrayND.permuteAxes perm av
                     | ReverseAxis ax -> ArrayND.reverseAxis ax av
-                    | Select indices ->
+                    | Gather indices ->
                         let vIndices = 
                             indices 
                             |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
-                        ArrayND.select vIndices av
-                    | Disperse (indices, trgtShp) ->
+                        ArrayND.gather vIndices av
+                    | Scatter (indices, trgtShp) ->
                         let vIndices = 
                             indices 
                             |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
-                        ArrayND.disperse vIndices (shapeEval trgtShp) av                        
+                        ArrayND.scatter vIndices (shapeEval trgtShp) av                        
                     | Subtensor sr -> av.[rngEval sr]
                     | StoreToVar vs -> 
                         // TODO: stage variable write to avoid overwrite of used variables

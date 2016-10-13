@@ -247,8 +247,8 @@ module ArrayND =
             ifVal.IfThenElseImpl cond elseVal res
             res
 
-        abstract IndexedSetImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
-        default trgt.IndexedSetImpl indices src =
+        abstract GatherImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        default trgt.GatherImpl indices src =
             for trgtIdx in ArrayNDLayout.allIdx trgt.Layout do
                 let srcIdx = 
                     indices 
@@ -261,7 +261,7 @@ module ArrayND =
                        
         /// Sets the values of this array by selecting from the sources array according to the specified
         /// indices. If an index array is set to None then the target index is used as the source index.
-        member trgt.IndexedSet (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Gather (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -274,10 +274,10 @@ module ArrayND =
             if src.NDims <> indices.Length then
                 failwithf "must specify an index array for each dimension of src"
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
-            trgt.IndexedSetImpl indices src
+            trgt.GatherImpl indices src
 
-        abstract IndexedSumImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
-        default trgt.IndexedSumImpl indices src = 
+        abstract ScatterImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        default trgt.ScatterImpl indices src = 
             let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
             let addSingle a b = (a |> box |> unbox<single>) + (b |> box |> unbox<single>) |> box |> unbox<'T>
             let addDouble a b = (a |> box |> unbox<double>) + (b |> box |> unbox<double>) |> box |> unbox<'T>
@@ -301,7 +301,7 @@ module ArrayND =
         /// Sets the values of this array by summing elements from the sources array into the elements
         /// of this array specified by the indices.
         /// If an index array is set to None then the target index is used as the source index.
-        member trgt.IndexedSum (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Scatter (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -317,7 +317,7 @@ module ArrayND =
             if trgt.NDims <> indices.Length then
                 failwithf "must specify an index array for each dimension of the target"
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape src.Shape))
-            trgt.IndexedSumImpl indices src
+            trgt.ScatterImpl indices src
 
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
@@ -710,7 +710,7 @@ module ArrayND =
     /// If None is specified instead of an array in an dimension, the source index will match the 
     /// target index in that dimension.
     /// The result will have the shape of the (broadcasted) index arrays.
-    let select indices (src: #ArrayNDT<'T>) =
+    let gather indices (src: #ArrayNDT<'T>) =
         let someIndices = indices |> List.choose id
         if List.isEmpty someIndices then
             failwith "need to specify at least one index array"
@@ -725,19 +725,20 @@ module ArrayND =
         let bcIndices = rebuild indices bcSomeIndices
         let trgtShp = bcSomeIndices.Head.Shape
         let trgt = newCOfSameType trgtShp src
-        trgt.IndexedSet bcIndices src
+        trgt.Gather bcIndices src
         trgt
 
     /// Creates a new ArrayNDT of shape `trgtShp` by dispersing elements from `src` according to 
-    /// the specified `indices`.
+    /// the specified target `indices`. If an index occurs multiple times the corresponding values are summed.
+    /// Target elements that do not occur, are set to zero.
     /// `indices` must be a list of ArrayNDTs, one per dimension of `trgt` and of the same shape
     /// (or broadcastable to) as `src`.
     /// If None is specified instead of an array in an dimension, the source index will match the 
     /// target index in that dimension.
-    let disperse indices trgtShp (src: #ArrayNDT<'T>) =
+    let scatter indices trgtShp (src: #ArrayNDT<'T>) =
         let bcIndices = indices |> List.map (Option.map (broadcastToShape src.Shape))
         let trgt = newCOfSameType trgtShp src
-        trgt.IndexedSum bcIndices src
+        trgt.Scatter bcIndices src
         trgt
 
 

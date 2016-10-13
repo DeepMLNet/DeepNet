@@ -103,9 +103,9 @@ module Expr =
         /// reverses the tensor in the given dimension 
         | ReverseAxis of dim:int
         /// select elements according to the specified index arrays
-        | Select of indices:ExprT option list
+        | Gather of indices:ExprT option list
         /// disperses elements according to the specified index arrays
-        | Disperse of indices:ExprT option list * shp:ShapeSpecT
+        | Scatter of indices:ExprT option list * shp:ShapeSpecT
 
         // ==== variable storage ====
         /// variable write
@@ -484,8 +484,8 @@ module Expr =
                  | SRSDynStartSymSize (_, size) -> size)
         | Unary(ReverseAxis _, a) -> shapeOf a
         | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
-        | Unary(Select indices, a) -> indices |> List.pick id |> shapeOf
-        | Unary (Disperse (indices, shp), a) -> shp
+        | Unary(Gather indices, a) -> indices |> List.pick id |> shapeOf
+        | Unary (Scatter (indices, shp), a) -> shp
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
@@ -679,7 +679,7 @@ module Expr =
                     failwithf "cannot reverse non-existant axis %d of array with shape %A" ax sa
                 | Held ([], ReplicateTo (dim, s)) -> 
                     a |> checkAxis dim
-                | Select indices ->
+                | Gather indices ->
                     if nda <> indices.Length then
                         failwithf "select argument has %d dimensions but %d index arrays were specified" 
                             nda indices.Length
@@ -695,7 +695,7 @@ module Expr =
                             failwithf "all indices must have equal shape, but got %A"
                                 (indices |> List.map (Option.map shapeOf))
                         | _ -> ()
-                | Disperse (indices, shp) ->
+                | Scatter (indices, shp) ->
                     for idx in indices do
                         match idx with
                         | Some idx when idx.Type <> typeof<int> ->
@@ -861,12 +861,12 @@ module Expr =
                 match heldOp with
                 | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
             Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
-        | Unary (Select indices, a) ->
+        | Unary (Gather indices, a) ->
             let indices = indices |> List.map (Option.map sSub)
-            Unary (Select indices, sSub a)
-        | Unary (Disperse (indices, shp), a) ->
+            Unary (Gather indices, sSub a)
+        | Unary (Scatter (indices, shp), a) ->
             let indices = indices |> List.map (Option.map sSub)
-            Unary (Disperse (indices, sShp shp), sSub a)
+            Unary (Scatter (indices, sShp shp), sSub a)
         | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
@@ -916,10 +916,10 @@ module Expr =
                     match heldOp with 
                     | ReplicateTo (dim, s) -> SizeSpec.canEval s
                 List.forall ShapeSpec.canEval derivsShp && canEvalOp && subTest a
-            | Unary (Select indices, a) ->
+            | Unary (Gather indices, a) ->
                 let someIndices = indices |> List.choose id
                 List.forall subTest someIndices && subTest a
-            | Unary (Disperse (indices, shp), a) ->
+            | Unary (Scatter (indices, shp), a) ->
                 let someIndices = indices |> List.choose id
                 List.forall subTest someIndices && ShapeSpec.canEval shp && subTest a
             | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
@@ -977,12 +977,12 @@ module Expr =
             | Unary (op, a) -> Unary (op, subSubst a)
             | Unary (AssumeJacobian jac, a) ->
                 Unary (AssumeJacobian (subSubst jac), subSubst a)
-            | Unary (Select indices, a) ->
+            | Unary (Gather indices, a) ->
                 let indices = indices |> List.map (Option.map subSubst)
-                Unary (Select indices, subSubst a)
-            | Unary (Disperse (indices, shp), a) ->
+                Unary (Gather indices, subSubst a)
+            | Unary (Scatter (indices, shp), a) ->
                 let indices = indices |> List.map (Option.map subSubst)
-                Unary (Disperse (indices, shp), subSubst a)
+                Unary (Scatter (indices, shp), subSubst a)
             | Binary (IfThenElse c, a, b) -> 
                 Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
             | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
@@ -1098,7 +1098,7 @@ module Expr =
         | _ -> failwith "impossible"
 
     /// select elements according to the specified index arrays
-    let select indices a =
+    let gather indices a =
         let someIndices = indices |> List.choose id
         if List.isEmpty someIndices then
             failwith "need to specify at least one index array"
@@ -1111,13 +1111,13 @@ module Expr =
             | [], [] -> []
             | _ -> failwith "unbalanced idxs"
         let bcIndices = rebuild indices bcSomeIndices
-        Unary (Select bcIndices, a) |> check
+        Unary (Gather bcIndices, a) |> check
 
     /// select elements according to the specified index arrays
-    let disperse indices trgtShp a =
+    let scatter indices trgtShp a =
         let aShp = shapeOf a
         let indices = indices |> List.map (Option.map (broadcastToShape aShp))
-        Unary (Disperse (indices, trgtShp), a) |> check
+        Unary (Scatter (indices, trgtShp), a) |> check
 
 
     // elementwise operators

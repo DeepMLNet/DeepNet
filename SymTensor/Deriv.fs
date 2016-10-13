@@ -139,13 +139,13 @@ module Deriv =
                 egUnbroadcasted |> collapse 
             | ReverseAxis ax ->
                 egExp |> reverseAxis (ax + 1) |> collapse
-            | Select indices ->
+            | Gather indices ->
                 let dIndices = indices |> List.map (Option.map padLeft)
-                egExp |> disperse (None::dIndices) (funElems::shapeOf a) |> collapse
-            | Disperse (indices, shp) ->
+                egExp |> scatter (None::dIndices) (funElems::shapeOf a) |> collapse
+            | Scatter (indices, shp) ->
                 let dIndices = indices |> List.map (Option.map (fun idx -> 
                     idx |> broadcastToShape (funElems::idx.Shape)))                   
-                egExp |> select (None::dIndices) |> collapse
+                egExp |> gather (None::dIndices) |> collapse
             | Held (derivsShp, heldOp) -> 
                 Unary(Held (shapeOf a :: derivsShp, heldOp), eg)       
                      

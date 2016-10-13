@@ -402,13 +402,13 @@ let ``ReverseAxis on host`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
-let ``Trace compare: Select 1`` () =
+let ``Trace compare: Gather 1`` () =
     requireEqualTraces (fun device ->
         let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
         let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
         let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
 
-        let expr = a |> Expr.select [Some i0; Some i1]
+        let expr = a |> Expr.gather [Some i0; Some i1]
         let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
 
         let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
@@ -416,8 +416,70 @@ let ``Trace compare: Select 1`` () =
         let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
 
         let sv = exprFn av i0v i1v
-        printfn "a=\n%A" a
+        printfn "a=\n%A" av
         printfn "idxs=\n%A\n%A" i0v i1v
         printfn "select idxs a=\n%A" sv
     )
     
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Gather 2`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+        let expr = a |> Expr.gather [Some i0; None]
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v 
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A" i0v 
+        printfn "select idxs a=\n%A" sv
+    )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Scatter 1`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let shp = [SizeSpec.fix 5; SizeSpec.fix 5]
+
+        let expr = a |> Expr.scatter [Some i0; None] shp
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v 
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A" i0v 
+        printfn "scatter idxs a=\n%A" sv
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Scatter 2`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let shp = [SizeSpec.fix 5; SizeSpec.fix 5]
+
+        let expr = a |> Expr.scatter [Some i0; Some i1] shp
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let i1v = [0; 0; 0] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v i1v
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A\n%A" i0v i1v
+        printfn "scatter idxs a=\n%A" sv
+    )

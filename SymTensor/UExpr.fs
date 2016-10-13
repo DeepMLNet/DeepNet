@@ -53,8 +53,8 @@ module UExprTypes =
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT
-        | Select of IndexArgs
-        | Disperse of IndexArgs
+        | Gather of IndexArgs
+        | Scatter of IndexArgs
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
@@ -190,12 +190,12 @@ module UExpr =
 
                     // and separate op to extract referenced channel
                     UExpr (UExtraOp (Channel channel), [uLoop], metadata)
-                | Expr.Unary (Expr.Select indices, a) ->                
+                | Expr.Unary (Expr.Gather indices, a) ->                
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
-                    extra (Select idxArgNos) (a::idxArgs)
-                | Expr.Unary (Expr.Disperse (indices, _), a) ->
+                    extra (Gather idxArgNos) (a::idxArgs)
+                | Expr.Unary (Expr.Scatter (indices, _), a) ->
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
-                    extra (Disperse idxArgNos) (a::idxArgs)
+                    extra (Scatter idxArgNos) (a::idxArgs)
                 | Expr.Unary (Expr.Held (_, heldOp), a) ->
                     failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
