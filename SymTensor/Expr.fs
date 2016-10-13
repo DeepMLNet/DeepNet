@@ -1618,6 +1618,9 @@ module Expr =
         interpolate interpolator [a; b; c]
    
     /// A loop provides iterative evaluation of one or multiple expresisons.
+    /// All variables occurs in the loop channel expressions must be defined as loop variables.
+    /// The function `loop` performs automatic lifting of constants and thus allows for easy
+    /// usage of variables external to the loop.
     let loopNoLift spec channel args =
         Nary (Channel (Loop spec, channel), args) |> check
 
