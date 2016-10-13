@@ -296,6 +296,13 @@ module ArgTemplates =
                 let ptr = mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
                 ArrayNDSSArg ptr |> box
 
+    /// ArrayND argument with null data pointer template
+    type ArrayNDNullArgTmpl () = 
+        // TShape is ShapeStaicXD and TStride is StrideStaticXD.
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = "int"
+            member this.GetArg env strm = ArrayNDSSArg (nativeint 0) |> box
+
     type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
         interface ICudaArgTmpl with

@@ -786,6 +786,13 @@ _dev void elements30Ary0D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
 
 }
 
+template <typename TTarget, typename TSrc>
+_dev void select0D (TTarget &trgt, const TSrc &src) {
+
+  trgt.element() = src.element();
+
+}
+
 // ======================== dimensionality: 1 ==================================
 
 struct Pos1D {
@@ -1765,6 +1772,15 @@ _dev void elements30Ary1D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0) = op(pos0, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0>
+_dev void select1D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0) {
+ for (idx_t pos0 = threadIdx.x + blockIdx.x * blockDim.x; pos0 < trgt.shape(0); pos0 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0) = src.element(idx0.data() ? idx0.element(pos0) : pos0);
 
  }
 }
@@ -2941,6 +2957,17 @@ _dev void elements30Ary2D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos1 = threadIdx.x + blockIdx.x * blockDim.x; pos1 < trgt.shape(1); pos1 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1) = op(pos0, pos1, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1>
+_dev void select2D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1) {
+ for (idx_t pos0 = threadIdx.y + blockIdx.y * blockDim.y; pos0 < trgt.shape(0); pos0 += gridDim.y * blockDim.y) {
+ for (idx_t pos1 = threadIdx.x + blockIdx.x * blockDim.x; pos1 < trgt.shape(1); pos1 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1) = src.element(idx0.data() ? idx0.element(pos0, pos1) : pos0, idx1.data() ? idx1.element(pos0, pos1) : pos1);
 
  }
  }
@@ -4311,6 +4338,19 @@ _dev void elements30Ary3D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos2 = threadIdx.x + blockIdx.x * blockDim.x; pos2 < trgt.shape(2); pos2 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1, pos2) = op(pos0, pos1, pos2, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1, typename TIdx2>
+_dev void select3D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1, const TIdx2 &idx2) {
+ for (idx_t pos0 = threadIdx.z + blockIdx.z * blockDim.z; pos0 < trgt.shape(0); pos0 += gridDim.z * blockDim.z) {
+ for (idx_t pos1 = threadIdx.y + blockIdx.y * blockDim.y; pos1 < trgt.shape(1); pos1 += gridDim.y * blockDim.y) {
+ for (idx_t pos2 = threadIdx.x + blockIdx.x * blockDim.x; pos2 < trgt.shape(2); pos2 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1, pos2) = src.element(idx0.data() ? idx0.element(pos0, pos1, pos2) : pos0, idx1.data() ? idx1.element(pos0, pos1, pos2) : pos1, idx2.data() ? idx2.element(pos0, pos1, pos2) : pos2);
 
  }
  }
@@ -6064,6 +6104,23 @@ _dev void elements30Ary4D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos3 = threadIdx.x + blockIdx.x * blockDim.x; pos3 < trgt.shape(3); pos3 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1, pos2, pos3) = op(pos0, pos1, pos2, pos3, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1, typename TIdx2, typename TIdx3>
+_dev void select4D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1, const TIdx2 &idx2, const TIdx3 &idx3) {
+ const idx_t restElems = trgt.shape(0) * trgt.shape(1);
+ for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {
+ idx_t pos1 = posR;
+ const idx_t pos0 = pos1 / (trgt.shape(1));
+ pos1 -= pos0 * (trgt.shape(1));
+ for (idx_t pos2 = threadIdx.y + blockIdx.y * blockDim.y; pos2 < trgt.shape(2); pos2 += gridDim.y * blockDim.y) {
+ for (idx_t pos3 = threadIdx.x + blockIdx.x * blockDim.x; pos3 < trgt.shape(3); pos3 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1, pos2, pos3) = src.element(idx0.data() ? idx0.element(pos0, pos1, pos2, pos3) : pos0, idx1.data() ? idx1.element(pos0, pos1, pos2, pos3) : pos1, idx2.data() ? idx2.element(pos0, pos1, pos2, pos3) : pos2, idx3.data() ? idx3.element(pos0, pos1, pos2, pos3) : pos3);
 
  }
  }
@@ -8011,6 +8068,25 @@ _dev void elements30Ary5D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos4 = threadIdx.x + blockIdx.x * blockDim.x; pos4 < trgt.shape(4); pos4 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1, pos2, pos3, pos4) = op(pos0, pos1, pos2, pos3, pos4, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1, typename TIdx2, typename TIdx3, typename TIdx4>
+_dev void select5D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1, const TIdx2 &idx2, const TIdx3 &idx3, const TIdx4 &idx4) {
+ const idx_t restElems = trgt.shape(0) * trgt.shape(1) * trgt.shape(2);
+ for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {
+ idx_t pos2 = posR;
+ const idx_t pos0 = pos2 / (trgt.shape(1) * trgt.shape(2));
+ pos2 -= pos0 * (trgt.shape(1) * trgt.shape(2));
+ const idx_t pos1 = pos2 / (trgt.shape(2));
+ pos2 -= pos1 * (trgt.shape(2));
+ for (idx_t pos3 = threadIdx.y + blockIdx.y * blockDim.y; pos3 < trgt.shape(3); pos3 += gridDim.y * blockDim.y) {
+ for (idx_t pos4 = threadIdx.x + blockIdx.x * blockDim.x; pos4 < trgt.shape(4); pos4 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1, pos2, pos3, pos4) = src.element(idx0.data() ? idx0.element(pos0, pos1, pos2, pos3, pos4) : pos0, idx1.data() ? idx1.element(pos0, pos1, pos2, pos3, pos4) : pos1, idx2.data() ? idx2.element(pos0, pos1, pos2, pos3, pos4) : pos2, idx3.data() ? idx3.element(pos0, pos1, pos2, pos3, pos4) : pos3, idx4.data() ? idx4.element(pos0, pos1, pos2, pos3, pos4) : pos4);
 
  }
  }
@@ -10152,6 +10228,27 @@ _dev void elements30Ary6D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos5 = threadIdx.x + blockIdx.x * blockDim.x; pos5 < trgt.shape(5); pos5 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1, pos2, pos3, pos4, pos5) = op(pos0, pos1, pos2, pos3, pos4, pos5, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1, typename TIdx2, typename TIdx3, typename TIdx4, typename TIdx5>
+_dev void select6D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1, const TIdx2 &idx2, const TIdx3 &idx3, const TIdx4 &idx4, const TIdx5 &idx5) {
+ const idx_t restElems = trgt.shape(0) * trgt.shape(1) * trgt.shape(2) * trgt.shape(3);
+ for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {
+ idx_t pos3 = posR;
+ const idx_t pos0 = pos3 / (trgt.shape(1) * trgt.shape(2) * trgt.shape(3));
+ pos3 -= pos0 * (trgt.shape(1) * trgt.shape(2) * trgt.shape(3));
+ const idx_t pos1 = pos3 / (trgt.shape(2) * trgt.shape(3));
+ pos3 -= pos1 * (trgt.shape(2) * trgt.shape(3));
+ const idx_t pos2 = pos3 / (trgt.shape(3));
+ pos3 -= pos2 * (trgt.shape(3));
+ for (idx_t pos4 = threadIdx.y + blockIdx.y * blockDim.y; pos4 < trgt.shape(4); pos4 += gridDim.y * blockDim.y) {
+ for (idx_t pos5 = threadIdx.x + blockIdx.x * blockDim.x; pos5 < trgt.shape(5); pos5 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1, pos2, pos3, pos4, pos5) = src.element(idx0.data() ? idx0.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos0, idx1.data() ? idx1.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos1, idx2.data() ? idx2.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos2, idx3.data() ? idx3.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos3, idx4.data() ? idx4.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos4, idx5.data() ? idx5.element(pos0, pos1, pos2, pos3, pos4, pos5) : pos5);
 
  }
  }
@@ -12487,6 +12584,29 @@ _dev void elements30Ary7D (const TElementsOp &op, TTarget &trgt, const TSrc0 &sr
  for (idx_t pos6 = threadIdx.x + blockIdx.x * blockDim.x; pos6 < trgt.shape(6); pos6 += gridDim.x * blockDim.x) {
 
   trgt.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) = op(pos0, pos1, pos2, pos3, pos4, pos5, pos6, src0, src1, src2, src3, src4, src5, src6, src7, src8, src9, src10, src11, src12, src13, src14, src15, src16, src17, src18, src19, src20, src21, src22, src23, src24, src25, src26, src27, src28, src29);
+
+ }
+ }
+ }
+}
+
+template <typename TTarget, typename TSrc, typename TIdx0, typename TIdx1, typename TIdx2, typename TIdx3, typename TIdx4, typename TIdx5, typename TIdx6>
+_dev void select7D (TTarget &trgt, const TSrc &src, const TIdx0 &idx0, const TIdx1 &idx1, const TIdx2 &idx2, const TIdx3 &idx3, const TIdx4 &idx4, const TIdx5 &idx5, const TIdx6 &idx6) {
+ const idx_t restElems = trgt.shape(0) * trgt.shape(1) * trgt.shape(2) * trgt.shape(3) * trgt.shape(4);
+ for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {
+ idx_t pos4 = posR;
+ const idx_t pos0 = pos4 / (trgt.shape(1) * trgt.shape(2) * trgt.shape(3) * trgt.shape(4));
+ pos4 -= pos0 * (trgt.shape(1) * trgt.shape(2) * trgt.shape(3) * trgt.shape(4));
+ const idx_t pos1 = pos4 / (trgt.shape(2) * trgt.shape(3) * trgt.shape(4));
+ pos4 -= pos1 * (trgt.shape(2) * trgt.shape(3) * trgt.shape(4));
+ const idx_t pos2 = pos4 / (trgt.shape(3) * trgt.shape(4));
+ pos4 -= pos2 * (trgt.shape(3) * trgt.shape(4));
+ const idx_t pos3 = pos4 / (trgt.shape(4));
+ pos4 -= pos3 * (trgt.shape(4));
+ for (idx_t pos5 = threadIdx.y + blockIdx.y * blockDim.y; pos5 < trgt.shape(5); pos5 += gridDim.y * blockDim.y) {
+ for (idx_t pos6 = threadIdx.x + blockIdx.x * blockDim.x; pos6 < trgt.shape(6); pos6 += gridDim.x * blockDim.x) {
+
+  trgt.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) = src.element(idx0.data() ? idx0.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos0, idx1.data() ? idx1.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos1, idx2.data() ? idx2.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos2, idx3.data() ? idx3.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos3, idx4.data() ? idx4.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos4, idx5.data() ? idx5.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos5, idx6.data() ? idx6.element(pos0, pos1, pos2, pos3, pos4, pos5, pos6) : pos6);
 
  }
  }

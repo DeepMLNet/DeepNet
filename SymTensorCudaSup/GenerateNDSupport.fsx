@@ -273,7 +273,29 @@ for dims = 0 to maxDims do
         wrt ""
 
     for ary = 0 to maxArity do
-        elementsWrapper ary 
+        elementsWrapper ary
+        
+    let selectFunc () =    
+        let idxTmpl = 
+            {0 .. dims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
+        let allTmpl = "typename TTarget" :: "typename TSrc" :: idxTmpl
+        wrt "template <%s>" (allTmpl |> cw ", ")
+         
+        let idxArgDecls =
+            {0 .. dims - 1} |> Seq.map (fun i -> sprintf "const TIdx%d &idx%d" i i) |> Seq.toList
+        let allArgDecls = "TTarget &trgt" :: "const TSrc &src" :: idxArgDecls
+        wrt "_dev void select%dD (%s) {" dims (allArgDecls |> cw ", ")
+
+        elementwiseLoop false (fun dims ->      
+            let poses = ad |>> prn "pos%d" |> Seq.toList
+            let idxArgs = {0 .. dims - 1} |> Seq.map (fun a -> sprintf "idx%d" a) |> Seq.toList
+            let selectArgs = idxArgs |> List.mapi (fun d ia -> 
+                sprintf "%s.data() ? %s.element(%s) : %s" ia ia (poses |> cw ", ") poses.[d])
+            wrt "  trgt.element(%s) = src.element(%s);" (poses |> cw ", ") (selectArgs |> cw ", "))        
+        wrt "}"
+        wrt ""       
+
+    selectFunc ()
 
 let elementwiseHeterogenousLoop fBody =
     wrt " for (idx_t idx = threadIdx.x + blockIdx.x * blockDim.x; idx < trgt.size(); idx += gridDim.x * blockDim.x) {"

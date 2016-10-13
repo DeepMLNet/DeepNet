@@ -333,6 +333,12 @@ module CudaExecUnit =
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse -> inplaceFirstSrcReq ()
 
+        | UUnaryOp (Expr.Select _) -> needExtra op
+        | UExtraOp (Select idxArgs) -> dfltSrcWithNoViewReq ()
+
+        | UUnaryOp (Expr.Disperse _) -> needExtra op
+        | UExtraOp (Disperse idxArgs) -> dfltSrcWithNoViewReq ()
+            
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
@@ -609,6 +615,12 @@ module CudaExecUnit =
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
+        | UUnaryOp (Expr.Select _) -> needExtra op
+        | UExtraOp (Select idxArgs) -> dfltChOutplaceTrgt ()
+
+        | UUnaryOp (Expr.Disperse _) -> needExtra op
+        | UExtraOp (Disperse idxArgs) -> dfltChOutplaceTrgt ()
+
         // extension        
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
@@ -666,6 +678,16 @@ module CudaExecUnit =
         let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
+
+    /// execution items for a select operation
+    let execItemsForSelect trgt srcView idxViews =
+        let funcName = sprintf "select%dD" (ArrayND.nDims trgt)
+        let args = 
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl srcView) :> ICudaArgTmpl) ::
+            (List.map (function | Some v -> ArrayNDArgTmpl v :> ICudaArgTmpl
+                                | None   -> ArrayNDNullArgTmpl () :> ICudaArgTmpl) idxViews)
+        execItemsForKernel funcName args args (workDimForElemwise trgt false)
 
     /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
     let reductionFuncnameAndArgs trgt cOp cInitialOp src =
@@ -1251,6 +1273,20 @@ module CudaExecUnit =
 
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+
+        | UUnaryOp (Expr.Select _) -> needExtra op
+        | UExtraOp (Select idxArgs) -> 
+            let srcs = srcsDfltCh ()
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            execItemsForSelect (dfltChTrgt()) srcs.[0] idxArgs
+
+        | UUnaryOp (Expr.Disperse _) -> needExtra op
+        | UExtraOp (Disperse idxArgs) -> 
+            let srcs = srcsDfltCh ()
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            failwith "TODO"
 
         // extension
         | UNaryOp (ExtensionOp eop) -> 

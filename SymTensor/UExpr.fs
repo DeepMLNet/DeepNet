@@ -43,6 +43,8 @@ module UExprTypes =
         Channels:   Map<ChannelT, ULoopValueT>
     }
 
+    and IndexArgs = int option list
+
     /// ops that have special handling
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
@@ -51,6 +53,8 @@ module UExprTypes =
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT
+        | Select of IndexArgs
+        | Disperse of IndexArgs
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
@@ -129,6 +133,16 @@ module UExpr =
         UExprs:             Dictionary<UExprT, UExprT>
     }
 
+    let internal indicesToIdxArgs indices =
+        let idxArgNos, _ =
+            (1, indices)
+            ||> List.mapFold (fun argNo idx ->
+                match idx with
+                | Some _ -> Some argNo, argNo + 1
+                | None -> None, argNo)
+        let idxArgs = indices |> List.choose id
+        idxArgNos, idxArgs
+
     let rec private toUExprRec (caches: UExprCaches) (expr: ExprT) =
         match caches.UExprForExpr.TryFind expr with
         | Some cached -> cached
@@ -176,6 +190,12 @@ module UExpr =
 
                     // and separate op to extract referenced channel
                     UExpr (UExtraOp (Channel channel), [uLoop], metadata)
+                | Expr.Unary (Expr.Select indices, a) ->                
+                    let idxArgNos, idxArgs = indicesToIdxArgs indices
+                    extra (Select idxArgNos) (a::idxArgs)
+                | Expr.Unary (Expr.Disperse (indices, _), a) ->
+                    let idxArgNos, idxArgs = indicesToIdxArgs indices
+                    extra (Disperse idxArgNos) (a::idxArgs)
                 | Expr.Unary (Expr.Held (_, heldOp), a) ->
                     failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
