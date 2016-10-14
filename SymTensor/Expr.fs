@@ -712,22 +712,28 @@ module Expr =
                         match indices |> List.tryPick id with
                         | Some idx -> idx.Shape
                         | None -> failwith "gather needs at least one specified index expression"  
-                    for idx in indices do
+                    for dim, idx in List.indexed indices do
                         match idx with
                         | Some idx when idx.Type <> typeof<int> ->
                             failwithf "all index arrays for gather must be of type int, but got type %A" idx.Type
                         | Some idx when idx.Shape <> trgtShape ->
                             failwithf "all gather indices must have equal shape, but got %A"
                                 (indices |> List.map (Option.map shapeOf))
+                        | None when dim >= ShapeSpec.nDim trgtShape ->
+                            failwithf "gather index dimensions beyond the number of target dimensions \
+                                       must not be None"
                         | _ -> ()
                 | Scatter (indices, shp) ->
-                    for idx in indices do
+                    for dim, idx in List.indexed indices do
                         match idx with
                         | Some idx when idx.Type <> typeof<int> ->
                             failwithf "all index arrays for scatter must be of type int, but got type %A" idx.Type
                         | Some idx when idx.Shape <> a.Shape ->
                             failwithf "all scatter indices must have shape of source %A, but got %A" a.Shape
                                 (indices |> List.map (Option.map shapeOf))
+                        | None when dim >= a.NDims ->
+                            failwithf "scatter index dimensions beyond the number of source dimensions \
+                                       must not be None"
                         | _ -> ()
                 | _ -> ()
 

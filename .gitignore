@@ -243,3 +243,4 @@ ModelManifest.xml
 /TestExes/LangRNN/Data/reddit-comments-2015-08.csv
 /TestExes/LangRNN/Data/reddit-comments-2015-08-tokenized.txt
 /TestExes/LangRNN/tokenize.pyc
+/TestExes/LangRNN/Data/Songs

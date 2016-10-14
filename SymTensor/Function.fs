@@ -251,7 +251,8 @@ module Func =
                 |> List.map (fun gen -> gen.UVarSpecsAndEvalable failIfImpossible compileEnv.SymSizes) 
                 |> List.unzip
             let neededVars = Set.unionMany vars   
-            printfn "neededVars: %A" (neededVars |> Set.toList)
+            if Debug.PrintInstantiations then
+                printfn "Vars needed for instantiation:\n%A" (neededVars |> Set.toList)
 
             // check that all necessary symbol sizes are available
             let allSizesAvail = sizeAvail |> List.forall id

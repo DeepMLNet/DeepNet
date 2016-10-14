@@ -273,6 +273,8 @@ module ArrayND =
             | None -> ()
             if src.NDims <> indices.Length then
                 failwithf "must specify an index array for each dimension of src"
+            if indices |> List.skip trgt.NDims |> List.exists Option.isNone then
+                failwithf "index dimensions beyond the number of target dimensions must not be None"
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
             trgt.GatherImpl indices src
 
@@ -316,6 +318,8 @@ module ArrayND =
             | None -> ()
             if trgt.NDims <> indices.Length then
                 failwithf "must specify an index array for each dimension of the target"
+            if indices |> List.skip src.NDims |> List.exists Option.isNone then
+                failwithf "index dimensions beyond the number of source dimensions must not be None"
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape src.Shape))
             trgt.ScatterImpl indices src
 

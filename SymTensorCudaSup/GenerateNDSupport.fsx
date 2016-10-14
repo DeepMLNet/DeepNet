@@ -275,48 +275,53 @@ for dims = 0 to maxDims do
     for ary = 0 to maxArity do
         elementsWrapper ary
         
-    let gatherFunc () =    
+    let gatherFunc trgtDims srcDims =    
         let idxTmpl = 
-            {0 .. dims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
+            {0 .. srcDims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
         let allTmpl = "typename TTarget" :: "typename TSrc" :: idxTmpl
         wrt "template <%s>" (allTmpl |> cw ", ")
          
         let idxArgDecls =
-            {0 .. dims - 1} |> Seq.map (fun i -> sprintf "const TIdx%d &idx%d" i i) |> Seq.toList
+            {0 .. srcDims - 1} |> Seq.map (fun i -> sprintf "const TIdx%d &idx%d" i i) |> Seq.toList
         let allArgDecls = "TTarget &trgt" :: "const TSrc &src" :: idxArgDecls
-        wrt "_dev void gather%dD (%s) {" dims (allArgDecls |> cw ", ")
+        wrt "_dev void gather%dDTo%dD (%s) {" srcDims trgtDims (allArgDecls |> cw ", ")
 
-        elementwiseLoop "trgt" false (fun dims ->      
-            let poses = ad |>> prn "pos%d" |> Seq.toList
-            let idxArgs = {0 .. dims - 1} |> Seq.map (fun a -> sprintf "idx%d" a) |> Seq.toList
-            let selectArgs = idxArgs |> List.mapi (fun d ia -> 
-                sprintf "%s.data() ? %s.element(%s) : %s" ia ia (poses |> cw ", ") poses.[d])
-            wrt "  trgt.element(%s) = src.element(%s);" (poses |> cw ", ") (selectArgs |> cw ", "))        
+        elementwiseLoop "trgt" false (fun _ ->      
+            let trgtPoses = {0 .. trgtDims-1} |>> prn "pos%d" |> Seq.toList
+            let srcPoses = [0 .. srcDims-1] |> List.map (fun d -> 
+                if d < trgtDims then
+                    sprintf "idx%d.data() ? idx%d.element(%s) : %s" d d (trgtPoses |> cw ", ") trgtPoses.[d]
+                else
+                    sprintf "idx%d.element(%s)" d (trgtPoses |> cw ", "))
+            wrt "  trgt.element(%s) = src.element(%s);" (trgtPoses |> cw ", ") (srcPoses |> cw ", "))        
         wrt "}"
         wrt ""       
 
-    let scatterFunc () =    
+    let scatterFunc trgtDims srcDims =    
         let idxTmpl = 
-            {0 .. dims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
+            {0 .. trgtDims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
         let allTmpl = "typename TTarget" :: "typename TSrc" :: idxTmpl
         wrt "template <%s>" (allTmpl |> cw ", ")
          
         let idxArgDecls =
-            {0 .. dims - 1} |> Seq.map (fun i -> sprintf "const TIdx%d &idx%d" i i) |> Seq.toList
+            {0 .. trgtDims - 1} |> Seq.map (fun i -> sprintf "const TIdx%d &idx%d" i i) |> Seq.toList
         let allArgDecls = "TTarget &trgt" :: "const TSrc &src" :: idxArgDecls
-        wrt "_dev void scatter%dD (%s) {" dims (allArgDecls |> cw ", ")
+        wrt "_dev void scatter%dDTo%dD (%s) {" srcDims trgtDims (allArgDecls |> cw ", ")
 
         elementwiseLoop "src" false (fun dims ->      
-            let poses = ad |>> prn "pos%d" |> Seq.toList
-            let idxArgs = {0 .. dims - 1} |> Seq.map (fun a -> sprintf "idx%d" a) |> Seq.toList
-            let selectArgs = idxArgs |> List.mapi (fun d ia -> 
-                sprintf "%s.data() ? %s.element(%s) : %s" ia ia (poses |> cw ", ") poses.[d])
-            wrt "  atomicAdd(&trgt.element(%s), src.element(%s));" (selectArgs |> cw ", ") (poses |> cw ", ") )        
+            let srcPoses = {0 .. srcDims-1} |>> prn "pos%d" |> Seq.toList
+            let trgtPoses = [0 .. trgtDims-1] |> List.map (fun d -> 
+                if d < srcDims then
+                    sprintf "idx%d.data() ? idx%d.element(%s) : %s" d d (srcPoses |> cw ", ") srcPoses.[d]
+                else
+                    sprintf "idx%d.element(%s)" d (srcPoses |> cw ", "))
+            wrt "  atomicAdd(&trgt.element(%s), src.element(%s));" (trgtPoses |> cw ", ") (srcPoses |> cw ", ") )        
         wrt "}"
         wrt ""       
 
-    gatherFunc ()
-    scatterFunc ()
+    for srcDims=0 to maxDims do
+        gatherFunc dims srcDims
+        scatterFunc dims srcDims
 
 let elementwiseHeterogenousLoop fBody =
     wrt " for (idx_t idx = threadIdx.x + blockIdx.x * blockDim.x; idx < trgt.size(); idx += gridDim.x * blockDim.x) {"

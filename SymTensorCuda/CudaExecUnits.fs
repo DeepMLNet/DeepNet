@@ -681,7 +681,7 @@ module CudaExecUnit =
 
     /// execution items for a gather operation
     let execItemsForGather trgt src idxViews =
-        let funcName = sprintf "gather%dD" (ArrayND.nDims trgt)
+        let funcName = sprintf "gather%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
@@ -692,7 +692,7 @@ module CudaExecUnit =
 
     /// execution items for a scatter operation
     let execItemsForScatter trgt src idxViews =
-        let funcName = sprintf "scatter%dD" (ArrayND.nDims trgt)
+        let funcName = sprintf "scatter%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::

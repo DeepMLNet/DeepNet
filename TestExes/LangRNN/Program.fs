@@ -86,7 +86,7 @@ module Program =
         let stepLoss = -log targetProb 
         let loss = Expr.mean stepLoss
 
-        printfn "loss:\n%A" loss
+        //printfn "loss:\n%A" loss
 
         let mi = mb.Instantiate (DevCuda, Map [nWords,     NWords
                                                nRecurrent, NRecurrent])
@@ -98,7 +98,7 @@ module Program =
                 | None -> 
                     ArrayNDCuda.zeros<single> [NBatch; NRecurrent] :> IArrayNDT
             let n = smpl.Words.Shape.[1]
-            printfn "smpl.Words: %A" smpl.Words.Shape
+            //printfn "smpl.Words: %A" smpl.Words.Shape
             VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
                           target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
                           initial, state]
