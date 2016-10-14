@@ -56,15 +56,15 @@ module ExpectationPropagation =
         ///Update loop of the EP algorithm runs n iterations
         let optimize  n (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
             let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
-            let prevSigma = Expr.var<single> "prevSigma" (sigma.Shape)
-            let prevMu = Expr.var<single> "prevMu" ([SizeSpec.fix 1;mu.Shape.[0]])
-            let prevCovSite = Expr.var<single> "prevCovSite" ([SizeSpec.fix 1;covSite.Shape.[0]])
-            let prevMuSite = Expr.var<single> "prevMuSite" ([SizeSpec.fix 1;muSite.Shape.[0]])
+            let prevSigma = Expr.var<single> "prevSigma" sigma.Shape
+            let prevMu = Expr.var<single> "prevMu" mu.Shape
+            let prevCovSite = Expr.var<single> "prevCovSite"covSite.Shape
+            let prevMuSite = Expr.var<single> "prevMuSite" muSite.Shape
             let nIters = SizeSpec.fix n
             let delayCovSite = SizeSpec.fix 1
-            let delayMuSite = SizeSpec.fix 2
-            let delaySigma = SizeSpec.fix 3
-            let delayMu = SizeSpec.fix 4
+            let delayMuSite = SizeSpec.fix 1
+            let delaySigma = SizeSpec.fix 1
+            let delayMu = SizeSpec.fix 1
             let chCovSite = "covSite"
             let chMuSite = "muSite"
             let chSigma = "sigma"
@@ -84,18 +84,21 @@ module ExpectationPropagation =
                                  ls, Expr.ConstArg 5
                                  x, Expr.ConstArg 6
                                  sigNs, Expr.ConstArg 7]
-                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=1}
+                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=0}
                                      chMuSite, {LoopValueT.Expr=newMuSite; LoopValueT.SliceDim=0}
                                      chSigma, {LoopValueT.Expr=newSigma; LoopValueT.SliceDim=0}
                                      chMu, {LoopValueT.Expr=newMu; LoopValueT.SliceDim=0}]    
             }
             let covSite = Expr.reshape [SizeSpec.fix 1;covSite.Shape.[0]] covSite
+            let muSite = Expr.reshape [SizeSpec.fix 1;muSite.Shape.[0]] muSite
+            let sigma = Expr.reshape [SizeSpec.fix 1;sigma.Shape.[0];sigma.Shape.[1]] sigma
+            let mu = Expr.reshape [SizeSpec.fix 1;mu.Shape.[0]] mu
             let newCovSite = Expr.loop loopSpec chCovSite [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
             let newMuSite = Expr.loop loopSpec chMuSite [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
             let newSigma = Expr.loop loopSpec chSigma [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
             let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu;Expr.makeVar sigVar;Expr.makeVar ls;Expr.makeVar x;Expr.makeVar sigNs]
-            newSigma,newMu,newCovSite,newMuSite
-        optimize 5 (sigma,mu, covSite,muSite)
+            newSigma.[nIters - 1,0..newSigma.Shape.[1] - 1,0..newSigma.Shape.[2] - 1],newMu.[nIters - 1,0..newMu.Shape.[1] - 1],newCovSite.[nIters - 1,0..newCovSite.Shape.[1] - 1],newMuSite.[nIters - 1,0..newMuSite.Shape.[1] - 1]
+        optimize 10 (sigma,mu, covSite,muSite)
 
 
 module GaussianProcess =
@@ -191,12 +194,32 @@ module GaussianProcess =
         let mean,cov = 
             match monotonicity with
             | Some vu ->
+                
+                let covPdFun (x:ExprT) (k:ExprT) =
+                    let i, j  = ElemExpr.idx2
+                    let cMat,xvect = ElemExpr.arg2<single>
+                    let xelem = xvect[i]
+                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
+                    let sizeK1 = k.Shape.[0]
+                    let sizeK2 = k.Shape.[0]
+                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+                
+                let covPdPd  (x:ExprT) (y:ExprT) (k:ExprT)  = 
+                    let i, j  = ElemExpr.idx2
+                    let cMat,xvect,yvect = ElemExpr.arg3<single>
+                    let xelem = xvect[i]
+                    let yelem = yvect[j]
+                    let cPdPd = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem yelem
+                    let sizeK1 = k.Shape.[0]
+                    let sizeK2 = k.Shape.[0]
+                    Expr.elements [sizeK1;sizeK2] cPdPd [k;x;y]
+                
                 ///locations of the virtual derivative points on training points
                 let xm = x
                 let kFf = k
-                let kFf' = covMat x xm |> Deriv.compute |> Deriv.ofVar xm
-                let kF'f = covMat xm x |> Deriv.compute |> Deriv.ofVar xm
-                let kF'f' = covMat xm xm |> Deriv.compute |> Deriv.ofVar xm |> Deriv.compute |> Deriv.ofVar xm
+                let kF'f = covMat xm x |> covPdFun xm
+                let kFf' = kF'f.T
+                let kF'f' = covMat xm xm |> covPdPd xm xm
 
 
                 //TODO: covSite and muSite without EP algorithm
@@ -205,12 +228,19 @@ module GaussianProcess =
 
                 
                 let xJoint = Expr.concat 0 [x;xm]
-                let kJoint = Expr.concat 1 [Expr.concat 0 [kFf;kFf'];Expr.concat 0 [kF'f;kF'f']]
+                printfn "Shape kFf = %A\nShape kFf' = %A"kFf.Shape kFf'.Shape
+                printfn "Shape kF'f = %A\nShape kFf' = %A"kF'f.Shape kF'f'.Shape
+                let kJoint1,kJoint2 = Expr.concat 0 [kFf;kFf'],Expr.concat 0 [kF'f;kF'f']
+                printfn "Shape kJoint1 = %A\nShape  kJoint2 = %A" kJoint1.Shape  kJoint2.Shape
+                let kJoint = Expr.concat 1 [kJoint1;kJoint2]
+                printfn "Shape kJoint = %A" kJoint.Shape
                 let muJoint = Expr.concat 0 [y;muSite]
                 let zeroMat = Expr.zerosLike kFf
                 let zeroMatFf' = Expr.zerosLike kFf'
                 let zeroMatF'f = Expr.zerosLike kF'f
-                let sigmaJoint =  Expr.concat 1 [Expr.concat 0 [zeroMat;zeroMatFf'];Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]]
+                let sigmaJ1,sigmaJ2=Expr.concat 0 [zeroMat;zeroMatFf'],Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]
+                printfn "Shape sigmaJ1 = %A\nShape sigmaJ2 = %A"sigmaJ1.Shape sigmaJ2.Shape
+                let sigmaJoint =  Expr.concat 1 [sigmaJ1;sigmaJ2] 
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar
                 let meanXJoint = meanFct xJoint
