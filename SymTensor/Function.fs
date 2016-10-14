@@ -65,13 +65,14 @@ module VarEnv =
                 if VarSpec.nDims vSym <> ArrayND.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
                         (ArrayND.shape vVal) vSym
-                let failShape () =
-                    failwithf "expected variable %s with shape %A but got value with shape %A"
-                        vSym.Name vSym.Shape (ArrayND.shape vVal)
 
                 (VarSpec.shape vSym, ArrayND.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
+                    let failShape () =
+                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
+                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
+                            vSym vSymShp vVal.Shape
                     match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
                     | Base (Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
                     | Base (Fixed f) -> 

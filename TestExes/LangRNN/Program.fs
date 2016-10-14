@@ -20,9 +20,10 @@ module Program =
 //    let NRecurrent  = 650
     
     let NWords      = 200
-    let NBatch      = 20
+    let NBatch      = 100
     let NSteps      = 35
     let NRecurrent  = 100
+    let NMaxBatches = 1000
 
 
 
@@ -55,7 +56,7 @@ module Program =
         tokenizedSentences |> Seq.map (List.map (fun id -> wordForId.[id]))
 
     
-    let trainModel dataset =
+    let trainModel (dataset: TrnValTst<WordSeq>) =
         let mb = ModelBuilder<single> ("Lang")
 
         let nBatch     = mb.Size "nBatch"
@@ -91,12 +92,14 @@ module Program =
         let mi = mb.Instantiate (DevCuda, Map [nWords,     NWords
                                                nRecurrent, NRecurrent])
 
+        let lossFn = mi.Func (loss) |> arg3 initial input target
+
+        let zeroInitial = ArrayNDCuda.zeros<single> [NBatch; NRecurrent]
         let smplVarEnv stateOpt (smpl: WordSeq) =
             let state =
                 match stateOpt with
                 | Some state -> state :> IArrayNDT
-                | None -> 
-                    ArrayNDCuda.zeros<single> [NBatch; NRecurrent] :> IArrayNDT
+                | None -> zeroInitial :> IArrayNDT
             let n = smpl.Words.Shape.[1]
             //printfn "smpl.Words: %A" smpl.Words.Shape
             VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
@@ -107,9 +110,14 @@ module Program =
 
         let trainCfg = {
             Train.defaultCfg with
+                MaxIters  = Some 10
                 BatchSize = NBatch
         }
-        Train.train trainable dataset trainCfg
+        //Train.train trainable dataset trainCfg
+
+        printfn "Calculating loss:"
+        let lossVal = lossFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
+        printfn "loss=%f" (lossVal |> ArrayND.value)
 
 
     [<EntryPoint>]
@@ -141,6 +149,7 @@ module Program =
             tokenizedSentences 
             |> List.concat
             |> List.chunkBySize NSteps
+            |> List.take NMaxBatches
             |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
             |> List.filter (fun {Words=words} -> words.Shape = [NSteps])
             |> Dataset.FromSamples
@@ -151,8 +160,9 @@ module Program =
         let res = trainModel dataset
 
 
-
-        0
+        // shutdown
+        Cuda.CudaSup.shutdown ()
+        0 
 
 
 
