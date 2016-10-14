@@ -91,9 +91,9 @@ module RecurrentLayer =
     }
 
     /// Predicts an output sequence by running the RNN over the input sequence.
-    /// Argument shapes: input[smpl, step, inUnit].
-    /// Output shapes:  output[smpl, step, outUnit].
-    let pred (pars: Pars) (input: ExprT) =
+    /// Argument shapes: initial[smpl, recUnit],  input[smpl, step, inUnit].
+    /// Output shapes:     final[smpl, recUnit], output[smpl, step, outUnit].
+    let pred (pars: Pars) (initial: ExprT) (input: ExprT) =
         // inputWeights     [recUnit, inUnit]
         // recurrentWeights [recUnit, recUnit]
         // outputWeights    [outUnit, recUnit]
@@ -101,6 +101,7 @@ module RecurrentLayer =
         // outputBias       [recUnit]
         // input            [smpl, step]           - if OneHotIndexInput=true 
         // input            [smpl, step, inUnit]   - if OneHotIndexInput=false
+        // initial          [smpl, recUnit]
         // state            [smpl, step, recUnit]
         // output           [smpl, step, outUnit]
 
@@ -118,7 +119,7 @@ module RecurrentLayer =
         // build loop
         let inputSlice = 
             if pars.HyperPars.OneHotIndexInput then
-                Expr.var<single> "InputSlice"  [nBatch]
+                Expr.var<int> "InputSlice"  [nBatch]
             else
                 Expr.var<single> "InputSlice"  [nBatch; pars.HyperPars.NInput]
         let prevState = 
@@ -141,15 +142,17 @@ module RecurrentLayer =
         let loopSpec = {
             Expr.Length = nSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
-                             Expr.extractVar state, 
+                             Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
                                  chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
         }
 
-        let initialState = Expr.zeros<single> [nBatch; SizeSpec.fix 1; nRecurrent]
-        let outputs = Expr.loop loopSpec chOutput [input; initialState]
+        let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1; nRecurrent]
+        let states  = Expr.loop loopSpec chState  [input; initial]
+        let outputs = Expr.loop loopSpec chOutput [input; initial]
+        let final = states.[*, nSteps-1, *]
 
-        outputs
+        final, outputs
 
 

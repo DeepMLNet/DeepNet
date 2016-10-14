@@ -295,6 +295,9 @@ module Expr =
         /// implementations. This method may be omitted when no verification will be done.
         abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
 
+        /// Should return the set of variables that this op instance depends on.
+        abstract ContainedVars: Set<VarSpecT>
+
     /// an expression
     and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>] 
         ExprT =
@@ -380,12 +383,24 @@ module Expr =
 
     /// returns true if subExpr is contained in expr
     let rec contains subExpr expr =
+        let subCon = contains subExpr
         if expr = subExpr then true
         else
             match expr with
-            | Unary (_, a) -> contains subExpr a
-            | Binary (_, a, b) -> contains subExpr a || contains subExpr b
-            | Nary (_, es) -> List.exists (contains subExpr) es
+            | Unary (Gather indices, a) ->
+                subCon a || 
+                indices |> List.exists (function | Some idx -> subCon idx | None -> false)
+            | Unary (Scatter (indices, _), a) ->
+                subCon a || 
+                indices |> List.exists (function | Some idx -> subCon idx | None -> false)
+            | Unary (AssumeJacobian jac, a) ->
+                subCon a || subCon jac
+            | Binary (IfThenElse cond, a, b) ->
+                subCon a || subCon b || subCon cond
+
+            | Unary (_, a) -> subCon a
+            | Binary (_, a, b) -> subCon a || subCon b
+            | Nary (_, es) -> List.exists subCon es
             | _ -> false
 
     /// Produces an error message about incompatible shapes.
@@ -564,8 +579,18 @@ module Expr =
         match expr with
         | Leaf (Var vs) -> Set.singleton vs
         | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
+        | Unary (Gather indices, a) ->
+            let indicesVars = indices |> List.choose (Option.map extractVars)
+            Set.unionMany (extractVars a :: indicesVars)
+        | Unary (Scatter (indices, _), a) ->
+            let indicesVars = indices |> List.choose (Option.map extractVars)
+            Set.unionMany (extractVars a :: indicesVars)
+        | Unary (AssumeJacobian jac, a) -> 
+            Set.union (extractVars jac) (extractVars a)
         | Binary (IfThenElse cond, a, b) -> 
             Set.unionMany [extractVars cond; extractVars a; extractVars b]
+        | Nary (ExtensionOp eop, es) ->
+            Set.unionMany (eop.ContainedVars :: (es |> List.map extractVars))
 
         | Leaf _ -> Set.empty
         | Unary (_, a) -> extractVars a
@@ -681,27 +706,27 @@ module Expr =
                     a |> checkAxis dim
                 | Gather indices ->
                     if nda <> indices.Length then
-                        failwithf "select argument has %d dimensions but %d index arrays were specified" 
+                        failwithf "gather argument has %d dimensions but %d index arrays were specified" 
                             nda indices.Length
                     let trgtShape =
                         match indices |> List.tryPick id with
                         | Some idx -> idx.Shape
-                        | None -> failwith "select needs at least one specified index expression"  
+                        | None -> failwith "gather needs at least one specified index expression"  
                     for idx in indices do
                         match idx with
                         | Some idx when idx.Type <> typeof<int> ->
-                            failwithf "all index arrays for select must be of type int, but got type %A" idx.Type
+                            failwithf "all index arrays for gather must be of type int, but got type %A" idx.Type
                         | Some idx when idx.Shape <> trgtShape ->
-                            failwithf "all indices must have equal shape, but got %A"
+                            failwithf "all gather indices must have equal shape, but got %A"
                                 (indices |> List.map (Option.map shapeOf))
                         | _ -> ()
                 | Scatter (indices, shp) ->
                     for idx in indices do
                         match idx with
                         | Some idx when idx.Type <> typeof<int> ->
-                            failwithf "all index arrays for select must be of type int, but got type %A" idx.Type
+                            failwithf "all index arrays for scatter must be of type int, but got type %A" idx.Type
                         | Some idx when idx.Shape <> a.Shape ->
-                            failwithf "all indices must have shape of source %A, but got %A" a.Shape
+                            failwithf "all scatter indices must have shape of source %A, but got %A" a.Shape
                                 (indices |> List.map (Option.map shapeOf))
                         | _ -> ()
                 | _ -> ()
@@ -750,19 +775,22 @@ module Expr =
                 es |> List.iter checkExpr
                 let ss = es |> List.map shapeOf
 
-                if es |> List.exists (fun e -> typename e <> typename es.Head) then
-                    failwithf "cannot apply n-ary operation %A to expressions of different types %A"
-                        op (es |> List.map (typename >> TypeName.getType))
+                let checkEqualTypes() =
+                    if es |> List.exists (fun e -> typename e <> typename es.Head) then
+                        failwithf "cannot apply n-ary operation %A to expressions of different types %A"
+                            op (es |> List.map (typename >> TypeName.getType))
                 let checkArg idx =
                     if not (0 <= idx && idx < es.Length) then
                         failwithf "the zero-based index %d does not exist for %d specified arguments" idx es.Length
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> 
+                    checkEqualTypes()
                     let tns = es |> List.map typename
                     ElemExpr.check elemExpr |> ignore
                     ElemExpr.checkCompatibility elemExpr ss tns trgtShp
                 | Interpolate ip ->
+                    checkEqualTypes()
                     let nDims = ip.MinArg.Length
                     if nDims < 1 then
                         failwith "interpolator must be at least one-dimensional"

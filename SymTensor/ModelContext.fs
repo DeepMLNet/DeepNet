@@ -305,7 +305,7 @@ module ModelContextTypes =
             match size with
             | Base (Sym sym) -> 
                 match symSizeEnv |> Map.tryFind sym with
-                | Some (Base (Fixed value)) -> value
+                | Some (Base (Fixed _) as value) -> SizeSpec.eval value
                 | _ -> failwith "size symbol is unknown or does not a have a numeric value"
             | _ -> failwith "need a size symbol to set size"
 

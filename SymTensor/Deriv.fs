@@ -472,7 +472,9 @@ module Deriv =
                 let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
 
                 // calculate Jacobians w.r.t. all variables
-                value.Expr |> computeWithRootJacobian incomingJacobian)    
+                let chDeriv = value.Expr |> computeWithRootJacobian incomingJacobian               
+                chDeriv
+                )    
             |> Seq.reduce merge
 
         // go through portContents and create actual port contents
@@ -592,7 +594,8 @@ module Deriv =
         /// expressions that have received Jacobians from all their dependants
         let exprsWithFullJacobian = Queue<ExprT> ()
 
-        let multiChannelOpJacobians = Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
+        let multiChannelOpJacobians = 
+            Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
         let multiChannelOpsWithFullJacobians = Queue<MultiChannelOpUsageT> ()
 
         /// adds the specified Jacobian coming from `source` to `target`
@@ -673,7 +676,7 @@ module Deriv =
                 multiChannelDiffStep mcOp channelJacs |> transmitJacobians (Choice2Of2 mcOp)
         
         {
-            FunElems  = rootExpr.NElems
+            FunElems  = rootJacobian.Shape.[0]
             Jacobians = varJacs
         }    
 

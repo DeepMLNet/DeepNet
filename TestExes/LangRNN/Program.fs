@@ -8,10 +8,28 @@ open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
 open Optimizers
+open Datasets
 
 
 module Program =
 
+    let dataPath = "../../Data/reddit-comments-2015-08-tokenized.txt"
+//    let NWords      = 8000
+//    let NBatch      = 20
+//    let NSteps      = 35
+//    let NRecurrent  = 650
+    
+    let NWords      = 200
+    let NBatch      = 20
+    let NSteps      = 35
+    let NRecurrent  = 100
+
+
+
+    type WordSeq = {
+        Words:  ArrayNDT<int>
+    }
+    
     let readData path = 
         seq {
             for line in File.ReadLines path do
@@ -37,16 +55,17 @@ module Program =
         tokenizedSentences |> Seq.map (List.map (fun id -> wordForId.[id]))
 
     
-    let buildModel () =
-        let mb = ModelBuilder ("Lang")
+    let trainModel dataset =
+        let mb = ModelBuilder<single> ("Lang")
 
         let nBatch     = mb.Size "nBatch"
         let nSteps     = mb.Size "nSteps"
         let nWords     = mb.Size "nWords"
         let nRecurrent = mb.Size "nRecurrent"
 
-        let input  = mb.Var<int> "Input"  [nBatch; nSteps]
-        let target = mb.Var<int> "Target" [nBatch; nSteps]
+        let input   = mb.Var<int>     "Input"   [nBatch; nSteps]
+        let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
+        let target  = mb.Var<int>     "Target"  [nBatch; nSteps]
         
         let rnn = RecurrentLayer.pars (mb.Module "RNN") {
             RecurrentLayer.defaultHyperPars with
@@ -58,21 +77,43 @@ module Program =
                 OneHotIndexInput        = true
         }
 
-        // pred [smpl, step, word] - probability of word
-        let pred = input |> RecurrentLayer.pred rnn
+        // final [smpl, recUnit]
+        // pred  [smpl, step, word] - probability of word
+        let final, pred = (initial, input) ||> RecurrentLayer.pred rnn
 
         // [smpl, step]
         let targetProb = pred |> Expr.gather [None; None; Some target]            
         let stepLoss = -log targetProb 
         let loss = Expr.mean stepLoss
 
-        pred, loss
+        printfn "loss:\n%A" loss
+
+        let mi = mb.Instantiate (DevCuda, Map [nWords,     NWords
+                                               nRecurrent, NRecurrent])
+
+        let smplVarEnv stateOpt (smpl: WordSeq) =
+            let state =
+                match stateOpt with
+                | Some state -> state :> IArrayNDT
+                | None -> 
+                    ArrayNDCuda.zeros<single> [NBatch; NRecurrent] :> IArrayNDT
+            let n = smpl.Words.Shape.[1]
+            printfn "smpl.Words: %A" smpl.Words.Shape
+            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
+                          target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
+                          initial, state]
+                          
+        let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
+
+        let trainCfg = {
+            Train.defaultCfg with
+                BatchSize = NBatch
+        }
+        Train.train trainable dataset trainCfg
 
 
     [<EntryPoint>]
     let main argv = 
-        let dataPath = "../../Data/reddit-comments-2015-08-tokenized.txt"
-        let vocabularySize = 8000
 
         let sentences = readData dataPath
 
@@ -80,23 +121,35 @@ module Program =
         printfn "Found %d unique words." (Map.toSeq freqs |> Seq.length)
         
         let freqsSorted = freqs |> Map.toList |> List.sortByDescending snd 
-                          |> List.take (vocabularySize-1)
+                          |> List.take (NWords-1)
         
         let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
         let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
-                        |> Map.add (vocabularySize-1) "UNKNOWN_TOKEN"
+                        |> Map.add (NWords-1) "UNKNOWN_TOKEN"
 
         let tokenizedSentences = sentences |> tokenize idForWord
         let detokenizedSentences = tokenizedSentences |> detokenize wordForId
 
         printfn "Using vocabulary of size %d with least common word %A."
-            vocabularySize (List.last freqsSorted)       
+                NWords (List.last freqsSorted)       
         //printfn "%A" (sentences |> Seq.take 10 |> Seq.toList)
         //printfn "%A" (tokenizedSentences |> Seq.take 10 |> Seq.toList)
         //printfn "%A" (detokenizedSentences |> Seq.take 10 |> Seq.toList)
 
+        // create dataset
+        let dataset = 
+            tokenizedSentences 
+            |> List.concat
+            |> List.chunkBySize NSteps
+            |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
+            |> List.filter (fun {Words=words} -> words.Shape = [NSteps])
+            |> Dataset.FromSamples
+            |> TrnValTst.Of
+            |> TrnValTst.ToCuda
 
-        // build model
+        // train model
+        let res = trainModel dataset
+
 
 
         0
