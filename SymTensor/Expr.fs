@@ -42,6 +42,8 @@ module Expr =
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
         | Identity of shape:SizeSpecT * typ:TypeNameT
+        /// vector counting from zero to given size minus one
+        | Arange of size:SizeSpecT * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -413,6 +415,7 @@ module Expr =
         | Leaf (Identity (_, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
         | Leaf (SizeValue (_, tn)) -> tn
+        | Leaf (Arange (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
         | Binary (Equal, _, _)
@@ -448,6 +451,7 @@ module Expr =
         | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
+        | Leaf(Arange (size, _)) -> ShapeSpec.vector size
 
         // variable access
         | Leaf(Var vs) -> VarSpec.shape vs
@@ -884,6 +888,7 @@ module Expr =
         | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
         | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
+        | Leaf (Arange (size, tn)) -> Leaf (Arange (sSize size, tn))
         | Leaf _ -> expr
 
         | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
@@ -934,48 +939,52 @@ module Expr =
     /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
         let subTest = testEvalAllSymSizes failIfNot
+        let tSize = SizeSpec.canEval
+        let tShp = ShapeSpec.canEval
+        let tSrs = SimpleRangesSpec.canEvalSymbols
         let evalable =
             match expr with
-            | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
-            | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
-            | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
+            | Leaf (Identity (ss, tn)) -> tSize ss
+            | Leaf (SizeValue (sc, tn)) -> tSize sc
+            | Leaf (Var vs) -> tShp (VarSpec.shape vs)
+            | Leaf (Arange (size, tn)) -> tSize size
             | Leaf _ -> true
 
-            | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && subTest a
-            | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && subTest a
-            | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && subTest a
-            | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && subTest a
+            | Unary (Reshape ss, a) -> tShp ss && subTest a
+            | Unary (DoBroadcast ss, a) -> tShp ss && subTest a
+            | Unary (StoreToVar vs, a) -> tShp (VarSpec.shape vs) && subTest a
+            | Unary (Subtensor srs, a) -> tSrs srs && subTest a
             | Unary (Held (derivsShp, heldOp), a) ->
                 let canEvalOp =
                     match heldOp with 
-                    | ReplicateTo (dim, s) -> SizeSpec.canEval s
-                List.forall ShapeSpec.canEval derivsShp && canEvalOp && subTest a
+                    | ReplicateTo (dim, s) -> tSize s
+                List.forall tShp derivsShp && canEvalOp && subTest a
             | Unary (Gather indices, a) ->
                 let someIndices = indices |> List.choose id
                 List.forall subTest someIndices && subTest a
             | Unary (Scatter (indices, shp), a) ->
                 let someIndices = indices |> List.choose id
-                List.forall subTest someIndices && ShapeSpec.canEval shp && subTest a
+                List.forall subTest someIndices && tShp shp && subTest a
             | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
             | Unary (op, a) -> subTest a
 
             | Binary (SetSubtensor srs, a, b) -> 
-                SimpleRangesSpec.canEvalSymbols srs && subTest a && subTest b
+                tSrs srs && subTest a && subTest b
             | Binary (IfThenElse c, a, b) ->
                 subTest c && subTest a && subTest b 
             | Binary (op, a, b) -> subTest a && subTest b
 
             | Nary (Elements (trgtShp, elemExpr), es) -> 
-                ShapeSpec.canEval trgtShp && 
+                tShp trgtShp && 
                 ElemExpr.canEvalAllSymSizes elemExpr && 
                 List.forall subTest es
             | Nary (Channel (Loop spec, channel), es) ->
-                (SizeSpec.canEval spec.Length) 
+                (tSize spec.Length) 
                 &&
                 (spec.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
-                    ShapeSpec.canEval vs.Shape &&
+                    tShp vs.Shape &&
                     match li with
-                    | PreviousChannel pc -> SizeSpec.canEval pc.Delay
+                    | PreviousChannel pc -> tSize pc.Delay
                     | _ -> true)) 
                 &&
                 (spec.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> subTest lv.Expr))                
@@ -1367,6 +1376,15 @@ module Expr =
     /// variable of given name, type and shape
     let varOfType name typ (ss: ShapeSpecT) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> check
+
+    /// Vector counting from zero to given size minus one.
+    [<RequiresExplicitTypeArguments>]
+    let arange<'T> size =
+        Leaf(Arange(size, TypeName.ofType<'T>)) |> check
+
+    /// Vector counting from zero to given size minus one.
+    let arangeOfType shp typ =
+        Leaf(Arange(shp, TypeName.ofTypeInst typ)) |> check
 
     /// annotated expression
     let annotate ano a = 

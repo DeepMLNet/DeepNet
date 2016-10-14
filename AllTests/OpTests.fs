@@ -483,3 +483,24 @@ let ``Trace compare: Scatter 2`` () =
         printfn "idxs=\n%A\n%A" i0v i1v
         printfn "scatter idxs a=\n%A" sv
     )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: arange int`` () =
+    requireEqualTraces (fun device ->
+        let expr = Expr.arange<int> (SizeSpec.fix 10)
+        let exprFn = Func.make<int> device.DefaultFactory expr |> arg0
+        let av = exprFn ()
+        printfn "arange<int> 10 =%A"av
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: arange single`` () =
+    requireEqualTraces (fun device ->
+        let expr = Expr.arange<single> (SizeSpec.fix 10)
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg0
+        let av = exprFn ()
+        printfn "arange<single> 10 =%A"av
+    )

@@ -1008,6 +1008,8 @@ module CudaExecUnit =
             let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
             let cs = ConstSpec.ofValue value
             execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
+        | ULeafOp (Arange _) ->
+            execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CountingIEOp_t", true)) [] 
 
         // variable access
         | ULeafOp (Var vs) -> 

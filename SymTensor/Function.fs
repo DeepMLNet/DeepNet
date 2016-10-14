@@ -438,6 +438,11 @@ module Func =
 [<AutoOpen>]
 module FuncTypes = 
 
+    type Arg0Func<'TR> = unit -> 'TR
+    let arg0<'TR> (f: VarEnvT -> 'TR) : Arg0Func<'TR> =
+        fun () -> 
+            VarEnv.empty |> f
+
     type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
     let arg1<'T0, 'TR> (vs0: ExprT) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
         fun (val0: ArrayNDT<'T0>) -> 

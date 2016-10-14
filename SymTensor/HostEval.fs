@@ -68,6 +68,9 @@ module HostEval =
                     match op with
                     | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
+                    | Arange (ss, tn) -> 
+                        ArrayNDHost.arange (sizeEval ss) 
+                        |> ArrayND.convert :> ArrayNDT<'T> :?> ArrayNDHostT<'T>
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
