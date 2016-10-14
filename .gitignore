@@ -216,6 +216,7 @@ ModelManifest.xml
 /Data/MNIST/MNIST.h5
 /docs/output
 /DeepNet.VC.db
+/SymTensorCudaSup/NDSupport.cuh
 
 /MKL/build/
 /TestData.h5
