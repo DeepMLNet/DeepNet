@@ -19,11 +19,18 @@ module Program =
 //    let NSteps      = 35
 //    let NRecurrent  = 650
     
-    let NWords      = 200
-    let NBatch      = 100
-    let NSteps      = 35
-    let NRecurrent  = 100
-    let NMaxBatches = 1000
+    let NWords      = 4000
+    let NBatch      = 1000
+    let NSteps      = 10
+    let NRecurrent  = 101
+    let NMaxSamples = 10000
+
+//    let NWords      = 8000
+//    let NBatch      = 1000
+//    let NSteps      = 35
+//    let NRecurrent  = 100
+//    let NMaxSamples = 10000
+
 
 
 
@@ -87,12 +94,17 @@ module Program =
         let stepLoss = -log targetProb 
         let loss = Expr.mean stepLoss
 
+        let dLoss = Deriv.compute loss
+        let dLossDInitial = dLoss |> Deriv.ofVar initial |> Expr.sum
         //printfn "loss:\n%A" loss
 
         let mi = mb.Instantiate (DevCuda, Map [nWords,     NWords
                                                nRecurrent, NRecurrent])
 
+
         let lossFn = mi.Func (loss) |> arg3 initial input target
+
+        let dLossDInitialFn = mi.Func (loss, dLossDInitial) |> arg3 initial input target
 
         let zeroInitial = ArrayNDCuda.zeros<single> [NBatch; NRecurrent]
         let smplVarEnv stateOpt (smpl: WordSeq) =
@@ -112,16 +124,32 @@ module Program =
             Train.defaultCfg with
                 MaxIters  = Some 10
                 BatchSize = NBatch
+                CheckpointDir = Some "."
         }
         //Train.train trainable dataset trainCfg
 
-        printfn "Calculating loss:"
-        let lossVal = lossFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
-        printfn "loss=%f" (lossVal |> ArrayND.value)
+//        for i=1 to 1 do
+//            printfn "Calculating loss:"
+//            let lossVal = lossFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
+//            printfn "loss=%f" (lossVal |> ArrayND.value)
+
+        //let tr = Trace.startSessionWithRng "trc" (Some 900, None) 
+
+        for i=1 to 1 do
+            printfn "Calculating and dloss:"
+            let lossVal, dLossVal = dLossDInitialFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
+            printfn "loss=%f   dloss/dInitial=%f" (lossVal |> ArrayND.value) (dLossVal |> ArrayND.value)
+
+        //let ts = tr.End ()
+        //ts |> Trace.dumpToFile "trc.txt"
+
 
 
     [<EntryPoint>]
     let main argv = 
+
+        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
+        SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
 
         let sentences = readData dataPath
 
@@ -149,7 +177,7 @@ module Program =
             tokenizedSentences 
             |> List.concat
             |> List.chunkBySize NSteps
-            |> List.take NMaxBatches
+            |> List.take NMaxSamples
             |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
             |> List.filter (fun {Words=words} -> words.Shape = [NSteps])
             |> Dataset.FromSamples

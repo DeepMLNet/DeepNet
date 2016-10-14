@@ -275,6 +275,25 @@ for dims = 0 to maxDims do
     for ary = 0 to maxArity do
         elementsWrapper ary
         
+    let checkPosFunc () = 
+        let posArgDecls = ad |>> prn "idx_t pos%d" |> Seq.toList
+        wrt "template <typename TAry>"
+        wrt "_dev void checkPos%dD (const char *msg, const TAry &ary, %s) {" dims (posArgDecls |> cw ", ")
+        let allChecks = ad |> Seq.map (fun d -> prn "(0 <= pos%d && pos%d < ary.shape(%d))" d d d)
+        wrt "  if (!(%s)) {" (allChecks |> cw " && ")
+        let allIdxFmt, allIdxVal = ad |> Seq.toList |> List.map (fun d -> "%d", sprintf "pos%d" d) |> List.unzip
+        let allShpFmt, allShpVal = ad |> Seq.toList |> List.map (fun d -> "%d", sprintf "ary.shape(%d)" d) |> List.unzip
+        wrt "    printf(\"Invalid index for %%s: [%s] is out of range for shape [%s].\\n\", msg, %s, %s);" 
+            (allIdxFmt |> cw "; ") (allShpFmt |> cw "; ") (allIdxVal |> cw ", ") (allShpVal |> cw ", ")
+        wrt "    __threadfence();"
+        wrt "    __syncthreads();"
+        wrt "    asm(\"trap;\");"
+        wrt "  }"
+        wrt "}"
+        wrt ""
+
+    if dims > 0 then checkPosFunc ()
+
     let gatherFunc trgtDims srcDims =    
         let idxTmpl = 
             {0 .. srcDims - 1} |> Seq.map (sprintf "typename TIdx%d") |> Seq.toList
@@ -290,9 +309,12 @@ for dims = 0 to maxDims do
             let trgtPoses = {0 .. trgtDims-1} |>> prn "pos%d" |> Seq.toList
             let srcPoses = [0 .. srcDims-1] |> List.map (fun d -> 
                 if d < trgtDims then
-                    sprintf "idx%d.data() ? idx%d.element(%s) : %s" d d (trgtPoses |> cw ", ") trgtPoses.[d]
+                    wrt "  const idx_t srcPos%d = idx%d.data() ? idx%d.element(%s) : %s;" d d d (trgtPoses |> cw ", ") trgtPoses.[d]                    
                 else
-                    sprintf "idx%d.element(%s)" d (trgtPoses |> cw ", "))
+                    wrt "  const idx_t srcPos%d = idx%d.element(%s);" d d (trgtPoses |> cw ", ")
+                sprintf "srcPos%d" d)
+            if srcDims > 0 then
+                wrt "  checkPos%dD (\"gather source\", src, %s);" srcDims (srcPoses |> cw ", ")
             wrt "  trgt.element(%s) = src.element(%s);" (trgtPoses |> cw ", ") (srcPoses |> cw ", "))        
         wrt "}"
         wrt ""       
@@ -312,9 +334,12 @@ for dims = 0 to maxDims do
             let srcPoses = {0 .. srcDims-1} |>> prn "pos%d" |> Seq.toList
             let trgtPoses = [0 .. trgtDims-1] |> List.map (fun d -> 
                 if d < srcDims then
-                    sprintf "idx%d.data() ? idx%d.element(%s) : %s" d d (srcPoses |> cw ", ") srcPoses.[d]
+                    wrt "  const idx_t trgtPos%d = idx%d.data() ? idx%d.element(%s) : %s;" d d d (srcPoses |> cw ", ") srcPoses.[d]
                 else
-                    sprintf "idx%d.element(%s)" d (srcPoses |> cw ", "))
+                    wrt "  const idx_t trgtPos%d = idx%d.element(%s);" d d (srcPoses |> cw ", ")
+                sprintf "trgtPos%d" d)
+            if trgtDims > 0 then
+                wrt "  checkPos%dD (\"scatter target\", trgt, %s);" trgtDims (trgtPoses |> cw ", ")
             wrt "  atomicAdd(&trgt.element(%s), src.element(%s));" (trgtPoses |> cw ", ") (srcPoses |> cw ", ") )        
         wrt "}"
         wrt ""       

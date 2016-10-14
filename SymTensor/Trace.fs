@@ -37,10 +37,11 @@ module Trace =
     }
 
     type TraceSession = {
-        Name:           string
-        Start:          DateTime
-        mutable End:    DateTime option
-        ExprEvals:      ResizeArray<ExprEvaluation>
+        Name:                   string
+        Start:                  DateTime
+        mutable End:            DateTime option
+        ExprEvals:              ResizeArray<ExprEvaluation>
+        StoreResultEventRng:    int option * int option
     }
 
     let private activeTraceSession = new ThreadLocal<TraceSession option>()
@@ -91,19 +92,23 @@ module Trace =
             member this.Dispose () = abort ()
         override this.Finalize() = abort ()
 
-    let startSession name = 
+    let startSessionWithRng name rng =
         match activeTraceSession.Value with
         | Some ts -> failwithf "trace session %s already active" ts.Name
         | None -> ()
 
         let ts = {
-            Name        = name
-            Start       = DateTime.Now
-            End         = None
-            ExprEvals   = ResizeArray<ExprEvaluation>()
+            Name                = name
+            Start               = DateTime.Now
+            End                 = None
+            ExprEvals           = ResizeArray<ExprEvaluation>()
+            StoreResultEventRng = rng
         }
         activeTraceSession.Value <- Some ts
         new TraceSessionHandle(ts)
+
+    let startSession name = 
+        startSessionWithRng name (None, None)
 
     let inline private getActiveExpr () = 
         match activeExprEval.Value with
@@ -165,10 +170,18 @@ module Trace =
     let loopStack () : LoopStack =
         activeLoopStack.Value.ToArray() |> List.ofArray |> List.rev
 
-    let exprEvaledWithMsg uexpr res msg =
+    let private empty = ArrayNDHost.zeros<int> [0] :> IArrayNDT
+
+    let exprEvaledWithMsg uexpr (res: Lazy<IArrayNDT>) msg =
         if isActive () then
-            let ee = getActiveExpr ()
-            ee.Trace.Add (ExprEvaled (uexpr, loopStack(), ArrayND.copyUntyped res, msg))
+            let ee, es = getActiveExpr (), getActiveTraceSession ()
+            let id = ee.Trace.Count
+            let first, last = es.StoreResultEventRng
+            let first, last = first |? 0, last |? Int32.MaxValue
+            let resVal =
+                if (first <= id && id <= last) then ArrayND.copyUntyped (res.Force())
+                else empty
+            ee.Trace.Add (ExprEvaled (uexpr, loopStack(), resVal, msg))
             
     let exprEvaled uexpr res =
         exprEvaledWithMsg uexpr res ""

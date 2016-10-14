@@ -189,7 +189,7 @@ module HostEval =
                     |> box |> unbox
 
             if Trace.isActive () then
-                Trace.exprEvaled (expr |> UExpr.toUExpr) res
+                Trace.exprEvaled (expr |> UExpr.toUExpr) (lazy (res :> IArrayNDT))
             res
 
         /// evaluates all channels of a loop
