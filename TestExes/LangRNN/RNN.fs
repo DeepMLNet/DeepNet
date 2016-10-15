@@ -127,12 +127,11 @@ module RecurrentLayer =
         let state =
             let inpAct = // [smpl, recUnit]
                 if pars.HyperPars.OneHotIndexInput then
-                    // inputWeights [recUnit, inUnit]
+                    //                      bcRecUnit    [smpl*, recUnit]
                     // inputSlice [smpl] => bcInputSlice [smpl, recUnit*]
-                    //                                ru [smpl*, recUnit]
-                    //let ru = [0..recUnits-1] |> Expr.padLeft |> Expr.broadcast [nBatch; nRecurrent]
+                    let bcRecUnit = Expr.arange<int> nRecurrent |> Expr.padLeft |> Expr.broadcast [nBatch; nRecurrent]
                     let bcInputSlice = inputSlice |> Expr.padRight |> Expr.broadcast [nBatch; nRecurrent]
-                    inputWeights |> Expr.gather [None; Some bcInputSlice]
+                    inputWeights |> Expr.gather [Some bcRecUnit; Some bcInputSlice]
                 else
                     inputSlice .* inputWeights.T
             let recAct = prevState .* recurrentWeights.T

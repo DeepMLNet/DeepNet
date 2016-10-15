@@ -67,6 +67,7 @@
     <Compile Include="Hold.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />
+    <Compile Include="UExprVisualize.fs" />
     <Compile Include="Dump.fs" />
     <Compile Include="Trace.fs" />
     <Compile Include="Function.fs" />
@@ -102,6 +103,15 @@
       <HintPath>..\packages\ManagedCuda-75-x64.7.5.7\lib\net45\x64\ManagedCuda.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Microsoft.Msagl">
+      <HintPath>..\Libs\Microsoft.Msagl.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Msagl.Drawing">
+      <HintPath>..\Libs\Microsoft.Msagl.Drawing.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Msagl.GraphViewerGdi">
+      <HintPath>..\Libs\Microsoft.Msagl.GraphViewerGdi.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
@@ -116,7 +126,9 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj">

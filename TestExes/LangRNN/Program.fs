@@ -22,7 +22,7 @@ module Program =
     let NWords      = 4000
     let NBatch      = 1000
     let NSteps      = 10
-    let NRecurrent  = 101
+    let NRecurrent  = 100
     let NMaxSamples = 10000
 
 //    let NWords      = 8000
@@ -122,7 +122,7 @@ module Program =
 
         let trainCfg = {
             Train.defaultCfg with
-                MaxIters  = Some 10
+                //MaxIters  = Some 10
                 BatchSize = NBatch
                 CheckpointDir = Some "."
         }
@@ -135,9 +135,10 @@ module Program =
 
         //let tr = Trace.startSessionWithRng "trc" (Some 900, None) 
 
-        for i=1 to 1 do
+        for smpl in dataset.Trn.Batches NBatch |> Seq.take 2 do
             printfn "Calculating and dloss:"
-            let lossVal, dLossVal = dLossDInitialFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
+            //let lossVal, dLossVal = dLossDInitialFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
+            let lossVal, dLossVal = dLossDInitialFn zeroInitial smpl.Words smpl.Words
             printfn "loss=%f   dloss/dInitial=%f" (lossVal |> ArrayND.value) (dLossVal |> ArrayND.value)
 
         //let ts = tr.End ()
@@ -148,8 +149,8 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 
-        SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
-        SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
+        //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
+        //SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
 
         let sentences = readData dataPath
 

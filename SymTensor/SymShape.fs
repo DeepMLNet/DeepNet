@@ -768,9 +768,16 @@ module RangeSpecTypes =
     type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list
 
     /// simple range specification
+    [<StructuredFormatDisplay("{Pretty}")>]
     type SimpleRangeSpecT<'Dyn> =
         | SRSSymStartSymEnd     of SizeSpecT * (SizeSpecT option)
         | SRSDynStartSymSize    of 'Dyn * SizeSpecT                    
+
+        member this.Pretty =
+            match this with
+            | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
+            | SRSSymStartSymEnd (first, None) -> sprintf "%A.." first
+            | SRSDynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
 
     let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
         

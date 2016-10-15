@@ -283,10 +283,17 @@ module Func =
 
             // if everything is available, then compile
             if allSizesAvail && allLocsAvail && allStridesAvail then 
+                // build UExprs
                 let uexprCache = UExpr.createCache ()
                 let uexprs = 
                     baseExprGens 
                     |> List.map (fun gen -> gen.Generate compileEnv.SymSizes uexprCache) 
+
+                // visualize UExprs, if requested
+                if Debug.VisualizeUExpr then
+                    UExprVisualize.show uexprs
+
+                // compile
                 Some {
                     Exprs=uexprs
                     CompileEnv=compileEnv
