@@ -76,7 +76,7 @@ module Program =
 
     let verifyRNNGradientOneHot () =
         printfn "Verifying RNN gradient with one-hot class encoding..."
-        let device = DevCuda //DevCuda
+        let device = DevCuda //DevHost
 
         let mb = ModelBuilder<single> ("Lang")
         let nBatch     = mb.Size "nBatch"
@@ -112,6 +112,49 @@ module Program =
 
         DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
         printfn "Done."
+
+    let verifyRNNGradientIndexed () =
+        printfn "Verifying RNN gradient with indexed class encoding..."
+        let device = DevCuda // DevHost //DevHost
+
+        let mb = ModelBuilder<single> ("Lang")
+        let nBatch     = mb.Size "nBatch"
+        let nSteps     = mb.Size "nSteps"
+        let nWords     = mb.Size "nWords"
+        let nRecurrent = mb.Size "nRecurrent"
+
+        let input   = mb.Var<int>     "Input"   [nBatch; nSteps]
+        let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
+        let target  = mb.Var<int>     "Target"  [nBatch; nSteps]
+        
+        let rnn = RecurrentLayer.pars (mb.Module "RNN") {
+            RecurrentLayer.defaultHyperPars with
+                NInput                  = nWords
+                NRecurrent              = nRecurrent
+                NOutput                 = nWords
+                RecurrentActivationFunc = Tanh
+                OutputActivationFunc    = SoftMax
+                OneHotIndexInput        = true 
+        }
+        let _, pred = (initial, input) ||> RecurrentLayer.pred rnn
+        let targetProb = pred |> Expr.gather [None; None; Some target]            
+        let loss = -log targetProb |> Expr.mean
+
+        let NBatch, NSteps, NWords, NRecurrent = 2, 15, 4, 10
+        let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
+        mi.InitPars 100
+
+        let rng = System.Random 123
+        let vInput = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
+        let vTarget = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
+                                   initial, vInitial :> IArrayNDT 
+                                   target, vTarget :> IArrayNDT] 
+
+        DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
+        printfn "Done."
+
 
     
     //let trainModel (dataset: TrnValTst<WordSeq>) =
@@ -279,7 +322,8 @@ module Program =
 //            |> TrnValTst.ToCuda
 
 
-        verifyRNNGradientOneHot ()
+        //verifyRNNGradientOneHot ()
+        verifyRNNGradientIndexed ()
 
         // train model
         //let res = trainModel dataset

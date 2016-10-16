@@ -444,10 +444,13 @@ module ModelContextTypes =
             (expr, parameters)
             ||> Map.fold (fun expr vs pi ->
                 expr |> Expr.subst pi.Expr parameterSet.[vs])
+            |> Expr.substSymSizes compileEnv.SymSizes
 
         /// inserts the ParameterStorage into the given variable environment
         member this.Use varEnv =
-            parameterStorage.Use varEnv
+            varEnv
+            |> parameterStorage.Use 
+            |> VarEnv.substSymSizes compileEnv.SymSizes
 
         /// the device this model instance is stored on
         member this.Device = device
@@ -456,11 +459,9 @@ module ModelContextTypes =
         member this.ParameterSet = parameterSet
 
         /// symbolic flat parameter vector
-        member this.ParameterVector = this.ParameterSet.Flat
-
-        /// Derivative of "expr" w.r.t. flat vector containing all model parameters
-        member this.WrtParameters expr =
-            this.ParameterSet.WrtFlat expr
+        member this.ParameterVector = 
+            this.ParameterSet.Flat
+            |> Expr.substSymSizes compileEnv.SymSizes
 
         /// Parameter values.
         member this.ParameterStorage = parameterStorage

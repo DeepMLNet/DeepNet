@@ -84,23 +84,29 @@ module VarEnv =
                     | Multinom m -> failShape ()
                 ) env)
 
+
     /// substitues the given symbol sizes into the variable environment
-    let checkAndSubstSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
+    let substSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
         varEnv 
         |> Map.toSeq
-        |> Seq.map (fun (vs, value) -> 
+        |> Seq.map (fun (vs, value) -> VarSpec.substSymSizes symSizes vs, value)
+        |> Map.ofSeq
+
+    /// checks that the values are valid in type and shape for the variables
+    let check (varEnv: VarEnvT) =
+        varEnv |> Map.iter (fun vs value ->
             if TypeName.ofTypeInst value.DataType <> vs.TypeName then
                 failwithf "variable %A was expected to be of type %A but a \
                            value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
 
             let ss = VarSpec.shape vs
-            let ns = ss |> SymSizeEnv.substShape symSizes |> ShapeSpec.eval
-            if ArrayND.shape value <> ns then
+            match ShapeSpec.tryEval ss with
+            | Some ns when ArrayND.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
                            value with shape %A was provided" vs.Name ns ss (ArrayND.shape value)
-
-            VarSpec.substSymSizes symSizes vs, value)
-        |> Map.ofSeq
+            | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
+            | _ -> ()
+        )
         
     /// gets the type names of the variable value arrays
     let valueTypeNames (varEnv: VarEnvT) =
@@ -305,7 +311,8 @@ module Func =
         /// Performs evaluation of a compiled function.
         let performEval compileRes varEnv = 
             // substitute and check symbol sizes
-            let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileRes.CompileEnv.SymSizes
+            let varEnv = varEnv |> VarEnv.substSymSizes compileRes.CompileEnv.SymSizes 
+            VarEnv.check varEnv
             let varLocs = varEnv |> VarEnv.valueLocations 
             let varStrides = varEnv |> VarEnv.valueStrides 
 
