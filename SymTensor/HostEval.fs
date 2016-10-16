@@ -51,7 +51,7 @@ module HostEval =
                 failwithf "expression of type %A does not match eval function of type %A"
                     expr.Type typeof<'R>
 
-            let varEval vs = evalEnv.VarEnv |> VarEnv.getVarSpec vs |> box :?> ArrayNDHostT<'T>
+            let varEval vs = evalEnv.VarEnv |> VarEnv.getVarSpec vs |> fun v -> v.Copy() |> box :?> ArrayNDHostT<'T>
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
             let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 

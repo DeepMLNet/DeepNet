@@ -76,7 +76,7 @@ module Program =
 
     let verifyRNNGradientOneHot () =
         printfn "Verifying RNN gradient with one-hot class encoding..."
-        let device = DevHost
+        let device = DevHost //DevCuda
 
         let mb = ModelBuilder<single> ("Lang")
         let nBatch     = mb.Size "nBatch"

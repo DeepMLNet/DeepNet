@@ -21,12 +21,10 @@ module DerivCheck =
 
             // f (x+epsilon)
             xd.[[xi]] <- xiVal + epsilon
-            printfn "xd forward: %A" xd
             let ydf = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
 
             // f (x-epsilon)
             xd.[[xi]] <- xiVal - epsilon
-            printfn "xd backward: %A" xd
             let ydb = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
 
             // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
