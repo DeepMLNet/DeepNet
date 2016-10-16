@@ -95,5 +95,5 @@ let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
     let vars = buildVars<float> shps
     let expr = exprFn vars
     let varEnv = buildVarEnv<float> vars shps rng DevHost
-    DerivCheck.checkExprTree tolerance 1e-7 varEnv expr
+    DerivCheck.checkExprTree DevHost tolerance 1e-7 varEnv expr
 

@@ -445,6 +445,10 @@ module ModelContextTypes =
             ||> Map.fold (fun expr vs pi ->
                 expr |> Expr.subst pi.Expr parameterSet.[vs])
 
+        /// inserts the ParameterStorage into the given variable environment
+        member this.Use varEnv =
+            parameterStorage.Use varEnv
+
         /// the device this model instance is stored on
         member this.Device = device
 

@@ -108,10 +108,11 @@ module UExprVisualize =
                             let txt, color = getElemOpText op
                             opNode.LabelText <- txt
                             opNode.Attr.FillColor <- color
-                            //match op with
-                            //| UElemExpr.ULeafOp (ElemExpr.ArgElement _) -> 
-                            //    graph.LayerConstraints.PinNodesToMaxLayer opNode
-                            //| _ -> ()
+                            match op with
+                            | UElemExpr.ULeafOp (ElemExpr.ArgElement _) -> 
+                                opNode.Attr.Shape <- Shape.Diamond
+                                //graph.LayerConstraints.PinNodesToMaxLayer opNode
+                            | _ -> ()
                             opNode.UserData <- elemExpr
                             for i, arg in List.indexed args do
                                 let argNode = build arg
@@ -128,17 +129,57 @@ module UExprVisualize =
             
             let channels = loopSpec.Channels |> Map.toList
             let chExprs = channels |> List.map (fun (ch, lv) -> lv.UExpr)
-            let chResNodes = nodesForExprs subgraph chExprs
+            let chResNodes, nodeForExpr = nodesForExprs subgraph chExprs
 
-            for (ch, lv), chResNode in List.zip channels chResNodes do
-                let chResLabelNode = newNode subgraph
-                chResLabelNode.LabelText <- sprintf "%s" ch
-                chResLabelNode.Attr.FillColor <- Color.Blue
-                chResLabelNode.Label.FontColor <- Color.White
-                newEdge chResNode chResLabelNode "" |> ignore                
+            let chResLabelNodes = 
+                List.zip channels chResNodes
+                |> List.map (fun ((ch, lv), chResNode) ->
+                    // add channel nodes
+                    let chResLabelNode = newNode subgraph
+                    chResLabelNode.LabelText <- sprintf "%s (SliceDim=%d)" ch lv.SliceDim
+                    chResLabelNode.Attr.FillColor <- Color.Blue
+                    chResLabelNode.Label.FontColor <- Color.White
+                    newEdge chResNode chResLabelNode "" |> ignore                
+                    ch, chResLabelNode)
+                |> Map.ofList
+
+            // annotate loop variables
+            for KeyValue(expr, node) in nodeForExpr do
+                match expr with
+                | UExpr (ULeafOp (Expr.Var vs), _, _) ->
+                    let li = loopSpec.Vars.[vs]
+                    match li with
+                    | Expr.ConstArg argIdx ->
+                        let argNode = newNode subgraph
+                        argNode.LabelText <- sprintf "Arg %d" argIdx
+                        argNode.Attr.FillColor <- Color.Yellow
+                        argNode.Attr.Shape <- Shape.Diamond
+                        node.Attr.FillColor <- Color.Transparent
+                        newEdge argNode node "" |> ignore
+                    | Expr.SequenceArgSlice sas ->
+                        let argNode = newNode subgraph
+                        argNode.LabelText <- sprintf "Arg %d (SliceDim=%d)" sas.ArgIdx sas.SliceDim
+                        argNode.Attr.FillColor <- Color.Yellow
+                        argNode.Attr.Shape <- Shape.Diamond
+                        node.Attr.FillColor <- Color.Transparent
+                        newEdge argNode node "" |> ignore
+                    | Expr.PreviousChannel pc ->
+                        // add loop to channel
+                        let ln = chResLabelNodes.[pc.Channel]
+                        newEdge ln node (sprintf "delay %A" pc.Delay) |> ignore
+                        // add initial
+                        let initialNode = newNode subgraph
+                        initialNode.LabelText <- sprintf "Initial %d" pc.InitialArg
+                        initialNode.Attr.FillColor <- Color.Yellow
+                        initialNode.Attr.Shape <- Shape.Diamond
+                        node.Attr.FillColor <- Color.Transparent
+                        newEdge initialNode node "" |> ignore
+                    | _ -> ()
+                | _ -> ()                            
+
             subgraph
 
-        and nodesForExprs (subgraph: Subgraph) exprs =
+        and nodesForExprs (subgraph: Subgraph) exprs : Node list * Map<UExprT, Node> =
             let nodeForExpr = Dictionary<UExprT, Node> (HashIdentity.Reference)
             let rec build expr =
                 match nodeForExpr.TryFind expr with
@@ -164,15 +205,21 @@ module UExprVisualize =
                         nodeForExpr.[expr] <- opNode
 
                         for i, arg in List.indexed args do
-                            let argNode = build arg
-                            let lbl = if args.Length > 1 then sprintf "%d" i else ""
-                            newEdge argNode opNode lbl |> ignore
+                            match arg with
+                            | UExpr (UExtraOp (Channel ch), [chSrc], _) ->
+                                let argNode = build chSrc
+                                let lbl = if args.Length > 1 then sprintf "%d=%s" i ch else ch
+                                newEdge argNode opNode lbl |> ignore
+                            | _ -> 
+                                let argNode = build arg
+                                let lbl = if args.Length > 1 then sprintf "%d" i else ""
+                                newEdge argNode opNode lbl |> ignore
                         opNode
 
-            exprs |> List.map build
+            exprs |> List.map build, Map.ofDictionary nodeForExpr
 
         // build main graph
-        let resNodes = nodesForExprs graph.RootSubgraph rootExprs
+        let resNodes, _ = nodesForExprs graph.RootSubgraph rootExprs
         for i, resNode in List.indexed resNodes do
             let resLabelNode = newNode graph.RootSubgraph
             resLabelNode.LabelText <- sprintf "Result %d" i

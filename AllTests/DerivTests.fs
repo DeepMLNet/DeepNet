@@ -107,7 +107,7 @@ let ``Gather`` () =
     let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
     let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
 
-    DerivCheck.checkExprTree 1e-6 1e-7 varEnv expr
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
 
 
 [<Fact>]
@@ -124,4 +124,4 @@ let ``Scatter`` () =
     let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
     let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
 
-    DerivCheck.checkExprTree 1e-6 1e-7 varEnv expr
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr

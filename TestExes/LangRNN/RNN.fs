@@ -72,7 +72,7 @@ module RecurrentLayer =
     let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
         let fanIn = float shp.[1] 
         let r = 1.0 / sqrt fanIn       
-        (System.Random seed).SeqDouble(-r, r)
+        (System.Random seed).SeqDouble(-1.0, 1.0)
         |> Seq.map conv<'T>
         |> ArrayNDHost.ofSeqWithShape shp
         
@@ -135,10 +135,10 @@ module RecurrentLayer =
                 else
                     inputSlice .* inputWeights.T
             let recAct = prevState .* recurrentWeights.T
-            inpAct + recAct + recurrentBias
+            inpAct + recAct //+ recurrentBias
             |> ActivationFunc.apply pars.HyperPars.RecurrentActivationFunc
         let output =
-            state .* outputWeights.T + outputBias
+            state .* outputWeights.T //+ outputBias
             |> ActivationFunc.apply pars.HyperPars.OutputActivationFunc
         let chState, chOutput = "State", "Output"
         let loopSpec = {

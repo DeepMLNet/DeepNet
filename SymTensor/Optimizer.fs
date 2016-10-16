@@ -352,6 +352,16 @@ module Optimizer =
                     |> pullSumOutOfElements
                     |> broadcastInsignificantElementsAxes
 
+                // optmize loops
+                | Nary (Channel (Loop loopSpec, ch), args) ->
+                    let args = args |> List.map optimize
+                    let loopSpec = {
+                        loopSpec with
+                            Channels = loopSpec.Channels 
+                                       |> Map.map (fun ch lv -> {lv with Expr=optimize lv.Expr})
+                    }
+                    Nary (Channel (Loop loopSpec, ch), args)
+
                 // pass through
                 | Leaf _ -> expr
                 | Unary(op, a) -> Unary (op, optimize a)            

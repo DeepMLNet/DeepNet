@@ -248,6 +248,24 @@ module Util =
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
         System.IO.Path.Combine (lad, "DeepNet")
     
+    [<Flags>]
+    type ErrorModes = 
+        | SYSTEM_DEFAULT = 0x0
+        | SEM_FAILCRITICALERRORS = 0x0001
+        | SEM_NOALIGNMENTFAULTEXCEPT = 0x0004
+        | SEM_NOGPFAULTERRORBOX = 0x0002
+        | SEM_NOOPENFILEERRORBOX = 0x8000
+
+    [<DllImport("kernel32.dll")>]
+    extern ErrorModes private SetErrorMode(ErrorModes mode)
+
+    /// disables the Windows WER dialog box on crash of this application
+    let disableCrashDialog () =
+        SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX |||
+                     ErrorModes.SEM_FAILCRITICALERRORS |||
+                     ErrorModes.SEM_NOOPENFILEERRORBOX)
+        |> ignore
+
     /// converts sequence of ints to sequence of strings
     let intToStrSeq items =
         Seq.map (sprintf "%d") items
@@ -310,6 +328,8 @@ module Util =
                 Some (f |> round |> int)
             else None
         | _ -> None
+
+
 
 /// Permutation utilities
 module Permutation =

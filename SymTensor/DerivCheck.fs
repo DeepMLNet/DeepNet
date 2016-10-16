@@ -11,18 +11,28 @@ module DerivCheck =
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
     let inline numDerivEpsilon (epsilon: 'T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
         let y = f x
-        let xShp, yShp = ArrayND.shape x, ArrayND.shape y
         let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
-        let xf, yf = x |> ArrayND.reshape [xElems], y |> ArrayND.reshape [yElems]
+        let xShp = ArrayND.shape x
 
-        let j = ArrayNDHost.zeros [yElems; xElems]
+        let jac = ArrayND.zerosOfSameType [yElems; xElems] x
+        let xd = x |> ArrayND.reshape [xElems] |> ArrayND.copy
         for xi = 0 to xElems - 1 do
-            let xdf = ArrayND.copy xf
-            xdf |> ArrayND.set [xi] ((xf |> ArrayND.get [xi]) + epsilon)
-            let ydf = xdf |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
-            let d : ArrayNDT<'T> = (ydf - yf) / (ArrayND.scalarOfSameType ydf epsilon)
-            ArrayND.copyTo d (j |> ArrayND.view [RngAll; RngElem xi])
-        j 
+            let xiVal = xd.[[xi]]
+
+            // f (x+epsilon)
+            xd.[[xi]] <- xiVal + epsilon
+            printfn "xd forward: %A" xd
+            let ydf = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
+
+            // f (x-epsilon)
+            xd.[[xi]] <- xiVal - epsilon
+            printfn "xd backward: %A" xd
+            let ydb = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
+
+            // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
+            jac.[*, xi] <- (ydf - ydb) / (ArrayND.scalarOfSameType ydf (epsilon + epsilon))
+            xd.[[xi]] <- xiVal
+        jac 
 
     /// evaluates the Jacobian of f at x numerically
     let inline numDeriv f x = 
@@ -30,12 +40,12 @@ module DerivCheck =
 
     /// Checks that symbolic and numeric derivatives of the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    let inline checkExpr (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
+    let inline checkExpr (device: IDevice) (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs.Jacobians |> Map.toSeq do
             let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
-            let exprFun = expr |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
-            let rDiffFun = rDiff |> Func.make<'T> DevHost.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            let exprFun = expr |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            let rDiffFun = rDiff |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
 
             let value = VarEnv.getVarSpec wrt varEnv
             let symGradVal = rDiffFun value
@@ -52,7 +62,7 @@ module DerivCheck =
 
     /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    let inline checkExprTree (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: ExprT) = 
+    let inline checkExprTree (device: IDevice) (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: ExprT) = 
         let rec checkSubExpr expr = 
             match expr with
             | Expr.Leaf(_) -> ()
@@ -63,7 +73,7 @@ module DerivCheck =
                 checkSubExpr b
             | Expr.Nary(_, es) ->
                 es |> List.iter checkSubExpr
-            checkExpr maxDeviation epsilon varEnv expr
+            checkExpr device maxDeviation epsilon varEnv expr
 
         checkSubExpr expr
 

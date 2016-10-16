@@ -1433,7 +1433,8 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
     /// Concatenates the list of tensors in the given axis.
-    let concat dim (arys: #ArrayNDT<'T> list) =
+    let concat dim (arys: #ArrayNDT<'T> seq) =
+        let arys = List.ofSeq arys
         if List.isEmpty arys then
             invalidArg "arys" "cannot concatenate empty list of tensors"
 

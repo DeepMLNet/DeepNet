@@ -25,5 +25,5 @@ module Debug =
     /// if true, Deriv.ofVar fails if specified variable was not present in derived expression
     let mutable FailIfVarNotInDerivative = false
 
-    let mutable VisualizeUExpr = true
+    let mutable VisualizeUExpr = false
 
