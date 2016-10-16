@@ -76,7 +76,7 @@ module Program =
 
     let verifyRNNGradientOneHot () =
         printfn "Verifying RNN gradient with one-hot class encoding..."
-        let device = DevHost //DevCuda
+        let device = DevCuda //DevCuda
 
         let mb = ModelBuilder<single> ("Lang")
         let nBatch     = mb.Size "nBatch"
@@ -100,7 +100,7 @@ module Program =
         let _, pred = (initial, input) ||> RecurrentLayer.pred rnn
         let loss = -target * log pred |> Expr.mean
 
-        let NBatch, NSteps, NWords, NRecurrent = 2, 2, 2, 2
+        let NBatch, NSteps, NWords, NRecurrent = 2, 15, 4, 10
         let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
         mi.InitPars 100
 
@@ -110,7 +110,7 @@ module Program =
         let vTarget = rng.UniformArrayND (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput; initial, vInitial; target, vTarget] 
 
-        DerivCheck.checkExprTree device 1e-4f 1e-1f (varEnv |> mi.Use) (loss |> mi.Use)
+        DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
         printfn "Done."
 
     

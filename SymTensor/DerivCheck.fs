@@ -52,11 +52,12 @@ module DerivCheck =
 
             let deviation = ArrayND.sum gradDiff |> ArrayND.value
             if deviation > maxDeviation then
-                printfn "Symbolic grad of \n%A\n wrt %A is \n%A\n with value \n%A" expr wrt rDiff symGradVal
+                printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
+                        (truncStr expr) wrt (truncStr rDiff) symGradVal
                 printfn "and numeric grad has value \n%A." exprGradVal
 
-                failwithf "Deviation of expression %A is %A which is greater than maximum deviation %A."
-                    expr deviation maxDeviation
+                failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
+                    (truncStr expr) deviation maxDeviation
 
     /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.

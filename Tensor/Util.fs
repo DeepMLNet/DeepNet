@@ -225,6 +225,14 @@ module UtilTypes =
     let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
         callGenericInst<'U, 'R> null methodName genericTypeArgs args
 
+    /// object x converted to a string and capped to a maximum length
+    let truncStr x =
+        let maxLen = 80
+        let s = sprintf "%A" x
+        let s = s.Replace ("\n", " ")
+        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
+        else s
+
 
 module Util =
 
