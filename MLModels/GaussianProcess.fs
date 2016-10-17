@@ -53,8 +53,8 @@ module ExpectationPropagation =
             let vSUpd = vSUpd |> Expr.checkFinite "vSUpd"
             let tauSite = tauSUpd 
             let vSite =  vSUpd
-            let sigma = (Expr.invert sigma) + (Expr.diagMat tauSite) |> Expr.invert
-            let mu = sigma.*(Expr.diagMat (1.0f/tauSite)).*vSite
+            let sigma = sigma + (Expr.diagMat (1.0f/tauSite))
+            let mu = sigma.*vSite
             sigma,mu,tauSite,vSite
 
         ///Update loop of the EP algorithm runs n iterations
@@ -92,7 +92,7 @@ module ExpectationPropagation =
             let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,*]
             let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,*] |> Expr.checkFinite "muSUpd" 
             newTauSite,newVSite
-        let tauSite,vSite = optimize 20 (sigma,mu, tauSite,vSite)
+        let tauSite,vSite = optimize 5 (sigma,mu, tauSite,vSite)
         let covSite = (1.0f/tauSite)
         let muSite = (Expr.diagMat covSite) .* vSite
         covSite, muSite
@@ -176,7 +176,7 @@ module GaussianProcess =
             match pars with
             | LinPars _ -> linearCovariance z z'
             | SEPars parsSE  -> squaredExpCovariance (parsSE.Lengthscale,parsSE.SignalVariance) z z'
-        let k           = (covMat x x) + Expr.diagMat sigmaNs
+        let k           = (covMat x x)
         let kStarstar  = covMat xStar xStar
         
         let meanFct,monotonicity,cut = 
@@ -226,10 +226,10 @@ module GaussianProcess =
                 let kJoint1,kJoint2 = Expr.concat 0 [kFf;kFf'],Expr.concat 0 [kF'f;kF'f']
                 let kJoint = Expr.concat 1 [kJoint1;kJoint2]
                 let muJoint = Expr.concat 0 [y;muSite]
-                let zeroMat = Expr.zerosLike kFf
+                let sigmaNMat = Expr.diagMat sigmaNs
                 let zeroMatFf' = Expr.zerosLike kFf'
                 let zeroMatF'f = Expr.zerosLike kF'f
-                let sigmaJ1,sigmaJ2=Expr.concat 0 [zeroMat;zeroMatFf'],Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]
+                let sigmaJ1,sigmaJ2=Expr.concat 0 [sigmaNMat;zeroMatFf'],Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]
                 let sigmaJoint =  Expr.concat 1 [sigmaJ1;sigmaJ2] 
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar
@@ -239,6 +239,7 @@ module GaussianProcess =
             
                 mean,cov
             | None ->
+                let k = k  + Expr.diagMat sigmaNs
                 let kInv        = Expr.invert k
                 let kStar      = covMat x xStar
                 let mean = meanXStar + kStar.T .* kInv .* (y - meanX)
