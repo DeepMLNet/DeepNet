@@ -30,14 +30,16 @@ module ExpectationPropagation =
     /// Runs Expecattion Maximization algorithm for monotonicity
     let monotonicityEP (sigma:ExprT)  (vu:single) =
         let mu = sigma |> Expr.diag |> Expr.zerosLike
-        let muSite = mu 
-        let covSite = mu 
+        let vSite = mu 
+        let tauSite = mu 
         
         /// one update step of the EP algorithm
-        let updateStep (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT)= 
+        let updateStep (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT)= 
             let cov = Expr.diag sigma
-            let covMinus = 1.0f / (1.0f / cov - 1.0f / covSite)
-            let muMinus = covMinus*(1.0f/cov * mu - 1.0f/covSite * muSite)
+            let tauMinus = (1.0f / cov) - tauSite
+            let vMinus = (1.0f/cov) * mu - vSite
+            let covMinus = (1.0f/tauMinus)
+            let muMinus = (Expr.diagMat covMinus) .* vMinus
             let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
             let normPdfZ = standardNormalPDF z
             let normCdfZ  = standardNormalCDF z
@@ -45,28 +47,30 @@ module ExpectationPropagation =
             let covHatf2 = z + normPdfZ/  normCdfZ
             let covHat = covMinus - covHatf1 * covHatf2
             let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
-            let covSUpd = 1.0f / (1.0f / covHat - 1.0f / cov)
-            let muSUpd = (covSUpd * (1.0f / covHat*muHat - 1.0f / cov) * mu)
-            let covSite = covSUpd 
-            let muSite =  muSUpd
-            let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/covSite)) |> Expr.invert
-            let mu = sigma.*(Expr.diagMat (1.0f/covSite)).*muSite
-            sigma,mu,covSite,muSite
+            let tauSUpd = (1.0f /covHat) - tauMinus
+            let tauSUpd = tauSUpd |> Expr.checkFinite "tauSUpd"
+            let vSUpd = (1.0f / covHat) * muHat - vMinus
+            let vSUpd = vSUpd |> Expr.checkFinite "vSUpd"
+            let tauSite = tauSUpd 
+            let vSite =  vSUpd
+            let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/tauSite)) |> Expr.invert
+            let mu = sigma.*(Expr.diagMat (1.0f/tauSite)).*vSite
+            sigma,mu,tauSite,vSite
 
         ///Update loop of the EP algorithm runs n iterations
-        let optimize  n (sigma: ExprT, mu: ExprT,covSite: ExprT,muSite: ExprT) = 
-            let newSigma, newMu,newCovSite,newMuSite = updateStep (sigma,mu,covSite,muSite)
+        let optimize  n (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT) = 
+            let newSigma, newMu,newTauSite,newVSite = updateStep (sigma,mu,tauSite,vSite)
             let prevSigma = Expr.var<single> "prevSigma" sigma.Shape
             let prevMu = Expr.var<single> "prevMu" mu.Shape
-            let prevCovSite = Expr.var<single> "prevCovSite"covSite.Shape
-            let prevMuSite = Expr.var<single> "prevMuSite" muSite.Shape
+            let prevTauSite = Expr.var<single> "prevCovSite"tauSite.Shape
+            let prevVSite = Expr.var<single> "prevMuSite" vSite.Shape
             let nIters = SizeSpec.fix n
-            let delayCovSite = SizeSpec.fix 1
-            let delayMuSite = SizeSpec.fix 1
+            let delayTauSite = SizeSpec.fix 1
+            let delayVSite = SizeSpec.fix 1
             let delaySigma = SizeSpec.fix 1
             let delayMu = SizeSpec.fix 1
-            let chCovSite = "covSite"
-            let chMuSite = "muSite"
+            let chTauSite = "covSite"
+            let chVSite = "muSite"
             let chSigma = "sigma"
             let chMu = "mu"
             let sigVar =  VarSpec.create "GP.GaussianProcess.SignalVariance" typeof<single> []
@@ -76,26 +80,28 @@ module ExpectationPropagation =
 
             let loopSpec = {
                 Expr.Length = nIters
-                Expr.Vars = Map [Expr.extractVar prevCovSite,  Expr.PreviousChannel {Channel=chCovSite; Delay=delayCovSite; InitialArg=0}
-                                 Expr.extractVar prevMuSite,  Expr.PreviousChannel {Channel=chMuSite; Delay=delayMuSite; InitialArg=1}
+                Expr.Vars = Map [Expr.extractVar prevTauSite,  Expr.PreviousChannel {Channel=chTauSite; Delay=delayTauSite; InitialArg=0}
+                                 Expr.extractVar prevVSite,  Expr.PreviousChannel {Channel=chVSite; Delay=delayVSite; InitialArg=1}
                                  Expr.extractVar prevSigma, Expr.PreviousChannel {Channel=chSigma; Delay=delaySigma; InitialArg=2}
                                  Expr.extractVar prevMu, Expr.PreviousChannel {Channel=chMu; Delay=delayMu; InitialArg=3}]
-                Expr.Channels = Map [chCovSite, {LoopValueT.Expr=newCovSite; LoopValueT.SliceDim=0}
-                                     chMuSite, {LoopValueT.Expr=newMuSite; LoopValueT.SliceDim=0}
+                Expr.Channels = Map [chTauSite, {LoopValueT.Expr=newTauSite; LoopValueT.SliceDim=0}
+                                     chVSite, {LoopValueT.Expr=newVSite; LoopValueT.SliceDim=0}
                                      chSigma, {LoopValueT.Expr=newSigma; LoopValueT.SliceDim=0}
                                      chMu, {LoopValueT.Expr=newMu; LoopValueT.SliceDim=0}]    
             }
-            let covSite = Expr.reshape [SizeSpec.fix 1;covSite.Shape.[0]] covSite
-            let muSite = Expr.reshape [SizeSpec.fix 1;muSite.Shape.[0]] muSite
+            let tauSite = Expr.reshape [SizeSpec.fix 1;tauSite.Shape.[0]] tauSite
+            let vSite = Expr.reshape [SizeSpec.fix 1;vSite.Shape.[0]] vSite
             let sigma = Expr.reshape [SizeSpec.fix 1;sigma.Shape.[0];sigma.Shape.[1]] sigma
             let mu = Expr.reshape [SizeSpec.fix 1;mu.Shape.[0]] mu
-            let newCovSite = Expr.loop loopSpec chCovSite [covSite;muSite;sigma;mu]
-            let newMuSite = Expr.loop loopSpec chMuSite [covSite;muSite;sigma;mu]
-            let newSigma = Expr.loop loopSpec chSigma [covSite;muSite;sigma;mu]
-            let newMu = Expr.loop loopSpec chMu [covSite;muSite;sigma;mu]
-            newSigma.[nIters - 1,0..newSigma.Shape.[1] - 1,0..newSigma.Shape.[2] - 1],newMu.[nIters - 1,0..newMu.Shape.[1] - 1],newCovSite.[nIters - 1,0..newCovSite.Shape.[1] - 1],newMuSite.[nIters - 1,0..newMuSite.Shape.[1] - 1]
-        optimize 10 (sigma,mu, covSite,muSite)
-
+            let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,0..tauSite.Shape.[1] - 1]
+            let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,0..vSite.Shape.[1] - 1] |> Expr.checkFinite "muSUpd"
+            let newSigma = (Expr.loop loopSpec chSigma [tauSite;vSite;sigma;mu]).[nIters - 1,0..sigma.Shape.[1] - 1,0..sigma.Shape.[2] - 1]
+            let newMu = (Expr.loop loopSpec chMu [tauSite;vSite;sigma;mu]).[nIters - 1,0..mu.Shape.[1] - 1] 
+            newTauSite,newVSite
+        let tauSite,vSite = optimize 10 (sigma,mu, tauSite,vSite)
+        let covSite = (1.0f/tauSite)
+        let muSite = (Expr.diagMat covSite) .* vSite
+        covSite, muSite
 
 module GaussianProcess =
     
@@ -219,7 +225,7 @@ module GaussianProcess =
 
 
                 //TODO: covSite and muSite without EP algorithm
-                let _,_,covSite,muSite = ExpectationPropagation.monotonicityEP k vu
+                let covSite,muSite = ExpectationPropagation.monotonicityEP k vu
                 
                 let covSite = covSite |> Expr.checkFinite "covSite"
                 let muSite = muSite |> Expr.checkFinite "muSite"
