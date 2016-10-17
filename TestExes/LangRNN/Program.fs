@@ -19,35 +19,35 @@ module Program =
 //    let NSteps      = 35
 //    let NRecurrent  = 650
     
-//    let NWords      = 7
 //    let NWords      = 100
 //    let NBatch      = 1000
 //    let NSteps      = 20
 //    let NRecurrent  = 100
 //    let NMaxSamples = 10000
 
-//    let NWords      = 8000
-//    let NBatch      = 1000
-//    let NSteps      = 35
-//    let NRecurrent  = 100
-//    let NMaxSamples = 10000
+    //let NWords      = 300
+    let NWords      = 8000
+    let NBatch      = 1000
+    let NSteps      = 35
+    let NRecurrent  = 100
+    //let NMaxSamples = 1000
+    let NMaxSamples = 40000
 
 
-    let NWords      = 5
-    let NSteps      = 7
-    let NBatch      = 10
-    let NMaxSamples = 10
-
-    let NRecurrent  = 8
+//    let NWords      = 5
+//    let NSteps      = 7
+//    let NBatch      = 10
+//    let NMaxSamples = 10
+//    let NRecurrent  = 8
 
 
     type WordSeq = {
         Words:  ArrayNDT<int>
     }
 
-    type WordSeqOneHot = {
-        Words:  ArrayNDT<single>
-    }
+    //type WordSeqOneHot = {
+    //    Words:  ArrayNDT<single>
+    //}
     
     let readData path = 
         seq {
@@ -73,58 +73,66 @@ module Program =
     let detokenize (wordForId: Map<int, string>) tokenizedSentences =
         tokenizedSentences |> Seq.map (List.map (fun id -> wordForId.[id]))
 
-
-    let verifyRNNGradientOneHot () =
-        printfn "Verifying RNN gradient with one-hot class encoding..."
-        let device = DevCuda //DevHost
-
-        let mb = ModelBuilder<single> ("Lang")
-        let nBatch     = mb.Size "nBatch"
-        let nSteps     = mb.Size "nSteps"
-        let nWords     = mb.Size "nWords"
-        let nRecurrent = mb.Size "nRecurrent"
-
-        let input   = mb.Var<single>  "Input"   [nBatch; nSteps; nWords]
-        let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
-        let target  = mb.Var<single>  "Target"  [nBatch; nSteps; nWords]
+    let loadDataset () =
+        let sentences = readData dataPath
+        let freqs = sentences |> Seq.concat |> wordFreqs
+        printfn "Found %d unique words." (Map.toSeq freqs |> Seq.length)
         
-        let rnn = RecurrentLayer.pars (mb.Module "RNN") {
-            RecurrentLayer.defaultHyperPars with
-                NInput                  = nWords
-                NRecurrent              = nRecurrent
-                NOutput                 = nWords
-                RecurrentActivationFunc = Tanh
-                OutputActivationFunc    = SoftMax
-                OneHotIndexInput        = false 
-        }
-        let _, pred = (initial, input) ||> RecurrentLayer.pred rnn
-        let loss = -target * log pred |> Expr.mean
+        let freqsSorted = freqs |> Map.toList |> List.sortByDescending snd 
+                          |> List.take (NWords-1)       
+        let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
+        let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
+                        |> Map.add (NWords-1) "UNKNOWN_TOKEN" 
 
-        let NBatch, NSteps, NWords, NRecurrent = 2, 15, 4, 10
-        let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
-        mi.InitPars 100
+        let tokenizedSentences = sentences |> tokenize idForWord |> List.ofSeq
+        printfn "Having %d sentences with vocabulary of size %d with least common word %A."
+                (tokenizedSentences.Length) NWords (List.last freqsSorted)       
 
+        tokenizedSentences 
+        |> List.concat
+        |> List.chunkBySize NSteps
+        |> List.filter (fun chunk -> chunk.Length = NSteps)
+        |> fun b -> printfn "Would have %d samples in total." b.Length; b
+        |> List.take NMaxSamples
+        |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
+        |> Dataset.FromSamples
+        |> TrnValTst.Of
+        |> TrnValTst.ToCuda
+
+    let generateRandomDataset () =
         let rng = System.Random 123
-        let vInput = rng.UniformArrayND (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
-        let vInitial = ArrayNDHost.zeros [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.UniformArrayND (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput; initial, vInitial; target, vTarget] 
+        Seq.init NMaxSamples (fun _ -> 
+            {WordSeq.Words = rng.Seq (0, NWords-1) |> ArrayNDHost.ofSeqWithShape [NSteps]})
+        |> Dataset.FromSamples
+        |> TrnValTst.Of
+        |> TrnValTst.ToCuda
 
-        DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
-        printfn "Done."
+//        let dataset : TrnValTst<WordSeqOneHot> =
+//            Seq.init NMaxSamples (fun _ -> 
+//                {Words =
+//                    rng.Seq (0, NWords-1)
+//                    |> Seq.take NSteps
+//                    |> Seq.map (fun w -> 
+//                        ArrayNDHost.initIndexed [1; NWords] (fun p -> if p.[1] = w then 1.0f else 0.0f))
+//                    |> ArrayND.concat 0})
+//            |> Dataset.FromSamples
+//            |> TrnValTst.Of
+//            |> TrnValTst.ToCuda
 
-    let verifyRNNGradientIndexed () =
-        printfn "Verifying RNN gradient with indexed class encoding..."
-        let device = DevCuda // DevHost //DevHost
 
+    let trainModel (dataset: TrnValTst<WordSeq>) =
+    //let trainModel (dataset: TrnValTst<WordSeqOneHot>) =
         let mb = ModelBuilder<single> ("Lang")
+
         let nBatch     = mb.Size "nBatch"
         let nSteps     = mb.Size "nSteps"
         let nWords     = mb.Size "nWords"
         let nRecurrent = mb.Size "nRecurrent"
 
         let input   = mb.Var<int>     "Input"   [nBatch; nSteps]
+        //let input   = mb.Var<single>  "Input"   [nBatch; nSteps; nWords]
         let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
+        //let target  = mb.Var<single>  "Target"  [nBatch; nSteps; nWords]
         let target  = mb.Var<int>     "Target"  [nBatch; nSteps]
         
         let rnn = RecurrentLayer.pars (mb.Module "RNN") {
@@ -134,52 +142,8 @@ module Program =
                 NOutput                 = nWords
                 RecurrentActivationFunc = Tanh
                 OutputActivationFunc    = SoftMax
-                OneHotIndexInput        = true 
-        }
-        let _, pred = (initial, input) ||> RecurrentLayer.pred rnn
-        let targetProb = pred |> Expr.gather [None; None; Some target]            
-        let loss = -log targetProb |> Expr.mean
-
-        let NBatch, NSteps, NWords, NRecurrent = 2, 15, 4, 10
-        let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
-        mi.InitPars 100
-
-        let rng = System.Random 123
-        let vInput = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
-        let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
-                                   initial, vInitial :> IArrayNDT 
-                                   target, vTarget :> IArrayNDT] 
-
-        DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
-        printfn "Done."
-
-
-    
-    //let trainModel (dataset: TrnValTst<WordSeq>) =
-    let trainModel (dataset: TrnValTst<WordSeqOneHot>) =
-        let mb = ModelBuilder<single> ("Lang")
-
-        let nBatch     = mb.Size "nBatch"
-        let nSteps     = mb.Size "nSteps"
-        let nWords     = mb.Size "nWords"
-        let nRecurrent = mb.Size "nRecurrent"
-
-        //let input   = mb.Var<int>     "Input"   [nBatch; nSteps]
-        let input   = mb.Var<single>  "Input"   [nBatch; nSteps; nWords]
-        let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
-        let target  = mb.Var<single>  "Target"  [nBatch; nSteps; nWords]
-        //let target  = mb.Var<int>     "Target"  [nBatch; nSteps]
-        
-        let rnn = RecurrentLayer.pars (mb.Module "RNN") {
-            RecurrentLayer.defaultHyperPars with
-                NInput                  = nWords
-                NRecurrent              = nRecurrent
-                NOutput                 = nWords
-                RecurrentActivationFunc = Tanh
-                OutputActivationFunc    = SoftMax
-                OneHotIndexInput        = false // true
+                OneHotIndexInput        = true
+                //OneHotIndexInput        = false 
         }
 
         // final [smpl, recUnit]
@@ -187,9 +151,9 @@ module Program =
         let final, pred = (initial, input) ||> RecurrentLayer.pred rnn
 
         // [smpl, step]
-        //let targetProb = pred |> Expr.gather [None; None; Some target]            
-        //let stepLoss = -log targetProb 
-        let stepLoss = -target * log pred
+        let targetProb = pred |> Expr.gather [None; None; Some target]            
+        let stepLoss = -log targetProb 
+        //let stepLoss = -target * log pred
 
         let loss = Expr.mean stepLoss
 
@@ -205,34 +169,33 @@ module Program =
 
         let dLossDInitialFn = mi.Func (loss, dLossDInitial) |> arg3 initial input target
 
-        //let smplVarEnv stateOpt (smpl: WordSeq) =
-        let smplVarEnv stateOpt (smpl: WordSeqOneHot) =
+        let smplVarEnv stateOpt (smpl: WordSeq) =
+        //let smplVarEnv stateOpt (smpl: WordSeqOneHot) =
             let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
             let state =
                 match stateOpt with
                 | Some state -> state :> IArrayNDT
                 | None -> zeroInitial :> IArrayNDT
-            //let n = smpl.Words.Shape.[1]
             let n = smpl.Words.Shape.[1]
-            //printfn "smpl.Words: %A" smpl.Words.Shape
-            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2, *] :> IArrayNDT
-                          target,  smpl.Words.[*, 1 .. n-1, *] :> IArrayNDT
-                          initial, state]
-//
-//            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
-//                          target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
+//            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2, *] :> IArrayNDT
+//                          target,  smpl.Words.[*, 1 .. n-1, *] :> IArrayNDT
 //                          initial, state]
+
+            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
+                          target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
+                          initial, state]
                           
-        let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
-        //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
+        //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
+        let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
 
         let trainCfg = {
             Train.defaultCfg with
-                MinIters  = Some 1000
-                MaxIters  = Some 1000
+                //MinIters  = Some 1000
+                //MaxIters  = Some 10
+                //MaxIters  = Some 1000
                 BatchSize = NBatch
-                LearningRates = [1e-4; 1e-5]
-                //CheckpointDir = Some "."
+                //LearningRates = [1e-4; 1e-5]
+                CheckpointDir = Some "."
                 BestOn    = Training
         }
         Train.train trainable dataset trainCfg |> ignore
@@ -258,76 +221,23 @@ module Program =
 
     [<EntryPoint>]
     let main argv = 
-
         Util.disableCrashDialog ()
-
         //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         //SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
+        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
         //SymTensor.Debug.VisualizeUExpr <- true
 
-//        let sentences = readData dataPath
-//
-//        let freqs = sentences |> Seq.concat |> wordFreqs
-//        printfn "Found %d unique words." (Map.toSeq freqs |> Seq.length)
-//        
-//        let freqsSorted = freqs |> Map.toList |> List.sortByDescending snd 
-//                          |> List.take (NWords-1)
-//        
-//        let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
-//        let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
-//                        |> Map.add (NWords-1) "UNKNOWN_TOKEN" 
-//
-//        let tokenizedSentences = sentences |> tokenize idForWord
-//        let detokenizedSentences = tokenizedSentences |> detokenize wordForId
-//
-//        printfn "Using vocabulary of size %d with least common word %A."
-//                NWords (List.last freqsSorted)       
-        //printfn "%A" (sentences |> Seq.take 10 |> Seq.toList)
-        //printfn "%A" (tokenizedSentences |> Seq.take 10 |> Seq.toList)
-        //printfn "%A" (detokenizedSentences |> Seq.take 10 |> Seq.toList)
+        // tests
+        //verifyRNNGradientOneHot DevCuda
+        //verifyRNNGradientIndexed DevCuda
+        //TestUtils.compareTraces verifyRNNGradientIndexed false |> ignore
 
-//        // create dataset
-//        let dataset = 
-//            tokenizedSentences 
-//            //|> Seq.take NMaxSamples
-//            |> List.concat
-//            |> List.chunkBySize NSteps
-//            |> List.take NMaxSamples
-//            |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
-//            |> List.filter (fun {Words=words} -> words.Shape = [NSteps])
-//            |> Dataset.FromSamples
-//            |> TrnValTst.Of
-//            |> TrnValTst.ToCuda
-
-        let rng = System.Random 123
-
-        // generate random data
-        let dataset : TrnValTst<WordSeqOneHot> =
-            Seq.init NMaxSamples (fun _ -> 
-                {Words =
-                    rng.Seq (0, NWords-1)
-                    |> Seq.take NSteps
-                    |> Seq.map (fun w -> 
-                        ArrayNDHost.initIndexed [1; NWords] (fun p -> if p.[1] = w then 1.0f else 0.0f))
-                    |> ArrayND.concat 0})
-            |> Dataset.FromSamples
-            |> TrnValTst.Of
-            |> TrnValTst.ToCuda
-
-
-//            {Words = ArrayNDHost.arange 5 |> ArrayND.convert}
-//            |> Seq.replicate 10
-//            |> Dataset.FromSamples
-//            |> TrnValTst.Of
-//            |> TrnValTst.ToCuda
-
-
-        //verifyRNNGradientOneHot ()
-        verifyRNNGradientIndexed ()
+        printfn "Loading dataset..."
+        let dataset = loadDataset ()
+        printfn "Done."
 
         // train model
-        //let res = trainModel dataset
-
+        let res = trainModel dataset
 
         // shutdown
         Cuda.CudaSup.shutdown ()

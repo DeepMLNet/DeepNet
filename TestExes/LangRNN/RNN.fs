@@ -131,9 +131,12 @@ module RecurrentLayer =
                     // inputSlice [smpl] => bcInputSlice [smpl, recUnit*]
                     let bcRecUnit = Expr.arange<int> nRecurrent |> Expr.padLeft |> Expr.broadcast [nBatch; nRecurrent]
                     let bcInputSlice = inputSlice |> Expr.padRight |> Expr.broadcast [nBatch; nRecurrent]
+                    //let bcRecUnit = bcRecUnit |> Expr.print "bcRecUnit"
+                    //let bcInputSlice = bcInputSlice |> Expr.print "bcInputSlice"
                     inputWeights |> Expr.gather [Some bcRecUnit; Some bcInputSlice]
                 else
                     inputSlice .* inputWeights.T
+            //let inpAct = inpAct |> Expr.print "inpAct"
             let recAct = prevState .* recurrentWeights.T
             inpAct + recAct //+ recurrentBias
             |> ActivationFunc.apply pars.HyperPars.RecurrentActivationFunc

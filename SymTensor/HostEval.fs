@@ -18,12 +18,15 @@ module HostEval =
     /// evaluation functions
     type private EvalT =       
 
+        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: ExprT) : IArrayNDT =
+             callGeneric<EvalT, IArrayNDT> "Eval" [expr.Type] (evalEnv, expr)
+
+
         static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
             let retType = expr.Type
             if retType <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
                     retType typeof<'R>
-
             let argType = 
                 match expr with
                 | Leaf _ -> retType
@@ -37,14 +40,12 @@ module HostEval =
                     match es with
                     | [] -> retType
                     | [e] -> e.Type
-                    | e::res ->
-                        if res |> List.exists (fun re -> re.Type <> e.Type) then
-                            failwithf "currently arguments of n-ary ops must all have the same 
-                                       data type but we got types %A" 
-                                       (es |> List.map (fun e -> e.Type))
-                        e.Type
-
+                    | _ ->
+                        let ts = es |> List.map (fun e -> e.TypeName) |> Set.ofList
+                        if ts.Count = 1 then es.Head.Type
+                        else typeof<obj>
             callGeneric<EvalT, ArrayNDHostT<'R>> "DoEval" [argType; retType] (evalEnv, expr)
+
 
         static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
             if expr.Type <> typeof<'R> then
@@ -55,6 +56,8 @@ module HostEval =
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
             let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
+            let subEvalTypeNeutral (subExpr: ExprT) : IArrayNDT = 
+                EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
                     (fun intExpr -> EvalT.Eval<int> (evalEnv, intExpr) |> ArrayND.value)
@@ -175,31 +178,31 @@ module HostEval =
                         |> box |> unbox
 
                 | Nary(op, es) ->
-                    let esv = es |> List.map subEval
                     match op with 
-                    | Discard -> ArrayNDHost.zeros [0]
+                    | Discard -> ArrayNDHost.zeros [0] |> box
                     | Elements (resShape, elemExpr) -> 
-                        let esv = esv |> List.map (fun v -> v :> ArrayNDT<'T>)
+                        let esv = es |> List.map subEval |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
-                        ElemExprHostEval.eval elemExpr esv nResShape    
-                    | Interpolate ip -> esv |> Interpolator.interpolate ip 
+                        ElemExprHostEval.eval elemExpr esv nResShape |> box
+                    | Interpolate ip ->  
+                        es |> List.map subEval |> Interpolator.interpolate ip |> box
                     | Channel (Loop spec, channel) -> 
+                        let esv = es |> List.map subEvalTypeNeutral
                         if Trace.isActive () then Trace.enteringLoop (expr |> UExpr.toUExpr |> Trace.extractLoop)
                         let channelValues = EvalT.LoopEval (evalEnv, spec, esv)
                         if Trace.isActive () then Trace.leavingLoop (expr |> UExpr.toUExpr |> Trace.extractLoop)
-                        channelValues.[channel]                       
-                    | ExtensionOp eop -> eop.EvalSimple esv 
-                    |> box |> unbox
+                        channelValues.[channel] |> box
+                    | ExtensionOp eop -> 
+                        eop.EvalSimple (es |> List.map subEval) |> box
+                    |> unbox
 
             if Trace.isActive () then
                 Trace.exprEvaled (expr |> UExpr.toUExpr) (lazy (res :> IArrayNDT))
             res
 
         /// evaluates all channels of a loop
-        static member LoopEval<'T, 'R> (evalEnv: EvalEnvT, spec: LoopSpecT, args: ArrayNDHostT<'T> list) 
-                                       : Map<ChannelT, ArrayNDHostT<'R>> =
-
-            let args = args |> List.map (fun arg -> arg :> IArrayNDT)
+        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpecT, args: IArrayNDT list) 
+                               : Map<ChannelT, IArrayNDT> =
 
             // iteration index variables
             let nIters = SizeSpec.eval spec.Length
@@ -215,7 +218,7 @@ module HostEval =
                     {
                         LoopEval.Shape    = sliceShp
                         LoopEval.SliceDim = lv.SliceDim
-                        LoopEval.Target   = ArrayNDHost.zeros<'R> targetShp :> IArrayNDT
+                        LoopEval.Target   = ArrayNDHost.newCOfType lv.Expr.Type targetShp
                     })
 
             // perform loop
@@ -231,11 +234,11 @@ module HostEval =
                     LoopEval.buildInOut iter iterAry itersRemAry spec.Vars args channelInfos
                 let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
                 for KeyValue(ch, lv) in spec.Channels do
-                    (iterChannelEnv.[ch] :?> ArrayNDHostT<'R>).[Fill] <- 
-                        EvalT.Eval (iterEvalEnv, lv.Expr)
+                    iterChannelEnv.[ch].[Fill] <- EvalT.EvalTypeNeutral (iterEvalEnv, lv.Expr)
 
             // return outputs
-            channelInfos |> Map.map (fun ch ci -> ci.Target :?> ArrayNDHostT<'R>)                          
+            channelInfos |> Map.map (fun ch ci -> ci.Target)                          
+
             
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.

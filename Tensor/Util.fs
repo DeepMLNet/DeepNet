@@ -379,3 +379,14 @@ module Permutation =
         check perm
         lst |> List.permute (fun i -> perm.[i])
 
+    /// permutation is a swap of two elements
+    let (|Swap|_|) (perm: int list) =
+        if is perm then
+            let idxPerm = List.indexed perm
+            match idxPerm |> List.tryFind (fun (pos, dest) -> pos <> dest) with
+            | Some (cand, candDest) when perm.[candDest] = cand &&
+                    idxPerm |> List.forall (fun (pos, dest) -> pos=cand || pos=candDest || pos=dest) ->
+                Some (cand, candDest)
+            | _ -> None
+        else None
+                

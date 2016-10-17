@@ -41,23 +41,26 @@ module DerivCheck =
     let inline checkExpr (device: IDevice) (maxDeviation: 'T) (epsilon: 'T) varEnv expr =
         let rDiffs = Deriv.compute expr
         for wrt, rDiff in rDiffs.Jacobians |> Map.toSeq do
-            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
-            let exprFun = expr |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
-            let rDiffFun = rDiff |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            if wrt.Type = typeof<'T> then
+                let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
+                let exprFun = expr |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+                let rDiffFun = rDiff |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
 
-            let value = VarEnv.getVarSpec wrt varEnv
-            let symGradVal = rDiffFun value
-            let exprGradVal = numDerivEpsilon epsilon exprFun value
-            let gradDiff = abs (symGradVal - exprGradVal)
+                let value = VarEnv.getVarSpec wrt varEnv
+                let symGradVal = rDiffFun value
+                let exprGradVal = numDerivEpsilon epsilon exprFun value
+                let gradDiff = abs (symGradVal - exprGradVal)
 
-            let deviation = ArrayND.sum gradDiff |> ArrayND.value
-            if deviation > maxDeviation then
-                printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
-                        (truncStr expr) wrt (truncStr rDiff) symGradVal
-                printfn "and numeric grad has value \n%A." exprGradVal
-
-                failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
-                    (truncStr expr) deviation maxDeviation
+                let deviation = ArrayND.sum gradDiff |> ArrayND.value
+                if deviation > maxDeviation then
+                    printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
+                            (truncStr expr) wrt (truncStr rDiff) symGradVal
+                    printfn "and numeric grad has value \n%A." exprGradVal
+                    failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
+                        (truncStr expr) deviation maxDeviation
+            else
+                printfn "DerivCheck: Skipping variable %A because it does not match type %A."
+                        wrt typeof<'T>
 
     /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.

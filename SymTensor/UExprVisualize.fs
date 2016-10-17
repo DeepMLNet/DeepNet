@@ -9,28 +9,6 @@ open Basics
 
 module UExprVisualize =
 
-    let buildGraph () =
-    
-        let graph = Graph ("TestGraph")
-
-        let node1 = Node ("MyNodeId")
-        node1.LabelText <- "blabla"
-        //node1.Label <- Label ("my node text")
-        //let label = Label("mt")
-        //label.FontColor <- Color.Black
-        //node1.La
-        graph.AddNode node1
-
-        let node2 = Node ("MyNodeId2")
-        //node2.Label <- Label ("my node other text")
-        node2.Attr.FillColor <- Color.Magenta
-        graph.AddNode node2
-
-        graph.AddPrecalculatedEdge (Edge (node1, node2, ConnectionToGraph.Connected))
-
-        graph
-
-
     let fromUExpr rootExprs =
         let graph = Graph ("UExpr")
 
@@ -150,19 +128,14 @@ module UExprVisualize =
                     let li = loopSpec.Vars.[vs]
                     match li with
                     | Expr.ConstArg argIdx ->
-                        let argNode = newNode subgraph
-                        argNode.LabelText <- sprintf "Arg %d" argIdx
-                        argNode.Attr.FillColor <- Color.Yellow
-                        argNode.Attr.Shape <- Shape.Diamond
-                        node.Attr.FillColor <- Color.Transparent
-                        newEdge argNode node "" |> ignore
+                        node.LabelText <- sprintf "Arg %d\n%s" argIdx node.LabelText
+                        node.Attr.FillColor <- Color.Yellow
+                        node.Attr.Shape <- Shape.Diamond
                     | Expr.SequenceArgSlice sas ->
-                        let argNode = newNode subgraph
-                        argNode.LabelText <- sprintf "Arg %d (SliceDim=%d)" sas.ArgIdx sas.SliceDim
-                        argNode.Attr.FillColor <- Color.Yellow
-                        argNode.Attr.Shape <- Shape.Diamond
-                        node.Attr.FillColor <- Color.Transparent
-                        newEdge argNode node "" |> ignore
+                        node.LabelText <- 
+                            sprintf "Arg %d (SliceDim=%d)\n%s" sas.ArgIdx sas.SliceDim node.LabelText
+                        node.Attr.FillColor <- Color.Yellow
+                        node.Attr.Shape <- Shape.Diamond
                     | Expr.PreviousChannel pc ->
                         // add loop to channel
                         let ln = chResLabelNodes.[pc.Channel]
@@ -245,7 +218,3 @@ module UExprVisualize =
         let graph = fromUExpr exprs
         showGraph graph 
 
-
-    let demo () =
-        let graph = buildGraph ()
-        showGraph graph 

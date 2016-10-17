@@ -1717,43 +1717,44 @@ module Expr =
             expr |> extractVars |> Set.isEmpty |> not
 
         /// pulls out expression parts that do not depend on loop variables
-        let rec lift expr =
-            match expr with                   
-            | Leaf (Var vs) when not (vars |> Map.containsKey vs) ->
-                let vs = addConstVar expr
-                makeVar vs                  
-
-            | Unary (Gather indices, a) ->
-                Unary (Gather (indices |> List.map (Option.map lift)), lift a)
-            | Unary (Scatter (indices, trgtShp), a) ->
-                Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
-
-            | Binary (IfThenElse cond, a, b) ->
-                Binary (IfThenElse (lift cond), lift a, lift b)
-
-            | Leaf _ -> expr
-            | Unary (op, a) -> Unary (op, lift a)
-            | Binary (op, a, b) -> Binary (op, lift a, lift b)
-            | Nary (op, es) -> Nary (op, es |> List.map lift)
-
 //        let rec lift expr =
-//            if dependsOnVars expr && not (dependsOnLoopVars expr) then
+//            match expr with                   
+//            | Leaf (Var vs) when not (vars |> Map.containsKey vs) ->
 //                let vs = addConstVar expr
-//                makeVar vs
-//            else
-//                match expr with                   
-//                | Unary (Gather indices, a) ->
-//                    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
-//                | Unary (Scatter (indices, trgtShp), a) ->
-//                    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+//                makeVar vs                  
 //
-//                | Binary (IfThenElse cond, a, b) ->
-//                    Binary (IfThenElse (lift cond), lift a, lift b)
+//            | Unary (Gather indices, a) ->
+//                Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+//            | Unary (Scatter (indices, trgtShp), a) ->
+//                Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
 //
-//                | Leaf _ -> expr
-//                | Unary (op, a) -> Unary (op, lift a)
-//                | Binary (op, a, b) -> Binary (op, lift a, lift b)
-//                | Nary (op, es) -> Nary (op, es |> List.map lift)
+//            | Binary (IfThenElse cond, a, b) ->
+//                Binary (IfThenElse (lift cond), lift a, lift b)
+//
+//            | Leaf _ -> expr
+//            | Unary (op, a) -> Unary (op, lift a)
+//            | Binary (op, a, b) -> Binary (op, lift a, lift b)
+//            | Nary (op, es) -> Nary (op, es |> List.map lift)
+
+        let rec lift expr =
+            if dependsOnVars expr && not (dependsOnLoopVars expr) then
+            //if not (dependsOnLoopVars expr) then
+                let vs = addConstVar expr
+                makeVar vs
+            else
+                match expr with                   
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+                | Unary (Scatter (indices, trgtShp), a) ->
+                    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (lift cond), lift a, lift b)
+
+                | Leaf _ -> expr
+                | Unary (op, a) -> Unary (op, lift a)
+                | Binary (op, a, b) -> Binary (op, lift a, lift b)
+                | Nary (op, es) -> Nary (op, es |> List.map lift)
                 
         // lift constants out of loop
         let liftedChannels = spec.Channels |> Map.map (fun ch lv -> {lv with Expr = lift lv.Expr})

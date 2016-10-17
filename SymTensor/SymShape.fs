@@ -675,14 +675,18 @@ module ShapeSpec =
 
     let disableAllBroadcasts sa : ShapeSpecT =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed Frac.one) else ss) sa
-
+        
+    /// True if both shape have the same number of elements and 
+    /// are both broadcastable or non-broadcastable in each dimension.
     let equalWithBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
         List.length sa = List.length sb &&
             List.forall2 SizeSpec.equalWithBroadcastability sa sb
 
+    /// True if both shapes have the same number of elements in each dimension.
+    /// Broadcastable and non-broadcastable are treated as equal.            
     let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
          List.length sa = List.length sb &&
-            List.forall2 SizeSpec.equalWithBroadcastability sa sb
+            List.forall2 SizeSpec.equalWithoutBroadcastability sa sb
 
     /// Permutes the axes as specified.
     let permuteAxes (permut: int list) (sa: ShapeSpecT) : ShapeSpecT =

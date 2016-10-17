@@ -52,11 +52,17 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="RNN.fs" />
+    <Compile Include="RNNTests.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="tokenize.py" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\AllTests\AllTests.fsproj">
+      <Name>AllTests</Name>
+      <Project>{d5cd7ec0-fb57-4cba-89e8-43e101d23ced}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\DeepNet\DeepNet.fsproj">
       <Name>DeepNet</Name>
       <Project>{7c53d1c7-8ed2-4e04-8f2d-cf0384c51f33}</Project>

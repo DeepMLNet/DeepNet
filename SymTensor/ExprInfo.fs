@@ -69,6 +69,8 @@ type ExprInfoT (expr: ExprT) =
         doBuild expr
         dependants, usedChannels      
 
+    let dependantsStructural = Map.ofDictionary dependants
+
     /// Contained expression.
     /// It is ensured that equal sub-expression are the same object instance.
     member this.Expr = expr 
@@ -77,6 +79,11 @@ type ExprInfoT (expr: ExprT) =
     /// Comparison is done based on reference equality.
     member this.Dependants expr =
         match dependants.TryFind expr with
+        | Some deps -> deps |> Set.ofSeq
+        | None -> Set.empty
+
+    member this.DependantsStructural expr =
+        match dependantsStructural.TryFind expr with
         | Some deps -> deps |> Set.ofSeq
         | None -> Set.empty
 

@@ -366,6 +366,9 @@ module ArrayND =
             let valueObj = Array.last allArgs
             match valueObj with
             | :? ArrayNDT<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
+            | :? IArrayNDT as ov -> 
+                failwithf "cannot assign data type %A to array of data type %A" 
+                          ov.DataType this.DataType
             | _ -> failwithf "need array of same type to assign, but got type %A" 
                         (valueObj.GetType())
                 

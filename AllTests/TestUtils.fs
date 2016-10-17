@@ -39,6 +39,7 @@ let compareTraces func dump =
 
     let diffs = Trace.compare hostTrace cudaTrace
     if diffs > 0 then
+        printfn "Traces differ. Dumping to UneqalCUDA.txt and UneqalHost.txt."
         cudaTrace |> dumpTrace "UnequalCUDA.txt" 
         hostTrace |> dumpTrace "UnequalHost.txt"
     diffs
