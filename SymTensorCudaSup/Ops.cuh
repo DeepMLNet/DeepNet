@@ -25,6 +25,13 @@ struct ZerosEOp_t
 };
 
 
+struct CountingIEOp_t {
+	_dev idx_t operator() (const idx_t *pos, const idx_t dims) const {
+		return pos[0];
+	}
+};
+
+
 struct DiagonalOneIEOp_t {
 	_dev float operator() (const idx_t *pos, const idx_t dims) const {
 		if (dims == 0) {

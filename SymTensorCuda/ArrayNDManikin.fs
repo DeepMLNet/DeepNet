@@ -39,12 +39,18 @@ module ArrayNDManikinTypes =
     /// Memory can either be on the host or the accelerator.
     [<StructuredFormatDisplay("{Pretty}")>]
     type MemManikinT =
+        /// no memory (represents a null pointer)
+        | MemZero of TypeNameT
+        /// a memory allocation internal to the workspace
         | MemAlloc of MemAllocManikinT
+        /// an external variable
         | MemExternal of VarSpecT
+        /// a constant array
         | MemConst of MemConstManikinT
         with 
             member this.Pretty = 
                 match this with
+                | MemZero t -> sprintf "MemZero %A" t.Type
                 | MemAlloc a -> sprintf "MemAlloc %d" a.Id
                 | MemExternal vs -> sprintf "MemExternal %A" vs
                 | MemConst c -> sprintf "MemConst %d" c.Id
@@ -64,6 +70,7 @@ module ArrayNDManikinTypes =
             | MemAlloc {TypeName=tn} -> tn
             | MemExternal vs -> vs.TypeName
             | MemConst mc -> mc.TypeName
+            | MemZero t -> t
 
         override this.Item
             with get pos = failwith "ArrayNDManikin does not store data"
@@ -103,6 +110,11 @@ module ArrayNDManikinTypes =
 
 module ArrayNDManikin =
     open ArrayND
+
+    /// creates a new ArrayNDManikinT using no storage
+    let newZero typ shape =
+        let layout = ArrayNDLayout.newC shape
+        ArrayNDManikinT (layout, MemZero typ)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with C-order
     let newC memAllocator typ shape = 

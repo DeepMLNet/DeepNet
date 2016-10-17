@@ -79,14 +79,19 @@ module ConstSpecTypes =
                 | ConstDouble v -> v |> box |> unbox
                 | ConstSingle v -> v |> box |> unbox
                 | ConstBool v -> v |> box |> unbox  
+            
+            /// the value as object
+            member this.Value =
+                match this with
+                | ConstInt v -> v |> box 
+                | ConstDouble v -> v |> box
+                | ConstSingle v -> v |> box 
+                | ConstBool v -> v |> box 
                 
             /// gets the value converting it to type 'T
-            member this.GetConvertedValue<'T>() : 'T =             
-                match this with
-                | ConstInt v -> v |> conv<'T>
-                | ConstDouble v -> v |> conv<'T>
-                | ConstSingle v -> v |> conv<'T>
-                | ConstBool v -> v |> conv<'T>
+            member this.GetConvertedValue<'T>() : 'T =   
+                this.Value |> conv<'T>          
+
 
 /// scalar constant value
 module ConstSpec =

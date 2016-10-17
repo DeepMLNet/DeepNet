@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -93,3 +94,34 @@ let ``Max, min output on host`` () =
 let ``Max, min output on CUDA`` () =
     ``Max, min output`` DevCuda
 
+[<Fact>]
+let ``Gather`` () =
+    let a = Expr.var<float> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+    let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+    let expr = a |> Expr.gather [Some i0; Some i1]
+
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
+
+
+[<Fact>]
+let ``Scatter`` () =
+    let a = Expr.var<float> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+    let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let trgtShp = [SizeSpec.fix 3; SizeSpec.fix 4]
+
+    let expr = a |> Expr.scatter [Some i0; Some i1] trgtShp
+
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr

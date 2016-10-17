@@ -178,6 +178,8 @@ module Train =
         abstract member SaveModel: path:string -> unit
         /// Model parameter values (i.e. weights).
         abstract member ModelParameters: ArrayNDT<'T> with get, set
+        /// Resets the internal model state. (for example the latent state of an RNN)
+        abstract member ResetModelState: unit -> unit
         /// Initialize optimizer state.
         abstract member InitOptState: unit -> unit
         /// Load optimizer state from specified file.
@@ -185,27 +187,50 @@ module Train =
         /// Save optimizer state to specified file.
         abstract member SaveOptState: path: string -> unit
 
-    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
-    let trainableFromLossExprs
+    /// Constructs an ITrainable<_> from expressions.
+    let internal newTrainable
             (modelInstance: ModelInstance<'T>) 
             (losses: ExprT list) 
-            (varEnvBuilder: 'Smpl -> VarEnvT)
+            (nextStateExpr: ExprT option)
+            (varEnvBuilder: ArrayNDT<'T> option -> 'Smpl -> VarEnvT)
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
+        let usingState = Option.isSome nextStateExpr
+        let mutable modelState = None
+
         let losses = losses |> List.map modelInstance.Use 
         let mainLoss = losses.Head
-        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device
-        let lossesFn = modelInstance.Func losses << varEnvBuilder
-        let lossesOptFn = modelInstance.Func (losses @ [opt.OptStepExpr]) |> opt.Use << varEnvBuilder
-
+        let stateAndLosses = 
+            if usingState then nextStateExpr.Value :: losses else losses
+            
+        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device       
         let mutable optState = opt.InitialState optCfg modelInstance.ParameterValues
-    
+
+        let updateStateAndGetLosses result = 
+            match result with
+            | nextState :: losses when usingState -> 
+                modelState <- Some nextState
+                losses
+            | losses when not usingState -> losses
+            | _ -> failwith "unexpected result"
+
+        let lossesFn =
+            let fn = modelInstance.Func stateAndLosses
+            fun smpl ->                
+                fn <| varEnvBuilder modelState smpl 
+                |> updateStateAndGetLosses
+
+        let lossesOptFn = 
+            let fn = modelInstance.Func (opt.OptStepExpr :: stateAndLosses) |> opt.Use
+            fun smpl optCfg optState ->
+                fn <| varEnvBuilder modelState smpl <| optCfg <| optState
+                |> List.tail |> updateStateAndGetLosses
+   
         {new ITrainable<'Smpl, 'T> with
             member this.Losses sample = lossesFn sample |> List.map (ArrayND.value >> conv<float>)
             member this.Optimize learningRate sample = 
-                let lossesAndOpt = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
-                let losses = lossesAndOpt |> List.take (lossesAndOpt.Length - 1)
+                let losses = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
                 lazy (losses |> List.map (ArrayND.value >> conv<float>))
             member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
             member this.InitModel seed = modelInstance.InitPars seed
@@ -214,10 +239,20 @@ module Train =
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
                 and set (value) = modelInstance.ParameterValues <- value
+            member this.ResetModelState () = modelState <- None
             member this.InitOptState () = optState <- opt.InitialState optCfg modelInstance.ParameterValues
             member this.LoadOptState path = optState <- opt.LoadState path
             member this.SaveOptState path = opt.SaveState path optState    
         }
+
+    /// Constructs an ITrainable<_> for the given stateful model using the specified loss
+    /// expressions, state update expression and optimizer.
+    let newStatefulTrainable modelInstance losses nextState varEnvBuilder optNew optCfg =
+        newTrainable modelInstance losses (Some nextState) varEnvBuilder optNew optCfg
+
+    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
+    let trainableFromLossExprs modelInstance losses varEnvBuilder optNew optCfg =
+        newTrainable modelInstance losses None (fun _ -> varEnvBuilder) optNew optCfg
 
     /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
     let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
@@ -292,6 +327,7 @@ module Train =
             | None -> ()
 
             // execute training
+            trainable.ResetModelState ()
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
@@ -307,7 +343,9 @@ module Train =
                     |> List.map (fun l -> l / float n)
 
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
+                trainable.ResetModelState ()
                 let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
+                trainable.ResetModelState ()
                 let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
 
                 // compute and log primary validation & test loss
@@ -477,9 +515,9 @@ module Train =
 
         let bestEntry, _ = TrainingLog.best log
         printfn "Training completed after %d iterations in %A because %A with best losses:" 
-            bestEntry.Iter duration faith
+                bestEntry.Iter duration faith
         printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
-            bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+                bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
 
         {
             History             = List.rev log.History

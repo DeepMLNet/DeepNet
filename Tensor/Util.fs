@@ -225,6 +225,14 @@ module UtilTypes =
     let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
         callGenericInst<'U, 'R> null methodName genericTypeArgs args
 
+    /// object x converted to a string and capped to a maximum length
+    let truncStr x =
+        let maxLen = 80
+        let s = sprintf "%A" x
+        let s = s.Replace ("\n", " ")
+        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
+        else s
+
 
 module Util =
 
@@ -248,6 +256,24 @@ module Util =
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
         System.IO.Path.Combine (lad, "DeepNet")
     
+    [<Flags>]
+    type ErrorModes = 
+        | SYSTEM_DEFAULT = 0x0
+        | SEM_FAILCRITICALERRORS = 0x0001
+        | SEM_NOALIGNMENTFAULTEXCEPT = 0x0004
+        | SEM_NOGPFAULTERRORBOX = 0x0002
+        | SEM_NOOPENFILEERRORBOX = 0x8000
+
+    [<DllImport("kernel32.dll")>]
+    extern ErrorModes private SetErrorMode(ErrorModes mode)
+
+    /// disables the Windows WER dialog box on crash of this application
+    let disableCrashDialog () =
+        SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX |||
+                     ErrorModes.SEM_FAILCRITICALERRORS |||
+                     ErrorModes.SEM_NOOPENFILEERRORBOX)
+        |> ignore
+
     /// converts sequence of ints to sequence of strings
     let intToStrSeq items =
         Seq.map (sprintf "%d") items
@@ -311,6 +337,8 @@ module Util =
             else None
         | _ -> None
 
+
+
 /// Permutation utilities
 module Permutation =
     
@@ -351,3 +379,14 @@ module Permutation =
         check perm
         lst |> List.permute (fun i -> perm.[i])
 
+    /// permutation is a swap of two elements
+    let (|Swap|_|) (perm: int list) =
+        if is perm then
+            let idxPerm = List.indexed perm
+            match idxPerm |> List.tryFind (fun (pos, dest) -> pos <> dest) with
+            | Some (cand, candDest) when perm.[candDest] = cand &&
+                    idxPerm |> List.forall (fun (pos, dest) -> pos=cand || pos=candDest || pos=dest) ->
+                Some (cand, candDest)
+            | _ -> None
+        else None
+                

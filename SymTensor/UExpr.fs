@@ -43,6 +43,8 @@ module UExprTypes =
         Channels:   Map<ChannelT, ULoopValueT>
     }
 
+    and IndexArgs = int option list
+
     /// ops that have special handling
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
@@ -51,6 +53,8 @@ module UExprTypes =
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT
+        | Gather of IndexArgs
+        | Scatter of IndexArgs
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
@@ -124,10 +128,26 @@ module UExprRngsSpec =
 
 module UExpr =
 
-    type UExprCaches = {
+    type private UExprCaches = {
         UExprForExpr:       Dictionary<ExprT, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
     }
+
+    /// extracts all variables from the unified expression
+    let rec extractVars (UExpr (op, args, metadata)) = 
+        match op with
+        | ULeafOp (Expr.Var vs) -> Set.singleton vs
+        | _ -> args |> List.map extractVars |> Set.unionMany
+
+    let internal indicesToIdxArgs indices =
+        let idxArgNos, _ =
+            (1, indices)
+            ||> List.mapFold (fun argNo idx ->
+                match idx with
+                | Some _ -> Some argNo, argNo + 1
+                | None -> None, argNo)
+        let idxArgs = indices |> List.choose id
+        idxArgNos, idxArgs
 
     let rec private toUExprRec (caches: UExprCaches) (expr: ExprT) =
         match caches.UExprForExpr.TryFind expr with
@@ -176,6 +196,12 @@ module UExpr =
 
                     // and separate op to extract referenced channel
                     UExpr (UExtraOp (Channel channel), [uLoop], metadata)
+                | Expr.Unary (Expr.Gather indices, a) ->                
+                    let idxArgNos, idxArgs = indicesToIdxArgs indices
+                    extra (Gather idxArgNos) (a::idxArgs)
+                | Expr.Unary (Expr.Scatter (indices, _), a) ->
+                    let idxArgNos, idxArgs = indicesToIdxArgs indices
+                    extra (Scatter idxArgNos) (a::idxArgs)
                 | Expr.Unary (Expr.Held (_, heldOp), a) ->
                     failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
@@ -201,33 +227,100 @@ module UExpr =
             caches.UExprForExpr.[expr] <- uExpr     
             uExpr       
 
-    /// converts an expression to a unified expression
-    and toUExprWithCache caches (expr: ExprT) =
-        expr
-        |> Expr.check
-        |> toUExprRec caches 
-
-    /// creates an unified expression cache cache
-    and createCache () = 
-        {
+    /// converts a list of expressions to a list of unified expressions
+    and toUExprs (exprs: ExprT list) =
+        let caches = {
             UExprForExpr    = Dictionary<ExprT, UExprT>(HashIdentity.Structural)
             UExprs          = Dictionary<UExprT, UExprT>(HashIdentity.Structural)        
         }     
+        exprs 
+        |> List.map Expr.check
+        |> List.map (toUExprRec caches)
+        |> removeUnusedChannels
 
     /// converts an expression to a unified expression
     and toUExpr (expr: ExprT) =
-        let caches = createCache ()
-        toUExprWithCache caches expr
+        toUExprs [expr] |> List.exactlyOne        
 
     /// converts a loop specification to an unified loop specification
     and loopSpecToULoopSpec (loopSpec: LoopSpecT) = 
+        let channels = loopSpec.Channels |> Map.toList 
+        let chUExprs = toUExprs (channels |> List.map (fun (_, lv) -> lv.Expr))
+        let uChannels = 
+            List.zip channels chUExprs
+            |> List.map (fun ((ch, lv), uexpr) -> ch, {UExpr=uexpr; SliceDim=lv.SliceDim})
         {
             Length   = SizeSpec.eval loopSpec.Length
             Vars     = loopSpec.Vars
-            Channels = loopSpec.Channels 
-                        |> Map.map (fun ch lv ->
-                                {UExpr=toUExpr lv.Expr; SliceDim=lv.SliceDim})
-        }           
+            Channels = uChannels |> Map.ofList
+        }          
+
+    /// removes unused loop channels from a loop expression
+    and private removeUnusedLoopChannels (externallyUsedChannels: Set<ChannelT>) uexpr  =
+        match uexpr with
+        | UExpr (UExtraOp (Loop uLoopSpec), args, metadata) ->
+            let rec usedChannelsAndVars prevUsedChs =
+                let usedVars =
+                    uLoopSpec.Channels
+                    |> Map.filter (fun ch _ -> prevUsedChs |> Set.contains ch)
+                    |> Map.toSeq
+                    |> Seq.map (fun (ch, lv) -> extractVars lv.UExpr) 
+                    |> Set.unionMany
+
+                let usedChs =
+                    (prevUsedChs, usedVars)
+                    ||> Seq.fold (fun ucs vs ->
+                        match uLoopSpec.Vars.[vs] with
+                        | PreviousChannel {Channel=channel} -> ucs |> Set.add channel
+                        | _ -> ucs)     
+
+                if usedChs <> prevUsedChs then usedChannelsAndVars usedChs
+                else usedChs, usedVars
+
+            let usedChs, usedVars = usedChannelsAndVars externallyUsedChannels               
+            let filterChs chMap = chMap |> Map.filter (fun ch _ -> usedChs.Contains ch) 
+            let uLoopSpec = 
+                {uLoopSpec with 
+                    Vars     = uLoopSpec.Vars |> Map.filter (fun var _ -> usedVars.Contains var)
+                    Channels = filterChs uLoopSpec.Channels}
+            let metadata = 
+                {metadata with
+                    ChannelShape = filterChs metadata.ChannelShape
+                    ChannelType  = filterChs metadata.ChannelType}
+            UExpr (UExtraOp (Loop uLoopSpec), args, metadata)
+        | _ -> failwith "not a loop expression"
+        
+    /// removes unused channels from multi-channels ops in a set of unified expressions
+    and removeUnusedChannels (uexprs: UExprT list) =
+        // build set of used channels
+        let usedChannels = Dictionary<UExprT, HashSet<ChannelT>> (HashIdentity.Reference)
+        let rec buildUsed (UExpr (op, args, _)) =
+            match op with
+            | UExtraOp (Channel ch) ->
+                let multichannelExpr = args.Head
+                if not (usedChannels.ContainsKey multichannelExpr) then
+                    usedChannels.[multichannelExpr] <- HashSet<_> ()
+                usedChannels.[multichannelExpr].Add ch |> ignore
+            | _ -> ()
+            for arg in args do
+                buildUsed arg
+        uexprs |> List.iter buildUsed 
+
+        // filter unused channels
+        let processed = Dictionary<UExprT, UExprT> (HashIdentity.Reference)
+        let rec rebuild (UExpr (op, args, metadata) as origExpr) =
+            match processed.TryFind origExpr with
+            | Some replacement -> replacement
+            | None ->
+                let expr = UExpr (op, args |> List.map rebuild, metadata)
+                let replacement = 
+                    match op with
+                    | UExtraOp (Loop _) -> 
+                        removeUnusedLoopChannels (Set.ofSeq usedChannels.[origExpr]) expr
+                    | _ -> expr
+                processed.[origExpr] <- replacement
+                replacement
+        uexprs |> List.map rebuild 
 
     /// Converts a unified expression to an expression if the unified expression
     /// was created using the toUExpr function. Otherwise returns None.

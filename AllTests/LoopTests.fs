@@ -94,19 +94,19 @@ let ``Build complicated loop 1`` () =
     //printfn "resultA:\n%A" resultA
     //printfn "resultB:\n%A" resultB
 
-    let symSizes = Map [SizeSpec.extractSymbol nIters, SizeSpec.fix 5
-                        SizeSpec.extractSymbol m,      SizeSpec.fix 3 
-                        SizeSpec.extractSymbol n,      SizeSpec.fix 2
-                        SizeSpec.extractSymbol delayA, SizeSpec.fix 1
-                        SizeSpec.extractSymbol delayB, SizeSpec.fix 2
-                        ]
-    let resultA = resultA |> Expr.substSymSizes symSizes
-    let resultB = resultB |> Expr.substSymSizes symSizes   
-
-    let initialA = initialA |> Expr.substSymSizes symSizes
-    let initialB = initialB |> Expr.substSymSizes symSizes
-    let seqA = seqA |> Expr.substSymSizes symSizes
-    let constAExt = constAExt |> Expr.substSymSizes symSizes
+//    let symSizes = Map [SizeSpec.extractSymbol nIters, SizeSpec.fix 5
+//                        SizeSpec.extractSymbol m,      SizeSpec.fix 3 
+//                        SizeSpec.extractSymbol n,      SizeSpec.fix 2
+//                        SizeSpec.extractSymbol delayA, SizeSpec.fix 1
+//                        SizeSpec.extractSymbol delayB, SizeSpec.fix 2
+//                        ]
+//    let resultA = resultA |> Expr.substSymSizes symSizes
+//    let resultB = resultB |> Expr.substSymSizes symSizes   
+//
+//    let initialA = initialA |> Expr.substSymSizes symSizes
+//    let initialB = initialB |> Expr.substSymSizes symSizes
+//    let seqA = seqA |> Expr.substSymSizes symSizes
+//    let constAExt = constAExt |> Expr.substSymSizes symSizes
 
     resultA, resultB, initialA, initialB, seqA, constAExt
 
@@ -157,6 +157,7 @@ let ``Derivative of complicated loop 1`` (device: IDevice) =
     let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
 
     let result = Expr.sum resultA + Expr.sum resultB
+    printfn "result:\n%A" result
     let dResult = Deriv.compute result
     let dInitialA = dResult |> Deriv.ofVar initialA
     let dInitialB = dResult |> Deriv.ofVar initialB

@@ -65,13 +65,14 @@ module VarEnv =
                 if VarSpec.nDims vSym <> ArrayND.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
                         (ArrayND.shape vVal) vSym
-                let failShape () =
-                    failwithf "expected variable %s with shape %A but got value with shape %A"
-                        vSym.Name vSym.Shape (ArrayND.shape vVal)
 
                 (VarSpec.shape vSym, ArrayND.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
+                    let failShape () =
+                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
+                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
+                            vSym vSymShp vVal.Shape
                     match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
                     | Base (Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
                     | Base (Fixed f) -> 
@@ -83,23 +84,29 @@ module VarEnv =
                     | Multinom m -> failShape ()
                 ) env)
 
+
     /// substitues the given symbol sizes into the variable environment
-    let checkAndSubstSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
+    let substSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
         varEnv 
         |> Map.toSeq
-        |> Seq.map (fun (vs, value) -> 
+        |> Seq.map (fun (vs, value) -> VarSpec.substSymSizes symSizes vs, value)
+        |> Map.ofSeq
+
+    /// checks that the values are valid in type and shape for the variables
+    let check (varEnv: VarEnvT) =
+        varEnv |> Map.iter (fun vs value ->
             if TypeName.ofTypeInst value.DataType <> vs.TypeName then
                 failwithf "variable %A was expected to be of type %A but a \
                            value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
 
             let ss = VarSpec.shape vs
-            let ns = ss |> SymSizeEnv.substShape symSizes |> ShapeSpec.eval
-            if ArrayND.shape value <> ns then
+            match ShapeSpec.tryEval ss with
+            | Some ns when ArrayND.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
                            value with shape %A was provided" vs.Name ns ss (ArrayND.shape value)
-
-            VarSpec.substSymSizes symSizes vs, value)
-        |> Map.ofSeq
+            | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
+            | _ -> ()
+        )
         
     /// gets the type names of the variable value arrays
     let valueTypeNames (varEnv: VarEnvT) =
@@ -114,7 +121,7 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (Expr.ExprT * ArrayNDT<'T>) seq) =
+    let ofSeq (entries: (ExprT * #IArrayNDT) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
@@ -195,11 +202,11 @@ module CompileEnv =
 module Func =
 
     type private UExprGenT = {
-        Generate:               SymSizeEnvT -> UExpr.UExprCaches -> UExprT
+        Generate:               SymSizeEnvT -> ExprT
         UVarSpecsAndEvalable:   bool -> SymSizeEnvT -> Set<VarSpecT> * bool       
     }
 
-    let private uExprGenerate baseExpr symSizes cache =
+    let private exprGenerate baseExpr symSizes =
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
         let substExpr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
@@ -216,12 +223,7 @@ module Func =
                 (Expr.countOps baseExpr) (Expr.countOps optimizedExpr)
                 (Expr.countUniqueOps baseExpr) (Expr.countUniqueOps optimizedExpr)
 
-        let sw = Stopwatch.StartNew ()
-        if Debug.TraceCompile then printfn "Converting to UExpr..."
-        let uExpr = UExpr.toUExprWithCache cache optimizedExpr
-        if Debug.Timing then printfn "Converting to UExpr took %A" sw.Elapsed
-        
-        uExpr
+        optimizedExpr
 
     let private uExprVarSpecsAndEvalable baseExpr failIfNotEvalable symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
@@ -250,7 +252,9 @@ module Func =
                 baseExprGens 
                 |> List.map (fun gen -> gen.UVarSpecsAndEvalable failIfImpossible compileEnv.SymSizes) 
                 |> List.unzip
-            let neededVars = Set.unionMany vars            
+            let neededVars = Set.unionMany vars   
+            if Debug.PrintInstantiations then
+                printfn "Vars needed for instantiation:\n%A" (neededVars |> Set.toList)
 
             // check that all necessary symbol sizes are available
             let allSizesAvail = sizeAvail |> List.forall id
@@ -280,10 +284,22 @@ module Func =
 
             // if everything is available, then compile
             if allSizesAvail && allLocsAvail && allStridesAvail then 
-                let uexprCache = UExpr.createCache ()
-                let uexprs = 
+                // build optimized exprs
+                let exprs = 
                     baseExprGens 
-                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes uexprCache) 
+                    |> List.map (fun gen -> gen.Generate compileEnv.SymSizes) 
+
+                // convert to UExprs
+                let sw = Stopwatch.StartNew ()
+                if Debug.TraceCompile then printfn "Converting to UExprs..."
+                let uexprs = UExpr.toUExprs exprs
+                if Debug.Timing then printfn "Converting to UExprs took %A" sw.Elapsed
+
+                // visualize UExprs, if requested
+                if Debug.VisualizeUExpr then
+                    UExprVisualize.show uexprs
+
+                // compile
                 Some {
                     Exprs=uexprs
                     CompileEnv=compileEnv
@@ -295,7 +311,8 @@ module Func =
         /// Performs evaluation of a compiled function.
         let performEval compileRes varEnv = 
             // substitute and check symbol sizes
-            let varEnv = varEnv |> VarEnv.checkAndSubstSymSizes compileRes.CompileEnv.SymSizes
+            let varEnv = varEnv |> VarEnv.substSymSizes compileRes.CompileEnv.SymSizes 
+            VarEnv.check varEnv
             let varLocs = varEnv |> VarEnv.valueLocations 
             let varStrides = varEnv |> VarEnv.valueStrides 
 
@@ -362,7 +379,7 @@ module Func =
     /// makes a function that evaluates the given expression 
     let make<'T0> factory (expr0: ExprT)  =
         checkType<'T0> "" expr0
-        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let evalAll = evalWrapper factory [expr0gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
@@ -371,8 +388,8 @@ module Func =
     let make2<'T0, 'T1> factory (expr0: ExprT) (expr1: ExprT) =    
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
-        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
-        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
@@ -382,9 +399,9 @@ module Func =
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
         checkType<'T2> "third" expr2
-        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
-        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
-        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=exprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
@@ -395,10 +412,10 @@ module Func =
         checkType<'T1> "second" expr1
         checkType<'T2> "third" expr2
         checkType<'T3> "fourth" expr3
-        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
-        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
-        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
-        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=exprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=exprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
@@ -410,11 +427,11 @@ module Func =
         checkType<'T2> "third" expr2
         checkType<'T3> "fourth" expr3
         checkType<'T4> "fifth" expr4
-        let expr0gen = {Generate=uExprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
-        let expr1gen = {Generate=uExprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
-        let expr2gen = {Generate=uExprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
-        let expr3gen = {Generate=uExprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
-        let expr4gen = {Generate=uExprGenerate expr4; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr4}   
+        let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
+        let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
+        let expr2gen = {Generate=exprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
+        let expr3gen = {Generate=exprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
+        let expr4gen = {Generate=exprGenerate expr4; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr4}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen; expr4gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
@@ -425,7 +442,7 @@ module Func =
         let exprsGen =
             exprs
             |> List.map (fun expr -> 
-                {Generate=uExprGenerate expr; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr})
+                {Generate=exprGenerate expr; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr})
         let evalAll = evalWrapper factory exprsGen
         fun (varEnv: VarEnvT) ->
             let reses = evalAll varEnv
@@ -434,6 +451,11 @@ module Func =
 
 [<AutoOpen>]
 module FuncTypes = 
+
+    type Arg0Func<'TR> = unit -> 'TR
+    let arg0<'TR> (f: VarEnvT -> 'TR) : Arg0Func<'TR> =
+        fun () -> 
+            VarEnv.empty |> f
 
     type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
     let arg1<'T0, 'TR> (vs0: ExprT) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =

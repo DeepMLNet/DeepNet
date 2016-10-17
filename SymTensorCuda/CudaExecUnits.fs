@@ -333,6 +333,12 @@ module CudaExecUnit =
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse -> inplaceFirstSrcReq ()
 
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> dfltSrcWithNoViewReq ()
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> dfltSrcWithNoViewReq ()
+            
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
@@ -609,6 +615,12 @@ module CudaExecUnit =
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> dfltChOutplaceTrgt ()
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> dfltChOutplaceTrgt ()
+
         // extension        
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
@@ -666,6 +678,28 @@ module CudaExecUnit =
         let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
+
+    /// execution items for a gather operation
+    let execItemsForGather trgt src idxViews =
+        let funcName = sprintf "gather%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let args = 
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
+            (List.map (function | Some v -> ArrayNDArgTmpl v :> ICudaArgTmpl
+                                | None   -> ArrayNDNullArgTmpl (TypeName.ofType<int>, trgt.Shape) 
+                                            :> ICudaArgTmpl) idxViews)
+        execItemsForKernel funcName args args (workDimForElemwise trgt false)
+
+    /// execution items for a scatter operation
+    let execItemsForScatter trgt src idxViews =
+        let funcName = sprintf "scatter%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let args = 
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
+            (List.map (function | Some v -> ArrayNDArgTmpl v :> ICudaArgTmpl
+                                | None   -> ArrayNDNullArgTmpl (TypeName.ofType<int>, src.Shape) 
+                                            :> ICudaArgTmpl) idxViews)
+        execItemsForKernel funcName args args (workDimForElemwise src false)
 
     /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
     let reductionFuncnameAndArgs trgt cOp cInitialOp src =
@@ -954,6 +988,7 @@ module CudaExecUnit =
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
+            | MemZero _
             | MemConst _
             | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
             | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
@@ -973,6 +1008,8 @@ module CudaExecUnit =
             let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
             let cs = ConstSpec.ofValue value
             execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
+        | ULeafOp (Arange _) ->
+            execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CountingIEOp_t", true)) [] 
 
         // variable access
         | ULeafOp (Var vs) -> 
@@ -1251,6 +1288,25 @@ module CudaExecUnit =
 
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> 
+            let srcs = srcsDfltCh ()
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            execItemsForGather (dfltChTrgt()) srcs.[0] idxArgs
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> 
+            let trgt, srcs = dfltChTrgt(), srcsDfltCh()
+            // set target to zero
+            let zero = ConstSpec.zeroOfType trgt.DataType
+            let zeroItems = execItemsForElemwise trgt (ConstEOpArgTmpl zero) []
+            // scatter from src into target
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            let scatterItems = execItemsForScatter trgt srcs.[0] idxArgs
+            zeroItems @ scatterItems
 
         // extension
         | UNaryOp (ExtensionOp eop) -> 

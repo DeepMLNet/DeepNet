@@ -202,6 +202,7 @@ module CudaExecEnv =
     /// Gets device memory and offset in bytes for an internal allocation or external reference.
     let getDevMem (env: CudaExecEnvT) (memManikin: MemManikinT) =
         match memManikin with
+        | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0), 0
         | MemAlloc im -> env.InternalMem.[im], 0
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
@@ -296,6 +297,14 @@ module ArgTemplates =
                 let ptr = mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
                 ArrayNDSSArg ptr |> box
 
+    /// ArrayND argument with null data pointer template
+    type ArrayNDNullArgTmpl (typ: TypeNameT, shape: NShapeSpecT) = 
+        let manikin = ArrayNDManikin.newZero typ shape
+        member this.Manikin = manikin
+        interface ICudaArgTmpl with
+            member this.CPPTypeName = manikin.CPPType
+            member this.GetArg env strm = ArrayNDSSArg (nativeint 0) |> box
+
     type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
         interface ICudaArgTmpl with
@@ -348,6 +357,7 @@ module ArgTemplates =
             member this.GetArg env strm = 
                 let storage = 
                     match memManikin with
+                    | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0)
                     | MemAlloc im -> env.InternalMem.[im]
                     | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
                     | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData

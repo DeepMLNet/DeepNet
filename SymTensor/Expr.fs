@@ -42,6 +42,8 @@ module Expr =
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
         | Identity of shape:SizeSpecT * typ:TypeNameT
+        /// vector counting from zero to given size minus one
+        | Arange of size:SizeSpecT * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -102,6 +104,10 @@ module Expr =
         | Subtensor of ExprRngsSpecT
         /// reverses the tensor in the given dimension 
         | ReverseAxis of dim:int
+        /// select elements according to the specified index arrays
+        | Gather of indices:ExprT option list
+        /// disperses elements according to the specified index arrays
+        | Scatter of indices:ExprT option list * shp:ShapeSpecT
 
         // ==== variable storage ====
         /// variable write
@@ -291,6 +297,9 @@ module Expr =
         /// implementations. This method may be omitted when no verification will be done.
         abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
 
+        /// Should return the set of variables that this op instance depends on.
+        abstract ContainedVars: Set<VarSpecT>
+
     /// an expression
     and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>] 
         ExprT =
@@ -376,12 +385,24 @@ module Expr =
 
     /// returns true if subExpr is contained in expr
     let rec contains subExpr expr =
+        let subCon = contains subExpr
         if expr = subExpr then true
         else
             match expr with
-            | Unary (_, a) -> contains subExpr a
-            | Binary (_, a, b) -> contains subExpr a || contains subExpr b
-            | Nary (_, es) -> List.exists (contains subExpr) es
+            | Unary (Gather indices, a) ->
+                subCon a || 
+                indices |> List.exists (function | Some idx -> subCon idx | None -> false)
+            | Unary (Scatter (indices, _), a) ->
+                subCon a || 
+                indices |> List.exists (function | Some idx -> subCon idx | None -> false)
+            | Unary (AssumeJacobian jac, a) ->
+                subCon a || subCon jac
+            | Binary (IfThenElse cond, a, b) ->
+                subCon a || subCon b || subCon cond
+
+            | Unary (_, a) -> subCon a
+            | Binary (_, a, b) -> subCon a || subCon b
+            | Nary (_, es) -> List.exists subCon es
             | _ -> false
 
     /// Produces an error message about incompatible shapes.
@@ -394,6 +415,7 @@ module Expr =
         | Leaf (Identity (_, tn)) -> tn
         | Leaf (ScalarConst cs) -> cs.TypeName
         | Leaf (SizeValue (_, tn)) -> tn
+        | Leaf (Arange (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
         | Binary (Equal, _, _)
@@ -429,6 +451,7 @@ module Expr =
         | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
         | Leaf(ScalarConst _) -> ShapeSpec.scalar
         | Leaf(SizeValue _) -> ShapeSpec.scalar
+        | Leaf(Arange (size, _)) -> ShapeSpec.vector size
 
         // variable access
         | Leaf(Var vs) -> VarSpec.shape vs
@@ -480,6 +503,8 @@ module Expr =
                  | SRSDynStartSymSize (_, size) -> size)
         | Unary(ReverseAxis _, a) -> shapeOf a
         | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
+        | Unary(Gather indices, a) -> indices |> List.pick id |> shapeOf
+        | Unary (Scatter (indices, shp), a) -> shp
 
         // misc
         | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
@@ -558,8 +583,18 @@ module Expr =
         match expr with
         | Leaf (Var vs) -> Set.singleton vs
         | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
+        | Unary (Gather indices, a) ->
+            let indicesVars = indices |> List.choose (Option.map extractVars)
+            Set.unionMany (extractVars a :: indicesVars)
+        | Unary (Scatter (indices, _), a) ->
+            let indicesVars = indices |> List.choose (Option.map extractVars)
+            Set.unionMany (extractVars a :: indicesVars)
+        | Unary (AssumeJacobian jac, a) -> 
+            Set.union (extractVars jac) (extractVars a)
         | Binary (IfThenElse cond, a, b) -> 
             Set.unionMany [extractVars cond; extractVars a; extractVars b]
+        | Nary (ExtensionOp eop, es) ->
+            Set.unionMany (eop.ContainedVars :: (es |> List.map extractVars))
 
         | Leaf _ -> Set.empty
         | Unary (_, a) -> extractVars a
@@ -673,6 +708,37 @@ module Expr =
                     failwithf "cannot reverse non-existant axis %d of array with shape %A" ax sa
                 | Held ([], ReplicateTo (dim, s)) -> 
                     a |> checkAxis dim
+                | Gather indices ->
+                    if nda <> indices.Length then
+                        failwithf "gather argument has %d dimensions but %d index arrays were specified" 
+                            nda indices.Length
+                    let trgtShape =
+                        match indices |> List.tryPick id with
+                        | Some idx -> idx.Shape
+                        | None -> failwith "gather needs at least one specified index expression"  
+                    for dim, idx in List.indexed indices do
+                        match idx with
+                        | Some idx when idx.Type <> typeof<int> ->
+                            failwithf "all index arrays for gather must be of type int, but got type %A" idx.Type
+                        | Some idx when idx.Shape <> trgtShape ->
+                            failwithf "all gather indices must have equal shape, but got %A"
+                                (indices |> List.map (Option.map shapeOf))
+                        | None when dim >= ShapeSpec.nDim trgtShape ->
+                            failwithf "gather index dimensions beyond the number of target dimensions \
+                                       must not be None"
+                        | _ -> ()
+                | Scatter (indices, shp) ->
+                    for dim, idx in List.indexed indices do
+                        match idx with
+                        | Some idx when idx.Type <> typeof<int> ->
+                            failwithf "all index arrays for scatter must be of type int, but got type %A" idx.Type
+                        | Some idx when idx.Shape <> a.Shape ->
+                            failwithf "all scatter indices must have shape of source %A, but got %A" a.Shape
+                                (indices |> List.map (Option.map shapeOf))
+                        | None when dim >= a.NDims ->
+                            failwithf "scatter index dimensions beyond the number of source dimensions \
+                                       must not be None"
+                        | _ -> ()
                 | _ -> ()
 
             | Binary (op, a, b) ->
@@ -719,19 +785,22 @@ module Expr =
                 es |> List.iter checkExpr
                 let ss = es |> List.map shapeOf
 
-                if es |> List.exists (fun e -> typename e <> typename es.Head) then
-                    failwithf "cannot apply n-ary operation %A to expressions of different types %A"
-                        op (es |> List.map (typename >> TypeName.getType))
+                let checkEqualTypes() =
+                    if es |> List.exists (fun e -> typename e <> typename es.Head) then
+                        failwithf "cannot apply n-ary operation %A to expressions of different types %A"
+                            op (es |> List.map (typename >> TypeName.getType))
                 let checkArg idx =
                     if not (0 <= idx && idx < es.Length) then
                         failwithf "the zero-based index %d does not exist for %d specified arguments" idx es.Length
 
                 match op with
                 | Elements (trgtShp, elemExpr) -> 
+                    checkEqualTypes()
                     let tns = es |> List.map typename
                     ElemExpr.check elemExpr |> ignore
                     ElemExpr.checkCompatibility elemExpr ss tns trgtShp
                 | Interpolate ip ->
+                    checkEqualTypes()
                     let nDims = ip.MinArg.Length
                     if nDims < 1 then
                         failwith "interpolator must be at least one-dimensional"
@@ -819,6 +888,7 @@ module Expr =
         | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
         | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
         | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
+        | Leaf (Arange (size, tn)) -> Leaf (Arange (sSize size, tn))
         | Leaf _ -> expr
 
         | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
@@ -830,6 +900,12 @@ module Expr =
                 match heldOp with
                 | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
             Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
+        | Unary (Gather indices, a) ->
+            let indices = indices |> List.map (Option.map sSub)
+            Unary (Gather indices, sSub a)
+        | Unary (Scatter (indices, shp), a) ->
+            let indices = indices |> List.map (Option.map sSub)
+            Unary (Scatter (indices, sShp shp), sSub a)
         | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
         | Unary (op, a) -> Unary (op, sSub a)
 
@@ -863,42 +939,52 @@ module Expr =
     /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
         let subTest = testEvalAllSymSizes failIfNot
+        let tSize = SizeSpec.canEval
+        let tShp = ShapeSpec.canEval
+        let tSrs = SimpleRangesSpec.canEvalSymbols
         let evalable =
             match expr with
-            | Leaf (Identity (ss, tn)) -> SizeSpec.canEval ss
-            | Leaf (SizeValue (sc, tn)) -> SizeSpec.canEval sc
-            | Leaf (Var vs) -> ShapeSpec.canEval (VarSpec.shape vs)
+            | Leaf (Identity (ss, tn)) -> tSize ss
+            | Leaf (SizeValue (sc, tn)) -> tSize sc
+            | Leaf (Var vs) -> tShp (VarSpec.shape vs)
+            | Leaf (Arange (size, tn)) -> tSize size
             | Leaf _ -> true
 
-            | Unary (Reshape ss, a) -> ShapeSpec.canEval ss && subTest a
-            | Unary (DoBroadcast ss, a) -> ShapeSpec.canEval ss && subTest a
-            | Unary (StoreToVar vs, a) -> ShapeSpec.canEval (VarSpec.shape vs) && subTest a
-            | Unary (Subtensor srs, a) -> SimpleRangesSpec.canEvalSymbols srs && subTest a
+            | Unary (Reshape ss, a) -> tShp ss && subTest a
+            | Unary (DoBroadcast ss, a) -> tShp ss && subTest a
+            | Unary (StoreToVar vs, a) -> tShp (VarSpec.shape vs) && subTest a
+            | Unary (Subtensor srs, a) -> tSrs srs && subTest a
             | Unary (Held (derivsShp, heldOp), a) ->
                 let canEvalOp =
                     match heldOp with 
-                    | ReplicateTo (dim, s) -> SizeSpec.canEval s
-                List.forall ShapeSpec.canEval derivsShp && canEvalOp && subTest a
+                    | ReplicateTo (dim, s) -> tSize s
+                List.forall tShp derivsShp && canEvalOp && subTest a
+            | Unary (Gather indices, a) ->
+                let someIndices = indices |> List.choose id
+                List.forall subTest someIndices && subTest a
+            | Unary (Scatter (indices, shp), a) ->
+                let someIndices = indices |> List.choose id
+                List.forall subTest someIndices && tShp shp && subTest a
             | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
             | Unary (op, a) -> subTest a
 
             | Binary (SetSubtensor srs, a, b) -> 
-                SimpleRangesSpec.canEvalSymbols srs && subTest a && subTest b
+                tSrs srs && subTest a && subTest b
             | Binary (IfThenElse c, a, b) ->
                 subTest c && subTest a && subTest b 
             | Binary (op, a, b) -> subTest a && subTest b
 
             | Nary (Elements (trgtShp, elemExpr), es) -> 
-                ShapeSpec.canEval trgtShp && 
+                tShp trgtShp && 
                 ElemExpr.canEvalAllSymSizes elemExpr && 
                 List.forall subTest es
             | Nary (Channel (Loop spec, channel), es) ->
-                (SizeSpec.canEval spec.Length) 
+                (tSize spec.Length) 
                 &&
                 (spec.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
-                    ShapeSpec.canEval vs.Shape &&
+                    tShp vs.Shape &&
                     match li with
-                    | PreviousChannel pc -> SizeSpec.canEval pc.Delay
+                    | PreviousChannel pc -> tSize pc.Delay
                     | _ -> true)) 
                 &&
                 (spec.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> subTest lv.Expr))                
@@ -934,6 +1020,12 @@ module Expr =
             | Unary (op, a) -> Unary (op, subSubst a)
             | Unary (AssumeJacobian jac, a) ->
                 Unary (AssumeJacobian (subSubst jac), subSubst a)
+            | Unary (Gather indices, a) ->
+                let indices = indices |> List.map (Option.map subSubst)
+                Unary (Gather indices, subSubst a)
+            | Unary (Scatter (indices, shp), a) ->
+                let indices = indices |> List.map (Option.map subSubst)
+                Unary (Scatter (indices, shp), subSubst a)
             | Binary (IfThenElse c, a, b) -> 
                 Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
             | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
@@ -1027,6 +1119,13 @@ module Expr =
         let bb = b |> reshapeIfNecessary psb |> broadcastIfNecessary bsb    
         Binary (op, ba, bb) |> check
 
+    /// pads from the left and broadcasts the argument to the given shape if possible
+    let broadcastToShape shp a =
+        let sa = shapeOf a
+        let psa = sa |> ShapeSpec.padTo (nDim shp)
+        let bsa = psa |> ShapeSpec.broadcastToShape shp
+        a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa        
+
     /// pads and broadcasts all arguments to same shape if possible
     let broadcastToSameMany es =
         let ss = es |> List.map shapeOf
@@ -1040,6 +1139,29 @@ module Expr =
         match broadcastToSameMany [a; b] with
         | [bcA; bcB] -> bcA, bcB
         | _ -> failwith "impossible"
+
+    /// select elements according to the specified index arrays
+    let gather indices a =
+        let someIndices = indices |> List.choose id
+        if List.isEmpty someIndices then
+            failwith "need to specify at least one index array"
+        let bcSomeIndices = broadcastToSameMany someIndices
+        let rec rebuild idxs repIdxs =
+            match idxs, repIdxs with
+            | Some idx :: rIdxs, repIdx :: rRepIdxs ->
+                Some repIdx :: rebuild rIdxs rRepIdxs
+            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
+            | [], [] -> []
+            | _ -> failwith "unbalanced idxs"
+        let bcIndices = rebuild indices bcSomeIndices
+        Unary (Gather bcIndices, a) |> check
+
+    /// select elements according to the specified index arrays
+    let scatter indices trgtShp a =
+        let aShp = shapeOf a
+        let indices = indices |> List.map (Option.map (broadcastToShape aShp))
+        Unary (Scatter (indices, trgtShp), a) |> check
+
 
     // elementwise operators
     type ExprT with
@@ -1254,6 +1376,15 @@ module Expr =
     /// variable of given name, type and shape
     let varOfType name typ (ss: ShapeSpecT) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> check
+
+    /// Vector counting from zero to given size minus one.
+    [<RequiresExplicitTypeArguments>]
+    let arange<'T> size =
+        Leaf(Arange(size, TypeName.ofType<'T>)) |> check
+
+    /// Vector counting from zero to given size minus one.
+    let arangeOfType shp typ =
+        Leaf(Arange(shp, TypeName.ofTypeInst typ)) |> check
 
     /// annotated expression
     let annotate ano a = 
@@ -1539,8 +1670,97 @@ module Expr =
         interpolate interpolator [a; b; c]
    
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    let loop spec channel inputs =
-        Nary (Channel (Loop spec, channel), inputs) |> check
+    /// All variables occurs in the loop channel expressions must be defined as loop variables.
+    /// The function `loop` performs automatic lifting of constants and thus allows for easy
+    /// usage of variables external to the loop.
+    let loopNoLift spec channel args =
+        Nary (Channel (Loop spec, channel), args) |> check
+
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    let loop spec channel args =       
+        let mutable args = args
+        let mutable vars = spec.Vars
+
+        /// adds an argument and returns its index
+        let addArg (expr: ExprT) =
+            match args |> List.tryFindIndex ((=) expr) with
+            | Some argIdx -> argIdx
+            | None ->
+                let argIdx = args.Length
+                args <- args @ [expr]
+                argIdx
+
+        /// adds a constant variable, its required argument and returns the associated VarSpecT
+        let addConstVar (expr: ExprT) =
+            match vars |> Map.tryFindKey (fun vs lv ->
+                                           match lv with
+                                           | ConstArg argIdx when args.[argIdx] = expr -> true
+                                           | _ -> false) with
+            | Some vs -> vs
+            | None ->
+                let rec genName i =
+                    let name = sprintf "CONST%d" i
+                    match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
+                    | Some _ -> genName (i + 1)
+                    | None -> name
+                let vs = VarSpec.ofNameShapeAndTypeName (genName 0) expr.Shape expr.TypeName
+                let lv = ConstArg (addArg expr)
+                vars <- vars |> Map.add vs lv
+                vs
+
+        /// true if expr depends on any loop variable
+        let dependsOnLoopVars expr = 
+            vars |> Map.exists (fun vs _ -> expr |> contains (makeVar vs))
+
+        /// true if expr contains a variable
+        let dependsOnVars expr =
+            expr |> extractVars |> Set.isEmpty |> not
+
+        /// pulls out expression parts that do not depend on loop variables
+//        let rec lift expr =
+//            match expr with                   
+//            | Leaf (Var vs) when not (vars |> Map.containsKey vs) ->
+//                let vs = addConstVar expr
+//                makeVar vs                  
+//
+//            | Unary (Gather indices, a) ->
+//                Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+//            | Unary (Scatter (indices, trgtShp), a) ->
+//                Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+//
+//            | Binary (IfThenElse cond, a, b) ->
+//                Binary (IfThenElse (lift cond), lift a, lift b)
+//
+//            | Leaf _ -> expr
+//            | Unary (op, a) -> Unary (op, lift a)
+//            | Binary (op, a, b) -> Binary (op, lift a, lift b)
+//            | Nary (op, es) -> Nary (op, es |> List.map lift)
+
+        let rec lift expr =
+            if dependsOnVars expr && not (dependsOnLoopVars expr) then
+            //if not (dependsOnLoopVars expr) then
+                let vs = addConstVar expr
+                makeVar vs
+            else
+                match expr with                   
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+                | Unary (Scatter (indices, trgtShp), a) ->
+                    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (lift cond), lift a, lift b)
+
+                | Leaf _ -> expr
+                | Unary (op, a) -> Unary (op, lift a)
+                | Binary (op, a, b) -> Binary (op, lift a, lift b)
+                | Nary (op, es) -> Nary (op, es |> List.map lift)
+                
+        // lift constants out of loop
+        let liftedChannels = spec.Channels |> Map.map (fun ch lv -> {lv with Expr = lift lv.Expr})
+        let spec = {spec with Channels = liftedChannels; Vars = vars}            
+
+        loopNoLift spec channel args
 
     /// reverses the tensor in the given dimension 
     let reverseAxis dim (a: ExprT) : ExprT =

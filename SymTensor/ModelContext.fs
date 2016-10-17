@@ -189,7 +189,8 @@ module ModelContextTypes =
                 printfn "%-50s %A" (par.Name + ": ") value.Shape
 
 
-    /// A model builder.
+    /// A model builder. 
+    /// The type 'T specifies the data type of the model parameters.
     [<StructuredFormatDisplay("{PrettyString}")>]
     type ModelBuilder<'T when 'T: equality and 'T: comparison> 
                                             (context:       string,
@@ -241,8 +242,9 @@ module ModelContextTypes =
                 subMC
 
         /// Creates and returns a model variable.
-        member this.Var (name: string) (shape: ShapeSpecT) : ExprT =
-            let v = Expr.var<'T> (context + "." + name) shape
+        [<RequiresExplicitTypeArguments>]
+        member this.Var<'V> (name: string) (shape: ShapeSpecT) : ExprT =
+            let v = Expr.var<'V> (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v)
             v
 
@@ -303,7 +305,7 @@ module ModelContextTypes =
             match size with
             | Base (Sym sym) -> 
                 match symSizeEnv |> Map.tryFind sym with
-                | Some (Base (Fixed value)) -> value
+                | Some (Base (Fixed _) as value) -> SizeSpec.eval value
                 | _ -> failwith "size symbol is unknown or does not a have a numeric value"
             | _ -> failwith "need a size symbol to set size"
 
@@ -442,6 +444,13 @@ module ModelContextTypes =
             (expr, parameters)
             ||> Map.fold (fun expr vs pi ->
                 expr |> Expr.subst pi.Expr parameterSet.[vs])
+            |> Expr.substSymSizes compileEnv.SymSizes
+
+        /// inserts the ParameterStorage into the given variable environment
+        member this.Use varEnv =
+            varEnv
+            |> parameterStorage.Use 
+            |> VarEnv.substSymSizes compileEnv.SymSizes
 
         /// the device this model instance is stored on
         member this.Device = device
@@ -450,11 +459,9 @@ module ModelContextTypes =
         member this.ParameterSet = parameterSet
 
         /// symbolic flat parameter vector
-        member this.ParameterVector = this.ParameterSet.Flat
-
-        /// Derivative of "expr" w.r.t. flat vector containing all model parameters
-        member this.WrtParameters expr =
-            this.ParameterSet.WrtFlat expr
+        member this.ParameterVector = 
+            this.ParameterSet.Flat
+            |> Expr.substSymSizes compileEnv.SymSizes
 
         /// Parameter values.
         member this.ParameterStorage = parameterStorage

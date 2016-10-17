@@ -39,6 +39,7 @@ let compareTraces func dump =
 
     let diffs = Trace.compare hostTrace cudaTrace
     if diffs > 0 then
+        printfn "Traces differ. Dumping to UneqalCUDA.txt and UneqalHost.txt."
         cudaTrace |> dumpTrace "UnequalCUDA.txt" 
         hostTrace |> dumpTrace "UnequalHost.txt"
     diffs
@@ -95,5 +96,5 @@ let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
     let vars = buildVars<float> shps
     let expr = exprFn vars
     let varEnv = buildVarEnv<float> vars shps rng DevHost
-    DerivCheck.checkExprTree tolerance 1e-7 varEnv expr
+    DerivCheck.checkExprTree DevHost tolerance 1e-7 varEnv expr
 

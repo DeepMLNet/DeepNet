@@ -62,6 +62,7 @@
     </None>
     <Content Include="packages.config" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Util.fs" />
     <Compile Include="Pickle.fs" />
     <Compile Include="Linear.fs" />
     <Compile Include="Neural.fs" />

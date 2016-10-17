@@ -198,3 +198,94 @@ let ``Invert Kk matrix`` () =
     let diff = id - ids
     printfn "maxdiff: %f" (ArrayND.max diff |> ArrayND.value)
     ArrayND.almostEqualWithTol 1e-5f 1e-5f id ids |> ArrayND.value |> Assert.True
+
+
+[<Fact>]
+let ``Select`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0 = [1; 2; 0; 3] |> ArrayNDHost.ofList |> ArrayND.padRight |> ArrayND.broadcastDim 1 2
+    let idxs = [Some i0; None]
+
+    let s = a |> ArrayND.gather idxs
+
+    printfn "a=\n%A" a
+    printfn "idxs=\n%A" idxs
+    printfn "select idxs a=\n%A" s
+
+[<Fact>]
+let ``Select 2`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0 = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let idxs = [Some i0; None]
+
+    let s = a |> ArrayND.gather idxs
+
+    printfn "a=\n%A" a
+    printfn "idxs=\n%A" idxs
+    printfn "select idxs a=\n%A" s
+
+[<Fact>]
+let ``Select 3`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0 = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1 = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let idxs = [Some i0; Some i1]
+
+    let s = a |> ArrayND.gather idxs
+
+    printfn "a=\n%A" a
+    printfn "idxs=\n%A" idxs
+    printfn "select idxs a=\n%A" s
+
+
+[<Fact>]
+let ``Disperse 1`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0 = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1 = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let idxs = [Some i0; Some i1]
+    let shp = [3; 3]
+
+    let s = a |> ArrayND.scatter idxs shp
+
+    printfn "a=\n%A" a
+    printfn "shp=%A" shp
+    printfn "idxs=\n%A" idxs
+    printfn "disperse idxs shp a=\n%A" s
+
+
+[<Fact>]
+let ``Disperse 2`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0 = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let idxs = [Some i0; None]
+    let shp = [3; 3]
+
+    let s = a |> ArrayND.scatter idxs shp
+
+    printfn "a=\n%A" a
+    printfn "shp=%A" shp
+    printfn "idxs=\n%A" idxs
+    printfn "disperse idxs shp a=\n%A" s
+
+
+[<Fact>]
+let ``Disperse 3`` () =
+
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let idxs = [None; None]
+    let shp = [5; 3]
+
+    let s = a |> ArrayND.scatter idxs shp
+
+    printfn "a=\n%A" a
+    printfn "shp=%A" shp
+    printfn "idxs=\n%A" idxs
+    printfn "disperse idxs shp a=\n%A" s
+
+
