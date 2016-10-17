@@ -36,17 +36,17 @@ module ExpectationPropagation =
         /// one update step of the EP algorithm
         let updateStep (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT)= 
             let cov = Expr.diag sigma
-            let tauMinus = (1.0f / cov) - tauSite
-            let vMinus = (1.0f/cov) * mu - vSite
-            let covMinus = (1.0f/tauMinus)
-            let muMinus = (Expr.diagMat covMinus) .* vMinus
-            let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
-            let normPdfZ = standardNormalPDF z
-            let normCdfZ  = standardNormalCDF z
-            let covHatf1 = covMinus *** 2.0f * normPdfZ / (normCdfZ * (vu ** 2.0f + covMinus))
-            let covHatf2 = z + normPdfZ/  normCdfZ
-            let covHat = covMinus - covHatf1 * covHatf2
-            let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f)))
+            let tauMinus = (1.0f / cov) - tauSite |> Expr.checkFinite "tauMinus"
+            let vMinus = (1.0f/cov) * mu - vSite |> Expr.checkFinite "vMinus"
+            let covMinus = (1.0f/tauMinus) |> Expr.checkFinite "covMinus"
+            let muMinus = (Expr.diagMat covMinus) .* vMinus |> Expr.checkFinite "muMinus"
+            let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "z"
+            let normPdfZ = standardNormalPDF z |> Expr.checkFinite "normPdfZ"
+            let normCdfZ  = standardNormalCDF z |> Expr.checkFinite "normCdfZ"
+            let covHatf1 = covMinus *** 2.0f * normPdfZ / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
+            let covHatf2 = z + normPdfZ/  normCdfZ |> Expr.checkFinite "covHatf2"
+            let covHat = covMinus - covHatf1 * covHatf2 |> Expr.checkFinite "covHat"
+            let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "muHat"
             let tauSUpd = (1.0f /covHat) - tauMinus
             let tauSUpd = tauSUpd |> Expr.checkFinite "tauSUpd"
             let vSUpd = (1.0f / covHat) * muHat - vMinus
@@ -92,7 +92,7 @@ module ExpectationPropagation =
             let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,*]
             let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,*] |> Expr.checkFinite "muSUpd" 
             newTauSite,newVSite
-        let tauSite,vSite = optimize 5 (sigma,mu, tauSite,vSite)
+        let tauSite,vSite = optimize 20 (sigma,mu, tauSite,vSite)
         let covSite = (1.0f/tauSite)
         let muSite = (Expr.diagMat covSite) .* vSite
         covSite, muSite
@@ -105,12 +105,13 @@ module GaussianProcess =
         | Linear
         /// squared exponential kernel
         | SquaredExponential of single*single
-    
+
+
     /// GP hyperparameters
     type HyperPars = {
         Kernel:             Kernel
         MeanFunction:       (ExprT -> ExprT)
-        Monotonicity:       single option
+        Monotonicity:       (single*int*single*single) option
         CutOutsideRange:    bool
         }
     
@@ -124,13 +125,15 @@ module GaussianProcess =
 
     /// GP parameters with linear kernel
     type ParsLinear = {
-        HyperPars:  HyperPars
+        ObservationPoints:  ExprT
+        HyperPars:          HyperPars
         }
     
     /// GP parameters with squared exponential kernel
     type ParsSE = {
         Lengthscale:    ExprT
         SignalVariance: ExprT
+        ObservationPoints:  ExprT
         HyperPars:  HyperPars
         }
 
@@ -140,15 +143,22 @@ module GaussianProcess =
     let  initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
         ArrayNDHost.scalar s
 
+    let initObservationPoints minElem maxElem seed (shp: int list) : ArrayNDHostT<single> =
+        ArrayNDHost.linSpaced minElem maxElem shp.[0]
+
     type Pars = LinPars of ParsLinear | SEPars of  ParsSE
 
 
-
     let pars (mb: ModelBuilder<_>) (hp:HyperPars) = 
+        let n,min,max = match hp.Monotonicity with
+                | Some (f,i,min,max) -> i,min,max
+                | None ->  2,0.0f,1.0f
         match hp.Kernel with
-        | Linear -> LinPars {HyperPars = hp}
+        | Linear -> LinPars {ObservationPoints =  mb.Param ("ObservationPoints", [SizeSpec.fix n], initObservationPoints min max )
+                             HyperPars = hp}
         | SquaredExponential (l,s)-> SEPars { Lengthscale = mb.Param ("Lengthscale" , [], initLengthscale l)
                                               SignalVariance = mb.Param ("SignalVariance" , [], initSignalVariance s)
+                                              ObservationPoints =  mb.Param ("ObservationPoints", [SizeSpec.fix n], initObservationPoints min max )
                                               HyperPars = hp}
     
 
@@ -179,17 +189,17 @@ module GaussianProcess =
         let k           = (covMat x x)
         let kStarstar  = covMat xStar xStar
         
-        let meanFct,monotonicity,cut = 
+        let meanFct,monotonicity,cut,oPs = 
             match pars with
-            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity, parsLin.HyperPars.CutOutsideRange
-            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity,  parsSE.HyperPars.CutOutsideRange
+            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.Monotonicity, parsLin.HyperPars.CutOutsideRange, parsLin.ObservationPoints
+            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.Monotonicity,  parsSE.HyperPars.CutOutsideRange, parsSE.ObservationPoints
         
         let meanX = meanFct x
         let meanXStar = meanFct xStar
 
         let mean,cov = 
             match monotonicity with
-            | Some vu ->
+            | Some (vu,_,_,_) ->
                 
                 let covPdFun (x:ExprT) (k:ExprT) =
                     let i, j  = ElemExpr.idx2
@@ -197,9 +207,18 @@ module GaussianProcess =
                     let xelem = xvect[i]
                     let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
                     let sizeK1 = k.Shape.[0]
-                    let sizeK2 = k.Shape.[0]
+                    let sizeK2 = k.Shape.[1]
                     Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
                 
+                let covFunPd (x:ExprT) (k:ExprT) =
+                    let i, j  = ElemExpr.idx2
+                    let cMat,xvect = ElemExpr.arg2<single>
+                    let xelem = xvect[j]
+                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
+                    let sizeK1 = k.Shape.[0]
+                    let sizeK2 = k.Shape.[1]
+                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+
                 let covPdPd  (x:ExprT) (y:ExprT) (k:ExprT)  = 
                     let i, j  = ElemExpr.idx2
                     let cMat,xvect,yvect = ElemExpr.arg3<single>
@@ -207,30 +226,26 @@ module GaussianProcess =
                     let yelem = yvect[j]
                     let cPdPd = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem yelem
                     let sizeK1 = k.Shape.[0]
-                    let sizeK2 = k.Shape.[0]
+                    let sizeK2 = k.Shape.[1]
                     Expr.elements [sizeK1;sizeK2] cPdPd [k;x;y]
                 
                 ///locations of the virtual derivative points on training points
-                let xm = x
+                let xm = oPs 
                 let kFf = k
                 let kF'f = covMat xm x |> covPdFun xm
-                let kFf' = kF'f.T
-                let kF'f' = covMat xm xm |> covPdPd xm xm
-
-                let covSite,muSite = ExpectationPropagation.monotonicityEP k vu
+                let kFf' = covMat x xm |> covFunPd xm
+                let kMm = covMat xm xm
+                let kF'f' = kMm  |> covPdPd xm xm
+                let kF'f'= kF'f' |> Expr.checkFinite "KF'f'"
+                let covSite,muSite = ExpectationPropagation.monotonicityEP kMm  vu
                 
                 let covSite = covSite |> Expr.checkFinite "covSite"
                 let muSite = muSite |> Expr.checkFinite "muSite"
-
                 let xJoint = Expr.concat 0 [x;xm]
-                let kJoint1,kJoint2 = Expr.concat 0 [kFf;kFf'],Expr.concat 0 [kF'f;kF'f']
-                let kJoint = Expr.concat 1 [kJoint1;kJoint2]
+                let kJoint1,kJoint2 = Expr.concat 1 [kFf;kFf'],Expr.concat 1 [kF'f;kF'f']
+                let kJoint = Expr.concat 0 [kJoint1;kJoint2]
                 let muJoint = Expr.concat 0 [y;muSite]
-                let sigmaNMat = Expr.diagMat sigmaNs
-                let zeroMatFf' = Expr.zerosLike kFf'
-                let zeroMatF'f = Expr.zerosLike kF'f
-                let sigmaJ1,sigmaJ2=Expr.concat 0 [sigmaNMat;zeroMatFf'],Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]
-                let sigmaJoint =  Expr.concat 1 [sigmaJ1;sigmaJ2] 
+                let sigmaJoint =  Expr.concat 0 [sigmaNs; covSite] |> Expr.diagMat
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar
                 let meanXJoint = meanFct xJoint

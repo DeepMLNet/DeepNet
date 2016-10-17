@@ -20,8 +20,8 @@ module PlotTests =
         
         let seed = 1
         let rand = Random seed
-        let ntraining = 100
-        let ninput = 5000
+        let ntraining = 20
+        let ninput = 500
 
         let trnXList =  (TestFunctions.randomSortedListOfLength rand (-5.0f,-1.0f) (ntraining/2)) @  (TestFunctions.randomSortedListOfLength rand (1.0f,5.0f) (ntraining/2))
         let trnXHost = trnXList |> ArrayNDHost.ofList
@@ -43,7 +43,7 @@ module PlotTests =
         let tanHMean (x:ExprT) = tanh x
         let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f)
                          GaussianProcess.MeanFunction = tanHMean
-                         GaussianProcess.Monotonicity = None
+                         GaussianProcess.Monotonicity = Some (1e-6f,20,-5.0f,5.0f)
                          GaussianProcess.CutOutsideRange = false}
         let range = (-0.5f,0.5f)
         let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.Plots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput

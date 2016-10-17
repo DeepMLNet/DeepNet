@@ -16,7 +16,7 @@ open MLPlots
 let ``Monotonicity on Artificial Examples`` () =
     let nSmpls = 100
     let nInp = 500
-    let rand =  Random()
+    let rand =  Random(1234)
     let sampleX num = rand.SortedUniformArrayND (-3.0,3.0) [num] |> ArrayND.single |> ArrayNDHost.fetch
     let sampleEpsilon num = rand.NormalArrayND (0.0,sqrt(0.1)) [num] |> ArrayND.single |> ArrayNDHost.fetch
     let fctA x = if x < 0.5f then 0.0f else 2.0f
@@ -37,7 +37,7 @@ let ``Monotonicity on Artificial Examples`` () =
                                                 GaussianProcess.Monotonicity = None;
                                                 GaussianProcess.CutOutsideRange = false}
     let pars1 = GaussianProcess.pars (mb.Module "GaussianProcess1") hyperPars1
-    let hyperPars2 = {hyperPars1 with GaussianProcess.Monotonicity = Some 1e-6f}
+    let hyperPars2 = {hyperPars1 with GaussianProcess.Monotonicity = Some (1e-6f,10,-3.0f,3.0f)}
     let pars2 = GaussianProcess.pars (mb.Module "GaussianProcess2") hyperPars2
     let mi = mb.Instantiate (DevCuda,
                             Map[nTrnSmpls, nSmpls
@@ -65,10 +65,10 @@ let ``Monotonicity on Artificial Examples`` () =
         printfn "rmse1  = %A\n rmse2  = %A" rmse1 rmse2
         rmse1.Data.[0] ,rmse2.Data.[0] 
         
-    let rmsesFA1,rmsesFA2 = [0..4] |> List.map (fun _ -> (runTest fctA)) |> List.unzip 
-    let rmsesFB1,rmsesFB2 = [0..4] |> List.map (fun _ -> (runTest fctB)) |> List.unzip 
-    let rmsesFC1,rmsesFC2 = [0..4] |> List.map (fun _ -> (runTest fctC)) |> List.unzip 
-    let rmsesFD1,rmsesFD2 = [0..4] |> List.map (fun _ -> (runTest fctD)) |> List.unzip 
+    let rmsesFA1,rmsesFA2 = [0..9] |> List.map (fun _ -> (runTest fctA)) |> List.unzip 
+    let rmsesFB1,rmsesFB2 = [0..9] |> List.map (fun _ -> (runTest fctB)) |> List.unzip 
+    let rmsesFC1,rmsesFC2 = [0..9] |> List.map (fun _ -> (runTest fctC)) |> List.unzip 
+    let rmsesFD1,rmsesFD2 = [0..9] |> List.map (fun _ -> (runTest fctD)) |> List.unzip 
     printfn "rmse function A: %7.4f  %7.4f" (List.average rmsesFA1) (List.average rmsesFA2)
     printfn "rmse function B: %7.4f  %7.4f" (List.average rmsesFB1) (List.average rmsesFB2)
     printfn "rmse function C: %7.4f  %7.4f" (List.average rmsesFC1) (List.average rmsesFC2)
