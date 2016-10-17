@@ -27,7 +27,7 @@ module PlotTests =
         let trnXHost = trnXList |> ArrayNDHost.ofList
         let trnTList = trnXList |>  TestFunctions.randPolynomial rand
         let trnTHost = trnTList |> ArrayNDHost.ofList
-
+//        let trnTHost = trnXList |> List.map (fun x -> 2.0f*x) |> ArrayNDHost.ofList
         let sigmaNs_host = (ArrayNDHost.ones<single> [ntraining]) * sqrt 0.001f
 
         //transfer train parametters to device (Host or GPU)

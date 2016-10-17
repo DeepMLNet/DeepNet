@@ -53,7 +53,7 @@ module ExpectationPropagation =
             let vSUpd = vSUpd |> Expr.checkFinite "vSUpd"
             let tauSite = tauSUpd 
             let vSite =  vSUpd
-            let sigma = (Expr.invert sigma) + (Expr.diagMat (1.0f/tauSite)) |> Expr.invert
+            let sigma = (Expr.invert sigma) + (Expr.diagMat tauSite) |> Expr.invert
             let mu = sigma.*(Expr.diagMat (1.0f/tauSite)).*vSite
             sigma,mu,tauSite,vSite
 
@@ -73,10 +73,6 @@ module ExpectationPropagation =
             let chVSite = "muSite"
             let chSigma = "sigma"
             let chMu = "mu"
-            let sigVar =  VarSpec.create "GP.GaussianProcess.SignalVariance" typeof<single> []
-            let ls =  VarSpec.create "GP.GaussianProcess.Lengthscale" typeof<single>[]
-            let x = VarSpec.create "GP.x" typeof<single>[SizeSpec.symbol "nTrnSmpls"]
-            let sigNs = VarSpec.create "GP.sigNs" typeof<single>[SizeSpec.symbol "nTrnSmpls"]
 
             let loopSpec = {
                 Expr.Length = nIters
@@ -93,12 +89,10 @@ module ExpectationPropagation =
             let vSite = Expr.reshape [SizeSpec.fix 1;vSite.Shape.[0]] vSite
             let sigma = Expr.reshape [SizeSpec.fix 1;sigma.Shape.[0];sigma.Shape.[1]] sigma
             let mu = Expr.reshape [SizeSpec.fix 1;mu.Shape.[0]] mu
-            let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,0..tauSite.Shape.[1] - 1]
-            let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,0..vSite.Shape.[1] - 1] |> Expr.checkFinite "muSUpd"
-            let newSigma = (Expr.loop loopSpec chSigma [tauSite;vSite;sigma;mu]).[nIters - 1,0..sigma.Shape.[1] - 1,0..sigma.Shape.[2] - 1]
-            let newMu = (Expr.loop loopSpec chMu [tauSite;vSite;sigma;mu]).[nIters - 1,0..mu.Shape.[1] - 1] 
+            let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,*]
+            let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,*] |> Expr.checkFinite "muSUpd" 
             newTauSite,newVSite
-        let tauSite,vSite = optimize 10 (sigma,mu, tauSite,vSite)
+        let tauSite,vSite = optimize 20 (sigma,mu, tauSite,vSite)
         let covSite = (1.0f/tauSite)
         let muSite = (Expr.diagMat covSite) .* vSite
         covSite, muSite
@@ -223,26 +217,19 @@ module GaussianProcess =
                 let kFf' = kF'f.T
                 let kF'f' = covMat xm xm |> covPdPd xm xm
 
-
-                //TODO: covSite and muSite without EP algorithm
                 let covSite,muSite = ExpectationPropagation.monotonicityEP k vu
                 
                 let covSite = covSite |> Expr.checkFinite "covSite"
                 let muSite = muSite |> Expr.checkFinite "muSite"
 
                 let xJoint = Expr.concat 0 [x;xm]
-                printfn "Shape kFf = %A\nShape kFf' = %A"kFf.Shape kFf'.Shape
-                printfn "Shape kF'f = %A\nShape kFf' = %A"kF'f.Shape kF'f'.Shape
                 let kJoint1,kJoint2 = Expr.concat 0 [kFf;kFf'],Expr.concat 0 [kF'f;kF'f']
-                printfn "Shape kJoint1 = %A\nShape  kJoint2 = %A" kJoint1.Shape  kJoint2.Shape
                 let kJoint = Expr.concat 1 [kJoint1;kJoint2]
-                printfn "Shape kJoint = %A" kJoint.Shape
                 let muJoint = Expr.concat 0 [y;muSite]
                 let zeroMat = Expr.zerosLike kFf
                 let zeroMatFf' = Expr.zerosLike kFf'
                 let zeroMatF'f = Expr.zerosLike kF'f
                 let sigmaJ1,sigmaJ2=Expr.concat 0 [zeroMat;zeroMatFf'],Expr.concat 0 [zeroMatF'f.T;(Expr.diagMat covSite)]
-                printfn "Shape sigmaJ1 = %A\nShape sigmaJ2 = %A"sigmaJ1.Shape sigmaJ2.Shape
                 let sigmaJoint =  Expr.concat 1 [sigmaJ1;sigmaJ2] 
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar

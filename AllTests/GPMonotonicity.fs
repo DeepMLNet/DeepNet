@@ -10,15 +10,15 @@ open System
 open Basics
 open TestUtils
 open Models
+open MLPlots
 
 [<Fact>]
 let ``Monotonicity on Artificial Examples`` () =
     let nSmpls = 100
     let nInp = 500
     let rand =  Random()
-    let sampleX num = rand.UniformArrayND (0.0,1.0) [num] |> ArrayND.single |> ArrayNDHost.fetch
-    let sampleEpsilon num = rand.NormalArrayND (0.0,1.0) [num] |> ArrayND.single |> ArrayNDHost.fetch
-    let normalize (mean:single) std (ary:ArrayNDHostT<single>) = ArrayND.map (fun x -> (x-mean)/std) ary
+    let sampleX num = rand.SortedUniformArrayND (-3.0,3.0) [num] |> ArrayND.single |> ArrayNDHost.fetch
+    let sampleEpsilon num = rand.NormalArrayND (0.0,sqrt(0.1)) [num] |> ArrayND.single |> ArrayNDHost.fetch
     let fctA x = if x < 0.5f then 0.0f else 2.0f
     let fctB x = 2.0f*x
     let fctC x = exp(1.5f*x)
@@ -30,39 +30,45 @@ let ``Monotonicity on Artificial Examples`` () =
     let x = mb.Var<single>  "x" [nTrnSmpls]
     let t = mb.Var<single>  "t" [nTrnSmpls]
     let inp = mb.Var<single>  "inp" [nInput]
+    let fInp = mb.Var<single>  "Finp" [nInput] 
     let zeroMean x = Expr.zerosLike x
     let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f);
                                                 GaussianProcess.MeanFunction = zeroMean;
                                                 GaussianProcess.Monotonicity = None;
                                                 GaussianProcess.CutOutsideRange = false}
-    let pars1 = GaussianProcess.pars (mb.Module "GaussianProcess") hyperPars1
+    let pars1 = GaussianProcess.pars (mb.Module "GaussianProcess1") hyperPars1
     let hyperPars2 = {hyperPars1 with GaussianProcess.Monotonicity = Some 1e-6f}
-    let pars2 = GaussianProcess.pars (mb.Module "GaussianProcess") hyperPars2
+    let pars2 = GaussianProcess.pars (mb.Module "GaussianProcess2") hyperPars2
     let mi = mb.Instantiate (DevCuda,
                             Map[nTrnSmpls, nSmpls
                                 nInput,    nInp])
     let mean1, _ = GaussianProcess.predict pars1 x t sigNs inp
     let mean2, _ = GaussianProcess.predict pars2 x t sigNs inp
-    let RMSE1 = sqrt(LossLayer.loss LossLayer.MSE mean1 inp)
-    let RMSE2 = sqrt(LossLayer.loss LossLayer.MSE mean2 inp)
-    let rmse1Fun = mi.Func RMSE1 |>arg4 x t sigNs inp
-    let rmse2Fun = mi.Func RMSE2 |>arg4 x t sigNs inp
+    let two = Expr.twoOfSameType mean1
+    let RMSE1 = sqrt((mean1 - fInp) ** two|> Expr.mean)
+    let RMSE2 = sqrt((mean2 - fInp) ** two|> Expr.mean)
+    let rmse1Fun = mi.Func RMSE1 |>arg5 x t sigNs inp fInp
+    let rmse2Fun = mi.Func RMSE2 |>arg5 x t sigNs inp fInp
+    let mean1Fun = mi.Func mean1 |>arg5 x t sigNs inp fInp
+    let mean2Fun = mi.Func mean2 |>arg5 x t sigNs inp fInp
     let runTest (func: single-> single) =
         let x = sampleX nSmpls
         let y = (ArrayND.map func x) + sampleEpsilon nSmpls
-//        let x = normalize 0.0f 0.5f x |> ArrayNDCuda.toDev
-//        let y = normalize 0.0f 0.5f y |> ArrayNDCuda.toDev
-        let sigmas = (ArrayND.zerosLike x) * 0.1f
-        let input = ArrayNDHost.linSpaced -3.0f 3.0f nInp |> ArrayNDCuda.toDev
-        let rmse1 = rmse1Fun x y sigmas input |> ArrayNDHost.fetch
-        let rmse2 = rmse2Fun x y sigmas input |> ArrayNDHost.fetch
-        printfn "rrmse1  = %A\n rmse2  = %A" rmse1 rmse2
+        let sigmas = (ArrayND.onesLike x) * sqrt(0.1f)
+        let input =ArrayNDHost.linSpaced -3.0f 3.0f nInp |> ArrayNDCuda.toDev
+        let fInput = (ArrayND.map func input) 
+        let rmse1 = rmse1Fun x y sigmas input fInput|> ArrayNDHost.fetch
+        let rmse2 = rmse2Fun x y sigmas input fInput|> ArrayNDHost.fetch
+        printfn "x = \n %A \ny = \n %A \ninput = \n %A \nFinput = \n %A \n" x y input fInput
+        printfn "mean1 =\n%A" (mean1Fun x y sigmas input fInput|> ArrayNDHost.fetch)
+        printfn "mean2 =\n%A" (mean2Fun x y sigmas input fInput|> ArrayNDHost.fetch)
+        printfn "rmse1  = %A\n rmse2  = %A" rmse1 rmse2
         rmse1.Data.[0] ,rmse2.Data.[0] 
         
-    let rmsesFA1,rmsesFA2 = [0..49] |> List.map (fun _ -> (runTest fctA)) |> List.unzip 
-    let rmsesFB1,rmsesFB2 = [0..49] |> List.map (fun _ -> (runTest fctB)) |> List.unzip 
-    let rmsesFC1,rmsesFC2 = [0..49] |> List.map (fun _ -> (runTest fctC)) |> List.unzip 
-    let rmsesFD1,rmsesFD2 = [0..49] |> List.map (fun _ -> (runTest fctD)) |> List.unzip 
+    let rmsesFA1,rmsesFA2 = [0..4] |> List.map (fun _ -> (runTest fctA)) |> List.unzip 
+    let rmsesFB1,rmsesFB2 = [0..4] |> List.map (fun _ -> (runTest fctB)) |> List.unzip 
+    let rmsesFC1,rmsesFC2 = [0..4] |> List.map (fun _ -> (runTest fctC)) |> List.unzip 
+    let rmsesFD1,rmsesFD2 = [0..4] |> List.map (fun _ -> (runTest fctD)) |> List.unzip 
     printfn "rmse function A: %7.4f  %7.4f" (List.average rmsesFA1) (List.average rmsesFA2)
     printfn "rmse function B: %7.4f  %7.4f" (List.average rmsesFB1) (List.average rmsesFB2)
     printfn "rmse function C: %7.4f  %7.4f" (List.average rmsesFC1) (List.average rmsesFC2)

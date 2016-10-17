@@ -297,10 +297,10 @@ module GPActivation =
         //let predMean = pred_mean |> Expr.dump "pred_mean"
         let predMean = 
             if pars.HyperPars.CutOutsideRange then
-                let xFirst = trnX.[0..nGps- 1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tFirst = trnT.[0..nGps-1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let xLast = trnX.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tLast = trnT.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
 
                 let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
                 Expr.ifThenElse (mu >>>> xLast) tLast predMean
@@ -599,10 +599,10 @@ module MeanOnlyGPLayer =
         let mean = meanInput + (KStarT .* KInv .* (trnT - meanTrnX)).T
         let mean = 
             if pars.HyperPars.CutOutsideRange then
-                let xFirst = trnX.[0..nGps- 1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tFirst = trnT.[0..nGps-1,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let xLast = trnX.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tLast = trnT.[0..nGps - 1,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
 
                 let mean = Expr.ifThenElse (input <<<< xFirst) tFirst mean
                 Expr.ifThenElse (input >>>> xLast) tLast mean
