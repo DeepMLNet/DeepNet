@@ -53,10 +53,10 @@ module GPPlots =
                 let mb = ModelBuilder<single> "GP"
                 let nTrnSmpls = mb.Size "nTrnSmpls"
                 let nInput = mb.Size "nInput"
-                let sigNs = mb.Var "sigs" [nTrnSmpls]
-                let x = mb.Var  "x" [nTrnSmpls]
-                let t = mb.Var  "t" [nTrnSmpls]
-                let inp = mb.Var  "inp" [nInput]
+                let sigNs = mb.Var<single> "sigs" [nTrnSmpls]
+                let x = mb.Var<single>  "x" [nTrnSmpls]
+                let t = mb.Var<single>  "t" [nTrnSmpls]
+                let inp = mb.Var<single>  "inp" [nInput]
                 let pars = GaussianProcess.pars (mb.Module "GaussianProcess") config.HyperPars
                 let mi = mb.Instantiate (DevCuda,
                                          Map[nTrnSmpls, config.NTrain

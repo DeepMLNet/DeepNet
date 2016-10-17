@@ -26,10 +26,10 @@ let ``Monotonicity on Artificial Examples`` () =
     let mb = ModelBuilder<single> "GP"
     let nTrnSmpls = mb.Size "nTrnSmpls"
     let nInput = mb.Size "nInput"
-    let sigNs = mb.Var "sigNs" [nTrnSmpls]
-    let x = mb.Var  "x" [nTrnSmpls]
-    let t = mb.Var  "t" [nTrnSmpls]
-    let inp = mb.Var  "inp" [nInput]
+    let sigNs = mb.Var<single> "sigNs" [nTrnSmpls]
+    let x = mb.Var<single>  "x" [nTrnSmpls]
+    let t = mb.Var<single>  "t" [nTrnSmpls]
+    let inp = mb.Var<single>  "inp" [nInput]
     let zeroMean x = Expr.zerosLike x
     let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f);
                                                 GaussianProcess.MeanFunction = zeroMean;
@@ -41,22 +41,24 @@ let ``Monotonicity on Artificial Examples`` () =
     let mi = mb.Instantiate (DevCuda,
                             Map[nTrnSmpls, nSmpls
                                 nInput,    nInp])
-    let mean1, cov1 = GaussianProcess.predict pars1 x t sigNs inp
-    let mean2, cov2 = GaussianProcess.predict pars2 x t sigNs inp
+    let mean1, _ = GaussianProcess.predict pars1 x t sigNs inp
+    let mean2, _ = GaussianProcess.predict pars2 x t sigNs inp
     let RMSE1 = sqrt(LossLayer.loss LossLayer.MSE mean1 inp)
     let RMSE2 = sqrt(LossLayer.loss LossLayer.MSE mean2 inp)
     let rmse1Fun = mi.Func RMSE1 |>arg4 x t sigNs inp
-    let rmse2Fun = mi.Func RMSE1 |>arg4 x t sigNs inp
+    let rmse2Fun = mi.Func RMSE2 |>arg4 x t sigNs inp
     let runTest (func: single-> single) =
         let x = sampleX nSmpls
         let y = (ArrayND.map func x) + sampleEpsilon nSmpls
         let x = normalize 0.0f 0.5f x |> ArrayNDCuda.toDev
         let y = normalize 0.0f 0.5f y |> ArrayNDCuda.toDev
-        let sigmas = ArrayND.zerosLike x 
+        let sigmas = (ArrayND.zerosLike x) * 0.1f
         let input = ArrayNDHost.linSpaced -3.0f 3.0f nInp |> ArrayNDCuda.toDev
         let rmse1 = rmse1Fun x y sigmas input |> ArrayNDHost.fetch
-        let rmse2 = rmse1Fun x y sigmas input |> ArrayNDHost.fetch
-        ArrayNDHost.toList rmse1 |> List.head, ArrayNDHost.toList rmse2 |> List.head
+        let rmse2 = rmse2Fun x y sigmas input |> ArrayNDHost.fetch
+        printfn "rrmse1  = %A\n rmse2  = %A" rmse1 rmse2
+        rmse1.Data.[0] ,rmse2.Data.[0] 
+        
     let rmsesFA1,rmsesFA2 = [0..49] |> List.map (fun _ -> (runTest fctA)) |> List.unzip 
     let rmsesFB1,rmsesFB2 = [0..49] |> List.map (fun _ -> (runTest fctB)) |> List.unzip 
     let rmsesFC1,rmsesFC2 = [0..49] |> List.map (fun _ -> (runTest fctC)) |> List.unzip 
