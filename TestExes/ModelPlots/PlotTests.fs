@@ -1,4 +1,4 @@
-﻿namespace ModelPlots
+﻿namespace ModelTests
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda

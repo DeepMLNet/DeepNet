@@ -28,7 +28,7 @@ module ExpectationPropagation =
         (1.0f + gaussianError(x/sqrt(2.0f)))/2.0f
     
     /// Runs Expecattion Maximization algorithm for monotonicity
-    let monotonicityEP (sigma:ExprT)  (vu:single) =
+    let monotonicityEP (sigma:ExprT)  (vu:single) iters=
         let mu = sigma |> Expr.diag |> Expr.zerosLike
         let vSite = mu 
         let tauSite = mu 
@@ -92,7 +92,7 @@ module ExpectationPropagation =
             let newTauSite = (Expr.loop loopSpec chTauSite [tauSite;vSite;sigma;mu]).[nIters - 1,*]
             let newVSite = (Expr.loop loopSpec chVSite [tauSite;vSite;sigma;mu]).[nIters - 1,*] |> Expr.checkFinite "muSUpd" 
             newTauSite,newVSite
-        let tauSite,vSite = optimize 20 (sigma,mu, tauSite,vSite)
+        let tauSite,vSite = optimize iters (sigma,mu, tauSite,vSite)
         let covSite = (1.0f/tauSite)
         let muSite = (Expr.diagMat covSite) .* vSite
         covSite, muSite
@@ -179,6 +179,41 @@ module GaussianProcess =
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
+    
+    let covPdFunLin (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec = ElemExpr.arg2<single>
+        let klinDeriv = yvec[y_smpl]
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] klinDeriv [x; y]
+    let covPdPdLin (x:ExprT) (y:ExprT) =
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        (Expr.zerosOfSameType x [sizeX;sizeY]) + 1.0f
+
+    let covPdFunSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
+        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/ (2.0f * len[]***2.0f))
+        let innerDeriv = - ((2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl])/ (2.0f * len[]***2.0f))
+        let dksedx = outerDeriv* innerDeriv
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
+
+    let covPdPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
+        let factor1 = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f))
+        let f1InnerDeriv =  (( 2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl]) / (2.0f*len[]***2.0f))
+        let factor1Deriv = factor1*f1InnerDeriv
+        let factor2 =  ((2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl])/ (2.0f * len[]***2.0f))
+        let factor2Deriv = 2.0f / (2.0f * len[] *** 2.0f)
+        let dksedx = factor1Deriv*f1InnerDeriv* factor2 + factor1 * factor2Deriv
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
 
     /// Prediction of mean and covariance of input data xstar given train inputs x and targets y
     let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
@@ -201,43 +236,54 @@ module GaussianProcess =
             match monotonicity with
             | Some (vu,_,_,_) ->
                 
-                let covPdFun (x:ExprT) (k:ExprT) =
-                    let i, j  = ElemExpr.idx2
-                    let cMat,xvect = ElemExpr.arg2<single>
-                    let xelem = xvect[i]
-                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
-                    let sizeK1 = k.Shape.[0]
-                    let sizeK2 = k.Shape.[1]
-                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
-                
-                let covFunPd (x:ExprT) (k:ExprT) =
-                    let i, j  = ElemExpr.idx2
-                    let cMat,xvect = ElemExpr.arg2<single>
-                    let xelem = xvect[j]
-                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
-                    let sizeK1 = k.Shape.[0]
-                    let sizeK2 = k.Shape.[1]
-                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+//                let covPdFun (x:ExprT) (z:ExprT) =
+//                    let i, j  = ElemExpr.idx2
+//                    let cMat,xvect = ElemExpr.arg2<single>
+//                    let xelem = xvect[i]
+//                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
+//                    let sizeK1 = k.Shape.[0]
+//                    let sizeK2 = k.Shape.[1]
+//                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+                let covPdFun (x:ExprT) (y:ExprT) =
+                    match pars with
+                        | LinPars _ -> covPdFunLin x y
+                        | SEPars parsSE  -> covPdFunSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
 
-                let covPdPd  (x:ExprT) (y:ExprT) (k:ExprT)  = 
-                    let i, j  = ElemExpr.idx2
-                    let cMat,xvect,yvect = ElemExpr.arg3<single>
-                    let xelem = xvect[i]
-                    let yelem = yvect[j]
-                    let cPdPd = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem yelem
-                    let sizeK1 = k.Shape.[0]
-                    let sizeK2 = k.Shape.[1]
-                    Expr.elements [sizeK1;sizeK2] cPdPd [k;x;y]
-                
+//                let covFunPd (x:ExprT) (k:ExprT) =
+//                    let i, j  = ElemExpr.idx2
+//                    let cMat,xvect = ElemExpr.arg2<single>
+//                    let xelem = xvect[j]
+//                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
+//                    let sizeK1 = k.Shape.[0]
+//                    let sizeK2 = k.Shape.[1]
+//                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+
+//
+//                let covPdPd  (x:ExprT) (y:ExprT) (k:ExprT)  = 
+//                    let i, j  = ElemExpr.idx2
+//                    let cMat,xvect,yvect = ElemExpr.arg3<single>
+//                    let xelem = xvect[i]
+//                    let yelem = yvect[j]
+//                    let cPdPd = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem yelem
+//                    let sizeK1 = k.Shape.[0]
+//                    let sizeK2 = k.Shape.[1]
+//                    Expr.elements [sizeK1;sizeK2] cPdPd [k;x;y]
+                let covPdPd (x:ExprT) (y:ExprT) =
+                    match pars with
+                        | LinPars _ -> covPdFunLin x y
+                        | SEPars parsSE  -> covPdPdSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
                 ///locations of the virtual derivative points on training points
                 let xm = oPs 
                 let kFf = k
-                let kF'f = covMat xm x |> covPdFun xm
-                let kFf' = covMat x xm |> covFunPd xm
+//                let kF'f = covMat xm x |> covPdFun xm
+//                let kFf' = covMat x xm |> covFunPd xm
+                let kF'f = covPdFun xm x
+                let kFf' = kF'f.T//covFunPd x xm
                 let kMm = covMat xm xm
-                let kF'f' = kMm  |> covPdPd xm xm
+//                let kF'f' = kMm  |> covPdPd xm xm
+                let kF'f' = covPdPd xm xm
                 let kF'f'= kF'f' |> Expr.checkFinite "KF'f'"
-                let covSite,muSite = ExpectationPropagation.monotonicityEP kMm  vu
+                let covSite,muSite = ExpectationPropagation.monotonicityEP kMm  vu 10
                 
                 let covSite = covSite |> Expr.checkFinite "covSite"
                 let muSite = muSite |> Expr.checkFinite "muSite"
@@ -249,7 +295,7 @@ module GaussianProcess =
                 let kInv = Expr.invert (kJoint + sigmaJoint)
                 let kStar = covMat xJoint xStar
                 let meanXJoint = meanFct xJoint
-                let mean = meanXStar + kStar.T .* kInv .* (muJoint - meanXJoint)
+                let mean =  kStar.T .* kInv .* (muJoint)
                 let cov = kStarstar - kStar.T .* kInv .* kStar
             
                 mean,cov

@@ -1,6 +1,6 @@
 ﻿// Learn more about F# at http://fsharp.org
 // See the 'F# Tutorial' project for more help.
-namespace ModelPlots
+namespace ModelTests
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -10,6 +10,7 @@ module Program =
     [<EntryPoint>]
     let main argv = 
 //        ApplicationTests.testPlot ()
-//        PlotTests.multiplotTest () 
+//        PlotTests.multiplotTest ()
+        GPTests.EPTest ()
         PlotTests.GPTransferTest ()
         0 // return an integer exit code
