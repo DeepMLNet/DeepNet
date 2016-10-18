@@ -1339,6 +1339,18 @@ module Expr =
     let minElemwise a b =
         constructElementwise MinElemwise a b
 
+    /// Ensures that all elements are between Some minVal and Some maxVal.
+    let cage (minVal, maxVal) a =
+        let a =
+            match minVal with
+            | Some mv -> maxElemwise (scalar mv) a
+            | None -> a
+        let a =
+            match maxVal with
+            | Some mv -> minElemwise (scalar mv) a
+            | None -> a
+        a
+
     /// reshape (assuming C-continguous order) tensor; element count does not change
     let reshape ss a = Unary(Reshape(ss), a) |> check
 

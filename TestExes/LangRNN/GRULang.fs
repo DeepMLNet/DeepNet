@@ -63,7 +63,7 @@ module GRULang =
     }
 
     let sigmoid (z: ExprT) = 1.0f / (1.0f + exp (-z))
-    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z))
+    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z) + 1e-4f)
 
     let pred (pars: Pars) (initial: ExprT) (words: ExprT) =
         // words            [smpl, pos]
@@ -107,7 +107,8 @@ module GRULang =
         let finalState = states.[*, nSteps-1, *]
 
         let target     = words.[*, 1 .. nSteps]
-        let targetProb = outputs |> Expr.gather [None; None; Some target]            
+        let targetProb = outputs |> Expr.gather [None; None; Some target]      
+        let targetProb = targetProb |> Expr.cage (Some 0.0001f, Some 100.0f)      
         let loss       = -log targetProb |> Expr.mean
 
         finalState, outputs, loss
