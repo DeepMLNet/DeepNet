@@ -115,8 +115,9 @@ module GRULang =
 
 
 module GRUTrain =
-    let EmbeddingDim = 48
-    let NBatch       = 500
+    //let EmbeddingDim = 48
+    let EmbeddingDim = 128
+    let NBatch       = 250
 
     let train (dataset: TrnValTst<WordSeq>) =
         let mb = ModelBuilder<single> ("M")
@@ -160,7 +161,7 @@ module GRUTrain =
                 //MaxIters  = Some 1000
                 BatchSize = NBatch
                 //LearningRates = [1e-4; 1e-5]
-                //CheckpointDir = Some "."
+                CheckpointDir = Some "."
                 BestOn    = Training
         }
         Train.train trainable dataset trainCfg |> ignore

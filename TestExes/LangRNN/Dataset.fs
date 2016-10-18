@@ -24,10 +24,11 @@ type WordSeq = {
 
 module Dataset = 
     let dataPath     = "../../Data/reddit-comments-2015-08-tokenized.txt"
-    let StepsPerSmpl = 35
+    let StepsPerSmpl = 20
     let VocSize      = 2000
     //let NMaxSamples  = 40000
-    let NMaxSamples  = 10000
+    //let NMaxSamples  = Some 10000
+    let NMaxSamples  = None
 
     let readData path = 
         seq {
@@ -73,7 +74,7 @@ module Dataset =
         |> List.chunkBySize StepsPerSmpl
         |> List.filter (fun chunk -> chunk.Length = StepsPerSmpl)
         |> fun b -> printfn "Would have %d samples in total." b.Length; b
-        |> List.take NMaxSamples
+        |> fun b -> match NMaxSamples with | Some n -> b |> List.take n | None -> b
         |> fun b -> printfn "Using %d samples with %d steps per sample." b.Length b.Head.Length; b
         |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
         |> Dataset.FromSamples
@@ -82,7 +83,7 @@ module Dataset =
 
     let random () =
         let rng = System.Random 123
-        Seq.init NMaxSamples (fun _ -> 
+        Seq.init NMaxSamples.Value (fun _ -> 
             {WordSeq.Words = rng.Seq (0, VocSize-1) |> ArrayNDHost.ofSeqWithShape [StepsPerSmpl]})
         |> Dataset.FromSamples
         |> TrnValTst.Of
