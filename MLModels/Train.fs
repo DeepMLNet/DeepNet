@@ -321,7 +321,7 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
 
-            printf "%d " iter
+            printf "%6d \r" iter
 
             /// set dump prefix
             match cfg.DumpPrefix with
@@ -334,7 +334,6 @@ module Train =
 
             // record loss
             if iter % cfg.LossRecordInterval = 0 then
-                printf "\r                                                              \r"
 
                 let multiAvg lls =
                     let mutable n = 1

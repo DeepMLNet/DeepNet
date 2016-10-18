@@ -179,7 +179,7 @@ module HostEval =
 
                 | Nary(op, es) ->
                     match op with 
-                    | Discard -> ArrayNDHost.zeros [0] |> box
+                    | Discard -> ArrayNDHost.zeros<'R> [0] |> box
                     | Elements (resShape, elemExpr) -> 
                         let esv = es |> List.map subEval |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
