@@ -51,8 +51,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Dataset.fs" />
     <Compile Include="RNN.fs" />
     <Compile Include="RNNTests.fs" />
+    <Compile Include="GRULang.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="tokenize.py" />

@@ -110,8 +110,8 @@ module ModelContextTypes =
 
         /// substitutes this ParameterSet into the given expression
         member this.Subst expr =
-            (expr, pars)
-            ||> List.fold (fun expr par -> Expr.subst (Expr.makeVar par) this.[par] expr)
+            let parSubst = pars |> List.map (fun par -> Expr.makeVar par, this.[par]) |> Map.ofList
+            expr |> Expr.subst parSubst
 
         /// pretty string
         member this.Pretty =
@@ -441,9 +441,13 @@ module ModelContextTypes =
 
         /// substitutes the ParameterStorage into the given expression
         member this.Use expr =
-            (expr, parameters)
-            ||> Map.fold (fun expr vs pi ->
-                expr |> Expr.subst pi.Expr parameterSet.[vs])
+            let parSubst = 
+                parameters 
+                |> Map.toSeq 
+                |> Seq.map (fun (vs, pi) -> pi.Expr, parameterSet.[vs])
+                |> Map.ofSeq
+            expr
+            |> Expr.subst parSubst
             |> Expr.substSymSizes compileEnv.SymSizes
 
         /// inserts the ParameterStorage into the given variable environment

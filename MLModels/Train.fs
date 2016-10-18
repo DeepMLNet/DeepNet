@@ -321,6 +321,8 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
 
+            printf "%6d \r" iter
+
             /// set dump prefix
             match cfg.DumpPrefix with
             | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter

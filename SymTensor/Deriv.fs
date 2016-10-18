@@ -1,5 +1,7 @@
 ﻿namespace SymTensor
 
+open System.Diagnostics
+
 open Basics
 
 [<AutoOpen>]
@@ -682,8 +684,12 @@ module Deriv =
 
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
     and compute (rootExpr: ExprT) : DerivT =
+        if Debug.TraceCompile then printfn "Computing derivatives..."
+        let sw = Stopwatch.StartNew()
         let rootJac = shapeOf rootExpr |> ShapeSpec.nElem |> identityOfSameType rootExpr
-        computeWithRootJacobian rootJac rootExpr
+        let deriv = computeWithRootJacobian rootJac rootExpr
+        if Debug.Timing then printfn "Computing derivatives took %A" sw.Elapsed
+        deriv
 
     /// extracts the Jacobian of the given VarSpecT
     and ofVarSpec var (deriv: DerivT) =
