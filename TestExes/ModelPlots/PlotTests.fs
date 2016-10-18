@@ -43,7 +43,7 @@ module PlotTests =
         let tanHMean (x:ExprT) = tanh x
         let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f)
                          GaussianProcess.MeanFunction = tanHMean
-                         GaussianProcess.Monotonicity = Some (1e-6f,20,-5.0f,5.0f)
+                         GaussianProcess.Monotonicity = Some (1e-6f,10,-5.0f,5.0f)
                          GaussianProcess.CutOutsideRange = false}
         let range = (-0.5f,0.5f)
         let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.Plots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput

@@ -14,8 +14,8 @@ open MLPlots
 
 [<Fact>]
 let ``Monotonicity on Artificial Examples`` () =
-    let nSmpls = 100
-    let nInp = 500
+    let nSmpls = 10
+    let nInp = 20
     let rand =  Random(1234)
     let sampleX num = rand.SortedUniformArrayND (-3.0,3.0) [num] |> ArrayND.single |> ArrayNDHost.fetch
     let sampleEpsilon num = rand.NormalArrayND (0.0,sqrt(0.1)) [num] |> ArrayND.single |> ArrayNDHost.fetch
