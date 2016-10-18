@@ -55,7 +55,6 @@ let ``ReplicateTo`` () =
     )
 
 
-
 let ``Max, min output`` (device: IDevice) =
     let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 2]
     let b = Expr.var<single> "b" [SizeSpec.fix 2; SizeSpec.fix 2]
@@ -93,6 +92,30 @@ let ``Max, min output on host`` () =
 [<Trait("Category", "Skip_CI")>]
 let ``Max, min output on CUDA`` () =
     ``Max, min output`` DevCuda
+
+let ``Max reduction output`` (device: IDevice) =
+    let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 4]
+    let expr = Expr.maxAxis 0 a
+    let fn = Func.make<single> device.DefaultFactory expr |> arg1 a
+    let dexpr = Deriv.compute expr
+    let da = dexpr |> Deriv.ofVar a
+    let fda = Func.make<single> device.DefaultFactory da |> arg1 a
+    let rng = System.Random (123)
+    let av = rng.UniformArrayND (-1.0f, 1.0f) [3; 4] |> post device
+    let res = fn av 
+    let dav = fda av 
+    printfn "a=\n%A" av
+    printfn "res=\n%A" res
+    printfn "da=\n%A" dav
+
+[<Fact>]
+let ``Max reduction output on host`` () =
+    ``Max reduction output`` DevHost
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Max reduction output on CUDA`` () =
+    ``Max reduction output`` DevCuda
 
 [<Fact>]
 let ``Gather`` () =

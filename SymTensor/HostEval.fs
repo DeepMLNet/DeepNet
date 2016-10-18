@@ -106,6 +106,8 @@ module HostEval =
                     | Invert -> ArrayND.invert av
                     | Sum -> ArrayND.sum av
                     | SumAxis ax -> ArrayND.sumAxis ax av
+                    | MaxAxis ax -> ArrayND.maxAxis ax av
+                    | MinAxis ax -> ArrayND.minAxis ax av
                     | Reshape ss -> ArrayND.reshape (shapeEval ss) av
                     | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
                     | PermuteAxes perm -> ArrayND.permuteAxes perm av

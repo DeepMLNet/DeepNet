@@ -176,14 +176,14 @@ let ``Derivative of ReplicateTo on host`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
-let ``Trace compare: max, min`` () =
+let ``Trace compare: max, min elemwise`` () =
     requireEqualTracesWithRandomData [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c]  ->
         Expr.minElemwise (Expr.maxElemwise a b) c
     )
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
-let ``Trace compare: max, min derivative`` () =
+let ``Trace compare: max, min elemwise derivative`` () =
     requireEqualTracesWithRandomData [[2; 2]; [2; 2]; [2; 2]] (fun [a; b; c]  ->
         let expr = Expr.minElemwise (Expr.maxElemwise a b) c
         let dexpr = Deriv.compute expr
@@ -192,6 +192,24 @@ let ``Trace compare: max, min derivative`` () =
         let dc = dexpr |> Deriv.ofVar c
         Expr.discard [expr; da; db; dc]
    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min reduction`` () =
+    requireEqualTracesWithRandomData [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.maxAxis 2 |> Expr.minAxis 1
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min reduction derivative`` () =
+    requireEqualTracesWithRandomData [[4; 5; 3]] (fun [a]  ->
+        let expr = a |> Expr.maxAxis 2 |> Expr.minAxis 1
+        let dexpr = Deriv.compute expr
+        let da = dexpr |> Deriv.ofVar a
+        Expr.discard [expr; da]
+   )
+
 
 
 [<Fact>]

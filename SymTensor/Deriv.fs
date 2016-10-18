@@ -154,11 +154,14 @@ module Deriv =
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
                         |> collapse 
             | SumAxis ax -> 
-                let eeg = egExp 
-                let bca = eeg |> reshape (shapeOf eeg |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                let ael = (shapeOf a).[ax]
-                let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
-                bc |> collapse 
+                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+            | MaxAxis ax 
+            | MinAxis ax ->
+                let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
+                let bcEgExp = egExp |> reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (zerosLike bcEgExp) |> collapse
+
             | StoreToVar _ -> eg 
 
             | NullifyJacobian -> Expr.zerosLike eg 

@@ -67,26 +67,30 @@ module ConstSpecTypes =
             /// the type name of the constant
             member this.TypeName = 
                 match this with
-                | ConstInt _ -> TypeName.ofType<int>
+                | ConstInt _    -> TypeName.ofType<int>
                 | ConstDouble _ -> TypeName.ofType<double>
                 | ConstSingle _ -> TypeName.ofType<single>
-                | ConstBool _ -> TypeName.ofType<bool>
+                | ConstBool _   -> TypeName.ofType<bool>
+
+            /// the type of the constant
+            member this.Type =
+                this.TypeName.Type
 
             /// gets the value which must be of type 'T
             member this.GetValue() : 'T =
                 match this with
-                | ConstInt v -> v |> box |> unbox
+                | ConstInt v    -> v |> box |> unbox
                 | ConstDouble v -> v |> box |> unbox
                 | ConstSingle v -> v |> box |> unbox
-                | ConstBool v -> v |> box |> unbox  
+                | ConstBool v   -> v |> box |> unbox  
             
             /// the value as object
             member this.Value =
                 match this with
-                | ConstInt v -> v |> box 
+                | ConstInt v    -> v |> box 
                 | ConstDouble v -> v |> box
                 | ConstSingle v -> v |> box 
-                | ConstBool v -> v |> box 
+                | ConstBool v   -> v |> box 
                 
             /// gets the value converting it to type 'T
             member this.GetConvertedValue<'T>() : 'T =   
@@ -109,18 +113,49 @@ module ConstSpec =
     let value (cs: ConstSpecT) =
         cs.GetValue ()
 
-    /// the type name
+    /// the type name of the constant
     let typeName (cs: ConstSpecT) =
         cs.TypeName
 
-    let zeroOfType (typ: System.Type) =
-        0 |> convTo typ |> ofValue
+    /// the type of the constant
+    let typ (cs: ConstSpecT) =
+        cs.Type
 
-    let oneOfType (typ: System.Type) =
+    /// one of specified type
+    let one (typ: System.Type) =
         1 |> convTo typ |> ofValue
 
-    let twoOfType (typ: System.Type) =
+    /// two of specified type
+    let two (typ: System.Type) =
         1 |> convTo typ |> ofValue
+
+    /// zero constant of specified type
+    let zero typ =
+        match typ with
+        | _ when typ = typeof<int>    -> ConstInt 0
+        | _ when typ = typeof<double> -> ConstDouble 0.0
+        | _ when typ = typeof<single> -> ConstSingle 0.0f
+        | _ when typ = typeof<bool>   -> ConstBool false
+        | _ -> failwithf "unsupported type %A" typ
+
+    /// minimum value constant of specified type
+    let minValue typ =
+        match typ with
+        | _ when typ = typeof<int>    -> ConstInt (System.Int32.MinValue)
+        | _ when typ = typeof<double> -> ConstDouble (System.Double.MinValue)
+        | _ when typ = typeof<single> -> ConstSingle (System.Single.MinValue)
+        | _ when typ = typeof<bool>   -> ConstBool false
+        | _ -> failwithf "unsupported type %A" typ
+
+    /// maximum value constant of specified type
+    let maxValue typ =
+        match typ with
+        | _ when typ = typeof<int>    -> ConstInt (System.Int32.MaxValue)
+        | _ when typ = typeof<double> -> ConstDouble (System.Double.MaxValue)
+        | _ when typ = typeof<single> -> ConstSingle (System.Single.MaxValue)
+        | _ when typ = typeof<bool>   -> ConstBool true
+        | _ -> failwithf "unsupported type %A" typ
+
 
 
 [<AutoOpen>]
