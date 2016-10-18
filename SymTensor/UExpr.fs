@@ -11,6 +11,8 @@ open Expr
 [<AutoOpen>]
 module UExprTypes = 
 
+    let private uExprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
+
     /// default channel
     let dfltChId : ChannelT = "#"
 
@@ -58,6 +60,7 @@ module UExprTypes =
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type
+    
     and UOpT =
         | ULeafOp of Expr.LeafOpT
         | UUnaryOp of Expr.UnaryOpT
@@ -66,9 +69,45 @@ module UExprTypes =
         | UExtraOp of UExtraOpT
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    
-    and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
+    and [<CustomComparison; CustomEquality; StructuredFormatDisplay("{Pretty}")>]
         UExprT = 
         | UExpr of UOpT * (UExprT list) * UMetadata
+
+        member inline this.Op = match this with UExpr (op, _, _) -> op
+        member inline this.Args = match this with UExpr (_, args, _) -> args
+        member this.Metadata = match this with UExpr (_, _, metadata) -> metadata
+        member this.ChannelType = this.Metadata.ChannelType
+        member this.ChannelShape = this.Metadata.ChannelShape
+        member this.Expr = this.Metadata.Expr       
+
+        member inline private this.Proxy = 
+            match this with UExpr (op, args, _) -> op, args
+
+        // avoid comparing and hashing metadata
+        override this.Equals other =
+            match other with
+            | :? UExprT as other -> (this :> System.IEquatable<_>).Equals other
+            | _ -> false
+        interface System.IEquatable<UExprT> with
+            member this.Equals other = 
+                if obj.ReferenceEquals (this, other) then true
+                else this.Proxy = other.Proxy
+        override this.GetHashCode() =
+            match uExprHashCache.TryFind this with
+            | Some h -> h
+            | None ->
+                let h = hash this.Proxy
+                uExprHashCache.[this] <- h
+                h
+        interface System.IComparable<UExprT> with
+            member this.CompareTo other =
+                compare this.Proxy other.Proxy
+                //compare (this.Op, this.Args) (other.Op, other.Args)
+        interface System.IComparable with
+            member this.CompareTo other =
+                match other with
+                | :? UExprT as other -> (this :> System.IComparable<_>).CompareTo other
+                | _ -> failwithf "cannot compare UExprT to type %A" (other.GetType())
 
         /// pretty string
         member this.Pretty =
@@ -79,12 +118,6 @@ module UExprTypes =
             | UExpr (UNaryOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
             | UExpr (UExtraOp uop, subs, _) -> sprintf "{%A} (%A)" uop subs
 
-        member this.Op = match this with UExpr (op, _, _) -> op
-        member this.Args = match this with UExpr (_, args, _) -> args
-        member this.Metadata = match this with UExpr (_, _, metadata) -> metadata
-        member this.ChannelType = this.Metadata.ChannelType
-        member this.ChannelShape = this.Metadata.ChannelShape
-        member this.Expr = this.Metadata.Expr       
 
     /// An IOp that can be converted to an unified expression for compilation.
     type ICompilableOp =
@@ -131,6 +164,7 @@ module UExpr =
     type private UExprCaches = {
         UExprForExpr:       Dictionary<ExprT, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
+        ULoopSpecs:         Dictionary<LoopSpecT, ULoopSpecT>
     }
 
     /// extracts all variables from the unified expression
@@ -180,7 +214,7 @@ module UExpr =
                     extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
                 | Expr.Nary (Expr.Channel (Expr.Loop loopSpec, channel), se) ->
                     // build separate loop op
-                    let uLoopSpec = loopSpecToULoopSpec loopSpec
+                    let uLoopSpec = loopSpecToULoopSpec caches loopSpec
                     let uLoopMetadata = {
                         ChannelType  = Expr.loopOutputTypeNames loopSpec
                         ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> ShapeSpec.eval shp)
@@ -230,8 +264,9 @@ module UExpr =
     /// converts a list of expressions to a list of unified expressions
     and toUExprs (exprs: ExprT list) =
         let caches = {
-            UExprForExpr    = Dictionary<ExprT, UExprT>(HashIdentity.Structural)
-            UExprs          = Dictionary<UExprT, UExprT>(HashIdentity.Structural)        
+            UExprForExpr    = Dictionary<ExprT, UExprT> () //(HashIdentity.LimitedStructural 10)
+            UExprs          = Dictionary<UExprT, UExprT>()        
+            ULoopSpecs      = Dictionary<LoopSpecT, ULoopSpecT> () //(HashIdentity.LimitedStructural 10)
         }     
         exprs 
         |> List.map Expr.check
@@ -243,17 +278,22 @@ module UExpr =
         toUExprs [expr] |> List.exactlyOne        
 
     /// converts a loop specification to an unified loop specification
-    and loopSpecToULoopSpec (loopSpec: LoopSpecT) = 
-        let channels = loopSpec.Channels |> Map.toList 
-        let chUExprs = toUExprs (channels |> List.map (fun (_, lv) -> lv.Expr))
-        let uChannels = 
-            List.zip channels chUExprs
-            |> List.map (fun ((ch, lv), uexpr) -> ch, {UExpr=uexpr; SliceDim=lv.SliceDim})
-        {
-            Length   = SizeSpec.eval loopSpec.Length
-            Vars     = loopSpec.Vars
-            Channels = uChannels |> Map.ofList
-        }          
+    and private loopSpecToULoopSpec (caches: UExprCaches) (loopSpec: LoopSpecT) = 
+        match caches.ULoopSpecs.TryFind loopSpec with
+        | Some uLoopSpec -> uLoopSpec
+        | None ->
+            let channels = loopSpec.Channels |> Map.toList 
+            let chUExprs = toUExprs (channels |> List.map (fun (_, lv) -> lv.Expr))
+            let uChannels = 
+                List.zip channels chUExprs
+                |> List.map (fun ((ch, lv), uexpr) -> ch, {UExpr=uexpr; SliceDim=lv.SliceDim})
+            let uLoopSpec = {
+                Length   = SizeSpec.eval loopSpec.Length
+                Vars     = loopSpec.Vars
+                Channels = uChannels |> Map.ofList
+            }          
+            caches.ULoopSpecs.[loopSpec] <- uLoopSpec
+            uLoopSpec
 
     /// removes unused loop channels from a loop expression
     and private removeUnusedLoopChannels (externallyUsedChannels: Set<ChannelT>) uexpr  =

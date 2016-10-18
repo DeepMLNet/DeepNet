@@ -13,7 +13,7 @@ open Datasets
 
 module Program =
 
-    let dataPath = "../../Data/reddit-comments-2015-08-tokenized.txt"
+
 //    let NWords      = 8000
 //    let NBatch      = 20
 //    let NSteps      = 35
@@ -26,12 +26,10 @@ module Program =
 //    let NMaxSamples = 10000
 
     //let NWords      = 300
-    let NWords      = 8000
     let NBatch      = 1000
     let NSteps      = 35
     let NRecurrent  = 100
     //let NMaxSamples = 1000
-    let NMaxSamples = 40000
 
 
 //    let NWords      = 5
@@ -41,83 +39,9 @@ module Program =
 //    let NRecurrent  = 8
 
 
-    type WordSeq = {
-        Words:  ArrayNDT<int>
-    }
 
-    //type WordSeqOneHot = {
-    //    Words:  ArrayNDT<single>
-    //}
+
     
-    let readData path = 
-        seq {
-            for line in File.ReadLines path do
-                let words = line.Split ([|' '|]) |> List.ofArray
-                yield words
-        }
-
-    let wordFreqs words =
-        let freqs = Dictionary<string, int> ()
-        for word in words do
-            freqs.[word] <- (freqs.GetOrDefault word 0) + 1
-        Map.ofDictionary freqs
-
-    let tokenize idForWord sentences =
-        let nWords = idForWord |> Map.toSeq |> Seq.length        
-        sentences |> Seq.map (List.map (fun word ->
-            match idForWord |> Map.tryFind word with
-            | Some id -> id
-            | None -> nWords
-        ))
-
-    let detokenize (wordForId: Map<int, string>) tokenizedSentences =
-        tokenizedSentences |> Seq.map (List.map (fun id -> wordForId.[id]))
-
-    let loadDataset () =
-        let sentences = readData dataPath
-        let freqs = sentences |> Seq.concat |> wordFreqs
-        printfn "Found %d unique words." (Map.toSeq freqs |> Seq.length)
-        
-        let freqsSorted = freqs |> Map.toList |> List.sortByDescending snd 
-                          |> List.take (NWords-1)       
-        let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
-        let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
-                        |> Map.add (NWords-1) "UNKNOWN_TOKEN" 
-
-        let tokenizedSentences = sentences |> tokenize idForWord |> List.ofSeq
-        printfn "Having %d sentences with vocabulary of size %d with least common word %A."
-                (tokenizedSentences.Length) NWords (List.last freqsSorted)       
-
-        tokenizedSentences 
-        |> List.concat
-        |> List.chunkBySize NSteps
-        |> List.filter (fun chunk -> chunk.Length = NSteps)
-        |> fun b -> printfn "Would have %d samples in total." b.Length; b
-        |> List.take NMaxSamples
-        |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
-        |> Dataset.FromSamples
-        |> TrnValTst.Of
-        |> TrnValTst.ToCuda
-
-    let generateRandomDataset () =
-        let rng = System.Random 123
-        Seq.init NMaxSamples (fun _ -> 
-            {WordSeq.Words = rng.Seq (0, NWords-1) |> ArrayNDHost.ofSeqWithShape [NSteps]})
-        |> Dataset.FromSamples
-        |> TrnValTst.Of
-        |> TrnValTst.ToCuda
-
-//        let dataset : TrnValTst<WordSeqOneHot> =
-//            Seq.init NMaxSamples (fun _ -> 
-//                {Words =
-//                    rng.Seq (0, NWords-1)
-//                    |> Seq.take NSteps
-//                    |> Seq.map (fun w -> 
-//                        ArrayNDHost.initIndexed [1; NWords] (fun p -> if p.[1] = w then 1.0f else 0.0f))
-//                    |> ArrayND.concat 0})
-//            |> Dataset.FromSamples
-//            |> TrnValTst.Of
-//            |> TrnValTst.ToCuda
 
 
     let trainModel (dataset: TrnValTst<WordSeq>) =
@@ -161,7 +85,7 @@ module Program =
         let dLossDInitial = dLoss |> Deriv.ofVar rnn.InputWeights |> Expr.sum
         //printfn "loss:\n%A" loss
 
-        let mi = mb.Instantiate (DevCuda, Map [nWords,     NWords
+        let mi = mb.Instantiate (DevCuda, Map [nWords,     Dataset.VocSize
                                                nRecurrent, NRecurrent])
 
 
@@ -219,6 +143,7 @@ module Program =
 
 
 
+
     [<EntryPoint>]
     let main argv = 
         Util.disableCrashDialog ()
@@ -226,6 +151,10 @@ module Program =
         //SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
         SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
         //SymTensor.Debug.VisualizeUExpr <- true
+        //SymTensor.Debug.TraceCompile <- true
+        //SymTensor.Debug.Timing <- true
+        //SymTensor.Compiler.Cuda.Debug.Timing <- true
+        //SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
         // tests
         //verifyRNNGradientOneHot DevCuda
@@ -233,11 +162,12 @@ module Program =
         //TestUtils.compareTraces verifyRNNGradientIndexed false |> ignore
 
         printfn "Loading dataset..."
-        let dataset = loadDataset ()
+        let dataset = Dataset.load ()
         printfn "Done."
 
         // train model
-        let res = trainModel dataset
+        //let res = trainModel dataset
+        let res = GRUTrain.train dataset
 
         // shutdown
         Cuda.CudaSup.shutdown ()

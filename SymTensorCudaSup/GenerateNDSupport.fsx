@@ -280,7 +280,7 @@ for dims = 0 to maxDims do
     let checkPosFunc () = 
         let posArgDecls = ad |>> prn "idx_t pos%d" |> Seq.toList
         wrt "template <typename TAry>"
-        wrt "_dev void checkPos%dD (const char *msg, const TAry &ary, %s) {" dims (posArgDecls |> cw ", ")
+        wrt "_devonly void checkPos%dD (const char *msg, const TAry &ary, %s) {" dims (posArgDecls |> cw ", ")
         let allChecks = ad |> Seq.map (fun d -> prn "(0 <= pos%d && pos%d < ary.shape(%d))" d d d)
         wrt "  if (!(%s)) {" (allChecks |> cw " && ")
         let allIdxFmt, allIdxVal = ad |> Seq.toList |> List.map (fun d -> "%d", sprintf "pos%d" d) |> List.unzip

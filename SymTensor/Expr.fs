@@ -13,6 +13,8 @@ open VarSpec
 module Expr =
     open ArrayND
 
+    let private exprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
+
     /// boxes the contents of an option
     let inline boxOption (oo: #obj option) = 
         match oo with
@@ -300,13 +302,52 @@ module Expr =
         /// Should return the set of variables that this op instance depends on.
         abstract ContainedVars: Set<VarSpecT>
 
+    and [<StructuralComparison; StructuralEqualityAttribute>]
+        private ExprProxyT = 
+        | ProxyLeaf of LeafOpT
+        | ProxyUnary of UnaryOpT * ExprT
+        | ProxyBinary of BinaryOpT * ExprT * ExprT
+        | ProxyNary of NaryOpT * (ExprT list)
+
     /// an expression
-    and [<StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>] 
+    and [<CustomComparison; CustomEqualityAttribute; StructuredFormatDisplay("{Pretty}")>] 
         ExprT =
         | Leaf of LeafOpT
         | Unary of UnaryOpT * ExprT
         | Binary of BinaryOpT * ExprT * ExprT
         | Nary of NaryOpT * (ExprT list)
+
+        member inline private this.Proxy = 
+            match this with
+            | Leaf op -> ProxyLeaf op
+            | Unary (op, a) -> ProxyUnary (op, a)
+            | Binary (op, a, b) -> ProxyBinary (op, a, b)
+            | Nary (op, es) -> ProxyNary (op, es)
+
+        // cache hash code using object reference
+        override this.Equals other =
+            match other with
+            | :? ExprT as other -> (this :> System.IEquatable<_>).Equals other
+            | _ -> false
+        interface System.IEquatable<ExprT> with
+            member this.Equals other = 
+                if obj.ReferenceEquals (this, other) then true
+                else this.Proxy = other.Proxy
+        override this.GetHashCode() =
+            match exprHashCache.TryFind this with
+            | Some h -> h
+            | None ->
+                let h = hash this.Proxy
+                exprHashCache.[this] <- h
+                h
+        interface System.IComparable<ExprT> with
+            member this.CompareTo other =
+                compare this.Proxy other.Proxy
+        interface System.IComparable with
+            member this.CompareTo other =
+                match other with
+                | :? ExprT as other -> (this :> System.IComparable<_>).CompareTo other
+                | _ -> failwithf "cannot compare ExprT to type %A" (other.GetType())
 
         /// pretty string
         member this.Pretty =
@@ -318,7 +359,7 @@ module Expr =
 
     type FullExprRngSpecT = RangeSpecT<ExprT>
     type FullExprRngsSpecT = RangesSpecT<ExprT>
-
+   
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
         match uop with
@@ -439,122 +480,132 @@ module Expr =
     and internal loopOutputTypeNames (spec: LoopSpecT) =
         spec.Channels |> Map.map (fun ch lv -> typename lv.Expr)
 
+    let private shapeCache = ConcurrentDictionary<ExprT, ShapeSpecT> (HashIdentity.Reference)
+
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
         // We assume that all operands have compatible size. 
         // For elementwise operations we assume that a and b are already broadcasted
         // to have the *same* size.
 
-        match expr with
+        match shapeCache.TryFind expr with
+        | Some shp -> shp
+        | None ->
+            let shp =
+                match expr with
 
-        // tensor creation
-        | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
-        | Leaf(ScalarConst _) -> ShapeSpec.scalar
-        | Leaf(SizeValue _) -> ShapeSpec.scalar
-        | Leaf(Arange (size, _)) -> ShapeSpec.vector size
+                // tensor creation
+                | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
+                | Leaf(ScalarConst _) -> ShapeSpec.scalar
+                | Leaf(SizeValue _) -> ShapeSpec.scalar
+                | Leaf(Arange (size, _)) -> ShapeSpec.vector size
 
-        // variable access
-        | Leaf(Var vs) -> VarSpec.shape vs
+                // variable access
+                | Leaf(Var vs) -> VarSpec.shape vs
 
-        // unary elementwise
-        | Unary (Negate, a)                       
-        | Unary (Abs, a)
-        | Unary (SignT, a)
-        | Unary (Log, a)
-        | Unary (Log10, a)                           
-        | Unary (Exp, a)                           
-        | Unary (Sin, a)
-        | Unary (Cos, a)
-        | Unary (Tan, a)
-        | Unary (Asin, a)
-        | Unary (Acos, a)
-        | Unary (Atan, a)
-        | Unary (Sinh, a)
-        | Unary (Cosh, a)
-        | Unary (Tanh, a)
-        | Unary (Sqrt, a)
-        | Unary (Ceil, a)
-        | Unary (Floor, a)
-        | Unary (Round, a)
-        | Unary (Truncate, a)
-        | Unary (Not, a)
-        | Unary (NullifyJacobian, a)
-        | Unary (AssumeJacobian _, a)
-            -> shapeOf a
+                // unary elementwise
+                | Unary (Negate, a)                       
+                | Unary (Abs, a)
+                | Unary (SignT, a)
+                | Unary (Log, a)
+                | Unary (Log10, a)                           
+                | Unary (Exp, a)                           
+                | Unary (Sin, a)
+                | Unary (Cos, a)
+                | Unary (Tan, a)
+                | Unary (Asin, a)
+                | Unary (Acos, a)
+                | Unary (Atan, a)
+                | Unary (Sinh, a)
+                | Unary (Cosh, a)
+                | Unary (Tanh, a)
+                | Unary (Sqrt, a)
+                | Unary (Ceil, a)
+                | Unary (Floor, a)
+                | Unary (Round, a)
+                | Unary (Truncate, a)
+                | Unary (Not, a)
+                | Unary (NullifyJacobian, a)
+                | Unary (AssumeJacobian _, a)
+                    -> shapeOf a
 
-        // tensor operations
-        | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
-        | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
-        | Unary(Invert, a) -> shapeOf a
+                // tensor operations
+                | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
+                | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
+                | Unary(Invert, a) -> shapeOf a
 
-        // reductions
-        | Unary(Sum, _) -> ShapeSpec.scalar
-        | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                // reductions
+                | Unary(Sum, _) -> ShapeSpec.scalar
+                | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
 
-        // shape operations
-        | Unary(Reshape(ss), _) -> ss
-        | Unary(DoBroadcast(ss), _) -> ss
-        | Unary(PermuteAxes perm, a) -> shapeOf a |> ShapeSpec.permuteAxes perm
-        | Unary(Subtensor(srs), a) ->
-            (srs, shapeOf a)
-            ||> List.map2 (fun sr shp ->
-                 match sr with
-                 | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
-                 | SRSDynStartSymSize (_, size) -> size)
-        | Unary(ReverseAxis _, a) -> shapeOf a
-        | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
-        | Unary(Gather indices, a) -> indices |> List.pick id |> shapeOf
-        | Unary (Scatter (indices, shp), a) -> shp
+                // shape operations
+                | Unary(Reshape(ss), _) -> ss
+                | Unary(DoBroadcast(ss), _) -> ss
+                | Unary(PermuteAxes perm, a) -> shapeOf a |> ShapeSpec.permuteAxes perm
+                | Unary(Subtensor(srs), a) ->
+                    (srs, shapeOf a)
+                    ||> List.map2 (fun sr shp ->
+                         match sr with
+                         | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
+                         | SRSDynStartSymSize (_, size) -> size)
+                | Unary(ReverseAxis _, a) -> shapeOf a
+                | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
+                | Unary(Gather indices, a) -> indices |> List.pick id |> shapeOf
+                | Unary (Scatter (indices, shp), a) -> shp
 
-        // misc
-        | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
-        | Unary(Print _, a) -> shapeOf a
-        | Unary(Dump _, a) -> shapeOf a
-        | Unary(CheckFinite _, a) -> shapeOf a
-        | Unary(Annotated(_), a) -> shapeOf a
-        | Unary(Held (derivShp :: _, heldOp), a) -> [(shapeOf a).[0]; ShapeSpec.nElem derivShp]
+                // misc
+                | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
+                | Unary(Print _, a) -> shapeOf a
+                | Unary(Dump _, a) -> shapeOf a
+                | Unary(CheckFinite _, a) -> shapeOf a
+                | Unary(Annotated(_), a) -> shapeOf a
+                | Unary(Held (derivShp :: _, heldOp), a) -> [(shapeOf a).[0]; ShapeSpec.nElem derivShp]
 
-        // binary elementwise
-        | Binary (Add, a, _)                         
-        | Binary (Substract, a, _)                     
-        | Binary (Multiply, a, _)                      
-        | Binary (Divide, a, _)                        
-        | Binary (Modulo, a, _)
-        | Binary (Power, a, _)     
-        | Binary (MaxElemwise, a, _)                    
-        | Binary (MinElemwise, a, _)       
-        | Binary (Equal, a, _)             
-        | Binary (Less, a, _)
-        | Binary (LessEqual, a, _)
-        | Binary (Greater, a, _)
-        | Binary (GreaterEqual, a, _)
-        | Binary (NotEqual, a, _)
-        | Binary (IfThenElse _, a, _)
-        | Binary (And, a, _)
-        | Binary (Or, a, _)
-            -> shapeOf a
+                // binary elementwise
+                | Binary (Add, a, _)                         
+                | Binary (Substract, a, _)                     
+                | Binary (Multiply, a, _)                      
+                | Binary (Divide, a, _)                        
+                | Binary (Modulo, a, _)
+                | Binary (Power, a, _)     
+                | Binary (MaxElemwise, a, _)                    
+                | Binary (MinElemwise, a, _)       
+                | Binary (Equal, a, _)             
+                | Binary (Less, a, _)
+                | Binary (LessEqual, a, _)
+                | Binary (Greater, a, _)
+                | Binary (GreaterEqual, a, _)
+                | Binary (NotEqual, a, _)
+                | Binary (IfThenElse _, a, _)
+                | Binary (And, a, _)
+                | Binary (Or, a, _)
+                    -> shapeOf a
             
-        // matrix/tensor operations
-        | Binary (Dot, a, b) -> 
-            let sa, sb = shapeOf a, shapeOf b
-            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
-            | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
-            | _ -> failwithf "invalid dot product shapes: %A, %A" sa sb
-        | Binary (TensorProduct, a, b) -> 
-            let sa, sb = shapeOf a, shapeOf b
-            List.map2 (*) sa sb
+                // matrix/tensor operations
+                | Binary (Dot, a, b) -> 
+                    let sa, sb = shapeOf a, shapeOf b
+                    match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+                    | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+                    | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
+                    | _ -> failwithf "invalid dot product shapes: %A, %A" sa sb
+                | Binary (TensorProduct, a, b) -> 
+                    let sa, sb = shapeOf a, shapeOf b
+                    List.map2 (*) sa sb
 
-        // shape operations
-        | Binary (SetSubtensor ss, a, b) ->
-            shapeOf a
+                // shape operations
+                | Binary (SetSubtensor ss, a, b) ->
+                    shapeOf a
 
-        // misc
-        | Nary(Discard, _) -> ShapeSpec.emptyVector 
-        | Nary(Elements (resShape, elemExpr), _) -> resShape
-        | Nary(Interpolate _, es) -> shapeOf es.Head
-        | Nary(Channel (Loop spec, channel), es) -> loopOutputShapes spec |> Map.find channel
-        | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
+                // misc
+                | Nary(Discard, _) -> ShapeSpec.emptyVector 
+                | Nary(Elements (resShape, elemExpr), _) -> resShape
+                | Nary(Interpolate _, es) -> shapeOf es.Head
+                | Nary(Channel (Loop spec, channel), es) -> loopOutputShapes spec |> Map.find channel
+                | Nary(ExtensionOp eop, es) -> eop.Shape (es |> List.map shapeOf)
+
+            shapeCache.[expr] <- shp
+            shp
+    
 
     /// Returns the shapes of the outputs of the loop channels.
     and internal loopOutputShapes (spec: LoopSpecT) =
@@ -623,7 +674,7 @@ module Expr =
             failwithf "invalid axis %d for expression of shape %A" ax (shapeOf expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
+    let checkedExprs = HashSet<ExprT> ()//(HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT) =
@@ -879,62 +930,70 @@ module Expr =
 
     /// substitues the given symbol sizes into the expression
     let rec substSymSizes symSizes (expr: ExprT) =
-        let sSub = substSymSizes symSizes
+        let substituted = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
         let sSize = SymSizeEnv.subst symSizes
         let sShp = SymSizeEnv.substShape symSizes
         let sSrs = SymSizeEnv.substRange symSizes
 
-        match expr with
-        | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
-        | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
-        | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
-        | Leaf (Arange (size, tn)) -> Leaf (Arange (sSize size, tn))
-        | Leaf _ -> expr
+        let rec sSub expr = 
+            match substituted.TryFind expr with
+            | Some subst -> subst
+            | None ->
+                let subst = 
+                    match expr with
+                    | Leaf (Identity (ss, tn)) -> Leaf (Identity (sSize ss, tn))
+                    | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue (sSize sc, tn))
+                    | Leaf (Var vs) -> Leaf (Var {vs with Shape = sShp vs.Shape})
+                    | Leaf (Arange (size, tn)) -> Leaf (Arange (sSize size, tn))
+                    | Leaf _ -> expr
 
-        | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
-        | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
-        | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
-        | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
-        | Unary (Held (derivsShp, heldOp), a) ->
-            let substOp =
-                match heldOp with
-                | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
-            Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
-        | Unary (Gather indices, a) ->
-            let indices = indices |> List.map (Option.map sSub)
-            Unary (Gather indices, sSub a)
-        | Unary (Scatter (indices, shp), a) ->
-            let indices = indices |> List.map (Option.map sSub)
-            Unary (Scatter (indices, sShp shp), sSub a)
-        | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
-        | Unary (op, a) -> Unary (op, sSub a)
+                    | Unary (Reshape ss, a) -> Unary (Reshape (sShp ss), sSub a)
+                    | Unary (DoBroadcast ss, a) -> Unary (DoBroadcast (sShp ss), sSub a)
+                    | Unary (StoreToVar vs, a) -> Unary (StoreToVar {vs with Shape = sShp vs.Shape}, sSub a)
+                    | Unary (Subtensor srs, a) -> Unary (Subtensor (sSrs srs), sSub a)
+                    | Unary (Held (derivsShp, heldOp), a) ->
+                        let substOp =
+                            match heldOp with
+                            | ReplicateTo (dim, s) -> ReplicateTo (dim, sSize s)
+                        Unary (Held (derivsShp |> List.map sShp, substOp), sSub a)
+                    | Unary (Gather indices, a) ->
+                        let indices = indices |> List.map (Option.map sSub)
+                        Unary (Gather indices, sSub a)
+                    | Unary (Scatter (indices, shp), a) ->
+                        let indices = indices |> List.map (Option.map sSub)
+                        Unary (Scatter (indices, sShp shp), sSub a)
+                    | Unary (AssumeJacobian jac, a) -> Unary (AssumeJacobian (sSub jac), sSub a)
+                    | Unary (op, a) -> Unary (op, sSub a)
 
-        | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (sSub c), sSub a, sSub b)
-        | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
-        | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
+                    | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (sSub c), sSub a, sSub b)
+                    | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
+                    | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
-        | Nary (Elements (trgtShp, elemExpr), es) -> 
-            Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
-        | Nary (Channel (Loop spec, channel), es) ->
-            let substSpec = {
-                Length = sSize spec.Length
-                Vars = spec.Vars
-                       |> Map.toSeq
-                       |> Seq.map (fun (vs, li) ->
-                           let vs = {vs with Shape = sShp vs.Shape}
-                           let li = match li with
-                                    | PreviousChannel pc -> 
-                                        PreviousChannel {pc with Delay = sSize pc.Delay}
-                                    | _ -> li
-                           vs, li)
-                       |> Map.ofSeq
-                Channels = spec.Channels
-                           |> Map.map (fun ch lv -> {lv with Expr = sSub lv.Expr})
-            }
-            Nary (Channel (Loop substSpec, channel), es |> List.map sSub)
-        | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
-        | Nary (op, es) -> Nary (op, List.map sSub es)
-
+                    | Nary (Elements (trgtShp, elemExpr), es) -> 
+                        Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
+                    | Nary (Channel (Loop spec, channel), es) ->
+                        let substSpec = {
+                            Length = sSize spec.Length
+                            Vars = spec.Vars
+                                   |> Map.toSeq
+                                   |> Seq.map (fun (vs, li) ->
+                                       let vs = {vs with Shape = sShp vs.Shape}
+                                       let li = match li with
+                                                | PreviousChannel pc -> 
+                                                    PreviousChannel {pc with Delay = sSize pc.Delay}
+                                                | _ -> li
+                                       vs, li)
+                                   |> Map.ofSeq
+                            Channels = spec.Channels
+                                       |> Map.map (fun ch lv -> {lv with Expr = sSub lv.Expr})
+                        }
+                        Nary (Channel (Loop substSpec, channel), es |> List.map sSub)
+                    | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
+                    | Nary (op, es) -> Nary (op, List.map sSub es)
+                
+                substituted.[expr] <- subst
+                subst
+        sSub expr
 
     /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
@@ -1008,30 +1067,34 @@ module Expr =
         checkExpr expr |> ignore
         expr
 
-    /// Replaces all occurences of "part" in "expr" with "replacement".
+    /// Replaces all occurences of the map key with its value in the specified expression.
     /// Does not replace subexpressions within loop channel value expressions.
-    let subst part replacement expr =
+    let subst (replacements: Map<ExprT, ExprT>) expr =
         // TODO: currently does not substitues into Subtensor and SetSubtensor dyanmic range expression.
-        let rec doSubst part replacement expr =       
-            let subSubst = doSubst part replacement
-            match expr with
-            | _ when expr = part -> replacement
-            | Leaf _ -> expr
-            | Unary (op, a) -> Unary (op, subSubst a)
-            | Unary (AssumeJacobian jac, a) ->
-                Unary (AssumeJacobian (subSubst jac), subSubst a)
-            | Unary (Gather indices, a) ->
-                let indices = indices |> List.map (Option.map subSubst)
-                Unary (Gather indices, subSubst a)
-            | Unary (Scatter (indices, shp), a) ->
-                let indices = indices |> List.map (Option.map subSubst)
-                Unary (Scatter (indices, shp), subSubst a)
-            | Binary (IfThenElse c, a, b) -> 
-                Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
-            | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
-            | Nary (op, es) -> Nary (op, es |> List.map subSubst)
+        let rec subSubst expr =       
+            match replacements.TryFind expr with
+            | Some replacement -> replacement
+            | None ->
+                match expr with
+                // substitute into ops containing expressions
+                | Unary (AssumeJacobian jac, a) ->
+                    Unary (AssumeJacobian (subSubst jac), subSubst a)
+                | Unary (Gather indices, a) ->
+                    let indices = indices |> List.map (Option.map subSubst)
+                    Unary (Gather indices, subSubst a)
+                | Unary (Scatter (indices, shp), a) ->
+                    let indices = indices |> List.map (Option.map subSubst)
+                    Unary (Scatter (indices, shp), subSubst a)
+                | Binary (IfThenElse c, a, b) -> 
+                    Binary (IfThenElse (subSubst c), subSubst a, subSubst b)
 
-        doSubst part replacement expr |> check
+                // apply recursively
+                | Leaf _ -> expr
+                | Unary (op, a) -> Unary (op, subSubst a)
+                | Binary (op, a, b) -> Binary (op, subSubst a, subSubst b)
+                | Nary (op, es) -> Nary (op, es |> List.map subSubst)
+
+        subSubst expr |> check
 
     /// counts operators, not counting repeating subexpressions
     let countUniqueOps expr  =
@@ -1708,15 +1771,15 @@ module Expr =
                 vars <- vars |> Map.add vs lv
                 vs
 
-        /// true if expr depends on any loop variable
-        let dependsOnLoopVars expr = 
-            vars |> Map.exists (fun vs _ -> expr |> contains (makeVar vs))
-
-        /// true if expr contains a variable
-        let dependsOnVars expr =
-            expr |> extractVars |> Set.isEmpty |> not
-
-        /// pulls out expression parts that do not depend on loop variables
+//        /// true if expr depends on any loop variable
+//        let dependsOnLoopVars expr = 
+//            vars |> Map.exists (fun vs _ -> expr |> contains (makeVar vs))
+//
+//        /// true if expr contains a variable
+//        let dependsOnVars expr =
+//            expr |> extractVars |> Set.isEmpty |> not
+//
+//        /// pulls out expression parts that do not depend on loop variables
 //        let rec lift expr =
 //            match expr with                   
 //            | Leaf (Var vs) when not (vars |> Map.containsKey vs) ->
@@ -1736,25 +1799,36 @@ module Expr =
 //            | Binary (op, a, b) -> Binary (op, lift a, lift b)
 //            | Nary (op, es) -> Nary (op, es |> List.map lift)
 
+        let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
+        let lifted = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+
         let rec lift expr =
-            if dependsOnVars expr && not (dependsOnLoopVars expr) then
-            //if not (dependsOnLoopVars expr) then
-                let vs = addConstVar expr
-                makeVar vs
-            else
-                match expr with                   
-                | Unary (Gather indices, a) ->
-                    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
-                | Unary (Scatter (indices, trgtShp), a) ->
-                    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+            match lifted.TryFind expr with
+            | Some rep -> rep
+            | None ->
+                let exprVars = extractVars expr
+                let dependsOnVars = not (Set.isEmpty exprVars)
+                let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
+                let rep =
+                    if dependsOnVars && not dependsOnLoopVars then
+                        //if not (dependsOnLoopVars expr) then
+                        let vs = addConstVar expr
+                        makeVar vs
+                    else
+                        match expr with                   
+                        | Unary (Gather indices, a) ->
+                            Unary (Gather (indices |> List.map (Option.map lift)), lift a)
+                        | Unary (Scatter (indices, trgtShp), a) ->
+                            Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
+                        | Binary (IfThenElse cond, a, b) ->
+                            Binary (IfThenElse (lift cond), lift a, lift b)
 
-                | Binary (IfThenElse cond, a, b) ->
-                    Binary (IfThenElse (lift cond), lift a, lift b)
-
-                | Leaf _ -> expr
-                | Unary (op, a) -> Unary (op, lift a)
-                | Binary (op, a, b) -> Binary (op, lift a, lift b)
-                | Nary (op, es) -> Nary (op, es |> List.map lift)
+                        | Leaf _ -> expr
+                        | Unary (op, a) -> Unary (op, lift a)
+                        | Binary (op, a, b) -> Binary (op, lift a, lift b)
+                        | Nary (op, es) -> Nary (op, es |> List.map lift)
+                lifted.[expr] <- rep
+                rep
                 
         // lift constants out of loop
         let liftedChannels = spec.Channels |> Map.map (fun ch lv -> {lv with Expr = lift lv.Expr})

@@ -7,7 +7,9 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+    let private optimized = Dictionary<ExprT, ExprT> () //(HashIdentity.Reference)
+    let private combined = Dictionary<ExprT, ExprT> () //(HashIdentity.Reference)
+    let private fullOptimized = Dictionary<ExprT, ExprT> () //(HashIdentity.Structural)
 
     /// Returns a list containing one element each axis of the expression.
     /// The element is true if the axis is broadcasted.
@@ -229,16 +231,6 @@ module Optimizer =
         | Power     -> Some ElemExpr.Power
         | _         -> None
 
-//    and lemIndicesToZero (sizesToSet: Set<int>) (elemExpr: ElemExprT) =
-//        let subExpr = setElemIndicesToZero
-//        let subSize ss =
-//        match elemExpr with
-//    
-//        | ElemExpr.Leaf _ -> elemExpr
-//        | ElemExpr.Unary (op, a) -> ElemExpr.Unary(op, subExpr a)
-//        | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, subExpr a, subExpr b)
-
-
     /// combines elemwise and elements operations into one elements operation
     and combineIntoElementsRec (exprInfo: ExprInfoT) (expr: ExprT) : ExprT =
         let subComb = combineIntoElementsRec exprInfo
@@ -246,13 +238,13 @@ module Optimizer =
         /// Gets the element expression for the argument, or starts a
         /// new element expression if the argument is not an element expression.
         let rec getArgElemExpr argExpr =            
-            let shared = 
-                Set.count (exprInfo.DependantsStructural argExpr) > 1 &&
-                Set.count (Expr.extractVars argExpr) > 0
-            //let shared = false
-            match subComb argExpr, shared with
-            | Nary (Elements (_, argElemExpr), argArgs), false -> argElemExpr, argArgs
-            | Unary (DoBroadcast shp, a), false ->
+            let combinable () = 
+                Set.count (exprInfo.DependantsStructural argExpr) = 1 ||
+                Set.count (Expr.extractVars argExpr) = 0
+            //let combinable () = false
+            match subComb argExpr with
+            | Nary (Elements (_, argElemExpr), argArgs) when combinable() -> argElemExpr, argArgs
+            | Unary (DoBroadcast shp, a) when combinable() ->
                 // set broadcasted dimensions to zero in element expression
                 let bcSubst = 
                     Expr.shapeOf a
@@ -263,8 +255,9 @@ module Optimizer =
                     |> Map.ofSeq
                 let bcElemExpr, bcArgs = getArgElemExpr a
                 bcElemExpr |> ElemExpr.substSymSizes bcSubst, bcArgs
-            | Unary (Reshape rsShp, src), false when 
-                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape ->
+            | Unary (Reshape rsShp, src) when 
+                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape &&
+                    combinable() ->
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
@@ -290,7 +283,7 @@ module Optimizer =
                     | _ -> failwith "invalid reshape for broadcast axes insertion"
                 let res = insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
                 res
-            | combArgExpr, _ -> 
+            | combArgExpr -> 
                 let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
                 ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
 
@@ -305,43 +298,49 @@ module Optimizer =
                 | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, adjust a, adjust b)
             aElemExpr, adjust bElemExpr, aArgs @ bArgs
 
-        let shp = Expr.shapeOf expr
-        match expr with
-        | Leaf op ->
-            match leafOpToElemOp op with
-            | Some elemOp -> 
-                Expr.elements shp (ElemExpr.Leaf elemOp) []
-                |> optimizeElements
-            | None -> expr
+        match combined.LockedTryFind expr with
+        | Some comb -> comb
+        | None -> 
+            let comb =
+                match expr with
+                | Leaf op ->
+                    match leafOpToElemOp op with
+                    | Some elemOp -> 
+                        Expr.elements (Expr.shapeOf expr) (ElemExpr.Leaf elemOp) []
+                        |> optimizeElements
+                    | None -> expr
         
-        | Unary (op, aExpr) ->
-            match unaryOpToElemOp op with
-            | Some elemOp ->       
-                let aElemExpr, aArgs = getArgElemExpr aExpr        
-                let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
-                Expr.elements shp elemExpr aArgs
-                |> optimizeElements
-            | None -> Unary (op, subComb aExpr)
+                | Unary (op, aExpr) ->
+                    match unaryOpToElemOp op with
+                    | Some elemOp ->       
+                        let aElemExpr, aArgs = getArgElemExpr aExpr        
+                        let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
+                        Expr.elements (Expr.shapeOf expr) elemExpr aArgs
+                        |> optimizeElements
+                    | None -> Unary (op, subComb aExpr)
                     
-        | Binary (op, aExpr, bExpr) ->
-            match binaryOpToElemOp op with
-            | Some elemOp ->
-                let aElemExpr, aArgs = getArgElemExpr aExpr   
-                let bElemExpr, bArgs = getArgElemExpr bExpr   
-                let aElemExpr, bElemExpr, abArgs = 
-                    joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
-                let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
-                Expr.elements shp elemExpr abArgs
-                |> optimizeElements
-            | None -> Binary (op, subComb aExpr, subComb bExpr)
+                | Binary (op, aExpr, bExpr) ->
+                    match binaryOpToElemOp op with
+                    | Some elemOp ->
+                        let aElemExpr, aArgs = getArgElemExpr aExpr   
+                        let bElemExpr, bArgs = getArgElemExpr bExpr   
+                        let aElemExpr, bElemExpr, abArgs = 
+                            joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
+                        let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
+                        Expr.elements (Expr.shapeOf expr) elemExpr abArgs
+                        |> optimizeElements
+                    | None -> Binary (op, subComb aExpr, subComb bExpr)
 
-        //| Nary (Elements (_, elemExpr), args) ->
-            // TODO: if we are an ElemExpr, merge with children
-            //printf "could combine two elemexprs"
-            //expr
+                //| Nary (Elements (_, elemExpr), args) ->
+                    // TODO: if we are an ElemExpr, merge with children
+                    //printf "could combine two elemexprs"
+                    //expr
 
-        | Nary (op, es) ->
-            Nary (op, es |> List.map subComb)
+                | Nary (op, es) ->
+                    Nary (op, es |> List.map subComb)
+
+            combined.LockedSet (expr, comb)
+            comb
 
     /// Optimizes an expression.
     and private optRec (expr: ExprT) : ExprT =
@@ -443,18 +442,18 @@ module Optimizer =
                 | Nary(op, es) -> Nary (op, List.map optRec es)
 
             optimized.LockedSet (expr, opt)
-            opt |> Expr.check
+            optimized.LockedSet (opt, opt)
+            opt
 
     /// Optimizes an expression.
     and optimize (expr: ExprT) : ExprT =
-        let opt = expr |> optRec
-        let combined = combineIntoElementsRec (ExprInfoT opt) opt
-        let expr = combined |> Expr.check
-
-        let opt = expr |> optRec
-        let combined = combineIntoElementsRec (ExprInfoT opt) opt
-        let expr = combined |> Expr.check
-
-        expr
+        match fullOptimized.LockedTryFind expr with
+        | Some opt -> opt
+        | None ->
+            let opt = expr |> optRec |> Expr.check
+            let opt = combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+            fullOptimized.LockedSet (expr, opt)
+            fullOptimized.LockedSet (opt, opt)
+            opt
 
 
