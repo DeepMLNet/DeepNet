@@ -39,11 +39,11 @@ module ExpectationPropagation =
             let tauMinus = (1.0f / cov) - tauSite |> Expr.checkFinite "tauMinus"
             let vMinus = (1.0f/cov) * mu - vSite |> Expr.checkFinite "vMinus"
             let covMinus = (1.0f/tauMinus) |> Expr.checkFinite "covMinus"
-            let muMinus = (Expr.diagMat covMinus) .* vMinus |> Expr.checkFinite "muMinus"
+            let muMinus = covMinus * vMinus |> Expr.checkFinite "muMinus"
             let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "z"
             let normPdfZ = standardNormalPDF z |> Expr.checkFinite "normPdfZ"
             let normCdfZ  = standardNormalCDF z |> Expr.checkFinite "normCdfZ"
-            let covHatf1 = covMinus *** 2.0f * normPdfZ / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
+            let covHatf1 = (covMinus *** 2.0f * normPdfZ) / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
             let covHatf2 = z + normPdfZ/  normCdfZ |> Expr.checkFinite "covHatf2"
             let covHat = covMinus - covHatf1 * covHatf2 |> Expr.checkFinite "covHat"
             let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "muHat"
@@ -94,7 +94,7 @@ module ExpectationPropagation =
             newTauSite,newVSite
         let tauSite,vSite = optimize iters (sigma,mu, tauSite,vSite)
         let covSite = (1.0f/tauSite)
-        let muSite = (Expr.diagMat covSite) .* vSite
+        let muSite = covSite * vSite
         covSite, muSite
 
 module GaussianProcess =
@@ -187,6 +187,15 @@ module GaussianProcess =
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] klinDeriv [x; y]
+    
+    let covFunPdLin (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec = ElemExpr.arg2<single>
+        let klinDeriv = xvec[x_smpl]
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] klinDeriv [x; y]
+
     let covPdPdLin (x:ExprT) (y:ExprT) =
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
@@ -195,8 +204,18 @@ module GaussianProcess =
     let covPdFunSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/ (2.0f * len[]***2.0f))
-        let innerDeriv = ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl])/ (2.0f * len[]***2.0f))
+        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f)/ (2.0f * len[] *** 2.0f))
+        let innerDeriv = ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl]) / (2.0f * len[] *** 2.0f))
+        let dksedx = outerDeriv* innerDeriv
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
+    
+    let covFunPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
+        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f)/ (2.0f * len[] *** 2.0f))
+        let innerDeriv = (( 2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl]) / (2.0f*len[]***2.0f))
         let dksedx = outerDeriv* innerDeriv
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
@@ -208,9 +227,9 @@ module GaussianProcess =
         let factor1 = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f))
         let f1InnerDeriv =  (( 2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl]) / (2.0f*len[]***2.0f))
         let factor1Deriv = factor1*f1InnerDeriv
-        let factor2 =  ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl])/ (2.0f * len[]***2.0f))
+        let factor2 =  ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl])/ (2.0f * len[] *** 2.0f))
         let factor2Deriv = 2.0f / (2.0f * len[] *** 2.0f)
-        let dksedx = factor1Deriv*f1InnerDeriv* factor2 + factor1 * factor2Deriv
+        let dksedx = factor1Deriv* factor2 + factor1 * factor2Deriv
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
@@ -249,6 +268,10 @@ module GaussianProcess =
                         | LinPars _ -> covPdFunLin x y
                         | SEPars parsSE  -> covPdFunSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
 
+                let covFunPd (x:ExprT) (y:ExprT) =
+                    match pars with
+                        | LinPars _ -> covFunPdLin x y
+                        | SEPars parsSE  -> covFunPdSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
 //                let covFunPd (x:ExprT) (k:ExprT) =
 //                    let i, j  = ElemExpr.idx2
 //                    let cMat,xvect = ElemExpr.arg2<single>
@@ -278,7 +301,7 @@ module GaussianProcess =
 //                let kF'f = covMat xm x |> covPdFun xm
 //                let kFf' = covMat x xm |> covFunPd xm
                 let kF'f = covPdFun xm x
-                let kFf' = kF'f.T//covFunPd x xm
+                let kFf' = covFunPd x xm
                 let kMm = covMat xm xm
 //                let kF'f' = kMm  |> covPdPd xm xm
                 let kF'f' = covPdPd xm xm

@@ -32,9 +32,9 @@ let ``Monotonicity on Artificial Examples`` () =
     let inp = mb.Var<single>  "inp" [nInput]
     let fInp = mb.Var<single>  "Finp" [nInput] 
     let zeroMean x = Expr.zerosLike x
-    let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f);
-                                                GaussianProcess.MeanFunction = zeroMean;
-                                                GaussianProcess.Monotonicity = None;
+    let hyperPars1 = {GaussianProcess.Kernel =  GaussianProcess.SquaredExponential (1.0f,1.0f)
+                                                GaussianProcess.MeanFunction = zeroMean
+                                                GaussianProcess.Monotonicity = None
                                                 GaussianProcess.CutOutsideRange = false}
     let pars1 = GaussianProcess.pars (mb.Module "GaussianProcess1") hyperPars1
     let hyperPars2 = {hyperPars1 with GaussianProcess.Monotonicity = Some (1e-6f,10,-3.0f,3.0f)}
