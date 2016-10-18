@@ -99,6 +99,12 @@ module Expr =
         /// minimum over given dimension
         | MinAxis of int
 
+        // ==== index reductions ====
+        /// inidices of maximums over given dimension
+        | ArgMaxAxis of int
+        /// inidices of minimums over given dimension
+        | ArgMinAxis of int
+
         // ==== shape operations ====
         /// reshape tensor; element count does not change
         | Reshape of ShapeSpecT         
@@ -463,6 +469,10 @@ module Expr =
         | Leaf (Arange (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
+        | Unary (ArgMinAxis _, _)
+        | Unary (ArgMaxAxis _, _)
+            -> TypeName.ofType<int>
+
         | Binary (Equal, _, _)
         | Binary (Less, _, _)
         | Binary (LessEqual, _, _)
@@ -543,6 +553,10 @@ module Expr =
                 | Unary(SumAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
                 | Unary(MaxAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
                 | Unary(MinAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+
+                // index reductions
+                | Unary(ArgMaxAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(ArgMinAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
 
                 // shape operations
                 | Unary(Reshape(ss), _) -> ss
@@ -708,12 +722,12 @@ module Expr =
 
                 match op with
                 | Not -> reqBool op a
-                | SumAxis(ax) when not (0 <= ax && ax < nda) ->
-                    failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
-                | MaxAxis(ax) when not (0 <= ax && ax < nda) ->
-                    failwithf "cannot max over non-existant axis %d of array with shape %A" ax sa
-                | MinAxis(ax) when not (0 <= ax && ax < nda) ->
-                    failwithf "cannot min over non-existant axis %d of array with shape %A" ax sa
+                | SumAxis(ax)
+                | MaxAxis(ax) 
+                | MinAxis(ax) 
+                | ArgMaxAxis(ax) 
+                | ArgMinAxis(ax) when not (0 <= ax && ax < nda) ->
+                    failwithf "cannot recude over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
                     if ShapeSpec.nElem sa .<> ShapeSpec.nElem ss then
                         failwithf "reshape cannot change number of elements while reshaping from %A to %A" sa ss
@@ -1420,6 +1434,20 @@ module Expr =
     /// maximum over given dimension, while keeping the axis with one (broadcastable) element
     let minKeepingAxis ax a =
         a |> minAxis ax |> insertBroadcastAxis ax
+
+    /// index of maximum over given dimension
+    let argMaxAxis ax a = Unary(ArgMaxAxis(ax), a) |> check
+
+    /// index of maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let argMaxKeepingAxis ax a =
+        a |> argMaxAxis ax |> insertBroadcastAxis ax
+
+    /// index of maximum over given dimension
+    let argMinAxis ax a = Unary(ArgMinAxis(ax), a) |> check
+
+    /// index of maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let argMinKeepingAxis ax a =
+        a |> argMinAxis ax |> insertBroadcastAxis ax
 
     /// mean over all elements
     let mean (a: ExprT) = 

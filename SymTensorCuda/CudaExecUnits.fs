@@ -246,6 +246,10 @@ module CudaExecUnit =
         | UUnaryOp (MaxAxis _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (MinAxis _) -> dfltSrcWithNoViewReq ()
 
+        // index reductions
+        | UUnaryOp (ArgMaxAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (ArgMinAxis _) -> dfltSrcWithNoViewReq ()
+
         // shape operations
         | UUnaryOp (Reshape _) ->        
             match trgtDfltChReq () with
@@ -519,6 +523,10 @@ module CudaExecUnit =
         | UUnaryOp (MaxAxis _) -> dfltChOutplaceTrgt ()
         | UUnaryOp (MinAxis _) -> dfltChOutplaceTrgt ()
 
+        // index reductions
+        | UUnaryOp (ArgMaxAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp (ArgMinAxis _) -> dfltChOutplaceTrgt ()
+
         // shape operations
         | UUnaryOp (Reshape _) ->        
             // TODO: optimize: check if copy is really necessary
@@ -706,16 +714,17 @@ module CudaExecUnit =
         execItemsForKernel funcName args args (workDimForElemwise src false)
 
     /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
-    let reductionFuncnameAndArgs trgt cOp cInitialOp src =
+    let reductionFuncnameAndArgs trgt indexed cOp cInitialOp src =
         let args = [cOp :> ICudaArgTmpl
                     cInitialOp :> ICudaArgTmpl
                     ArrayNDArgTmpl trgt :> ICudaArgTmpl
                     ArrayNDArgTmpl src :> ICudaArgTmpl]
-        let funcName = sprintf "reduceTo%dD" (ArrayND.nDims trgt)
+        let idxStr = if indexed then "Idx" else ""
+        let funcName = sprintf "reduce%sTo%dD" idxStr (ArrayND.nDims trgt)
         funcName, args
 
     /// execution items for a reduction operation
-    let execItemsForReduction trgt cOp cInitialOp src =
+    let execItemsForReduction trgt indexed cOp cInitialOp src =
         match ArrayND.shape trgt, ArrayND.shape src with
         | _, [] -> failwith "cannot reduce a scalar array"
         | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
@@ -724,7 +733,7 @@ module CudaExecUnit =
             failwithf "cannot reduce from shape %A to shape %A" srcShp trgtShp 
         | _ -> ()
 
-        let funcName, args = reductionFuncnameAndArgs trgt cOp cInitialOp src
+        let funcName, args = reductionFuncnameAndArgs trgt indexed cOp cInitialOp src
         execItemsForKernel funcName args args (workDimForElemwise trgt false)
 
     /// function name of elements wrapper and its arguments for the given target, operation and sources
@@ -926,14 +935,22 @@ module CudaExecUnit =
 
             batchExecItems @ remExecItems @ recExecItems
 
+    /// reduce one axis by appling an operation such as sum, max, min, ...
     let execItemsForReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the reduction is performed over comes last
         let nd = ArrayND.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.permuteAxes axOrder src
-
         (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
-            execItemsForReduction tmpTrgt (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) tmpSrc)
+            execItemsForReduction tmpTrgt false (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) tmpSrc)
+
+    /// reduce one axis by appling an operation on indices such as argMax, argMin, ...
+    let execItemsForIdxReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        // we need to swap axes so that the axes the reduction is performed over comes last
+        let nd = ArrayND.nDims src
+        let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
+        let srcAdj = ArrayND.permuteAxes axOrder src
+        execItemsForReduction trgt true (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) srcAdj
 
     /// exection items to reduce all elements of src into the scalar trgt
     let rec execItemsForReduce memAllocator eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
@@ -1044,6 +1061,10 @@ module CudaExecUnit =
         | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (ConstSpec.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (ConstSpec.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+
+        // index reductions
+        | UUnaryOp (ArgMaxAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMaxIROp_t" (ConstSpec.minValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ArgMinAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMinIROp_t" (ConstSpec.maxValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
 
         // tensor ops
         | UUnaryOp (Diag _) -> []

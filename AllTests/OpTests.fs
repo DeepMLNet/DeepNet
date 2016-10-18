@@ -211,6 +211,21 @@ let ``Trace compare: max, min reduction derivative`` () =
    )
 
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: argMax reduction`` () =
+    requireEqualTracesWithRandomDataIdx [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.argMaxAxis 1
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: argMin reduction`` () =
+    requireEqualTracesWithRandomDataIdx [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.argMinAxis 2
+    )
+
+
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]

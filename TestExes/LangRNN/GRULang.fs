@@ -63,7 +63,12 @@ module GRULang =
     }
 
     let sigmoid (z: ExprT) = 1.0f / (1.0f + exp (-z))
-    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z) + 1e-4f)
+    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z))
+
+    let negLogSoftmax (z: ExprT) =
+        let c = z |> Expr.maxKeepingAxis 1
+        c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)))
+        
 
     let pred (pars: Pars) (initial: ExprT) (words: ExprT) =
         // words            [smpl, pos]
@@ -88,7 +93,7 @@ module GRULang =
         let reset  = emb .* pars.EmbToReset  + prevState .* pars.StateToReset  + Expr.padLeft pars.ResetBias  |> sigmoid
         let hidden = emb .* pars.EmbToHidden + (prevState * reset) .* pars.StateToHidden                      |> tanh
         let state  = (1.0f - update) * hidden + update * prevState
-        let output = state .* pars.StateToWord + Expr.padLeft pars.WordBias |> softmax
+        let output = state .* pars.StateToWord + Expr.padLeft pars.WordBias |> negLogSoftmax
 
         let chState, chOutput = "State", "Output"
         let loopSpec = {
@@ -107,9 +112,18 @@ module GRULang =
         let finalState = states.[*, nSteps-1, *]
 
         let target     = words.[*, 1 .. nSteps]
-        let targetProb = outputs |> Expr.gather [None; None; Some target]      
-        let targetProb = targetProb |> Expr.cage (Some 0.0001f, Some 100.0f)      
-        let loss       = -log targetProb |> Expr.mean
+        let loss       = outputs |> Expr.gather [None; None; Some target] |> Expr.mean 
+
+        let generateLoopSpec = {
+            Expr.Length = SizeSpec.fix 50
+            Expr.Vars = Map [Expr.extractVar inputSlice, 
+                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1; InitialArg=0}
+                             Expr.extractVar prevState, 
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
+            Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
+                                 chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
+        }
+
 
         finalState, outputs, loss
 

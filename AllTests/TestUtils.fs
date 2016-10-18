@@ -91,6 +91,10 @@ let requireEqualTracesWithRandomDataLogic shps (exprFn: ExprT list -> ExprT) =
     compareTraces (randomEval<single, bool> shps exprFn) false
     |> should equal 0
 
+let requireEqualTracesWithRandomDataIdx shps (exprFn: ExprT list -> ExprT) =
+    compareTraces (randomEval<single, int> shps exprFn) false
+    |> should equal 0
+
 let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
     let rng = System.Random(123)
     let vars = buildVars<float> shps

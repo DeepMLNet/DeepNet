@@ -314,6 +314,30 @@ struct MinEOp_t
 	}
 };
 
+struct ArgMaxIROp_t
+{
+	_dev void operator() (float &maxVal, idx_t &maxPos, float candVal, idx_t candPos) const
+	{
+		if (candVal > maxVal)
+		{
+			maxVal = candVal;
+			maxPos = candPos;
+		}
+	}
+};
+
+struct ArgMinIROp_t
+{
+	_dev void operator() (float &minVal, idx_t &minPos, float candVal, idx_t candPos) const
+	{
+		if (candVal < minVal)
+		{
+			minVal = candVal;
+			minPos = candPos;
+		}
+	}
+};
+
 struct EqualEOp_t
 {
 	_dev bool operator() (float a, float b) const
