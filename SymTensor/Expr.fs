@@ -1800,7 +1800,7 @@ module Expr =
 //            | Nary (op, es) -> Nary (op, es |> List.map lift)
 
         let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
-        let lifted = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+        let lifted = Dictionary<ExprT, ExprT> ()
 
         let rec lift expr =
             match lifted.TryFind expr with

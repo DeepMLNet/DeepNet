@@ -26,7 +26,8 @@ module Dataset =
     let dataPath     = "../../Data/reddit-comments-2015-08-tokenized.txt"
     let StepsPerSmpl = 35
     let VocSize      = 2000
-    let NMaxSamples  = 40000
+    //let NMaxSamples  = 40000
+    let NMaxSamples  = 10000
 
     let readData path = 
         seq {

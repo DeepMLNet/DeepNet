@@ -116,7 +116,7 @@ module GRULang =
 
 module GRUTrain =
     let EmbeddingDim = 48
-    let NBatch       = 100
+    let NBatch       = 500
 
     let train (dataset: TrnValTst<WordSeq>) =
         let mb = ModelBuilder<single> ("M")
@@ -139,13 +139,16 @@ module GRUTrain =
         let mi = mb.Instantiate (DevCuda, Map [nWords,       Dataset.VocSize
                                                embeddingDim, EmbeddingDim])
 
-        let smplVarEnv stateOpt (smpl: WordSeq) =
+        let smplVarEnv (stateOpt: ArrayNDT<single> option) (smpl: WordSeq) =
+            let nBatch = smpl.Words.Shape.[0]
             let state =
                 match stateOpt with
-                | Some state -> state :> IArrayNDT
+                | Some state -> 
+                    if state.Shape.[0] > nBatch then state.[0 .. nBatch-1, *]
+                    else state
                 | None -> 
-                    ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; EmbeddingDim] :> IArrayNDT
-            VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state]
+                    ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
+            VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
                           
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
