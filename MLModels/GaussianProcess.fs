@@ -7,26 +7,34 @@ open System
 module ExpectationPropagation =
     
     /// PDF of standard normal distribution
-    let standardNormalPDF (x:ExprT) =
-        let fact = 1.0f/sqrt(2.0f*(single System.Math.PI))
-        fact * exp(-(x***2.0f)/2.0f)
+    let standardNormalPDF (x:ExprT) (mu:ExprT) (cov:ExprT)=
+        let fact = 1.0f / sqrt( 2.0f * (single System.Math.PI)*cov)
+        fact * exp( - ((x - mu) *** 2.0f) / (2.0f * cov))
     
     /// Computes approximate gaussian error 
     /// with maximum approximation error of 1.2 * 10 ** -7
     let gaussianError (x:ExprT) = 
         
-        let t = 1.0f/(1.0f+0.5f*abs(x))
-        let sum = -0.18628806f + 1.00002368f * t + 0.37409196f * t ***2.0f +
-                   0.09678418f * t *** 3.0f - 0.18628806f * t ***4.0f + 0.27886807f * t *** 5.0f -
-                   1.13520398f * t ***6.0f + 1.48851587f * t ***7.0f - 0.82215223f * t ***8.0f +
-                   0.17087277f * t ***9.0f
-        let tau = t * exp(-x***2.0f + sum)
-        Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau-1.0f)
+        let t = 1.0f/  (1.0f + 0.5f * abs(x))
+        let sum = -1.26551233f + 1.00002368f * t + 0.37409196f * t *** 2.0f +
+                   0.09678418f * t *** 3.0f - 0.18628806f * t *** 4.0f + 0.27886807f * t *** 5.0f -
+                   1.13520398f * t *** 6.0f + 1.48851587f * t *** 7.0f - 0.82215223f * t *** 8.0f +
+                   0.17087277f * t *** 9.0f
+        let tau = t * exp(-x *** 2.0f + sum)
+        Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau - 1.0f)
     
     ///CDF of standard normal distribution
-    let standardNormalCDF (x:ExprT) =
-        (1.0f + gaussianError(x/sqrt(2.0f)))/2.0f
+    let standardNormalCDF (x:ExprT) (mu:ExprT) (cov:ExprT) =
+        (1.0f + gaussianError((x- mu) / sqrt(2.0f * cov))) / 2.0f
     
+    let normalize (x:ExprT) =
+        let mean = Expr.mean x
+        let cov = (Expr.mean (x * x)) - (mean * mean)
+        let stdev = sqrt cov
+        let zeroCov = x - (Expr.reshape [SizeSpec.broadcastable] mean)
+        let nonzeroCov = (x - (Expr.reshape [SizeSpec.broadcastable] mean)) / (Expr.reshape [SizeSpec.broadcastable] stdev)
+        Expr.ifThenElse (cov ==== (Expr.zeroOfSameType cov)) zeroCov nonzeroCov
+
     /// Runs Expecattion Maximization algorithm for monotonicity
     let monotonicityEP (sigma:ExprT)  (vu:single) iters=
         let mu = sigma |> Expr.diag |> Expr.zerosLike
@@ -41,12 +49,13 @@ module ExpectationPropagation =
             let covMinus = (1.0f/tauMinus) |> Expr.checkFinite "covMinus"
             let muMinus = covMinus * vMinus |> Expr.checkFinite "muMinus"
             let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "z"
-            let normPdfZ = standardNormalPDF z |> Expr.checkFinite "normPdfZ"
-            let normCdfZ  = standardNormalCDF z |> Expr.checkFinite "normCdfZ"
-            let covHatf1 = (covMinus *** 2.0f * normPdfZ) / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
-            let covHatf2 = z + normPdfZ/  normCdfZ |> Expr.checkFinite "covHatf2"
+            let normZ = standardNormalPDF z (Expr.zeroOfSameType z) (Expr.oneOfSameType z)
+//            let normZ = normalize z
+            let normCdfZ  = standardNormalCDF z (Expr.zeroOfSameType z) (Expr.oneOfSameType z)
+            let covHatf1 = (covMinus *** 2.0f * normZ) / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
+            let covHatf2 = z + normZ/  normCdfZ |> Expr.checkFinite "covHatf2"
             let covHat = covMinus - covHatf1 * covHatf2 |> Expr.checkFinite "covHat"
-            let muHat = muMinus - (covMinus*normPdfZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "muHat"
+            let muHat = muMinus - (covMinus*normZ) / (normCdfZ * vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "muHat"
             let tauSUpd = (1.0f /covHat) - tauMinus
             let tauSUpd = tauSUpd |> Expr.checkFinite "tauSUpd"
             let vSUpd = (1.0f / covHat) * muHat - vMinus
@@ -175,7 +184,7 @@ module GaussianProcess =
     let squaredExpCovariance (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let kse = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/ (2.0f * len[]***2.0f))
+        let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
@@ -184,14 +193,6 @@ module GaussianProcess =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec = ElemExpr.arg2<single>
         let klinDeriv = yvec[y_smpl]
-        let sizeX = Expr.nElems x
-        let sizeY = Expr.nElems y
-        Expr.elements [sizeX;sizeY] klinDeriv [x; y]
-    
-    let covFunPdLin (x:ExprT) (y:ExprT) =
-        let x_smpl, y_smpl  = ElemExpr.idx2
-        let xvec, yvec = ElemExpr.arg2<single>
-        let klinDeriv = xvec[x_smpl]
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] klinDeriv [x; y]
@@ -204,36 +205,45 @@ module GaussianProcess =
     let covPdFunSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f)/ (2.0f * len[] *** 2.0f))
-        let innerDeriv = ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl]) / (2.0f * len[] *** 2.0f))
+        let outerDeriv = sigmaf[] * exp ( - ((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f)/ (2.0f * len[] *** 2.0f))
+        let innerDeriv = (( xvec[x_smpl] - yvec[y_smpl]) / (len[] *** 2.0f))
         let dksedx = outerDeriv* innerDeriv
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
     
-    let covFunPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
-        let x_smpl, y_smpl  = ElemExpr.idx2
-        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let outerDeriv = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f)/ (2.0f * len[] *** 2.0f))
-        let innerDeriv = (( 2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl]) / (2.0f*len[]***2.0f))
-        let dksedx = outerDeriv* innerDeriv
-        let sizeX = Expr.nElems x
-        let sizeY = Expr.nElems y
-        Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
+//    let covPdFunSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+//        let x_smpl, y_smpl  = ElemExpr.idx2
+//        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
+//        let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
+//        let xElem = xvec[x_smpl]
+//        let kseDeriv = ElemExprDeriv.compute kse  |> ElemExprDeriv.ofArgElem xElem 
+//        let sizeX = Expr.nElems x
+//        let sizeY = Expr.nElems y
+//        Expr.elements [sizeX;sizeY] kseDeriv [x; y;l;sigf]
 
     let covPdPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let factor1 = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f))
-        let f1InnerDeriv =  (( 2.0f * xvec[x_smpl] - 2.0f * yvec[y_smpl]) / (2.0f*len[]***2.0f))
+        let factor1 = sigmaf[] * exp ( - ((xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f))
+        let f1InnerDeriv =  (( yvec[y_smpl] - xvec[x_smpl]) / (len[] *** 2.0f))
         let factor1Deriv = factor1*f1InnerDeriv
-        let factor2 =  ((-2.0f * xvec[x_smpl] + 2.0f * yvec[y_smpl])/ (2.0f * len[] *** 2.0f))
-        let factor2Deriv = 2.0f / (2.0f * len[] *** 2.0f)
+        let factor2 =  (( xvec[x_smpl] - yvec[y_smpl])/ (len[] *** 2.0f))
+        let factor2Deriv = 1.0f / (len[] *** 2.0f)
         let dksedx = factor1Deriv* factor2 + factor1 * factor2Deriv
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
-
+//    let covPdPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+//        let x_smpl, y_smpl  = ElemExpr.idx2
+//        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
+//        let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
+//        let xElem = xvec[x_smpl]
+//        let yElem = yvec[y_smpl]
+//        let kseDeriv = ElemExprDeriv.compute kse  |> ElemExprDeriv.ofArgElem xElem |> ElemExprDeriv.compute |> ElemExprDeriv.ofArgElem xElem
+//        let sizeX = Expr.nElems x
+//        let sizeY = Expr.nElems y
+//        Expr.elements [sizeX;sizeY] kseDeriv [x; y;l;sigf]
     /// Prediction of mean and covariance of input data xstar given train inputs x and targets y
     let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
         let covMat z z' =
@@ -241,7 +251,7 @@ module GaussianProcess =
             | LinPars _ -> linearCovariance z z'
             | SEPars parsSE  -> squaredExpCovariance (parsSE.Lengthscale,parsSE.SignalVariance) z z'
         let k           = (covMat x x)
-        let kStarstar  = covMat xStar xStar
+        let kStarStar  = covMat xStar xStar
         
         let meanFct,monotonicity,cut,oPs = 
             match pars with
@@ -254,8 +264,8 @@ module GaussianProcess =
         let mean,cov = 
             match monotonicity with
             | Some (vu,_,_,_) ->
-                
-//                let covPdFun (x:ExprT) (z:ExprT) =
+//                
+//                let covPdFun (x:ExprT) (k:ExprT) =
 //                    let i, j  = ElemExpr.idx2
 //                    let cMat,xvect = ElemExpr.arg2<single>
 //                    let xelem = xvect[i]
@@ -268,20 +278,7 @@ module GaussianProcess =
                         | LinPars _ -> covPdFunLin x y
                         | SEPars parsSE  -> covPdFunSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
 
-                let covFunPd (x:ExprT) (y:ExprT) =
-                    match pars with
-                        | LinPars _ -> covFunPdLin x y
-                        | SEPars parsSE  -> covFunPdSE (parsSE.Lengthscale,parsSE.SignalVariance) x y
-//                let covFunPd (x:ExprT) (k:ExprT) =
-//                    let i, j  = ElemExpr.idx2
-//                    let cMat,xvect = ElemExpr.arg2<single>
-//                    let xelem = xvect[j]
-//                    let cPdFun = cMat[i;j] |> ElemExprDeriv.compute  |> ElemExprDeriv.ofArgElem xelem
-//                    let sizeK1 = k.Shape.[0]
-//                    let sizeK2 = k.Shape.[1]
-//                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
 
-//
 //                let covPdPd  (x:ExprT) (y:ExprT) (k:ExprT)  = 
 //                    let i, j  = ElemExpr.idx2
 //                    let cMat,xvect,yvect = ElemExpr.arg3<single>
@@ -301,7 +298,7 @@ module GaussianProcess =
 //                let kF'f = covMat xm x |> covPdFun xm
 //                let kFf' = covMat x xm |> covFunPd xm
                 let kF'f = covPdFun xm x
-                let kFf' = covFunPd x xm
+                let kFf' =  kF'f.T
                 let kMm = covMat xm xm
 //                let kF'f' = kMm  |> covPdPd xm xm
                 let kF'f' = covPdPd xm xm
@@ -319,7 +316,7 @@ module GaussianProcess =
                 let kStar = covMat xJoint xStar
                 let meanXJoint = meanFct xJoint
                 let mean =  kStar.T .* kInv .* (muJoint)
-                let cov = kStarstar - kStar.T .* kInv .* kStar
+                let cov = kStarStar - kStar.T .* kInv .* kStar
             
                 mean,cov
             | None ->
@@ -327,7 +324,7 @@ module GaussianProcess =
                 let kInv        = Expr.invert k
                 let kStar      = covMat x xStar
                 let mean = meanXStar + kStar.T .* kInv .* (y - meanX)
-                let cov = kStarstar - kStar.T .* kInv .* kStar
+                let cov = kStarStar - kStar.T .* kInv .* kStar
                 mean,cov
         let mean = 
             if cut then

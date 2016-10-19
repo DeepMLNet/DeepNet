@@ -9,6 +9,7 @@ open RProvider.ggplot2
 module Program =
     [<EntryPoint>]
     let main argv = 
+//        SymTensor.Debug.VisualizeUExpr <- true
 //        ApplicationTests.testPlot ()
 //        PlotTests.multiplotTest ()
         GPTests.EPTest ()

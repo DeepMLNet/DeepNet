@@ -42,6 +42,8 @@ let ``Monotonicity on Artificial Examples`` () =
     let mi = mb.Instantiate (DevCuda,
                             Map[nTrnSmpls, nSmpls
                                 nInput,    nInp])
+//    let x = ExpectationPropagation.normalize x
+//    let t = ExpectationPropagation.normalize t
     let mean1, _ = GaussianProcess.predict pars1 x t sigNs inp
     let mean2, _ = GaussianProcess.predict pars2 x t sigNs inp
     let two = Expr.twoOfSameType mean1

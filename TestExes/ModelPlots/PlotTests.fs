@@ -21,13 +21,13 @@ module PlotTests =
         let seed = 1
         let rand = Random seed
         let ntraining = 20
-        let ninput = 500
+        let ninput = 10
 
         let trnXList =  (TestFunctions.randomSortedListOfLength rand (-5.0f,-1.0f) (ntraining/2)) @  (TestFunctions.randomSortedListOfLength rand (1.0f,5.0f) (ntraining/2))
         let trnXHost = trnXList |> ArrayNDHost.ofList
         let trnTList = trnXList |>  TestFunctions.randPolynomial rand
         let trnTHost = trnTList |> ArrayNDHost.ofList
-//        let trnTHost = trnXList |> List.map (fun x -> 2.0f*x) |> ArrayNDHost.ofList
+        let trnTHost = trnXList |> List.map (fun x -> 0.5f * x ** 3.0f) |> ArrayNDHost.ofList
         let sigmaNs_host = (ArrayNDHost.ones<single> [ntraining]) * sqrt 0.001f
 
         //transfer train parametters to device (Host or GPU)
@@ -42,8 +42,8 @@ module PlotTests =
         let zeroMean (x:ExprT) = Expr.zerosLike x
         let tanHMean (x:ExprT) = tanh x
         let hyperPars = {GaussianProcess.Kernel =GaussianProcess.SquaredExponential (1.0f,1.0f)
-                         GaussianProcess.MeanFunction = tanHMean
-                         GaussianProcess.Monotonicity = Some (1e-6f,10,-5.0f,5.0f)
+                         GaussianProcess.MeanFunction = zeroMean
+                         GaussianProcess.Monotonicity = Some (1e-6f,20,-5.0f,5.0f)
                          GaussianProcess.CutOutsideRange = false}
         let range = (-0.5f,0.5f)
         let smpls, mean_smpls, cov_smpls, stdev_smpls = GPPlots.Plots.predictGP hyperPars sigmaNsVal trnXVal trnTVal range ninput
@@ -51,7 +51,7 @@ module PlotTests =
         printfn "Sampled means =\n%A" mean_smpls
         printfn "Sampled Covariances =\n%A" cov_smpls
         printfn "Sampled StanderdDeviations =\n%A" stdev_smpls
-        let gpTestPlot = fun () -> GPPlots.Plots.simplePlot (hyperPars, sigmaNsVal, trnXVal, trnTVal,ninput)
+        let gpTestPlot = fun () -> GPPlots.Plots.simplePlot (hyperPars, sigmaNsVal, trnXVal, trnTVal,ninput,minY= - 50.0f,maxY = 50.0f)
         gpTestPlot ()
         save "GPTestplot1.png" gpTestPlot
 
