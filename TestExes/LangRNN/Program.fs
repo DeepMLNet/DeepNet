@@ -32,11 +32,18 @@ module Program =
         //verifyRNNGradientIndexed DevCuda
         //TestUtils.compareTraces verifyRNNGradientIndexed false |> ignore
 
-        let data = WordData (dataPath      = "../../Data/reddit-comments-2015-08-tokenized.txt",
-                             vocSize       = 8000,
+//        let data = WordData (dataPath      = "../../Data/reddit-comments-2015-08-tokenized.txt",
+//                             vocSizeLimit  = Some 8000,
+//                             stepsPerSmpl  = 20,
+//                             //maxSamples    = Some 1000
+//                             maxSamples    = None
+//                             )
+
+        let data = WordData (dataPath      = "../../Data/Songs/Songs",
+                             vocSizeLimit  = None,
                              stepsPerSmpl  = 20,
-                             //maxSamples    = Some 1000
-                             maxSamples    = None
+                             maxSamples    = Some 1000
+                             //maxSamples    = None
                              )
 
         let model = GRUTrain (VocSize      = data.VocSize,
@@ -59,13 +66,32 @@ module Program =
 
         // generate some word sequences
         printfn "Generating..."
-        let NPred  = 100
-        let NStart = 30
-        let startWords = {Words = data.Dataset.Trn.All.Words.[0..NPred-1, *]}
-        let genWords = model.Generate 1001 startWords
+        let NPred   = 10
+        let NStart  = 30
+
+        let rng = System.Random 123
+        let allWords = data.Words |> Array.ofList
+        let startIdxs = rng.Seq (0, allWords.Length-100) |> Seq.take NPred
+        
+        let startWords = 
+            startIdxs
+            |> Seq.map (fun startIdx ->
+                let mutable pos = startIdx
+                while allWords.[pos] <> "---" ||
+                        (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
+                    pos <- pos + 1
+                allWords.[pos .. pos+2*NStart-1] |> List.ofArray
+                )
+            |> Seq.map data.Tokenize
+            |> List.ofSeq
+            |> ArrayNDHost.ofList2D
+
+        let genWords = model.Generate 1001 {Words=startWords |> ArrayNDCuda.toDev}
+        let genWords = genWords.Words |> ArrayNDHost.fetch
         for s=0 to NPred-1 do
-            printfn "%3d: prime:     %s" s (data.ToStr startWords.Words.[s, *])
-            printfn "%3d: generated: %s" s (data.ToStr genWords.Words.[s, *])
+            printfn "%3d: prime:     %s" s (data.ToStr startWords.[s, 0..NStart-1])
+            printfn "%3d: generated: %s" s (data.ToStr genWords.[s, *])
+            printfn "%3d: original:  %s" s (data.ToStr startWords.[s, NStart-1..])
             printfn ""
 
         // shutdown

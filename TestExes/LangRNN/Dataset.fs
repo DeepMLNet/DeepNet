@@ -17,13 +17,8 @@ type WordSeq = {
     Words:  ArrayNDT<int>
 }
 
-//type WordSeqOneHot = {
-//    Words:  ArrayNDT<single>
-//}
-
-
 type WordData (dataPath:      string,
-               vocSize:       int,
+               vocSizeLimit:  int option,
                stepsPerSmpl:  int,
                maxSamples:    int option) =
 
@@ -31,7 +26,7 @@ type WordData (dataPath:      string,
     let sentences = 
         seq {
             for line in File.ReadLines dataPath do
-                let words = line.Split ([|' '|]) |> List.ofArray
+                let words = line.Split (' ') |> List.ofArray
                 yield words
         } |> Seq.cache
     let words = List.concat sentences
@@ -43,20 +38,25 @@ type WordData (dataPath:      string,
     do printfn "Found %d unique words." (Map.toSeq wordFreqs |> Seq.length)
         
     let freqsSorted = wordFreqs |> Map.toList |> List.sortByDescending snd 
-                      |> List.take (vocSize-1)       
+    let freqsSorted = match vocSizeLimit with Some vs -> freqsSorted |> List.take (vs-1) | None -> freqsSorted
     let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
     let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
-                    |> Map.add (vocSize-1) "###" 
+    let wordForId = match vocSizeLimit with Some vs -> wordForId |> Map.add (vs-1) "###"  | None -> wordForId
     let tokenize words =
         let nWords = idForWord |> Map.toSeq |> Seq.length        
         words |> List.map (fun word ->
             match idForWord |> Map.tryFind word with
             | Some id -> id
-            | None -> nWords)
+            | None when vocSizeLimit.IsSome -> nWords
+            | None -> failwithf "unknown word %s" word)
     let detokenize tokens =
         tokens |> List.map (fun id -> wordForId.[id])
-    do printfn "Using vocabulary of size %d with least common word %A." 
-               vocSize (List.last freqsSorted)    
+    let vocSize = 
+        match vocSizeLimit with
+        | Some vs -> vs
+        | None -> wordForId.Count
+    do printfn "Using vocabulary of size %d (limit: %A) with least common word %A." 
+               vocSize vocSizeLimit (List.last freqsSorted)    
 
     let dataset = 
         words 
@@ -90,5 +90,20 @@ type WordData (dataPath:      string,
         tokens 
         |> List.ofSeq 
         |> this.Detokenize 
-        |> List.map (fun s -> s.Replace("SENTENCE_START", ">>").Replace("SENTENCE_END", "<<"))
         |> String.concat " "
+
+    member this.Words = words
+    member this.Lines = 
+        let mutable rWords = words
+        while rWords.Head <> ">" do
+            rWords <- rWords.Tail
+
+        seq {
+            let mutable line = []       
+            for word in rWords do
+                if word = ">" then
+                    if line.Length > 0 then yield line
+                    line <- []
+                if word <> "===" && word <> "---" then
+                    line <- line @ [word]            
+        }

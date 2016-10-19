@@ -65,7 +65,7 @@ module TrainingLog =
         | None -> 0
 
     let best (log: Log<_>) =
-        log.Best.Value
+        log.Best
 
     let itersWithoutImprovement (log: Log<_>) =
         match log.Best with
@@ -158,7 +158,7 @@ module Train =
 
     /// Result of training
     type TrainingResult = {
-        Best:               TrainingLog.Entry
+        Best:               TrainingLog.Entry option
         TerminationReason:  Faith
         Duration:           TimeSpan
         History:            TrainingLog.Entry list
@@ -530,7 +530,6 @@ module Train =
                 | _ -> log, learningRates, duration, faith
             | _ ->
                 // training already finished in loaded checkpoint
-                printfn "Training finished in loaded checkpoint"
                 log, learningRates, duration, faith
         
         let faith =
@@ -538,15 +537,18 @@ module Train =
             else UserTerminated
 
         let log, learningRates, duration, faith = checkpointLoop log learningRates duration faith
-        let bestEntry, _ = TrainingLog.best log
-        printfn "Training completed after %d iterations in %A because %A with best losses:" 
-                bestEntry.Iter duration faith
-        printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
-                bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+        match TrainingLog.best log with
+        | Some (bestEntry, _) ->
+            printfn "Training completed after %d iterations in %A because %A with best losses:" 
+                    bestEntry.Iter duration faith
+            printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
+                    bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+        | None ->
+            printfn "No training was performed."
 
         {
             History             = List.rev log.History
-            Best                = bestEntry
+            Best                = log |> TrainingLog.best |> Option.map fst
             TerminationReason   = faith
             Duration            = duration
         }

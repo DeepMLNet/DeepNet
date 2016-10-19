@@ -59,6 +59,7 @@
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="tokenize.py" />
+    <None Include="PreprocessSongs.fsx" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\AllTests\AllTests.fsproj">
