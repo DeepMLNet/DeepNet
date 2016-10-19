@@ -41,7 +41,7 @@ module RNNLang =
 
  
 
-    let trainModel (dataset: TrnValTst<WordSeq>) =
+    let trainModel (dataset: TrnValTst<WordSeq>) vocSizeVal =
     //let trainModel (dataset: TrnValTst<WordSeqOneHot>) =
         let mb = ModelBuilder<single> ("Lang")
 
@@ -78,7 +78,7 @@ module RNNLang =
 
         let loss = Expr.mean stepLoss
 
-        let mi = mb.Instantiate (DevCuda, Map [nWords,     Dataset.VocSize
+        let mi = mb.Instantiate (DevCuda, Map [nWords,     vocSizeVal
                                                nRecurrent, NRecurrent])
 
         let smplVarEnv stateOpt (smpl: WordSeq) =

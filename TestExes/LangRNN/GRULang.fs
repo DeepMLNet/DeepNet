@@ -70,16 +70,20 @@ module GRULang =
         c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)))
         
 
-    let pred (pars: Pars) (initial: ExprT) (words: ExprT) =
+    let pred (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =
         // words            [smpl, pos]
         // input            [smpl, step]           
         // initial          [smpl, recUnit]
+        // genFirstWord     [smpl]
         // state            [smpl, step, recUnit]
         // output           [smpl, step, word]
 
         let nBatch = words.Shape.[0]
         let nSteps = words.Shape.[1] - 1
         let embeddingDim = pars.HyperPars.EmbeddingDim
+
+        let initial      = initialSlice |> Expr.reshape [nBatch; SizeSpec.fix 1; embeddingDim]
+        let genFirstWord = genFirstWord |> Expr.reshape [nBatch; SizeSpec.fix 1]
 
         // build loop
         let inputSlice = Expr.var<int>    "InputSlice"  [nBatch] 
@@ -93,68 +97,75 @@ module GRULang =
         let reset  = emb .* pars.EmbToReset  + prevState .* pars.StateToReset  + Expr.padLeft pars.ResetBias  |> sigmoid
         let hidden = emb .* pars.EmbToHidden + (prevState * reset) .* pars.StateToHidden                      |> tanh
         let state  = (1.0f - update) * hidden + update * prevState
-        let output = state .* pars.StateToWord + Expr.padLeft pars.WordBias |> negLogSoftmax
+        let output = state .* pars.StateToWord + Expr.padLeft pars.WordBias
+        let pred   = output |> Expr.argMaxAxis 1 
+        let logWordProb = output |> negLogSoftmax
 
-        let chState, chOutput = "State", "Output"
+        // training loop
+        let chState, chLogWordProb, chPred = "State", "LogWordProb", "Pred"
         let loopSpec = {
             Expr.Length = nSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
-            Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
-                                 chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
+            Expr.Channels = Map [chState,       {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
+                                 chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]    
         }
+        let input        = words.[*, 0 .. nSteps-1]
+        let states       = Expr.loop loopSpec chState  [input; initial]
+        let logWordProbs = Expr.loop loopSpec chLogWordProb [input; initial]
+        let finalState   = states.[*, nSteps-1, *]
 
-        let input   = words.[*, 0 .. nSteps-1]
-        let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1; embeddingDim]
-        let states  = Expr.loop loopSpec chState  [input; initial]
-        let outputs = Expr.loop loopSpec chOutput [input; initial]
-        let finalState = states.[*, nSteps-1, *]
+        let target       = words.[*, 1 .. nSteps]
+        let loss         = logWordProbs |> Expr.gather [None; None; Some target] |> Expr.mean 
 
-        let target     = words.[*, 1 .. nSteps]
-        let loss       = outputs |> Expr.gather [None; None; Some target] |> Expr.mean 
-
-        let generateLoopSpec = {
-            Expr.Length = SizeSpec.fix 50
+        // generating loop
+        let genSteps = SizeSpec.fix 200
+        let genLoopSpec = {
+            Expr.Length = genSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, 
-                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1; InitialArg=0}
+                                    Expr.PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1; InitialArg=0}
                              Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
-                                 chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
+                                 chPred,   {LoopValueT.Expr=pred;   LoopValueT.SliceDim=1}]    
         }
+        let states        = Expr.loop genLoopSpec chState  [genFirstWord; initial; initialSlice]
+        let generated     = Expr.loop genLoopSpec chPred   [genFirstWord; initial; initialSlice]
+        let genFinalState = states.[*, genSteps-1, *]
+
+        (finalState, logWordProbs, loss), (genFinalState, generated)
 
 
-        finalState, outputs, loss
 
+type GRUTrain (VocSize:      int,
+               EmbeddingDim: int) =
 
+    let mb = ModelBuilder<single> ("M")
 
-module GRUTrain =
-    //let EmbeddingDim = 48
-    let EmbeddingDim = 128
-    let NBatch       = 250
+    let embeddingDim = mb.Size "embeddingDim"
+    let nWords       = mb.Size "nWords"
+    let nBatch       = mb.Size "nBatch"
+    let nSteps       = mb.Size "nSteps"
 
-    let train (dataset: TrnValTst<WordSeq>) =
-        let mb = ModelBuilder<single> ("M")
+    let words      = mb.Var<int>     "Words"      [nBatch; nSteps]
+    let initial    = mb.Var<single>  "Initial"    [nBatch; embeddingDim]
+    let firstWord  = mb.Var<int>     "FirstWord"  [nBatch]
 
-        let embeddingDim = mb.Size "embeddingDim"
-        let nWords       = mb.Size "nWords"
-        let nBatch       = mb.Size "nBatch"
-        let nSteps       = mb.Size "nSteps"
+    let model = GRULang.pars (mb.Module "GRULang") {
+        NWords       = nWords
+        EmbeddingDim = embeddingDim
+    }      
 
-        let words   = mb.Var<int>     "Words"   [nBatch; nSteps]
-        let initial = mb.Var<single>  "Initial" [nBatch; embeddingDim]
+    let (final, pred, loss), (genFinal, genWords) = (initial, words, firstWord) |||> GRULang.pred model
 
-        let model = GRULang.pars (mb.Module "GRULang") {
-            NWords       = nWords
-            EmbeddingDim = embeddingDim
-        }      
+    let mi = mb.Instantiate (DevCuda, Map [nWords,       VocSize
+                                           embeddingDim, EmbeddingDim])
 
-        let final, pred, loss = (initial, words) ||> GRULang.pred model
+    let generateFn = mi.Func<single, int> (genFinal, genWords) |> arg2 initial firstWord
+    let processFn  = mi.Func<single>      (final)              |> arg2 initial words                       
 
-        let mi = mb.Instantiate (DevCuda, Map [nWords,       Dataset.VocSize
-                                               embeddingDim, EmbeddingDim])
-
+    member this.Train (dataset: TrnValTst<WordSeq>) trainCfg =
         let smplVarEnv (stateOpt: ArrayNDT<single> option) (smpl: WordSeq) =
             let nBatch = smpl.Words.Shape.[0]
             let state =
@@ -165,43 +176,28 @@ module GRUTrain =
                 | None -> 
                     ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
             VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
-                          
+
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
-
-        let trainCfg = {
-            Train.defaultCfg with
-                //MinIters  = Some 1000
-                //MaxIters  = Some 10
-                //MaxIters  = Some 1000
-                BatchSize = NBatch
-                //LearningRates = [1e-4; 1e-5]
-                CheckpointDir = Some "."
-                BestOn    = Training
-        }
         Train.train trainable dataset trainCfg |> ignore
 
+    member this.Generate seed (startWords: WordSeq) =
+        // sw [smpl, step]
+        let sw = startWords.Words
+        let nBatch, nStart = sw.Shape.[0], sw.Shape.[1]
+
+        let rng = System.Random seed
+
+        let initial = rng.UniformArrayND (-1.0f, 1.0f) [nBatch; EmbeddingDim]
+                      |> ArrayNDCuda.toDev :> ArrayNDT<_>
+        //let initial = ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+        let primed = 
+            if nStart > 1 then processFn initial sw.[*, 0 .. nStart-2]
+            else initial
+
+        let final, gen = generateFn primed sw.[*, nStart-1]
+        {Words=gen}
 
 
 
-        //let dLoss = Deriv.compute loss
-        //let dLossDW = dLoss |> Deriv.ofVar model.StateToHidden |> Expr.sum
-        //printfn "loss:\n%A" loss
-        //let lossFn = mi.Func (loss) |> arg3 initial input target
-        //let dLossDInitialFn = mi.Func (loss, dLossDInitial) |> arg3 initial input target
-//        for i=1 to 1 do
-//            printfn "Calculating loss:"
-//            let lossVal = lossFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
-//            printfn "loss=%f" (lossVal |> ArrayND.value)
 
-        //let tr = Trace.startSessionWithRng "trc" (Some 900, None) 
-
-//        for smpl in dataset.Trn.Batches NBatch do
-//            let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
-//            printfn "Calculating and dloss:"
-//            //let lossVal, dLossVal = dLossDInitialFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
-//            let lossVal, dLossVal = dLossDInitialFn zeroInitial smpl.Words smpl.Words
-//            printfn "loss=%f   dloss/dInitial=%f" (lossVal |> ArrayND.value) (dLossVal |> ArrayND.value)
-
-        //let ts = tr.End ()
-        //ts |> Trace.dumpToFile "trc.txt"
