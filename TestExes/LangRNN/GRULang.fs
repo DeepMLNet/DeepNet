@@ -93,9 +93,9 @@ module GRULang =
         let bcInputSlice = inputSlice |> Expr.padRight |> Expr.broadcast [nBatch; embeddingDim]
         let emb = pars.WordToEmb |> Expr.gather [Some bcInputSlice; Some bcEmbUnit]
 
-        let update = emb .* pars.EmbToUpdate + prevState .* pars.StateToUpdate + Expr.padLeft pars.UpdateBias |> sigmoid
-        let reset  = emb .* pars.EmbToReset  + prevState .* pars.StateToReset  + Expr.padLeft pars.ResetBias  |> sigmoid
-        let hidden = emb .* pars.EmbToHidden + (prevState * reset) .* pars.StateToHidden                      |> tanh
+        let update = emb .* pars.EmbToUpdate + prevState .* pars.StateToUpdate           + Expr.padLeft pars.UpdateBias |> sigmoid
+        let reset  = emb .* pars.EmbToReset  + prevState .* pars.StateToReset            + Expr.padLeft pars.ResetBias  |> sigmoid
+        let hidden = emb .* pars.EmbToHidden + (prevState * reset) .* pars.StateToHidden + Expr.padLeft pars.HiddenBias |> tanh
         let state  = (1.0f - update) * hidden + update * prevState
         let output = state .* pars.StateToWord + Expr.padLeft pars.WordBias
         let pred   = output |> Expr.argMaxAxis 1 
@@ -188,9 +188,9 @@ type GRUTrain (VocSize:      int,
 
         let rng = System.Random seed
 
-        let initial = rng.UniformArrayND (-1.0f, 1.0f) [nBatch; EmbeddingDim]
-                      |> ArrayNDCuda.toDev :> ArrayNDT<_>
-        //let initial = ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+//        let initial = rng.UniformArrayND (-1.0f, 1.0f) [nBatch; EmbeddingDim]
+//                      |> ArrayNDCuda.toDev :> ArrayNDT<_>
+        let initial = ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
         let primed = 
             if nStart > 1 then processFn initial sw.[*, 0 .. nStart-2]
             else initial

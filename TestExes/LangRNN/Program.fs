@@ -39,11 +39,11 @@ module Program =
 //                             maxSamples    = None
 //                             )
 
-        let data = WordData (dataPath      = "../../Data/Songs/Songs",
+        let data = WordData (dataPath      = "../../Data/Songs.txt",
                              vocSizeLimit  = None,
                              stepsPerSmpl  = 20,
-                             maxSamples    = Some 1000
-                             //maxSamples    = None
+                             //maxSamples    = Some 1000
+                             maxSamples    = None
                              )
 
         let model = GRUTrain (VocSize      = data.VocSize,
@@ -60,7 +60,7 @@ module Program =
                 BestOn             = Training
                 CheckpointDir      = Some "."
                 CheckpointInterval = Some 10
-                PerformTraining    = false
+                //PerformTraining    = false
         }
         model.Train data.Dataset trainCfg |> ignore
 
@@ -91,7 +91,7 @@ module Program =
         for s=0 to NPred-1 do
             printfn "%3d: prime:     %s" s (data.ToStr startWords.[s, 0..NStart-1])
             printfn "%3d: generated: %s" s (data.ToStr genWords.[s, *])
-            printfn "%3d: original:  %s" s (data.ToStr startWords.[s, NStart-1..])
+            printfn "%3d: original:  %s" s (data.ToStr startWords.[s, NStart..])
             printfn ""
 
         // shutdown

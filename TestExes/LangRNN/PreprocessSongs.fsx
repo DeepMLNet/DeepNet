@@ -2,7 +2,7 @@
 open System.IO
 open System.Text.RegularExpressions
 
-let outfile = File.CreateText "Data/Songs/Songs"
+let outfile = File.CreateText "Data/Songs.txt"
 
 let mutable prevEmpty = false
 

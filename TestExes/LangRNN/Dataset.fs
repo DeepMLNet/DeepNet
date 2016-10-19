@@ -27,6 +27,7 @@ type WordData (dataPath:      string,
         seq {
             for line in File.ReadLines dataPath do
                 let words = line.Split (' ') |> List.ofArray
+                let words = words |> List.filter (fun w -> w.Trim().Length > 0)
                 yield words
         } |> Seq.cache
     let words = List.concat sentences
@@ -39,6 +40,7 @@ type WordData (dataPath:      string,
         
     let freqsSorted = wordFreqs |> Map.toList |> List.sortByDescending snd 
     let freqsSorted = match vocSizeLimit with Some vs -> freqsSorted |> List.take (vs-1) | None -> freqsSorted
+    do printfn "Most common words:\n%A" (freqsSorted |> List.take 10)
     let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
     let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
     let wordForId = match vocSizeLimit with Some vs -> wordForId |> Map.add (vs-1) "###"  | None -> wordForId
