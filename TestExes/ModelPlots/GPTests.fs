@@ -63,8 +63,8 @@ module GPTests=
         let kInv = Expr.invert (kJoint + sigmaJoint)
         let kStar = GaussianProcess.squaredExpCovariance (l,sigf) xJoint xStar
         let kStarStar = GaussianProcess.squaredExpCovariance (l,sigf) xStar xStar
-//        let mean =  kStar.T .* kInv .* (muJoint)
-//        let cov = kStarStar - kStar.T .* kInv .* kStar
+        let mean =  kStar.T .* kInv .* (muJoint)
+        let cov = kStarStar - kStar.T .* kInv .* kStar
 
        
 
@@ -79,6 +79,8 @@ module GPTests=
         let kStarFun = Func.make<single> cmplr kStar |> arg5 xm x xStar l sigf
         let kStarStarFun = Func.make<single> cmplr kStarStar |> arg3 xStar l sigf
 
+        let meanFun = Func.make<single> cmplr mean |> arg7 xm x xStar y l sigf sigN
+        let covFun = Func.make<single> cmplr cov |> arg7 xm x xStar y l sigf sigN
 
         let lValue = ArrayNDHost.scalar 1.0f |> ArrayNDCuda.toDev
         let sigfValue = ArrayNDHost.scalar 1.0f |> ArrayNDCuda.toDev
@@ -121,3 +123,8 @@ module GPTests=
 
         let interim = kStar.T .* kInv .* kStar
         printfn "kStar.T .* kInv .* kStar = \n%A" interim
+
+        let mean = meanFun xmValue xValue xStarValue yValue lValue sigfValue sigNValue
+        let cov = covFun xmValue xValue xStarValue yValue lValue sigfValue sigNValue
+        printfn "mean = \n%A" mean
+        printfn "cov = \n%A" cov

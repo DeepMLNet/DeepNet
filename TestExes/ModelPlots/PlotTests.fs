@@ -21,7 +21,7 @@ module PlotTests =
         let seed = 1
         let rand = Random seed
         let ntraining = 20
-        let ninput = 10
+        let ninput = 100
 
         let trnXList =  (TestFunctions.randomSortedListOfLength rand (-5.0f,-1.0f) (ntraining/2)) @  (TestFunctions.randomSortedListOfLength rand (1.0f,5.0f) (ntraining/2))
         let trnXHost = trnXList |> ArrayNDHost.ofList
