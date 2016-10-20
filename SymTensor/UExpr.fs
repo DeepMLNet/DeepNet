@@ -158,6 +158,22 @@ module UExprRngsSpec =
         | []                              , []        -> []
         | _                               , _         -> failwith "invalid unified subtensor spec"
 
+    /// checks that the static parts of the range specification are compatible with the given shape
+    let checkCompatibility (shp: ShapeSpecT) (srs: UExprRngsSpecT) =
+        let shp = ShapeSpec.eval shp
+        let failRng () =
+            failwithf "Subtensor range specification %A is invalid for tensor of shape %A." srs shp
+        if shp.Length <> srs.Length then failRng ()
+        (shp, srs) ||> List.iter2 (fun size rng ->           
+            match rng with
+            | SRSSymStartSymEnd (s, fo) ->
+                let s, fo = SizeSpec.eval s, Option.map SizeSpec.eval fo
+                if not (0 <= s && s < size) then failRng ()
+                match fo with
+                | Some fo when not (0 <= fo && fo < size && fo >= s-1) -> failRng ()
+                | _ -> ()
+            | SRSDynStartSymSize _ -> ())        
+        
 
 module UExpr =
 
@@ -200,11 +216,13 @@ module UExpr =
                 // ops that need special handling
                 | Expr.Unary (Expr.Subtensor sr, a)  ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
+                    usr |> UExprRngsSpec.checkCompatibility a.Shape
                     extra (Subtensor usr) (a :: dynExprs)
                 | Expr.Unary (Expr.NullifyJacobian, a) -> toUExprRec a
                 | Expr.Unary (Expr.AssumeJacobian _, a) -> toUExprRec a
                 | Expr.Binary (Expr.SetSubtensor sr, a, b) ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr   
+                    usr |> UExprRngsSpec.checkCompatibility a.Shape
                     extra (SetSubtensor usr) (a :: b :: dynExprs)
                 | Expr.Binary (Expr.IfThenElse cond, ifTrue, ifFalse) ->
                     extra IfThenElse [ifTrue; ifFalse; cond]
