@@ -411,3 +411,7 @@ module ArrayNDHost =
     /// Creates a list from the data in this ArrayNDT. The data is copied.
     let toList (ary: ArrayNDHostT<_>) =
         ary |> toArray |> Array.toList
+
+    /// One-dimensional int tensor containing the numbers [0; 1; ...; size-1].
+    let arange size =
+        {0 .. size-1} |> ofSeq

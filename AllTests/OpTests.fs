@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -175,14 +176,14 @@ let ``Derivative of ReplicateTo on host`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
-let ``Trace compare: max, min`` () =
+let ``Trace compare: max, min elemwise`` () =
     requireEqualTracesWithRandomData [[3; 3]; [3; 3]; [3; 3]] (fun [a; b; c]  ->
         Expr.minElemwise (Expr.maxElemwise a b) c
     )
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
-let ``Trace compare: max, min derivative`` () =
+let ``Trace compare: max, min elemwise derivative`` () =
     requireEqualTracesWithRandomData [[2; 2]; [2; 2]; [2; 2]] (fun [a; b; c]  ->
         let expr = Expr.minElemwise (Expr.maxElemwise a b) c
         let dexpr = Deriv.compute expr
@@ -191,6 +192,39 @@ let ``Trace compare: max, min derivative`` () =
         let dc = dexpr |> Deriv.ofVar c
         Expr.discard [expr; da; db; dc]
    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min reduction`` () =
+    requireEqualTracesWithRandomData [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.maxAxis 2 |> Expr.minAxis 1
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: max, min reduction derivative`` () =
+    requireEqualTracesWithRandomData [[4; 5; 3]] (fun [a]  ->
+        let expr = a |> Expr.maxAxis 2 |> Expr.minAxis 1
+        let dexpr = Deriv.compute expr
+        let da = dexpr |> Deriv.ofVar a
+        Expr.discard [expr; da]
+   )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: argMax reduction`` () =
+    requireEqualTracesWithRandomDataIdx [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.argMaxAxis 1
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: argMin reduction`` () =
+    requireEqualTracesWithRandomDataIdx [[4; 5; 3]] (fun [a]  ->
+        a |> Expr.argMinAxis 2
+    )
+
 
 
 [<Fact>]
@@ -385,8 +419,6 @@ let ``Check finite on CUDA passing`` () =
     printfn "passing:"
     checkFiniteOpTest 1.0f 0.5f
 
-
-
 [<Fact>]
 let ``ReverseAxis on host`` () =
     let a = Expr.var<int> "a" [SizeSpec.fix 3; SizeSpec.fix 2]
@@ -401,3 +433,107 @@ let ``ReverseAxis on host`` () =
     printfn "rev 0 av=\n%A" rav0
     printfn "rev 1 av=\n%A" rav1
 
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Gather 1`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+        let expr = a |> Expr.gather [Some i0; Some i1]
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v i1v
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A\n%A" i0v i1v
+        printfn "select idxs a=\n%A" sv
+    )
+    
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Gather 2`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+        let expr = a |> Expr.gather [Some i0; None]
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v 
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A" i0v 
+        printfn "select idxs a=\n%A" sv
+    )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Scatter 1`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let shp = [SizeSpec.fix 5; SizeSpec.fix 5]
+
+        let expr = a |> Expr.scatter [Some i0; None] shp
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v 
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A" i0v 
+        printfn "scatter idxs a=\n%A" sv
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: Scatter 2`` () =
+    requireEqualTraces (fun device ->
+        let a = Expr.var<single> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+        let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+        let shp = [SizeSpec.fix 5; SizeSpec.fix 5]
+
+        let expr = a |> Expr.scatter [Some i0; Some i1] shp
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
+
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.single
+        let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let i1v = [0; 0; 0] |> ArrayNDHost.ofList |> ArrayND.padLeft
+
+        let sv = exprFn av i0v i1v
+        printfn "a=\n%A" av
+        printfn "idxs=\n%A\n%A" i0v i1v
+        printfn "scatter idxs a=\n%A" sv
+    )
+
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: arange int`` () =
+    requireEqualTraces (fun device ->
+        let expr = Expr.arange<int> (SizeSpec.fix 10)
+        let exprFn = Func.make<int> device.DefaultFactory expr |> arg0
+        let av = exprFn ()
+        printfn "arange<int> 10 =%A"av
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: arange single`` () =
+    requireEqualTraces (fun device ->
+        let expr = Expr.arange<single> (SizeSpec.fix 10)
+        let exprFn = Func.make<single> device.DefaultFactory expr |> arg0
+        let av = exprFn ()
+        printfn "arange<single> 10 =%A"av
+    )

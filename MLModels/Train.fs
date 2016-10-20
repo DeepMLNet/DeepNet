@@ -65,7 +65,7 @@ module TrainingLog =
         | None -> 0
 
     let best (log: Log<_>) =
-        log.Best.Value
+        log.Best
 
     let itersWithoutImprovement (log: Log<_>) =
         match log.Best with
@@ -114,8 +114,12 @@ module Train =
         LearningRates:                  float list
         /// Checkpoint storage directory. (is created if it does not exist)
         CheckpointDir:                  string option
+        /// number of iterations between automatic writing of checkpoints
+        CheckpointInterval:             int option
         /// If true, checkpoint is not loaded from disk.
         DiscardCheckpoint:              bool
+        /// If false, no training is performed after loading the checkpoint.
+        PerformTraining:                bool
         /// If set, during each iteration the dump prefix will be set to the given string
         /// concatenated with the iteration number.
         DumpPrefix:                     string option
@@ -135,7 +139,9 @@ module Train =
         MaxIters                    = None
         LearningRates               = [1e-3; 1e-4; 1e-5; 1e-6]
         CheckpointDir               = None
+        CheckpointInterval          = None
         DiscardCheckpoint           = false
+        PerformTraining             = true
         DumpPrefix                  = None
     }
 
@@ -147,11 +153,12 @@ module Train =
         | TargetLossReached
         | UserTerminated
         | CheckpointRequested
+        | CheckpointIntervalReached
         | NaNEncountered
 
     /// Result of training
     type TrainingResult = {
-        Best:               TrainingLog.Entry
+        Best:               TrainingLog.Entry option
         TerminationReason:  Faith
         Duration:           TimeSpan
         History:            TrainingLog.Entry list
@@ -178,6 +185,8 @@ module Train =
         abstract member SaveModel: path:string -> unit
         /// Model parameter values (i.e. weights).
         abstract member ModelParameters: ArrayNDT<'T> with get, set
+        /// Resets the internal model state. (for example the latent state of an RNN)
+        abstract member ResetModelState: unit -> unit
         /// Initialize optimizer state.
         abstract member InitOptState: unit -> unit
         /// Load optimizer state from specified file.
@@ -185,27 +194,50 @@ module Train =
         /// Save optimizer state to specified file.
         abstract member SaveOptState: path: string -> unit
 
-    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
-    let trainableFromLossExprs
+    /// Constructs an ITrainable<_> from expressions.
+    let internal newTrainable
             (modelInstance: ModelInstance<'T>) 
             (losses: ExprT list) 
-            (varEnvBuilder: 'Smpl -> VarEnvT)
+            (nextStateExpr: ExprT option)
+            (varEnvBuilder: ArrayNDT<'T> option -> 'Smpl -> VarEnvT)
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
+        let usingState = Option.isSome nextStateExpr
+        let mutable modelState = None
+
         let losses = losses |> List.map modelInstance.Use 
         let mainLoss = losses.Head
-        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device
-        let lossesFn = modelInstance.Func losses << varEnvBuilder
-        let lossesOptFn = modelInstance.Func (losses @ [opt.OptStepExpr]) |> opt.Use << varEnvBuilder
-
+        let stateAndLosses = 
+            if usingState then nextStateExpr.Value :: losses else losses
+            
+        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device       
         let mutable optState = opt.InitialState optCfg modelInstance.ParameterValues
-    
+
+        let updateStateAndGetLosses result = 
+            match result with
+            | nextState :: losses when usingState -> 
+                modelState <- Some nextState
+                losses
+            | losses when not usingState -> losses
+            | _ -> failwith "unexpected result"
+
+        let lossesFn =
+            let fn = modelInstance.Func stateAndLosses
+            fun smpl ->                
+                fn <| varEnvBuilder modelState smpl 
+                |> updateStateAndGetLosses
+
+        let lossesOptFn = 
+            let fn = modelInstance.Func (opt.OptStepExpr :: stateAndLosses) |> opt.Use
+            fun smpl optCfg optState ->
+                fn <| varEnvBuilder modelState smpl <| optCfg <| optState
+                |> List.tail |> updateStateAndGetLosses
+   
         {new ITrainable<'Smpl, 'T> with
             member this.Losses sample = lossesFn sample |> List.map (ArrayND.value >> conv<float>)
             member this.Optimize learningRate sample = 
-                let lossesAndOpt = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
-                let losses = lossesAndOpt |> List.take (lossesAndOpt.Length - 1)
+                let losses = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
                 lazy (losses |> List.map (ArrayND.value >> conv<float>))
             member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
             member this.InitModel seed = modelInstance.InitPars seed
@@ -214,10 +246,20 @@ module Train =
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
                 and set (value) = modelInstance.ParameterValues <- value
+            member this.ResetModelState () = modelState <- None
             member this.InitOptState () = optState <- opt.InitialState optCfg modelInstance.ParameterValues
             member this.LoadOptState path = optState <- opt.LoadState path
             member this.SaveOptState path = opt.SaveState path optState    
         }
+
+    /// Constructs an ITrainable<_> for the given stateful model using the specified loss
+    /// expressions, state update expression and optimizer.
+    let newStatefulTrainable modelInstance losses nextState varEnvBuilder optNew optCfg =
+        newTrainable modelInstance losses (Some nextState) varEnvBuilder optNew optCfg
+
+    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
+    let trainableFromLossExprs modelInstance losses varEnvBuilder optNew optCfg =
+        newTrainable modelInstance losses None (fun _ -> varEnvBuilder) optNew optCfg
 
     /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
     let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
@@ -260,6 +302,7 @@ module Train =
                 if cfg.DiscardCheckpoint then cp.Remove ()
                 Some cp
             | None -> None
+        let mutable lastCheckpointIter = 0
         let mutable checkpointRequested = false
         use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->
             match cp with
@@ -286,12 +329,15 @@ module Train =
         /// training function
         let rec doTrain iter learningRate log =
 
+            if not Console.IsInputRedirected then printf "%6d \r" iter
+
             /// set dump prefix
             match cfg.DumpPrefix with
             | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter
             | None -> ()
 
             // execute training
+            trainable.ResetModelState ()
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
@@ -307,7 +353,9 @@ module Train =
                     |> List.map (fun l -> l / float n)
 
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
+                trainable.ResetModelState ()
                 let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
+                trainable.ResetModelState ()
                 let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
 
                 // compute and log primary validation & test loss
@@ -381,6 +429,11 @@ module Train =
                 | _ -> ()
 
                 // process checkpoint request
+                match cfg.CheckpointInterval with
+                | Some interval when iter >= lastCheckpointIter + interval && faith = Continue -> 
+                    lastCheckpointIter <- iter
+                    faith <- CheckpointIntervalReached
+                | _ -> ()
                 if checkpointRequested then faith <- CheckpointRequested
 
                 match faith with
@@ -390,11 +443,12 @@ module Train =
                 doTrain (iter + 1) learningRate log
 
         // training loop with decreasing learning rate
-        let rec trainLoop log learningRates = 
+        let rec trainLoop prevFaith log learningRates = 
             match learningRates with
             | learningRate::rLearningRates ->
                 // train
-                printfn "Using learning rate %g" learningRate
+                if prevFaith <> CheckpointIntervalReached then
+                    printfn "Using learning rate %g" learningRate
                 let log, faith = doTrain (TrainingLog.lastIter log + 1) learningRate log
 
                 if faith <> CheckpointRequested then
@@ -409,7 +463,7 @@ module Train =
                     // reset log to best iteration so far 
                     let log = log |> TrainingLog.removeToIter (TrainingLog.bestIter log)
                     // continue with lower learning rate
-                    trainLoop log rLearningRates
+                    trainLoop faith log rLearningRates
                 | _ -> log, faith, learningRates
             | [] -> failwith "no learning rates"
         
@@ -432,21 +486,23 @@ module Train =
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
                 TrainingLog.create cfg.MinImprovement cfg.BestOn, cfg.LearningRates, TimeSpan.Zero, Continue
-        
-        // train
-        let log, duration, faith = 
+
+        // outer training loop with checkpoint saving
+        let rec checkpointLoop log learningRates duration faith =
             match faith with
-            | Continue | CheckpointRequested ->
+            | Continue | CheckpointRequested | CheckpointIntervalReached ->
                 // train
-                printfn "Training with %A" dataset
+                if faith <> CheckpointIntervalReached then
+                    printfn "Training with %A" dataset
                 let watch = Stopwatch.StartNew()
-                let log, faith, learningRates = trainLoop log learningRates
+                let log, faith, learningRates = trainLoop faith log learningRates
                 let duration = duration + watch.Elapsed
 
                 // save checkpoint 
                 match cp with
                 | Some cp ->
-                    printfn "Saving checkpoint to %s" cp.Directory
+                    if faith <> CheckpointIntervalReached then
+                        printfn "Saving checkpoint to %s" cp.Directory
                     cp.Mkdir ()
                     trainable.SaveOptState cp.OptStateFile
                     trainable.SaveModel cp.ModelFile
@@ -466,24 +522,33 @@ module Train =
                         Duration = duration
                         Faith = faith
                     }
-                    if faith = CheckpointRequested then exit 10
                 | None -> ()
 
-                log, duration, faith
+                match faith with
+                | CheckpointRequested -> exit 0
+                | CheckpointIntervalReached -> checkpointLoop log learningRates duration faith
+                | _ -> log, learningRates, duration, faith
             | _ ->
                 // training already finished in loaded checkpoint
-                printfn "Training finished in loaded checkpoint"
-                log, duration, faith
+                log, learningRates, duration, faith
+        
+        let faith =
+            if cfg.PerformTraining then faith
+            else UserTerminated
 
-        let bestEntry, _ = TrainingLog.best log
-        printfn "Training completed after %d iterations in %A because %A with best losses:" 
-            bestEntry.Iter duration faith
-        printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
-            bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+        let log, learningRates, duration, faith = checkpointLoop log learningRates duration faith
+        match TrainingLog.best log with
+        | Some (bestEntry, _) ->
+            printfn "Training completed after %d iterations in %A because %A with best losses:" 
+                    bestEntry.Iter duration faith
+            printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
+                    bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+        | None ->
+            printfn "No training was performed."
 
         {
             History             = List.rev log.History
-            Best                = bestEntry
+            Best                = log |> TrainingLog.best |> Option.map fst
             TerminationReason   = faith
             Duration            = duration
         }

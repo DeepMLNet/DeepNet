@@ -25,6 +25,13 @@ struct ZerosEOp_t
 };
 
 
+struct CountingIEOp_t {
+	_dev idx_t operator() (const idx_t *pos, const idx_t dims) const {
+		return pos[0];
+	}
+};
+
+
 struct DiagonalOneIEOp_t {
 	_dev float operator() (const idx_t *pos, const idx_t dims) const {
 		if (dims == 0) {
@@ -304,6 +311,30 @@ struct MinEOp_t
 	_dev float operator() (float a, float b) const
 	{
 		return min(a, b);
+	}
+};
+
+struct ArgMaxIROp_t
+{
+	_dev void operator() (float &maxVal, idx_t &maxPos, float candVal, idx_t candPos) const
+	{
+		if (candVal > maxVal)
+		{
+			maxVal = candVal;
+			maxPos = candPos;
+		}
+	}
+};
+
+struct ArgMinIROp_t
+{
+	_dev void operator() (float &minVal, idx_t &minPos, float candVal, idx_t candPos) const
+	{
+		if (candVal < minVal)
+		{
+			minVal = candVal;
+			minPos = candPos;
+		}
 	}
 };
 

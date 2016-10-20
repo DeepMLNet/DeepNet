@@ -150,6 +150,11 @@
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml" />
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>cd "$(ProjectDir)\..\SymTensorCudaSup"
+if not exist NDSupport.cuh ("$(FrameworkSDKRoot)\..\..\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx)
+</PreBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

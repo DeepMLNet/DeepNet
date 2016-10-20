@@ -7,7 +7,9 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+    let private optimized = Dictionary<ExprT, ExprT> () //(HashIdentity.Reference)
+    let private combined = Dictionary<ExprT, ExprT> () //(HashIdentity.Reference)
+    let private fullOptimized = Dictionary<ExprT, ExprT> () //(HashIdentity.Structural)
 
     /// Returns a list containing one element each axis of the expression.
     /// The element is true if the axis is broadcasted.
@@ -106,7 +108,7 @@ module Optimizer =
                     let summandExpr = Expr.elements sumandShape summandSubst args
                     let summedExpr = summandExpr |> Expr.sumAxis nDims
 
-                    sumArg, [optimize summedExpr]
+                    sumArg, [optRec summedExpr]
 
                 | ElemExpr.Leaf (op) -> 
                     ElemExpr.Leaf (op), []
@@ -146,7 +148,7 @@ module Optimizer =
 
                 // broadcast result to original shape
                 let bcElements = sigElements |> Expr.broadcast resShape
-                optimize bcElements
+                optRec bcElements
             | None -> elements
 
         | _ -> failwith "not an elements expression"
@@ -166,12 +168,12 @@ module Optimizer =
 
             let rec repMul cnt arg =
                 match cnt with
-                | 0 -> ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type)
+                | 0 -> ElemExpr.constSpec (ConstSpec.one elemExpr.Type)
                 | 1 -> arg
                 | _ when cnt > 0 ->
                     arg * repMul (cnt - 1) arg
                 | _ when cnt < 0 ->
-                    ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type) / repMul (-cnt) arg
+                    ElemExpr.constSpec (ConstSpec.one elemExpr.Type) / repMul (-cnt) arg
                 | _ -> failwith "impossible"
 
             match p with
@@ -230,17 +232,60 @@ module Optimizer =
         | _         -> None
 
     /// combines elemwise and elements operations into one elements operation
-    and combineIntoElements (expr: ExprT) : ExprT =
-        let shp = Expr.shapeOf expr
-        let nd = Expr.nDims expr
-        let idxs = [0 .. nd-1] |> List.map ElemExpr.idx
+    and combineIntoElementsRec (exprInfo: ExprInfoT) (expr: ExprT) : ExprT =
+        let subComb = combineIntoElementsRec exprInfo
 
         /// Gets the element expression for the argument, or starts a
         /// new element expression if the argument is not an element expression.
-        let getArgElemExpr argExpr =
-            match argExpr with
-            | Nary (Elements (_, argElemExpr), argArgs) -> argElemExpr, argArgs
-            | _ -> ElemExpr.argElemWithType argExpr.Type 0 idxs, [argExpr]  
+        let rec getArgElemExpr argExpr =            
+            let combinable () = 
+                Set.count (exprInfo.DependantsStructural argExpr) = 1 ||
+                Set.count (Expr.extractVars argExpr) = 0
+            //let combinable () = false
+            match subComb argExpr with
+            | Nary (Elements (_, argElemExpr), argArgs) when combinable() -> argElemExpr, argArgs
+            | Unary (DoBroadcast shp, a) when combinable() ->
+                // set broadcasted dimensions to zero in element expression
+                let bcSubst = 
+                    Expr.shapeOf a
+                    |> List.indexed
+                    |> List.collect (fun (d, ss) ->
+                        if ss = SizeSpec.broadcastable then [ElemExpr.idxSymbol d, SizeSpec.zero]
+                        else [])
+                    |> Map.ofSeq
+                let bcElemExpr, bcArgs = getArgElemExpr a
+                bcElemExpr |> ElemExpr.substSymSizes bcSubst, bcArgs
+            | Unary (Reshape rsShp, src) when 
+                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape &&
+                    combinable() ->
+                // replace insertion of broadcast axes using Reshape op by insertion of
+                // axes into element expression
+                let rsElemExpr, rsArgs = getArgElemExpr src
+                let rec insertBcAxes srcDim srcShp rsShp elemExpr =
+                    match srcShp, rsShp with
+                    | [], [] -> elemExpr
+                    | _, rsSize::remRsShp when rsSize = SizeSpec.broadcastable ->
+                        let dimRng = [srcDim .. argExpr.NDims-1]
+                        let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
+                        let insSubst1 =
+                            dimRng
+                            |> List.map (fun d -> ElemExpr.idxSymbol d, Base (Sym (rplSym d)))
+                            |> Map.ofList
+                        let insSubst2 =
+                            dimRng
+                            |> List.map (fun d -> rplSym d, ElemExpr.idx (d+1))
+                            |> Map.ofList
+                        let substExpr = 
+                            elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
+                        insertBcAxes srcDim srcShp remRsShp substExpr
+                    | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
+                        insertBcAxes (srcDim + 1) remSrcShp remRsShp elemExpr
+                    | _ -> failwith "invalid reshape for broadcast axes insertion"
+                let res = insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
+                res
+            | combArgExpr -> 
+                let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
+                ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
 
         /// Joins the arguments of two element expressions and adjusts them accordingly.
         let joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs) =
@@ -253,45 +298,52 @@ module Optimizer =
                 | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, adjust a, adjust b)
             aElemExpr, adjust bElemExpr, aArgs @ bArgs
 
-        match expr with
-        | Leaf op ->
-            match leafOpToElemOp op with
-            | Some elemOp -> 
-                Expr.elements shp (ElemExpr.Leaf elemOp) []
-                |> optimizeElements
-            | None -> expr
+        match combined.LockedTryFind expr with
+        | Some comb -> comb
+        | None -> 
+            let comb =
+                match expr with
+                | Leaf op ->
+                    match leafOpToElemOp op with
+                    | Some elemOp -> 
+                        Expr.elements (Expr.shapeOf expr) (ElemExpr.Leaf elemOp) []
+                        |> optimizeElements
+                    | None -> expr
         
-        | Unary (op, aExpr) ->
-            match unaryOpToElemOp op with
-            | Some elemOp ->       
-                let aElemExpr, aArgs = getArgElemExpr aExpr        
-                let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
-                Expr.elements shp elemExpr aArgs
-                |> optimizeElements
-            | None -> expr
+                | Unary (op, aExpr) ->
+                    match unaryOpToElemOp op with
+                    | Some elemOp ->       
+                        let aElemExpr, aArgs = getArgElemExpr aExpr        
+                        let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
+                        Expr.elements (Expr.shapeOf expr) elemExpr aArgs
+                        |> optimizeElements
+                    | None -> Unary (op, subComb aExpr)
                     
-        | Binary (op, aExpr, bExpr) ->
-            match binaryOpToElemOp op with
-            | Some elemOp ->
-                let aElemExpr, aArgs = getArgElemExpr aExpr   
-                let bElemExpr, bArgs = getArgElemExpr bExpr   
-                let aElemExpr, bElemExpr, abArgs = 
-                    joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
-                let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
-                Expr.elements shp elemExpr abArgs
-                |> optimizeElements
-            | None -> expr
+                | Binary (op, aExpr, bExpr) ->
+                    match binaryOpToElemOp op with
+                    | Some elemOp ->
+                        let aElemExpr, aArgs = getArgElemExpr aExpr   
+                        let bElemExpr, bArgs = getArgElemExpr bExpr   
+                        let aElemExpr, bElemExpr, abArgs = 
+                            joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
+                        let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
+                        Expr.elements (Expr.shapeOf expr) elemExpr abArgs
+                        |> optimizeElements
+                    | None -> Binary (op, subComb aExpr, subComb bExpr)
 
-        | Nary (Elements (_, elemExpr), args) ->
-            // TODO: if we are an ElemExpr, merge with children
-            //printf "could combine two elemexprs"
-            expr
+                //| Nary (Elements (_, elemExpr), args) ->
+                    // TODO: if we are an ElemExpr, merge with children
+                    //printf "could combine two elemexprs"
+                    //expr
 
-        | Nary _ -> expr
+                | Nary (op, es) ->
+                    Nary (op, es |> List.map subComb)
 
+            combined.LockedSet (expr, comb)
+            comb
 
     /// Optimizes an expression.
-    and optimize (expr: ExprT) : ExprT =
+    and private optRec (expr: ExprT) : ExprT =
         match optimized.LockedTryFind expr with
         | Some opt -> opt 
         | None ->
@@ -300,39 +352,50 @@ module Optimizer =
 
                 // remove unnecessary axes permutations
                 | Unary (PermuteAxes perm, a) when Permutation.isIdentity perm ->
-                    optimize a
+                    optRec a
 
                 // remove unnecessary reshapes
                 | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
-                    optimize a            
+                    optRec a            
 
                 // remove unnecessary broadcasts
                 | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
-                    optimize a
+                    optRec a
 
                 // combine subsequent axes permutations
                 | Unary (PermuteAxes perm1, Unary (PermuteAxes perm2, a)) ->
                     let perm = Permutation.chain perm1 perm2
-                    optimize (Unary (PermuteAxes perm, a))
+                    optRec (Unary (PermuteAxes perm, a))
+
+                // remove unneccessary permutation of size-one axes before reshape
+                | Unary (Reshape ss, Unary (PermuteAxes (Permutation.Swap (ax1, ax2)), a)) when
+                        (a.Shape.[ax1] .= SizeSpec.one || a.Shape.[ax2] .= SizeSpec.one) &&
+                        a.Shape.[ax1+1 .. ax2-1] |> List.forall (fun ss -> ss .= SizeSpec.one) ->
+                    optRec (Unary (Reshape ss, a))
 
                 // combine subsequent reshapes
                 | Unary (Reshape ss, Unary (Reshape _, a)) ->
-                    optimize (Unary (Reshape ss, a))
+                    optRec (Unary (Reshape ss, a))
 
                 // combine subsequent broadcasts
                 | Unary (DoBroadcast bc, Unary (DoBroadcast _, a)) ->
-                    optimize (Unary (DoBroadcast bc, a))
+                    optRec (Unary (DoBroadcast bc, a))
+
+                // remove unnecessary broadcasts after reshape
+                | Unary (DoBroadcast bcShp, Unary (Reshape reShp, a)) when 
+                        ShapeSpec.equalWithoutBroadcastability bcShp reShp ->
+                    optRec (Unary (Reshape bcShp, a))
 
                 // pull permute through broadcast
                 | Unary (DoBroadcast bc, Unary (PermuteAxes perm, a)) ->
                     let bcPerm = bc |> Permutation.apply (Permutation.invert perm)
-                    optimize (Unary (PermuteAxes perm, Unary (DoBroadcast bcPerm, a)))
+                    optRec (Unary (PermuteAxes perm, Unary (DoBroadcast bcPerm, a)))
 
                 // pull permute, broadcast and reshape through unary elementwise ops
                 | Unary (UnaryElemwiseOp as op, Unary (PermuteAxes _ as lop, a)) 
                 | Unary (UnaryElemwiseOp as op, Unary (Reshape _ as lop, a)) 
                 | Unary (UnaryElemwiseOp as op, Unary (DoBroadcast _ as lop, a)) ->
-                    optimize (Unary (lop, Unary (op, a)))
+                    optRec (Unary (lop, Unary (op, a)))
 
                 // pull matching permute, broadcast and reshape through binary elementwise ops
                 | Binary (BinaryElemwiseOp as op, Unary (PermuteAxes _ as lopa, a),
@@ -342,27 +405,55 @@ module Optimizer =
                 | Binary (BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
                                                   Unary (DoBroadcast _ as lopb, b))
                             when lopa = lopb && shapeOf a = shapeOf b ->
-                    optimize (Unary (lopa, Binary (op, a, b)))
+                    optRec (Unary (lopa, Binary (op, a, b)))
+
+                // optimize gather and scatter index arguments
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (indices |> List.map (Option.map optimize)), optRec a)
+                | Unary (Scatter (indices, shp), a) ->
+                    Unary (Scatter (indices |> List.map (Option.map optimize), shp), optRec a)
+
+                // optimize IfThenElse condition
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (optimize cond), optRec a, optRec b)
 
                 // optimize elements expressions
                 | Nary (Elements (resShape, elemExpr), args) ->
-                    let args = args |> List.map optimize
+                    let args = args |> List.map optRec
                     Nary (Elements (resShape, elemExpr), args)
                     |> optimizeElements
                     |> pullSumOutOfElements
                     |> broadcastInsignificantElementsAxes
 
+                // optmize loops
+                | Nary (Channel (Loop loopSpec, ch), args) ->
+                    let args = args |> List.map optRec
+                    let loopSpec = {
+                        loopSpec with
+                            Channels = loopSpec.Channels 
+                                       |> Map.map (fun ch lv -> {lv with Expr=optimize lv.Expr})
+                    }
+                    Nary (Channel (Loop loopSpec, ch), args)
+
                 // pass through
                 | Leaf _ -> expr
-                | Unary(op, a) -> Unary (op, optimize a)            
-                | Binary(op, a, b) -> Binary (op, optimize a, optimize b)
-                | Nary(op, es) -> Nary (op, List.map optimize es)
-
-            // try to combine elementwise operations into an element expression
-            let opt = combineIntoElements opt
+                | Unary(op, a) -> Unary (op, optRec a)            
+                | Binary(op, a, b) -> Binary (op, optRec a, optRec b)
+                | Nary(op, es) -> Nary (op, List.map optRec es)
 
             optimized.LockedSet (expr, opt)
-            opt |> Expr.check
+            optimized.LockedSet (opt, opt)
+            opt
 
+    /// Optimizes an expression.
+    and optimize (expr: ExprT) : ExprT =
+        match fullOptimized.LockedTryFind expr with
+        | Some opt -> opt
+        | None ->
+            let opt = expr |> optRec |> Expr.check
+            let opt = combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+            fullOptimized.LockedSet (expr, opt)
+            fullOptimized.LockedSet (opt, opt)
+            opt
 
 

@@ -27,7 +27,13 @@ module RandomExtensions =
         /// Generates an infinite sequence of random numbers within the given range.
         member this.SeqSingle (minValue: single, maxValue: single) =
             this.SeqDouble (double minValue, double maxValue) |> Seq.map single
-        
+
+        /// Samples each element of an ArrayND of shape shp from a discrete uniform distribution
+        /// between minValue and maxValue.      
+        member this.IntArrayND (minValue, maxValue) shp =
+            this.Seq (minValue, maxValue)
+            |> ArrayNDNS.ArrayNDHost.ofSeqWithShape shp
+
         /// Samples each element of an ArrayND of shape shp from a uniform distribution
         /// between minValue and maxValue.
         member this.UniformArrayND (minValue: 'T, maxValue: 'T) shp =

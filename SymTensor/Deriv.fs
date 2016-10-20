@@ -1,5 +1,7 @@
 ﻿namespace SymTensor
 
+open System.Diagnostics
+
 open Basics
 
 [<AutoOpen>]
@@ -72,9 +74,9 @@ module Deriv =
             let wrtElems = (shapeOf g).[1..] |> ShapeSpec.nElem
             g |> reshape [funElems; wrtElems]
 
-        /// logic op failure
-        let failLogic op =
-            failwithf "cannot calculate derivative of logic or comparison operation %A" op
+        // non differentiable op failures
+        let failLogic op = failwithf "cannot calculate derivative of logic or comparison operation %A" op
+        let failIndex op = failwithf "cannot calculate derivative of op %A that returns indices" op
 
         /// zero Jacobian
         let zeroJacobian wrt =
@@ -139,16 +141,29 @@ module Deriv =
                 egUnbroadcasted |> collapse 
             | ReverseAxis ax ->
                 egExp |> reverseAxis (ax + 1) |> collapse
+            | Gather indices ->
+                let dIndices = indices |> List.map (Option.map padLeft)
+                egExp |> scatter (None::dIndices) (funElems::shapeOf a) |> collapse
+            | Scatter (indices, shp) ->
+                let dIndices = indices |> List.map (Option.map (fun idx -> 
+                    idx |> broadcastToShape (funElems::idx.Shape)))                   
+                egExp |> gather (None::dIndices) |> collapse
             | Held (derivsShp, heldOp) -> 
-                Unary(Held (shapeOf a :: derivsShp, heldOp), eg)                
+                Unary(Held (shapeOf a :: derivsShp, heldOp), eg)       
+                     
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
                         |> collapse 
             | SumAxis ax -> 
-                let eeg = egExp 
-                let bca = eeg |> reshape (shapeOf eeg |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                let ael = (shapeOf a).[ax]
-                let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
-                bc |> collapse 
+                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+            | MaxAxis ax 
+            | MinAxis ax ->
+                let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
+                let bcEgExp = egExp |> reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (zerosLike bcEgExp) |> collapse
+            | ArgMaxAxis ax
+            | ArgMinAxis ax -> failIndex op
+
             | StoreToVar _ -> eg 
 
             | NullifyJacobian -> Expr.zerosLike eg 
@@ -356,7 +371,7 @@ module Deriv =
             | ConstArg argIdx ->
                 // create a variable for the sum of the accumulated Jacobian so far
                 let dAccumName = sprintf "dSum_ConstArg%d[-1]" argIdx
-                let dAccumVar = VarSpec.create dAccumName liType [funElems; liElems]
+                let dAccumVar = VarSpec.create dAccumName liType (funElems :: liShape)
 
                 // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                 let dPortName = sprintf "dSum_ConstArg%d" argIdx
@@ -464,14 +479,16 @@ module Deriv =
                 let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
 
                 // calculate Jacobians w.r.t. all variables
-                value.Expr |> computeWithRootJacobian incomingJacobian)    
+                let chDeriv = value.Expr |> computeWithRootJacobian incomingJacobian               
+                chDeriv
+                )    
             |> Seq.reduce merge
 
         // go through portContents and create actual port contents
         let ports =
             portContents
-            |> Seq.map (fun pc ->
-                let port, {DerivWrt=derivWrts; ValueOf=valueOf; SliceDim=sliceDim} = pc.Key, pc.Value
+            |> Map.ofDictionary
+            |> Map.map (fun port {DerivWrt=derivWrts; ValueOf=valueOf; SliceDim=sliceDim} ->
                 let expr = 
                     seq {
                         // obtain Jacobians
@@ -485,8 +502,7 @@ module Deriv =
                         | Some vs -> yield Expr.makeVar vs
                         | None -> ()
                     } |> Seq.reduce (+)
-                port, {Expr=expr; SliceDim=sliceDim})
-            |> Map.ofSeq
+                {Expr=expr; SliceDim=sliceDim})
 
         // create variable specification
         let varsFromDeriv = 
@@ -543,9 +559,8 @@ module Deriv =
         // build derivatives w.r.t. our arguments
         let argIdxDerivExprs = 
             argIdxDerivs 
-            |> Seq.map (fun aid -> 
-                let argIdx, loopDerivs = aid.Key, aid.Value
-                
+            |> Map.ofDictionary
+            |> Map.map (fun argIdx loopDerivs ->                
                 // sum over ports producing derivative and reverse if necessary
                 let dExprExpanded =
                     loopDerivs
@@ -560,8 +575,7 @@ module Deriv =
                 // collapse Jacobian
                 let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
                 let dExpr = dExprExpanded |> Expr.reshape [funElems; wrtElems]
-                argIdx, dExpr)
-            |> Map.ofSeq
+                dExpr)
 
         // output mapping from original argument to its derivative
         [for a=0 to originalArgs.Length-1 do
@@ -587,7 +601,8 @@ module Deriv =
         /// expressions that have received Jacobians from all their dependants
         let exprsWithFullJacobian = Queue<ExprT> ()
 
-        let multiChannelOpJacobians = Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
+        let multiChannelOpJacobians = 
+            Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
         let multiChannelOpsWithFullJacobians = Queue<MultiChannelOpUsageT> ()
 
         /// adds the specified Jacobian coming from `source` to `target`
@@ -668,14 +683,18 @@ module Deriv =
                 multiChannelDiffStep mcOp channelJacs |> transmitJacobians (Choice2Of2 mcOp)
         
         {
-            FunElems  = rootExpr.NElems
+            FunElems  = rootJacobian.Shape.[0]
             Jacobians = varJacs
         }    
 
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
     and compute (rootExpr: ExprT) : DerivT =
+        if Debug.TraceCompile then printfn "Computing derivatives..."
+        let sw = Stopwatch.StartNew()
         let rootJac = shapeOf rootExpr |> ShapeSpec.nElem |> identityOfSameType rootExpr
-        computeWithRootJacobian rootJac rootExpr
+        let deriv = computeWithRootJacobian rootJac rootExpr
+        if Debug.Timing then printfn "Computing derivatives took %A" sw.Elapsed
+        deriv
 
     /// extracts the Jacobian of the given VarSpecT
     and ofVarSpec var (deriv: DerivT) =

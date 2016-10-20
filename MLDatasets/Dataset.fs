@@ -236,7 +236,11 @@ type Dataset<'S> (fieldStorages: IArrayNDT list) =
             let fieldTyp = (Seq.head fieldSmpls).DataType
             let stor = ArrayNDHost.newCOfType fieldTyp storShp 
             for smpl, smplVal in Seq.indexed fieldSmpls do
-                stor.[smpl, Fill] <- smplVal
+                if stor.[smpl, Fill].Shape = smplVal.Shape then
+                    stor.[smpl, Fill] <- smplVal
+                else
+                    failwithf "the sample with index %d has shape %A but shape %A was expected"
+                              smpl smplVal.Shape stor.[smpl, Fill].Shape
             stor :> IArrayNDT            
 
         #if false

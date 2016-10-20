@@ -243,6 +243,12 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltSrcWithNoViewReq ()
         | UUnaryOp (SumAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (MaxAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (MinAxis _) -> dfltSrcWithNoViewReq ()
+
+        // index reductions
+        | UUnaryOp (ArgMaxAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (ArgMinAxis _) -> dfltSrcWithNoViewReq ()
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
@@ -333,6 +339,12 @@ module CudaExecUnit =
         | UBinaryOp (Expr.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse -> inplaceFirstSrcReq ()
 
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> dfltSrcWithNoViewReq ()
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> dfltSrcWithNoViewReq ()
+            
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
@@ -508,6 +520,12 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltChOutplaceTrgt ()
         | UUnaryOp (SumAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp (MaxAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp (MinAxis _) -> dfltChOutplaceTrgt ()
+
+        // index reductions
+        | UUnaryOp (ArgMaxAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp (ArgMinAxis _) -> dfltChOutplaceTrgt ()
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
@@ -609,6 +627,12 @@ module CudaExecUnit =
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
 
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> dfltChOutplaceTrgt ()
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> dfltChOutplaceTrgt ()
+
         // extension        
         | UNaryOp (ExtensionOp eop) -> 
             (toCudaUOp eop).TrgtGivenSrcs compileEnv args helpers
@@ -667,17 +691,40 @@ module CudaExecUnit =
         let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
+    /// execution items for a gather operation
+    let execItemsForGather trgt src idxViews =
+        let funcName = sprintf "gather%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let args = 
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
+            (List.map (function | Some v -> ArrayNDArgTmpl v :> ICudaArgTmpl
+                                | None   -> ArrayNDNullArgTmpl (TypeName.ofType<int>, trgt.Shape) 
+                                            :> ICudaArgTmpl) idxViews)
+        execItemsForKernel funcName args args (workDimForElemwise trgt false)
+
+    /// execution items for a scatter operation
+    let execItemsForScatter trgt src idxViews =
+        let funcName = sprintf "scatter%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let args = 
+            ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
+            ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
+            (List.map (function | Some v -> ArrayNDArgTmpl v :> ICudaArgTmpl
+                                | None   -> ArrayNDNullArgTmpl (TypeName.ofType<int>, src.Shape) 
+                                            :> ICudaArgTmpl) idxViews)
+        execItemsForKernel funcName args args (workDimForElemwise src false)
+
     /// function name of reduction wrapper and its arguments for the given target, operation, initial value and source
-    let reductionFuncnameAndArgs trgt cOp cInitialOp src =
+    let reductionFuncnameAndArgs trgt indexed cOp cInitialOp src =
         let args = [cOp :> ICudaArgTmpl
                     cInitialOp :> ICudaArgTmpl
                     ArrayNDArgTmpl trgt :> ICudaArgTmpl
                     ArrayNDArgTmpl src :> ICudaArgTmpl]
-        let funcName = sprintf "reduceTo%dD" (ArrayND.nDims trgt)
+        let idxStr = if indexed then "Idx" else ""
+        let funcName = sprintf "reduce%sTo%dD" idxStr (ArrayND.nDims trgt)
         funcName, args
 
     /// execution items for a reduction operation
-    let execItemsForReduction trgt cOp cInitialOp src =
+    let execItemsForReduction trgt indexed cOp cInitialOp src =
         match ArrayND.shape trgt, ArrayND.shape src with
         | _, [] -> failwith "cannot reduce a scalar array"
         | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
@@ -686,7 +733,7 @@ module CudaExecUnit =
             failwithf "cannot reduce from shape %A to shape %A" srcShp trgtShp 
         | _ -> ()
 
-        let funcName, args = reductionFuncnameAndArgs trgt cOp cInitialOp src
+        let funcName, args = reductionFuncnameAndArgs trgt indexed cOp cInitialOp src
         execItemsForKernel funcName args args (workDimForElemwise trgt false)
 
     /// function name of elements wrapper and its arguments for the given target, operation and sources
@@ -888,31 +935,28 @@ module CudaExecUnit =
 
             batchExecItems @ remExecItems @ recExecItems
 
-    /// exection items to sum src over the specified axis into trgt
-    let execItemsForSumAxis memAllocator ax (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
-        // we need to swap axes so that the axes the summation is performed over comes last
+    /// reduce one axis by appling an operation such as sum, max, min, ...
+    let execItemsForReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        // we need to swap axes so that the axes the reduction is performed over comes last
         let nd = ArrayND.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
         let srcAdj = ArrayND.permuteAxes axOrder src
-
-        // initial value is zero for summation
-        let initial = 
-            match trgt.TypeName with
-            | t when t = TypeName.ofType<double> -> ConstDouble 0.0
-            | t when t = TypeName.ofType<single> -> ConstSingle 0.0f
-            | t when t = TypeName.ofType<int>    -> ConstInt 0
-            | t -> failwithf "unsupported type %A" t
-
         (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
-            execItemsForReduction tmpTrgt (NoArgEOpArgTmpl("AddEOp_t", false)) (ConstEOpArgTmpl initial) tmpSrc        
-        )
+            execItemsForReduction tmpTrgt false (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) tmpSrc)
 
-    /// exection items to sum all elements of src into the scalar trgt
-    let rec execItemsForSum memAllocator (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
-        if ArrayND.nDims trgt <> 0 then failwith "sum target must be scalar"
+    /// reduce one axis by appling an operation on indices such as argMax, argMin, ...
+    let execItemsForIdxReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        // we need to swap axes so that the axes the reduction is performed over comes last
+        let nd = ArrayND.nDims src
+        let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
+        let srcAdj = ArrayND.permuteAxes axOrder src
+        execItemsForReduction trgt true (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) srcAdj
 
+    /// exection items to reduce all elements of src into the scalar trgt
+    let rec execItemsForReduce memAllocator eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
+        if ArrayND.nDims trgt <> 0 then failwith "reduce target must be scalar"
         match src.Shape with
-        | [_] -> execItemsForSumAxis memAllocator 0 trgt src
+        | [_] -> execItemsForReduceAxis memAllocator 0 eOpName initial trgt src
         | [] -> copyExecItems trgt src
         | srcShp ->
             // create temporary target
@@ -920,10 +964,10 @@ module CudaExecUnit =
             let tmpShp = srcShp.[0 .. nDims-2]
             let tmp = ArrayNDManikin.newC memAllocator src.TypeName tmpShp            
 
-            // sum over last axis, and then sum recursively over remaining axes
-            let sumLastExecItems = execItemsForSumAxis memAllocator (nDims-1) tmp src
-            let sumOtherExecItems = execItemsForSum memAllocator trgt tmp
-            sumLastExecItems @ sumOtherExecItems
+            // reduce over last axis, and then reduce recursively over remaining axes
+            let reduceLastExecItems = execItemsForReduceAxis memAllocator (nDims-1) eOpName initial tmp src
+            let reduceOtherExecItems = execItemsForReduce memAllocator eOpName initial trgt tmp
+            reduceLastExecItems @ reduceOtherExecItems
 
     /// returns the execution units for the specified op
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
@@ -954,6 +998,7 @@ module CudaExecUnit =
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
+            | MemZero _
             | MemConst _
             | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
             | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
@@ -973,6 +1018,8 @@ module CudaExecUnit =
             let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
             let cs = ConstSpec.ofValue value
             execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
+        | ULeafOp (Arange _) ->
+            execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CountingIEOp_t", true)) [] 
 
         // variable access
         | ULeafOp (Var vs) -> 
@@ -1010,8 +1057,14 @@ module CudaExecUnit =
         | UUnaryOp Not -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NotEOp_t", false)) (srcsDfltCh())
 
         // reductions
-        | UUnaryOp Sum -> execItemsForSum memAllocator (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (SumAxis ax) -> execItemsForSumAxis memAllocator ax (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp Sum -> execItemsForReduce memAllocator "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (ConstSpec.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (ConstSpec.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+
+        // index reductions
+        | UUnaryOp (ArgMaxAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMaxIROp_t" (ConstSpec.minValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ArgMinAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMinIROp_t" (ConstSpec.maxValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
 
         // tensor ops
         | UUnaryOp (Diag _) -> []
@@ -1251,6 +1304,25 @@ module CudaExecUnit =
 
         | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
         | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+
+        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UExtraOp (Gather idxArgs) -> 
+            let srcs = srcsDfltCh ()
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            execItemsForGather (dfltChTrgt()) srcs.[0] idxArgs
+
+        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UExtraOp (Scatter idxArgs) -> 
+            let trgt, srcs = dfltChTrgt(), srcsDfltCh()
+            // set target to zero
+            let zero = ConstSpec.zero trgt.DataType
+            let zeroItems = execItemsForElemwise trgt (ConstEOpArgTmpl zero) []
+            // scatter from src into target
+            let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
+                                                        | None   -> None)
+            let scatterItems = execItemsForScatter trgt srcs.[0] idxArgs
+            zeroItems @ scatterItems
 
         // extension
         | UNaryOp (ExtensionOp eop) -> 

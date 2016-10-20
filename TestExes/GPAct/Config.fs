@@ -62,8 +62,8 @@ module ConfigLoader =
         let nInput  = mb.Size "nInput"
         let nOutput = mb.Size "nOutput"
 
-        let input  = mb.Var "Input"  [nBatch; nInput]
-        let target = mb.Var "Target" [nBatch; nOutput]
+        let input  = mb.Var<single> "Input"  [nBatch; nInput]
+        let target = mb.Var<single> "Target" [nBatch; nOutput]
 
         // load config
         NInput <- (fun () -> nInput)

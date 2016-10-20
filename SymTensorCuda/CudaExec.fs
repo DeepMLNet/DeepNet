@@ -729,12 +729,13 @@ module CudaExprWorkspaceTypes =
 
                         let crashTraceFile = "CudaCrashTrace.txt"
                         use tw = File.CreateText crashTraceFile
+                        Trace.WithMessage <- true
                         Trace.dumpActiveTrace tw
                         printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = resDev.ToHost()
+                    let resHost = lazy (resDev.ToHost() :> IArrayNDT)
                     let msg = 
                         match previousCall with
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"

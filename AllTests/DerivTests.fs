@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -54,7 +55,6 @@ let ``ReplicateTo`` () =
     )
 
 
-
 let ``Max, min output`` (device: IDevice) =
     let a = Expr.var<single> "a" [SizeSpec.fix 2; SizeSpec.fix 2]
     let b = Expr.var<single> "b" [SizeSpec.fix 2; SizeSpec.fix 2]
@@ -93,3 +93,58 @@ let ``Max, min output on host`` () =
 let ``Max, min output on CUDA`` () =
     ``Max, min output`` DevCuda
 
+let ``Max reduction output`` (device: IDevice) =
+    let a = Expr.var<single> "a" [SizeSpec.fix 3; SizeSpec.fix 4]
+    let expr = Expr.maxAxis 0 a
+    let fn = Func.make<single> device.DefaultFactory expr |> arg1 a
+    let dexpr = Deriv.compute expr
+    let da = dexpr |> Deriv.ofVar a
+    let fda = Func.make<single> device.DefaultFactory da |> arg1 a
+    let rng = System.Random (123)
+    let av = rng.UniformArrayND (-1.0f, 1.0f) [3; 4] |> post device
+    let res = fn av 
+    let dav = fda av 
+    printfn "a=\n%A" av
+    printfn "res=\n%A" res
+    printfn "da=\n%A" dav
+
+[<Fact>]
+let ``Max reduction output on host`` () =
+    ``Max reduction output`` DevHost
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Max reduction output on CUDA`` () =
+    ``Max reduction output`` DevCuda
+
+[<Fact>]
+let ``Gather`` () =
+    let a = Expr.var<float> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+    let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+
+    let expr = a |> Expr.gather [Some i0; Some i1]
+
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
+
+
+[<Fact>]
+let ``Scatter`` () =
+    let a = Expr.var<float> "a" [SizeSpec.fix 4; SizeSpec.fix 3]
+    let i0 = Expr.var<int> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let i1 = Expr.var<int> "i1" [SizeSpec.broadcastable; SizeSpec.fix 3]
+    let trgtShp = [SizeSpec.fix 3; SizeSpec.fix 4]
+
+    let expr = a |> Expr.scatter [Some i0; Some i1] trgtShp
+
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4; 3] |> ArrayND.float
+    let i0v = [1; 2; 2] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let i1v = [0; 0; 1] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr

@@ -31,8 +31,8 @@ let main argv =
               LossMeasure = LossLayer.CrossEntropy }
 
     // define variables
-    let input  : ExprT = mb.Var "Input"  [nBatch; nInput]
-    let target : ExprT = mb.Var "Target" [nBatch; nClass]
+    let input  : ExprT = mb.Var<single> "Input"  [nBatch; nInput]
+    let target : ExprT = mb.Var<single> "Target" [nBatch; nClass]
 
     // instantiate model
     mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]

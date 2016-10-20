@@ -110,8 +110,8 @@ module ModelContextTypes =
 
         /// substitutes this ParameterSet into the given expression
         member this.Subst expr =
-            (expr, pars)
-            ||> List.fold (fun expr par -> Expr.subst (Expr.makeVar par) this.[par] expr)
+            let parSubst = pars |> List.map (fun par -> Expr.makeVar par, this.[par]) |> Map.ofList
+            expr |> Expr.subst parSubst
 
         /// pretty string
         member this.Pretty =
@@ -189,7 +189,8 @@ module ModelContextTypes =
                 printfn "%-50s %A" (par.Name + ": ") value.Shape
 
 
-    /// A model builder.
+    /// A model builder. 
+    /// The type 'T specifies the data type of the model parameters.
     [<StructuredFormatDisplay("{PrettyString}")>]
     type ModelBuilder<'T when 'T: equality and 'T: comparison> 
                                             (context:       string,
@@ -241,8 +242,9 @@ module ModelContextTypes =
                 subMC
 
         /// Creates and returns a model variable.
-        member this.Var (name: string) (shape: ShapeSpecT) : ExprT =
-            let v = Expr.var<'T> (context + "." + name) shape
+        [<RequiresExplicitTypeArguments>]
+        member this.Var<'V> (name: string) (shape: ShapeSpecT) : ExprT =
+            let v = Expr.var<'V> (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v)
             v
 
@@ -303,7 +305,7 @@ module ModelContextTypes =
             match size with
             | Base (Sym sym) -> 
                 match symSizeEnv |> Map.tryFind sym with
-                | Some (Base (Fixed value)) -> value
+                | Some (Base (Fixed _) as value) -> SizeSpec.eval value
                 | _ -> failwith "size symbol is unknown or does not a have a numeric value"
             | _ -> failwith "need a size symbol to set size"
 
@@ -439,9 +441,20 @@ module ModelContextTypes =
 
         /// substitutes the ParameterStorage into the given expression
         member this.Use expr =
-            (expr, parameters)
-            ||> Map.fold (fun expr vs pi ->
-                expr |> Expr.subst pi.Expr parameterSet.[vs])
+            let parSubst = 
+                parameters 
+                |> Map.toSeq 
+                |> Seq.map (fun (vs, pi) -> pi.Expr, parameterSet.[vs])
+                |> Map.ofSeq
+            expr
+            |> Expr.subst parSubst
+            |> Expr.substSymSizes compileEnv.SymSizes
+
+        /// inserts the ParameterStorage into the given variable environment
+        member this.Use varEnv =
+            varEnv
+            |> parameterStorage.Use 
+            |> VarEnv.substSymSizes compileEnv.SymSizes
 
         /// the device this model instance is stored on
         member this.Device = device
@@ -450,11 +463,9 @@ module ModelContextTypes =
         member this.ParameterSet = parameterSet
 
         /// symbolic flat parameter vector
-        member this.ParameterVector = this.ParameterSet.Flat
-
-        /// Derivative of "expr" w.r.t. flat vector containing all model parameters
-        member this.WrtParameters expr =
-            this.ParameterSet.WrtFlat expr
+        member this.ParameterVector = 
+            this.ParameterSet.Flat
+            |> Expr.substSymSizes compileEnv.SymSizes
 
         /// Parameter values.
         member this.ParameterStorage = parameterStorage
@@ -517,30 +528,42 @@ module ModelContextTypes =
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT) =
+        member this.Func<'T0> (resultLoc: ArrayLocT, expr0: ExprT) =
             let expr0 = this.Use expr0
-            Func.make<'T> (compileSpec resultLoc) expr0 << useParStorage
+            Func.make<'T0> (compileSpec resultLoc) expr0 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT) = 
+            this.Func<'T> (resultLoc, expr0)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+        member this.Func<'T0, 'T1> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
-            Func.make2<'T, 'T> (compileSpec resultLoc) expr0 expr1 << useParStorage
+            Func.make2<'T0, 'T1> (compileSpec resultLoc) expr0 expr1 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+            this.Func<'T, 'T> (resultLoc, expr0, expr1)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func<'T0, 'T1, 'T2> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
-            Func.make3<'T, 'T, 'T> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+            Func.make3<'T0, 'T1, 'T2> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+            this.Func<'T, 'T, 'T> (resultLoc, expr0, expr1, expr2)
 
         member this.Func (exprs: ExprT list) =
             this.Func (device.DefaultLoc, exprs)
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
+        member this.Func<'T0> (expr0: ExprT) =
+            this.Func<'T0> (device.DefaultLoc, expr0)
+
         member this.Func (expr0: ExprT) =
             this.Func (device.DefaultLoc, expr0)
 
@@ -549,8 +572,13 @@ module ModelContextTypes =
         member this.Func (expr0: ExprT, expr1: ExprT) =
             this.Func (device.DefaultLoc, expr0, expr1)
 
+        member this.Func<'T0, 'T1> (expr0: ExprT, expr1: ExprT) =
+            this.Func<'T0, 'T1> (device.DefaultLoc, expr0, expr1)
+
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
         member this.Func (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             this.Func (device.DefaultLoc, expr0, expr1, expr2)
         
+        member this.Func<'T0, 'T1, 'T2> (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+            this.Func<'T0, 'T1, 'T2> (device.DefaultLoc, expr0, expr1, expr2)

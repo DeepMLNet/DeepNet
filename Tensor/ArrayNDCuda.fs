@@ -304,9 +304,9 @@ module ArrayNDCuda =
         Activator.CreateInstance (aryType, [|box layout|]) :?> IArrayNDCudaT
 
     /// Creates a IArrayNDT for the given pointer, allocation size in bytes, type and layout.
-    let fromPtrAndType (ptr: CUdeviceptr) typ (layout: ArrayNDLayoutT) = 
+    let fromPtrAndType (ptr: CUdeviceptr) (sizeInBytes: SizeT) typ (layout: ArrayNDLayoutT) = 
         let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
-        let devVar = Activator.CreateInstance (devVarType, [|box ptr|])
+        let devVar = Activator.CreateInstance (devVarType, [|box ptr; box sizeInBytes|])
 
         let devStorType = typedefof<CudaStorageT<_>>.MakeGenericType [|typ|]
         let devStor = Activator.CreateInstance (devStorType, [|devVar|])

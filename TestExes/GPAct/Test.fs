@@ -84,8 +84,8 @@ module TestFunctions =
         let mgp = 
             GPActivation.pars (mb.Module "MGP") {GPActivation.defaultHyperPars with
                                                   NGPs=nGPs; NTrnSmpls=nTrnSmpls}
-        let inp_mean = mb.Var "inp_mean"  [nSmpls; nGPs]
-        let inp_cov  = mb.Var "inp_cov"   [nSmpls; nGPs; nGPs]
+        let inp_mean = mb.Var<single> "inp_mean"  [nSmpls; nGPs]
+        let inp_cov  = mb.Var<single> "inp_cov"   [nSmpls; nGPs; nGPs]
         mb.SetSize nGPs      ngps
         mb.SetSize nTrnSmpls ntraining
         let mi = mb.Instantiate device
@@ -223,9 +223,9 @@ module TestFunctions =
                 {WeightTransform = {WeightTransform.defaultHyperPars with NInput=nInputs; NOutput=nGPs}
                  Activation      = {GPActivation.defaultHyperPars with NGPs=nGPs; NTrnSmpls=nTrnSmpls}}
 
-        let inp_mean = mb.Var "inp_mean"  [nSmpls; nInputs]
-        let pred     = mb.Var "Pred"      [nSmpls; nGPs]
-        let target   = mb.Var "Target"    [nSmpls; nGPs]
+        let inp_mean = mb.Var<single> "inp_mean"  [nSmpls; nInputs]
+        let pred     = mb.Var<single> "Pred"      [nSmpls; nGPs]
+        let target   = mb.Var<single> "Target"    [nSmpls; nGPs]
 
 
         mb.SetSize  nGPs         ngps
