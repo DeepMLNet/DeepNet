@@ -165,16 +165,16 @@ type GRUTrain (VocSize:      int,
     let generateFn = mi.Func<single, int> (genFinal, genWords) |> arg2 initial firstWord
     let processFn  = mi.Func<single>      (final)              |> arg2 initial words                       
 
-    member this.Train (dataset: TrnValTst<WordSeq>) trainCfg =
+    member this.Train (dataset: TrnValTst<WordSeq>) dropStateProb trainCfg =
+        let rng = System.Random 1
         let smplVarEnv (stateOpt: ArrayNDT<single> option) (smpl: WordSeq) =
             let nBatch = smpl.Words.Shape.[0]
+            let dropState = rng.NextDouble() < dropStateProb 
             let state =
                 match stateOpt with
-                | Some state -> 
-                    if state.Shape.[0] > nBatch then state.[0 .. nBatch-1, *]
-                    else state
-                | None -> 
-                    ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
+                | Some state when state.Shape.[0] = nBatch && not dropState -> state
+                | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1, *]
+                | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
             VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
 
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
@@ -184,13 +184,15 @@ type GRUTrain (VocSize:      int,
     member this.Generate seed (startWords: WordSeq) =
         // sw [smpl, step]
         let sw = startWords.Words
-        let nBatch, nStart = sw.Shape.[0], sw.Shape.[1]
+        let nBatch, nStart = sw.Shape.[0], sw.Shape.[1]        
 
-        let rng = System.Random seed
-
-//        let initial = rng.UniformArrayND (-1.0f, 1.0f) [nBatch; EmbeddingDim]
-//                      |> ArrayNDCuda.toDev :> ArrayNDT<_>
-        let initial = ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+        let initial = 
+            if seed = 0 then 
+                ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+            else
+                let rng = System.Random seed 
+                rng.UniformArrayND (-0.1f, 0.1f) [nBatch; EmbeddingDim]
+                |> ArrayNDCuda.toDev :> ArrayNDT<_>
         let primed = 
             if nStart > 1 then processFn initial sw.[*, 0 .. nStart-2]
             else initial

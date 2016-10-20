@@ -231,7 +231,8 @@ module CudaExecEnv =
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
-        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) typ manikin.Layout
+        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) (devMem.SizeInBytes - SizeT offset) 
+                                   typ manikin.Layout
 
     /// gets a CudaTexObject
     let getTextureObj (env: CudaExecEnvT) (tex: TextureObjectT) =

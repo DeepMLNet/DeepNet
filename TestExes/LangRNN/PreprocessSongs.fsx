@@ -50,6 +50,7 @@ let usableWords = vocabulary |> List.map fst |> Set.ofList
 
 let skipUnknownLine = true
 
+let mutable lastLine = ""
 let mutable line = ""
 let mutable hasUnknown = false
 for word in words do   
@@ -58,7 +59,9 @@ for word in words do
         else hasUnknown <- true; "###"
     if word = ">" || word = "---" || word = "===" then 
         if not (skipUnknownLine && hasUnknown) then
-            outfile.WriteLine line
+            if lastLine <> line then
+                outfile.WriteLine line
+            lastLine <- line
         line <- ""
         hasUnknown <- false
     if word = "---" || word = "===" then 

@@ -17,6 +17,8 @@ type WordSeq = {
     Words:  ArrayNDT<int>
 }
 
+exception UnknownWord of string
+
 type WordData (dataPath:      string,
                vocSizeLimit:  int option,
                stepsPerSmpl:  int,
@@ -50,7 +52,7 @@ type WordData (dataPath:      string,
             match idForWord |> Map.tryFind word with
             | Some id -> id
             | None when vocSizeLimit.IsSome -> nWords
-            | None -> failwithf "unknown word %s" word)
+            | None -> raise (UnknownWord word))
     let detokenize tokens =
         tokens |> List.map (fun id -> wordForId.[id])
     let vocSize = 
@@ -70,7 +72,7 @@ type WordData (dataPath:      string,
         |> fun b -> printfn "Using %d samples with %d steps per sample." b.Length b.Head.Length; b
         |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
         |> Dataset.FromSamples
-        |> TrnValTst.Of
+        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.95, valRatio=0.05, tstRatio=0.0)
         |> TrnValTst.ToCuda
 
     do printfn "%A" dataset
@@ -83,7 +85,7 @@ type WordData (dataPath:      string,
         Seq.init maxSamples.Value (fun _ -> 
             {WordSeq.Words = rng.Seq (0, vocSize-1) |> ArrayNDHost.ofSeqWithShape [stepsPerSmpl]})
         |> Dataset.FromSamples
-        |> TrnValTst.Of
+        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.95, valRatio=0.05, tstRatio=0.0)
         |> TrnValTst.ToCuda
 
     member this.Tokenize words = tokenize words
@@ -92,6 +94,11 @@ type WordData (dataPath:      string,
         tokens 
         |> List.ofSeq 
         |> this.Detokenize 
+        |> List.map (function
+                     | ">" -> "\n>"
+                     | "===" -> "\n==="
+                     | "---" -> "\n---"
+                     | w -> w)
         |> String.concat " "
 
     member this.Words = words
