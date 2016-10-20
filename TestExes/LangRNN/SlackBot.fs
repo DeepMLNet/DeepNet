@@ -58,7 +58,7 @@ type SlackBot (data:      WordData,
 
                     let msg = context.Message.Text
                     let msg = Regex.Replace(msg, @"<@.+>", "").Trim()
-                    //printfn "Got message: %s" msg
+                    //printfn "Got message: %s" msg_
 
                     // extract seed if specified
                     let words = msg.Split(' ') |> List.ofArray
