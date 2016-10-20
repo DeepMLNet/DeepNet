@@ -43,7 +43,7 @@ type SlackBot (data:      WordData,
         let line = Regex.Replace(line, @"\n", " > ")
         let line = Regex.Replace(line, @"  ", " ")
         let line = line.Trim()
-        "---" :: ">" :: (line.Split(' ') |> List.ofArray)
+        ">" :: (line.Split(' ') |> List.ofArray)
 
     do bot.Responders.Add (
         {
@@ -58,7 +58,7 @@ type SlackBot (data:      WordData,
 
                     let msg = context.Message.Text
                     let msg = Regex.Replace(msg, @"<@.+>", "").Trim()
-                    printfn "Got message: %s" msg
+                    //printfn "Got message: %s" msg
 
                     // extract seed if specified
                     let words = msg.Split(' ') |> List.ofArray
@@ -68,7 +68,7 @@ type SlackBot (data:      WordData,
                         | _ -> 0, words
 
                     // preprocess and split into words
-                    let line = (words @ [">"]) |> String.concat " "
+                    let line = words |> String.concat " "
                     let words = preprocess line
 
                     try
@@ -78,7 +78,6 @@ type SlackBot (data:      WordData,
                             |> data.Tokenize 
                             |> ArrayNDHost.ofList
                             |> ArrayND.reshape [1; -1]
-                            //|> ArrayND.replicate 1 10
                             |> ArrayNDCuda.toDev
 
                         // generate and detokenize
@@ -90,7 +89,7 @@ type SlackBot (data:      WordData,
                         let mutable pars = 0
                         let mutable lines = 0 
                         let response = 
-                            genWords
+                            words @ genWords
                             |> List.takeWhile (function 
                                                | ">" -> lines <- lines + 1; lines < maxLines
                                                | "---" -> pars <- pars + 1; pars < maxPars
@@ -100,7 +99,6 @@ type SlackBot (data:      WordData,
                                          | "---" -> "\n "
                                          | w -> w)
                             |> String.concat " "
-                            |> fun r -> if r.StartsWith("\n>") then r else "\n>" + r
 
                         new BotMessage(Text=sprintf "%s\n`%d`" response seed)
                     with UnknownWord uw ->

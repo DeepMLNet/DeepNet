@@ -194,8 +194,9 @@ type GRUTrain (VocSize:      int,
                 rng.UniformArrayND (-0.1f, 0.1f) [nBatch; EmbeddingDim]
                 |> ArrayNDCuda.toDev :> ArrayNDT<_>
         let primed = 
-            if nStart > 1 then processFn initial sw.[*, 0 .. nStart-2]
-            else initial
+            // last word of array is not actually processed
+            if nStart > 1 then processFn initial sw.[*, 0 .. nStart-1]
+            else initial        
 
         let final, gen = generateFn primed sw.[*, nStart-1]
         {Words=gen}
