@@ -52,11 +52,18 @@ module Main =
 
         // build model
         let cfgPath = results.GetResult <@Config_Path@>
-        let mi, predFn, trainFn = ConfigLoader.buildModel cfgPath
-   
-        // start training
-        let result = trainFn ()
-
+        let mi, predFn, trainFn, errorPrint = ConfigLoader.buildModel cfgPath
+        
+        let result = 
+            match errorPrint with 
+            | Some printFn -> 
+                printFn ()
+                // start training
+                let result = trainFn ()
+                printFn()
+                result
+            | None -> 
+                trainFn ()
         // save train results
         result.Save "result.json"
         

@@ -25,6 +25,8 @@ module ConfigTypes =
     type FeedForwardModel = {
         Layers:     Layer list
         Loss:       LossLayer.Measures
+        L1Weight:   single
+        L2Weight:   single
     }
 
     type CsvDataCfg = {
@@ -107,9 +109,24 @@ module ConfigLoader =
                     meanOnlyGPLayers <- meanOnlyGPLayers |> Map.add name pars
                     MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean
                 )
-
+        let l1Regularization, l2Regularization =
+            ((Expr.zeroOfSameType input, Expr.zeroOfSameType input), List.indexed cfg.Model.Layers)
+            ||> Seq.fold (fun (l1Term, l2Term) (layerIdx, layer) ->
+             match layer with
+                | NeuralLayer hp ->
+                    let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
+                    l1Term + (NeuralLayer.regularizationTerm pars 1), l2Term + (NeuralLayer.regularizationTerm pars 2)
+                | GPActivationLayer hp ->
+                    let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
+                    l1Term + (GPActivationLayer.regularizationTerm pars 1), l2Term + (GPActivationLayer.regularizationTerm pars 2)
+                | MeanOnlyGPLayer hp ->
+                    let pars = MeanOnlyGPLayer.pars (mb.Module (sprintf "MeanOnlyGPLayer%d" layerIdx)) hp
+                    l1Term + (MeanOnlyGPLayer.regularizationTerm pars 1), l2Term + (MeanOnlyGPLayer.regularizationTerm pars  2)
+                )
         // build loss
-        let loss = LossLayer.loss cfg.Model.Loss predMean target
+        let loss = (LossLayer.loss cfg.Model.Loss predMean target) +
+                   (cfg.Model.L1Weight / 2.0f) * l1Regularization + 
+                   (cfg.Model.L2Weight / 2.0f) * l2Regularization
 
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 
@@ -182,12 +199,18 @@ module ConfigLoader =
                 if not plotInProgress then
                     plotInProgress <- true
                     Async.Start plots
-
+        
+        let errorPrint = 
+            if (cfg.Model.Loss = LossLayer.CrossEntropy) || (cfg.Model.Loss = LossLayer.BinaryCrossEntropy) then 
+                let printFn () = ClassificationError.printErrors cfg.Training.BatchSize dataset predFn
+                Some printFn
+            else
+                None
         // build training function
         let trainCfg = {cfg.Training with LossRecordFunc = lossRecordFn}        
         let trainFn () = 
             Train.train trainable dataset trainCfg
 
-        mi, predFn, trainFn
+        mi, predFn, trainFn, errorPrint
 
 

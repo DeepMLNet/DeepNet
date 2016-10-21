@@ -143,7 +143,12 @@ module NeuralLayer =
             exp activation / (Expr.sumKeepingAxis 1 (exp activation))
         | Identity -> activation
 
-
+    let regularizationTerm pars (q:int) =
+        let weights = 
+            if pars.HyperPars.WeightsTrainable then pars.Weights 
+            else Expr.zerosLike pars.Weights
+        let regTerm = Regularization.lqRegularization weights q
+        regTerm  
 /// A neural network (multi-layer perceptron) of multiple 
 /// NeuralLayers and one LossLayer on top.
 module MLP =

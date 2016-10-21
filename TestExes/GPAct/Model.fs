@@ -67,8 +67,11 @@ module GPActivation =
 
     /// Hyper-parameters
     type HyperPars = {
-        /// number of GPs, equals number of outputs and inputs
+        /// number of GPs <= number of outputs and inputs
         NGPs:                   SizeSpecT
+
+        ///numberOfOutputs
+//        NOutput:                SizeSpecT
 
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
@@ -91,8 +94,9 @@ module GPActivation =
     /// default hyper-parameters
     let defaultHyperPars = {
         NGPs                  = SizeSpec.fix 0
+//        NOutput               = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
-        CutOutsideRange      = false
+        CutOutsideRange       = false
         LengthscalesTrainable = true
         TrnXTrainable         = true
         TrnTTrainable         = true
@@ -245,34 +249,38 @@ module GPActivation =
         // mu:    input mean        [smpl, gp]
         // Sigma: input covariance  [smpl, gp1, gp2]
         let nSmpls    = (Expr.shapeOf mu).[0]
-        let nGps      = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
-
+        
+        let nGps      = pars.HyperPars.NGPs
+        let nOutput   = nGps //pars.HyperPars.NOutput
         // check inputs
         let mu    = mu    |> Expr.checkFinite "mu"
         let sigma = sigma |> Expr.checkFinite "sigma"
 
         // check parameters and gate gradients
         let lengthscales = 
-            pars.Lengthscales 
+            pars.Lengthscales
             |> gate pars.HyperPars.LengthscalesTrainable
             |> Expr.checkFinite "Lengthscales"
+//            |> Expr.replicateTo 0 nOutput 
         let trnX = 
             pars.TrnX
             |> gate pars.HyperPars.TrnXTrainable
             |> Expr.checkFinite "TrnX"
+//            |> Expr.replicateTo 0 nOutput
         // trnT [gp, trn_smpl]
         let trnT = 
             pars.TrnT
             |> gate pars.HyperPars.TrnTTrainable
             |> Expr.checkFinite "TrnT"
+//            |> Expr.replicateTo 0 nOutput
         let trnSigma = 
             pars.TrnSigma
             |> gate pars.HyperPars.TrnSigmaTrainable
             |> Expr.checkFinite "TrnSigma"
-           
+//            |> Expr.replicateTo 0 nOutput
         // Kk [gp, trn_smpl1, trn_smpl2]
-        let Kk = Kk nGps nTrnSmpls lengthscales trnX trnSigma
+        let Kk = Kk nOutput nTrnSmpls lengthscales trnX trnSigma
         let Kk = Kk |> Expr.checkFinite "Kk"
         //let Kk = Kk |> Expr.dump "Kk"
         
@@ -281,7 +289,7 @@ module GPActivation =
         //let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
+        let lk = lk nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
         //let lk = lk |> Expr.dump "lk"
         
@@ -297,10 +305,10 @@ module GPActivation =
         //let predMean = pred_mean |> Expr.dump "pred_mean"
         let predMean = 
             if pars.HyperPars.CutOutsideRange then
-                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
 
                 let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
                 Expr.ifThenElse (mu >>>> xLast) tLast predMean
@@ -308,22 +316,22 @@ module GPActivation =
                 predMean
 
         // L[smpl, gp, trn_smpl1, trn_smpl2]
-        let L = L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
+        let L = L nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
 
         // betaBetaT = beta .* beta.T
         // [gp, trn_smpl, 1] .* [gp, 1, trn_smpl] ==> [gp, trn_smpl, trn_smpl]
         // is equivalent to: [gp, trn_smpl, 1*] * [gp, 1*, trn_smpl]
         let betaBetaT = 
-            Expr.reshape [nGps; nTrnSmpls; SizeSpec.broadcastable] beta *
-            Expr.reshape [nGps; SizeSpec.broadcastable; nTrnSmpls] beta
+            Expr.reshape [nOutput; nTrnSmpls; SizeSpec.broadcastable] beta *
+            Expr.reshape [nOutput; SizeSpec.broadcastable; nTrnSmpls] beta
         //let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
 
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
         // is equivalent to: [smpl, gp, trn_smpl, 1*] * [smpl, gp, 1*, trn_smpl]
         let lkLkT =
-            Expr.reshape [nSmpls; nGps; nTrnSmpls; SizeSpec.broadcastable] lk *
-            Expr.reshape [nSmpls; nGps; SizeSpec.broadcastable; nTrnSmpls] lk
+            Expr.reshape [nSmpls; nOutput; nTrnSmpls; SizeSpec.broadcastable] lk *
+            Expr.reshape [nSmpls; nOutput; SizeSpec.broadcastable; nTrnSmpls] lk
         //let lkLkT = lkLkT |> Expr.dump "lkLkT"
 
         // Tr( (Kk_inv - betaBetaT) .*  L )
@@ -343,7 +351,7 @@ module GPActivation =
 
         // T[smpl, gp1, gp2, trn_smpl1, trn_smpl2]
         //let T = Told nSmpls nGps nTrnSmpls mu sigma !pars.Lengthscales !pars.TrnX
-        let T = Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX
+        let T = Tnew nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
         //let T = T |> Expr.dump "T"
 
         // calculate betaTbeta = beta.T .* T .* beta
@@ -355,20 +363,20 @@ module GPActivation =
         let bc = SizeSpec.broadcastable
         let one = SizeSpec.one
         let betaTbeta = 
-            (Expr.reshape [bc; nGps; bc; one; nTrnSmpls] beta) .* T .* 
-            (Expr.reshape [bc; bc; nGps; nTrnSmpls; one] beta)
+            (Expr.reshape [bc; nOutput; bc; one; nTrnSmpls] beta) .* T .* 
+            (Expr.reshape [bc; bc; nOutput; nTrnSmpls; one] beta)
 
         // [smpl, gp1, gp2, 1, 1] ==> [smpl, gp1, gp2]
         let betaTbeta =
-            betaTbeta |> Expr.reshape [nSmpls; nGps; nGps]   
+            betaTbeta |> Expr.reshape [nSmpls; nOutput; nOutput]   
         //let betaTbeta = betaTbeta |> Expr.dump "betaTbeta"     
 
         // calculate m_k * m_l
         // [smpl, gp1, 1*] * [smpl, 1*, gp2]
         // ==> [smpl, gp1, gp2]
         let mkml = 
-            (Expr.reshape [nSmpls; nGps; bc] predMean) *
-            (Expr.reshape [nSmpls; bc; nGps] predMean)
+            (Expr.reshape [nSmpls; nOutput; bc] predMean) *
+            (Expr.reshape [nSmpls; bc; nOutput] predMean)
         //let mkml = mkml |> Expr.dump "mkml"
 
         /// calculate pred_cov_without_var =  beta.T .* T .* beta - m_k * m_l
@@ -376,7 +384,7 @@ module GPActivation =
         //let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
         // replace diagonal in pred_cov_without_var by pred_var
-        let predCov = setCovDiag nSmpls nGps predCovWithoutVar predVar
+        let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         predMean, predCov
@@ -439,7 +447,12 @@ module WeightTransform =
                         (Expr.reshape [SizeSpec.broadcastable; nInput; nGps] pars.Weights.T)
         newMu, newSigma
 
-
+    let regularizationTerm pars (q:int) =
+        let weights = 
+            if pars.HyperPars.Trainable then pars.Weights 
+            else Expr.zerosLike pars.Weights
+        let regTerm = Regularization.lqRegularization weights q
+        regTerm  
 /// Layer that propagates its input normal distribution through a weight matrix and activation
 /// functions described by GPs.
 module GPActivationLayer = 
@@ -472,6 +485,9 @@ module GPActivationLayer =
             HyperPars = hp
         }
 
+    let regularizationTerm pars (q:int) =
+        WeightTransform.regularizationTerm pars.WeightTransform q
+
     /// Propagates the input normal distribution through a weight matrix and activation
     /// functions described by GPs.
     let pred (pars: Pars) (meanIn, covIn) = 
@@ -486,7 +502,11 @@ module MeanOnlyGPLayer =
     type HyperPars = {
         /// number of Inputs
         NInput:                SizeSpecT
-        /// number of GPs, equals number of outputs
+        
+        /// number od Outputs
+        NOutput:                SizeSpecT
+        
+        /// number of GPs <= number of outputs
         NGPs:                   SizeSpecT
 
         /// number of training points for each GP
@@ -514,6 +534,7 @@ module MeanOnlyGPLayer =
     /// default hyper-parameters
     let defaultHyperPars = {
         NInput                = SizeSpec.fix 0
+        NOutput               = SizeSpec.fix 0
         NGPs                  = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
         CutOutsideRange       = false
@@ -569,43 +590,55 @@ module MeanOnlyGPLayer =
     let pred pars input =
         
         let nSmpls    = (Expr.shapeOf input).[0]
-        let nGps      = pars.HyperPars.NGPs
+//        let nGps      = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
+        let nOutput = pars.HyperPars.NOutput
 
         let lengthscales = 
-            pars.Lengthscales 
+            pars.Lengthscales
+            |> Expr.replicateTo 0 nOutput
             |> gate pars.HyperPars.LengthscalesTrainable
             |> Expr.checkFinite "Lengthscales"
         let trnX = 
             pars.TrnX
+            |> Expr.replicateTo 0 nOutput
             |> gate pars.HyperPars.TrnXTrainable
             |> Expr.checkFinite "TrnX"
         // trnT [gp, trn_smpl]
         let trnT = 
             pars.TrnT
+            |> Expr.replicateTo 0 nOutput
             |> gate pars.HyperPars.TrnTTrainable
             |> Expr.checkFinite "TrnT"
         let trnSigma = 
             pars.TrnSigma
+            |> Expr.replicateTo 0 nOutput
             |> gate pars.HyperPars.TrnSigmaTrainable
             |> Expr.checkFinite "TrnSigma"
         let input = Expr.checkFinite "Input" input
         let input = input .* pars.Weights.T + pars.Bias
-        let K = (covMat nGps nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma
+        let K = (covMat nOutput nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma
         let KInv = Expr.invert K
-        let KStarT = covMat nGps nSmpls nTrnSmpls lengthscales input.T trnX
+        let KStarT = covMat nOutput nSmpls nTrnSmpls lengthscales input.T trnX
         let meanTrnX = pars.HyperPars.MeanFunction trnX
         let meanInput = pars.HyperPars.MeanFunction input
         let mean = meanInput + (KStarT .* KInv .* (trnT - meanTrnX)).T
         let mean = 
             if pars.HyperPars.CutOutsideRange then
-                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
-                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps]|> Expr.broadcast [nSmpls;nGps]
+                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
 
                 let mean = Expr.ifThenElse (input <<<< xFirst) tFirst mean
                 Expr.ifThenElse (input >>>> xLast) tLast mean
             else
                 mean
         mean
+
+    let regularizationTerm pars (q:int) =
+        let weights = 
+            if pars.HyperPars.WeightsTrainable then pars.Weights 
+            else Expr.zerosLike pars.Weights
+        let regTerm = Regularization.lqRegularization weights q
+        regTerm 

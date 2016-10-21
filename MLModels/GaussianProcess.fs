@@ -40,7 +40,6 @@ module ExpectationPropagation =
         let mu = sigma |> Expr.diag |> Expr.zerosLike
         let vSite = mu 
         let tauSite = mu 
-        
         /// one update step of the EP algorithm
         let updateStep (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT)= 
             let cov = Expr.diag sigma
@@ -50,7 +49,6 @@ module ExpectationPropagation =
             let muMinus = covMinus * vMinus |> Expr.checkFinite "muMinus"
             let z = muMinus / (vu * sqrt(1.0f + covMinus / (vu ** 2.0f))) |> Expr.checkFinite "z"
             let normZ = standardNormalPDF z (Expr.zeroOfSameType z) (Expr.oneOfSameType z)
-//            let normZ = normalize z
             let normCdfZ  = standardNormalCDF z (Expr.zeroOfSameType z) (Expr.oneOfSameType z)
             let covHatf1 = (covMinus *** 2.0f * normZ) / (normCdfZ * (vu ** 2.0f + covMinus)) |> Expr.checkFinite "covHatf1"
             let covHatf2 = z + normZ /  normCdfZ |> Expr.checkFinite "covHatf2"
@@ -63,8 +61,51 @@ module ExpectationPropagation =
             let tauSite = tauSUpd 
             let vSite =  vSUpd
             let sigma = (Expr.invert sigma) + (Expr.diagMat tauSite) |> Expr.invert
+            let a = Expr.var<int> "a"
             let mu = sigma.*vSite
             sigma,mu,tauSite,vSite
+
+//        let updateStep (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT)= 
+//            let mutable sigma = sigma
+//            let mutable mu = mu
+//            let mutable tauSite = tauSite
+//            let mutable vSite = vSite
+//            let nElems = mu.NElems
+//            let nElemsInt = SizeSpec.eval  nElems
+//            let mutable i = 0
+//            
+//            while not (i.Equals (nElemsInt- 1)) do
+//                
+//                let covI = (Expr.diag sigma).[i]
+//                let muI = mu.[i]
+//                let tauSiteI = tauSite.[i]
+//                let vSiteI = vSite.[i]
+//
+//                let tauMinusI = (1.0f / covI) - tauSiteI |> Expr.checkFinite "tauMinus"
+//                let vMinusI = (1.0f/covI) * muI - vSiteI |> Expr.checkFinite "vMinus"
+//                let covMinusI = (1.0f/tauMinusI) |> Expr.checkFinite "covMinus"
+//                let muMinusI = covMinusI * vMinusI |> Expr.checkFinite "muMinus"
+//                let zI = muMinusI / (vu * sqrt(1.0f + covMinusI / (vu ** 2.0f))) |> Expr.checkFinite "z"
+//                let normZI = standardNormalPDF zI (Expr.zeroOfSameType zI) (Expr.oneOfSameType zI)
+//                let normCdfZI  = standardNormalCDF zI (Expr.zeroOfSameType zI) (Expr.oneOfSameType zI)
+//                let covHatf1 = (covMinusI *** 2.0f * normZI) / (normCdfZI * (vu ** 2.0f + covMinusI)) |> Expr.checkFinite "covHatf1"
+//                let covHatf2 = zI + normZI /  normCdfZI |> Expr.checkFinite "covHatf2"
+//                let covHatI = covMinusI - covHatf1 * covHatf2 |> Expr.checkFinite "covHat"
+//                let muHatI = muMinusI - (covMinusI*normZI) / (normCdfZI * vu * sqrt(1.0f + covMinusI / (vu ** 2.0f))) |> Expr.checkFinite "muHat"
+//                let deltaTau = (1.0f /covHatI) - tauMinusI - tauSiteI
+//                let tauSIUpd = tauSiteI + deltaTau
+//                let tauSIUpd = tauSIUpd |> Expr.checkFinite "tauSUpd"
+//                let vSIUpd = (1.0f / covHatI) * muHatI - vMinusI
+//                let vSIUpd = vSIUpd |> Expr.checkFinite "vSUpd"
+//                let eI = (Expr.identity<single> nElems).[*,i]
+//                tauSite <- tauSIUpd *eI
+//                vSite <- vSIUpd * eI
+//                let sI = sigma.[*,i] |> Expr.reshape [nElems;SizeSpec.fix 1]
+//                let sigmaUp = sigma - (1.0f / ((1.0f/deltaTau) + sigma.[i,i])) * (sI .* sI.T)
+//                sigma <- sigmaUp
+//                mu <- sigma.*vSite
+//                i <- i + 1
+//            sigma,mu,tauSite,vSite
 
         ///Update loop of the EP algorithm runs n iterations
         let optimize  n (sigma: ExprT, mu: ExprT,tauSite: ExprT,vSite: ExprT) = 

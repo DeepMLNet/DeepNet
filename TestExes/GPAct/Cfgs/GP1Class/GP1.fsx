@@ -39,17 +39,17 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHiddenUnits
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity
+                          TransferFunc  = NeuralLayer.SoftMax
                           WeightsTrainable = true
                           BiasTrainable = true}
                       ]
-             Loss   = LossLayer.MSE
+             Loss   = LossLayer.CrossEntropy
              L1Weight = 0.0f
              L2Weight = 1e-4f}
 
-    Data = {Path       = "../../../../Data/UCI/abalone.txt"
+    Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
-                           TargetCols       = [8]
+                           TargetCols       = [0]
                            IntTreatment     = CsvLoader.IntAsNumerical
                            CategoryEncoding = CsvLoader.OneHot
                            Missing          = CsvLoader.SkipRow}}        

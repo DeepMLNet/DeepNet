@@ -26,17 +26,18 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity
+                          TransferFunc  = NeuralLayer.SoftMax
                           WeightsTrainable = true
                           BiasTrainable = true}
                       ]
-             Loss   = LossLayer.MSE
+             Loss   = LossLayer.CrossEntropy
              L1Weight = 0.0f
-             L2Weight = 1e-4f}
+             L2Weight = 1e-4f
+             }
 
-    Data = {Path       = "../../../../Data/UCI/abalone.txt"
+    Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
-                           TargetCols       = [8]
+                           TargetCols       = [0]
                            IntTreatment     = CsvLoader.IntAsNumerical
                            CategoryEncoding = CsvLoader.OneHot
                            Missing          = CsvLoader.SkipRow}}        
@@ -44,7 +45,7 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 1000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 

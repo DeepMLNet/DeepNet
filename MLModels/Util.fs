@@ -57,4 +57,14 @@ module ActivationFunc =
         | SoftMax  -> softmax x
         | Identity -> id x
 
+module Regularization =
 
+
+    let lqRegularization (weights:ExprT) (q:int) =
+        Expr.sum (abs(weights) *** (single q))
+
+    let l1Regularization weights =
+        lqRegularization weights 1
+
+    let l2Regularization weights =
+        lqRegularization weights 1
