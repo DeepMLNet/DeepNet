@@ -53,27 +53,41 @@ module Program =
         let args = parser.ParseCommandLine argv
 
         // load data
-        let data = WordData (dataPath      = "../../Data/Songs.txt",
+//        let data = WordData (dataPath      = "../../Data/Songs.txt",
+//                             vocSizeLimit  = None,
+//                             stepsPerSmpl  = 25,
+//                             maxSamples    = args.TryGetResult <@ MaxSamples @>,
+//                             useChars      = false
+//                             )
+        let data = WordData (dataPath      = "../../Data/Gutenberg10000000.txt",
                              vocSizeLimit  = None,
-                             stepsPerSmpl  = 25,
-                             maxSamples    = args.TryGetResult <@ MaxSamples @>
+                             //stepsPerSmpl  = 25,
+                             stepsPerSmpl  = 50,
+                             maxSamples    = args.TryGetResult <@ MaxSamples @>,
+                             useChars      = true
                              )
 
+
+
         let model = GRUTrain (VocSize      = data.VocSize,
-                              EmbeddingDim = 128)
+                              EmbeddingDim = 181)
+                              //EmbeddingDim = 128)
 
         // train model or load checkpoint
         let trainCfg = {
             Train.defaultCfg with
                 MinIters           = args.TryGetResult <@ MaxIters @>
-                LearningRates      = [1e-3; 1e-4; 1e-5]
-                BatchSize          = 150
+                LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]
+                //BatchSize          = 150
+                BatchSize          = 200
                 BestOn             = Training
                 CheckpointDir      = Some "."
-                CheckpointInterval = Some 10
+                CheckpointInterval = Some 1
+                //CheckpointInterval = Some 10
                 PerformTraining    = args.Contains <@ Train @>
         }
-        model.Train data.Dataset 0.1 trainCfg |> ignore
+        model.Train data.Dataset 0.02 trainCfg |> ignore
+        //model.Train data.Dataset 0.1 trainCfg |> ignore
 
         // generate some word sequences
         match args.TryGetResult <@ Generate @> with
@@ -90,9 +104,12 @@ module Program =
                 startIdxs
                 |> Seq.map (fun startIdx ->
                     let mutable pos = startIdx
-                    while allWords.[pos+NStart-1] <> ">" ||
-                            (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
-                        pos <- pos + 1
+                    if not data.UseChars then
+                        while pos+2*NStart >= allWords.Length || 
+                              allWords.[pos+NStart-1] <> ">" ||
+                              (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
+                            pos <- pos + 1
+                            if pos >= allWords.Length then pos <- 0
                     allWords.[pos .. pos+2*NStart-1] |> List.ofArray
                     )
                 |> Seq.map data.Tokenize

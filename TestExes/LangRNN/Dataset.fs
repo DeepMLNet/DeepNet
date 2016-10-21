@@ -3,6 +3,7 @@
 
 open Basics
 open System.IO
+open System.Text
 
 open ArrayNDNS
 open SymTensor
@@ -22,15 +23,20 @@ exception UnknownWord of string
 type WordData (dataPath:      string,
                vocSizeLimit:  int option,
                stepsPerSmpl:  int,
-               maxSamples:    int option) =
+               maxSamples:    int option,
+               useChars:      bool) =
 
     do printfn "Reading text %s" dataPath
     let sentences = 
         seq {
-            for line in File.ReadLines dataPath do
-                let words = line.Split (' ') |> List.ofArray
-                let words = words |> List.filter (fun w -> w.Trim().Length > 0)
-                yield words
+            for line in File.ReadLines (dataPath, Encoding.GetEncoding 65001) do
+                if useChars then
+                    for ch in line do yield [string ch]
+                    yield ["\n"]
+                else
+                    let words = line.Split (' ') |> List.ofArray
+                    let words = words |> List.filter (fun w -> w.Trim().Length > 0)
+                    yield words
         } |> Seq.cache
     let words = List.concat sentences
     let wordFreqs =
@@ -42,7 +48,7 @@ type WordData (dataPath:      string,
         
     let freqsSorted = wordFreqs |> Map.toList |> List.sortByDescending snd 
     let freqsSorted = match vocSizeLimit with Some vs -> freqsSorted |> List.take (vs-1) | None -> freqsSorted
-    do printfn "Most common words:\n%A" (freqsSorted |> List.take 10)
+    do printfn "Most common words:\n%A" (freqsSorted |> List.truncate 60)
     let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
     let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
     let wordForId = match vocSizeLimit with Some vs -> wordForId |> Map.add (vs-1) "###"  | None -> wordForId
@@ -59,7 +65,7 @@ type WordData (dataPath:      string,
         match vocSizeLimit with
         | Some vs -> vs
         | None -> wordForId.Count
-    do printfn "Using vocabulary of size %d (limit: %A) with least common word %A." 
+    do printfn "Using vocab-/characbulary of size %d (limit: %A) with least common word %A." 
                vocSize vocSizeLimit (List.last freqsSorted)    
 
     let dataset = 
@@ -72,7 +78,7 @@ type WordData (dataPath:      string,
         |> fun b -> printfn "Using %d samples with %d steps per sample." b.Length b.Head.Length; b
         |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
         |> Dataset.FromSamples
-        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.95, valRatio=0.05, tstRatio=0.0)
+        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.90, valRatio=0.05, tstRatio=0.05)
         |> TrnValTst.ToCuda
 
     do printfn "%A" dataset
@@ -99,7 +105,7 @@ type WordData (dataPath:      string,
                      | "===" -> "\n==="
                      | "---" -> "\n---"
                      | w -> w)
-        |> String.concat " "
+        |> String.concat (if useChars then "" else " ")
 
     member this.Words = words
     member this.Lines = 
@@ -116,3 +122,6 @@ type WordData (dataPath:      string,
                 if word <> "===" && word <> "---" then
                     line <- line @ [word]            
         }
+
+    member this.UseChars = useChars
+
