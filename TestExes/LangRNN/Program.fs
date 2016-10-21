@@ -1,151 +1,34 @@
 ﻿namespace LangRNN
 
-open Basics
 open System.IO
+open Argu
 
+open Basics
 open ArrayNDNS
-open SymTensor
-open SymTensor.Compiler.Cuda
 open Models
-open Optimizers
-open Datasets
 
 
 module Program =
 
-
-//    let NWords      = 8000
-//    let NBatch      = 20
-//    let NSteps      = 35
-//    let NRecurrent  = 650
-    
-//    let NWords      = 100
-//    let NBatch      = 1000
-//    let NSteps      = 20
-//    let NRecurrent  = 100
-//    let NMaxSamples = 10000
-
-    //let NWords      = 300
-    let NBatch      = 1000
-    let NSteps      = 35
-    let NRecurrent  = 100
-    //let NMaxSamples = 1000
-
-
-//    let NWords      = 5
-//    let NSteps      = 7
-//    let NBatch      = 10
-//    let NMaxSamples = 10
-//    let NRecurrent  = 8
-
-
-
-
-    
-
-
-    let trainModel (dataset: TrnValTst<WordSeq>) =
-    //let trainModel (dataset: TrnValTst<WordSeqOneHot>) =
-        let mb = ModelBuilder<single> ("Lang")
-
-        let nBatch     = mb.Size "nBatch"
-        let nSteps     = mb.Size "nSteps"
-        let nWords     = mb.Size "nWords"
-        let nRecurrent = mb.Size "nRecurrent"
-
-        let input   = mb.Var<int>     "Input"   [nBatch; nSteps]
-        //let input   = mb.Var<single>  "Input"   [nBatch; nSteps; nWords]
-        let initial = mb.Var<single>  "Initial" [nBatch; nRecurrent]
-        //let target  = mb.Var<single>  "Target"  [nBatch; nSteps; nWords]
-        let target  = mb.Var<int>     "Target"  [nBatch; nSteps]
-        
-        let rnn = RecurrentLayer.pars (mb.Module "RNN") {
-            RecurrentLayer.defaultHyperPars with
-                NInput                  = nWords
-                NRecurrent              = nRecurrent
-                NOutput                 = nWords
-                RecurrentActivationFunc = Tanh
-                OutputActivationFunc    = SoftMax
-                OneHotIndexInput        = true
-                //OneHotIndexInput        = false 
-        }
-
-        // final [smpl, recUnit]
-        // pred  [smpl, step, word] - probability of word
-        let final, pred = (initial, input) ||> RecurrentLayer.pred rnn
-
-        // [smpl, step]
-        let targetProb = pred |> Expr.gather [None; None; Some target]            
-        let stepLoss = -log targetProb 
-        //let stepLoss = -target * log pred
-
-        let loss = Expr.mean stepLoss
-
-        let dLoss = Deriv.compute loss
-        let dLossDInitial = dLoss |> Deriv.ofVar rnn.InputWeights |> Expr.sum
-        //printfn "loss:\n%A" loss
-
-        let mi = mb.Instantiate (DevCuda, Map [nWords,     Dataset.VocSize
-                                               nRecurrent, NRecurrent])
-
-
-        let lossFn = mi.Func (loss) |> arg3 initial input target
-
-        let dLossDInitialFn = mi.Func (loss, dLossDInitial) |> arg3 initial input target
-
-        let smplVarEnv stateOpt (smpl: WordSeq) =
-        //let smplVarEnv stateOpt (smpl: WordSeqOneHot) =
-            let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
-            let state =
-                match stateOpt with
-                | Some state -> state :> IArrayNDT
-                | None -> zeroInitial :> IArrayNDT
-            let n = smpl.Words.Shape.[1]
-//            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2, *] :> IArrayNDT
-//                          target,  smpl.Words.[*, 1 .. n-1, *] :> IArrayNDT
-//                          initial, state]
-
-            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
-                          target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
-                          initial, state]
-                          
-        //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
-        let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
-
-        let trainCfg = {
-            Train.defaultCfg with
-                //MinIters  = Some 1000
-                //MaxIters  = Some 10
-                //MaxIters  = Some 1000
-                BatchSize = NBatch
-                //LearningRates = [1e-4; 1e-5]
-                CheckpointDir = Some "."
-                BestOn    = Training
-        }
-        Train.train trainable dataset trainCfg |> ignore
-
-//        for i=1 to 1 do
-//            printfn "Calculating loss:"
-//            let lossVal = lossFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
-//            printfn "loss=%f" (lossVal |> ArrayND.value)
-
-        //let tr = Trace.startSessionWithRng "trc" (Some 900, None) 
-
-//        for smpl in dataset.Trn.Batches NBatch do
-//            let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
-//            printfn "Calculating and dloss:"
-//            //let lossVal, dLossVal = dLossDInitialFn zeroInitial dataset.Trn.[0 .. NBatch-1].Words dataset.Trn.[0 .. NBatch-1].Words
-//            let lossVal, dLossVal = dLossDInitialFn zeroInitial smpl.Words smpl.Words
-//            printfn "loss=%f   dloss/dInitial=%f" (lossVal |> ArrayND.value) (dLossVal |> ArrayND.value)
-
-        //let ts = tr.End ()
-        //ts |> Trace.dumpToFile "trc.txt"
-
-
-
+    type CLIArgs = 
+        | Generate of int 
+        | Train
+        | Slack of string
+        | MaxSamples of int
+        | MaxIters of int
+        with
+        interface IArgParserTemplate with
+            member s.Usage =
+                match s with
+                | Generate _ -> "generates samples from trained model using the specified seed"
+                | Train -> "train model"
+                | Slack _ -> "connect as a slack bot using the specified key"
+                | MaxSamples _ -> "limits the number of training samples"
+                | MaxIters _ -> "limits the number of training epochs"
 
     [<EntryPoint>]
     let main argv = 
+        // debug
         Util.disableCrashDialog ()
         //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         //SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
@@ -156,18 +39,84 @@ module Program =
         //SymTensor.Compiler.Cuda.Debug.Timing <- true
         //SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
+        // required for SlackBot
+        Cuda.CudaSup.setContext ()
+
         // tests
         //verifyRNNGradientOneHot DevCuda
         //verifyRNNGradientIndexed DevCuda
         //TestUtils.compareTraces verifyRNNGradientIndexed false |> ignore
+        //exit 0
 
-        printfn "Loading dataset..."
-        let dataset = Dataset.load ()
-        printfn "Done."
+        let parser = ArgumentParser.Create<CLIArgs> (helpTextMessage="Language learning RNN",
+                                                     errorHandler = ProcessExiter())
+        let args = parser.ParseCommandLine argv
 
-        // train model
-        //let res = trainModel dataset
-        let res = GRUTrain.train dataset
+        // load data
+        let data = WordData (dataPath      = "../../Data/Songs.txt",
+                             vocSizeLimit  = None,
+                             stepsPerSmpl  = 25,
+                             maxSamples    = args.TryGetResult <@ MaxSamples @>
+                             )
+
+        let model = GRUTrain (VocSize      = data.VocSize,
+                              EmbeddingDim = 128)
+
+        // train model or load checkpoint
+        let trainCfg = {
+            Train.defaultCfg with
+                MinIters           = args.TryGetResult <@ MaxIters @>
+                LearningRates      = [1e-3; 1e-4; 1e-5]
+                BatchSize          = 150
+                BestOn             = Training
+                CheckpointDir      = Some "."
+                CheckpointInterval = Some 10
+                PerformTraining    = args.Contains <@ Train @>
+        }
+        model.Train data.Dataset 0.1 trainCfg |> ignore
+
+        // generate some word sequences
+        match args.TryGetResult <@ Generate @> with
+        | Some seed ->
+            printfn "Generating..."
+            let NStart  = 30
+            let NPred   = 20
+
+            let rng = System.Random seed
+            let allWords = data.Words |> Array.ofList
+            let startIdxs = rng.Seq (0, allWords.Length-100) |> Seq.take NPred
+        
+            let startWords = 
+                startIdxs
+                |> Seq.map (fun startIdx ->
+                    let mutable pos = startIdx
+                    while allWords.[pos+NStart-1] <> ">" ||
+                            (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
+                        pos <- pos + 1
+                    allWords.[pos .. pos+2*NStart-1] |> List.ofArray
+                    )
+                |> Seq.map data.Tokenize
+                |> List.ofSeq
+                |> ArrayNDHost.ofList2D
+
+            let genWords = model.Generate 1001 {Words=startWords |> ArrayNDCuda.toDev}
+            let genWords = genWords.Words |> ArrayNDHost.fetch
+            for s=0 to NPred-1 do
+                printfn "======================= Sample %d ====================================" s
+                printfn "====> prime:      \n%s" (data.ToStr startWords.[s, 0..NStart-1])
+                printfn "\n====> generated:\n> %s" (data.ToStr genWords.[s, *])
+                printfn "\n====> original: \n> %s" (data.ToStr startWords.[s, NStart..])
+                printfn ""
+        | None -> ()
+
+        // slack bot
+        match args.TryGetResult <@ Slack @> with
+        | Some slackKey -> 
+            let bot = SlackBot (data, model, slackKey)
+            printfn "\nSlackBot is connected. Press Ctrl+C to quit."
+            while true do
+               Async.Sleep 10000 |> Async.RunSynchronously
+        | None -> ()
 
         // shutdown
         Cuda.CudaSup.shutdown ()

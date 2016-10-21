@@ -74,9 +74,9 @@ module Deriv =
             let wrtElems = (shapeOf g).[1..] |> ShapeSpec.nElem
             g |> reshape [funElems; wrtElems]
 
-        /// logic op failure
-        let failLogic op =
-            failwithf "cannot calculate derivative of logic or comparison operation %A" op
+        // non differentiable op failures
+        let failLogic op = failwithf "cannot calculate derivative of logic or comparison operation %A" op
+        let failIndex op = failwithf "cannot calculate derivative of op %A that returns indices" op
 
         /// zero Jacobian
         let zeroJacobian wrt =
@@ -154,11 +154,16 @@ module Deriv =
             | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
                         |> collapse 
             | SumAxis ax -> 
-                let eeg = egExp 
-                let bca = eeg |> reshape (shapeOf eeg |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                let ael = (shapeOf a).[ax]
-                let bc = bca |> broadcast (shapeOf bca |> ShapeSpec.set (ax + 1) ael)
-                bc |> collapse 
+                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+            | MaxAxis ax 
+            | MinAxis ax ->
+                let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
+                let bcEgExp = egExp |> reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (zerosLike bcEgExp) |> collapse
+            | ArgMaxAxis ax
+            | ArgMinAxis ax -> failIndex op
+
             | StoreToVar _ -> eg 
 
             | NullifyJacobian -> Expr.zerosLike eg 

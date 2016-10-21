@@ -168,12 +168,12 @@ module Optimizer =
 
             let rec repMul cnt arg =
                 match cnt with
-                | 0 -> ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type)
+                | 0 -> ElemExpr.constSpec (ConstSpec.one elemExpr.Type)
                 | 1 -> arg
                 | _ when cnt > 0 ->
                     arg * repMul (cnt - 1) arg
                 | _ when cnt < 0 ->
-                    ElemExpr.constSpec (ConstSpec.oneOfType elemExpr.Type) / repMul (-cnt) arg
+                    ElemExpr.constSpec (ConstSpec.one elemExpr.Type) / repMul (-cnt) arg
                 | _ -> failwith "impossible"
 
             match p with

@@ -1152,7 +1152,8 @@ module ArrayND =
 
     /// positions of maximum values along given axis
     let argMaxAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
-        axisReduceTypeChange argMaxAxisReduc dim a
+        let f a = axisReduceTypeChange argMaxAxisReduc dim a
+        typedApplyTypeChange f f f f f a
 
     let inline private minImpl a =
         allElems a 
@@ -1181,7 +1182,8 @@ module ArrayND =
 
     /// positions of maximum values along given axis
     let argMinAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
-        axisReduceTypeChange argMinAxisReduc dim a
+        let f a = axisReduceTypeChange argMinAxisReduc dim a
+        typedApplyTypeChange f f f f f a
 
     /// true if all elements of the array are true
     let all a =

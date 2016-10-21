@@ -528,30 +528,42 @@ module ModelContextTypes =
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT) =
+        member this.Func<'T0> (resultLoc: ArrayLocT, expr0: ExprT) =
             let expr0 = this.Use expr0
-            Func.make<'T> (compileSpec resultLoc) expr0 << useParStorage
+            Func.make<'T0> (compileSpec resultLoc) expr0 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT) = 
+            this.Func<'T> (resultLoc, expr0)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+        member this.Func<'T0, 'T1> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
-            Func.make2<'T, 'T> (compileSpec resultLoc) expr0 expr1 << useParStorage
+            Func.make2<'T0, 'T1> (compileSpec resultLoc) expr0 expr1 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+            this.Func<'T, 'T> (resultLoc, expr0, expr1)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func<'T0, 'T1, 'T2> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
-            Func.make3<'T, 'T, 'T> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+            Func.make3<'T0, 'T1, 'T2> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
+
+        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+            this.Func<'T, 'T, 'T> (resultLoc, expr0, expr1, expr2)
 
         member this.Func (exprs: ExprT list) =
             this.Func (device.DefaultLoc, exprs)
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
+        member this.Func<'T0> (expr0: ExprT) =
+            this.Func<'T0> (device.DefaultLoc, expr0)
+
         member this.Func (expr0: ExprT) =
             this.Func (device.DefaultLoc, expr0)
 
@@ -560,8 +572,13 @@ module ModelContextTypes =
         member this.Func (expr0: ExprT, expr1: ExprT) =
             this.Func (device.DefaultLoc, expr0, expr1)
 
+        member this.Func<'T0, 'T1> (expr0: ExprT, expr1: ExprT) =
+            this.Func<'T0, 'T1> (device.DefaultLoc, expr0, expr1)
+
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
         member this.Func (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             this.Func (device.DefaultLoc, expr0, expr1, expr2)
         
+        member this.Func<'T0, 'T1, 'T2> (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+            this.Func<'T0, 'T1, 'T2> (device.DefaultLoc, expr0, expr1, expr2)

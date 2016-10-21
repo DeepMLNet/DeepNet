@@ -240,20 +240,35 @@ for dims = 0 to maxDims do
         for withIndexes in [true; false] do
             elementwiseWrapper ary withIndexes
 
-    let reduceWrapper () =
+    let reduceWrapper indexed =
+        let idxStr = if indexed then "Idx" else ""
         wrt "template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>" 
-        wrt "_dev void reduceTo%dD (const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {" dims
+        wrt "_dev void reduce%sTo%dD (const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {" idxStr dims
         elementwiseLoop "trgt" dims false (fun dims ->      
             let trgtPoses = ad |>> prn "pos%d" |> cw ", "           
             let srcPoses = Seq.append (ad |>> prn "pos%d") (Seq.singleton "reducePos") |> cw ", "
-            wrt "  typename TTarget::DataType v = initialOp();"
+            if indexed then
+                wrt "  typename TSrc::DataType v = initialOp();"
+            else
+                wrt "  typename TTarget::DataType v = initialOp();"
+            if indexed then
+                wrt "  idx_t p = 0;"
             wrt "  for (idx_t reducePos = 0; reducePos < src.shape(%d); reducePos++) {" dims
-            wrt "    v = op(v, src.element(%s));" srcPoses
+            if indexed then
+                wrt "    op(v, p, src.element(%s), reducePos);" srcPoses
+            else
+                wrt "    v = op(v, src.element(%s));" srcPoses
             wrt "  }"
-            wrt "  trgt.element(%s) = v;" trgtPoses)
+            if indexed then
+                wrt "  trgt.element(%s) = p;" trgtPoses
+            else
+                wrt "  trgt.element(%s) = v;" trgtPoses
+        )
         wrt "}"
         wrt ""
-    reduceWrapper()
+
+    reduceWrapper false
+    reduceWrapper true
 
     let elementsWrapper ary =
         let srcTmpl = 

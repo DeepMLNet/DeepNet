@@ -80,68 +80,76 @@ module HostEval =
                 | Unary(op, a) ->
                     let av = subEval a
                     match op with
-                    | Negate -> -av
-                    | Abs -> abs av
-                    | SignT -> ArrayND.signt av
-                    | Log -> log av
-                    | Log10 -> log10 av
-                    | Exp -> exp av
-                    | Sin -> sin av
-                    | Cos -> cos av
-                    | Tan -> tan av
-                    | Asin -> asin av
-                    | Acos -> acos av
-                    | Atan -> atan av
-                    | Sinh -> sinh av
-                    | Cosh -> cosh av
-                    | Tanh -> tanh av
-                    | Sqrt -> sqrt av
-                    | Ceil -> ceil av
-                    | Floor -> floor av
-                    | Round -> round av
-                    | Truncate -> truncate av
-                    | Not -> ~~~~(toBool av) |> toT
-                    | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
-                    | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
-                    | Invert -> ArrayND.invert av
-                    | Sum -> ArrayND.sum av
-                    | SumAxis ax -> ArrayND.sumAxis ax av
-                    | Reshape ss -> ArrayND.reshape (shapeEval ss) av
-                    | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
-                    | PermuteAxes perm -> ArrayND.permuteAxes perm av
-                    | ReverseAxis ax -> ArrayND.reverseAxis ax av
-                    | Gather indices ->
-                        let vIndices = 
-                            indices 
-                            |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
-                        ArrayND.gather vIndices av
-                    | Scatter (indices, trgtShp) ->
-                        let vIndices = 
-                            indices 
-                            |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
-                        ArrayND.scatter vIndices (shapeEval trgtShp) av                        
-                    | Subtensor sr -> av.[rngEval sr]
-                    | StoreToVar vs -> 
-                        // TODO: stage variable write to avoid overwrite of used variables
-                        ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
-                        ArrayND.relayout ArrayNDLayout.emptyVector av
-                    | NullifyJacobian -> av
-                    | AssumeJacobian _ -> av
-                    | Print msg ->
-                        printfn "%s=\n%A\n" msg av
-                        av
-                    | Dump name ->
-                        Dump.dumpValue name av
-                        av
-                    | CheckFinite name ->
-                        if not (ArrayND.allFinite av |> ArrayND.value) then
-                            printfn "Infinity or NaN encountered in %s with value:\n%A" name av
-                            failwithf "Infinity or NaN encountered in %s" name
-                        av
-                    | Annotated _-> av  
-                    | Held (_, heldOp) ->
-                        failwithf "the held op %A must be expanded before evaluation" heldOp
-                    |> box |> unbox              
+                    | ArgMaxAxis ax -> ArrayND.argMaxAxis ax av |> box |> unbox
+                    | ArgMinAxis ax -> ArrayND.argMinAxis ax av |> box |> unbox
+                    | _ ->
+                        match op with
+                        | Negate -> -av
+                        | Abs -> abs av
+                        | SignT -> ArrayND.signt av
+                        | Log -> log av
+                        | Log10 -> log10 av
+                        | Exp -> exp av
+                        | Sin -> sin av
+                        | Cos -> cos av
+                        | Tan -> tan av
+                        | Asin -> asin av
+                        | Acos -> acos av
+                        | Atan -> atan av
+                        | Sinh -> sinh av
+                        | Cosh -> cosh av
+                        | Tanh -> tanh av
+                        | Sqrt -> sqrt av
+                        | Ceil -> ceil av
+                        | Floor -> floor av
+                        | Round -> round av
+                        | Truncate -> truncate av
+                        | Not -> ~~~~(toBool av) |> toT
+                        | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
+                        | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
+                        | Invert -> ArrayND.invert av
+                        | Sum -> ArrayND.sum av
+                        | SumAxis ax -> ArrayND.sumAxis ax av
+                        | MaxAxis ax -> ArrayND.maxAxis ax av
+                        | MinAxis ax -> ArrayND.minAxis ax av
+                        | ArgMaxAxis _
+                        | ArgMinAxis _ -> failwith "implemented above"
+                        | Reshape ss -> ArrayND.reshape (shapeEval ss) av
+                        | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
+                        | PermuteAxes perm -> ArrayND.permuteAxes perm av
+                        | ReverseAxis ax -> ArrayND.reverseAxis ax av
+                        | Gather indices ->
+                            let vIndices = 
+                                indices 
+                                |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
+                            ArrayND.gather vIndices av
+                        | Scatter (indices, trgtShp) ->
+                            let vIndices = 
+                                indices 
+                                |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
+                            ArrayND.scatter vIndices (shapeEval trgtShp) av                        
+                        | Subtensor sr -> av.[rngEval sr]
+                        | StoreToVar vs -> 
+                            // TODO: stage variable write to avoid overwrite of used variables
+                            ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
+                            ArrayND.relayout ArrayNDLayout.emptyVector av
+                        | NullifyJacobian -> av
+                        | AssumeJacobian _ -> av
+                        | Print msg ->
+                            printfn "%s=\n%A\n" msg av
+                            av
+                        | Dump name ->
+                            Dump.dumpValue name av
+                            av
+                        | CheckFinite name ->
+                            if not (ArrayND.allFinite av |> ArrayND.value) then
+                                printfn "Infinity or NaN encountered in %s with value:\n%A" name av
+                                failwithf "Infinity or NaN encountered in %s" name
+                            av
+                        | Annotated _-> av  
+                        | Held (_, heldOp) ->
+                            failwithf "the held op %A must be expanded before evaluation" heldOp
+                        |> box |> unbox              
                 | Binary(op, a, b) ->
                     let av, bv = subEval a, subEval b
                     match op with

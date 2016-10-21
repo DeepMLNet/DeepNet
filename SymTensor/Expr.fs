@@ -93,7 +93,17 @@ module Expr =
         /// summation of all elements
         | Sum                           
         /// summation over given dimension
-        | SumAxis of int                
+        | SumAxis of int
+        /// maximum over given dimension                
+        | MaxAxis of int
+        /// minimum over given dimension
+        | MinAxis of int
+
+        // ==== index reductions ====
+        /// inidices of maximums over given dimension
+        | ArgMaxAxis of int
+        /// inidices of minimums over given dimension
+        | ArgMinAxis of int
 
         // ==== shape operations ====
         /// reshape tensor; element count does not change
@@ -459,6 +469,10 @@ module Expr =
         | Leaf (Arange (_, tn)) -> tn
         | Leaf (Var vs) -> vs.TypeName
 
+        | Unary (ArgMinAxis _, _)
+        | Unary (ArgMaxAxis _, _)
+            -> TypeName.ofType<int>
+
         | Binary (Equal, _, _)
         | Binary (Less, _, _)
         | Binary (LessEqual, _, _)
@@ -536,7 +550,13 @@ module Expr =
 
                 // reductions
                 | Unary(Sum, _) -> ShapeSpec.scalar
-                | Unary(SumAxis(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(SumAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(MaxAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(MinAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+
+                // index reductions
+                | Unary(ArgMaxAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(ArgMinAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
 
                 // shape operations
                 | Unary(Reshape(ss), _) -> ss
@@ -702,8 +722,12 @@ module Expr =
 
                 match op with
                 | Not -> reqBool op a
-                | SumAxis(ax) when not (0 <= ax && ax < nda) ->
-                    failwithf "cannot sum over non-existant axis %d of array with shape %A" ax sa
+                | SumAxis(ax)
+                | MaxAxis(ax) 
+                | MinAxis(ax) 
+                | ArgMaxAxis(ax) 
+                | ArgMinAxis(ax) when not (0 <= ax && ax < nda) ->
+                    failwithf "cannot recude over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
                     if ShapeSpec.nElem sa .<> ShapeSpec.nElem ss then
                         failwithf "reshape cannot change number of elements while reshaping from %A to %A" sa ss
@@ -1339,6 +1363,18 @@ module Expr =
     let minElemwise a b =
         constructElementwise MinElemwise a b
 
+    /// Ensures that all elements are between Some minVal and Some maxVal.
+    let cage (minVal, maxVal) a =
+        let a =
+            match minVal with
+            | Some mv -> maxElemwise (scalar mv) a
+            | None -> a
+        let a =
+            match maxVal with
+            | Some mv -> minElemwise (scalar mv) a
+            | None -> a
+        a
+
     /// reshape (assuming C-continguous order) tensor; element count does not change
     let reshape ss a = Unary(Reshape(ss), a) |> check
 
@@ -1384,6 +1420,34 @@ module Expr =
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
     let sumKeepingAxis ax a =
         a |> sumAxis ax |> insertBroadcastAxis ax
+
+    /// maximum over given dimension
+    let maxAxis ax a = Unary(MaxAxis(ax), a) |> check
+
+    /// maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let maxKeepingAxis ax a =
+        a |> maxAxis ax |> insertBroadcastAxis ax
+
+    /// maximum over given dimension
+    let minAxis ax a = Unary(MinAxis(ax), a) |> check
+
+    /// maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let minKeepingAxis ax a =
+        a |> minAxis ax |> insertBroadcastAxis ax
+
+    /// index of maximum over given dimension
+    let argMaxAxis ax a = Unary(ArgMaxAxis(ax), a) |> check
+
+    /// index of maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let argMaxKeepingAxis ax a =
+        a |> argMaxAxis ax |> insertBroadcastAxis ax
+
+    /// index of maximum over given dimension
+    let argMinAxis ax a = Unary(ArgMinAxis(ax), a) |> check
+
+    /// index of maximum over given dimension, while keeping the axis with one (broadcastable) element
+    let argMinKeepingAxis ax a =
+        a |> argMinAxis ax |> insertBroadcastAxis ax
 
     /// mean over all elements
     let mean (a: ExprT) = 
