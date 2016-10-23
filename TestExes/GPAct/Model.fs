@@ -388,8 +388,20 @@ module GPActivation =
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         predMean, predCov
-
-
+    let regularizationTerm pars q = 
+        let trnT = pars.TrnT
+        let trnX = pars.TrnT
+        let trnTReg =
+            if pars.HyperPars.TrnTTrainable then
+                Regularization.lqRegularization trnT q
+            else 
+                Expr.zeroOfSameType trnT
+        let trnXReg = 
+            if pars.HyperPars.TrnTTrainable then
+                Regularization.lqRegularization trnX q
+            else 
+                Expr.zeroOfSameType trnX
+        trnTReg + trnXReg
 
 /// Propagates a normal distribution through a weight matrix.
 module WeightTransform =
@@ -448,11 +460,11 @@ module WeightTransform =
         newMu, newSigma
 
     let regularizationTerm pars (q:int) =
-        let weights = 
-            if pars.HyperPars.Trainable then pars.Weights 
-            else Expr.zerosLike pars.Weights
-        let regTerm = Regularization.lqRegularization weights q
-        regTerm  
+        let weights = pars.Weights
+        if pars.HyperPars.Trainable then
+            Regularization.lqRegularization weights q
+        else 
+            Expr.zeroOfSameType weights 
 /// Layer that propagates its input normal distribution through a weight matrix and activation
 /// functions described by GPs.
 module GPActivationLayer = 
@@ -486,7 +498,9 @@ module GPActivationLayer =
         }
 
     let regularizationTerm pars (q:int) =
-        WeightTransform.regularizationTerm pars.WeightTransform q
+        (GPActivation.regularizationTerm pars.Activation q) +
+        (WeightTransform.regularizationTerm pars.WeightTransform q)
+
 
     /// Propagates the input normal distribution through a weight matrix and activation
     /// functions described by GPs.
@@ -637,8 +651,8 @@ module MeanOnlyGPLayer =
         mean
 
     let regularizationTerm pars (q:int) =
-        let weights = 
-            if pars.HyperPars.WeightsTrainable then pars.Weights 
-            else Expr.zerosLike pars.Weights
-        let regTerm = Regularization.lqRegularization weights q
-        regTerm 
+        let weights = pars.Weights
+        if pars.HyperPars.WeightsTrainable then
+            Regularization.lqRegularization weights q
+        else 
+            Expr.zeroOfSameType weights 

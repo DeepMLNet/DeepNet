@@ -44,7 +44,7 @@ let cfg = {
                           BiasTrainable = true}
                       ]
              Loss   = LossLayer.CrossEntropy
-             L1Weight = 0.0f
+             L1Weight = 1e-4f
              L2Weight = 1e-4f}
 
     Data = {Path       = "../../../../../letter-recognition.txt"
