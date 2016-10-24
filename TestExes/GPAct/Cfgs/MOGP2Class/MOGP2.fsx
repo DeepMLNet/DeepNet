@@ -29,7 +29,7 @@ let cfg = {
                             WeightsTrainable      = true
                             LengthscalesInit      = Const 0.4f
                             TrnXInit              = Linspaced (-2.0f, 2.0f)
-                            TrnTInit              = Linspaced (-2.0f, 2.0f)
+                            TrnTInit              = Linspaced (-1.0f, 1.0f)
                             TrnSigmaInit          = Const (sqrt 0.1f)
                             WeightsInit           = FanOptimal
                             BiasInit              = Const 0.0f}
@@ -46,7 +46,7 @@ let cfg = {
                             WeightsTrainable      = true
                             LengthscalesInit      = Const 0.4f
                             TrnXInit              = Linspaced (-2.0f, 2.0f)
-                            TrnTInit              = Linspaced (-2.0f, 2.0f)
+                            TrnTInit              = Linspaced (-1.0f, 1.0f)
                             TrnSigmaInit          = Const (sqrt 0.1f)
                             WeightsInit           = FanOptimal
                             BiasInit              = Const 0.0f}
@@ -54,17 +54,18 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden2
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity
+                          TransferFunc  = NeuralLayer.SoftMax
                           WeightsTrainable = true
                           BiasTrainable = true}
                       ]
-             Loss   = LossLayer.MSE
+             Loss   = LossLayer.CrossEntropy
              L1Weight = 0.0f
              L2Weight = 1e-4f}
 
+    //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../Data/UCI/abalone.txt"
             Parameters = {CsvLoader.DefaultParameters with
-                           TargetCols       = [8]
+                           TargetCols       = [0]
                            IntTreatment     = CsvLoader.IntAsNumerical
                            CategoryEncoding = CsvLoader.OneHot
                            Missing          = CsvLoader.SkipRow}}        

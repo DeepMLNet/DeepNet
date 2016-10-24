@@ -37,10 +37,10 @@ module LossLayer =
             -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
-            //let maxVal = Expr.scalarOfSameType pred 1000
-            //let minVal = Expr.scalarOfSameType pred 1e-5
-            //let pred = Expr.minElemwise pred maxVal
-            //let pred = Expr.maxElemwise pred minVal
+//            let maxVal = Expr.scalarOfSameType pred 1000
+//            let minVal = Expr.scalarOfSameType pred 1e-5
+//            let pred = Expr.minElemwise pred maxVal
+//            let pred = Expr.maxElemwise pred minVal
             -target * log pred
             |> Expr.sumAxis 1
             |> Expr.mean

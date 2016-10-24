@@ -109,6 +109,7 @@ module ConfigLoader =
                     meanOnlyGPLayers <- meanOnlyGPLayers |> Map.add name pars
                     MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean
                 )
+
         let l1Regularization, l2Regularization =
             ((Expr.zeroOfSameType input, Expr.zeroOfSameType input), List.indexed cfg.Model.Layers)
             ||> Seq.fold (fun (l1Term, l2Term) (layerIdx, layer) ->
@@ -127,7 +128,6 @@ module ConfigLoader =
         let loss = (LossLayer.loss cfg.Model.Loss predMean target) +
                    (cfg.Model.L1Weight / 2.0f) * l1Regularization + 
                    (cfg.Model.L2Weight / 2.0f) * l2Regularization
-
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 
                                  Map [nInput,  fullDataset.[0].Input.NElems

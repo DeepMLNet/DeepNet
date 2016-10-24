@@ -35,6 +35,7 @@ let cfg = {
              L2Weight = 1e-4f
              }
 
+    //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [0]

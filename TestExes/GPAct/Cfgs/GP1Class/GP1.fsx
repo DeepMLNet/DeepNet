@@ -23,14 +23,14 @@ let cfg = {
                                              WeightsInit           = FanOptimal
                                              BiasInit              = Const 0.0f}
                          Activation      = {GPActivation.defaultHyperPars with
-                                             NGPs                  = nHiddenUnits
-//                                             NOutput               = nHiddenUnits
+                                             NGPs                  = nHiddenGps
+                                             NOutput               = nHiddenUnits
                                              NTrnSmpls             = SizeSpec.fix 10
                                              CutOutsideRange       = true
                                              LengthscalesTrainable = true
                                              TrnXTrainable         = true
                                              TrnTTrainable         = true
-                                             TrnSigmaTrainable     = false
+                                             TrnSigmaTrainable     = true
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-1.0f, 1.0f)
@@ -46,7 +46,7 @@ let cfg = {
              Loss   = LossLayer.CrossEntropy
              L1Weight = 1e-4f
              L2Weight = 1e-4f}
-
+    //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [0]

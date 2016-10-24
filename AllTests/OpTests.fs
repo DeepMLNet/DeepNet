@@ -140,8 +140,8 @@ let ``ReplicateTo on CUDA`` () =
     let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> ArrayNDHost.ofList2D 
     let av0, av1 = fns av
     printfn "a=\n%A" av 
-    printfn "repTo 0 7 a=\n%A" av0
-    printfn "repTo 1 5 a=\n%A" av1
+    printfn "repTo 0 6 a=\n%A" av0
+    printfn "repTo 1 7 a=\n%A" av1
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]

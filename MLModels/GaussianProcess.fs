@@ -36,7 +36,8 @@ module ExpectationPropagation =
         Expr.ifThenElse (cov ==== (Expr.zeroOfSameType cov)) zeroCov nonzeroCov
 
     /// Runs Expecattion Maximization algorithm for monotonicity
-    let monotonicityEP (sigma:ExprT)  (vu:single) iters=
+    let monotonicityEP (k:ExprT)  (vu:single) iters=
+        let sigma = k
         let mu = sigma |> Expr.diag |> Expr.zerosLike
         let vSite = mu 
         let tauSite = mu 
@@ -60,8 +61,9 @@ module ExpectationPropagation =
             let vSUpd = vSUpd |> Expr.checkFinite "vSUpd"
             let tauSite = tauSUpd 
             let vSite =  vSUpd
-            let sigma = (Expr.invert sigma) + (Expr.diagMat tauSite) |> Expr.invert
-            let a = Expr.var<int> "a"
+            let sSiteSqrt = (Expr.diagMat (sqrt tauSite))
+            let bInv = (Expr.identity<single> sigma.Shape.[0]) + sSiteSqrt .* k .* sSiteSqrt |> Expr.invert
+            let sigma = k - k .* sSiteSqrt .* bInv .* sSiteSqrt .* k
             let mu = sigma.*vSite
             sigma,mu,tauSite,vSite
 
@@ -274,6 +276,7 @@ module GaussianProcess =
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] dksedx [x; y;l;sigf]
+
 //    let covPdPdSE (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
 //        let x_smpl, y_smpl  = ElemExpr.idx2
 //        let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
@@ -313,6 +316,7 @@ module GaussianProcess =
 //                    let sizeK1 = k.Shape.[0]
 //                    let sizeK2 = k.Shape.[1]
 //                    Expr.elements [sizeK1;sizeK2] cPdFun [k;x]
+
                 let covPdFun (x:ExprT) (y:ExprT) =
                     match pars with
                         | LinPars _ -> covPdFunLin x y
@@ -328,6 +332,7 @@ module GaussianProcess =
 //                    let sizeK1 = k.Shape.[0]
 //                    let sizeK2 = k.Shape.[1]
 //                    Expr.elements [sizeK1;sizeK2] cPdPd [k;x;y]
+
                 let covPdPd (x:ExprT) (y:ExprT) =
                     match pars with
                         | LinPars _ -> covPdFunLin x y
@@ -380,7 +385,7 @@ module GaussianProcess =
             else
                 mean
         mean, cov
-    /// WARNING: NOT YET IMPLEMENTED, ONLY A RIMINDER FOR LATER IMPLEMENTATION!
+    /// WARNING: NOT YET IMPLEMENTED, ONLY A REMINDER FOR LATER IMPLEMENTATION!
     /// !!! CALLING THIS FUNCTION WILL ONLY CAUSE AN ERROR !!!
     let logMarginalLiklihood (pars:Pars) x y sigmaNs xStar =
         failwith "TODO: implement logMarginalLikelihood"

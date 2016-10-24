@@ -34,14 +34,15 @@ let cfg = {
                        NeuralLayer
                          {NInput        = nHidden2
                           NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity
+                          TransferFunc  = NeuralLayer.SoftMax
                           WeightsTrainable = true
                           BiasTrainable = true}
                       ]
              Loss   = LossLayer.CrossEntropy
              L1Weight = 0.0f
              L2Weight = 1e-4f}
-
+    
+    //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [0]
