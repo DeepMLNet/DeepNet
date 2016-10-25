@@ -124,9 +124,9 @@ module GPActivation =
     /// creates parameters
     let pars (mb: ModelBuilder<_>) hp = {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit) 
-        TrnX           = mb.Param ("TrnX",         [hp.NOutput; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
-        TrnT           = mb.Param ("TrnT",         [hp.NOutput; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
-        TrnSigma       = mb.Param ("TrnSigma",     [hp.NOutput; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
+        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
+        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
+        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
         HyperPars      = hp
     }
 
@@ -257,28 +257,33 @@ module GPActivation =
         let mu    = mu    |> Expr.checkFinite "mu"
         let sigma = sigma |> Expr.checkFinite "sigma"
         // check parameters and gate gradients
+
         let lengthscales = 
             pars.Lengthscales
             |> gate pars.HyperPars.LengthscalesTrainable
             |> Expr.checkFinite "Lengthscales"
             |> Expr.replicateTo 0 nOutput 
+
         let trnX = 
             pars.TrnX
             |> gate pars.HyperPars.TrnXTrainable
             |> Expr.checkFinite "TrnX"
             |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
+
         // trnT [gp, trn_smpl]
         let trnT = 
             pars.TrnT
             |> gate pars.HyperPars.TrnTTrainable
             |> Expr.checkFinite "TrnT"
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
 
         let trnSigma = 
             pars.TrnSigma
             |> gate pars.HyperPars.TrnSigmaTrainable
             |> Expr.checkFinite "TrnSigma"
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
 
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nOutput nTrnSmpls lengthscales trnX trnSigma
