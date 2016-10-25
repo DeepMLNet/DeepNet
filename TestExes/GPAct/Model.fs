@@ -524,7 +524,7 @@ module MeanOnlyGPLayer =
         NInput:                SizeSpecT
         
         /// number od Outputs
-//        NOutput:                SizeSpecT
+        NOutput:                SizeSpecT
         
         /// number of GPs <= number of outputs
         NGPs:                   SizeSpecT
@@ -554,7 +554,7 @@ module MeanOnlyGPLayer =
     /// default hyper-parameters
     let defaultHyperPars = {
         NInput                = SizeSpec.fix 0
-//        NOutput               = SizeSpec.fix 0
+        NOutput               = SizeSpec.fix 0
         NGPs                  = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
         CutOutsideRange       = false
@@ -600,8 +600,8 @@ module MeanOnlyGPLayer =
         TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
         TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
         TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
-        Weights        = mb.Param ("Weights", [hp.NGPs; hp.NInput], GPUtils.initVals hp.WeightsInit)
-        Bias           = mb.Param ("Bias",    [hp.NGPs],            GPUtils.initVals hp.BiasInit)    
+        Weights        = mb.Param ("Weights", [hp.NOutput; hp.NInput], GPUtils.initVals hp.WeightsInit)
+        Bias           = mb.Param ("Bias",    [hp.NOutput],            GPUtils.initVals hp.BiasInit)    
         HyperPars      = hp
     }
 
@@ -615,31 +615,37 @@ module MeanOnlyGPLayer =
     let pred pars input =
         
         let nSmpls    = (Expr.shapeOf input).[0]
-//        let nGps      = pars.HyperPars.NGPs
+        let nGps      = pars.HyperPars.NGPs
         let nTrnSmpls = pars.HyperPars.NTrnSmpls
-        let nOutput = pars.HyperPars.NGPs
+        let nOutput = pars.HyperPars.NOutput
 
         let lengthscales = 
             pars.Lengthscales
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
             |> gate pars.HyperPars.LengthscalesTrainable
             |> Expr.checkFinite "Lengthscales"
         let trnX = 
             pars.TrnX
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
             |> gate pars.HyperPars.TrnXTrainable
             |> Expr.checkFinite "TrnX"
+
         // trnT [gp, trn_smpl]
         let trnT = 
             pars.TrnT
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
             |> gate pars.HyperPars.TrnTTrainable
             |> Expr.checkFinite "TrnT"
         let trnSigma = 
             pars.TrnSigma
-//            |> Expr.replicateTo 0 nOutput
+            |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
             |> gate pars.HyperPars.TrnSigmaTrainable
             |> Expr.checkFinite "TrnSigma"
+
         let input = Expr.checkFinite "Input" input
         let input = input .* pars.Weights.T + pars.Bias
         let K = (covMat nOutput nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma

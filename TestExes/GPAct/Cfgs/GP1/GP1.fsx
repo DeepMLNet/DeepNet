@@ -32,8 +32,8 @@ let cfg = {
                                              TrnTTrainable         = true
                                              TrnSigmaTrainable     = false
                                              LengthscalesInit      = Const 0.4f
-                                             TrnXInit              = Random (-2.0f, 2.0f)
-                                             TrnTInit              = Random (-1.0f, 1.0f)
+                                             TrnXInit              = Linspaced (-2.0f, 2.0f)
+                                             TrnTInit              = Linspaced (-1.0f, 1.0f)
                                              TrnSigmaInit          = Const (sqrt 0.01f)}}
                        
                        NeuralLayer

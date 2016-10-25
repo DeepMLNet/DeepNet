@@ -11,14 +11,15 @@ open GPAct
 
 
 let nHidden = SizeSpec.fix 30
-
+let nGps    = SizeSpec.fix 10
 
 let cfg = {
 
     Model = {Layers = [MeanOnlyGPLayer 
                         {MeanOnlyGPLayer.defaultHyperPars with
                             NInput                = ConfigLoader.NInput()
-                            NGPs                  = nHidden
+                            NGPs                  = nGps
+                            NOutput               = nHidden
                             NTrnSmpls             = SizeSpec.fix 10
                             MeanFunction          = (fun x -> tanh x)
                             LengthscalesTrainable = true

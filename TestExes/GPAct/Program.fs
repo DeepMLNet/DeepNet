@@ -46,14 +46,14 @@ module Main =
 //        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
 
-//        // parsing command line input
-//        let parser = ArgumentParser.Create<CLIArguments> (helpTextMessage="Trains a model using a config file.",
-//                                                          errorHandler = ProcessExiter())
-//        let results = parser.ParseCommandLine argv
-//
-//        // build model
-//        let cfgPath = results.GetResult <@Config_Path@>
-        let cfgPath = "../../Cfgs/GP1/GP1.fsx"
+        // parsing command line input
+        let parser = ArgumentParser.Create<CLIArguments> (helpTextMessage="Trains a model using a config file.",
+                                                          errorHandler = ProcessExiter())
+        let results = parser.ParseCommandLine argv
+
+        // build model
+        let cfgPath = results.GetResult <@Config_Path@>
+//        let cfgPath = "../../Cfgs/GP1/GP1.fsx"
         let mi, predFn, trainFn, errorPrint = ConfigLoader.buildModel cfgPath
         
         let result = 
