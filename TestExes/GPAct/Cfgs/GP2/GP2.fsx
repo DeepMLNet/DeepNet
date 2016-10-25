@@ -10,10 +10,10 @@ open Optimizers
 open GPAct
 
 
-let nHidden1 = SizeSpec.fix 30
-let nGPs1    = SizeSpec.fix 10
-let nHidden2 = SizeSpec.fix 30
-let nGPs2    = SizeSpec.fix 10
+let nHidden1 = SizeSpec.fix 10
+let nGPs1    = SizeSpec.fix 1
+let nHidden2 = SizeSpec.fix 10
+let nGPs2    = SizeSpec.fix 1
 
 let cfg = {
 

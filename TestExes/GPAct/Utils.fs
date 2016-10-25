@@ -49,6 +49,7 @@ module GPUtilsTypes =
         | IdentityMatrix
         /// fan-in/out optimal random weight matrix for neurons
         | FanOptimal
+    
 
 
 module GPUtils =

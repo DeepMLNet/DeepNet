@@ -10,8 +10,10 @@ open Optimizers
 open GPAct
 
 
-let nHidden1 = SizeSpec.fix 30
-let nHidden2 = SizeSpec.fix 30
+let nHidden1 = SizeSpec.fix 10
+let nGPs1    = SizeSpec.fix 1
+let nHidden2 = SizeSpec.fix 10
+let nGPs2    = SizeSpec.fix 1
 
 
 let cfg = {
@@ -25,7 +27,8 @@ let cfg = {
                                              WeightsInit           = FanOptimal
                                              BiasInit              = Const 0.0f}
                          Activation      = {GPActivation.defaultHyperPars with
-                                             NGPs                  = nHidden1
+                                             NGPs                  = nGPs1
+                                             NOutput               = nHidden1
                                              NTrnSmpls             = SizeSpec.fix 10
                                              LengthscalesTrainable = true
                                              CutOutsideRange       = true
@@ -45,7 +48,8 @@ let cfg = {
                                              WeightsInit           = FanOptimal
                                              BiasInit              = Const 0.0f}
                          Activation      = {GPActivation.defaultHyperPars with
-                                             NGPs                  = nHidden2
+                                             NGPs                  = nGPs2
+                                             NOutput               = nHidden2
                                              NTrnSmpls             = SizeSpec.fix 10
                                              LengthscalesTrainable = true
                                              TrnXTrainable         = false

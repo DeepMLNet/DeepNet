@@ -58,8 +58,8 @@ module MeanOnlyGPLayer =
         TrnXInit              = Linspaced (-2.0f, 2.0f)
         TrnTInit              = Linspaced (-2.0f, 2.0f)
         TrnSigmaInit          = Const (sqrt 0.1f)
-        WeightsInit     = FanOptimal
-        BiasInit        = Const 0.0f
+        WeightsInit           = FanOptimal
+        BiasInit              = Const 0.0f
     }
 
     /// Parameter expressions.

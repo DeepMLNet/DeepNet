@@ -189,7 +189,7 @@ module ConfigLoader =
                                                                 s.[gp, *],
                                                                 x.[gp, *],
                                                                 t.[gp, *],
-                                                                50, -5.0f, 5.0f, -5.0f, 5.0f)
+                                                                200, -5.0f, 5.0f, -5.0f, 5.0f)
                             name,plot)
                         savePlot 1200 900 "." (sprintf "%s-%05d.pdf" name state.Iter) (fun () ->
                             plotgrid plots
