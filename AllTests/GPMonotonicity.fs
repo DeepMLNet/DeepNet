@@ -13,6 +13,7 @@ open Models
 open MLPlots
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Monotonicity on Artificial Examples`` () =
     let nSmpls = 10
     let nInp = 20
