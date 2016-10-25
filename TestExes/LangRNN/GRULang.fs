@@ -62,12 +62,14 @@ module GRULang =
         HyperPars     = hp
     }
 
-    let sigmoid (z: ExprT) = 1.0f / (1.0f + exp (-z))
-    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z))
+    //let sigmoid (z: ExprT) = 1.0f / (1.0f + exp (-z))
+    let sigmoid (z: ExprT) = (tanh z + 1.0f) / 2.0f
+
+    //let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z))
 
     let negLogSoftmax (z: ExprT) =
         let c = z |> Expr.maxKeepingAxis 1
-        c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)))
+        c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)) + 1e-6f)
         
 
     let build (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =

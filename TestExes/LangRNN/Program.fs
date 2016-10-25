@@ -95,8 +95,9 @@ module Program =
         let trainCfg = {
             Train.defaultCfg with
                 MinIters           = args.TryGetResult <@ MaxIters @>
+                LearningRates      = [1e-2; 1e-3; 1e-4; 1e-5; 1e-6]
                 //LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]
-                LearningRates      = [1e-4; 1e-5; 1e-6]
+                //LearningRates      = [1e-4; 1e-5; 1e-6]
                 BatchSize          = batchSize
                 SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
