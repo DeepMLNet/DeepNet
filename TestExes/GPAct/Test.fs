@@ -126,9 +126,9 @@ module TestFunctions =
             Trn_T = trn_t_host;
             Trn_Sigma = trn_sigma_host}
 
-        let trainData = [trainInp] |> Dataset.FromSamples
+        let trainData = [trainInp] |> Dataset.ofSamples
         let trainFileName = sprintf "TrainData.h5"
-        trainData.Save(trainFileName)
+        trainData |> Dataset.save trainFileName
 
         //transfer train parametters to device (Host or GPU)
         let ls_val = ls_host |> post device
@@ -196,9 +196,9 @@ module TestFunctions =
                             randomTest () )
         Dump.stop ()
 
-        let testData = testList |> Dataset.FromSamples
+        let testData = testList |> Dataset.ofSamples
         let testFileName = sprintf "TestData.h5"
-        testData.Save(testFileName)
+        testData |> Dataset.save testFileName
     
     let TestGPTransferUnit device =
         //initiating random number generator 

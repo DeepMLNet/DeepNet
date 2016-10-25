@@ -52,7 +52,7 @@ let chars = Seq.cache (seq {
 })
 
 // write output
-let limit = Some 10000000
+let limit = Some 1000000
 let fn, writeChars = 
     match limit with
     Some l -> sprintf "Data/Gutenberg%d.txt" l, chars |> Seq.truncate l

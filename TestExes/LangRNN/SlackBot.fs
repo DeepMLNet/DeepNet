@@ -12,7 +12,7 @@ open ArrayNDNS
 
 
 type SlackBot (data:      WordData,
-               model:     GRUTrain,
+               model:     GRUInst,
                slackKey:  string) =
 
     let maxPars = 3

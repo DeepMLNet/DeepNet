@@ -81,8 +81,8 @@ module ConfigLoader =
         let fullData = 
             CsvLoader.loadFile cfg.Data.Parameters cfg.Data.Path
             |> Seq.shuffle 100
-        let fullDataset = Dataset.FromSamples fullData
-        let dataset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
+        let fullDataset = Dataset.ofSamples fullData
+        let dataset = fullDataset |> TrnValTst.ofDataset |> TrnValTst.toCuda
         
         // build model
         let mutable gpLayers = Map.empty
