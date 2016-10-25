@@ -70,7 +70,7 @@ module GRULang =
         c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)))
         
 
-    let pred (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =
+    let build (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =
         // words            [smpl, pos]
         // input            [smpl, step]           
         // initial          [smpl, recUnit]
@@ -108,11 +108,11 @@ module GRULang =
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
-            Expr.Channels = Map [chState,       {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
+            Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
                                  chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]    
         }
         let input        = words.[*, 0 .. nSteps-1]
-        let states       = Expr.loop loopSpec chState  [input; initial]
+        let states       = Expr.loop loopSpec chState       [input; initial]
         let logWordProbs = Expr.loop loopSpec chLogWordProb [input; initial]
         let finalState   = states.[*, nSteps-1, *]
 
@@ -138,8 +138,8 @@ module GRULang =
 
 
 
-type GRUTrain (VocSize:      int,
-               EmbeddingDim: int) =
+type GRUInst (VocSize:      int,
+              EmbeddingDim: int) =
 
     let mb = ModelBuilder<single> ("M")
 
@@ -157,7 +157,7 @@ type GRUTrain (VocSize:      int,
         EmbeddingDim = embeddingDim
     }      
 
-    let (final, pred, loss), (genFinal, genWords) = (initial, words, firstWord) |||> GRULang.pred model
+    let (final, pred, loss), (genFinal, genWords) = (initial, words, firstWord) |||> GRULang.build model
 
     let mi = mb.Instantiate (DevCuda, Map [nWords,       VocSize
                                            embeddingDim, EmbeddingDim])
@@ -175,6 +175,7 @@ type GRUTrain (VocSize:      int,
                 | Some state when state.Shape.[0] = nBatch && not dropState -> state
                 | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1, *]
                 | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
+            if smpl.Words.Shape.[1] < 2 then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
             VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
 
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg

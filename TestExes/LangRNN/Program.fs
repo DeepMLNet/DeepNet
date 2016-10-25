@@ -14,8 +14,15 @@ module Program =
         | Generate of int 
         | Train
         | Slack of string
-        | MaxSamples of int
+        | TokenLimit of int
         | MaxIters of int
+        | BatchSize of int
+        | [<Mandatory>] Data of string
+        | Steps of int
+        | Hiddens of int
+        | CheckpointInterval of int
+        | DropState of float
+        | PrintSamples
         with
         interface IArgParserTemplate with
             member s.Usage =
@@ -23,8 +30,15 @@ module Program =
                 | Generate _ -> "generates samples from trained model using the specified seed"
                 | Train -> "train model"
                 | Slack _ -> "connect as a slack bot using the specified key"
-                | MaxSamples _ -> "limits the number of training samples"
+                | TokenLimit _ -> "limits the number of training tokens"
                 | MaxIters _ -> "limits the number of training epochs"
+                | BatchSize _ -> "training batch size"
+                | Data _ -> "path to data file"
+                | Steps _ -> "number of steps to back-propagate gradient for"
+                | Hiddens _ -> "number of hidden units"
+                | CheckpointInterval _ -> "number of epochs between writing checkpoint"
+                | DropState _ -> "probability of setting latent state to zero at the start of a mini-batch"
+                | PrintSamples -> "prints some samples from the training set"
 
     [<EntryPoint>]
     let main argv = 
@@ -51,32 +65,49 @@ module Program =
         let parser = ArgumentParser.Create<CLIArgs> (helpTextMessage="Language learning RNN",
                                                      errorHandler = ProcessExiter())
         let args = parser.ParseCommandLine argv
+        let batchSize = args.GetResult (<@BatchSize@>, 250)
+        let stepsPerSmpl = args.GetResult (<@Steps@>, 25)
+        let embeddingDim = args.GetResult (<@Hiddens@>, 128)
+        let checkpointInterval = args.GetResult (<@CheckpointInterval@>, 10)
+        let dropState = args.GetResult (<@DropState@>, 0.0)
 
         // load data
-        let data = WordData (dataPath      = "../../Data/Songs.txt",
+        let data = WordData (dataPath      = args.GetResult <@Data@>,
                              vocSizeLimit  = None,
-                             stepsPerSmpl  = 25,
-                             maxSamples    = args.TryGetResult <@ MaxSamples @>
-                             )
+                             stepsPerSmpl  = stepsPerSmpl,
+                             minSamples    = int (float batchSize / 0.90),
+                             tokenLimit    = args.TryGetResult <@TokenLimit@>,
+                             useChars      = true)
 
-        let model = GRUTrain (VocSize      = data.VocSize,
-                              EmbeddingDim = 128)
+        // instantiate model
+        let model = GRUInst (VocSize      = data.VocSize,
+                             EmbeddingDim = embeddingDim)
+
+        // output some training samples
+        if args.Contains <@PrintSamples@> then
+            for smpl=0 to 3 do
+                for i, s in Seq.indexed (data.Dataset.Trn.SlotBatches batchSize stepsPerSmpl) do
+                    let words = s.Words.[smpl, *] |> data.ToStr
+                    printfn "Batch %d, sample %d:\n%s\n" i smpl words
 
         // train model or load checkpoint
+        printfn "Training with batch size %d and %d steps per slot" batchSize stepsPerSmpl
         let trainCfg = {
             Train.defaultCfg with
                 MinIters           = args.TryGetResult <@ MaxIters @>
-                LearningRates      = [1e-3; 1e-4; 1e-5]
-                BatchSize          = 150
+                //LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]
+                LearningRates      = [1e-4; 1e-5; 1e-6]
+                BatchSize          = batchSize
+                SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
                 CheckpointDir      = Some "."
-                CheckpointInterval = Some 10
-                PerformTraining    = args.Contains <@ Train @>
+                CheckpointInterval = Some checkpointInterval
+                PerformTraining    = args.Contains <@Train@>
         }
-        model.Train data.Dataset 0.1 trainCfg |> ignore
+        model.Train data.Dataset dropState trainCfg |> ignore
 
         // generate some word sequences
-        match args.TryGetResult <@ Generate @> with
+        match args.TryGetResult <@Generate@> with
         | Some seed ->
             printfn "Generating..."
             let NStart  = 30
@@ -90,9 +121,12 @@ module Program =
                 startIdxs
                 |> Seq.map (fun startIdx ->
                     let mutable pos = startIdx
-                    while allWords.[pos+NStart-1] <> ">" ||
-                            (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
-                        pos <- pos + 1
+                    if not data.UseChars then
+                        while pos+2*NStart >= allWords.Length || 
+                              allWords.[pos+NStart-1] <> ">" ||
+                              (allWords.[pos .. pos+NStart-1] |> Array.contains "===") do
+                            pos <- pos + 1
+                            if pos >= allWords.Length then pos <- 0
                     allWords.[pos .. pos+2*NStart-1] |> List.ofArray
                     )
                 |> Seq.map data.Tokenize
@@ -110,7 +144,7 @@ module Program =
         | None -> ()
 
         // slack bot
-        match args.TryGetResult <@ Slack @> with
+        match args.TryGetResult <@Slack@> with
         | Some slackKey -> 
             let bot = SlackBot (data, model, slackKey)
             printfn "\nSlackBot is connected. Press Ctrl+C to quit."
@@ -121,8 +155,5 @@ module Program =
         // shutdown
         Cuda.CudaSup.shutdown ()
         0 
-
-
-
 
 

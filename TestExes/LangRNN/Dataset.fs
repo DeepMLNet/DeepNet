@@ -3,6 +3,7 @@
 
 open Basics
 open System.IO
+open System.Text
 
 open ArrayNDNS
 open SymTensor
@@ -22,15 +23,21 @@ exception UnknownWord of string
 type WordData (dataPath:      string,
                vocSizeLimit:  int option,
                stepsPerSmpl:  int,
-               maxSamples:    int option) =
+               minSamples:    int,
+               tokenLimit:    int option,
+               useChars:      bool) =
 
     do printfn "Reading text %s" dataPath
     let sentences = 
         seq {
-            for line in File.ReadLines dataPath do
-                let words = line.Split (' ') |> List.ofArray
-                let words = words |> List.filter (fun w -> w.Trim().Length > 0)
-                yield words
+            for line in File.ReadLines (dataPath, Encoding.GetEncoding 65001) do
+                if useChars then
+                    for ch in line do yield [string ch]
+                    yield ["\n"]
+                else
+                    let words = line.Split (' ') |> List.ofArray
+                    let words = words |> List.filter (fun w -> w.Trim().Length > 0)
+                    yield words
         } |> Seq.cache
     let words = List.concat sentences
     let wordFreqs =
@@ -38,13 +45,13 @@ type WordData (dataPath:      string,
         for word in words do
             freqs.[word] <- (freqs.GetOrDefault word 0) + 1
         Map.ofDictionary freqs
-    do printfn "Found %d unique words." (Map.toSeq wordFreqs |> Seq.length)
+    do printfn "Found %d unique tokens." (Map.toSeq wordFreqs |> Seq.length)
         
     let freqsSorted = wordFreqs |> Map.toList |> List.sortByDescending snd 
     let freqsSorted = match vocSizeLimit with Some vs -> freqsSorted |> List.take (vs-1) | None -> freqsSorted
-    do printfn "Most common words:\n%A" (freqsSorted |> List.take 10)
-    let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i) |> Map.ofSeq
-    let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i, word) |> Map.ofSeq
+    do printfn "Most common tokens:\n%A" (freqsSorted |> List.truncate 60)
+    let idForWord = freqsSorted |> Seq.mapi (fun i (word, _) -> word, i+1) |> Map.ofSeq |> Map.add "%" 0
+    let wordForId = freqsSorted |> Seq.mapi (fun i (word, _) -> i+1, word) |> Map.ofSeq |> Map.add 0 "%"
     let wordForId = match vocSizeLimit with Some vs -> wordForId |> Map.add (vs-1) "###"  | None -> wordForId
     let tokenize words =
         let nWords = idForWord |> Map.toSeq |> Seq.length        
@@ -59,21 +66,20 @@ type WordData (dataPath:      string,
         match vocSizeLimit with
         | Some vs -> vs
         | None -> wordForId.Count
-    do printfn "Using vocabulary of size %d (limit: %A) with least common word %A." 
+    do printfn "Using vocab-/charabulary of size %d (limit: %A) with least common token %A." 
                vocSize vocSizeLimit (List.last freqsSorted)    
 
     let dataset = 
         words 
         |> tokenize
-        |> List.chunkBySize stepsPerSmpl
-        |> List.filter (fun chunk -> chunk.Length = stepsPerSmpl)
-        |> fun b -> printfn "Would have %d samples in total." b.Length; b
-        |> fun b -> match maxSamples with | Some n -> b |> List.take n | None -> b
-        |> fun b -> printfn "Using %d samples with %d steps per sample." b.Length b.Head.Length; b
-        |> List.map (fun smplWords -> {Words = smplWords |> ArrayNDHost.ofList})
-        |> Dataset.FromSamples
-        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.95, valRatio=0.05, tstRatio=0.0)
-        |> TrnValTst.ToCuda
+        |> fun t -> printfn "Having %d tokens in total." t.Length; t
+        |> fun t -> match tokenLimit with | Some n -> t |> List.truncate n | None -> t
+        |> fun t -> printfn "Using %d tokens." t.Length; t
+        |> fun t -> Seq.singleton {Words = ArrayNDHost.ofList t}
+        |> Dataset.ofSeqSamples
+        |> Dataset.cutToMinSamples minSamples
+        |> TrnValTst.ofDatasetWithRatios (0.90, 0.05, 0.05)
+        |> TrnValTst.toCuda
 
     do printfn "%A" dataset
 
@@ -82,11 +88,11 @@ type WordData (dataPath:      string,
 
     member this.Random =
         let rng = System.Random 123
-        Seq.init maxSamples.Value (fun _ -> 
+        Seq.init tokenLimit.Value (fun _ -> 
             {WordSeq.Words = rng.Seq (0, vocSize-1) |> ArrayNDHost.ofSeqWithShape [stepsPerSmpl]})
-        |> Dataset.FromSamples
-        |> fun ds -> TrnValTst.Of (ds, trnRatio=0.95, valRatio=0.05, tstRatio=0.0)
-        |> TrnValTst.ToCuda
+        |> Dataset.ofSeqSamples
+        |> TrnValTst.ofDatasetWithRatios (0.90, 0.05, 0.05)
+        |> TrnValTst.toCuda
 
     member this.Tokenize words = tokenize words
     member this.Detokenize tokens = detokenize tokens
@@ -99,7 +105,7 @@ type WordData (dataPath:      string,
                      | "===" -> "\n==="
                      | "---" -> "\n---"
                      | w -> w)
-        |> String.concat " "
+        |> String.concat (if useChars then "" else " ")
 
     member this.Words = words
     member this.Lines = 
@@ -116,3 +122,6 @@ type WordData (dataPath:      string,
                 if word <> "===" && word <> "---" then
                     line <- line @ [word]            
         }
+
+    member this.UseChars = useChars
+

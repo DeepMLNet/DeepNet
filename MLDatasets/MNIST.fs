@@ -142,7 +142,7 @@ module Mnist =
 
         let orgTrn = Dataset<MnistT> [trnImgsFlat; raw.TrnLbls]
         let trn, vali =
-            match orgTrn.Partition [1. - valRatio; valRatio] with
+            match orgTrn |> Dataset.partition [1. - valRatio; valRatio] with
             | [trn; vali] -> trn, vali
             | _ -> failwith "impossible"
         let tst = Dataset<MnistT> [tstImgsFlat; raw.TstLbls]
