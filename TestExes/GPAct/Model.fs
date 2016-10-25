@@ -1,65 +1,8 @@
 ﻿namespace GPAct
 
-open ArrayNDNS
+
 open SymTensor
-open Basics
 open Models
-
-
-[<AutoOpen>]
-module GPUtilsTypes =
-
-    /// initialization types
-    type InitMethod =
-        /// constant value
-        | Const of value:single
-        /// linear spaced
-        | Linspaced of first:single * last:single
-        /// random
-        | Random of lower:single * upper:single
-        /// identity matrix
-        | IdentityMatrix
-        /// fan-in/out optimal random weight matrix for neurons
-        | FanOptimal
-
-
-module GPUtils =
-
-    /// calculates initialization values
-    let initVals initType seed shp =
-        let rng = System.Random seed            
-        match initType with
-        | Const value -> ArrayNDHost.filled shp value
-        | Linspaced (first, last) -> 
-            ArrayNDHost.linSpaced first last shp.[1]
-            |> ArrayND.padLeft
-            |> ArrayND.replicate 0 shp.[0]
-        | Random (lower, upper) ->
-            rng.UniformArrayND (lower, upper) shp
-        | IdentityMatrix ->
-            match shp with
-            | [n; m] when n = m -> ArrayNDHost.identity n
-            | _ -> failwith "need square matrix shape for identity matrix initialization"
-        | FanOptimal ->
-            let fanOut = shp.[0] |> single
-            let fanIn = shp.[1] |> single
-            let r = 4.0f * sqrt (6.0f / (fanIn + fanOut))
-            rng.UniformArrayND (-r, r) shp
-
-    /// Allows the gradient to pass if trainable is true.
-    let gate trainable expr =
-        if trainable then expr else Expr.assumeZeroDerivative expr
-
-    /// creates a zero covariance matrix for the given input.
-    let covZero input =
-        // input [smpl, unit]
-        let nSmpls = (Expr.shapeOf input).[0]
-        let nInput = (Expr.shapeOf input).[1]
-        // [smpl,inp1,1] .* [smpl,1,in2] => [smpl,in1,in2]
-        // is equivalent to [smpl,inp1,1*] * [smpl,1*,in2] => [smpl,in1,in2]
-        Expr.zeros<single> [nSmpls; nInput; nInput]
-
-
 open GPUtils
 
 /// propagates normal distributions through non-linearities described by GPs
@@ -263,6 +206,7 @@ module GPActivation =
             |> gate pars.HyperPars.LengthscalesTrainable
             |> Expr.checkFinite "Lengthscales"
             |> Expr.replicateTo 0 nOutput 
+            |> Hold.tryRelease
 
         let trnX = 
             pars.TrnX
@@ -284,6 +228,7 @@ module GPActivation =
             |> gate pars.HyperPars.TrnSigmaTrainable
             |> Expr.checkFinite "TrnSigma"
             |> Expr.replicateTo 0 nOutput
+            |> Hold.tryRelease
 
         // Kk [gp, trn_smpl1, trn_smpl2]
         let Kk = Kk nOutput nTrnSmpls lengthscales trnX trnSigma
@@ -516,160 +461,3 @@ module GPActivationLayer =
         meanAct, covAct
 
 
-module MeanOnlyGPLayer =
-    /// Hyper-parameters
-    /// Hyper-parameters
-    type HyperPars = {
-        /// number of Inputs
-        NInput:                SizeSpecT
-        
-        /// number od Outputs
-        NOutput:                SizeSpecT
-        
-        /// number of GPs <= number of outputs
-        NGPs:                   SizeSpecT
-
-        /// number of training points for each GP
-        NTrnSmpls:              SizeSpecT
-
-        ///GP parameters (for all Gps in the layer)
-        CutOutsideRange:        bool
-        MeanFunction:       (ExprT -> ExprT)
-        Monotonicity:       (single*int*single*single) option
-
-        LengthscalesTrainable:  bool
-        TrnXTrainable:          bool
-        TrnTTrainable:          bool
-        TrnSigmaTrainable:      bool
-        WeightsTrainable:       bool
-
-        LengthscalesInit:       InitMethod
-        TrnXInit:               InitMethod
-        TrnTInit:               InitMethod
-        TrnSigmaInit:           InitMethod
-        WeightsInit:            InitMethod
-        BiasInit:               InitMethod
-    }
-
-    /// default hyper-parameters
-    let defaultHyperPars = {
-        NInput                = SizeSpec.fix 0
-        NOutput               = SizeSpec.fix 0
-        NGPs                  = SizeSpec.fix 0
-        NTrnSmpls             = SizeSpec.fix 10
-        CutOutsideRange       = false
-        MeanFunction          = (fun x -> Expr.zerosLike x)
-        Monotonicity          = None
-        LengthscalesTrainable = true
-        TrnXTrainable         = true
-        TrnTTrainable         = true
-        TrnSigmaTrainable     = true
-        WeightsTrainable      = true
-        LengthscalesInit      = Const 0.4f
-        TrnXInit              = Linspaced (-2.0f, 2.0f)
-        TrnTInit              = Linspaced (-2.0f, 2.0f)
-        TrnSigmaInit          = Const (sqrt 0.1f)
-        WeightsInit     = FanOptimal
-        BiasInit        = Const 0.0f
-    }
-
-    /// Parameter expressions.
-    type Pars = {
-        /// GP lengthscales: [gp]
-        Lengthscales:       ExprT 
-        /// x values of GP training samples:         [gp, trn_smpl]
-        TrnX:               ExprT 
-        /// target values of GP training samples:    [gp, trn_smpl]
-        TrnT:               ExprT 
-        /// standard deviation of GP target values:  [gp, trn_smpl]
-        TrnSigma:           ExprT 
-        /// weights [nOutput, nInput]
-        Weights:        ExprT 
-        /// bias [nOutput]
-        Bias:           ExprT
-
-        /// hyper-parameters
-        HyperPars:          HyperPars
-    }
-    
-
-    /// creates parameters
-    let pars (mb: ModelBuilder<_>) hp = 
-        {
-        Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit)
-        TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
-        TrnT           = mb.Param ("TrnT",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnTInit)
-        TrnSigma       = mb.Param ("TrnSigma",     [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnSigmaInit)
-        Weights        = mb.Param ("Weights", [hp.NOutput; hp.NInput], GPUtils.initVals hp.WeightsInit)
-        Bias           = mb.Param ("Bias",    [hp.NOutput],            GPUtils.initVals hp.BiasInit)    
-        HyperPars      = hp
-    }
-
-
-    let covMat nGps nXSmpls nYSmpls lengthscales x y=
-         let gp, xSmpl, ySmpl = ElemExpr.idx3   
-         let lVec, xVec,yVec  = ElemExpr.arg3<single>
-         let kse = (exp -((xVec[gp;xSmpl] - yVec[gp;ySmpl])***2.0f)/ (2.0f * lVec[gp]***2.0f))
-         Expr.elements [nGps;nXSmpls;nYSmpls] kse [lengthscales;x;y]
-    
-    let pred pars input =
-        
-        let nSmpls    = (Expr.shapeOf input).[0]
-        let nGps      = pars.HyperPars.NGPs
-        let nTrnSmpls = pars.HyperPars.NTrnSmpls
-        let nOutput = pars.HyperPars.NOutput
-
-        let lengthscales = 
-            pars.Lengthscales
-            |> Expr.replicateTo 0 nOutput
-            |> Hold.tryRelease
-            |> gate pars.HyperPars.LengthscalesTrainable
-            |> Expr.checkFinite "Lengthscales"
-        let trnX = 
-            pars.TrnX
-            |> Expr.replicateTo 0 nOutput
-            |> Hold.tryRelease
-            |> gate pars.HyperPars.TrnXTrainable
-            |> Expr.checkFinite "TrnX"
-
-        // trnT [gp, trn_smpl]
-        let trnT = 
-            pars.TrnT
-            |> Expr.replicateTo 0 nOutput
-            |> Hold.tryRelease
-            |> gate pars.HyperPars.TrnTTrainable
-            |> Expr.checkFinite "TrnT"
-        let trnSigma = 
-            pars.TrnSigma
-            |> Expr.replicateTo 0 nOutput
-            |> Hold.tryRelease
-            |> gate pars.HyperPars.TrnSigmaTrainable
-            |> Expr.checkFinite "TrnSigma"
-
-        let input = Expr.checkFinite "Input" input
-        let input = input .* pars.Weights.T + pars.Bias
-        let K = (covMat nOutput nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma
-        let KInv = Expr.invert K
-        let KStarT = covMat nOutput nSmpls nTrnSmpls lengthscales input.T trnX
-        let meanTrnX = pars.HyperPars.MeanFunction trnX
-        let meanInput = pars.HyperPars.MeanFunction input
-        let mean = meanInput + (KStarT .* KInv .* (trnT - meanTrnX)).T
-        let mean = 
-            if pars.HyperPars.CutOutsideRange then
-                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-
-                let mean = Expr.ifThenElse (input <<<< xFirst) tFirst mean
-                Expr.ifThenElse (input >>>> xLast) tLast mean
-            else
-                mean
-        mean
-
-    let regularizationTerm pars (q:int) =
-        let weights = pars.Weights
-        if pars.HyperPars.WeightsTrainable then
-            Regularization.lqRegularization weights q
-        else 
-            Expr.zeroOfSameType weights 
