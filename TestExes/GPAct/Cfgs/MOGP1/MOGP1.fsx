@@ -34,15 +34,14 @@ let cfg = {
                             WeightsInit           = FanOptimal
                             BiasInit              = Const 0.0f}
                        NeuralLayer
-                         {NInput        = nHidden
-                          NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity
-                          WeightsTrainable = true
-                          BiasTrainable = true}
+                         {NeuralLayer.defaultHyperPars with
+                              NInput        = nHidden
+                              NOutput       = ConfigLoader.NOutput()
+                              TransferFunc  = NeuralLayer.Identity
+                              WeightsTrainable = true
+                              BiasTrainable = true}
                       ]
-             Loss   = LossLayer.MSE
-             L1Weight = 0.0f
-             L2Weight = 1e-4f}
+             Loss   = LossLayer.MSE}
 
     Data = {Path       = "../../../../Data/UCI/abalone.txt"
             Parameters = {CsvLoader.DefaultParameters with

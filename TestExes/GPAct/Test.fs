@@ -92,7 +92,7 @@ module TestFunctions =
 
         //model outputs
 //        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
-        let pred_mean,pred_cov = GPActivation.pred mgp (inp_mean, inp_cov)
+        let pred_mean,pred_cov,_ = GPActivation.pred mgp (inp_mean, inp_cov)
 //        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
         
 
@@ -228,7 +228,7 @@ module TestFunctions =
 
         let mi = mb.Instantiate device
 
-        let pred_mean, pred_cov = GPActivationLayer.pred gptu (inp_mean, GPUtils.covZero inp_mean)
+        let pred_mean, pred_cov,_ = GPActivationLayer.pred gptu (inp_mean, GPUtils.covZero inp_mean)
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
 
         let randomTest () =

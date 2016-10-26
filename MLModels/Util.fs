@@ -73,13 +73,13 @@ module Regularization =
 module NormalDistribution =
     
     /// PDF of standard normal distribution
-    let standardNormalPDF (x:ExprT) (mu:ExprT) (cov:ExprT)=
+    let pdf (x:ExprT) (mu:ExprT) (cov:ExprT)=
         let fact = 1.0f / sqrt( 2.0f * (single System.Math.PI)*cov)
         fact * exp( - ((x - mu) *** 2.0f) / (2.0f * cov))
     
     /// Computes approximate gaussian error 
     /// with maximum approximation error of 1.2 * 10 ** -7
-    let gaussianError (x:ExprT) = 
+    let gaussianErrorFkt (x:ExprT) = 
         
         let t = 1.0f/  (1.0f + 0.5f * abs(x))
         let sum = -1.26551233f + 1.00002368f * t + 0.37409196f * t *** 2.0f +
@@ -90,8 +90,8 @@ module NormalDistribution =
         Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau - 1.0f)
     
     ///CDF of standard normal distribution
-    let standardNormalCDF (x:ExprT) (mu:ExprT) (cov:ExprT) =
-        (1.0f + gaussianError((x- mu) / sqrt(2.0f * cov))) / 2.0f
+    let cdf (x:ExprT) (mu:ExprT) (cov:ExprT) =
+        (1.0f + gaussianErrorFkt((x- mu) / sqrt(2.0f * cov))) / 2.0f
     
     /// Normalizes 
     let normalize (x:ExprT) =

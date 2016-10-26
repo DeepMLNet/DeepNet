@@ -53,9 +53,9 @@ module MeanOnlyGPLayer =
         BiasInit:           InitMethod
         
         /// l1 regularization weight
-        L1Regularization:   float option
+        L1Regularization:   single option
         /// l2 regularization weight
-        L2Regularization:   float option
+        L2Regularization:   single option
     }
 
     /// The default hyper-parameters.

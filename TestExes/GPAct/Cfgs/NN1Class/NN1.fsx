@@ -17,22 +17,22 @@ let cfg = {
 
     Model = {Layers = [
                        NeuralLayer
-                         {NInput        = ConfigLoader.NInput()
-                          NOutput       = nHidden
-                          TransferFunc  = NeuralLayer.Tanh
-                          WeightsTrainable = true
-                          BiasTrainable = true}
+                         {NeuralLayer.defaultHyperPars with 
+                              NInput        = ConfigLoader.NInput()
+                              NOutput       = nHidden
+                              TransferFunc  = NeuralLayer.Tanh
+                              WeightsTrainable = true
+                              BiasTrainable = true}
                        
                        NeuralLayer
-                         {NInput        = nHidden
-                          NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.SoftMax
-                          WeightsTrainable = true
-                          BiasTrainable = true}
+                         {NeuralLayer.defaultHyperPars with
+                              NInput        = nHidden
+                              NOutput       = ConfigLoader.NOutput()
+                              TransferFunc  = NeuralLayer.SoftMax
+                              WeightsTrainable = true
+                              BiasTrainable = true}
                       ]
              Loss   = LossLayer.CrossEntropy
-             L1Weight = 0.0f
-             L2Weight = 1e-4f
              }
 
     //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data

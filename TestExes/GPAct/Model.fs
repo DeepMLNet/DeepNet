@@ -30,6 +30,8 @@ module GPActivation =
         TrnTTrainable:          bool
         /// optimize TrnSigmas during training
         TrnSigmaTrainable:      bool
+        /// monotonous activation function
+        Monotonicity:           single option
         /// lengthscale initialization method
         LengthscalesInit:       InitMethod
         /// tnrX initialization method
@@ -52,6 +54,7 @@ module GPActivation =
         TrnXTrainable         = true
         TrnTTrainable         = true
         TrnSigmaTrainable     = true
+        Monotonicity          = None
         LengthscalesInit      = Const 0.4f
         TrnXInit              = Linspaced (-2.0f, 2.0f)
         TrnTInit              = Linspaced (-2.0f, 2.0f)
@@ -96,7 +99,21 @@ module GPActivation =
             ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.scalar 0.0f)
         
         Expr.elements [nGps; nTrnSmpls; nTrnSmpls] kse [lengthscales; trnX; trnSigma]
-
+    
+    let dKkDx nGps nTrnSmpls lengthscales trnX trnSigma = 
+        // Kse element expression
+        // input  x[gp, trn_smpl]
+        //        l[gp]
+        //        s[gp, trn_smpl]
+        // output cov[gp, trn_smpl1, trn_smpl2]
+        let gp, trn_smpl1, trn_smpl2 = ElemExpr.idx3   
+        let l, x, s = ElemExpr.arg3<single>
+        let kse =
+            exp (- ((x [gp; trn_smpl1] - x [gp; trn_smpl2])***2.0f) / (2.0f * (l [gp])***2.0f) ) +
+            ElemExpr.ifThenElse trn_smpl1 trn_smpl2 (s [gp; trn_smpl1] *** 2.0f) (ElemExpr.scalar 0.0f)
+        let dkseDx = kse |> ElemExprDeriv.compute |> ElemExprDeriv.ofArgElem (x [gp; trn_smpl1])
+        Expr.elements [nGps; nTrnSmpls; nTrnSmpls] dkseDx [lengthscales; trnX; trnSigma] 
+    
     ///The covariance of training vectors and input vector 
     ///by GP instances with squared exponential covariance.
     let lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
@@ -119,7 +136,6 @@ module GPActivation =
         let lk = lk1 * lk2
 
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
-
 
     ///Elementwise matrix needed for calculation of the variance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
@@ -261,6 +277,7 @@ module GPActivation =
         // ==> pred_mean [smpl, gp]
         let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
         let predMean = predMean |> Expr.checkFinite "pred_mean"
+        
         //let predMean = pred_mean |> Expr.dump "pred_mean"
         let predMean = 
             if pars.HyperPars.CutOutsideRange then
@@ -274,6 +291,23 @@ module GPActivation =
             else
                 predMean
 
+        let regTerm =
+            match pars.HyperPars.Monotonicity with
+            | Some v ->
+                let dKkDx = dKkDx nOutput nTrnSmpls lengthscales trnX trnSigma |> Expr.checkFinite "dKkDx"
+                printfn "dKkDx shape = %A" dKkDx.Shape
+
+                let dpredMeanddX = dKkDx .*  beta 
+                                   |> Expr.checkFinite "dpredMeanddX"
+                printfn "dpredMeanddX shape = %A" dpredMeanddX.Shape
+
+                // exp(x > 88.0f) -> infinity for CUDA implementation of sigmoid this somehow leads to nan
+                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
+                |> ActivationFunc.sigmoid 
+                |> Expr.mean
+            | None  ->Expr.zeroOfSameType mu
+
+        let regTerm = regTerm |> Expr.checkFinite "regTerm"     
         // L[smpl, gp, trn_smpl1, trn_smpl2]
         let L = L nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
 
@@ -346,12 +380,7 @@ module GPActivation =
         let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        predMean, predCov
-
-    /// Calculates sum of all regularization terms of this layer.
-    let regularizationTerm pars = 
-        let trnT = pars.TrnT
-        Expr.zeroOfSameType trnT
+        predMean, predCov, regTerm
 
 /// Propagates a normal distribution through a weight matrix.
 module WeightTransform =
@@ -370,9 +399,9 @@ module WeightTransform =
         /// bias initialization method
         BiasInit:           InitMethod
         /// l1 regularization weight
-        L1Regularization:   float option
+        L1Regularization:   single option
         /// l2 regularization weight
-        L2Regularization:   float option
+        L2Regularization:   single option
     }
 
     /// The default hyper parameters.
@@ -479,17 +508,13 @@ module GPActivationLayer =
             HyperPars = hp
         }
 
-    /// Calculates sum of all regularization terms of this layer.
-    let regularizationTerm pars=
-        (GPActivation.regularizationTerm pars.Activation) +
-        (WeightTransform.regularizationTerm pars.WeightTransform)
-
 
     /// Propagates the input normal distribution through a weight matrix and activation
     /// functions described by GPs.
     let pred (pars: Pars) (meanIn, covIn) = 
-        let meanTf, covTf  = WeightTransform.transform pars.WeightTransform (meanIn, covIn)
-        let meanAct,covAct = GPActivation.pred pars.Activation (meanTf, covTf)
-        meanAct, covAct
+        let meanTf, covTf  = WeightTransform.transform pars.WeightTransform (meanIn, covIn) 
+        let regWT =WeightTransform.regularizationTerm pars.WeightTransform
+        let meanAct,covAct,regAct = GPActivation.pred pars.Activation (meanTf, covTf)
+        meanAct, covAct,regWT+regAct
 
 

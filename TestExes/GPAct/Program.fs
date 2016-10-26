@@ -23,7 +23,7 @@ module Main =
     
     [<EntryPoint>]
     let main argv = 
-        
+
         // Debug options:
         //SymTensor.Debug.Timing <- true
         //SymTensor.Debug.TraceCompile <- true
@@ -40,11 +40,12 @@ module Main =
         //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-        //SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- true
         //SymTensor.Compiler.Cuda.Debug.DumpCode <- true
         //SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
 //        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
+        let argv = [|"..\..\Cfgs\GP1\GP1.fsx"|]
 
         // parsing command line input
         let parser = ArgumentParser.Create<CLIArguments> (helpTextMessage="Trains a model using a config file.",

@@ -34,18 +34,19 @@ let cfg = {
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-1.0f, 1.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.01f)}}
+                                             TrnSigmaInit          = Const (sqrt 0.01f)
+                                             Monotonicity          = Some 0.0001f}}
                        
                        NeuralLayer
-                         {NInput        = nHiddenUnits
-                          NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.SoftMax
-                          WeightsTrainable = true
-                          BiasTrainable = true}
+                         {NeuralLayer.defaultHyperPars with 
+                              NInput        = nHiddenUnits
+                              NOutput       = ConfigLoader.NOutput()
+                              TransferFunc  = NeuralLayer.SoftMax
+                              WeightsTrainable = true
+                              BiasTrainable = true}
                       ]
-             Loss   = LossLayer.CrossEntropy
-             L1Weight = 1e-4f
-             L2Weight = 1e-4f}
+             Loss   = LossLayer.CrossEntropy}
+
     //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with

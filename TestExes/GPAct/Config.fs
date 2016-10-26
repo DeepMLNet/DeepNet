@@ -101,44 +101,29 @@ module ConfigLoader =
         let mutable meanOnlyGPLayers = Map.empty
         /// Map containing parameters of all GPActivationLayers of the model (used for plotting)
         let mutable gpLayers = Map.empty
-        let predMean, predVar = 
-            ((input, GPUtils.covZero input), List.indexed cfg.Model.Layers)
-            ||> Seq.fold (fun (mean, var) (layerIdx, layer) ->
+        let predMean, predVar, regularizationTerm = 
+            ((input, GPUtils.covZero input, Expr.zeroOfSameType input), List.indexed cfg.Model.Layers)
+            ||> Seq.fold (fun (mean, var, reg) (layerIdx, layer) ->
                 match layer with
                 | NeuralLayer hp ->
                     let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
-                    NeuralLayer.pred pars mean, GPUtils.covZero mean // TODO: implement variance prop
+                    NeuralLayer.pred pars mean, GPUtils.covZero mean,reg + NeuralLayer.regularizationTerm pars // TODO: implement variance prop
                 | GPActivationLayer hp ->
                     let name = sprintf "GPTransferLayer%d" layerIdx
                     let pars = GPActivationLayer.pars (mb.Module name) hp
                     gpLayers <- gpLayers |> Map.add name pars
-                    let predMean, predVar = GPActivationLayer.pred pars (mean, var)
-                    predMean, GPUtils.covZero predMean 
+                    let predMean, predVar, regGP = GPActivationLayer.pred pars (mean, var)
+                    predMean, GPUtils.covZero predMean, reg + regGP
                 | MeanOnlyGPLayer hp ->
                     let name = (sprintf "MeanOnlyGPLayer%d" layerIdx)
                     let pars = MeanOnlyGPLayer.pars (mb.Module name) hp
                     meanOnlyGPLayers <- meanOnlyGPLayers |> Map.add name pars
-                    MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean
-                )
-        // sum up all regularization terms
-        let regularization =
-            (Expr.zeroOfSameType input, List.indexed cfg.Model.Layers)
-            ||> Seq.fold (fun regTerm (layerIdx, layer) ->
-             match layer with
-                | NeuralLayer hp ->
-                    let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
-                    regTerm + (NeuralLayer.regularizationTerm pars)
-                | GPActivationLayer hp ->
-                    let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
-                    regTerm + (GPActivationLayer.regularizationTerm pars)
-                | MeanOnlyGPLayer hp ->
-                    let pars = MeanOnlyGPLayer.pars (mb.Module (sprintf "MeanOnlyGPLayer%d" layerIdx)) hp
-                    regTerm + (MeanOnlyGPLayer.regularizationTerm pars)
+                    MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean, reg + MeanOnlyGPLayer.regularizationTerm pars
                 )
 
         // build loss
         let loss = (LossLayer.loss cfg.Model.Loss predMean target) +
-                   regularization
+                   regularizationTerm
 
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 

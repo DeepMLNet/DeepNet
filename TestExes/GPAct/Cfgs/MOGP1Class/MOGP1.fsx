@@ -33,15 +33,14 @@ let cfg = {
                             WeightsInit           = FanOptimal
                             BiasInit              = Const 0.0f}
                        NeuralLayer
-                         {NInput        = nHidden
-                          NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.SoftMax
-                          WeightsTrainable = true
-                          BiasTrainable = true}
+                         {NeuralLayer.defaultHyperPars with
+                              NInput        = nHidden
+                              NOutput       = ConfigLoader.NOutput()
+                              TransferFunc  = NeuralLayer.SoftMax
+                              WeightsTrainable = true
+                              BiasTrainable = true}
                       ]
-             Loss   = LossLayer.CrossEntropy
-             L1Weight = 0.0f
-             L2Weight = 1e-4f}
+             Loss   = LossLayer.CrossEntropy}
     
     //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
     Data = {Path       = "../../../../Data/UCI/abalone.txt"

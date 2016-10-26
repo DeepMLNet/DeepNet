@@ -37,14 +37,13 @@ module LossLayer =
             -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
-//            let maxVal = Expr.scalarOfSameType pred 1000
-//            let minVal = Expr.scalarOfSameType pred 1e-5
-//            let pred = Expr.minElemwise pred maxVal
-//            let pred = Expr.maxElemwise pred minVal
+//            let targetProb = pred |> Expr.gather [None;Some target]
+//            let stepLoss = -log targetProb
+//            Expr.mean stepLoss
             -target * log pred
             |> Expr.sumAxis 1
             |> Expr.mean
-
+            
 
 /// A layer of neurons (perceptrons).
 module NeuralLayer = 
@@ -73,9 +72,9 @@ module NeuralLayer =
         /// bias trainable
         BiasTrainable:      bool
         /// l1 regularization weight
-        L1Regularization:   float option
+        L1Regularization:   single option
         /// l2 regularization weight
-        L2Regularization:   float option
+        L2Regularization:   single option
     }
 
     let defaultHyperPars = {
