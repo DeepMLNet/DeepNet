@@ -11,19 +11,28 @@ open GPAct
 
 
 let nHidden = SizeSpec.fix 30
-
+let nGps    = SizeSpec.fix 10
 
 let cfg = {
 
-    Model = {Layers = [
-                       NeuralLayer
-                         {NeuralLayer.defaultHyperPars with
-                              NInput        = ConfigLoader.NInput()
-                              NOutput       = nHidden
-                              TransferFunc  = NeuralLayer.Tanh
-                              WeightsTrainable = true
-                              BiasTrainable = true}
-                       
+    Model = {Layers = [MeanOnlyGPLayer 
+                        {MeanOnlyGPLayer.defaultHyperPars with
+                            NInput                = ConfigLoader.NInput()
+                            NGPs                  = nGps
+                            NOutput               = nHidden
+                            NTrnSmpls             = SizeSpec.fix 10
+                            MeanFunction          = (fun x -> tanh x)
+                            LengthscalesTrainable = true
+                            TrnXTrainable         = true
+                            TrnTTrainable         = true
+                            TrnSigmaTrainable     = false
+                            WeightsTrainable      = true
+                            LengthscalesInit      = Const 0.4f
+                            TrnXInit              = Linspaced (-2.0f, 2.0f)
+                            TrnTInit              = Linspaced (-2.0f, 2.0f)
+                            TrnSigmaInit          = Const (sqrt 0.1f)
+                            WeightsInit           = FanOptimal
+                            BiasInit              = Const 0.0f}
                        NeuralLayer
                          {NeuralLayer.defaultHyperPars with
                               NInput        = nHidden
@@ -44,11 +53,11 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 1000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 
     SaveParsDuringTraining = false
-    PlotGPsDuringTraining  = false
+    PlotGPsDuringTraining  = true
 }
 

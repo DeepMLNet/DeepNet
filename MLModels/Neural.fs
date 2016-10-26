@@ -67,23 +67,29 @@ module NeuralLayer =
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
-        NInput:           SizeSpecT
+        NInput:             SizeSpecT
         /// number of outputs
-        NOutput:          SizeSpecT
+        NOutput:            SizeSpecT
         /// transfer (activation) function
-        TransferFunc:     TransferFuncs
+        TransferFunc:       TransferFuncs
         /// weights trainable
-        WeightsTrainable: bool
+        WeightsTrainable:   bool
         /// bias trainable
-        BiasTrainable:    bool
+        BiasTrainable:      bool
+        /// l1 regularization weight
+        L1Regularization:   single option
+        /// l2 regularization weight
+        L2Regularization:   single option
     }
 
     let defaultHyperPars = {
-        NInput           = SizeSpec.fix 0
-        NOutput          = SizeSpec.fix 0
-        TransferFunc     = Tanh
-        WeightsTrainable = true
-        BiasTrainable    = true
+        NInput               = SizeSpec.fix 0
+        NOutput             = SizeSpec.fix 0
+        TransferFunc        = Tanh
+        WeightsTrainable    = true
+        BiasTrainable       = true
+        L1Regularization    = None
+        L2Regularization    = None
     }
 
 
@@ -153,6 +159,21 @@ module NeuralLayer =
             input - c - log (Expr.sumKeepingAxis 1 (exp (input - c))) 
         | Identity -> activation
 
+    /// Calculates sum of all regularization terms of this layer.
+    let regularizationTerm pars  =
+        let weights = pars.Weights
+        if pars.HyperPars.WeightsTrainable then
+            let l1reg =
+                match pars.HyperPars.L1Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            let l2reg =
+                match pars.HyperPars.L2Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            l1reg + l2reg
+        else 
+            Expr.zeroOfSameType weights
 
 /// A neural network (multi-layer perceptron) of multiple 
 /// NeuralLayers and one LossLayer on top.
@@ -196,8 +217,11 @@ module MLP =
     let loss pars input target =
         LossLayer.loss pars.HyperPars.LossMeasure (pred pars input) target
 
-
-
+    /// Calculates sum of all regularization terms of this model.
+    let regualrizationTerm pars input=
+        (Expr.zeroOfSameType input, pars.Layers)
+        ||> List.fold (fun reg p -> NeuralLayer.regularizationTerm p)
+        
 
 //module Autoencoder =
 //

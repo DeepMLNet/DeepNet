@@ -481,6 +481,16 @@ module FuncTypes =
     let arg5<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT)f : Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> =
         fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> f  
+    
+    type Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> ArrayNDT<'T4> -> ArrayNDT<'T5> -> 'TR
+    let arg6<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) f : Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> =
+        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) (val5: ArrayNDT<'T5>)  -> 
+            VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> f  
+
+    type Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> ArrayNDT<'T4> -> ArrayNDT<'T5> -> ArrayNDT<'T6> -> 'TR
+    let arg7<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) (vs6: ExprT) f : Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> =
+        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) (val5: ArrayNDT<'T5>) (val6: ArrayNDT<'T6>) -> 
+            VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> VarEnv.add vs6 val6 |> f  
 
     let addArg<'T, 'TR> (vs: ExprT) (f: VarEnvT -> 'TR) =
         fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->

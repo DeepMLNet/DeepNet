@@ -1053,7 +1053,7 @@ module ArrayND =
     let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
         ifTrue.IfThenElse cond ifFalse :?> 'B
 
-    /// converts the from one data type to another
+    /// converts the Array from one data type to another
     let convert (a: #ArrayNDT<'T>) : ArrayNDT<'C> =
         a |> mapTC (fun v -> conv<'C> v)
 
