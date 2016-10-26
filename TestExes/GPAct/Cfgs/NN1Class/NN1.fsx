@@ -17,7 +17,7 @@ let cfg = {
 
     Model = {Layers = [
                        NeuralLayer
-                         {NeuralLayer.defaultHyperPars with
+                         {NeuralLayer.defaultHyperPars with 
                               NInput        = ConfigLoader.NInput()
                               NOutput       = nHidden
                               TransferFunc  = NeuralLayer.Tanh
@@ -28,15 +28,17 @@ let cfg = {
                          {NeuralLayer.defaultHyperPars with
                               NInput        = nHidden
                               NOutput       = ConfigLoader.NOutput()
-                              TransferFunc  = NeuralLayer.Identity
+                              TransferFunc  = NeuralLayer.SoftMax
                               WeightsTrainable = true
                               BiasTrainable = true}
                       ]
-             Loss   = LossLayer.MSE}
+             Loss   = LossLayer.CrossEntropy
+             }
 
-    Data = {Path       = "../../../../Data/UCI/abalone.txt"
+    //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
+    Data = {Path       = "../../../../../letter-recognition.txt"
             Parameters = {CsvLoader.DefaultParameters with
-                           TargetCols       = [8]
+                           TargetCols       = [0]
                            IntTreatment     = CsvLoader.IntAsNumerical
                            CategoryEncoding = CsvLoader.OneHot
                            Missing          = CsvLoader.SkipRow}}        
@@ -44,7 +46,7 @@ let cfg = {
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 1000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 

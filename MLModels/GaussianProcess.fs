@@ -3,43 +3,74 @@
 open ArrayNDNS
 open SymTensor
 
-
 module GaussianProcess =
     
-    /// Kernek
+    /// Kernel Type.
     type Kernel =
         /// linear kernel
         | Linear
         /// squared exponential kernel
         | SquaredExponential of single*single
-    
-    /// GP hyperparameters
+
+
+
+    /// Gaussian Process hyperparameter type.
+    [<CustomEquality; NoComparison>]
     type HyperPars = {
-        Kernel :    Kernel
-        }
+        Kernel:             Kernel
+        MeanFunction:       ExprT -> ExprT
+        CutOutsideRange:    bool
+    } with
+        override x.Equals(yobj) =
+            match yobj with
+            | :? HyperPars as y -> 
+                let v = Expr.var<single> "v" [SizeSpec.symbol "n"]
+                x.Kernel = y.Kernel &&
+                x.MeanFunction v = y.MeanFunction v &&
+                x.CutOutsideRange = y.CutOutsideRange
+            | _ -> false
+        override x.GetHashCode() =
+            hash (x.Kernel, x.CutOutsideRange)
     
-    /// GP parameters with linear kernel
+
+    ///The dafault hyperparameters.
+    let defaultHyperPars ={
+        Kernel = SquaredExponential (1.0f,1.0f)
+        MeanFunction = (fun x -> Expr.zerosLike x)
+        CutOutsideRange = false
+        }
+
+
+    /// Gaussian Process parameters with linear kernel.
     type ParsLinear = {
-        HyperPars:  HyperPars
+        HyperPars:          HyperPars
         }
     
-    /// GP parameters with squared exponential kernel
+
+    /// Gaussian Process parameters with squared exponential kernel.
     type ParsSE = {
         Lengthscale:    ExprT
         SignalVariance: ExprT
         HyperPars:  HyperPars
         }
 
-    let internal initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
+
+    ///Iitializes the lengthscale.
+    let  initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
         ArrayNDHost.scalar l
     
-    let internal initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
+
+    /// Initializes the signal variance.
+    let  initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
         ArrayNDHost.scalar s
 
-    type Pars = LinPars of ParsLinear | SEPars of  ParsSE
+
+    /// Parameter Type of a Gaussian Process dependent on the used Kernel.
+    type Pars = LinPars of ParsLinear 
+                | SEPars of  ParsSE
 
 
-
+    /// Parameters of the Gaussian Process.
     let pars (mb: ModelBuilder<_>) (hp:HyperPars) = 
         match hp.Kernel with
         | Linear -> LinPars {HyperPars = hp}
@@ -48,34 +79,69 @@ module GaussianProcess =
                                               HyperPars = hp}
     
 
-    /// calculates Matrix between two vectors using linear kernel
+    /// Calculates covariance matrix between two vectors using linear kernel.
     let linearCovariance (x:ExprT) (y:ExprT) =
-        x .* y
-    
-    /// calculates Matrix between two vectors using linear kernel
+        let x_smpl, y_smpl  = ElemExpr.idx2
+        let xvec, yvec = ElemExpr.arg2<single>
+        let klin = xvec[x_smpl] * yvec[y_smpl]
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX;sizeY] klin [x; y]
+
+
+    /// Calculates covariance matrix between two vectors using linear kernel.
     let squaredExpCovariance (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
         let x_smpl, y_smpl  = ElemExpr.idx2
         let xvec, yvec,len,sigmaf = ElemExpr.arg4<single>
-        let kse = sigmaf[] * (exp -((xvec[x_smpl] - yvec[y_smpl])***2.0f)/ (2.0f * len[]***2.0f))
+        let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
         Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
+    
 
-    let predict (pars:Pars) x y sigmaNs x_star =
+    /// Predict mean and covariance of f(x*|x,y,sigmaNs,pars)
+    /// x:          train values
+    /// y:          f(x) + error
+    /// sigmaNs:    noise variance vector
+    let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
         let covMat z z' =
             match pars with
             | LinPars _ -> linearCovariance z z'
-            | SEPars pars  -> squaredExpCovariance (pars.Lengthscale,pars.SignalVariance) z z'
-        let K           = (covMat x x) + Expr.diagMat sigmaNs
-        let Kinv        = Expr.invert K
-        let K_star      = covMat x x_star
-        let K_starT     = Expr.transpose K_star
-        let K_starstar  = covMat x_star x_star
+            | SEPars parsSE  -> squaredExpCovariance (parsSE.Lengthscale,parsSE.SignalVariance) z z'
+        let k           = (covMat x x)
+        let kStarStar  = covMat xStar xStar
         
-        let mean = K_starT .* Kinv .* y
-        let cov = K_starstar - K_starT .* Kinv .* K_star
-        mean,cov
-    /// WARNING: NOT YET IMPLEMENTED, ONLY A RIMINDER FOR LATER IMPLEMENTATION!
+        let meanFct,cut = 
+            match pars with
+            | LinPars parsLin -> parsLin.HyperPars.MeanFunction, parsLin.HyperPars.CutOutsideRange
+            | SEPars parsSE -> parsSE.HyperPars.MeanFunction, parsSE.HyperPars.CutOutsideRange
+        
+        let meanX = meanFct x
+        let meanXStar = meanFct xStar
+
+
+        let k = k  + Expr.diagMat sigmaNs
+        let kInv        = Expr.invert k
+        let kStar      = covMat x xStar
+        let mean = meanXStar + kStar.T .* kInv .* (y - meanX)
+        let cov = kStarStar - kStar.T .* kInv .* kStar
+        let mean = 
+            if cut then
+                let nTrnSmpls =x.NElems
+                let nSmpls = xStar.NElems
+                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+
+                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
+                Expr.ifThenElse (xStar >>>> xLast) yLast mean
+            else
+                mean
+        mean, cov
+
+
+    /// WARNING: NOT YET IMPLEMENTED, ONLY A REMINDER FOR LATER IMPLEMENTATION!
     /// !!! CALLING THIS FUNCTION WILL ONLY CAUSE AN ERROR !!!
-    let logMarginalLiklihood (pars:Pars) x y sigmaNs x_sta =
+    let logMarginalLiklihood (pars:Pars) x y sigmaNs xStar =
         failwith "TODO: implement logMarginalLikelihood"

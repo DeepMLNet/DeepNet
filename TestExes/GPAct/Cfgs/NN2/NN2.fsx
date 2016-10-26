@@ -18,19 +18,28 @@ let cfg = {
 
     Model = {Layers = [
                        NeuralLayer
-                         {NInput        = ConfigLoader.NInput()
-                          NOutput       = nHidden1
-                          TransferFunc  = NeuralLayer.Tanh}
+                        {NeuralLayer.defaultHyperPars with
+                           NInput        = ConfigLoader.NInput()
+                           NOutput       = nHidden1
+                           TransferFunc  = NeuralLayer.Tanh
+                           WeightsTrainable = true
+                           BiasTrainable = true}
 
                        NeuralLayer
-                         {NInput        = nHidden1
-                          NOutput       = nHidden2
-                          TransferFunc  = NeuralLayer.Tanh}
+                        {NeuralLayer.defaultHyperPars with
+                           NInput        = nHidden1
+                           NOutput       = nHidden2
+                           TransferFunc  = NeuralLayer.Tanh
+                           WeightsTrainable = true
+                           BiasTrainable = true}
                        
                        NeuralLayer
-                         {NInput        = nHidden2
-                          NOutput       = ConfigLoader.NOutput()
-                          TransferFunc  = NeuralLayer.Identity}
+                        {NeuralLayer.defaultHyperPars with
+                           NInput        = nHidden2
+                           NOutput       = ConfigLoader.NOutput()
+                           TransferFunc  = NeuralLayer.Identity
+                           WeightsTrainable = true
+                           BiasTrainable = true}
                       ]
              Loss   = LossLayer.MSE}
 

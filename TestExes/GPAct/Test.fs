@@ -5,16 +5,16 @@ open SymTensor
 open SymTensor.Compiler.Cuda
 open System
 open Datasets
-open Models
 
+/// Functions to test GPActivation Model and its components
 module TestFunctions =
     
-    ///Transfers Arrays to device (either Host or DevCuda)
+    /// Transfers Arrays to device (either Host or DevCuda)
     let post device (x: ArrayNDT<'T>) =
         if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> ArrayNDT<'T>
         else x 
     
-    ///Sampling type for Model training parameters.
+    /// Sampling type for Model training parameters.
     type trainData ={
         Lengthscale:    ArrayNDT<single>
         Trn_X:          ArrayNDT<single>
@@ -22,7 +22,7 @@ module TestFunctions =
         Trn_Sigma:      ArrayNDT<single>
         }
 
-    ///Sampling type for Model input and prediction.
+    /// Sampling type for Model input and prediction.
     type predOutput = {
        In_Mean:         ArrayNDT<single>
        In_Cov:          ArrayNDT<single>
@@ -30,21 +30,21 @@ module TestFunctions =
        Pred_Cov:        ArrayNDT<single>
        }
 
-    ///Generates a random list of singles that is sorted.
+    /// Generates a random list of singles that is sorted.
     let randomSortedListOfLength (rand:Random) (minValue,maxValue) length =
         [1..length] |> List.map (fun _ -> rand.NextDouble())
         |> List.map (fun x -> (single x))
         |> List.map (fun x -> x  * (maxValue - minValue) + minValue)
         |> List.sort
 
-    ///Generates multiple random sorted lists of singles in a 2D list
+    /// Generates multiple random sorted lists of singles in a 2D list
     let randomSortedLists (rand:Random) (minValue,maxValue) length = 
         List.map (fun _ -> randomSortedListOfLength rand (minValue,maxValue) length)
     
     let fsng x = single x
     let isng x = single x
 
-    ///Generates a random polynomial of maximal power 2
+    /// Generates a random polynomial of maximal power 2
     let randPolynomial (rand:Random) list = 
 
         let fact1 = fsng (rand.NextDouble())
@@ -53,14 +53,14 @@ module TestFunctions =
         let pow2 = isng (rand.Next(1,2))
         list |> List.map (fun x ->   fact1 *x** pow1 - fact2 *x** pow2)
    
-   ///Turns a random matrix in the form of a covariance matrix into a Psd matrix. 
+   /// Turns a random matrix in the form of a covariance matrix into a Psd matrix. 
     let makePsd (c: ArrayNDT<_>) =        
         c.T .* c
 
 
 
-    ///Tests multilayer GPs with random parameters and random inputs.
-    ///Saves parameters and inputs in hdf5 files to compare with other implementations (especially gpsample.py).
+    /// Tests multilayer GPs with random parameters and random inputs.
+    /// Saves parameters and inputs in hdf5 files to compare with other implementations (especially gpsample.py).
     let testMultiGPLayer device =
 
         //initiating random number generator 
@@ -92,7 +92,7 @@ module TestFunctions =
 
         //model outputs
 //        let pred_mean = MultiGPLayer.pred mgp (WeightLayer.transform w (inp_mean, inp_cov))
-        let pred_mean,pred_cov = GPActivation.pred mgp (inp_mean, inp_cov)
+        let pred_mean,pred_cov,_ = GPActivation.pred mgp (inp_mean, inp_cov)
 //        let pred_mean= mi.Func pred_mean |> arg2 inp_mean inp_cov
         
 
@@ -135,18 +135,12 @@ module TestFunctions =
         let trn_x_val = trn_x_host  |> post device
         let trn_t_val = trn_t_host  |> post device
         let trn_sigma_val = trn_sigma_host  |> post device
-
+        let x = mi.ParameterStorage.[mgp.Lengthscales]
         mi.ParameterStorage.[mgp.Lengthscales] <- ls_val
         mi.ParameterStorage.[mgp.TrnX] <- trn_x_val
         mi.ParameterStorage.[mgp.TrnT] <- trn_t_val
         mi.ParameterStorage.[mgp.TrnSigma] <- trn_sigma_val
 
-        let transMean,transCov = WeightTransform.transform w (inp_mean,inp_cov)
-        let transTestFn1 =  mi.Func transMean |> arg2 inp_mean inp_cov
-        let transTestFn2 =  mi.Func transCov  |> arg2 inp_mean inp_cov
-        let initLMean,initLCov = inp_mean, GPUtils.covZero inp_mean
-        let initTestFn1 =  mi.Func initLMean |> arg1 inp_mean
-        let initTestFn2 =  mi.Func initLCov |> arg1 inp_mean
         ///run GpTransferModel with random test inputs
         let randomTest () =
 
@@ -200,7 +194,7 @@ module TestFunctions =
         let testFileName = sprintf "TestData.h5"
         testData |> Dataset.save testFileName
     
-    let TestGPTransferUnit device =
+    let testGPActivationLayer device =
         //initiating random number generator 
         let rand = Random(1)
         //defining size parameters
@@ -234,17 +228,8 @@ module TestFunctions =
 
         let mi = mb.Instantiate device
 
-        let pred_mean, pred_cov = GPActivationLayer.pred gptu (inp_mean, GPUtils.covZero inp_mean)
+        let pred_mean, pred_cov,_ = GPActivationLayer.pred gptu (inp_mean, GPUtils.covZero inp_mean)
         let pred_mean_cov_fn = mi.Func (pred_mean, pred_cov) |> arg1 inp_mean
-
-//        let loss =  -target * log pred |> Expr.sumAxis 0 |> Expr.mean
-//        let loss = loss |> Expr.dump "Loss"
-//        let cmplr = DevCuda.Compiler, CompileEnv.empty
-//        let loss_fn = Func.make cmplr loss |> arg2 pred_mean target
-
-//        let dLoss = Deriv.compute loss |> Deriv.ofVar mi.ParameterVector  |> Expr.reshape (Expr.shapeOf mi.ParameterVector) 
-//        let dLoss = dLoss |> Expr.dump "dLoss"
-//        let dLoss_fn = mi.Func dLoss |> arg2 pred_mean target
 
         let randomTest () =
 
@@ -252,26 +237,18 @@ module TestFunctions =
             let inp_mean_host = rand.UniformArrayND (-5.0f ,10.0f) [batchSize;ninputs]
             let inp_mean_val = inp_mean_host |> post device
 
-
             //calculate predicted mean and variance
             let pred_mean,pred_cov = pred_mean_cov_fn inp_mean_val
             let randOffset = rand.UniformArrayND (-0.2f ,0.2f) [batchSize;ngps] |> post device
             let target_val = pred_mean + randOffset
+            
             //print inputs and predictions
-
-//            let l = loss_fn pred_mean target_val
-//            let dL = dLoss_fn pred_mean tar
-
             printfn "inp_mean=\n%A" inp_mean_val
             printfn ""
             printfn "pred_mean=\n%A" pred_mean
             printfn "pred_cov=\n%A" pred_cov
             printfn ""
-//            printfn "loss=\n%A" l
-//            printfn ""
-//            printfn "dLoss=\n%A" dL
-//            printfn ""
-            //return sample of inputs and predictions
+
         Dump.start "gptudump.h5"
         let testList = [1..ntests]
                        |> List.map (fun n-> 

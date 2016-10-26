@@ -23,10 +23,11 @@ module Main =
     
     [<EntryPoint>]
     let main argv = 
-        
+
         // Debug options:
         //SymTensor.Debug.Timing <- true
         //SymTensor.Debug.TraceCompile <- true
+//        SymTensor.Debug.VisualizeUExpr <- true
         SymTensor.Debug.EnableCheckFinite <- false
         //SymTensor.Debug.PrintOptimizerStatistics <- true
         //SymTensor.Compiler.Cuda.Debug.Timing <- true
@@ -39,11 +40,12 @@ module Main =
         //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         SymTensor.Compiler.Cuda.Debug.DisableEvents <- true
         SymTensor.Compiler.Cuda.Debug.DisableStreams <- true
-        //SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
+        SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- true
         //SymTensor.Compiler.Cuda.Debug.DumpCode <- true
         //SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
-        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
+//        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
+        let argv = [|"..\..\Cfgs\GP1\GP1.fsx"|]
 
         // parsing command line input
         let parser = ArgumentParser.Create<CLIArguments> (helpTextMessage="Trains a model using a config file.",
@@ -52,10 +54,18 @@ module Main =
 
         // build model
         let cfgPath = results.GetResult <@Config_Path@>
-        let mi, predFn, trainFn = ConfigLoader.buildModel cfgPath
-   
-        // start training
-        let result = trainFn ()
+        let mi, predFn, trainFn, errorPrint = ConfigLoader.buildModel cfgPath
+        
+        let result = 
+            match errorPrint with 
+            | Some printFn -> 
+                printFn ()
+                // start training
+                let result = trainFn ()
+                printFn()
+                result
+            | None -> 
+                trainFn ()
 
         // save train results
         result.Save "result.json"
