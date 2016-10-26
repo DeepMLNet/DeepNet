@@ -26,11 +26,11 @@ let dataSamples =
 
 [<Fact>]
 let ``Loading curve dataset`` () =
-    let dataset = Dataset.FromSamples dataSamples
+    let dataset = Dataset.ofSamples dataSamples
     printfn "Number of samples: %d" dataset.NSamples
 
 type CurveDataset () =
-    let dataset = Dataset.FromSamples dataSamples
+    let dataset = Dataset.ofSamples dataSamples
 
     [<Fact>]
     member this.``Accessing elements`` () =
@@ -45,7 +45,7 @@ type CurveDataset () =
 
     [<Fact>]
     member this.``Partitioning`` () =
-        let parts = TrnValTst.Of dataset
+        let parts = TrnValTst.ofDataset dataset
         printfn "Training   set size: %d" parts.Trn.NSamples
         printfn "Validation set size: %d" parts.Val.NSamples
         printfn "Test       set size: %d" parts.Tst.NSamples
@@ -66,14 +66,14 @@ type CurveDataset () =
     [<Fact>]
     [<Trait("Category", "Skip_CI")>]
     member this.``To CUDA GPU`` () =
-        let dsCuda = dataset.ToCuda()
+        let dsCuda = dataset |> Dataset.toCuda
         printfn "copied to CUDA: %A" dsCuda
 
     [<Fact>]
     member this.``Saving and loading`` () =
-        dataset.Save "DatasetTests.h5"
+        dataset |> Dataset.save "DatasetTests.h5"
         printfn "Saved"
-        let dataset2 : Dataset<CurveSample> = Dataset.Load "DatasetTests.h5"
+        let dataset2 : Dataset<CurveSample> = Dataset.load "DatasetTests.h5"
         printfn "Loaded."
 
 
@@ -91,8 +91,38 @@ let ``Loading CSV datasets`` () =
     for path, pars in paths do
         printfn "Loading %s" path
         let data = CsvLoader.loadFile pars path |> Seq.cache
-        let ds = Dataset.FromSamples data
+        let ds = Dataset.ofSamples data
         printfn "%A" ds
         for smpl in data |> Seq.take 10 do
             printfn "Input: %s\nTarget: %s" smpl.Input.Full smpl.Target.Full
         printfn ""
+
+
+type SeqSample = {SeqData: ArrayNDT<int>}
+
+type SequenceDataset () = 
+    let smpl1 = {SeqData = ArrayNDHost.arange 98}
+    let smpl2 = {SeqData = 100 + ArrayNDHost.arange 98}
+    let smpl3 = {SeqData = 200 + ArrayNDHost.arange 98}
+    let dataset = Dataset.ofSeqSamples [smpl1; smpl2; smpl3]
+
+    [<Fact>]
+    member this.``Slot batches`` () =
+        printfn "Dataset: %A" dataset
+        for idx, sb in Seq.indexed (dataset.SlotBatches 2 4) do
+            printfn "Slotbatch %d:" idx
+            printfn "%A" sb.SeqData
+        printfn ""
+
+    [<Fact>]
+    member this.``Cut sequence`` () =
+        let minSmpls = 15
+        printfn "Original: %A" dataset
+        printfn "cutting to minimum of %d samples" minSmpls
+        let ds = dataset |> Dataset.cutToMinSamples minSmpls
+        printfn "Cut: %A" ds
+        for idx, sb in Seq.indexed (ds.SlotBatches 2 4) do
+            printfn "Slotbatch %d:" idx
+            printfn "%A" sb.SeqData
+        printfn ""
+

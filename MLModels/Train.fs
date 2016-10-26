@@ -93,6 +93,8 @@ module Train =
         Seed:                           int
         /// batch size
         BatchSize:                      int
+        /// time slot length for sequence training
+        SlotSize:                       int option
         /// number of iterations between evaluation of the loss
         LossRecordInterval:             int
         /// function that is called after loss has been evaluated
@@ -129,6 +131,7 @@ module Train =
     let defaultCfg = {
         Seed                        = 1
         BatchSize                   = 10000
+        SlotSize                    = None
         LossRecordInterval          = 10
         LossRecordFunc              = fun _ -> ()
         Termination                 = IterGain 1.25
@@ -304,18 +307,22 @@ module Train =
             | None -> None
         let mutable lastCheckpointIter = 0
         let mutable checkpointRequested = false
-        use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->
+        use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
             match cp with
-            | Some _ ->
+            | Some _ when evt.SpecialKey = ConsoleSpecialKey.ControlBreak ->
                 checkpointRequested <- true
                 evt.Cancel <- true
-            | None -> ()
+            | _ -> ()
         )
 
         // batches
-        let trnBatches = dataset.Trn.Batches cfg.BatchSize
-        let valBatches = dataset.Val.Batches cfg.BatchSize
-        let tstBatches = dataset.Tst.Batches cfg.BatchSize
+        let getBatches part = 
+            match cfg.SlotSize with
+            | Some slotSize -> part |> Dataset.slotBatches cfg.BatchSize slotSize
+            | None -> part |> Dataset.batches cfg.BatchSize
+        let trnBatches = getBatches dataset.Trn
+        let valBatches = getBatches dataset.Val
+        let tstBatches = getBatches dataset.Tst
 
         if Seq.isEmpty trnBatches then failwith "the training set is empty"
         if Seq.isEmpty valBatches then failwith "the validation set is empty"
@@ -525,7 +532,7 @@ module Train =
                 | None -> ()
 
                 match faith with
-                | CheckpointRequested -> exit 0
+                | CheckpointRequested -> exit 10
                 | CheckpointIntervalReached -> checkpointLoop log learningRates duration faith
                 | _ -> log, learningRates, duration, faith
             | _ ->

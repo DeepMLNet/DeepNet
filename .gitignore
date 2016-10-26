@@ -246,3 +246,10 @@ ModelManifest.xml
 /TestExes/LangRNN/tokenize.pyc
 /TestExes/LangRNN/Data/Songs
 /TestExes/LangRNN/Data/Songs.txt
+/TestExes/LangRNN/Data/Gutenberg
+/TestExes/LangRNN/Data/GutenbergRaw
+/TestExes/LangRNN/Data/Gutenberg10000000.txt
+/TestExes/LangRNN/Data/Gutenberg100000.txt
+/TestExes/LangRNN/Data/Gutenberg10000.txt
+/TestExes/LangRNN/Data/Gutenberg.txt
+/TestExes/LangRNN/Data/Gutenberg1000000.txt

@@ -51,6 +51,7 @@
     <DocumentationFile>bin\Debug\LangRNN.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <PlatformTarget>x64</PlatformTarget>
+    <StartArguments>--data ..\..\Data\Gutenberg100000.txt</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <DebugType>pdbonly</DebugType>
@@ -87,8 +88,9 @@
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="tokenize.py" />
-    <None Include="PreprocessSongs.fsx" />
+    <None Include="PreprocessGutenberg.fsx" />
     <Content Include="packages.config" />
+    <None Include="PreprocessSongs.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Argu">
