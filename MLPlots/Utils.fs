@@ -1,7 +1,6 @@
 ﻿namespace MLPlots
 
 open System.IO
-
 open ArrayNDNS
 open RProvider
 open RProvider.graphics
@@ -10,13 +9,16 @@ open RTools
 
 [<AutoOpen>]
 module Utils =
-    let ig =  ignore
 
-    /// Transforms an ArrayND<single> to a float list that can be used by RProvider
+    let private ig =  ignore
+
+
+    /// Transforms an ArrayND<single> to a float list that can be used by RProvider.
     let toFloatList (x: ArrayNDT<single>) : float list = 
         x |> ArrayNDHost.fetch |> ArrayNDHost.convert |> ArrayNDHost.toList
     
-    /// Saves a plot in directory dir with name name and size height x width
+
+    /// Saves a plot in directory dir with name name and size height x width.
     let savePlot (height:int) (width:int) (dir:string) (name:string) (plot:unit-> unit) =
         let path = dir + @"/" + name 
         R.lock (fun () ->
@@ -27,7 +29,12 @@ module Utils =
             plot()
             R.dev_off () |> ig
         )
+    
 
+    /// Plots several plots in one image.
+    /// Takes list of tuple
+    /// plot name:      string
+    /// plot function:  (unit -> unit)
     let plotgrid (plots:list<string*(unit-> unit)>) = 
         R.lock (fun () ->
             let nPlots = List.length plots |> float

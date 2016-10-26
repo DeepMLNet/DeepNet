@@ -16,28 +16,35 @@ open MLPlots
 [<AutoOpen>]
 /// configuration types
 module ConfigTypes =
-
+    
+    /// Supported layer types.
     type Layer = 
         | NeuralLayer of NeuralLayer.HyperPars
         | GPActivationLayer of GPActivationLayer.HyperPars
         | MeanOnlyGPLayer of MeanOnlyGPLayer.HyperPars
 
+    /// Configuration of the feed forward model.
     type FeedForwardModel = {
+        /// list of layers from input to output
         Layers:     Layer list
+        /// the loss meassure
         Loss:       LossLayer.Measures
-        L1Weight:   single
-        L2Weight:   single
     }
 
+    /// Configuration of the dataset.
     type CsvDataCfg = {
+        /// path of the dataset
         Path:       string
+        /// CsvLoader parameters to load the dataset
         Parameters: CsvLoader.Parameters
     }
 
+    /// Supported optimizer types.
     type Optimizer =
         | GradientDescent of GradientDescent.Cfg<single>
         | Adam of Adam.Cfg<single>
-
+    
+    /// Configuration of the whole experiment.
     type Cfg = {
         Model:                  FeedForwardModel
         Data:                   CsvDataCfg
@@ -50,7 +57,8 @@ module ConfigTypes =
 
 /// model building from configuration file
 module ConfigLoader =
-
+    
+    /// Placeholder to initialize mutable sizeSpecs. 
     let notLoading () : SizeSpecT = failwith "not loading a config file"
 
     let mutable NInput = notLoading
@@ -59,7 +67,8 @@ module ConfigLoader =
     /// Builds a trainable model from an F# configuration script file.
     /// The configuration script must assign the cfg variable of type ConfigTypes.Cfg.
     let buildModel cfgPath =
-
+        
+        // create model builder
         let mb = ModelBuilder<single> "Model"
         let nBatch  = mb.Size "nBatch"
         let nInput  = mb.Size "nInput"
@@ -88,7 +97,9 @@ module ConfigLoader =
         let dataset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
         
         // build model
+        /// Map containing parameters of all meanOnlyGPLayers of the model (used for plotting)
         let mutable meanOnlyGPLayers = Map.empty
+        /// Map containing parameters of all GPActivationLayers of the model (used for plotting)
         let mutable gpLayers = Map.empty
         let predMean, predVar = 
             ((input, GPUtils.covZero input), List.indexed cfg.Model.Layers)
@@ -109,25 +120,26 @@ module ConfigLoader =
                     meanOnlyGPLayers <- meanOnlyGPLayers |> Map.add name pars
                     MeanOnlyGPLayer.pred pars mean, GPUtils.covZero mean
                 )
-
-        let l1Regularization, l2Regularization =
-            ((Expr.zeroOfSameType input, Expr.zeroOfSameType input), List.indexed cfg.Model.Layers)
-            ||> Seq.fold (fun (l1Term, l2Term) (layerIdx, layer) ->
+        // sum up all regularization terms
+        let regularization =
+            (Expr.zeroOfSameType input, List.indexed cfg.Model.Layers)
+            ||> Seq.fold (fun regTerm (layerIdx, layer) ->
              match layer with
                 | NeuralLayer hp ->
                     let pars = NeuralLayer.pars (mb.Module (sprintf "NeuralLayer%d" layerIdx)) hp
-                    l1Term + (NeuralLayer.regularizationTerm pars 1), l2Term + (NeuralLayer.regularizationTerm pars 2)
+                    regTerm + (NeuralLayer.regularizationTerm pars)
                 | GPActivationLayer hp ->
                     let pars = GPActivationLayer.pars (mb.Module (sprintf "GPTransferLayer%d" layerIdx)) hp
-                    l1Term + (GPActivationLayer.regularizationTerm pars 1), l2Term + (GPActivationLayer.regularizationTerm pars 2)
+                    regTerm + (GPActivationLayer.regularizationTerm pars)
                 | MeanOnlyGPLayer hp ->
                     let pars = MeanOnlyGPLayer.pars (mb.Module (sprintf "MeanOnlyGPLayer%d" layerIdx)) hp
-                    l1Term + (MeanOnlyGPLayer.regularizationTerm pars 1), l2Term + (MeanOnlyGPLayer.regularizationTerm pars  2)
+                    regTerm + (MeanOnlyGPLayer.regularizationTerm pars)
                 )
+
         // build loss
         let loss = (LossLayer.loss cfg.Model.Loss predMean target) +
-                   (cfg.Model.L1Weight / 2.0f) * l1Regularization + 
-                   (cfg.Model.L2Weight / 2.0f) * l2Regularization
+                   regularization
+
         // instantiate model
         let mi = mb.Instantiate (DevCuda, 
                                  Map [nInput,  fullDataset.[0].Input.NElems
@@ -147,12 +159,17 @@ module ConfigLoader =
             | Adam cfg ->
                 Train.trainableFromLossExpr mi loss smplVarEnv Adam.New cfg
 
+        
+        /// True if plot thread is already running.
+        /// Due to RProvider only one plot thread can run at a time.
         let mutable plotInProgress = false
+        /// Saves Parameters and plots GP activation functions if
+        /// corresponding bools are true.
         let lossRecordFn (state: TrainingLog.Entry) =
             if cfg.SaveParsDuringTraining then
                 let filename = sprintf "Pars%05d.h5" state.Iter
                 mi.SavePars filename
-                      
+            // plot GP activation functions
             if cfg.PlotGPsDuringTraining && state.Iter % 200 = 0 then
                 let gpLayers = gpLayers |> Map.map (fun name pars -> 
                     let gpPars = pars.Activation
@@ -181,7 +198,6 @@ module ConfigLoader =
                             let ls = l.[gp] |> ArrayND.value
                             let hps =  {GaussianProcess.Kernel = GaussianProcess.SquaredExponential (ls,1.0f)
                                         GaussianProcess.MeanFunction = meanFct
-                                        GaussianProcess.Monotonicity = None
                                         GaussianProcess.CutOutsideRange = cut}
                             let name = sprintf "node %d" gp
                             let plot = fun () ->
@@ -200,6 +216,8 @@ module ConfigLoader =
                     plotInProgress <- true
                     Async.Start plots
         
+        // For classification return Some (unit -> unit) function to print classification error
+        // otherwise return None.
         let errorPrint = 
             if (cfg.Model.Loss = LossLayer.CrossEntropy) || (cfg.Model.Loss = LossLayer.BinaryCrossEntropy) then 
                 let printFn () = ClassificationError.printErrors cfg.Training.BatchSize dataset predFn

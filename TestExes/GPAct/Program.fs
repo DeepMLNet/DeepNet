@@ -53,7 +53,6 @@ module Main =
 
         // build model
         let cfgPath = results.GetResult <@Config_Path@>
-//        let cfgPath = "../../Cfgs/GP1/GP1.fsx"
         let mi, predFn, trainFn, errorPrint = ConfigLoader.buildModel cfgPath
         
         let result = 
@@ -66,6 +65,7 @@ module Main =
                 result
             | None -> 
                 trainFn ()
+
         // save train results
         result.Save "result.json"
         

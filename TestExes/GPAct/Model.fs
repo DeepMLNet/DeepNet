@@ -1,34 +1,42 @@
 ﻿namespace GPAct
 
-
 open SymTensor
 open Models
 open GPUtils
 
-/// propagates normal distributions through non-linearities described by GPs
+/// Propagates normal distributions through non-linearities described by GPs.
 module GPActivation =
 
-    /// Hyper-parameters
+    /// Hyper-parameters of the model.
     type HyperPars = {
-        /// number of GPs <= number of outputs and inputs
+        /// number of GP units <= number of outputs and inputs
         NGPs:                   SizeSpecT
 
-        ///numberOfOutputs
+        ///number of outputs
         NOutput:                SizeSpecT
 
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
 
+        /// if true mean stays at firt / last train value
+        /// if input is outside the range of training values
         CutOutsideRange:        bool
 
+        /// optimize lengthscales during training
         LengthscalesTrainable:  bool
+        /// optimize trnXvalues during training
         TrnXTrainable:          bool
+        /// optimize tnrTvalues during training
         TrnTTrainable:          bool
+        /// optimize TrnSigmas during training
         TrnSigmaTrainable:      bool
-
+        /// lengthscale initialization method
         LengthscalesInit:       InitMethod
+        /// tnrX initialization method
         TrnXInit:               InitMethod
+        /// tnrT initialization method
         TrnTInit:               InitMethod
+        /// tnrSigma initialization method
         TrnSigmaInit:           InitMethod
 
 
@@ -64,7 +72,7 @@ module GPActivation =
         HyperPars:          HyperPars
     }
     
-    /// creates parameters
+    /// Creates parameters.
     let pars (mb: ModelBuilder<_>) hp = {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit) 
         TrnX           = mb.Param ("TrnX",         [hp.NGPs; hp.NTrnSmpls], GPUtils.initVals hp.TrnXInit)
@@ -73,7 +81,7 @@ module GPActivation =
         HyperPars      = hp
     }
 
-        ///The covariance Matrices of the training vectors with themselves 
+    ///The covariance Matrices of the training vectors with themselves 
     ///by GP instances with squared exponential covariance.
     let Kk nGps nTrnSmpls lengthscales trnX trnSigma = 
         // Kse element expression
@@ -113,7 +121,7 @@ module GPActivation =
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
 
 
-    ///Elementwise Matrix needed for calculation of the varance prediction.
+    ///Elementwise matrix needed for calculation of the variance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // L element expression
         // inputs  l[gp]
@@ -139,7 +147,7 @@ module GPActivation =
         Expr.elements [nSmpls; nGps; nTrnSmpls; nTrnSmpls] L [mu; sigma; lengthscales; trnX]
 
 
-    ///Elementwise Matrix needed for calculation of the covarance prediction.
+    ///Elementwise matrix needed for calculation of the covariance prediction.
     let Tnew nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
         // T element expression
         // inputs  l[gp]
@@ -172,7 +180,7 @@ module GPActivation =
         Expr.elements [nSmpls; nGps; nGps; nTrnSmpls; nTrnSmpls] T [mu; sigma; lengthscales; trnX]
 
 
-    /// replace covariance matrix diagonal by specified variance
+    /// Replace covariance matrix diagonal by specified variance.
     let setCovDiag nSmpls nGps cov var =
         // inputs  cov[smpl, gp1, gp2]
         //         var[smpl, gp
@@ -339,46 +347,53 @@ module GPActivation =
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         predMean, predCov
-    let regularizationTerm pars q = 
+
+    /// Calculates sum of all regularization terms of this layer.
+    let regularizationTerm pars = 
         let trnT = pars.TrnT
-        let trnX = pars.TrnT
-        let trnTReg =
-            if pars.HyperPars.TrnTTrainable then
-                Regularization.lqRegularization trnT q
-            else 
-                Expr.zeroOfSameType trnT
-        let trnXReg = 
-            if pars.HyperPars.TrnTTrainable then
-                Regularization.lqRegularization trnX q
-            else 
-                Expr.zeroOfSameType trnX
-        trnTReg + trnXReg
+        Expr.zeroOfSameType trnT
 
 /// Propagates a normal distribution through a weight matrix.
 module WeightTransform =
-
+    
+    /// Hyper paramaters of the weight transform layer.
     type HyperPars = {
         /// number of inputs
-        NInput:         SizeSpecT 
+        NInput:             SizeSpecT 
 
         /// number of outputs
-        NOutput:        SizeSpecT
-
-        Trainable:      bool
-
-        WeightsInit:    InitMethod
-        BiasInit:       InitMethod
+        NOutput:            SizeSpecT
+        /// optimize weights and bias during training
+        Trainable:          bool
+        /// weight initialization method
+        WeightsInit:        InitMethod
+        /// bias initialization method
+        BiasInit:           InitMethod
+        /// l1 regularization weight
+        L1Regularization:   float option
+        /// l2 regularization weight
+        L2Regularization:   float option
     }
 
+    /// The default hyper parameters.
     let defaultHyperPars = {
-        NInput          = SizeSpec.fix 0
-        NOutput         = SizeSpec.fix 0
-        Trainable       = true
-        WeightsInit     = FanOptimal
-        BiasInit        = Const 0.0f
+        /// number of inputs
+        NInput              = SizeSpec.fix 0
+        /// number of outputs
+        NOutput             = SizeSpec.fix 0
+        /// defines if weights are trained
+        Trainable           = true
+        /// weight initialization method
+        WeightsInit         = FanOptimal
+        /// bias initialization method
+        BiasInit            = Const 0.0f
+        /// l1 regularization weight
+        L1Regularization    = None
+        /// l2 regularization weight
+        L2Regularization    = None
     }
 
-    /// Weight layer parameters.
+    /// Parameter expressions.
     type Pars = {
         /// weights [nOutput, nInput]
         Weights:        ExprT 
@@ -388,6 +403,7 @@ module WeightTransform =
         HyperPars:      HyperPars
     }
 
+    /// Creates parameters.
     let pars (mb: ModelBuilder<_>) hp = {
         Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], GPUtils.initVals hp.WeightsInit)
         Bias      = mb.Param ("Bias",    [hp.NOutput],            GPUtils.initVals hp.BiasInit)
@@ -409,27 +425,41 @@ module WeightTransform =
                         sigma .*
                         (Expr.reshape [SizeSpec.broadcastable; nInput; nGps] pars.Weights.T)
         newMu, newSigma
-
-    let regularizationTerm pars (q:int) =
+    
+    /// Calculates sum of all regularization terms of this layer.
+    let regularizationTerm pars  =
         let weights = pars.Weights
         if pars.HyperPars.Trainable then
-            Regularization.lqRegularization weights q
+            let l1reg =
+                match pars.HyperPars.L1Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            let l2reg =
+                match pars.HyperPars.L2Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            l1reg + l2reg
         else 
-            Expr.zeroOfSameType weights 
+            Expr.zeroOfSameType weights
+
+
 /// Layer that propagates its input normal distribution through a weight matrix and activation
 /// functions described by GPs.
 module GPActivationLayer = 
-
+    
+    /// Hyper parameters of GP Activation layer.
     type HyperPars = {
         WeightTransform: WeightTransform.HyperPars
         Activation:      GPActivation.HyperPars
     }
 
+    /// Default hyper parameters.
     let defaultHyperPars = {
         WeightTransform = WeightTransform.defaultHyperPars
         Activation      = GPActivation.defaultHyperPars
     }
 
+    /// Parameter expressions.
     type Pars = {
         /// weight transform parameters
         WeightTransform: WeightTransform.Pars
@@ -439,6 +469,7 @@ module GPActivationLayer =
         HyperPars:       HyperPars
     }
 
+    /// Creates parameters.
     let pars (mb: ModelBuilder<_>) (hp: HyperPars) = 
         if hp.Activation.NOutput <> hp.WeightTransform.NOutput then
             failwith "number of Outputs must equal number of output units in weight transform"
@@ -448,9 +479,10 @@ module GPActivationLayer =
             HyperPars = hp
         }
 
-    let regularizationTerm pars (q:int) =
-        (GPActivation.regularizationTerm pars.Activation q) +
-        (WeightTransform.regularizationTerm pars.WeightTransform q)
+    /// Calculates sum of all regularization terms of this layer.
+    let regularizationTerm pars=
+        (GPActivation.regularizationTerm pars.Activation) +
+        (WeightTransform.regularizationTerm pars.WeightTransform)
 
 
     /// Propagates the input normal distribution through a weight matrix and activation

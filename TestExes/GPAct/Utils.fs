@@ -9,15 +9,19 @@ open System.Text.RegularExpressions
 [<AutoOpen>]
 module Utils =
 
-    ///active patterns
+    /// Active pattern for device specifid in input string.
     let (|Cuda|Host|) input = if input = "DevCuda" then Cuda else Host
 
+
+    /// Transforms an input string to a string option.
     let inStringToStringOption string =
         let m = Regex.Match ("Some (\S+)", string)
         if m.Success then
             Some m.Groups.[0].Value
         else None
     
+
+    /// Transforms an input string to an int option.
     let inStringToIntOption string =
         let m = Regex.Match ("Some (\d+)", string)
         if m.Success then
@@ -26,6 +30,8 @@ module Utils =
             else None
         else None
     
+
+    /// Transforms an input string to a float option.
     let inStringToFloatOption string =
         let m = Regex.Match ("Some (\d+)", string)
         if m.Success then
@@ -54,7 +60,7 @@ module GPUtilsTypes =
 
 module GPUtils =
 
-    /// calculates initialization values
+    /// Calculates initialization values.
     let initVals initType seed shp =
         let rng = System.Random seed            
         match initType with
@@ -79,7 +85,7 @@ module GPUtils =
     let gate trainable expr =
         if trainable then expr else Expr.assumeZeroDerivative expr
 
-    /// creates a zero covariance matrix for the given input.
+    /// Creates a zero covariance matrix for the given input.
     let covZero input =
         // input [smpl, unit]
         let nSmpls = (Expr.shapeOf input).[0]

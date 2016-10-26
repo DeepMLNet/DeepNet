@@ -6,8 +6,9 @@ open Models
 open GPUtils
 
 module MeanOnlyGPLayer =
-    /// Hyper-parameters
-    /// Hyper-parameters
+
+
+    /// Hyper-parameters of meanOnlyGPLayer
     type HyperPars = {
         /// number of Inputs
         NInput:                SizeSpecT
@@ -15,32 +16,49 @@ module MeanOnlyGPLayer =
         /// number od Outputs
         NOutput:                SizeSpecT
         
-        /// number of GPs <= number of outputs
+        /// number of GP units <= number of outputs
         NGPs:                   SizeSpecT
 
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
 
-        ///GP parameters (for all Gps in the layer)
+        /// if true mean stays at firt / last train value
+        /// if input is outside the range of training values)
         CutOutsideRange:        bool
+        /// mean function of the GPs
         MeanFunction:       (ExprT -> ExprT)
-        Monotonicity:       (single*int*single*single) option
 
+        /// optimize lengthscales during training
         LengthscalesTrainable:  bool
+        /// optimize trnXvalues during training
         TrnXTrainable:          bool
+        /// optimize tnrTvalues during training
         TrnTTrainable:          bool
+        /// optimize TrnSigmas during training
         TrnSigmaTrainable:      bool
+        /// optimize weights and bias during training
         WeightsTrainable:       bool
 
+        /// lengthscale initialization method
         LengthscalesInit:       InitMethod
+        /// tnrX initialization method
         TrnXInit:               InitMethod
+        /// tnrT initialization method
         TrnTInit:               InitMethod
+        /// tnrSigma initialization method
         TrnSigmaInit:           InitMethod
-        WeightsInit:            InitMethod
-        BiasInit:               InitMethod
+        /// weight initialization method
+        WeightsInit:        InitMethod
+        /// bias initialization method
+        BiasInit:           InitMethod
+        
+        /// l1 regularization weight
+        L1Regularization:   float option
+        /// l2 regularization weight
+        L2Regularization:   float option
     }
 
-    /// default hyper-parameters
+    /// The default hyper-parameters.
     let defaultHyperPars = {
         NInput                = SizeSpec.fix 0
         NOutput               = SizeSpec.fix 0
@@ -48,7 +66,6 @@ module MeanOnlyGPLayer =
         NTrnSmpls             = SizeSpec.fix 10
         CutOutsideRange       = false
         MeanFunction          = (fun x -> Expr.zerosLike x)
-        Monotonicity          = None
         LengthscalesTrainable = true
         TrnXTrainable         = true
         TrnTTrainable         = true
@@ -60,6 +77,8 @@ module MeanOnlyGPLayer =
         TrnSigmaInit          = Const (sqrt 0.1f)
         WeightsInit           = FanOptimal
         BiasInit              = Const 0.0f
+        L1Regularization    = None
+        L2Regularization    = None
     }
 
     /// Parameter expressions.
@@ -76,13 +95,12 @@ module MeanOnlyGPLayer =
         Weights:        ExprT 
         /// bias [nOutput]
         Bias:           ExprT
-
         /// hyper-parameters
         HyperPars:          HyperPars
     }
     
 
-    /// creates parameters
+    /// Creates parameters.
     let pars (mb: ModelBuilder<_>) hp = 
         {
         Lengthscales   = mb.Param ("Lengthscales", [hp.NGPs],               GPUtils.initVals hp.LengthscalesInit)
@@ -94,13 +112,14 @@ module MeanOnlyGPLayer =
         HyperPars      = hp
     }
 
-
+    /// Calculates covariance matri using squared exponential kernel.
     let covMat nGps nXSmpls nYSmpls lengthscales x y=
          let gp, xSmpl, ySmpl = ElemExpr.idx3   
          let lVec, xVec,yVec  = ElemExpr.arg3<single>
          let kse = (exp -((xVec[gp;xSmpl] - yVec[gp;ySmpl])***2.0f)/ (2.0f * lVec[gp]***2.0f))
          Expr.elements [nGps;nXSmpls;nYSmpls] kse [lengthscales;x;y]
     
+    /// Predicting mean from input.
     let pred pars input =
         
         let nSmpls    = (Expr.shapeOf input).[0]
@@ -137,12 +156,12 @@ module MeanOnlyGPLayer =
 
         let input = Expr.checkFinite "Input" input
         let input = input .* pars.Weights.T + pars.Bias
-        let K = (covMat nOutput nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma
-        let KInv = Expr.invert K
-        let KStarT = covMat nOutput nSmpls nTrnSmpls lengthscales input.T trnX
+        let k = (covMat nOutput nTrnSmpls nTrnSmpls lengthscales trnX trnX)  + Expr.diagMat trnSigma
+        let kInv = Expr.invert k
+        let kStarT = covMat nOutput nSmpls nTrnSmpls lengthscales input.T trnX
         let meanTrnX = pars.HyperPars.MeanFunction trnX
         let meanInput = pars.HyperPars.MeanFunction input
-        let mean = meanInput + (KStarT .* KInv .* (trnT - meanTrnX)).T
+        let mean = meanInput + (kStarT .* kInv .* (trnT - meanTrnX)).T
         let mean = 
             if pars.HyperPars.CutOutsideRange then
                 let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
@@ -156,10 +175,19 @@ module MeanOnlyGPLayer =
                 mean
         mean
 
-    let regularizationTerm pars (q:int) =
+    /// Calculates sum of all regularization terms of this layer.
+    let regularizationTerm pars  =
         let weights = pars.Weights
         if pars.HyperPars.WeightsTrainable then
-            Regularization.lqRegularization weights q
+            let l1reg =
+                match pars.HyperPars.L1Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            let l2reg =
+                match pars.HyperPars.L2Regularization with
+                | Some f    -> f * Regularization.l1Regularization weights
+                | None      -> Expr.zeroOfSameType weights
+            l1reg + l2reg
         else 
-            Expr.zeroOfSameType weights 
+            Expr.zeroOfSameType weights
 

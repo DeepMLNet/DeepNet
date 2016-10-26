@@ -1,4 +1,5 @@
 ﻿namespace MLPlots
+
 open SymTensor.Compiler.Cuda
 open RProvider.graphics
 open Models
@@ -9,21 +10,30 @@ open RTools
 
 module GPPlots =
     
+    /// Comparison of kernel types of Gaussian Processes model.
     let compareKernelType (hpX:GaussianProcess.HyperPars) (hpY:GaussianProcess.HyperPars) =
         match hpX.Kernel, hpY.Kernel with
         | GaussianProcess.Linear, GaussianProcess.Linear -> true
         | GaussianProcess.SquaredExponential _, GaussianProcess.SquaredExponential _ -> true
         | _ -> false
+    
+
+    /// Comparison of mean functions of Gaussian Processes model.
     let compareMeanFkt (hpX:GaussianProcess.HyperPars) (hpY:GaussianProcess.HyperPars) =
         let n = SizeSpec.symbol "n"
         let v = Expr.var<single> "v" [n]
         let mX = hpX.MeanFunction v
         let mY = hpY.MeanFunction v
         mX = mY
+
+    /// Comparison of hyper parameters of Gaussian Processes model.
     let compareHypers hpX hpY= 
-                            (compareKernelType hpX hpY) && (compareMeanFkt hpX hpY)
+        (compareKernelType hpX hpY) && (compareMeanFkt hpX hpY)
     
 
+    /// Type of plot configurations for Gaussian Processes.
+    /// If two PlotCfgs are different the plot can not be 
+    /// performed by the same Gaussian Process with different parameters.
     [<CustomEquality;NoComparison>]
     type PlotCfg = 
         {HyperPars: GaussianProcess.HyperPars;
@@ -34,18 +44,24 @@ module GPPlots =
             match yobj with
             | :? PlotCfg as y-> x.NTest = y.NTest && x.NTrain = y.NTrain && (compareHypers x.HyperPars y.HyperPars)
             | _ -> false
-
+    
+    /// Map containing initialized Gaussian Process models.
     let mutable models = Map.empty
-    let mutable configs = Map.empty
+
+    /// Map containing the config type of Gaussian Process models
+    /// with same key the initialized model has in Map models.
+    let mutable modelConfigs = Map.empty
 
 
     type Plots = 
-    
-    
-        static member getModel (config:PlotCfg)=
         
-            let size = configs.Count
-            let key = Map.tryFindKey (fun key value -> value = config) configs
+
+        /// Checks if a fitting initialized model for a certain plot is already contained in map modles.
+        /// If not creates and initializes new model and saves config in configs.
+        static member getModel (config:PlotCfg) =
+        
+            let size = modelConfigs.Count
+            let key = Map.tryFindKey (fun key value -> value = config) modelConfigs
             match key with
             | Some idx ->
                 models.[idx]
@@ -62,14 +78,15 @@ module GPPlots =
                                          Map[nTrnSmpls, config.NTrain
                                              nInput,    config.NTest])
                 let newIdx = size + 1
-                configs <- configs.Add (newIdx, config)
+                modelConfigs <- modelConfigs.Add (newIdx, config)
                 models <- models.Add (newIdx,(pars, x, t, sigNs, inp ,mi))
                 pars, x, t, sigNs, inp ,mi
                
+
         /// Creates num samples from in range minValue to maxValue with constant distance.
         /// Calculates mean covariance and standerdDeviation of these samples given a Gaussian process
-        /// with covarianceKernel kernel, training noise Sigma trainVAlues trnX and trainTargets trnT
-        static member predictGP hyperPars (sigmaNs: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
+        /// with hyper parameters hyperPars, training noise sigmaN train values trnX and train targets trnT.
+        static member predictGP hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
                 (trnT: ArrayNDT<single>) (minValue, maxValue) nPoints =
             let config = {HyperPars = hyperPars
                           NTrain = trnX.NElems
@@ -87,13 +104,15 @@ module GPPlots =
             let meanCovStdFn = mi.Func (mean, cov, stdev) |> arg4 x t sigNs inp
         
             let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
-            let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaNs sX
+            let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaN sX
             sX, sMean, sCov, sStd
 
-        /// Plots a Gaussian Process with covarianceKernel kernel, training noise Sigma trainVAlues trnX and trainTargets trnT.
-        /// Step is the distance between two sample, smaller step => hihger plot smoothness and accuraccy, longer plot creation
-        /// Returns a function (unit -> unit) which starts the plot when applied
-        static member simplePlot (hyperPars, trnSigmas: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
+
+        /// Plots a Gaussian Process with hyper parameters hyperpars, training noise trnSigma,
+        /// train values trnX and train targets trnT.
+        /// Step is the distance between two sample, smaller step => higher plot smoothness and accuraccy,
+        /// longer plot creation. 
+        static member simplePlot (hyperPars, trnSigma: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
                                   ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
         
             let nPoints = defaultArg nPoints 20
@@ -101,7 +120,7 @@ module GPPlots =
             let minValue = defaultArg minX ((trnX |> ArrayND.min |> ArrayND.value) - trnDist * 0.1f)
             let maxValue = defaultArg maxX ((trnX |> ArrayND.max |> ArrayND.value) + trnDist * 0.1f)
 
-            let sX, sMean, sCov, sStd = Plots.predictGP hyperPars trnSigmas trnX trnT (minValue, maxValue) nPoints
+            let sX, sMean, sCov, sStd = Plots.predictGP hyperPars trnSigma trnX trnT (minValue, maxValue) nPoints
         
             let sX = sX |> toFloatList 
             let sMean = sMean |> toFloatList 

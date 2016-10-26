@@ -24,10 +24,12 @@ module RandomExtensions =
         member this.SeqSingle () =
             this.SeqDouble () |> Seq.map single
         
+        /// Generates an infinite sequence of random doubles x ~ N(mean,variance)
         member this.NormalDouble mean variance =
             let normal = Normal.WithMeanVariance (mean, variance)
             Seq.initInfinite (fun _ -> normal.Sample())
         
+        /// Generates an infinite sequence of random singles x ~ N(mean,variance)
         member this.NormalSingle mean variance =
             this.NormalDouble mean variance |> Seq.map single
 
@@ -62,6 +64,7 @@ module RandomExtensions =
             |> ArrayNDNS.ArrayNDHost.ofList
             |> ArrayNDNS.ArrayND.reshape shp
         
+        /// Generates an array of random elements x ~ N(mean,variance)
         member this.NormalArrayND (mean: 'T, variance: 'T) shp  =
             let mean, variance = conv<float> mean, conv<float> variance
             this.NormalDouble mean variance

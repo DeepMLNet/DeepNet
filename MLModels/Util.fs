@@ -57,8 +57,8 @@ module ActivationFunc =
         | SoftMax  -> softmax x
         | Identity -> id x
 
+/// Regularization expressions.
 module Regularization =
-
 
     let lqRegularization (weights:ExprT) (q:int) =
         Expr.sum (abs(weights) *** (single q))
@@ -68,3 +68,36 @@ module Regularization =
 
     let l2Regularization weights =
         lqRegularization weights 1
+
+/// Expressions concernred with Normal Distriutions
+module NormalDistribution =
+    
+    /// PDF of standard normal distribution
+    let standardNormalPDF (x:ExprT) (mu:ExprT) (cov:ExprT)=
+        let fact = 1.0f / sqrt( 2.0f * (single System.Math.PI)*cov)
+        fact * exp( - ((x - mu) *** 2.0f) / (2.0f * cov))
+    
+    /// Computes approximate gaussian error 
+    /// with maximum approximation error of 1.2 * 10 ** -7
+    let gaussianError (x:ExprT) = 
+        
+        let t = 1.0f/  (1.0f + 0.5f * abs(x))
+        let sum = -1.26551233f + 1.00002368f * t + 0.37409196f * t *** 2.0f +
+                   0.09678418f * t *** 3.0f - 0.18628806f * t *** 4.0f + 0.27886807f * t *** 5.0f -
+                   1.13520398f * t *** 6.0f + 1.48851587f * t *** 7.0f - 0.82215223f * t *** 8.0f +
+                   0.17087277f * t *** 9.0f
+        let tau = t * exp(-x *** 2.0f + sum)
+        Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau - 1.0f)
+    
+    ///CDF of standard normal distribution
+    let standardNormalCDF (x:ExprT) (mu:ExprT) (cov:ExprT) =
+        (1.0f + gaussianError((x- mu) / sqrt(2.0f * cov))) / 2.0f
+    
+    /// Normalizes 
+    let normalize (x:ExprT) =
+        let mean = Expr.mean x
+        let cov = (Expr.mean (x * x)) - (mean * mean)
+        let stdev = sqrt cov
+        let zeroCov = x - (Expr.reshape [SizeSpec.broadcastable] mean)
+        let nonzeroCov = (x - (Expr.reshape [SizeSpec.broadcastable] mean)) / (Expr.reshape [SizeSpec.broadcastable] stdev)
+        Expr.ifThenElse (cov ==== (Expr.zeroOfSameType cov)) zeroCov nonzeroCov
