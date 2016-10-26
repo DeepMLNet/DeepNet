@@ -145,8 +145,8 @@ module NeuralLayer =
         | Tanh     -> tanh activation
         | Sigmoid  -> (tanh (activation / two) + one) / two
         | SoftMax  -> 
-            let c = input |> Expr.maxKeepingAxis 1
-            let y = exp (input - c)
+            let c = activation |> Expr.maxKeepingAxis 1
+            let y = exp (activation - c)
             y / Expr.sumKeepingAxis 1 y
         | LogSoftMax -> 
             let c = input |> Expr.maxKeepingAxis 1
