@@ -16,11 +16,13 @@ module GRULang =
     type HyperPars = {
         NWords:                     SizeSpecT
         EmbeddingDim:               SizeSpecT
+        MultiStepLoss:              bool
     }
 
     let defaultHyperPars = {
         NWords                      = SizeSpec.fix 0
         EmbeddingDim                = SizeSpec.fix 0
+        MultiStepLoss               = false
     }
 
     type Pars = {        
@@ -62,12 +64,14 @@ module GRULang =
         HyperPars     = hp
     }
 
-    let sigmoid (z: ExprT) = 1.0f / (1.0f + exp (-z))
-    let softmax (z: ExprT) = exp z / (Expr.sumKeepingAxis 1 (exp z))
-
+    let sigmoid (z: ExprT) = (tanh (z/2.0f) + 1.0f) / 2.0f
+    let softmax (z: ExprT) =
+        let c = z |> Expr.maxKeepingAxis 1
+        let y = exp (z - c)
+        y / Expr.sumKeepingAxis 1 y
     let negLogSoftmax (z: ExprT) =
         let c = z |> Expr.maxKeepingAxis 1
-        c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)))
+        c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)) + 1e-6f)
         
 
     let build (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =
@@ -81,17 +85,24 @@ module GRULang =
         let nBatch = words.Shape.[0]
         let nSteps = words.Shape.[1] - 1
         let embeddingDim = pars.HyperPars.EmbeddingDim
+        let nWords = pars.HyperPars.NWords
 
         let initial      = initialSlice |> Expr.reshape [nBatch; SizeSpec.fix 1; embeddingDim]
         let genFirstWord = genFirstWord |> Expr.reshape [nBatch; SizeSpec.fix 1]
 
         // build loop
+        let step       = Expr.var<int>    "Step"        []
         let inputSlice = Expr.var<int>    "InputSlice"  [nBatch] 
         let prevState  = Expr.var<single> "PrevState"   [nBatch; embeddingDim]
+        let prevOutput = Expr.var<single> "PrevOutput"  [nBatch; nWords]
 
         let bcEmbUnit = Expr.arange<int> embeddingDim |> Expr.padLeft |> Expr.broadcast [nBatch; embeddingDim]
         let bcInputSlice = inputSlice |> Expr.padRight |> Expr.broadcast [nBatch; embeddingDim]
-        let emb = pars.WordToEmb |> Expr.gather [Some bcInputSlice; Some bcEmbUnit]
+        let inpEmb = pars.WordToEmb |> Expr.gather [Some bcInputSlice; Some bcEmbUnit]
+        let prvOutEmb = prevOutput .* pars.WordToEmb |> softmax
+        let emb = 
+            if pars.HyperPars.MultiStepLoss then Expr.ifThenElse (step <<<< 13) inpEmb prvOutEmb            
+            else inpEmb
 
         let update = emb .* pars.EmbToUpdate + prevState .* pars.StateToUpdate           + Expr.padLeft pars.UpdateBias |> sigmoid
         let reset  = emb .* pars.EmbToReset  + prevState .* pars.StateToReset            + Expr.padLeft pars.ResetBias  |> sigmoid
@@ -102,22 +113,39 @@ module GRULang =
         let logWordProb = output |> negLogSoftmax
 
         // training loop
-        let chState, chLogWordProb, chPred = "State", "LogWordProb", "Pred"
-        let loopSpec = {
-            Expr.Length = nSteps
-            Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
-                             Expr.extractVar prevState, 
+        let chState, chLogWordProb, chPred, chOutput = "State", "LogWordProb", "Pred", "Output"
+        let loopSpec = 
+            if pars.HyperPars.MultiStepLoss then 
+              {
+                Expr.Length = nSteps
+                Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
+                                 Expr.extractVar prevOutput,
+                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1; InitialArg=2}
+                                 Expr.extractVar prevState, 
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}
+                                 Expr.extractVar step, Expr.IterationIndex]
+                Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
+                                     chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}
+                                     chOutput,      {LoopValueT.Expr=output;      LoopValueT.SliceDim=1}]    
+              } 
+            else 
+              {
+                Expr.Length = nSteps
+                Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
+                                 Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
-            Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
-                                 chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]    
-        }
-        let input        = words.[*, 0 .. nSteps-1]
-        let states       = Expr.loop loopSpec chState       [input; initial]
-        let logWordProbs = Expr.loop loopSpec chLogWordProb [input; initial]
-        let finalState   = states.[*, nSteps-1, *]
+                Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
+                                     chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]
+              }
+        let input         = words.[*, 0 .. nSteps-1]
+        let initialOutput = Expr.zeros<single> [nBatch; SizeSpec.fix 1; nWords]
+        let loopArgs      = if pars.HyperPars.MultiStepLoss then [input; initial; initialOutput] else [input; initial]
 
-        let target       = words.[*, 1 .. nSteps]
-        let loss         = logWordProbs |> Expr.gather [None; None; Some target] |> Expr.mean 
+        let states        = Expr.loop loopSpec chState       loopArgs
+        let logWordProbs  = Expr.loop loopSpec chLogWordProb loopArgs
+        let finalState    = states.[*, nSteps-1, *]
+        let target        = words.[*, 1 .. nSteps]
+        let loss          = logWordProbs |> Expr.gather [None; None; Some target] |> Expr.mean 
 
         // generating loop
         let genSteps = SizeSpec.fix 200
@@ -138,8 +166,9 @@ module GRULang =
 
 
 
-type GRUInst (VocSize:      int,
-              EmbeddingDim: int) =
+type GRUInst (VocSize:       int,
+              EmbeddingDim:  int,
+              MultiStepLoss: bool) =
 
     let mb = ModelBuilder<single> ("M")
 
@@ -153,8 +182,9 @@ type GRUInst (VocSize:      int,
     let firstWord  = mb.Var<int>     "FirstWord"  [nBatch]
 
     let model = GRULang.pars (mb.Module "GRULang") {
-        NWords       = nWords
-        EmbeddingDim = embeddingDim
+        NWords        = nWords
+        EmbeddingDim  = embeddingDim
+        MultiStepLoss = MultiStepLoss
     }      
 
     let (final, pred, loss), (genFinal, genWords) = (initial, words, firstWord) |||> GRULang.build model

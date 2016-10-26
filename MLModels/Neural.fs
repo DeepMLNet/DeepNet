@@ -17,6 +17,9 @@ module LossLayer =
         | BinaryCrossEntropy
         /// multi-class cross entropy
         | CrossEntropy
+        /// soft-max followed by multi-class cross entropy
+        /// (use with identity transfer function in last layer)
+        | SoftMaxCrossEntropy
 
     /// Returns an expression for the loss given the loss measure `lm`, the predictions
     /// `pred` and the target values `target`.
@@ -37,13 +40,11 @@ module LossLayer =
             -(target * log pred + (one - target) * log (one - pred))
             |> Expr.mean
         | CrossEntropy ->
-            //let maxVal = Expr.scalarOfSameType pred 1000
-            //let minVal = Expr.scalarOfSameType pred 1e-5
-            //let pred = Expr.minElemwise pred maxVal
-            //let pred = Expr.maxElemwise pred minVal
-            -target * log pred
-            |> Expr.sumAxis 1
-            |> Expr.mean
+            -target * log pred |> Expr.sumAxis 1 |> Expr.mean
+        | SoftMaxCrossEntropy ->
+            let c = pred |> Expr.maxKeepingAxis 1
+            let logProb = pred - c - log (Expr.sumKeepingAxis 1 (exp (pred - c)))             
+            -target * logProb |> Expr.sumAxis 1 |> Expr.mean
 
 
 /// A layer of neurons (perceptrons).
@@ -53,10 +54,13 @@ module NeuralLayer =
     type TransferFuncs =
         /// tanh transfer function
         | Tanh
-        /// sigmoid transfer function
+        /// sigmoid transfer function 
         | Sigmoid
-        /// soft-max transfer function
+        /// soft-max transfer function 
+        /// (use SoftMaxCrossEntropy loss measure if possible)
         | SoftMax
+        /// logarithm of soft-max transfer function
+        | LogSoftMax
         /// no transfer function
         | Identity
 
@@ -136,11 +140,17 @@ module NeuralLayer =
             else Expr.assumeZeroDerivative pars.Bias
         let activation = input .* weights.T + bias
         let one = Expr.scalarOfSameType activation 1
+        let two = Expr.scalarOfSameType activation 2
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
-        | Sigmoid  -> one / (one + exp (-activation))
+        | Sigmoid  -> (tanh (activation / two) + one) / two
         | SoftMax  -> 
-            exp activation / (Expr.sumKeepingAxis 1 (exp activation))
+            let c = activation |> Expr.maxKeepingAxis 1
+            let y = exp (activation - c)
+            y / Expr.sumKeepingAxis 1 y
+        | LogSoftMax -> 
+            let c = input |> Expr.maxKeepingAxis 1
+            input - c - log (Expr.sumKeepingAxis 1 (exp (input - c))) 
         | Identity -> activation
 
 

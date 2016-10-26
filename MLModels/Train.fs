@@ -532,7 +532,7 @@ module Train =
                 | None -> ()
 
                 match faith with
-                | CheckpointRequested -> exit 0
+                | CheckpointRequested -> exit 10
                 | CheckpointIntervalReached -> checkpointLoop log learningRates duration faith
                 | _ -> log, learningRates, duration, faith
             | _ ->
