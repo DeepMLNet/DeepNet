@@ -78,7 +78,7 @@ type WordData (dataPath:      string,
         |> fun t -> Seq.singleton {Words = ArrayNDHost.ofList t}
         |> Dataset.ofSeqSamples
         |> Dataset.cutToMinSamples minSamples
-        |> TrnValTst.ofDatasetWithRatios (0.90, 0.05, 0.05)
+        |> TrnValTst.ofDatasetWithRatios (0.95, 0.04, 0.01)
         |> TrnValTst.toCuda
 
     do printfn "%A" dataset

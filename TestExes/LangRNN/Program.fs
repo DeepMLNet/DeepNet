@@ -23,6 +23,8 @@ module Program =
         | CheckpointInterval of int
         | DropState of float
         | PrintSamples
+        | MultiStepLoss
+        | UseChars
         with
         interface IArgParserTemplate with
             member s.Usage =
@@ -39,6 +41,8 @@ module Program =
                 | CheckpointInterval _ -> "number of epochs between writing checkpoint"
                 | DropState _ -> "probability of setting latent state to zero at the start of a mini-batch"
                 | PrintSamples -> "prints some samples from the training set"
+                | MultiStepLoss -> "use multi-step loss"
+                | UseChars -> "uses chars as tokens (instead of words)"
 
     [<EntryPoint>]
     let main argv = 
@@ -70,6 +74,7 @@ module Program =
         let embeddingDim = args.GetResult (<@Hiddens@>, 128)
         let checkpointInterval = args.GetResult (<@CheckpointInterval@>, 10)
         let dropState = args.GetResult (<@DropState@>, 0.0)
+        let multiStepLoss = args.Contains <@MultiStepLoss@>
 
         // load data
         let data = WordData (dataPath      = args.GetResult <@Data@>,
@@ -77,11 +82,12 @@ module Program =
                              stepsPerSmpl  = stepsPerSmpl,
                              minSamples    = int (float batchSize / 0.90),
                              tokenLimit    = args.TryGetResult <@TokenLimit@>,
-                             useChars      = true)
+                             useChars      = args.Contains <@UseChars@>)
 
         // instantiate model
-        let model = GRUInst (VocSize      = data.VocSize,
-                             EmbeddingDim = embeddingDim)
+        let model = GRUInst (VocSize       = data.VocSize,
+                             EmbeddingDim  = embeddingDim,
+                             MultiStepLoss = multiStepLoss)
 
         // output some training samples
         if args.Contains <@PrintSamples@> then
@@ -91,14 +97,15 @@ module Program =
                     printfn "Batch %d, sample %d:\n%s\n" i smpl words
 
         // train model or load checkpoint
-        printfn "Training with batch size %d and %d steps per slot" batchSize stepsPerSmpl
+        printfn "Training with %d steps per slot" stepsPerSmpl
         let trainCfg = {
             Train.defaultCfg with
-                MinIters           = args.TryGetResult <@ MaxIters @>
+                MinIters           = Some 150
+                MaxIters           = args.TryGetResult <@ MaxIters @>
                 LearningRates      = [1e-2; 1e-3; 1e-4; 1e-5; 1e-6]
                 //LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]
                 //LearningRates      = [1e-4; 1e-5; 1e-6]
-                BatchSize          = batchSize
+                BatchSize          = System.Int32.MaxValue
                 SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
                 CheckpointDir      = Some "."
