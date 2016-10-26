@@ -134,7 +134,6 @@ module GPActivation =
         let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
         let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
-
         Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
 
     ///Elementwise matrix needed for calculation of the variance prediction.
@@ -295,12 +294,8 @@ module GPActivation =
             match pars.HyperPars.Monotonicity with
             | Some v ->
                 let dKkDx = dKkDx nOutput nTrnSmpls lengthscales trnX trnSigma |> Expr.checkFinite "dKkDx"
-                printfn "dKkDx shape = %A" dKkDx.Shape
-
                 let dpredMeanddX = dKkDx .*  beta 
                                    |> Expr.checkFinite "dpredMeanddX"
-                printfn "dpredMeanddX shape = %A" dpredMeanddX.Shape
-
                 // exp(x > 88.0f) -> infinity for CUDA implementation of sigmoid this somehow leads to nan
                 Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
                 |> ActivationFunc.sigmoid 
