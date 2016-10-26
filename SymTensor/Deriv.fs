@@ -115,7 +115,8 @@ module Deriv =
             | Round -> zeroJacobian a
             | Truncate -> zeroJacobian a
             
-            | Not -> failLogic op
+            | Not -> zeroJacobian a
+                //failLogic op
 
             | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
             | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
@@ -162,7 +163,7 @@ module Deriv =
                 let bcEgExp = egExp |> reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
                 Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (zerosLike bcEgExp) |> collapse
             | ArgMaxAxis ax
-            | ArgMinAxis ax -> failIndex op
+            | ArgMinAxis ax -> zeroJacobian a
 
             | StoreToVar _ -> eg 
 
@@ -216,11 +217,13 @@ module Deriv =
             | Greater
             | GreaterEqual
             | NotEqual
-                -> failLogic op
+                -> zeroJacobian a .+ zeroJacobian b
+                //-> failLogic op
 
             | And 
             | Or 
-                -> failLogic op
+                -> zeroJacobian a .+ zeroJacobian b
+                //-> failLogic op
 
             | IfThenElse cond -> ifThenElseJac cond a b
 
