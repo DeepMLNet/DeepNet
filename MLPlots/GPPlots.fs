@@ -10,40 +10,13 @@ open RTools
 
 module GPPlots =
     
-    /// Comparison of kernel types of Gaussian Processes model.
-    let compareKernelType (hpX:GaussianProcess.HyperPars) (hpY:GaussianProcess.HyperPars) =
-        match hpX.Kernel, hpY.Kernel with
-        | GaussianProcess.Linear, GaussianProcess.Linear -> true
-        | GaussianProcess.SquaredExponential _, GaussianProcess.SquaredExponential _ -> true
-        | _ -> false
-    
-
-    /// Comparison of mean functions of Gaussian Processes model.
-    let compareMeanFkt (hpX:GaussianProcess.HyperPars) (hpY:GaussianProcess.HyperPars) =
-        let n = SizeSpec.symbol "n"
-        let v = Expr.var<single> "v" [n]
-        let mX = hpX.MeanFunction v
-        let mY = hpY.MeanFunction v
-        mX = mY
-
-    /// Comparison of hyper parameters of Gaussian Processes model.
-    let compareHypers hpX hpY= 
-        (compareKernelType hpX hpY) && (compareMeanFkt hpX hpY)
-    
-
     /// Type of plot configurations for Gaussian Processes.
     /// If two PlotCfgs are different the plot can not be 
     /// performed by the same Gaussian Process with different parameters.
-    [<CustomEquality;NoComparison>]
     type PlotCfg = 
         {HyperPars: GaussianProcess.HyperPars;
          NTrain:    int;
-         NTest:     int}
-    
-        override x.Equals(yobj) =
-            match yobj with
-            | :? PlotCfg as y-> x.NTest = y.NTest && x.NTrain = y.NTrain && (compareHypers x.HyperPars y.HyperPars)
-            | _ -> false
+         NTest:     int}  
     
     /// Map containing initialized Gaussian Process models.
     let mutable models = Map.empty

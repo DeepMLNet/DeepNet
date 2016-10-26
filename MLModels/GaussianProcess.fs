@@ -15,11 +15,22 @@ module GaussianProcess =
 
 
     /// Gaussian Process hyperparameter type.
+    [<CustomEquality; NoComparison>]
     type HyperPars = {
         Kernel:             Kernel
-        MeanFunction:       (ExprT -> ExprT)
+        MeanFunction:       ExprT -> ExprT
         CutOutsideRange:    bool
-        }
+    } with
+        override x.Equals(yobj) =
+            match yobj with
+            | :? HyperPars as y -> 
+                let v = Expr.var<single> "v" [SizeSpec.symbol "n"]
+                x.Kernel = y.Kernel &&
+                x.MeanFunction v = y.MeanFunction v &&
+                x.CutOutsideRange = y.CutOutsideRange
+            | _ -> false
+        override x.GetHashCode() =
+            hash (x.Kernel, x.CutOutsideRange)
     
 
     ///The dafault hyperparameters.
