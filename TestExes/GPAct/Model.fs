@@ -6,6 +6,9 @@ open GPUtils
 
 /// Propagates normal distributions through non-linearities described by GPs.
 module GPActivation =
+    
+    type OutputMode =
+        MeanOnly | MeanVariance | MeanCovariance
 
     /// Hyper-parameters of the model.
     type HyperPars = {
@@ -17,6 +20,8 @@ module GPActivation =
 
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
+
+        OutputMode:             OutputMode
 
         /// if true mean stays at firt / last train value
         /// if input is outside the range of training values
@@ -49,6 +54,7 @@ module GPActivation =
         NGPs                  = SizeSpec.fix 0
         NOutput               = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
+        OutputMode            = MeanVariance
         CutOutsideRange       = false
         LengthscalesTrainable = true
         TrnXTrainable         = true
@@ -372,16 +378,18 @@ module GPActivation =
         let predCovWithoutVar = betaTbeta - mkml
         //let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
+        let predCov =
+            match pars.HyperPars.OutputMode with
+            // create zero matrix the size of the covariance matrix
+            | MeanOnly          -> Expr.zeros<single> [nSmpls;nOutput;nOutput]
+            // create matrix with diagonal variance in lowest dimensions
+            | MeanVariance      -> setCovDiag nSmpls nOutput (Expr.zeros<single> [nSmpls;nOutput;nOutput]) predVar
+            // replace diagonal in pred_cov_without_var by pred_var
+            | MeanCovariance    -> setCovDiag nSmpls nOutput predCovWithoutVar predVar
         // replace diagonal in pred_cov_without_var by pred_var
         let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
-        //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        let noCov = Expr.zeros<single> [nSmpls;nOutput;nOutput]
-
-        let predVar = setCovDiag nSmpls nOutput noCov predVar
-
-//        predMean, predCov, regTerm
-        predMean, predVar, regTerm
+        predMean, predCov, regTerm
 
 /// Propagates a normal distribution through a weight matrix.
 module WeightTransform =
