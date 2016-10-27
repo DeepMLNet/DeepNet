@@ -320,7 +320,7 @@ module GPActivation =
             Expr.reshape [nOutput; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nOutput; SizeSpec.broadcastable; nTrnSmpls] beta
         //let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
-
+        
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
         // is equivalent to: [smpl, gp, trn_smpl, 1*] * [smpl, gp, 1*, trn_smpl]
