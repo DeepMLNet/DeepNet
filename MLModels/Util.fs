@@ -43,6 +43,11 @@ module ActivationFunc =
         let one = Expr.scalarOfSameType x 1        
         one / (one + exp (-x))
 
+    let alternativeSigmoid (x:ExprT) =
+        let one = Expr.scalarOfSameType x 1
+        let two = Expr.scalarOfSameType x 2
+        (tanh (x / two) + one) / two
+
     /// Soft-max activation function.
     /// The second dimension enumerates the possible classes.
     let softmax (x: ExprT) =

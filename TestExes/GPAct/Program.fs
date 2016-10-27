@@ -45,7 +45,7 @@ module Main =
         //SymTensor.Compiler.Cuda.Debug.TerminateAfterRecipeGeneration <- true
 //        SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
 
-        let argv = [|"..\..\Cfgs\GP1\GP1.fsx"|]
+//        let argv = [|"..\..\Cfgs\GP1\GP1.fsx"|]
 
         // parsing command line input
         let parser = ArgumentParser.Create<CLIArguments> (helpTextMessage="Trains a model using a config file.",

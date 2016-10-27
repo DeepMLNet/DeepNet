@@ -297,8 +297,9 @@ module GPActivation =
                 let dpredMeanddX = dKkDx .*  beta 
                                    |> Expr.checkFinite "dpredMeanddX"
                 // exp(x > 88.0f) -> infinity for CUDA implementation of sigmoid this somehow leads to nan
-                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
-                |> ActivationFunc.sigmoid 
+//                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
+                (dpredMeanddX / v)
+                |> ActivationFunc.alternativeSigmoid 
                 |> Expr.mean
             | None  ->Expr.zeroOfSameType mu
 
@@ -375,7 +376,12 @@ module GPActivation =
         let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
         //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
-        predMean, predCov, regTerm
+        let noCov = Expr.zeros<single> [nSmpls;nOutput;nOutput]
+
+        let predVar = setCovDiag nSmpls nOutput noCov predVar
+
+//        predMean, predCov, regTerm
+        predMean, predVar, regTerm
 
 /// Propagates a normal distribution through a weight matrix.
 module WeightTransform =

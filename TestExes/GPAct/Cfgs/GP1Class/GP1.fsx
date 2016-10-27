@@ -35,7 +35,7 @@ let cfg = {
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-1.0f, 1.0f)
                                              TrnSigmaInit          = Const (sqrt 0.01f)
-                                             Monotonicity          = Some 0.0001f}}
+                                             Monotonicity          = Some 1e-4f}}
                        
                        NeuralLayer
                          {NeuralLayer.defaultHyperPars with 

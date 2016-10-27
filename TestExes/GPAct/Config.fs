@@ -113,7 +113,7 @@ module ConfigLoader =
                     let pars = GPActivationLayer.pars (mb.Module name) hp
                     gpLayers <- gpLayers |> Map.add name pars
                     let predMean, predVar, regGP = GPActivationLayer.pred pars (mean, var)
-                    predMean, GPUtils.covZero predMean, reg + regGP
+                    predMean, predVar, reg + regGP
                 | MeanOnlyGPLayer hp ->
                     let name = (sprintf "MeanOnlyGPLayer%d" layerIdx)
                     let pars = MeanOnlyGPLayer.pars (mb.Module name) hp
