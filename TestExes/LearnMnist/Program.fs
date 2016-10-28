@@ -13,7 +13,7 @@ let main argv =
 
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
 
-    let mnist = if device = DevCuda then TrnValTst.ToCuda mnist else mnist
+    let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
 
     let mb = ModelBuilder<single> "NeuralNetModel"
 
