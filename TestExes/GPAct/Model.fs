@@ -387,7 +387,6 @@ module GPActivation =
             // replace diagonal in pred_cov_without_var by pred_var
             | MeanCovariance    -> setCovDiag nSmpls nOutput predCovWithoutVar predVar
         // replace diagonal in pred_cov_without_var by pred_var
-        let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
 
         predMean, predCov, regTerm
 
