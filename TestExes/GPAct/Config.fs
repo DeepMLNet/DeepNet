@@ -203,8 +203,11 @@ module ConfigLoader =
         
         // For classification return Some (unit -> unit) function to print classification error
         // otherwise return None.
+        let isClassifivation = (cfg.Model.Loss = LossLayer.CrossEntropy) ||
+                               (cfg.Model.Loss = LossLayer.BinaryCrossEntropy) ||
+                               (cfg.Model.Loss = LossLayer.SoftMaxCrossEntropy)
         let errorPrint = 
-            if (cfg.Model.Loss = LossLayer.CrossEntropy) || (cfg.Model.Loss = LossLayer.BinaryCrossEntropy) then 
+            if isClassifivation then 
                 let printFn () = ClassificationError.printErrors cfg.Training.BatchSize dataset predFn
                 Some printFn
             else
