@@ -5,7 +5,6 @@ open System.IO.Compression
 open System.Net
 open FSharp.Data
 open FSharp.Data.CsvExtensions
-
 open ArrayNDNS
 
 
@@ -29,7 +28,7 @@ module private TryParser =
 
 
 module CsvLoader =
-
+    open Util
     type private Category = string
 
     type private ColumnType =
@@ -177,10 +176,9 @@ module CsvLoader =
             let targets, inputs =
                 List.indexed smpl
                 |> List.partition (fun (idx, _) -> targetCols |> List.contains idx)
-            let targets = targets |> List.map snd
-            let inputs = inputs |> List.map snd
-
-            {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0 targets}
+            let targets = targets |> List.map snd |> (List.map (fun t -> Util.nonScalar t))
+            let inputs = inputs |> List.map snd |> (List.map (fun t -> Util.nonScalar t))
+            {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0  targets}
         )
     
 
