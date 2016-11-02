@@ -28,11 +28,11 @@ let cfg = {
                          {NeuralLayer.defaultHyperPars with
                               NInput        = nHidden
                               NOutput       = ConfigLoader.NOutput()
-                              TransferFunc  = NeuralLayer.SoftMax
+                              TransferFunc  = NeuralLayer.Identity
                               WeightsTrainable = true
                               BiasTrainable = true}
                       ]
-             Loss   = LossLayer.CrossEntropy
+             Loss   = LossLayer.SoftMaxCrossEntropy
              }
 
     //dataset from https://archive.ics.uci.edu/ml/machine-learning-databases/letter-recognition/letter-recognition.data
