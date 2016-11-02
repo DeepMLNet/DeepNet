@@ -145,11 +145,9 @@ module NeuralLayer =
             if pars.HyperPars.BiasTrainable then pars.Bias
             else Expr.assumeZeroDerivative pars.Bias
         let activation = input .* weights.T + bias
-        let one = Expr.scalarOfSameType activation 1
-        let two = Expr.scalarOfSameType activation 2
         match pars.HyperPars.TransferFunc with
         | Tanh     -> tanh activation
-        | Sigmoid  -> (tanh (activation / two) + one) / two
+        | Sigmoid  -> ActivationFunc.alternativeSigmoid activation
         | SoftMax  -> 
             let c = activation |> Expr.maxKeepingAxis 1
             let y = exp (activation - c)
