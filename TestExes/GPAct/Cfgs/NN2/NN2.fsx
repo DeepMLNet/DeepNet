@@ -10,8 +10,8 @@ open Optimizers
 open GPAct
 
 
-let nHidden1 = SizeSpec.fix 30
-let nHidden2 = SizeSpec.fix 30
+let nHidden1 = SizeSpec.fix 10
+let nHidden2 = SizeSpec.fix 10
 
 
 let cfg = {
@@ -47,7 +47,7 @@ let cfg = {
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [8]
                            IntTreatment     = CsvLoader.IntAsNumerical
-                           CategoryEncoding = CsvLoader.OneHot
+                           CategoryEncoding = CsvLoader.OrderedInt
                            Missing          = CsvLoader.SkipRow}}        
                                             
     Optimizer = Adam Adam.DefaultCfg
