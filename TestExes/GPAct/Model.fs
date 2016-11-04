@@ -122,7 +122,7 @@ module GPActivation =
     
     ///The covariance of training vectors and input vector 
     ///by GP instances with squared exponential covariance.
-    let lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
+    let lkEx nSmpls nGps nTrnSmpls mu sigma lengthscales (trnX:ExprT) =
         // lk element expression
         // inputs  l[gp]
         //         x[gp, trn_smpl]
@@ -140,7 +140,18 @@ module GPActivation =
         let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
         let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
-        Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
+
+        let lk = Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
+        lk
+//        let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let filler = (Expr.scalar 1.0f) |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let mu = mu |> Expr.reshape [nSmpls;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        printfn "Filler shape = %A" filler.Shape
+//        printfn "lk shape = %A" lk.Shape
+//        let lk = Expr.ifThenElse (mu <<<< xFirst) filler lk
+//        Expr.ifThenElse (mu >>>> xLast) (- filler) lk
+
 
     ///Elementwise matrix needed for calculation of the variance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
@@ -269,32 +280,44 @@ module GPActivation =
         //let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
+        let lk = lkEx nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
         //let lk = lk |> Expr.dump "lk"
-        
+
+
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
         let beta = KkInv .* trnT
         //let beta = beta |> Expr.dump "beta"
-
+        
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
-        let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
-        let predMean = predMean |> Expr.checkFinite "pred_mean"
-        
-        //let predMean = pred_mean |> Expr.dump "pred_mean"
         let predMean = 
             if pars.HyperPars.CutOutsideRange then
                 let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
                 let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-
-                let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
-                Expr.ifThenElse (mu >>>> xLast) tLast predMean
+                let mu =Expr.ifThenElse (mu <<<< xFirst) xFirst mu
+                let mu =Expr.ifThenElse (mu >>>> xLast) xLast mu
+                let lk = lkEx nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
+                lk * Expr.padLeft beta |> Expr.sumAxis 2
             else
-                predMean
+                lk * Expr.padLeft beta |> Expr.sumAxis 2
+
+        let predMean = predMean |> Expr.checkFinite "pred_mean"
+        
+//        //let predMean = pred_mean |> Expr.dump "pred_mean"
+//        let predMean = 
+//            if pars.HyperPars.CutOutsideRange then
+//                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tFirstJac = (Deriv.compute tFirst).Jacobians
+//                let tLastJac = (Deriv.compute tLast).Jacobians
+//                let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
+//                Expr.ifThenElse (mu >>>> xLast) tLast predMean
+//            else
+//                predMean
 
         let regTerm =
             match pars.HyperPars.Monotonicity with
