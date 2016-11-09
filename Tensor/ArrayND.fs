@@ -656,6 +656,30 @@ module ArrayND =
     let inline view ranges a =
         relayout (ArrayNDLayout.view ranges (layout a)) a        
     
+    /// Ensures that the tensor has at least one dimension.
+    let atLeast1D a =
+        if nDims a >= 1 then a
+        else a |> reshape [nElems a]
+
+    /// Ensures that the tensor has at least two dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast2D a =
+        if nDims a >= 2 then a
+        else a |> reshape [1; nElems a]
+
+    /// Ensures that the tensor has at least three dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast3D a =
+        if nDims a >= 3 then a
+        else a |> reshape [1; 1; nElems a]
+
+    /// Ensures that the tensor has at least four dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast4D a =
+        if nDims a >= 4 then a
+        else a |> reshape [1; 1; 1; nElems a]
+
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // array creation functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
