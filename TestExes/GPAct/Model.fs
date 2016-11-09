@@ -328,7 +328,7 @@ module GPActivation =
                 // exp(x > 88.0f) -> infinity for CUDA implementation of sigmoid this somehow leads to nan
 //                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
                 (dpredMeanddX / v)
-                |> ActivationFunc.alternativeSigmoid 
+                |> ActivationFunc.sigmoid 
                 |> Expr.mean
             | None  ->Expr.zeroOfSameType mu
 

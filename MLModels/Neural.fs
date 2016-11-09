@@ -58,9 +58,9 @@ module NeuralLayer =
         | Sigmoid
         /// soft-max transfer function 
         /// (use SoftMaxCrossEntropy loss measure if possible)
-        | SoftMax
+        | Softmax
         /// logarithm of soft-max transfer function
-        | LogSoftMax
+        | LogSoftmax
         /// no transfer function
         | Identity
 
@@ -144,18 +144,13 @@ module NeuralLayer =
         let bias = 
             if pars.HyperPars.BiasTrainable then pars.Bias
             else Expr.assumeZeroDerivative pars.Bias
-        let activation = input .* weights.T + bias
+        let act = input .* weights.T + bias
         match pars.HyperPars.TransferFunc with
-        | Tanh     -> tanh activation
-        | Sigmoid  -> ActivationFunc.alternativeSigmoid activation
-        | SoftMax  -> 
-            let c = activation |> Expr.maxKeepingAxis 1
-            let y = exp (activation - c)
-            y / Expr.sumKeepingAxis 1 y
-        | LogSoftMax -> 
-            let c = input |> Expr.maxKeepingAxis 1
-            input - c - log (Expr.sumKeepingAxis 1 (exp (input - c))) 
-        | Identity -> activation
+        | Tanh     -> ActivationFunc.tanh act
+        | Sigmoid  -> ActivationFunc.sigmoid act
+        | Softmax  -> ActivationFunc.softmax act
+        | LogSoftmax -> ActivationFunc.logSoftmax act
+        | Identity -> act
 
     /// Calculates sum of all regularization terms of this layer.
     let regularizationTerm pars  =
