@@ -6,6 +6,9 @@ open GPUtils
 
 /// Propagates normal distributions through non-linearities described by GPs.
 module GPActivation =
+    
+    type OutputMode =
+        MeanOnly | MeanVariance | MeanCovariance
 
     /// Hyper-parameters of the model.
     type HyperPars = {
@@ -17,6 +20,8 @@ module GPActivation =
 
         /// number of training points for each GP
         NTrnSmpls:              SizeSpecT
+
+        OutputMode:             OutputMode
 
         /// if true mean stays at firt / last train value
         /// if input is outside the range of training values
@@ -49,6 +54,7 @@ module GPActivation =
         NGPs                  = SizeSpec.fix 0
         NOutput               = SizeSpec.fix 0
         NTrnSmpls             = SizeSpec.fix 10
+        OutputMode            = MeanVariance
         CutOutsideRange       = false
         LengthscalesTrainable = true
         TrnXTrainable         = true
@@ -116,7 +122,7 @@ module GPActivation =
     
     ///The covariance of training vectors and input vector 
     ///by GP instances with squared exponential covariance.
-    let lk nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
+    let lkEx nSmpls nGps nTrnSmpls mu sigma lengthscales (trnX:ExprT) =
         // lk element expression
         // inputs  l[gp]
         //         x[gp, trn_smpl]
@@ -134,7 +140,18 @@ module GPActivation =
         let lk1 = sqrt ( (l [gp])***2.0f / ((l [gp])***2.0f + s [smpl; gp; gp]) )
         let lk2 = exp ( -( (m [smpl; gp] - x [gp; trn_smpl])***2.0f / (2.0f * ((l [gp])***2.0f + s [smpl; gp; gp])) ) )
         let lk = lk1 * lk2
-        Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
+
+        let lk = Expr.elements [nSmpls; nGps; nTrnSmpls] lk [mu; sigma; lengthscales; trnX]
+        lk
+//        let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let filler = (Expr.scalar 1.0f) |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        let mu = mu |> Expr.reshape [nSmpls;nGps;SizeSpec.broadcastable]|> Expr.broadcast [nSmpls;nGps;nTrnSmpls]
+//        printfn "Filler shape = %A" filler.Shape
+//        printfn "lk shape = %A" lk.Shape
+//        let lk = Expr.ifThenElse (mu <<<< xFirst) filler lk
+//        Expr.ifThenElse (mu >>>> xLast) (- filler) lk
+
 
     ///Elementwise matrix needed for calculation of the variance prediction.
     let L nSmpls nGps nTrnSmpls mu sigma lengthscales trnX =
@@ -263,32 +280,44 @@ module GPActivation =
         //let Kk_inv = Kk_inv |> Expr.dump "Kk_inv"
         
         // lk [smpl, gp, trn_smpl]
-        let lk = lk nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
+        let lk = lkEx nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
         let lk = lk |> Expr.checkFinite "lk"
         //let lk = lk |> Expr.dump "lk"
-        
+
+
         // ([gp, trn_smpl1, trn_smpl2] .* [gp, trn_smpl])       
         // ==> beta [gp, trn_smpl]
         let beta = KkInv .* trnT
         //let beta = beta |> Expr.dump "beta"
-
+        
         // ==> sum ( [smpl, gp, trn_smpl] * beta[1*, gp, trn_smpl], trn_smpl)
         // ==> pred_mean [smpl, gp]
-        let predMean = lk * Expr.padLeft beta |> Expr.sumAxis 2
-        let predMean = predMean |> Expr.checkFinite "pred_mean"
-        
-        //let predMean = pred_mean |> Expr.dump "pred_mean"
         let predMean = 
             if pars.HyperPars.CutOutsideRange then
                 let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
                 let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
-
-                let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
-                Expr.ifThenElse (mu >>>> xLast) tLast predMean
+                let mu =Expr.ifThenElse (mu <<<< xFirst) xFirst mu
+                let mu =Expr.ifThenElse (mu >>>> xLast) xLast mu
+                let lk = lkEx nSmpls nOutput nTrnSmpls mu sigma lengthscales trnX
+                lk * Expr.padLeft beta |> Expr.sumAxis 2
             else
-                predMean
+                lk * Expr.padLeft beta |> Expr.sumAxis 2
+
+        let predMean = predMean |> Expr.checkFinite "pred_mean"
+        
+//        //let predMean = pred_mean |> Expr.dump "pred_mean"
+//        let predMean = 
+//            if pars.HyperPars.CutOutsideRange then
+//                let xFirst = trnX.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tFirst = trnT.[*,0] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let xLast = trnX.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tLast = trnT.[*,nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable;nOutput]|> Expr.broadcast [nSmpls;nOutput]
+//                let tFirstJac = (Deriv.compute tFirst).Jacobians
+//                let tLastJac = (Deriv.compute tLast).Jacobians
+//                let predMean = Expr.ifThenElse (mu <<<< xFirst) tFirst predMean
+//                Expr.ifThenElse (mu >>>> xLast) tLast predMean
+//            else
+//                predMean
 
         let regTerm =
             match pars.HyperPars.Monotonicity with
@@ -297,7 +326,8 @@ module GPActivation =
                 let dpredMeanddX = dKkDx .*  beta 
                                    |> Expr.checkFinite "dpredMeanddX"
                 // exp(x > 88.0f) -> infinity for CUDA implementation of sigmoid this somehow leads to nan
-                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
+//                Expr.maxElemwise (dpredMeanddX / v) ((Expr.zerosLike dpredMeanddX) - 88.0f)
+                (dpredMeanddX / v)
                 |> ActivationFunc.sigmoid 
                 |> Expr.mean
             | None  ->Expr.zeroOfSameType mu
@@ -313,7 +343,7 @@ module GPActivation =
             Expr.reshape [nOutput; nTrnSmpls; SizeSpec.broadcastable] beta *
             Expr.reshape [nOutput; SizeSpec.broadcastable; nTrnSmpls] beta
         //let betaBetaT = betaBetaT |> Expr.dump "betaBetaT"
-
+        
         // lkLkT = lk .* lk.T
         // [smpl, gp, trn_smpl, 1] .* [smpl, gp, 1, trn_smpl] ==> [smpl, gp, trn_smpl, trn_smpl]
         // is equivalent to: [smpl, gp, trn_smpl, 1*] * [smpl, gp, 1*, trn_smpl]
@@ -371,9 +401,15 @@ module GPActivation =
         let predCovWithoutVar = betaTbeta - mkml
         //let pred_cov_without_var = pred_cov_without_var |> Expr.dump "pred_cov_without_var"
 
+        let predCov =
+            match pars.HyperPars.OutputMode with
+            // create zero matrix the size of the covariance matrix
+            | MeanOnly          -> Expr.zeros<single> [nSmpls;nOutput;nOutput]
+            // create matrix with diagonal variance in lowest dimensions
+            | MeanVariance      -> setCovDiag nSmpls nOutput (Expr.zeros<single> [nSmpls;nOutput;nOutput]) predVar
+            // replace diagonal in pred_cov_without_var by pred_var
+            | MeanCovariance    -> setCovDiag nSmpls nOutput predCovWithoutVar predVar
         // replace diagonal in pred_cov_without_var by pred_var
-        let predCov = setCovDiag nSmpls nOutput predCovWithoutVar predVar
-        //let pred_cov = pred_cov |> Expr.dump "pred_cov"
 
         predMean, predCov, regTerm
 

@@ -11,7 +11,7 @@ open GPAct
 
 
 let nHiddenUnits = SizeSpec.fix 30
-let nHiddenGps =SizeSpec.fix 10
+let nHiddenGps =SizeSpec.fix 1
 
 let cfg = {
 
@@ -26,16 +26,17 @@ let cfg = {
                                              NGPs                  = nHiddenGps
                                              NOutput               = nHiddenUnits
                                              NTrnSmpls             = SizeSpec.fix 10
+                                             OutputMode            = GPActivation.MeanOnly
                                              CutOutsideRange       = true
-                                             LengthscalesTrainable = true
-                                             TrnXTrainable         = true
-                                             TrnTTrainable         = true
+                                             LengthscalesTrainable = false
+                                             TrnXTrainable         = false
+                                             TrnTTrainable         = false
                                              TrnSigmaTrainable     = false
-                                             LengthscalesInit      = Const 0.4f
+                                             LengthscalesInit      = Const 1.0f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
-                                             TrnTInit              = Linspaced (-1.0f, 1.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.01f)
-                                             Monotonicity          = Some 1e-4f}}
+                                             TrnTInit              = FunOfLinspaced (-2.0f, 2.0f,(fun x -> tanh x) )
+                                             TrnSigmaInit          = Const (sqrt 0.0f)
+                                             Monotonicity          = None}}
                        
                        NeuralLayer
                          {NeuralLayer.defaultHyperPars with 

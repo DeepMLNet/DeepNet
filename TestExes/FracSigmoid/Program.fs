@@ -101,8 +101,8 @@ module Program =
         let fullData = 
             CsvLoader.loadFile cfg.Data.Parameters cfg.Data.Path
             |> Seq.shuffle 100
-        let fullDataset = Dataset.FromSamples fullData
-        let dataset = TrnValTst.Of fullDataset |> TrnValTst.ToCuda
+        let fullDataset = Dataset.ofSeqSamples fullData
+        let dataset = TrnValTst.ofDataset fullDataset |> TrnValTst.toCuda
         
         // build model
         let mutable tblLayers = Map.empty

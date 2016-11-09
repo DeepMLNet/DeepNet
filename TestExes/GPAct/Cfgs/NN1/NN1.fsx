@@ -38,13 +38,13 @@ let cfg = {
             Parameters = {CsvLoader.DefaultParameters with
                            TargetCols       = [8]
                            IntTreatment     = CsvLoader.IntAsNumerical
-                           CategoryEncoding = CsvLoader.OneHot
+                           CategoryEncoding = CsvLoader.OrderedInt
                            Missing          = CsvLoader.SkipRow}}        
                                             
     Optimizer = Adam Adam.DefaultCfg
 
     Training = {Train.defaultCfg with 
-                 MinIters  = Some 1000
+                 MinIters  = Some 5000
                  BatchSize = System.Int32.MaxValue
                  MaxIters  = None}
 

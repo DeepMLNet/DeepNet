@@ -10,9 +10,9 @@ open Optimizers
 open GPAct
 
 
-let nHidden1 = SizeSpec.fix 10
+let nHidden1 = SizeSpec.fix 30
 let nGPs1    = SizeSpec.fix 1
-let nHidden2 = SizeSpec.fix 10
+let nHidden2 = SizeSpec.fix 15
 let nGPs2    = SizeSpec.fix 1
 
 
@@ -38,7 +38,8 @@ let cfg = {
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-1.0f, 1.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.01f)}}
+                                             TrnSigmaInit          = Const (sqrt 0.01f)
+                                             Monotonicity          = Some 1e-4f}}
 
                        GPActivationLayer 
                         {WeightTransform = {WeightTransform.defaultHyperPars with
@@ -59,7 +60,8 @@ let cfg = {
                                              LengthscalesInit      = Const 0.4f
                                              TrnXInit              = Linspaced (-2.0f, 2.0f)
                                              TrnTInit              = Linspaced (-1.0f, 1.0f)
-                                             TrnSigmaInit          = Const (sqrt 0.01f)}}
+                                             TrnSigmaInit          = Const (sqrt 0.01f)
+                                             Monotonicity          = Some 1e-4f}}
                        
                        NeuralLayer
                          {NeuralLayer.defaultHyperPars with 

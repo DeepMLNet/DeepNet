@@ -49,6 +49,8 @@ module GPUtilsTypes =
         | Const of value:single
         /// linear spaced
         | Linspaced of first:single * last:single
+        /// function of linear spaced input values
+        | FunOfLinspaced of first:single * last:single * func:(single -> single)
         /// random
         | Random of lower:single * upper:single
         /// identity matrix
@@ -67,6 +69,11 @@ module GPUtils =
         | Const value -> ArrayNDHost.filled shp value
         | Linspaced (first, last) -> 
             ArrayNDHost.linSpaced first last shp.[1]
+            |> ArrayND.padLeft
+            |> ArrayND.replicate 0 shp.[0]
+        | FunOfLinspaced (first, last, f) ->
+            ArrayNDHost.linSpaced first last shp.[1]
+            |> ArrayND.map f
             |> ArrayND.padLeft
             |> ArrayND.replicate 0 shp.[0]
         | Random (lower, upper) ->

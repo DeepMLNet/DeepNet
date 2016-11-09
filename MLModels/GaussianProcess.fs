@@ -96,8 +96,17 @@ module GaussianProcess =
         let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
         let sizeX = Expr.nElems x
         let sizeY = Expr.nElems y
-        Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
-    
+
+        let kse = Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
+        kse
+//        let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
+//        let xLast = x.[sizeX - 1] |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
+//        let filler = (Expr.scalar 1.0f) |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
+//        let y = y |> Expr.reshape [SizeSpec.broadcastable;sizeY]|> Expr.broadcast [sizeX;sizeY]
+//        printfn "Filler shape = %A" filler.Shape
+//        printfn "lk shape = %A" kse.Shape
+//        let lk = Expr.ifThenElse (y <<<< xFirst) filler kse
+//        Expr.ifThenElse (y >>>> xLast) (-filler) lk
 
     /// Predict mean and covariance of f(x*|x,y,sigmaNs,pars)
     /// x:          train values
@@ -119,25 +128,36 @@ module GaussianProcess =
         let meanX = meanFct x
         let meanXStar = meanFct xStar
 
-
         let k = k  + Expr.diagMat sigmaNs
         let kInv        = Expr.invert k
+
         let kStar      = covMat x xStar
-        let mean = meanXStar + kStar.T .* kInv .* (y - meanX)
-        let cov = kStarStar - kStar.T .* kInv .* kStar
+
         let mean = 
             if cut then
-                let nTrnSmpls =x.NElems
-                let nSmpls = xStar.NElems
-                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-
-                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
-                Expr.ifThenElse (xStar >>>> xLast) yLast mean
+                let sizeX,sizeXStar = x.NElems,xStar.NElems
+                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [sizeXStar]
+                let xLast = x.[sizeX - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [sizeXStar]
+                let xStar = Expr.ifThenElse (xStar <<<< xFirst) xFirst xStar
+                let xStar = Expr.ifThenElse (xStar >>>> xLast) xLast xStar
+                let kStar = covMat x xStar
+                meanXStar + kStar.T .* kInv .* (y - meanX)
             else
-                mean
+                meanXStar + kStar.T .* kInv .* (y - meanX)
+        let cov = kStarStar - kStar.T .* kInv .* kStar
+//        let mean = 
+//            if cut then
+//                let nTrnSmpls =x.NElems
+//                let nSmpls = xStar.NElems
+//                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//
+//                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
+//                Expr.ifThenElse (xStar >>>> xLast) yLast mean
+//            else
+//                mean
         mean, cov
 
 

@@ -40,14 +40,22 @@ module ActivationFunc =
 
     /// sigmoid activation function
     let sigmoid (x: ExprT) =
-        let one = Expr.scalarOfSameType x 1        
-        one / (one + exp (-x))
+        let one = Expr.scalarOfSameType x 1
+        let two = Expr.scalarOfSameType x 2
+        (tanh (x / two) + one) / two
 
     /// Soft-max activation function.
     /// The second dimension enumerates the possible classes.
     let softmax (x: ExprT) =
-        // x[smpl, class]
-        exp x / (Expr.sumKeepingAxis 1 (exp x))
+        let c = x |> Expr.maxKeepingAxis 1
+        let y = exp (x - c)
+        y / Expr.sumKeepingAxis 1 y
+
+    /// Natural logarithm of soft-max activation function.
+    /// The second dimension enumerates the possible classes.
+    let logSoftmax (x: ExprT) =
+        let c = x |> Expr.maxKeepingAxis 1
+        x - c - log (Expr.sumKeepingAxis 1 (exp (x - c))) 
 
     /// applies the specified activation function
     let apply af x =

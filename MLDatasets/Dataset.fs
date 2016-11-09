@@ -6,7 +6,7 @@ open Microsoft.FSharp.Reflection
 
 open Basics
 open ArrayNDNS
-
+open Util
 
 /// A dataset of a record type 'S containing ArrayNDT<_> data variables.
 /// The first dimension of each record field is the sample.
