@@ -138,8 +138,8 @@ module GaussianProcess =
                 let meanYLast = meanFct yLast
                 let meanFirst = meanYFirst + kFirst .* kInv .* (y - meanX)
                 let meanLast = meanYLast + kLast .* kInv .* (y - meanX)
-                let mean = Expr.ifThenElse (xStar <<<< xFirst) meanFirst mean
-                Expr.ifThenElse (xStar >>>> xLast) meanLast mean
+                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
+                Expr.ifThenElse (xStar >>>> xLast) yLast mean
             else
                 mean
         mean, cov
