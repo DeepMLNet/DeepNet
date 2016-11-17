@@ -99,19 +99,6 @@ module GaussianProcess =
 
         let kse = Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
         kse
-//        let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
-//        let xLast = x.[sizeX - 1] |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
-//        let filler = (Expr.scalar 1.0f) |> Expr.reshape [SizeSpec.broadcastable;SizeSpec.broadcastable]|> Expr.broadcast [sizeX;sizeY]
-//        let y = y |> Expr.reshape [SizeSpec.broadcastable;sizeY]|> Expr.broadcast [sizeX;sizeY]
-//        printfn "Filler shape = %A" filler.Shape
-//        printfn "lk shape = %A" kse.Shape
-//        let lk = Expr.ifThenElse (y <<<< xFirst) filler kse
-//        Expr.ifThenElse (y >>>> xLast) (-filler) lk
-
-    /// Predict mean and covariance of f(x*|x,y,sigmaNs,pars)
-    /// x:          train values
-    /// y:          f(x) + error
-    /// sigmaNs:    noise variance vector
     let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
         let covMat z z' =
             match pars with
@@ -134,30 +121,27 @@ module GaussianProcess =
         let kStar      = covMat x xStar
 
         let mean = 
-            if cut then
-                let sizeX,sizeXStar = x.NElems,xStar.NElems
-                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [sizeXStar]
-                let xLast = x.[sizeX - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [sizeXStar]
-                let xStar = Expr.ifThenElse (xStar <<<< xFirst) xFirst xStar
-                let xStar = Expr.ifThenElse (xStar >>>> xLast) xLast xStar
-                let kStar = covMat x xStar
-                meanXStar + kStar.T .* kInv .* (y - meanX)
-            else
-                meanXStar + kStar.T .* kInv .* (y - meanX)
+            meanXStar + kStar.T .* kInv .* (y - meanX)
         let cov = kStarStar - kStar.T .* kInv .* kStar
-//        let mean = 
-//            if cut then
-//                let nTrnSmpls =x.NElems
-//                let nSmpls = xStar.NElems
-//                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-//                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-//                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-//                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-//
-//                let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
-//                Expr.ifThenElse (xStar >>>> xLast) yLast mean
-//            else
-//                mean
+        let mean = 
+            if cut then
+                let nTrnSmpls =x.NElems
+                let nSmpls = xStar.NElems
+                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let epsilon = 1e-27f
+                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let kFirst = covMat yFirst x
+                let kLast = covMat yLast x
+                let meanYFirst = meanFct yFirst
+                let meanYLast = meanFct yLast
+                let meanFirst = meanYFirst + kFirst .* kInv .* (y - meanX)
+                let meanLast = meanYLast + kLast .* kInv .* (y - meanX)
+                let mean = Expr.ifThenElse (xStar <<<< xFirst) meanFirst mean
+                Expr.ifThenElse (xStar >>>> xLast) meanLast mean
+            else
+                mean
         mean, cov
 
 
