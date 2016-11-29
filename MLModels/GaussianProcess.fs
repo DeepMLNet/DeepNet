@@ -132,12 +132,6 @@ module GaussianProcess =
                 let epsilon = 1e-27f
                 let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
                 let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-//                let kFirst = covMat yFirst x
-//                let kLast = covMat yLast x
-//                let meanYFirst = meanFct yFirst
-//                let meanYLast = meanFct yLast
-//                let meanFirst = meanYFirst + kFirst .* kInv .* (y - meanX)
-//                let meanLast = meanYLast + kLast .* kInv .* (y - meanX)
                 let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
                 Expr.ifThenElse (xStar >>>> xLast) yLast mean
             else
