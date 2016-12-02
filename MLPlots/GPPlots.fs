@@ -52,8 +52,8 @@ module GPPlots =
                                              nInput,    config.NTest])
                 let newIdx = size + 1
                 modelConfigs <- modelConfigs.Add (newIdx, config)
-                models <- models.Add (newIdx,(pars, x, t, sigNs, inp ,mi))
-                pars, x, t, sigNs, inp ,mi
+                models <- models.Add (newIdx,(pars, x, t, sigNs, inp, mi))
+                pars, x, t, sigNs, inp, mi
                
 
         /// Creates num samples from in range minValue to maxValue with constant distance.
@@ -80,6 +80,27 @@ module GPPlots =
             let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaN sX
             sX, sMean, sCov, sStd
 
+
+        static member predictGPDeriv hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
+                (trnT: ArrayNDT<single>) (minValue:single, maxValue) nPoints =
+            let config = {HyperPars = hyperPars
+                          NTrain = trnX.NElems
+                          NTest = nPoints}
+            let pars, x, t, sigNs, inp, mi = Plots.getModel config
+
+            match pars, hyperPars.Kernel with
+            | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
+                mi.ParameterStorage.[parsSE.Lengthscale] <-ArrayNDHost.scalar l
+                mi.ParameterStorage.[parsSE.SignalVariance] <- ArrayNDHost.scalar s
+            | _ -> ()
+
+            let mean, _ = GaussianProcess.predict pars x t sigNs inp  
+            let dMeanDInp = Deriv.compute mean |> Deriv.ofVar inp |> Expr.diag                   
+            let dMeanDInpFn = mi.Func (dMeanDInp) |> arg4 x t sigNs inp
+        
+            let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
+            let sDMeanDInp = dMeanDInpFn trnX trnT sigmaN sX
+            sX, sDMeanDInp
 
         /// Plots a Gaussian Process with hyper parameters hyperpars, training noise trnSigma,
         /// train values trnX and train targets trnT.

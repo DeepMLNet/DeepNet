@@ -83,7 +83,7 @@ module NeuralLayer =
     }
 
     let defaultHyperPars = {
-        NInput               = SizeSpec.fix 0
+        NInput              = SizeSpec.fix 0
         NOutput             = SizeSpec.fix 0
         TransferFunc        = Tanh
         WeightsTrainable    = true
@@ -104,18 +104,14 @@ module NeuralLayer =
     }
 
     let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
+        let rng = System.Random seed
         let fanOut = shp.[0] |> float
         let fanIn = shp.[1] |> float
-        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
-        let rng = System.Random seed
-        
-        rng.SeqDouble(-r, r)
-        |> Seq.map conv<'T>
-        |> ArrayNDHost.ofSeqWithShape shp
+        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
+        rng.UniformArrayND (conv<'T> -r, conv<'T> r) shp
         
     let internal initBias seed (shp: int list) : ArrayNDHostT<'T> =
-        Seq.initInfinite (fun _ -> conv<'T> 0)
-        |> ArrayNDHost.ofSeqWithShape shp
+        ArrayNDHost.zeros shp
 
     /// Creates the parameters for the neural-layer in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
