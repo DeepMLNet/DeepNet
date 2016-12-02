@@ -36,7 +36,9 @@ module VarEnv =
 
     /// get variable value from environment
     let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #IArrayNDT =
-        varEnv.[vs] |> box |> unbox
+        match varEnv |> Map.tryFind vs with
+        | Some v -> v |> box |> unbox
+        | None -> failwithf "variable %A is not present in the specified VarEnv" vs
 
     /// add variable value to environment
     let add (var: Expr.ExprT) (value: #IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
