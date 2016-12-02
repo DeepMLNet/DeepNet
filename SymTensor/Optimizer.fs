@@ -96,7 +96,7 @@ module Optimizer =
                     let sumArg = ElemExpr.argElemWithType typ sumArgPos sumArgIdx
 
                     // add summation dimension to the right
-                    let sumElems = last - first - 1
+                    let sumElems = last - first + 1
                     let sumandShape = resShape @ [sumElems]
                     let sumandIdx = first + ElemExpr.idx nDims
 
