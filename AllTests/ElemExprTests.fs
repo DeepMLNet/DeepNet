@@ -397,3 +397,91 @@ let ``Eval and derive: lkse`` () =
     printfn "dlkse / dsigma=\n%A" dlk1Val
     printfn "dlkse / dx=\n%A" dlk2Val
     printfn "dlkse / dl=\n%A" dlk3Val
+
+
+[<Fact>]
+let ``DerivTest: GP Predict`` () =   
+    /// squared exponential covariance matrix
+    let sqExpCov (l:ExprT, sigf:ExprT) x y =
+        let x_smpl, y_smpl = ElemExpr.idx2
+        let xvec, yvec,len,sigmaf = ElemExpr.arg4<double>
+        let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0) / (2.0 * len[] *** 2.0) )
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX; sizeY] kse [x; y; l; sigf]
+
+    // variables
+    let nTrnSmpls = SizeSpec.fix 5
+    let nTstSmpls = SizeSpec.fix 4
+    let l = Expr.var<double> "l" []
+    let sigf = Expr.var<double> "sigf" []
+    let x = Expr.var<double> "x" [nTrnSmpls]
+    let t = Expr.var<double> "t" [nTrnSmpls]
+    let sign = Expr.var<double> "sign" [nTrnSmpls]
+    let x' = Expr.var<double> "x'" [nTstSmpls]
+
+    // GP prediction
+    let k  = sqExpCov (l, sigf) x x + Expr.diagMat sign
+    let k' = sqExpCov (l, sigf) x' x
+    let mean = k' .* (Expr.invert k) .* t
+
+    // do check
+    let xv = ArrayNDHost.linSpaced -4.0 4.0 5
+    let x'v = ArrayNDHost.linSpaced -3.0 3.0 4
+    let varEnv = VarEnv.ofSeq [l, ArrayNDHost.scalar 1.0
+                               sigf, ArrayNDHost.scalar 1.0
+                               x, xv
+                               t, xv |> ArrayND.map tanh
+                               sign, 0.001 * ArrayND.onesLike xv
+                               x', x'v
+                              ]
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv mean
+
+
+[<Fact>]
+let ``DerivTest: GP Predict2`` () =   
+    /// squared exponential covariance matrix
+    let sqExpCov (l:ExprT, sigf:ExprT) x y =
+        let x_smpl, y_smpl = ElemExpr.idx2
+        let xvec, yvec,len,sigmaf = ElemExpr.arg4<double>
+        //let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0) / (2.0 * len[] *** 2.0) )
+        //let kse = exp  (-( (xvec[x_smpl] - yvec[y_smpl]) ) )
+        let kse = xvec[x_smpl] + yvec[y_smpl]
+        let sizeX = Expr.nElems x
+        let sizeY = Expr.nElems y
+        Expr.elements [sizeX; sizeY] kse [x; y; l; sigf]
+
+    // variables
+    let nTrnSmpls = SizeSpec.fix 15
+    let nTstSmpls = SizeSpec.fix 10
+    let l = Expr.scalar 1.0
+    let sigf = Expr.scalar 1.0
+    let x = Expr.var<double> "x" [nTrnSmpls]
+    let t = Expr.var<double> "t" [nTrnSmpls]
+    let sign = Expr.var<double> "sign" [nTrnSmpls]
+    let x' = Expr.var<double> "x'" [nTstSmpls]
+
+    // GP prediction
+    //let k  = sqExpCov (l, sigf) x x + Expr.diagMat sign
+    //let k  = Expr.identity<double> nTrnSmpls
+    let k' = sqExpCov (l, sigf) x' x
+    let mean = k' //.* t
+    //let mean = k' .* (Expr.invert k) .* t
+
+    let dmean = mean |> Deriv.compute |> Deriv.ofVar x
+    printfn "%A" dmean
+
+    // do check
+    let xv = ArrayNDHost.linSpaced -4.0 4.0 15
+    let x'v = ArrayNDHost.linSpaced -3.0 3.0 10
+    let varEnv = VarEnv.ofSeq [                               
+                               x, xv
+                               t, xv |> ArrayND.map tanh
+                               sign, 0.001 * ArrayND.onesLike xv
+                               x', x'v
+                              ]
+    //SymTensor.Debug.VisualizeUExpr <- true
+    //SymTensor.Debug.DisableOptimizer <- true 
+
+    DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv mean
+
