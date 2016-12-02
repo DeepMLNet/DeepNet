@@ -127,11 +127,14 @@ module GaussianProcess =
             if cut then
                 let nTrnSmpls =x.NElems
                 let nSmpls = xStar.NElems
-                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let epsilon = 1e-27f
-                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xFirst = x.[1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xLast = x.[nTrnSmpls - 2] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yFirst = y.[1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yLast = y.[nTrnSmpls - 2] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+//                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
                 let mean = Expr.ifThenElse (xStar <<<< xFirst) yFirst mean
                 Expr.ifThenElse (xStar >>>> xLast) yLast mean
             else
