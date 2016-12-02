@@ -83,7 +83,7 @@ module NeuralLayer =
     }
 
     let defaultHyperPars = {
-        NInput               = SizeSpec.fix 0
+        NInput              = SizeSpec.fix 0
         NOutput             = SizeSpec.fix 0
         TransferFunc        = Tanh
         WeightsTrainable    = true
