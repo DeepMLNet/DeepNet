@@ -67,6 +67,6 @@ module RandomExtensions =
         /// Generates an array of random elements x ~ N(mean,variance)
         member this.NormalArrayND (mean: 'T, variance: 'T) shp  =
             let mean, variance = conv<float> mean, conv<float> variance
-            this.NormalDouble mean variance
+            this.NormalDouble mean variance |> Seq.map conv<'T>
             |> ArrayNDNS.ArrayNDHost.ofSeqWithShape shp
 
