@@ -72,10 +72,10 @@ module CsvLoader =
         Separators          = " \t,"    
     }
 
-    type CsvSample = {
-        Input:              ArrayNDT<single>
-        Target:             ArrayNDT<single>
-    }
+//    type CsvSample = {
+//        Input:              ArrayNDT<single>
+//        Target:             ArrayNDT<single>
+//    }
 
 
     let private loadRowTypes (intTreatment: IntTreatment) (csv: CsvFile) : RowTypes =
