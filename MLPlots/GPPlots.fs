@@ -2,6 +2,7 @@
 
 open SymTensor.Compiler.Cuda
 open RProvider.graphics
+open RProvider.plotrix
 open Models
 open ArrayNDNS
 open SymTensor
@@ -121,6 +122,8 @@ module GPPlots =
             let sStd = sStd |> toFloatList 
             let trainX = trnX |> toFloatList
             let trainT = trnT |> toFloatList
+            let trainTUpper = trnT + trnSigma |> toFloatList
+            let trainTLower = trnT - trnSigma |> toFloatList
             let upperStdev = List.map2 (fun m s-> m + s) sMean sStd |> List.rev
             let lowerStdev = List.map2 (fun m s-> m - s) sMean sStd
             let revX = List.rev sX
@@ -130,34 +133,36 @@ module GPPlots =
         
             R.lock (fun () ->
                 namedParams [   
-                     "x", box sX
-                     "y", box sMean
-                     "ylim", box [minY; maxY]
-                     "col", box "red"
-                     "type", box "n"
-                     "xlab", box "x"
-                     "ylab", box "y"]
+                     "x",       box sX
+                     "y",       box sMean
+                     "ylim",    box [minY; maxY]
+                     "col",     box "blue"
+                     "type",    box "n"
+                     "xlab",    box "x"
+                     "ylab",    box "y"]
                 |> R.plot |> ignore
                 namedParams [   
-                     "x", box (sX @ revX)
-                     "y", box (lowerStdev @ upperStdev)
-                     "col", box "beige"
+                     "x",       box (sX @ revX)
+                     "y",       box (lowerStdev @ upperStdev)
+                     "col",     box "beige"
                      "border" , box "NA"]
                 |> R.polygon |>ignore
                 namedParams [ 
-                    "x", box sX
-                    "y", box sMean
-                    "col", box "black"
-                    "type", box "l"
-                    "size", box 2]
+                    "x",        box sX
+                    "y",        box sMean
+                    "col",      box "black"
+                    "type",     box "l"
+                    "size",     box 2]
                 |> R.lines |>ignore
                 namedParams [ 
-                    "x", box trainX
-                    "y", box trainT
-                    "col", box "red"
-                    "type", box "p"
-                    "size", box 2]
-                |> R.lines |>ignore
+                    "x",        box trainX
+                    "y",        box trainT
+                    "ui",       box trainTUpper
+                    "li",       box trainTLower
+                    "pch",      box "."
+                    "col",      box "red"
+                    "add",      box true]
+                |> R.plotCI |>ignore
             )
 
             ()
