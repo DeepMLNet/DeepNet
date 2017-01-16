@@ -194,10 +194,9 @@ module CsvLoader =
             let targets = targets |> List.map snd |> List.map ArrayND.atLeast1D
             let inputs = inputs |> List.map snd |> List.map ArrayND.atLeast1D
             {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0  targets}
-        )
-    
+        ) 
 
-    let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) =
+    let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) (samples: DataSampleT seq) =
         let printField isHead s = 
             let fieldLen = 17
             let pad = if isHead then "-" else " " 
@@ -224,11 +223,11 @@ module CsvLoader =
             else
                 headPrintf "%d" i
         printfn ""
-        for row in Seq.take 5 data do
+        for row, smpl in Seq.take 5 (Seq.zip data samples) do
             for d in row do
                 fieldPrintf "%A" d
             printfn ""
-        printfn ""
+            //printfn "Input=%s   Target=%s" smpl.Input.Full smpl.Target.Full
 
     let loadFromReader (pars: Parameters) (reader: unit -> TextReader) = 
         let csv () = CsvFile.Load(reader(), separators=pars.Separators, quote='"', hasHeaders=false)
@@ -237,7 +236,7 @@ module CsvLoader =
         let data = loadData rowTypes (csv ()) 
         let dataArrays = fieldsToArrayNDs pars.Missing pars.CategoryEncoding rowTypes categoryTables pars.TargetCols data 
         let samples = toCsvSamples pars.TargetCols dataArrays 
-        printInfo pars rowTypes data
+        printInfo pars rowTypes data samples
         samples
 
     let loadTextFile (pars: Parameters) path =
