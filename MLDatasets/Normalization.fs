@@ -6,6 +6,7 @@ open Util
 
 
 [<AutoOpen>]
+/// Dataset normalization types.
 module NormalizationTypes =
 
     /// normalization operation to perform
@@ -36,6 +37,7 @@ module NormalizationTypes =
         | ZCAWhitened of means:ArrayNDHostT<single> * variances:ArrayNDHostT<single> * 
                          axes:ArrayNDHostT<single> 
 
+/// Dataset normalization functions.
 module Normalization =
 
     let rec private performField normalizer (data: ArrayNDHostT<single>)  =
@@ -140,6 +142,7 @@ module Normalization =
         | :? ArrayNDHostT<single> as fs -> fs
         | _ -> failwithf "normalization requires a dataset stored in CPU memory with single data type"
 
+    /// Normalizes each field of the specified Dataset using the specified normalizier.
     let perform (normalizers: Normalizer list) (dataset: Dataset<'S>) =
         let infos, nfs =            
             List.zip normalizers dataset.FieldStorages
@@ -149,6 +152,7 @@ module Normalization =
             |> List.unzip
         infos, Dataset<'S> (nfs, dataset.IsSeq)
         
+    /// Reverses the normalization performed by the 'perform' function.
     let reverse (normalizations: Normalization list) (dataset: Dataset<'S>) =
         let fs =
             List.zip normalizations dataset.FieldStorages
