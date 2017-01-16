@@ -156,6 +156,13 @@ module ArrayNDLayout =
     let padRight a =
         {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
 
+    /// Inserts an axis of size 1 before the specified position.
+    let insertAxis ax a =
+        if not (0 <= ax && ax <= nDims a) then
+            failwithf "axis %d out of range for array with shape %A" ax a.Shape
+        {a with Shape = a.Shape |> List.insert ax 1
+                Stride = a.Stride |> List.insert ax 0}        
+
     /// cuts one dimension from the left
     let cutLeft a =
         if nDims a = 0 then failwith "cannot remove dimensions from scalar"

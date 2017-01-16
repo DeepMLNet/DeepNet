@@ -326,6 +326,9 @@ module ArrayND =
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
+        /// computes the (real) eigenvalues and eigenvectors of the symmetric matrix
+        abstract SymmetricEigenDecomposition: unit -> ArrayNDT<'T> * ArrayNDT<'T>
+
         // enumerator interfaces
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
@@ -571,6 +574,10 @@ module ArrayND =
     /// appends a broadcastable dimension of size one as last dimension
     let inline padRight a =
         relayout (ArrayNDLayout.padRight (layout a)) a
+
+    /// Inserts an axis of size 1 before the specified position.
+    let inline insertAxis ax a =
+        relayout (ArrayNDLayout.insertAxis ax (layout a)) a
 
     /// cuts one dimension from the left
     let inline cutLeft a =
@@ -1135,7 +1142,27 @@ module ArrayND =
     /// mean over given axis
     let meanAxis dim a = 
         axisReduce mean dim a
+
+    /// standard deviation (maximum likelihood estimate for normally distributed variables)
+    let inline std (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let v = a - mean a
+        sqrt (v * v)
+
+    /// standard deviation (maximum likelihood estimate for normally distributed variables) over given axis
+    let inline stdAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let v = a - (a |> meanAxis dim |> insertAxis dim)
+        sqrt (v * v)    
     
+    /// tensor, matrix or vector norm of given order
+    let inline ordNorm (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let s = a ** ord |> sum
+        s ** (ArrayNDT<'T>.One / ord)
+
+    /// L2-norm of tensor, matrix or vector
+    let inline norm (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let two = ArrayNDT<'T>.One + ArrayNDT<'T>.One
+        ordNorm two a
+
     let inline private productImpl (a: ArrayNDT<'T>) =
         allElems a 
         |> Seq.fold (*) ArrayNDT<'T>.One
@@ -1439,6 +1466,11 @@ module ArrayND =
     /// consisting of the last two dimensions are inverted.
     let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
         a.Invert () :?> 'A
+
+    /// computes the (real) eigenvalues and eigenvectors of the symmetric matrix
+    let symmetricEigenDecomposition (a: 'A when 'A :> ArrayNDT<_>) : 'A * 'A =
+        let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
+        eigVals :?> 'A, eigVecs :?> 'A
 
     /// calculates the pairwise differences along the given axis
     let diffAxis ax (a: #ArrayNDT<'T>) =

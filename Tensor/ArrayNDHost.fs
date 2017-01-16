@@ -258,6 +258,25 @@ module ArrayNDHostTypes =
 
             inv :> ArrayNDT<'T>
 
+        override this.SymmetricEigenDecomposition () =
+            let nd = this.NDims
+            if nd <> 2 || this.Shape.[0] <> this.Shape.[1] then 
+                failwithf "require a square matrix for symmetric eigen decomposition but got %A" this.Shape
+            let size = this.Shape.[0]
+
+            let eigVecs = ArrayND.copy this
+            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [size]) :?> ArrayNDHostT<'T>
+
+            use a = eigVecs.GetTransposedBlas false
+            use w = eigVals.GetTransposedBlas false
+            let info = 
+                blasTypeChoose<'T, lapack_int>
+                    (fun () -> LAPACKE_ssyevd (LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr))
+                    (fun () -> LAPACKE_dsyevd (LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr))
+            if info < 0L then failwithf "LAPACK argument error %d" info
+            if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
+
+            eigVals :> ArrayNDT<'T>, eigVecs :> ArrayNDT<'T>
 
 
 module ArrayNDHost = 

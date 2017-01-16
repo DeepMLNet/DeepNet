@@ -241,6 +241,8 @@ module ArrayNDCudaTypes =
         override this.Invert () =
             failwith "not implemented"
 
+        override this.SymmetricEigenDecomposition () =
+            failwith "not implemented"
 
 
 module ArrayNDCuda = 
