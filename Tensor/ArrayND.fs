@@ -326,7 +326,9 @@ module ArrayND =
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
-        /// computes the (real) eigenvalues and eigenvectors of the symmetric matrix
+        /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+        /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+        /// corresponding eigenvalue in 'vals'.
         abstract SymmetricEigenDecomposition: unit -> ArrayNDT<'T> * ArrayNDT<'T>
 
         // enumerator interfaces
@@ -1467,7 +1469,9 @@ module ArrayND =
     let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
         a.Invert () :?> 'A
 
-    /// computes the (real) eigenvalues and eigenvectors of the symmetric matrix
+    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+    /// corresponding eigenvalue in 'vals'.
     let symmetricEigenDecomposition (a: 'A when 'A :> ArrayNDT<_>) : 'A * 'A =
         let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
         eigVals :?> 'A, eigVecs :?> 'A

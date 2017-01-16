@@ -265,7 +265,7 @@ module ArrayNDHostTypes =
             let size = this.Shape.[0]
 
             let eigVecs = ArrayND.copy this
-            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [size]) :?> ArrayNDHostT<'T>
+            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [1; size]) :?> ArrayNDHostT<'T>
 
             use a = eigVecs.GetTransposedBlas false
             use w = eigVals.GetTransposedBlas false
@@ -276,7 +276,7 @@ module ArrayNDHostTypes =
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
 
-            eigVals :> ArrayNDT<'T>, eigVecs :> ArrayNDT<'T>
+            eigVals.[0, *] :> ArrayNDT<'T>, eigVecs.T 
 
 
 module ArrayNDHost = 

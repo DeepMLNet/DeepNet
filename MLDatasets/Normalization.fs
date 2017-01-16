@@ -24,7 +24,7 @@ module NormalizationTypes =
         | PCAWhitening of nComponents:int option
         /// Apply ZCA whitening.
         /// Optionally specify how many dimensions to keep.
-        | ZCAWhitening of nComponents:int option
+        | ZCAWhitening 
 
     /// performed normalization operation
     type Normalization =
@@ -36,6 +36,7 @@ module NormalizationTypes =
                          axes:ArrayNDHostT<single> 
         | ZCAWhitened of means:ArrayNDHostT<single> * variances:ArrayNDHostT<single> * 
                          axes:ArrayNDHostT<single> 
+
 
 /// Dataset normalization functions.
 module Normalization =
@@ -85,7 +86,8 @@ module Normalization =
                 |> List.map fst
                 |> ArrayNDHost.ofList
             let variances = variances |> ArrayND.gather [Some sortIdx]
-            let axes = axes |> ArrayND.gather [None; Some sortIdx]
+            let axesIdx = ArrayND.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
+            let axes = axes |> ArrayND.gather [None; Some axesIdx]
 
             // limit number of components if desired
             let variances, axes =
@@ -100,8 +102,8 @@ module Normalization =
             // scale axes so that each has unit variance
             let whitened = pcaed / sqrt variances.[NewAxis, *]
             PCAWhitened (means, variances, axes), whitened
-        | ZCAWhitening nComps ->
-            match performField (PCAWhitening nComps) data with
+        | ZCAWhitening ->
+            match performField (PCAWhitening None) data with
             | PCAWhitened (means, variances, axes), whitened ->
                 let zcaed = whitened .* ArrayND.transpose axes  
                 ZCAWhitened (means, variances, axes), zcaed
@@ -144,6 +146,9 @@ module Normalization =
 
     /// Normalizes each field of the specified Dataset using the specified normalizier.
     let perform (normalizers: Normalizer list) (dataset: Dataset<'S>) =
+        if normalizers.Length <> dataset.FieldStorages.Length then
+            failwith "normalization requires one normalizer per field of dataset"
+
         let infos, nfs =            
             List.zip normalizers dataset.FieldStorages
             |> List.map (fun (n, fs) -> 
@@ -154,6 +159,8 @@ module Normalization =
         
     /// Reverses the normalization performed by the 'perform' function.
     let reverse (normalizations: Normalization list) (dataset: Dataset<'S>) =
+        if normalizations.Length <> dataset.FieldStorages.Length then
+            failwith "reversation of normalization requires one normalization info per field of dataset"
         let fs =
             List.zip normalizations dataset.FieldStorages
             |> List.map (fun (info, fs) -> fs |> extractFieldStorage |> reverseField info :> IArrayNDT)

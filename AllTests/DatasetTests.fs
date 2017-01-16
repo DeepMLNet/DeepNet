@@ -16,7 +16,7 @@ type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
 
 let dataSamples = 
     seq {
-        for filename in Directory.EnumerateFiles(dataDir, "*.npz") do
+        for filename in Directory.EnumerateFiles(dataDir, "*.npz") |> Seq.sort do
             use tactile = NPZFile.Open filename
             yield  {Time=tactile.Get "time"
                     Pos=tactile.Get "pos"
