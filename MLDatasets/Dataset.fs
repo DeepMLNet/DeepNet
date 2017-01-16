@@ -8,11 +8,10 @@ open Basics
 open ArrayNDNS
 open Util
 
-type DataSampleT =
-    {
-        Input:  ArrayNDT<single>;
-        Target: ArrayNDT<single>
-        }
+type DataSampleT = {
+    Input:  ArrayNDT<single>
+    Target: ArrayNDT<single>
+}
 
 
 /// A dataset of a record type 'S containing ArrayNDT<_> data variables.
