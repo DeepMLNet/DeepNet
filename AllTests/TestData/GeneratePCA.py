@@ -96,7 +96,7 @@ def zca(data):
 if __name__ == '__main__':
     # load data
     f = np.load("curve/smpl00.npz")
-    data = np.asarray(f['biotac'], dtype=np.float32)   # [feature, smpl]
+    data = np.asarray(f['biotac'], dtype=np.float64)   # [feature, smpl]
     print data.shape
 
     pca_whitened_full = pca_white(data, n_components=None)
@@ -104,9 +104,9 @@ if __name__ == '__main__':
     zca_whitened = zca(data)
 
     np.savez_compressed("PCA.npz",
-                        data=np.asarray(data.T, dtype=np.float32),
-                        pca_whitened_full=np.asarray(pca_whitened_full.T, dtype=np.float32),
-                        pca_whitened_10=np.asarray(pca_whitened_10.T, dtype=np.float32),
-                        zca_whitened=np.asarray(zca_whitened.T, dtype=np.float32))
+                        data=data.T, 
+                        pca_whitened_full=pca_whitened_full.T,
+                        pca_whitened_10=pca_whitened_10.T,
+                        zca_whitened=zca_whitened.T)
 
 

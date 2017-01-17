@@ -1146,24 +1146,39 @@ module ArrayND =
         axisReduce mean dim a
 
     /// standard deviation (maximum likelihood estimate for normally distributed variables)
-    let inline std (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let std (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
         let v = a - mean a
-        sqrt (v * v)
+        v * v |> mean |> sqrt :?> 'A
 
     /// standard deviation (maximum likelihood estimate for normally distributed variables) over given axis
-    let inline stdAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
-        let v = a - (a |> meanAxis dim |> insertAxis dim)
-        sqrt (v * v)    
+    let stdAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
+        let means = a |> meanAxis dim |> insertAxis dim
+        let v = a - means 
+        v * v |> meanAxis dim |> sqrt :?> 'A
     
     /// tensor, matrix or vector norm of given order
-    let inline ordNorm (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let ordNorm (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let ord = scalarOfType a ord
+        let a = a :> ArrayNDT<'T>
         let s = a ** ord |> sum
-        s ** (ArrayNDT<'T>.One / ord)
+        s ** (onesLike ord / ord) :?> 'A
+
+    /// tensor, matrix or vector norm of given order over given axis
+    let ordNormAxis dim (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let ord = scalarOfType a ord
+        let a = a :> ArrayNDT<'T>
+        let s = a ** ord |> sumAxis dim
+        s ** (onesLike ord / ord) :?> 'A
 
     /// L2-norm of tensor, matrix or vector
-    let inline norm (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
-        let two = ArrayNDT<'T>.One + ArrayNDT<'T>.One
-        ordNorm two a
+    let norm (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        ordNorm (conv<'T> 2) a
+
+    /// L2-norm of tensor, matrix or vector over given axis
+    let normAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        ordNormAxis dim (conv<'T> 2) a
 
     let inline private productImpl (a: ArrayNDT<'T>) =
         allElems a 

@@ -26,123 +26,79 @@ module NormalizationTypes =
         /// Optionally specify how many dimensions to keep.
         | ZCAWhitening 
 
+    /// type-neutral interface for Normalization<'T>
+    type INormalization =
+        interface end
+
     /// performed normalization operation
-    type Normalization =
+    type Normalization<'T> =
         | NotNormalized
-        | Rescaled of (single * single) list
-        | Standardized of (single * single) list
-        | ScaledToUnitLength of single list
-        | PCAWhitened of means:ArrayNDHostT<single> * variances:ArrayNDHostT<single> * 
-                         axes:ArrayNDHostT<single> 
-        | ZCAWhitened of means:ArrayNDHostT<single> * variances:ArrayNDHostT<single> * 
-                         axes:ArrayNDHostT<single> 
+        | Rescaled of minVals:ArrayNDHostT<'T> * maxVals:ArrayNDHostT<'T>
+        | Standardized of means:ArrayNDHostT<'T> * stds:ArrayNDHostT<'T>
+        | ScaledToUnitLength of lengths:ArrayNDHostT<'T> 
+        | PCAWhitened of Decomposition.PCAInfo<'T>
+        | ZCAWhitened of Decomposition.PCAInfo<'T>
+
+        interface INormalization
 
 
 /// Dataset normalization functions.
 module Normalization =
 
-    let rec private performField normalizer (data: ArrayNDHostT<single>)  =
+    let private performField normalizer (data: ArrayNDHostT<'T>)  =
+        let epsilon = ArrayNDHost.scalar (conv<'T> 1e-5)
         match normalizer with 
         | NoNormalizer ->
             NotNormalized, data
-        | Rescaling -> // TODO: change to broadcasting
-            let nData = ArrayNDHost.zeros data.Shape
-            let info = List.init data.Shape.[1] (fun f ->
-                let minVal = data.[*, f] |> ArrayND.min |> ArrayND.value
-                let maxVal = data.[*, f] |> ArrayND.max |> ArrayND.value
-                nData.[*, f] <- (data.[*, f] - minVal) / (maxVal - minVal)
-                minVal, maxVal)
-            Rescaled info, nData
+        | Rescaling -> 
+            let minVals = data |> ArrayND.minAxis 0
+            let maxVals = data |> ArrayND.maxAxis 0
+            let maxVals = ArrayND.maxElemwise maxVals (minVals + epsilon)
+            Rescaled (minVals, maxVals), (data - minVals.[NewAxis, *]) / (maxVals - minVals).[NewAxis, *]
         | Standardization ->
-            let nData = ArrayNDHost.zeros data.Shape
-            let info = List.init data.Shape.[1] (fun f ->
-                let mean = data.[*, f] |> ArrayND.mean |> ArrayND.value
-                let std = data.[*, f] |> ArrayND.std |> ArrayND.value
-                nData.[*, f] <- (data.[*, f] - mean) / std
-                mean, std)
-            Standardized info, nData        
-        | ScaleToUnitLength ->
-            let nData = ArrayNDHost.zeros data.Shape
-            let lengths = List.init data.Shape.[0] (fun s ->
-                let length = data.[s, *] |> ArrayND.norm |> ArrayND.value
-                nData.[s, *] <- data.[s, *] / length
-                length)
-            ScaledToUnitLength lengths, nData
-        | PCAWhitening nComps ->
-            // center data
             let means = data |> ArrayND.meanAxis 0
-            let centered = data - means.[NewAxis, *] // centered[smpl, feature]
-
-            // compute covariance matrix and its eigen decomposition
-            let cov = (ArrayND.transpose centered .* centered) / (single data.Shape.[0])
-            let variances, axes = ArrayND.symmetricEigenDecomposition cov 
-
-            // sort axes by their variances in descending order
-            let sortIdx = 
-                variances 
-                |> ArrayNDHost.toList 
-                |> List.indexed 
-                |> List.sortByDescending snd
-                |> List.map fst
-                |> ArrayNDHost.ofList
-            let variances = variances |> ArrayND.gather [Some sortIdx]
-            let axesIdx = ArrayND.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
-            let axes = axes |> ArrayND.gather [None; Some axesIdx]
-
-            // limit number of components if desired
-            let variances, axes =
-                match nComps with
-                | Some nComps -> variances.[0 .. nComps-1], axes.[*, 0 .. nComps-1]
-                | None -> variances, axes
-
-            // transform data into new coordinate system
-            // [smpl, feature] .* [feature, comp]
-            let pcaed = centered .* axes
-            
-            // scale axes so that each has unit variance
-            let whitened = pcaed / sqrt variances.[NewAxis, *]
-            PCAWhitened (means, variances, axes), whitened
+            let stds = (data |> ArrayND.stdAxis 0) + epsilon
+            Standardized (means, stds), (data - means.[NewAxis, *]) / stds.[NewAxis, *]
+        | ScaleToUnitLength ->
+            let lengths = (data |> ArrayND.normAxis 1) + epsilon
+            ScaledToUnitLength lengths, data / lengths.[*, NewAxis]
+        | PCAWhitening nComps ->
+            let whitened, info = Decomposition.PCA.Perform (data, ?nComps=nComps)
+            PCAWhitened info, whitened
         | ZCAWhitening ->
-            match performField (PCAWhitening None) data with
-            | PCAWhitened (means, variances, axes), whitened ->
-                let zcaed = whitened .* ArrayND.transpose axes  
-                ZCAWhitened (means, variances, axes), zcaed
-            | _ -> failwith "impossible"
+            let whitened, info = Decomposition.ZCA.Perform data
+            ZCAWhitened info, whitened
 
-    let rec private reverseField normalization (nData: ArrayNDHostT<single>) =
+    let private reverseField normalization (nData: ArrayNDHostT<'T>) =
         match normalization with
         | NotNormalized ->
             nData
-        | Rescaled info ->
-            let data = ArrayNDHost.zeros nData.Shape
-            for f, (minVal, maxVal) in List.indexed info do
-                data.[*, f] <- nData.[*, f] * (maxVal - minVal) + minVal
-            data
-        | Standardized info ->
-            let data = ArrayNDHost.zeros nData.Shape
-            for f, (mean, std) in List.indexed info do
-                data.[*, f] <- nData.[*, f] * std + mean
-            data
+        | Rescaled (minVals, maxVals) ->
+            nData * (maxVals - minVals).[NewAxis, *] + minVals.[NewAxis, *]
+        | Standardized (means, stds) ->
+            nData * stds.[NewAxis, *] + means.[NewAxis, *]
         | ScaledToUnitLength lengths ->
-            let data = ArrayNDHost.zeros nData.Shape
-            for s, length in List.indexed lengths do
-                data.[s, *] <- nData.[s, *] * length
-            data
-        | PCAWhitened (means, variances, axes) ->
-            let whitened = nData
-            let pcaed = whitened * sqrt variances.[NewAxis, *]
-            let centered = pcaed .* ArrayND.transpose axes // [smpl, comp] .* [comp, feature]
-            let data = centered + means.[NewAxis, *]
-            data
-        | ZCAWhitened (means, variances, axes) ->
-            let zcaed = nData
-            let whitened = zcaed .* axes
-            reverseField (PCAWhitened (means, variances, axes)) whitened
+            nData * lengths.[*, NewAxis]
+        | PCAWhitened info ->
+            Decomposition.PCA.Reverse (nData, info)
+        | ZCAWhitened info ->
+            Decomposition.ZCA.Reverse (nData, info)
 
-    let private extractFieldStorage (fs: IArrayNDT) =
+    let private performFieldUntyped n (fs: IArrayNDT) =
         match fs with
-        | :? ArrayNDHostT<single> as fs -> fs
-        | _ -> failwithf "normalization requires a dataset stored in CPU memory with single data type"
+        | :? ArrayNDHostT<single> as fs -> 
+            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
+        | :? ArrayNDHostT<double> as fs -> 
+            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
+        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
+
+    let private reverseFieldUntyped (n: INormalization) (fs: IArrayNDT) =
+        match fs with
+        | :? ArrayNDHostT<single> as fs -> 
+            reverseField (n :?> Normalization<single>) fs :> IArrayNDT
+        | :? ArrayNDHostT<double> as fs -> 
+            reverseField (n :?> Normalization<double>) fs :> IArrayNDT
+        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
 
     /// Normalizes each field of the specified Dataset using the specified normalizier.
     let perform (normalizers: Normalizer list) (dataset: Dataset<'S>) =
@@ -151,19 +107,17 @@ module Normalization =
 
         let infos, nfs =            
             List.zip normalizers dataset.FieldStorages
-            |> List.map (fun (n, fs) -> 
-                let info, nfs = fs |> extractFieldStorage |> performField n
-                info, nfs :> IArrayNDT)
+            |> List.map (fun (n, fs) -> performFieldUntyped n fs)
             |> List.unzip
         infos, Dataset<'S> (nfs, dataset.IsSeq)
         
     /// Reverses the normalization performed by the 'perform' function.
-    let reverse (normalizations: Normalization list) (dataset: Dataset<'S>) =
+    let reverse (normalizations: INormalization list) (dataset: Dataset<'S>) =
         if normalizations.Length <> dataset.FieldStorages.Length then
             failwith "reversation of normalization requires one normalization info per field of dataset"
         let fs =
             List.zip normalizations dataset.FieldStorages
-            |> List.map (fun (info, fs) -> fs |> extractFieldStorage |> reverseField info :> IArrayNDT)
+            |> List.map (fun (info, fs) -> reverseFieldUntyped info fs)
         Dataset<'S> (fs, dataset.IsSeq)            
 
 

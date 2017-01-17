@@ -16,6 +16,7 @@ module ArrayNDLayoutTypes =
     }
 
     /// range specification
+    [<StructuredFormatDisplay("{Pretty}")>]
     type RangeT = 
         /// single element
         | RngElem of int
@@ -25,6 +26,17 @@ module ArrayNDLayoutTypes =
         | RngNewAxis
         /// fill (...)
         | RngAllFill
+
+        /// pretty string
+        member this.Pretty =
+            match this with
+            | RngElem e -> sprintf "%d" e
+            | Rng (Some first, Some last) -> sprintf "%d..%d" first last
+            | Rng (Some first, None) -> sprintf "%d.." first 
+            | Rng (None, Some last) -> sprintf "0..%d" last
+            | Rng (None, None) -> "*"
+            | RngNewAxis -> "NewAxis"
+            | RngAllFill -> "Fill"
 
     /// all elements
     let RngAll = Rng (None, None)

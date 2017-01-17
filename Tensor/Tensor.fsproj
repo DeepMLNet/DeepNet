@@ -71,6 +71,7 @@
     <Compile Include="ArrayNDHDF.fs" />
     <Compile Include="NumpyFiles.fs" />
     <Compile Include="Random.fs" />
+    <Compile Include="Decomposition.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
     <None Include="build\Tensor.targets">
