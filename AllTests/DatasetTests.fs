@@ -83,8 +83,8 @@ type CurveDataset () =
 let ``Loading CSV datasets`` () =
     
     let paths = ["abalone.txt",       CsvLoader.DefaultParameters 
-                 "arrhythmia.txt.gz", {CsvLoader.DefaultParameters 
-                                       with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
+                 //"arrhythmia.txt.gz", {CsvLoader.DefaultParameters 
+                 //                      with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
                  "imports-85.data",   {CsvLoader.DefaultParameters 
                                        with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
                  "SPECT.txt",         CsvLoader.DefaultParameters]
