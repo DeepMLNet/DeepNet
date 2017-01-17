@@ -89,6 +89,10 @@
       <HintPath>..\packages\FsPickler.Json.2.1.0\lib\net45\FsPickler.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>

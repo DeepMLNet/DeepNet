@@ -97,6 +97,10 @@
       <HintPath>..\..\packages\Argu.3.3.0\lib\net40\Argu.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\..\..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="MargieBot">
       <HintPath>..\..\Libs\Slack\MargieBot.dll</HintPath>
     </Reference>
