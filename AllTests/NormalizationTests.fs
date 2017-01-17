@@ -32,7 +32,33 @@ type CurveNormalizationTests () =
         ArrayNDHDF.write hdf "reversed" (reversed.All.Data :?> ArrayNDHostT<single>)
         ArrayNDHDF.write hdf "refPCAWhitenedFull" refPCAWhitenedFull
 
-        //ArrayND.almostEqualWithTol 1e-5f 1e-4f dataset.All.Data reversed.All.Data |> should equal true
-        ArrayND.almostEqualWithTol 1.0f 1e-5f normalized.All.Data refPCAWhitenedFull |> should equal true
+        ArrayND.almostEqualWithTol 1e-5f 1e-4f dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
+        ArrayND.almostEqualWithTol 1.0f 1e-5f normalized.All.Data refPCAWhitenedFull |> ArrayND.value |> should equal true
         
+    [<Fact>]
+    member this.``Rescaling`` () =
+        let normalizers = [Rescaling]
+        let infos, normalized = dataset |> Normalization.perform normalizers
+        let reversed = normalized |> Normalization.reverse infos
 
+        let min = ArrayND.min normalized.All.Data 
+        let max = ArrayND.max normalized.All.Data 
+        
+        ArrayND.almostEqualWithTol 1e-5f 1e-4f min (ArrayNDHost.scalar 0.0f) |> ArrayND.value |> should equal true
+        ArrayND.almostEqualWithTol 1e-5f 1e-4f max (ArrayNDHost.scalar 1.0f) |> ArrayND.value |> should equal true
+
+        ArrayND.almostEqualWithTol 1e-5f 1e-4f dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
+
+     [<Fact>]
+     member this.``Standardization`` () =
+        let normalizers = [Standardization]
+        let infos, normalized = dataset |> Normalization.perform normalizers
+        let reversed = normalized |> Normalization.reverse infos
+
+        let means = ArrayND.meanAxis 0 normalized.All.Data 
+        let stdevs = ArrayND.stdAxis 0 normalized.All.Data
+
+        ArrayND.almostEqualWithTol 1e-5f 1e-4f means (ArrayND.zerosLike means) |> ArrayND.value |> should equal true
+//        ArrayND.almostEqualWithTol 1e-5f 1e-4f stdevs (ArrayND.onesLike stdevs) |> ArrayND.value |> should equal true
+//
+//        ArrayND.almostEqualWithTol 1e-5f 1e-4f dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
