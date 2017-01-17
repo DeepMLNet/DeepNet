@@ -164,6 +164,7 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   install:
+    - choco feature enable -n allowEmptyChecksums
     - cinst r.project
 
   before_build:
