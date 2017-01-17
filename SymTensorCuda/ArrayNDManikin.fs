@@ -104,6 +104,9 @@ module ArrayNDManikinTypes =
         override this.Invert () = 
             failwith "ArrayNDManikin does not store data"
 
+        override this.SymmetricEigenDecomposition () =
+            failwith "ArrayNDManikin does not store data"
+
         member this.Pretty = 
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
                 storage layout.Shape layout.Stride

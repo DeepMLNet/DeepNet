@@ -257,7 +257,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
 
 /// Dataset functions.
- module Dataset =
+module Dataset =
 
     /// Constructs a dataset from a sequence of samples of record type 'S.
     /// Each field in 'S must be of type ArrayNDT<_> and the dimensionality of each field

@@ -6,3 +6,11 @@ LAPACKE_dgetrf
 
 LAPACKE_sgetri
 LAPACKE_dgetri
+
+LAPACKE_sgeev
+LAPACKE_dgeev
+
+LAPACKE_ssyevd 
+LAPACKE_dsyevd
+
+

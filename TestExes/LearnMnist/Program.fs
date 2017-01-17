@@ -35,8 +35,8 @@ let main argv =
     let target : ExprT = mb.Var<single> "Target" [nBatch; nClass]
 
     // instantiate model
-    mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]
-    mb.SetSize nClass mnist.Trn.[0].Lbl.Shape.[0]
+    mb.SetSize nInput mnist.Trn.[0].Input.Shape.[0]
+    mb.SetSize nClass mnist.Trn.[0].Target.Shape.[0]
     mb.SetSize nHidden 100
     let mi = mb.Instantiate device
 
@@ -44,11 +44,10 @@ let main argv =
     let loss = MLP.loss mlp input target
     //let loss = loss |> Expr.checkFinite "loss"
 
-    let smplVarEnv (smpl: MnistT) =
+    let smplVarEnv (smpl: InputTargetSampleT) =
         VarEnv.empty
-        |> VarEnv.add input smpl.Img
-        |> VarEnv.add target smpl.Lbl
-
+        |> VarEnv.add input smpl.Input
+        |> VarEnv.add target smpl.Target
     let trainable =
         //Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg

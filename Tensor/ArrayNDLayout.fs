@@ -16,6 +16,7 @@ module ArrayNDLayoutTypes =
     }
 
     /// range specification
+    [<StructuredFormatDisplay("{Pretty}")>]
     type RangeT = 
         /// single element
         | RngElem of int
@@ -25,6 +26,17 @@ module ArrayNDLayoutTypes =
         | RngNewAxis
         /// fill (...)
         | RngAllFill
+
+        /// pretty string
+        member this.Pretty =
+            match this with
+            | RngElem e -> sprintf "%d" e
+            | Rng (Some first, Some last) -> sprintf "%d..%d" first last
+            | Rng (Some first, None) -> sprintf "%d.." first 
+            | Rng (None, Some last) -> sprintf "0..%d" last
+            | Rng (None, None) -> "*"
+            | RngNewAxis -> "NewAxis"
+            | RngAllFill -> "Fill"
 
     /// all elements
     let RngAll = Rng (None, None)
@@ -155,6 +167,13 @@ module ArrayNDLayout =
     /// adds a new dimension of size one to the right
     let padRight a =
         {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
+
+    /// Inserts an axis of size 1 before the specified position.
+    let insertAxis ax a =
+        if not (0 <= ax && ax <= nDims a) then
+            failwithf "axis %d out of range for array with shape %A" ax a.Shape
+        {a with Shape = a.Shape |> List.insert ax 1
+                Stride = a.Stride |> List.insert ax 0}        
 
     /// cuts one dimension from the left
     let cutLeft a =

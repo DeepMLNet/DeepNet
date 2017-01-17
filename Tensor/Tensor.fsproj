@@ -71,6 +71,7 @@
     <Compile Include="ArrayNDHDF.fs" />
     <Compile Include="NumpyFiles.fs" />
     <Compile Include="Random.fs" />
+    <Compile Include="Decomposition.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
     <None Include="build\Tensor.targets">
@@ -106,7 +107,7 @@
       <HintPath>HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>
     <Reference Include="ManagedCuda">
-      <HintPath>..\..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
+      <HintPath>..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="MathNet.Numerics">

@@ -326,6 +326,11 @@ module ArrayND =
         /// invert the matrix
         abstract Invert : unit -> ArrayNDT<'T>
 
+        /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+        /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+        /// corresponding eigenvalue in 'vals'.
+        abstract SymmetricEigenDecomposition: unit -> ArrayNDT<'T> * ArrayNDT<'T>
+
         // enumerator interfaces
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
@@ -571,6 +576,10 @@ module ArrayND =
     /// appends a broadcastable dimension of size one as last dimension
     let inline padRight a =
         relayout (ArrayNDLayout.padRight (layout a)) a
+
+    /// Inserts an axis of size 1 before the specified position.
+    let inline insertAxis ax a =
+        relayout (ArrayNDLayout.insertAxis ax (layout a)) a
 
     /// cuts one dimension from the left
     let inline cutLeft a =
@@ -1135,7 +1144,42 @@ module ArrayND =
     /// mean over given axis
     let meanAxis dim a = 
         axisReduce mean dim a
+
+    /// standard deviation (maximum likelihood estimate for normally distributed variables)
+    let std (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
+        let v = a - mean a
+        v * v |> mean |> sqrt :?> 'A
+
+    /// standard deviation (maximum likelihood estimate for normally distributed variables) over given axis
+    let stdAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let a = a :> ArrayNDT<'T>
+        let means = a |> meanAxis dim |> insertAxis dim
+        let v = a - means 
+        v * v |> meanAxis dim |> sqrt :?> 'A
     
+    /// tensor, matrix or vector norm of given order
+    let ordNorm (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let ord = scalarOfType a ord
+        let a = a :> ArrayNDT<'T>
+        let s = a ** ord |> sum
+        s ** (onesLike ord / ord) :?> 'A
+
+    /// tensor, matrix or vector norm of given order over given axis
+    let ordNormAxis dim (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        let ord = scalarOfType a ord
+        let a = a :> ArrayNDT<'T>
+        let s = a ** ord |> sumAxis dim
+        s ** (onesLike ord / ord) :?> 'A
+
+    /// L2-norm of tensor, matrix or vector
+    let norm (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        ordNorm (conv<'T> 2) a
+
+    /// L2-norm of tensor, matrix or vector over given axis
+    let normAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+        ordNormAxis dim (conv<'T> 2) a
+
     let inline private productImpl (a: ArrayNDT<'T>) =
         allElems a 
         |> Seq.fold (*) ArrayNDT<'T>.One
@@ -1439,6 +1483,13 @@ module ArrayND =
     /// consisting of the last two dimensions are inverted.
     let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
         a.Invert () :?> 'A
+
+    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+    /// corresponding eigenvalue in 'vals'.
+    let symmetricEigenDecomposition (a: 'A when 'A :> ArrayNDT<_>) : 'A * 'A =
+        let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
+        eigVals :?> 'A, eigVecs :?> 'A
 
     /// calculates the pairwise differences along the given axis
     let diffAxis ax (a: #ArrayNDT<'T>) =

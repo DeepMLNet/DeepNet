@@ -16,7 +16,7 @@ type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
 
 let dataSamples = 
     seq {
-        for filename in Directory.EnumerateFiles(dataDir, "*.npz") do
+        for filename in Directory.EnumerateFiles(dataDir, "*.npz") |> Seq.sort do
             use tactile = NPZFile.Open filename
             yield  {Time=tactile.Get "time"
                     Pos=tactile.Get "pos"
@@ -83,8 +83,8 @@ type CurveDataset () =
 let ``Loading CSV datasets`` () =
     
     let paths = ["abalone.txt",       CsvLoader.DefaultParameters 
-                 "arrhythmia.txt.gz", {CsvLoader.DefaultParameters 
-                                       with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
+                 //"arrhythmia.txt.gz", {CsvLoader.DefaultParameters 
+                 //                      with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
                  "imports-85.data",   {CsvLoader.DefaultParameters 
                                        with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
                  "SPECT.txt",         CsvLoader.DefaultParameters]

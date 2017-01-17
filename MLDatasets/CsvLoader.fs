@@ -30,10 +30,17 @@ module private TryParser =
 module CsvLoader =
     type private Category = string
 
+    [<StructuredFormatDisplay("{Pretty}")>]
     type private ColumnType =
         | Categorical of Set<Category>
         | Numerical
         | Unknown
+
+        member this.Pretty = 
+            match this with
+            | Categorical cs -> sprintf "{%s}" (cs |> Set.toList |> String.concat ", ")
+            | Numerical -> "Numerical"
+            | Unknown -> "Unknown"
 
     type private RowTypes = ColumnType list
 
@@ -41,10 +48,17 @@ module CsvLoader =
         | IntAsNumerical
         | IntAsCategorical
 
+    [<StructuredFormatDisplay("{Pretty}")>]
     type private ColumnData =
         | Category of Category
         | Number of float
         | Missing
+
+        member this.Pretty =
+            match this with
+            | Category c -> c
+            | Number n -> sprintf "%g" n
+            | Missing -> "Missing"
 
     type private RowData = ColumnData list
 
@@ -72,17 +86,12 @@ module CsvLoader =
         Separators          = " \t,"    
     }
 
-    type CsvSample = {
-        Input:              ArrayNDT<single>
-        Target:             ArrayNDT<single>
-    }
-
-
     let private loadRowTypes (intTreatment: IntTreatment) (csv: CsvFile) : RowTypes =
         csv.Rows
         |> Seq.map (fun row ->
             row.Columns
             |> Array.map (fun col ->
+                let col = col.Trim()
                 match col, intTreatment with
                 | TryParser.Int _, IntAsNumerical -> Numerical
                 | TryParser.Int n, IntAsCategorical -> Categorical (Set [n.ToString()])
@@ -115,6 +124,7 @@ module CsvLoader =
         |> Seq.map (fun row ->            
             Seq.zip row.Columns rowTypes
             |> Seq.map (fun (col, typ) ->
+                let col = col.Trim()
                 match typ with
                 | _ when col = "?" -> Missing
                 | Categorical _ -> Category col
@@ -178,8 +188,40 @@ module CsvLoader =
             let targets = targets |> List.map snd |> List.map ArrayND.atLeast1D
             let inputs = inputs |> List.map snd |> List.map ArrayND.atLeast1D
             {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0  targets}
-        )
-    
+        ) 
+
+    let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) (samples: InputTargetSampleT seq) =
+        let printField isHead s = 
+            let fieldLen = 17
+            let pad = if isHead then "-" else " " 
+            let ps =
+                if String.length s > fieldLen then 
+                    s.[0 .. fieldLen-1]
+                else
+                    let padLeft = (fieldLen - String.length s) / 2
+                    let padRight = fieldLen - padLeft - String.length s
+                    String.replicate padLeft pad + s + String.replicate padRight pad
+            printf "%s|" ps
+        let fieldPrintf format = Printf.kprintf (printField false) format
+        let headPrintf format = Printf.kprintf (printField true) format
+
+        printfn "CSV dataset information:"
+        for i, rt in Seq.indexed rowTypes do
+            if pars.TargetCols |> List.contains i then
+                printfn "Target %3d: %A" i rt
+            else
+                printfn "Column %3d: %A" i rt
+        for i, _ in List.indexed rowTypes do
+            if pars.TargetCols |> List.contains i then
+                headPrintf "*%d*" i
+            else
+                headPrintf "%d" i
+        printfn ""
+        for row, smpl in Seq.take 5 (Seq.zip data samples) do
+            for d in row do
+                fieldPrintf "%A" d
+            printfn ""
+            //printfn "Input=%s   Target=%s" smpl.Input.Full smpl.Target.Full
 
     let loadFromReader (pars: Parameters) (reader: unit -> TextReader) = 
         let csv () = CsvFile.Load(reader(), separators=pars.Separators, quote='"', hasHeaders=false)
@@ -188,6 +230,7 @@ module CsvLoader =
         let data = loadData rowTypes (csv ()) 
         let dataArrays = fieldsToArrayNDs pars.Missing pars.CategoryEncoding rowTypes categoryTables pars.TargetCols data 
         let samples = toCsvSamples pars.TargetCols dataArrays 
+        printInfo pars rowTypes data samples
         samples
 
     let loadTextFile (pars: Parameters) path =

@@ -12,7 +12,7 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   install:
-    - cinst r.project
+    - Appveyor\install.cmd
 
   before_build:
     - nuget restore DeepNet-CI.sln -Verbosity quiet
@@ -63,7 +63,7 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   install:
-    - cinst r.project
+    - Appveyor\install.cmd
 
   before_build:
     - nuget restore DeepNet-CI.sln -Verbosity quiet
@@ -107,7 +107,7 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   install:
-    - cinst r.project
+    - Appveyor\install.cmd
 
   before_build:
     - nuget restore DeepNet-CI.sln -Verbosity quiet
@@ -164,7 +164,7 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   install:
-    - cinst r.project
+    - Appveyor\install.cmd
 
   before_build:
     - nuget restore DeepNet-CI.sln -Verbosity quiet

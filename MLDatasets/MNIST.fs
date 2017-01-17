@@ -27,16 +27,6 @@ type MnistRawT = {
          TstImgs = this.TstImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
          TstLbls = this.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
 
-/// One or more MNIST sample(s).
-type MnistT = {
-    /// Flat training image.
-    /// Shape is [784] for a single sample and [n, 784] for n samples.
-    Img:    ArrayNDT<single>
-    /// One-hot label.
-    /// Shape is [10] for a single sample and [n, 10] for n samples.
-    Lbl:    ArrayNDT<single>
-} 
-
 
 /// Module containing functions to load the MNIST dataset.
 module Mnist = 
@@ -139,15 +129,13 @@ module Mnist =
         let raw = loadRaw directory
         let trnImgsFlat = raw.TrnImgs |> ArrayND.reshape [raw.TrnImgs.Shape.[0]; -1]
         let tstImgsFlat = raw.TstImgs |> ArrayND.reshape [raw.TstImgs.Shape.[0]; -1]
+        let orgTrn = Dataset<InputTargetSampleT> [trnImgsFlat; raw.TrnLbls]
 
-        let orgTrn = Dataset<MnistT> [trnImgsFlat; raw.TrnLbls]
         let trn, vali =
             match orgTrn |> Dataset.partition [1. - valRatio; valRatio] with
             | [trn; vali] -> trn, vali
             | _ -> failwith "impossible"
-        let tst = Dataset<MnistT> [tstImgsFlat; raw.TstLbls]
+        let tst = Dataset<InputTargetSampleT> [tstImgsFlat; raw.TstLbls]
 
         {Trn=trn; Val=vali; Tst=tst}
-
-
 
