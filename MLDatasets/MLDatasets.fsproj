@@ -54,6 +54,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Dataset.fs" />
+    <Compile Include="InputTargetSample.fs" />
     <Compile Include="Normalization.fs" />
     <Compile Include="MNIST.fs" />
     <Compile Include="CsvLoader.fs" />

@@ -35,8 +35,6 @@ let main argv =
     let target : ExprT = mb.Var<single> "Target" [nBatch; nClass]
 
     // instantiate model
-//    mb.SetSize nInput mnist.Trn.[0].Img.Shape.[0]
-//    mb.SetSize nClass mnist.Trn.[0].Lbl.Shape.[0]
     mb.SetSize nInput mnist.Trn.[0].Input.Shape.[0]
     mb.SetSize nClass mnist.Trn.[0].Target.Shape.[0]
     mb.SetSize nHidden 100
@@ -46,12 +44,7 @@ let main argv =
     let loss = MLP.loss mlp input target
     //let loss = loss |> Expr.checkFinite "loss"
 
-//    let smplVarEnv (smpl: MnistT) =
-//        VarEnv.empty
-//        |> VarEnv.add input smpl.Img
-//        |> VarEnv.add target smpl.Lbl
-
-    let smplVarEnv (smpl: DataSampleT) =
+    let smplVarEnv (smpl: InputTargetSampleT) =
         VarEnv.empty
         |> VarEnv.add input smpl.Input
         |> VarEnv.add target smpl.Target

@@ -8,12 +8,6 @@ open Basics
 open ArrayNDNS
 open Util
 
-type DataSampleT = {
-    Input:  ArrayNDT<single>
-    Target: ArrayNDT<single>
-}
-
-
 /// A dataset of a record type 'S containing ArrayNDT<_> data variables.
 /// The first dimension of each record field is the sample.
 /// All record fields must contain the same number of samples.

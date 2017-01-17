@@ -86,12 +86,6 @@ module CsvLoader =
         Separators          = " \t,"    
     }
 
-//    type CsvSample = {
-//        Input:              ArrayNDT<single>
-//        Target:             ArrayNDT<single>
-//    }
-
-
     let private loadRowTypes (intTreatment: IntTreatment) (csv: CsvFile) : RowTypes =
         csv.Rows
         |> Seq.map (fun row ->
@@ -196,7 +190,7 @@ module CsvLoader =
             {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0  targets}
         ) 
 
-    let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) (samples: DataSampleT seq) =
+    let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) (samples: InputTargetSampleT seq) =
         let printField isHead s = 
             let fieldLen = 17
             let pad = if isHead then "-" else " " 

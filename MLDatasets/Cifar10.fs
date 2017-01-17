@@ -102,14 +102,14 @@ module Cifar10 =
         let tstData = raw.TstData 
 
 //        let orgTrn = Dataset<MnistT> [trnImgsFlat; raw.TrnLbls]
-        let orgTrn = Dataset<DataSampleT> [trnData; raw.TrnLbls]
+        let orgTrn = Dataset<InputTargetSampleT> [trnData; raw.TrnLbls]
 
         let trn, vali =
             match orgTrn |> Dataset.partition [1. - valRatio; valRatio] with
             | [trn; vali] -> trn, vali
             | _ -> failwith "impossible"
 //        let tst = Dataset<MnistT> [tstImgsFlat; raw.TstLbls]
-        let tst = Dataset<DataSampleT> [tstData; raw.TstLbls]
+        let tst = Dataset<InputTargetSampleT> [tstData; raw.TstLbls]
 
 
         {Trn=trn; Val=vali; Tst=tst}
