@@ -1258,10 +1258,18 @@ module ArrayND =
         let value = allElems a |> Seq.fold (&&) true
         scalarOfSameType a value
 
+    /// true if all elements over given axis are true
+    let allAxis dim a =
+        axisReduce all dim a
+
     /// true if any element of the array is true
     let any a =
         let value = allElems a |> Seq.fold (||) false
         scalarOfSameType a value
+
+    /// true if any element over given axis are true
+    let anyAxis dim a =
+        axisReduce any dim a
      
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations

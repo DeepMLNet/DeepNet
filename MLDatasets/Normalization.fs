@@ -15,8 +15,9 @@ module NormalizationTypes =
         | NoNormalizer
         /// rescale the range of every feature to [0, 1]
         | Rescaling
-        /// make each feature have zero mean and unit variance
-        | Standardization
+        /// Make each feature have zero mean and unit variance.
+        /// If `keepZeroOne` is true, then features that contain only the values 0 and 1 are left untouched.
+        | Standardization of keepZeroOne:bool
         /// scale the feature vector so that it has L2-norm one
         | ScaleToUnitLength
         /// Apply Principal Component Analysis (PCA) whitening. 
@@ -34,7 +35,7 @@ module NormalizationTypes =
     type Normalization<'T> =
         | NotNormalized
         | Rescaled of minVals:ArrayNDHostT<'T> * maxVals:ArrayNDHostT<'T>
-        | Standardized of means:ArrayNDHostT<'T> * stds:ArrayNDHostT<'T>
+        | Standardized of means:ArrayNDHostT<'T> * stds:ArrayNDHostT<'T> * onlyZeroOne:ArrayNDHostT<bool> option
         | ScaledToUnitLength of lengths:ArrayNDHostT<'T> 
         | PCAWhitened of Decomposition.PCAInfo<'T>
         | ZCAWhitened of Decomposition.PCAInfo<'T>
@@ -55,10 +56,18 @@ module Normalization =
             let maxVals = data |> ArrayND.maxAxis 0
             let maxVals = ArrayND.maxElemwise maxVals (minVals + epsilon)
             Rescaled (minVals, maxVals), (data - minVals.[NewAxis, *]) / (maxVals - minVals).[NewAxis, *]
-        | Standardization ->
+        | Standardization keepZeroOne ->
+            let zero = ArrayND.scalarOfSameType data (conv<'T> 0)
+            let one = ArrayND.scalarOfSameType data (conv<'T> 1)
             let means = data |> ArrayND.meanAxis 0
             let stds = (data |> ArrayND.stdAxis 0) + epsilon
-            Standardized (means, stds), (data - means.[NewAxis, *]) / stds.[NewAxis, *]
+            let standardized = (data - means.[NewAxis, *]) / stds.[NewAxis, *]
+            let res, onlyZeroOne = 
+                if keepZeroOne then
+                    let onlyZeroOne = (data ==== zero) |||| (data ==== one) |> ArrayND.allAxis 0
+                    ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] data standardized, Some onlyZeroOne
+                else standardized, None
+            Standardized (means, stds, onlyZeroOne), res
         | ScaleToUnitLength ->
             let lengths = (data |> ArrayND.normAxis 1) + epsilon
             ScaledToUnitLength lengths, data / lengths.[*, NewAxis]
@@ -75,8 +84,11 @@ module Normalization =
             nData
         | Rescaled (minVals, maxVals) ->
             nData * (maxVals - minVals).[NewAxis, *] + minVals.[NewAxis, *]
-        | Standardized (means, stds) ->
-            nData * stds.[NewAxis, *] + means.[NewAxis, *]
+        | Standardized (means, stds, onlyZeroOne) ->
+            let unstd = nData * stds.[NewAxis, *] + means.[NewAxis, *]
+            match onlyZeroOne with
+            | Some onlyZeroOne -> ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] nData unstd
+            | None -> unstd            
         | ScaledToUnitLength lengths ->
             nData * lengths.[*, NewAxis]
         | PCAWhitened info ->

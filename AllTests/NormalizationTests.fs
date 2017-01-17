@@ -80,7 +80,7 @@ type CurveNormalizationTests () =
 
     [<Fact>]
     member this.``Standardization`` () =
-        let normalizers = [Standardization]
+        let normalizers = [Standardization true]
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
