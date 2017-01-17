@@ -166,6 +166,7 @@
   install:
     - choco feature enable -n allowEmptyChecksums
     - cinst r.project
+    - R -q -e "install.packages('plotrix'); install.packages('ggplot2')"
 
   before_build:
     - nuget restore DeepNet-CI.sln -Verbosity quiet
