@@ -12,7 +12,7 @@ module ArrayNDHDFTypes =
 
         /// Writes the given ArrayNDHostT into the HDF5 file under the given name.
         static member write<'T> (hdf5: HDF5) name (hostAry: ArrayNDHostT<'T>) =
-            let hostAry = ArrayND.ensureC hostAry
+            let hostAry = ArrayND.ensureCAndOffsetFree hostAry
             hdf5.Write (name, hostAry.Data, ArrayND.shape hostAry)
 
         /// Reads the ArrayNDHostT with the given name from an HDF5 file.
