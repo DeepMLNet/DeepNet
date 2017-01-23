@@ -135,7 +135,8 @@ module HDF5Types =
                         let groupHnd = H5G.create(fileHnd, nextPrefixPath) |> check 
                         H5G.close groupHnd |> check |> ignore
                     create nextPrefix dirs
-            create [] (HDF5.SplitPath path)                
+            if path.Length > 0 then
+                create [] (HDF5.SplitPath path)                
 
         /// Create all necessary parent groups for the given path.
         member private this.CreateParentGroups (path: string) =

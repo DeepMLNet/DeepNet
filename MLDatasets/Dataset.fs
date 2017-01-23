@@ -255,6 +255,41 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
             sprintf "Dataset containing %d samples of %s"
                     this.NSamples typeof<'S>.Name 
 
+    /// Saves this dataset into the specified HDF5 file.
+    /// `hdfPrefixPath` optionally specifies a prefix path within the HDF5 file for the dataset.
+    member this.Save (hdf, ?hdfPrefixPath) =
+        let prefixPath = defaultArg hdfPrefixPath ""
+        let fldInfos = FSharpType.GetRecordFields this.SampleType
+        for fldInfo, fs in Seq.zip fldInfos this.FieldStorages do
+            match fs with
+            | :? IArrayNDHostT as fs -> ArrayNDHDF.writeUntyped hdf (prefixPath + "/" + fldInfo.Name) fs
+            | _ -> failwith "can only save a dataset stored on the host"
+
+    /// Saves this dataset into the specified HDF5 file.
+    /// The file is overwritten.
+    member this.Save (filename) =
+        use hdf = HDF5.OpenWrite filename
+        this.Save (hdf)
+
+    /// Loads a dataset from the specified HDF5 file.
+    /// `hdfPrefixPath` optionally specifies a prefix path within the HDF5 file for the dataset.
+    static member Load<'S> (hdf, ?hdfPrefixPath) =
+        let prefixPath = defaultArg hdfPrefixPath ""
+        if not (FSharpType.IsRecord typeof<'S>) then
+            failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+        FSharpType.GetRecordFields typeof<'S>
+        |> Seq.map (fun fldInfo ->
+            if not (typeof<IArrayNDT>.IsAssignableFrom fldInfo.PropertyType) then 
+                failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+            let dataType = fldInfo.PropertyType.GenericTypeArguments.[0]
+            ArrayNDHDF.readUntyped hdf (prefixPath + "/" + fldInfo.Name) dataType :> IArrayNDT)
+        |> Seq.toList
+        |> Dataset<'S>
+
+    /// Loads a dataset from the specified HDF5 file.
+    static member Load<'S> (filename) =
+        use hdf = HDF5.OpenRead filename
+        Dataset<'S>.Load (hdf)        
 
 /// Dataset functions.
 module Dataset =
@@ -350,30 +385,6 @@ module Dataset =
         ds |> map (fun fs ->
             ArrayNDCuda.toHostUntyped (fs :?> IArrayNDCudaT))
 
-    /// saves this dataset into a HDF5 file
-    let save filename (ds: Dataset<_>) =
-        let fldInfos = FSharpType.GetRecordFields ds.SampleType
-        use hdf = HDF5.OpenWrite filename
-        for fldInfo, fs in Seq.zip fldInfos ds.FieldStorages do
-            match fs with
-            | :? IArrayNDHostT as fs -> ArrayNDHDF.writeUntyped hdf fldInfo.Name fs
-            | _ -> failwith "can only save a dataset stored on the host"
-
-    /// loads a dataset from a HDF5 file
-    let load<'S> filename =
-        if not (FSharpType.IsRecord typeof<'S>) then
-            failwith "Dataset sample type must be a record containing ArrayNDHostTs"
-        use hdf = HDF5.OpenRead filename
-        FSharpType.GetRecordFields typeof<'S>
-        |> Seq.map (fun fldInfo ->
-            if not (typeof<IArrayNDT>.IsAssignableFrom fldInfo.PropertyType) then 
-                failwith "Dataset sample type must be a record containing ArrayNDHostTs"
-            let dataType = fldInfo.PropertyType.GenericTypeArguments.[0]
-            ArrayNDHDF.readUntyped hdf fldInfo.Name dataType :> IArrayNDT)
-        |> Seq.toList
-        |> Dataset<'S>
-
-
 /// A training/validation/test partitioning of a dataset.
 [<StructuredFormatDisplay("{Pretty}")>]
 type TrnValTst<'S> = { 
@@ -428,19 +439,20 @@ module TrnValTst =
         Tst = this.Tst |> Dataset.toHost
     }
 
-    /// Saves this dataset to disk.
-    /// The given filename is append with '-Trn.h5', '-Val.h5' and '-Tst.h5'
-    /// for the training, validation and test set respectively.
+    /// Saves this dataset to disk in an HDF5 file.
+    /// HDF5 folders called 'Trn', 'Val' and 'Tst' are used to store the dataset parations.
     let save filename (this: TrnValTst<'S>) =
-        this.Trn |> Dataset.save (filename + "-Trn.h5")
-        this.Val |> Dataset.save (filename + "-Val.h5")
-        this.Tst |> Dataset.save (filename + "-Tst.h5")
+        use hdf = HDF5.OpenWrite filename
+        this.Trn.Save (hdf, "Trn")
+        this.Val.Save (hdf, "Val")
+        this.Tst.Save (hdf, "Tst")
 
-    /// Loads a dataset from disk.
-    /// The given filename is append with '-Trn.h5', '-Val.h5' and '-Tst.h5'
-    /// for the training, validation and test set respectively.
-    let load filename : TrnValTst<'S> = {
-        Trn = Dataset.load (filename + "-Trn.h5")
-        Val = Dataset.load (filename + "-Val.h5")
-        Tst = Dataset.load (filename + "-Tst.h5")
-    }
+    /// Loads a dataset from an HDF5 file.
+    /// HDF5 folders called 'Trn', 'Val' and 'Tst' are used to store the dataset parations.
+    let load filename : TrnValTst<'S> = 
+        use hdf = HDF5.OpenRead filename
+        {
+            Trn = Dataset.Load (hdf, "Trn")
+            Val = Dataset.Load (hdf, "Val")
+            Tst = Dataset.Load (hdf, "Tst")
+        }

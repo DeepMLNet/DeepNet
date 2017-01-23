@@ -71,9 +71,9 @@ type CurveDataset () =
 
     [<Fact>]
     member this.``Saving and loading`` () =
-        dataset |> Dataset.save "DatasetTests.h5"
+        dataset.Save "DatasetTests.h5"
         printfn "Saved"
-        let dataset2 : Dataset<CurveSample> = Dataset.load "DatasetTests.h5"
+        let dataset2 : Dataset<CurveSample> = Dataset.Load "DatasetTests.h5"
         printfn "Loaded."
 
 
