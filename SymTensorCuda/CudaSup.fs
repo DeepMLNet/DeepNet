@@ -71,6 +71,12 @@ module CudaSup =
         printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
         printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
 
+    let printDevice () =
+        let di = deviceInfo
+        printfn "Using CUDA device \"%s\" with %d multiprocessors @ %.2f GHz and %d MB memory." 
+            di.DeviceName di.MultiProcessorCount 
+            (float di.ClockRate / 10.0**6.0) (int64 di.TotalGlobalMemory / pown 2L 20)
+
     // CUDA BLAS handle
     let blas =
         new CudaBlas.CudaBlas()
