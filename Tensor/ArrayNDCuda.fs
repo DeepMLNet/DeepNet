@@ -189,7 +189,6 @@ module ArrayNDCudaTypes =
                 invalidArg "dst" "dst and src must be of same shape"
             if not (ArrayND.isC dst) then
                 invalidArg "dst" "dst must be contiguous"
-            //printfn "CopyIntoHost: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
 
             let src = ArrayND.ensureC src 
             let dstMemHnd, dstMemPtr =
@@ -199,6 +198,11 @@ module ArrayNDCudaTypes =
                 with CannotRegisterMemory -> 
                     let h = dst.Pin()
                     h :> IDisposable, h.Ptr
+
+            //printfn "CopyIntoHost: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
+            //printfn "ArrayNDCuda.CopyIntoHost: srcBase=0x%x dstBase=0x%x bytes=%d" 
+            //    (nativeint src.Storage.Data.DevicePointer.Pointer) dstMemPtr
+            //    (sizeof<'T> * ArrayND.nElems src)
 
             src.Storage.Data.CopyToHost(dstMemPtr, 
                                         SizeT (sizeof<'T> * ArrayND.offset src), 
