@@ -51,6 +51,10 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Debug.fs" />
@@ -76,8 +80,13 @@
     <Compile Include="ModelContext.fs" />
     <Compile Include="RecordParams.fs" />
     <Compile Include="DerivCheck.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="ManagedCuda">
+      <HintPath>..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.Msagl">
       <HintPath>..\Libs\Microsoft.Msagl.dll</HintPath>
     </Reference>
@@ -96,18 +105,12 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj">
       <Name>Tensor</Name>
       <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <PropertyGroup>
-    <PreBuildEvent>
-    </PreBuildEvent>
-  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
