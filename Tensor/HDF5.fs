@@ -102,11 +102,15 @@ module HDF5Types =
 
         /// Splits a HDF5 path string into a list.
         static member private SplitPath (path: string) =
-            path.Split('/') |> List.ofArray
+            path.Split('/') 
+            |> List.ofArray
+            |> List.filter (fun d -> String.length d > 0)
 
         /// Combines a list of groups into a HDF5 path string.
         static member private CombinePath (dirs: string list) =
-            String.concat "/" dirs
+            dirs
+            |> List.filter (fun d -> String.length d > 0)
+            |> String.concat "/" 
             
         /// Checks whether an object (array or group) with the given name exists.
         member this.Exists (name: string) =
