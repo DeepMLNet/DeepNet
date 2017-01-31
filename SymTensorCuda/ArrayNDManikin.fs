@@ -50,7 +50,7 @@ module ArrayNDManikinTypes =
             member this.Pretty = 
                 match this with
                 | MemZero t -> sprintf "MemZero %A" t.Type
-                | MemAlloc a -> sprintf "MemAlloc %d" a.Id
+                | MemAlloc a -> sprintf "MemAlloc %d (%d KB)" a.Id (a.ByteSize / 1024L)
                 | MemExternal vs -> sprintf "MemExternal %A" vs
                 | MemConst c -> sprintf "MemConst %d" c.Id
 

@@ -192,9 +192,14 @@ type UExprVisualizer (rootExprs: UExprT list) =
 
         exprs |> List.map build, Map.ofDictionary nodeForExpr
 
-    // build main graph
+    /// nodes for storages
+    let nodeForStorage = Dictionary<string, Node> ()
+
+    // build graph
+    let resNodes, nodeForExpr = nodesForExprs graph.RootSubgraph rootExprs
+
     do
-        let resNodes, _ = nodesForExprs graph.RootSubgraph rootExprs
+        // add result nodes
         for i, resNode in List.indexed resNodes do
             let resLabelNode = newNode graph.RootSubgraph
             resLabelNode.LabelText <- sprintf "Result %d" i
@@ -202,6 +207,36 @@ type UExprVisualizer (rootExprs: UExprT list) =
             resLabelNode.Label.FontColor <- Color.White
             newEdge resNode resLabelNode "" |> ignore
 
+    member this.AddManikins uExpr (manikins: List<string * string * string>) =
+        match nodeForExpr.TryFind uExpr with
+        | Some exprNode ->
+            // add manikin info node
+            let manikinNode = newNode graph.RootSubgraph // TODO: fix subgraphs
+            manikinNode.LabelText <- manikins 
+                                     |> List.map (fun (_, manikinStr, _) -> manikinStr)
+                                     |> String.concat "\n"
+            manikinNode.Attr.FillColor <- Color.Beige
+            manikinNode.Label.FontColor <- Color.Black
+            let manikinEdge = newEdge manikinNode exprNode ""
+            manikinEdge.Attr.ArrowheadAtTarget <- ArrowStyle.None
+
+            // add storage nodes
+            for label, _, storageStr in manikins do
+                let storageNode =
+                    match nodeForStorage.TryFind storageStr with
+                    | Some storageNode -> storageNode
+                    | None -> 
+                        let n = newNode graph.RootSubgraph // TODO: fix subgraphs
+                        n.LabelText <- storageStr
+                        n.Attr.FillColor <- Color.Bisque
+                        n.Label.FontColor <- Color.Black
+                        nodeForStorage.[storageStr] <- n
+                        n
+                newEdge storageNode manikinNode label |> ignore                       
+
+        | None -> () // ignore manikin information for unknown nodes
+
+    /// shows the graph
     member this.Show () = 
         let form = new System.Windows.Forms.Form(Text=graph.Label.Text, 
                                                  Width=1000, Height=600)
@@ -227,7 +262,7 @@ module UExprVisualizer =
     let getActive () =
         match active.Value with
         | Some v -> v
-        | None -> failwith "no visualization is active"
+        | None -> failwith "no UExprVisualizer is active on the current thread"
 
     let show () =
         if Debug.VisualizeUExpr then

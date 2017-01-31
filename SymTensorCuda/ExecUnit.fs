@@ -507,6 +507,9 @@ module ExecUnit =
                     let trgtManikins = 
                         trgtChannelsAndShared |> extractChannels |> Map.toList |> List.map snd                        
 
+                    // submit manikins to visualizer
+                    UExprVisualizer.addManikins erqExpr (trgtChannelsAndShared |> extractChannels) srcManikins
+
                     // emit execution unit 
                     let eu = {
                         Id         = newExecUnitId()

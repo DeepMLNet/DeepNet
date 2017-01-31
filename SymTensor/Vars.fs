@@ -26,7 +26,7 @@ module TypeNameTypes =
 
             /// pretty string
             member this.Pretty =
-                sprintf "%A" this.Type
+                sprintf "%s" this.Type.Name
     
 /// assembly qualified name of a .NET type
 module TypeName =

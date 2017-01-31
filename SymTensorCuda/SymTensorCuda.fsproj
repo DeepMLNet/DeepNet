@@ -61,6 +61,7 @@
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaSup.fs" />
     <Compile Include="ArrayNDManikin.fs" />
+    <Compile Include="UExprVisualize.fs" />
     <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaElemExpr.fs" />
