@@ -50,5 +50,3 @@ module Debug =
     /// terminates the program when a non-finite tensor was found by the CheckFinite op
     let mutable TerminateWhenNonFinite = true
 
-    /// terminates the program after CUDA recipe generation
-    let mutable TerminateAfterRecipeGeneration = false

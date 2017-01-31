@@ -25,5 +25,8 @@ module Debug =
     /// if true, Deriv.ofVar fails if specified variable was not present in derived expression
     let mutable FailIfVarNotInDerivative = false
 
+    // if true, a graph of the expression tree is shown during compilation
     let mutable VisualizeUExpr = false
 
+    /// terminates the program after an expression is compiled
+    let mutable TerminateAfterCompilation = false

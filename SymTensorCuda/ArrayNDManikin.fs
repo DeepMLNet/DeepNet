@@ -26,7 +26,7 @@ module ArrayNDManikinTypes =
         Elements:       int64
         Kind:           MemAllocKindT
     } with
-        member this.ByteSize = this.Elements * int64 (TypeName.size this.TypeName)
+        member this.ByteSize = this.Elements * TypeName.size64 this.TypeName
 
     type MemConstManikinT = {
         Id:             int

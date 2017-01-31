@@ -39,6 +39,10 @@ module TypeName =
     let size (tn: TypeNameT) =
         tn.Size
 
+    /// gets the size of the represented type in bytes as int64
+    let size64 (tn: TypeNameT) =
+        tn.Size |> int64
+
     /// gets the TypeName associated with the given type
     let ofType<'T> =
         TypeName (typeof<'T>.AssemblyQualifiedName)

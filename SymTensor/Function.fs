@@ -297,17 +297,25 @@ module Func =
                 let uexprs = UExpr.toUExprs exprs
                 if Debug.Timing then printfn "Converting to UExprs took %A" sw.Elapsed
 
-                // visualize UExprs, if requested
-                if Debug.VisualizeUExpr then
-                    UExprVisualize.show uexprs
+                // build UExpr visualization
+                UExprVisualizer.build uexprs 
 
                 // compile
-                Some {
+                let compileRes = {
                     Exprs=uexprs
                     CompileEnv=compileEnv
                     Eval=compiler.Compile compileEnv uexprs
                     NeededVars=neededVars
                 }
+
+                // show UExpr visualization, if requested
+                UExprVisualizer.show ()
+                UExprVisualizer.finish ()
+
+                // terminate program, if requested for debugging
+                if Debug.TerminateAfterCompilation then exit 0
+
+                Some compileRes
             else None
 
         /// Performs evaluation of a compiled function.
