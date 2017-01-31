@@ -38,7 +38,7 @@ module RNNTests =
         let _, pred = (initial, input) ||> RecurrentLayer.pred rnn
         let loss = -target * log pred |> Expr.mean
 
-        let NBatch, NSteps, NWords, NRecurrent = 2, 15, 4, 10
+        let NBatch, NSteps, NWords, NRecurrent = 2L, 15L, 4L, 10L
         let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
         mi.InitPars 100
 
@@ -76,14 +76,14 @@ module RNNTests =
         let targetProb = pred |> Expr.gather [None; None; Some target]            
         let loss = -log targetProb |> Expr.mean
 
-        let NBatch, NSteps, NWords, NRecurrent = 2, 6, 3, 3
+        let NBatch, NSteps, NWords, NRecurrent = 2L, 6L, 3L, 3L
         let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
                                    initial, vInitial :> IArrayNDT 
                                    target, vTarget :> IArrayNDT] 
@@ -116,14 +116,14 @@ module RNNTests =
         let targetProb = pred |> Expr.gather [None; None; Some target]            
         let loss = -log targetProb |> Expr.mean
 
-        let NBatch, NSteps, NWords, NRecurrent = 2, 6, 3, 3
+        let NBatch, NSteps, NWords, NRecurrent = 2L, 6L, 3L, 3L
         let mi = mb.Instantiate (device, Map [nWords, NWords; nRecurrent, NRecurrent])
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntArrayND (0, NWords-1) [NBatch; NSteps] |> device.ToDev
+        let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
                                    initial, vInitial :> IArrayNDT 
                                    target, vTarget :> IArrayNDT] 

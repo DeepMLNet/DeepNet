@@ -31,7 +31,7 @@ module Cifar10 =
     
     let private assemble dataSeq =
         let data = List.ofSeq dataSeq
-        let nSamples = List.length data
+        let nSamples = List.length data |> int64
 
         let dataShape = ArrayND.shape data.[0]
         let ds = ArrayNDHost.zeros (nSamples :: dataShape)

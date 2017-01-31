@@ -60,6 +60,7 @@ module ConstSpecTypes =
     [<StructuralEquality; StructuralComparison>]
     type ConstSpecT = 
         | ConstInt of int
+        | ConstInt64 of int64
         | ConstDouble of double
         | ConstSingle of single
         | ConstBool of bool
@@ -68,6 +69,7 @@ module ConstSpecTypes =
             member this.TypeName = 
                 match this with
                 | ConstInt _    -> TypeName.ofType<int>
+                | ConstInt64 _    -> TypeName.ofType<int64>
                 | ConstDouble _ -> TypeName.ofType<double>
                 | ConstSingle _ -> TypeName.ofType<single>
                 | ConstBool _   -> TypeName.ofType<bool>
@@ -80,6 +82,7 @@ module ConstSpecTypes =
             member this.GetValue() : 'T =
                 match this with
                 | ConstInt v    -> v |> box |> unbox
+                | ConstInt64 v  -> v |> box |> unbox
                 | ConstDouble v -> v |> box |> unbox
                 | ConstSingle v -> v |> box |> unbox
                 | ConstBool v   -> v |> box |> unbox  
@@ -88,6 +91,7 @@ module ConstSpecTypes =
             member this.Value =
                 match this with
                 | ConstInt v    -> v |> box 
+                | ConstInt64 v  -> v |> box 
                 | ConstDouble v -> v |> box
                 | ConstSingle v -> v |> box 
                 | ConstBool v   -> v |> box 
@@ -104,6 +108,7 @@ module ConstSpec =
     let ofValue (value: obj) =
         match value.GetType() with
         | t when t = typeof<int> -> ConstInt (value |> unbox)
+        | t when t = typeof<int64> -> ConstInt64 (value |> unbox)
         | t when t = typeof<double> -> ConstDouble (value |> unbox)
         | t when t = typeof<single> -> ConstSingle (value |> unbox)
         | t when t = typeof<bool> -> ConstBool (value |> unbox)
@@ -133,6 +138,7 @@ module ConstSpec =
     let zero typ =
         match typ with
         | _ when typ = typeof<int>    -> ConstInt 0
+        | _ when typ = typeof<int64>  -> ConstInt64 0L
         | _ when typ = typeof<double> -> ConstDouble 0.0
         | _ when typ = typeof<single> -> ConstSingle 0.0f
         | _ when typ = typeof<bool>   -> ConstBool false
@@ -142,6 +148,7 @@ module ConstSpec =
     let minValue typ =
         match typ with
         | _ when typ = typeof<int>    -> ConstInt (System.Int32.MinValue)
+        | _ when typ = typeof<int64>  -> ConstInt64 (System.Int64.MinValue)
         | _ when typ = typeof<double> -> ConstDouble (System.Double.MinValue)
         | _ when typ = typeof<single> -> ConstSingle (System.Single.MinValue)
         | _ when typ = typeof<bool>   -> ConstBool false
@@ -151,6 +158,7 @@ module ConstSpec =
     let maxValue typ =
         match typ with
         | _ when typ = typeof<int>    -> ConstInt (System.Int32.MaxValue)
+        | _ when typ = typeof<int64>  -> ConstInt64 (System.Int64.MaxValue)
         | _ when typ = typeof<double> -> ConstDouble (System.Double.MaxValue)
         | _ when typ = typeof<single> -> ConstSingle (System.Single.MaxValue)
         | _ when typ = typeof<bool>   -> ConstBool true

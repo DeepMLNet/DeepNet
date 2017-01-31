@@ -92,9 +92,9 @@ module Train =
         /// seed for parameter initialization
         Seed:                           int
         /// batch size
-        BatchSize:                      int
+        BatchSize:                      int64
         /// time slot length for sequence training
-        SlotSize:                       int option
+        SlotSize:                       int64 option
         /// number of iterations between evaluation of the loss
         LossRecordInterval:             int
         /// function that is called after loss has been evaluated
@@ -130,7 +130,7 @@ module Train =
     /// Default training configuration.
     let defaultCfg = {
         Seed                        = 1
-        BatchSize                   = 10000
+        BatchSize                   = 10000L
         SlotSize                    = None
         LossRecordInterval          = 10
         LossRecordFunc              = fun _ -> ()

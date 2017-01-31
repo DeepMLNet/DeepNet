@@ -54,11 +54,11 @@ module RandomExtensions =
         /// Samples each element of an ArrayND of shape shp from a uniform distribution
         /// between minValue and maxValue.
         member this.SortedUniformArrayND (minValue: 'T, maxValue: 'T) shp =
-            let nElems = shp |> List.fold (*) 1
+            let nElems = shp |> List.fold (*) 1L
             let minValue, maxValue = conv<float> minValue, conv<float> maxValue
             this.SeqDouble() 
             |> Seq.map (fun x -> x * (maxValue - minValue) + minValue |> conv<'T>)
-            |> Seq.take nElems
+            |> Seq.take (int32 nElems)
             |> Seq.toList
             |> List.sort
             |> ArrayNDNS.ArrayNDHost.ofList

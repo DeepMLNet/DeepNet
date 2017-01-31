@@ -352,16 +352,18 @@ module CudaExprWorkspaceTypes =
                 // memory management
                 | CudaCallT.MemAlloc mem -> 
                     let typeSize = Marshal.SizeOf (TypeName.getType mem.TypeName)
-                    let elements = if mem.Elements > 0 then mem.Elements else 1
+                    let elements = if mem.Elements > 0L then mem.Elements else 1L
                     match mem.Kind with
                     | MemAllocDev ->
-                        try
-                            execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT (elements * typeSize)))
-                        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory ->
-                            failwithf "Out of CUDA memory while allocating %d bytes" (elements * typeSize)
+                        let sizeInBytes = elements * int64 typeSize
+                        try execEnv.InternalMem.Add(mem, new CudaDeviceVariable<byte>(SizeT sizeInBytes))
+                        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
+                                                     || e.CudaError = CUResult.ErrorUnknown ->
+                            failwithf "CUDA memory allocation of %d MB failed (%A)" 
+                                      (sizeInBytes / pown 2L 20) e.CudaError
                     | MemAllocRegHost ->
-                        let sizeInBytes = elements * typeSize
-                        let ptr = Marshal.AllocHGlobal sizeInBytes
+                        let sizeInBytes = elements * int64 typeSize
+                        let ptr = Marshal.AllocHGlobal (nativeint sizeInBytes)
                         let cudaRegMem = new CudaRegisteredHostMemory<byte> (ptr, SizeT sizeInBytes)
                         cudaRegMem.Register (CUMemHostRegisterFlags.None)
                         execEnv.RegHostMem.Add(mem, {Ptr=ptr; CudaRegHostMem=cudaRegMem})
@@ -413,17 +415,17 @@ module CudaExprWorkspaceTypes =
                     let devAry, resDsc =
                         match tex.Contents.NDims with
                         | 1 ->
-                            if (ArrayND.stride tex.Contents).[0] <> 1 then
+                            if (ArrayND.stride tex.Contents).[0] <> 1L then
                                 failwith "texture contents must be continuous"
                             let nElems = tex.Contents.Shape.[0]
                             let devAry = new CudaArray1D
                                            (CUArrayFormat.Float, SizeT nElems, CudaArray1DNumChannels.One)
                             devAry.CopyFromDeviceToArray1D 
-                                (devVar.DevicePointer, SizeT (nElems * sizeof<single>), 
-                                 SizeT (ArrayND.offset tex.Contents * sizeof<single>))
+                                (devVar.DevicePointer, SizeT (nElems * sizeof64<single>), 
+                                 SizeT (ArrayND.offset tex.Contents * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 2 ->
-                            if (ArrayND.stride tex.Contents).[1] <> 1 then
+                            if (ArrayND.stride tex.Contents).[1] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
                             let devAry = new CudaArray2D(CUArrayFormat.Float, 
                                                          SizeT tex.Contents.Shape.[1],
@@ -431,13 +433,13 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray2DNumChannels.One)
                             use pdv = 
                                 new CudaPitchedDeviceVariable<single> 
-                                    (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof<single>), 
+                                    (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof64<single>), 
                                      SizeT tex.Contents.Shape.[1], SizeT tex.Contents.Shape.[0], 
-                                     SizeT ((ArrayND.stride tex.Contents).[0]) * sizeof<single>) 
+                                     SizeT (((ArrayND.stride tex.Contents).[0]) * sizeof64<single>)) 
                             devAry.CopyFromDeviceToThis (pdv)
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 3 ->
-                            if (ArrayND.stride tex.Contents).[2] <> 1 then
+                            if (ArrayND.stride tex.Contents).[2] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
                             if (ArrayND.stride tex.Contents).[0] <> 
                                (ArrayND.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
@@ -449,9 +451,9 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray3DNumChannels.One,
                                                          CUDAArray3DFlags.None)
                             devAry.CopyFromDeviceToThis 
-                                (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof<single>),
-                                 SizeT sizeof<single>, 
-                                 SizeT ((ArrayND.stride tex.Contents).[1]) * sizeof<single>)
+                                (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof64<single>),
+                                 SizeT sizeof64<single>, 
+                                 SizeT (((ArrayND.stride tex.Contents).[1]) * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | d -> failwithf "unsupported number of dimensions for texture: %d" d
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
@@ -556,12 +558,12 @@ module CudaExprWorkspaceTypes =
                     use aVar = a.GetVar execEnv
                     use bVar = b.GetVar execEnv
                     use trgtVar = trgt.GetVar execEnv
-                    let m = a.GetRowsForOp execEnv aOp.CudaBlasOperation
-                    let n = b.GetColumnsForOp execEnv bOp.CudaBlasOperation
-                    let k = a.GetColumnsForOp execEnv aOp.CudaBlasOperation
-                    let ldA = a.GetLeadingDimension execEnv
-                    let ldB = b.GetLeadingDimension execEnv
-                    let ldTrgt = trgt.GetLeadingDimension execEnv
+                    let m = a.GetRowsForOp execEnv aOp.CudaBlasOperation |> int32
+                    let n = b.GetColumnsForOp execEnv bOp.CudaBlasOperation |> int32
+                    let k = a.GetColumnsForOp execEnv aOp.CudaBlasOperation |> int32
+                    let ldA = a.GetLeadingDimension execEnv |> int32
+                    let ldB = b.GetLeadingDimension execEnv |> int32
+                    let ldTrgt = trgt.GetLeadingDimension execEnv |> int32
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.Gemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                       m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, 
@@ -571,43 +573,46 @@ module CudaExprWorkspaceTypes =
                     use aAry = a.GetPointerArrayDevice execEnv
                     use bAry = b.GetPointerArrayDevice execEnv
                     use trgtAry = trgt.GetPointerArrayDevice execEnv                    
-                    let m = a.GetRowsForOp aOp.CudaBlasOperation
-                    let n = b.GetColumnsForOp bOp.CudaBlasOperation
-                    let k = a.GetColumnsForOp aOp.CudaBlasOperation
-                    let ldA = a.LeadingDimension 
-                    let ldB = b.LeadingDimension 
-                    let ldTrgt = trgt.LeadingDimension 
+                    let m = a.GetRowsForOp aOp.CudaBlasOperation |> int32
+                    let n = b.GetColumnsForOp bOp.CudaBlasOperation |> int32
+                    let k = a.GetColumnsForOp aOp.CudaBlasOperation |> int32
+                    let ldA = a.LeadingDimension |> int32
+                    let ldB = b.LeadingDimension |> int32
+                    let ldTrgt = trgt.LeadingDimension |> int32
+                    let nSamples = a.NSamples |> int32
 
                     if Debug.TraceCalls then
                         printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, \
                                  ldA=%d, ldB=%d, ldTrgt=%d, nSamples=%d" 
-                            strm m n k ldA ldB ldTrgt a.NSamples
+                            strm m n k ldA ldB ldTrgt nSamples
 
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                              m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, 
-                                             trgtAry, ldTrgt, a.NSamples)
+                                             trgtAry, ldTrgt, nSamples)
 
                 | ExecItem (BlasGetrfBatched (a, pivot, info), strm) ->
                     use aAry = a.GetPointerArrayDevice execEnv
-                    let n = a.Rows 
-                    let ldA = a.LeadingDimension 
+                    let n = a.Rows |> int32
+                    let ldA = a.LeadingDimension |> int32
                     let pVar = pivot.GetVar execEnv
                     let infoVar = info.GetVar execEnv
+                    let nSamples = a.NSamples |> int32
                     CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, a.NSamples)
+                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, nSamples)
 
                 | ExecItem (BlasGetriBatched (a, pivot, trgt, info), strm) ->
                     use aAry = a.GetPointerArrayDevice execEnv
-                    let n = a.Rows 
-                    let ldA = a.LeadingDimension 
+                    let n = a.Rows |> int32
+                    let ldA = a.LeadingDimension |> int32
                     let pVar = pivot.GetVar execEnv
                     let trgtAry = trgt.GetPointerArrayDevice execEnv
-                    let ldC = trgt.LeadingDimension 
+                    let ldC = trgt.LeadingDimension |> int32
                     let infoVar = info.GetVar execEnv
+                    let nSamples = a.NSamples |> int32
                     CudaSup.blas.Stream <- getStream strm
                     CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, 
-                                                a.NSamples)
+                                                nSamples)
 
                 | ExecItem (BlasInitPointerArray (aryTmpl), strm) ->
                     let cacheKey = aryTmpl.PointerArrayCacheKey execEnv
@@ -637,15 +642,15 @@ module CudaExprWorkspaceTypes =
                     let iterRemMem, _ = CudaExecEnv.getDevMemForManikin execEnv info.ItersRemainingManikin
 
                     // iterate
-                    for iter=0 to info.Length-1 do
+                    for iter in 0L .. info.Length-1L do
                         if Debug.TraceCalls then 
-                            printfn "Loop iteration %d / %d on stream %d" iter (info.Length-1) strm
+                            printfn "Loop iteration %d / %d on stream %d" iter (info.Length-1L) strm
                         if Trace.isActive () then 
                             Trace.setLoopIter iter
 
                         // set iteration and iterations remaining
                         iterMem.MemsetAsync (uint32 iter, getStream strm)
-                        iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1), getStream strm)
+                        iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1L), getStream strm)
 
                         // obtain real ArrayNDCudaTs for array manikins
                         let lcis = info.Channels |> Map.map (fun ch ci -> 

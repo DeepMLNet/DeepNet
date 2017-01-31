@@ -8,7 +8,7 @@ open ManagedCuda.BasicTypes
 module CudaSupTypes =
 
     /// dimensionality of parallel work to perform (x, y, z)
-    type WorkDimT = int * int * int
+    type WorkDimT = int64 * int64 * int64
 
     /// CUDA block dimension (x, y, z)
     type BlockDimT = int * int * int
@@ -114,12 +114,15 @@ module CudaSup =
     /// specified work dimensions, since the maximum block and grid sizes are limited.
     let computeLaunchDim (workDim: WorkDimT) maxBlockSize =
         let (./) a b =
-            if a % b = 0 then a / b 
-            else a / b + 1 
+            if a % b = 0L then a / b 
+            else a / b + 1L
 
         let wx, wy, wz = workDim
         let mbx, mby, mbz = maxBlockDim
+        let mbx, mby, mbz = int64 mbx, int64 mby, int64 mbz
         let mgx, mgy, mgz = maxGridDim
+        let mgx, mgy, mgz = int64 mgx, int64 mgy, int64 mgz
+        let maxBlockSize = int64 maxBlockSize
 
         let bx = min mbx (min wx maxBlockSize)
         let by = min mby (min wy (maxBlockSize / bx))
@@ -129,11 +132,15 @@ module CudaSup =
         let gy = min mgy (wy ./ by)
         let gz = min mgz (wz ./ bz)
 
-        assert (if wx = 1 then bx = 1 && gx = 1 else true)
-        assert (if wy = 1 then by = 1 && gy = 1 else true)
-        assert (if wz = 1 then bz = 1 && gz = 1 else true)
+        assert (if wx = 1L then bx = 1L && gx = 1L else true)
+        assert (if wy = 1L then by = 1L && gy = 1L else true)
+        assert (if wz = 1L then bz = 1L && gz = 1L else true)
 
-        {Block = bx, by, bz; Grid = gx, gy, gz;}
+        let mv = int64 Microsoft.FSharp.Core.int32.MaxValue
+        assert (bx <= mv && by <= mv && bz <= mv)
+        assert (gx <= mv && gy <= mv && gz <= mv)
+
+        {Block = int32 bx, int32 by, int32 bz; Grid = int32 gx, int32 gy, int32 gz;}
 
     /// call implicit type conversation
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 

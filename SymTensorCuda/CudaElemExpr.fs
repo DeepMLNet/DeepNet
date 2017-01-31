@@ -53,7 +53,7 @@ module CudaElemExpr =
                     sp.Symbols
                     |> Map.toSeq
                     |> Seq.map (fun (sym, pow) ->
-                        [for p=0 to pow-1 do yield sizeSymVars.[sym]]
+                        [for p in 0L .. pow-1L do yield sizeSymVars.[sym]]
                         |> String.concat "*")
                     |> Seq.append (Seq.singleton (sprintf "%d" fac.IntValue))
                     |> String.concat " * ")

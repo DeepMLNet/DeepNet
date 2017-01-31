@@ -16,8 +16,8 @@ module GPPlots =
     /// performed by the same Gaussian Process with different parameters.
     type PlotCfg = 
         {HyperPars: GaussianProcess.HyperPars;
-         NTrain:    int;
-         NTest:     int}  
+         NTrain:    int64;
+         NTest:     int64}  
     
     /// Map containing initialized Gaussian Process models.
     let mutable models = Map.empty
@@ -110,7 +110,7 @@ module GPPlots =
         static member simplePlot (hyperPars, trnSigma: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
                                   ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
         
-            let nPoints = defaultArg nPoints 20
+            let nPoints = defaultArg nPoints 20L
             let trnDist = ArrayND.max trnX - ArrayND.min trnX |> ArrayND.value
             let minValue = defaultArg minX ((trnX |> ArrayND.min |> ArrayND.value) - trnDist * 0.1f)
             let maxValue = defaultArg maxX ((trnX |> ArrayND.max |> ArrayND.value) + trnDist * 0.1f)

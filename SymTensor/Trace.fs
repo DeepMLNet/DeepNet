@@ -16,7 +16,7 @@ module Trace =
 
     type LoopIter = {
         LoopExpr:       UExprT
-        Iter:           int
+        Iter:           int64
     }
 
     type LoopStack = LoopIter list
@@ -146,7 +146,7 @@ module Trace =
             match uexpr with
             | UExpr (UExtraOp (Loop _), _, _) -> ()
             | _ -> failwithf "not a loop expression: %A" uexpr
-            activeLoopStack.Value.Push {LoopExpr=uexpr; Iter=0}
+            activeLoopStack.Value.Push {LoopExpr=uexpr; Iter=0L}
             let ee = getActiveExpr ()
             ee.Trace.Add (EnteringLoop uexpr)
 
@@ -170,7 +170,7 @@ module Trace =
     let loopStack () : LoopStack =
         activeLoopStack.Value.ToArray() |> List.ofArray |> List.rev
 
-    let private empty = ArrayNDHost.zeros<int> [0] :> IArrayNDT
+    let private empty = ArrayNDHost.zeros<int> [0L] :> IArrayNDT
 
     let exprEvaledWithMsg uexpr (res: Lazy<IArrayNDT>) msg =
         if isActive () then
@@ -205,7 +205,11 @@ module Trace =
             let a = a :?> ArrayNDT<int>
             let b = b :?> ArrayNDT<int>
             ArrayND.all (a ==== b) |> ArrayND.value
-        | t -> failwithf "unsupported data type %A" t
+        | t, _ when t = typeof<int64> ->
+            let a = a :?> ArrayNDT<int64>
+            let b = b :?> ArrayNDT<int64>
+            ArrayND.all (a ==== b) |> ArrayND.value
+        | t -> failwithf "unsupported trace data type %A" t
 
     let compareCustom isSimilar a b =
         let maxDiffs = 3

@@ -40,7 +40,7 @@ module UExprTypes =
     }
 
     and ULoopSpecT = {
-        Length:     int
+        Length:     int64
         Vars:       Map<VarSpecT, LoopInputT>
         Channels:   Map<ChannelT, ULoopValueT>
     }
@@ -168,9 +168,9 @@ module UExprRngsSpec =
             match rng with
             | SRSSymStartSymEnd (s, fo) ->
                 let s, fo = SizeSpec.eval s, Option.map SizeSpec.eval fo
-                if not (0 <= s && s < size) then failRng ()
+                if not (0L <= s && s < size) then failRng ()
                 match fo with
-                | Some fo when not (0 <= fo && fo < size && fo >= s-1) -> failRng ()
+                | Some fo when not (0L <= fo && fo < size && fo >= s-1L) -> failRng ()
                 | _ -> ()
             | SRSDynStartSymSize _ -> ())        
         

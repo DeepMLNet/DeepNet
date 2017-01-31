@@ -22,8 +22,8 @@ exception UnknownWord of string
 
 type WordData (dataPath:      string,
                vocSizeLimit:  int option,
-               stepsPerSmpl:  int,
-               minSamples:    int,
+               stepsPerSmpl:  int64,
+               minSamples:    int64,
                tokenLimit:    int option,
                useChars:      bool) =
 

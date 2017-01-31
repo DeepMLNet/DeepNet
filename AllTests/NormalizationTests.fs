@@ -37,7 +37,7 @@ type CurveNormalizationTests () =
         
     [<Fact>]
     member this.``PCA Whitening 10`` () =
-        let normalizers = [PCAWhitening (Some 10)]
+        let normalizers = [PCAWhitening (Some 10L)]
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 

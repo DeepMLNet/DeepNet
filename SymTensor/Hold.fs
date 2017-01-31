@@ -18,14 +18,14 @@ module Hold =
             | ReplicateTo (dim, size) when SizeSpec.canEval size && SizeSpec.canEval a.Shape.[dim] ->                 
                 let nTrgt, nSrc = SizeSpec.eval size, SizeSpec.eval a.Shape.[dim]
                 let nReps, haveRemaining = 
-                    if nTrgt % nSrc = 0 then nTrgt / nSrc, false
-                    else nTrgt / nSrc + 1, true
+                    if nTrgt % nSrc = 0L then nTrgt / nSrc, false
+                    else nTrgt / nSrc + 1L, true
                 let aRep = a |> replicate dim (SizeSpec.fix nReps)
                 if haveRemaining then
                     let slice : ExprRngsSpecT = 
                         [0 .. aRep.NDims-1]
                         |> List.map (fun d -> 
-                            if d = dim then SRSSymStartSymEnd (SizeSpec.zero, Some (size - 1))
+                            if d = dim then SRSSymStartSymEnd (SizeSpec.zero, Some (size - 1L))
                             else SRSAll)
                     aRep.[slice]
                 else aRep

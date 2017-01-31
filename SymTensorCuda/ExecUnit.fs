@@ -53,7 +53,7 @@ module ExecUnitsTypes =
         OnCompletion:   EvalResultT -> unit
     }
 
-    type MemAllocatorT = TypeNameT -> int -> MemAllocKindT -> MemManikinT
+    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKindT -> MemManikinT
 
     type ExecItemsForOpArgs<'e> = {
         MemAllocator:       MemAllocatorT

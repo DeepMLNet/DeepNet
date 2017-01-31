@@ -33,8 +33,19 @@ template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
 template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
 #endif
 
+// integer types
+typedef char int8_t;
+typedef unsigned char uint8_t;
+typedef short int16_t;
+typedef unsigned short uint16_t;
+typedef int int32_t;
+typedef unsigned int uint32_t;
+typedef long long int64_t;
+typedef unsigned long long uint64_t;
 
-typedef int idx_t;
+
+// type for indices and sizes
+typedef int64_t idx_t;
 
 
 template <typename T>

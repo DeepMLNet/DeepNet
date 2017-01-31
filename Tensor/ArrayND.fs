@@ -34,9 +34,9 @@ module ArrayNDTypes =
     /// ArrayND of any type
     type IArrayNDT =
         abstract Layout:            ArrayNDLayoutT
-        abstract Shape:             int list
+        abstract Shape:             int64 list
         abstract NDims:             int
-        abstract NElems:            int
+        abstract NElems:            int64
         abstract CPPType:           string
         abstract NewView:           ArrayNDLayoutT -> IArrayNDT
         abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
@@ -77,23 +77,13 @@ module ArrayND =
         member this.Layout = layout
 
         /// value zero (if defined for 'T)
-        static member Zero =
-            if typeof<'T>.Equals(typeof<double>) then (box 0.0) :?> 'T
-            elif typeof<'T>.Equals(typeof<single>) then (box 0.0f) :?> 'T
-            elif typeof<'T>.Equals(typeof<int>) then (box 0) :?> 'T
-            elif typeof<'T>.Equals(typeof<byte>) then (box 0) :?> 'T
-            else failwithf "zero is undefined for type %A" typeof<'T>
+        static member Zero = conv<'T> 0
 
         /// value one (if defined for 'T)
-        static member One =
-            if typeof<'T>.Equals(typeof<double>) then (box 1.0) :?> 'T
-            elif typeof<'T>.Equals(typeof<single>) then (box 1.0f) :?> 'T
-            elif typeof<'T>.Equals(typeof<int>) then (box 1) :?> 'T
-            elif typeof<'T>.Equals(typeof<byte>) then (box 1) :?> 'T
-            else failwithf "one is undefined for type %A" typeof<'T>
+        static member One = conv<'T> 1
 
         /// item access
-        abstract Item : int list -> 'T with get, set
+        abstract Item : int64 list -> 'T with get, set
 
         /// a new ArrayND of same type and new storage allocation for given layout
         abstract NewOfSameType : ArrayNDLayoutT -> ArrayNDT<'T>
@@ -113,9 +103,9 @@ module ArrayND =
             let cppDataType = Util.cppType this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
-                else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
             let strideStr = 
-                "<" + ((ofst :: str) |> Util.intToStrSeq |> String.concat ",") + ">"
+                "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
             sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
                 dims cppDataType dims shapeStr dims strideStr            
 
@@ -247,7 +237,7 @@ module ArrayND =
             ifVal.IfThenElseImpl cond elseVal res
             res
 
-        abstract GatherImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        abstract GatherImpl: #ArrayNDT<int64> option list -> ArrayNDT<'T> -> unit
         default trgt.GatherImpl indices src =
             for trgtIdx in ArrayNDLayout.allIdx trgt.Layout do
                 let srcIdx = 
@@ -261,7 +251,7 @@ module ArrayND =
                        
         /// Sets the values of this array by selecting from the sources array according to the specified
         /// indices. If an index array is set to None then the target index is used as the source index.
-        member trgt.Gather (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Gather (indices: #ArrayNDT<int64> option list) (src: #ArrayNDT<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -278,15 +268,17 @@ module ArrayND =
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
             trgt.GatherImpl indices src
 
-        abstract ScatterImpl: #ArrayNDT<int> option list -> ArrayNDT<'T> -> unit
+        abstract ScatterImpl: #ArrayNDT<int64> option list -> ArrayNDT<'T> -> unit
         default trgt.ScatterImpl indices src = 
             let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
+            let addInt64 a b = (a |> box |> unbox<int64>) + (b |> box |> unbox<int64>) |> box |> unbox<'T>
             let addSingle a b = (a |> box |> unbox<single>) + (b |> box |> unbox<single>) |> box |> unbox<'T>
             let addDouble a b = (a |> box |> unbox<double>) + (b |> box |> unbox<double>) |> box |> unbox<'T>
             let addBool a b = ((a |> box |> unbox<bool>) || (b |> box |> unbox<bool>)) |> box |> unbox<'T>
             let add =
                 match typeof<'T> with
                 | t when t=typeof<int> -> addInt
+                | t when t=typeof<int64> -> addInt64
                 | t when t=typeof<single> -> addSingle
                 | t when t=typeof<double> -> addDouble
                 | t when t=typeof<bool> -> addBool
@@ -303,7 +295,7 @@ module ArrayND =
         /// Sets the values of this array by summing elements from the sources array into the elements
         /// of this array specified by the indices.
         /// If an index array is set to None then the target index is used as the source index.
-        member trgt.Scatter (indices: #ArrayNDT<int> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Scatter (indices: #ArrayNDT<int64> option list) (src: #ArrayNDT<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -347,10 +339,10 @@ module ArrayND =
                 // direct range specification
                 | [:? (RangeT list) as rngs] -> rngs
                 // slices
-                | (:? (int option) as so) :: (:? (int option) as fo)  :: rest ->
+                | (:? (int64 option) as so) :: (:? (int64 option) as fo)  :: rest ->
                     Rng (so, fo) :: toRng rest
                 // items
-                | (:? int as i)           :: rest ->
+                | (:? int64 as i)           :: rest ->
                     RngElem i :: toRng rest
                 | (:? SpecialAxisT as sa) :: rest ->
                     match sa with
@@ -457,10 +449,10 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////   
     
     /// get element value
-    let inline get (idx: int list) (a: ArrayNDT<_>) = a.[idx]
+    let inline get (idx: int64 list) (a: ArrayNDT<_>) = a.[idx]
     
     /// set element value
-    let inline set (idx: int list) value (a: ArrayNDT<_>) = a.[idx] <- value
+    let inline set (idx: int64 list) value (a: ArrayNDT<_>) = a.[idx] <- value
 
     /// if true, then setting NaN or Inf causes and exception to be thrown.
     let CheckFinite = false
@@ -567,7 +559,7 @@ module ArrayND =
 
     /// makes a contiguous copy of the given tensor if it is not contiguous and with zero offset
     let inline ensureCAndOffsetFree a = 
-        if isC a && offset a = 0 then a else copy a 
+        if isC a && offset a = 0L then a else copy a 
 
     /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
@@ -640,7 +632,7 @@ module ArrayND =
 
     /// Flattens the array into a vector assuming a contiguous (row-major) memory layout.
     let inline flatten a =
-        reshape [-1] a
+        reshape [-1L] a
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =
@@ -674,19 +666,19 @@ module ArrayND =
     /// If not, it is padded with size one dimensions from the left.
     let atLeast2D a =
         if nDims a >= 2 then a
-        else a |> reshape [1; nElems a]
+        else a |> reshape [1L; nElems a]
 
     /// Ensures that the tensor has at least three dimensions.
     /// If not, it is padded with size one dimensions from the left.
     let atLeast3D a =
         if nDims a >= 3 then a
-        else a |> reshape [1; 1; nElems a]
+        else a |> reshape [1L; 1L; nElems a]
 
     /// Ensures that the tensor has at least four dimensions.
     /// If not, it is padded with size one dimensions from the left.
     let atLeast4D a =
         if nDims a >= 4 then a
-        else a |> reshape [1; 1; 1; nElems a]
+        else a |> reshape [1L; 1L; 1L; nElems a]
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -741,7 +733,7 @@ module ArrayND =
     let inline fillDiagonalWithOnes (a: #ArrayNDT<'T>) =
         match shape a with
         | [n; m] when n = m ->
-            for i = 0 to n - 1 do
+            for i in 0L .. n-1L do
                 set [i; i] ArrayNDT<'T>.One a
         | _ -> invalidArg "a" "need a quadratic matrix"
 
@@ -812,15 +804,15 @@ module ArrayND =
             else failwith "sequence ended before ArrayNDT was filled")
 
     /// Fills the array with the values returned by the function.
-    let inline fillIndexed (f: int list -> 'T) (a: #ArrayNDT<'T>) =
+    let inline fillIndexed (f: int64 list -> 'T) (a: #ArrayNDT<'T>) =
         for idx in allIdx a do
             a.[idx] <- f idx
             
     /// Fills the vector with linearly spaced values from start to (including) stop.
     let inline fillLinSpaced (start: 'T) (stop: 'T) (a: #ArrayNDT<'T>) =
         if a.NDims <> 1 then invalidArg "a" "tensor must be one dimensional"
-        if a.NElems < 2 then invalidArg "a" "tensor must have at least two elements"
-        let step = (stop - start) / conv<'T> (a.NElems - 1)
+        if a.NElems < 2L then invalidArg "a" "tensor must have at least two elements"
+        let step = (stop - start) / conv<'T> (a.NElems - 1L)
         a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)       
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
@@ -886,12 +878,14 @@ module ArrayND =
                             (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>)
+                            (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>)
                             (a: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply fBool a 
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
+        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply fInt64  a 
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
 
@@ -899,12 +893,14 @@ module ArrayND =
                                      (fDouble: ArrayNDT<double> -> ArrayNDT<'R>) 
                                      (fSingle: ArrayNDT<single> -> ArrayNDT<'R>)
                                      (fInt:    ArrayNDT<int>    -> ArrayNDT<'R>)
+                                     (fInt64:  ArrayNDT<int64>  -> ArrayNDT<'R>)
                                      (fByte:   ArrayNDT<byte>   -> ArrayNDT<'R>)
                                      (a: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApplyTypeChange fBool a 
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApplyTypeChange fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApplyTypeChange fSingle a 
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApplyTypeChange fInt    a 
+        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApplyTypeChange fInt64  a 
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApplyTypeChange fByte   a 
         else failwith "unknown type"
 
@@ -912,12 +908,14 @@ module ArrayND =
                             (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
                             (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
                             (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<int>)
+                            (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>  -> ArrayNDT<int64>)
                             (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<byte>)
                             (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2 fBool   a b        
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
+        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply2 fInt64  a b
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
         else failwith "unknown type"
 
@@ -925,12 +923,14 @@ module ArrayND =
                                       (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<'R>) 
                                       (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<'R>)
                                       (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<'R>)
+                                      (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>  -> ArrayNDT<'R>)
                                       (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<'R>)
                                       (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2TypeChange fBool   a b
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2TypeChange fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2TypeChange fSingle a b
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2TypeChange fInt    a b
+        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply2TypeChange fInt64  a b
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2TypeChange fByte   a b
         else failwith "unknown type"
 
@@ -938,33 +938,37 @@ module ArrayND =
                         (fDouble: double -> double) 
                         (fSingle: single -> single)
                         (fInt:    int    -> int)
+                        (fInt64:  int64  -> int64)
                         (fByte:   byte   -> byte)
                         (a: #ArrayNDT<'T>) =
-        typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fByte) a
+        typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fInt64) (map fByte) a
 
     let inline typedMapTypeChange (fBool:   bool   -> 'R)
                                   (fDouble: double -> 'R) 
                                   (fSingle: single -> 'R)
                                   (fInt:    int    -> 'R)
+                                  (fInt64:  int64  -> 'R)
                                   (fByte:   byte   -> 'R)
                                   (a: #ArrayNDT<'T>) =
-        typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fByte) a
+        typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fInt64) (mapTC fByte) a
 
     let inline typedMap2 (fBool:   bool   -> bool   -> bool)
                          (fDouble: double -> double -> double) 
                          (fSingle: single -> single -> single)
                          (fInt:    int    -> int    -> int)
+                         (fInt64:  int64  -> int64  -> int64)
                          (fByte:   byte   -> byte   -> byte)
                          (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedApply2 (map2 fBool) (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fByte) a b
+        typedApply2 (map2 fBool) (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fInt64) (map2 fByte) a b
 
     let inline typedMap2TypeChange (fBool:   bool   -> bool   -> 'R)
                                    (fDouble: double -> double -> 'R)
                                    (fSingle: single -> single -> 'R)
                                    (fInt:    int    -> int    -> 'R)
+                                   (fInt64:  int64  -> int64  -> 'R)
                                    (fByte:   byte   -> byte   -> 'R)
                                    (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedApply2TypeChange (map2TC fBool) (map2TC fDouble) (map2TC fSingle) (map2TC fInt) (map2TC fByte) a b
+        typedApply2TypeChange (map2TC fBool) (map2TC fDouble) (map2TC fSingle) (map2TC fInt) (map2TC fInt64) (map2TC fByte) a b
 
     let inline signImpl (x: 'T) =
         conv<'T> (sign x)
@@ -972,50 +976,50 @@ module ArrayND =
     type ArrayNDT<'T> with    
 
         // element-wise unary
-        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~+) (~+) (~+) (unsp) a
-        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~-) (~-) (~-) (unsp) a
-        static member Abs       (a: #ArrayNDT<'T>) = typedMap (unsp) abs abs abs (unsp) a
-        static member SignT     (a: #ArrayNDT<'T>) = typedMap (unsp) signImpl signImpl sign (unsp) a
-        static member Log       (a: #ArrayNDT<'T>) = typedMap (unsp) log log (unsp) (unsp) a
-        static member Log10     (a: #ArrayNDT<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) a
-        static member Exp       (a: #ArrayNDT<'T>) = typedMap (unsp) exp exp (unsp) (unsp) a
-        static member Sin       (a: #ArrayNDT<'T>) = typedMap (unsp) sin sin (unsp) (unsp) a
-        static member Cos       (a: #ArrayNDT<'T>) = typedMap (unsp) cos cos (unsp) (unsp) a
-        static member Tan       (a: #ArrayNDT<'T>) = typedMap (unsp) tan tan (unsp) (unsp) a
-        static member Asin      (a: #ArrayNDT<'T>) = typedMap (unsp) asin asin (unsp) (unsp) a
-        static member Acos      (a: #ArrayNDT<'T>) = typedMap (unsp) acos acos (unsp) (unsp) a
-        static member Atan      (a: #ArrayNDT<'T>) = typedMap (unsp) atan atan (unsp) (unsp) a
-        static member Sinh      (a: #ArrayNDT<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) a
-        static member Cosh      (a: #ArrayNDT<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) a
-        static member Tanh      (a: #ArrayNDT<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) a
-        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) a
-        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) a
-        static member Floor     (a: #ArrayNDT<'T>) = typedMap (unsp) floor floor (unsp) (unsp) a
-        static member Round     (a: #ArrayNDT<'T>) = typedMap (unsp) round round (unsp) (unsp) a
-        static member Truncate  (a: #ArrayNDT<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) a
+        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
+        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
+        static member Abs       (a: #ArrayNDT<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
+        static member SignT     (a: #ArrayNDT<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
+        static member Log       (a: #ArrayNDT<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
+        static member Log10     (a: #ArrayNDT<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
+        static member Exp       (a: #ArrayNDT<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
+        static member Sin       (a: #ArrayNDT<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
+        static member Cos       (a: #ArrayNDT<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
+        static member Tan       (a: #ArrayNDT<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
+        static member Asin      (a: #ArrayNDT<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
+        static member Acos      (a: #ArrayNDT<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
+        static member Atan      (a: #ArrayNDT<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
+        static member Sinh      (a: #ArrayNDT<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
+        static member Cosh      (a: #ArrayNDT<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
+        static member Tanh      (a: #ArrayNDT<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
+        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
+        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
+        static member Floor     (a: #ArrayNDT<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
+        static member Round     (a: #ArrayNDT<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
+        static member Truncate  (a: #ArrayNDT<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
 
         // element-wise unary logic
         static member (~~~~)    (a: #ArrayNDT<bool>) = map not a
 
         // element-wise binary
-        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (+) (+) (+) (+) a b
-        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (-) (-) (-) (-) a b
-        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (*) (*) (*) (*) a b
-        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (/) (/) (/) (/) a b
-        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (%) (%) (%) (%) a b
-        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) a b
+        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
+        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
+        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
+        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
+        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
+        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
 
         // element-wise binary logic
         static member (&&&&) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (&&) a b
         static member (||||) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (||) a b
 
         // element-wise binary comparison
-        static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) a b
-        static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) a b
-        static member (<<==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) a b
-        static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) a b
-        static member (>>==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) a b
-        static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a b
+        static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
+        static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
+        static member (<<==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
+        static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
+        static member (>>==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
+        static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
 
         // element-wise binary with scalars
         static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfSameType a b)
@@ -1026,12 +1030,12 @@ module ArrayND =
         static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfSameType a b)        
         static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfSameType a b)
         static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfSameType a b)
-        static member (====) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
-        static member (<<<<) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
-        static member (<<==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) a (scalarOfSameType a b)    
-        static member (>>>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
-        static member (>>==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
-        static member (<<>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
+        static member (====) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
+        static member (<<<<) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
+        static member (<<==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
+        static member (>>>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
+        static member (>>==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
+        static member (<<>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
 
         static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) + b
         static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) - b
@@ -1041,12 +1045,12 @@ module ArrayND =
         static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) ** b
         static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) &&&& b
         static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) |||| b
-        static member (====) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (scalarOfSameType b a) b
-        static member (<<<<) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (scalarOfSameType b a) b
-        static member (<<==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
-        static member (>>>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (scalarOfSameType b a) b
-        static member (>>==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
-        static member (<<>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
+        static member (====) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
+        static member (<<<<) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
+        static member (<<==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
+        static member (>>>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
+        static member (>>==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
+        static member (<<>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
 
         // transposition
         member this.T = transpose this
@@ -1071,15 +1075,15 @@ module ArrayND =
     let inline isFinite (a: ArrayNDT<'T>) =
         let isFiniteSingle v = not (System.Single.IsInfinity v || System.Single.IsNaN v)
         let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
-        typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) a
+        typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) (unsp) a
 
     /// Elementwise picks the maximum of a or b.
     let inline maxElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedMap2 (max) (max) (max) (max) (max) a b
+        typedMap2 (max) (max) (max) (max) (max) (max) a b
 
     /// Elementwise picks the minimum of a or b.
     let inline minElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
-        typedMap2 (min) (min) (min) (min) (min) a b
+        typedMap2 (min) (min) (min) (min) (min) (min) a b
 
     /// Elementwise uses elements from ifTrue if cond is true, 
     /// otherwise elements from ifFalse.
@@ -1130,7 +1134,7 @@ module ArrayND =
 
     /// element-wise sum
     let sum (a: #ArrayNDT<'T>) =
-        typedApply (unsp) sumImpl sumImpl sumImpl sumImpl a 
+        typedApply (unsp) sumImpl sumImpl sumImpl sumImpl sumImpl a 
 
     /// element-wise sum over given axis
     let sumAxis dim a = 
@@ -1187,7 +1191,7 @@ module ArrayND =
 
     /// element-wise product
     let product (a: #ArrayNDT<'T>) =
-        typedApply (unsp) productImpl productImpl productImpl productImpl a 
+        typedApply (unsp) productImpl productImpl productImpl productImpl productImpl a 
 
     /// element-wise product over given axis
     let productAxis dim a = 
@@ -1200,8 +1204,8 @@ module ArrayND =
 
     /// maximum value
     let max a =
-        if nElems a = 0 then invalidArg "a" "cannot compute max of empty ArrayNDT"
-        typedApply (unsp) maxImpl maxImpl maxImpl maxImpl a
+        if nElems a = 0L then invalidArg "a" "cannot compute max of empty ArrayNDT"
+        typedApply (unsp) maxImpl maxImpl maxImpl maxImpl maxImpl a
     
     /// position of maximum value
     let argMax a =
@@ -1219,9 +1223,9 @@ module ArrayND =
         |> scalarOfType a
 
     /// positions of maximum values along given axis
-    let argMaxAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
+    let argMaxAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int64> =
         let f a = axisReduceTypeChange argMaxAxisReduc dim a
-        typedApplyTypeChange f f f f f a
+        typedApplyTypeChange f f f f f f a
 
     let inline private minImpl a =
         allElems a 
@@ -1230,8 +1234,8 @@ module ArrayND =
 
     /// minimum value
     let min a =
-        if nElems a = 0 then invalidArg "a" "cannot compute min of empty ArrayNDT"
-        typedApply (unsp) minImpl minImpl minImpl minImpl a
+        if nElems a = 0L then invalidArg "a" "cannot compute min of empty ArrayNDT"
+        typedApply (unsp) minImpl minImpl minImpl minImpl minImpl a
 
     /// position of maximum value
     let argMin a =
@@ -1249,9 +1253,9 @@ module ArrayND =
         |> scalarOfType a
 
     /// positions of maximum values along given axis
-    let argMinAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int> =
+    let argMinAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int64> =
         let f a = axisReduceTypeChange argMinAxisReduc dim a
-        typedApplyTypeChange f f f f f a
+        typedApplyTypeChange f f f f f f a
 
     /// true if all elements of the array are true
     let all a =
@@ -1301,10 +1305,10 @@ module ArrayND =
             let nJ = (shape a).[1]
             let nK = (shape b).[1]
             let c = newCOfSameType [nI; nK] a
-            for k=0 to nK - 1 do
-                for i=0 to nI - 1 do
+            for k in 0L .. nK-1L do
+                for i in 0L .. nI-1L do
                     let v = 
-                        {0 .. nJ - 1}
+                        {0L .. nJ-1L}
                         |> Seq.map (fun j -> (get [i; j] a) * (get [j; k] b))
                         |> Seq.sum
                     set [i; k] v c
@@ -1318,11 +1322,11 @@ module ArrayND =
                 failwithf "cannot compute batched dot product between arrays of shapes %A and %A" 
                     (shape a) (shape b)                
             let smplShape = (shape a).[0 .. nDims a - 3]
-            let nSmpls = List.fold (*) 1 smplShape
+            let nSmpls = List.fold (*) 1L smplShape
             let a = reshape [nSmpls; aRows; aCols] a
             let b = reshape [nSmpls; bRows; bCols] b
             let c = newCOfSameType [nSmpls; aRows; bCols] a
-            for smpl = 0 to nSmpls - 1 do
+            for smpl in 0L .. nSmpls-1L do
                 c.[smpl, *, *] <- matrixDot a.[smpl, *, *] b.[smpl, *, *]
             c |> reshape (smplShape @ [aRows; bCols])         
 
@@ -1330,12 +1334,12 @@ module ArrayND =
             | 1, 1 when shape a = shape b -> 
                 map2 (*) a b |> sum
             | 2, 1 when (shape a).[1] = (shape b).[0] -> 
-                matrixDot a (padRight b) |> view [RngAll; RngElem 0] 
+                matrixDot a (padRight b) |> view [RngAll; RngElem 0L] 
             | 2, 2 when (shape a).[1] = (shape b).[0] ->
                 matrixDot a b
             | na, nb when na > 2 && na = nb+1 && (shape a).[na-1] = (shape b).[nb-1] ->
                 // batched mat*vec
-                (batchedMatrixDot a (padRight b)).[Fill, 0]
+                (batchedMatrixDot a (padRight b)).[Fill, 0L]
             | na, nb when na > 2 && na = nb && (shape a).[na-1] = (shape b).[nb-2] ->
                 // batched mat*mat
                 batchedMatrixDot a b
@@ -1345,7 +1349,7 @@ module ArrayND =
 
     type ArrayNDT<'T> with   
         /// dot product
-        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl a b
+        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
 
     /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dot a b =
@@ -1362,7 +1366,7 @@ module ArrayND =
         let rec commonShape joinDim shps =               
             match shps with
             | [shp] ->
-                List.set joinDim -1 shp
+                List.set joinDim -1L shp
             | shp::rShps ->
                 let commonShp = commonShape joinDim [shp]
                 if commonShp <> commonShape joinDim rShps then
@@ -1370,7 +1374,7 @@ module ArrayND =
                 commonShp
             | [] -> []
 
-        let joinSize joinDim (shps: int list list) =
+        let joinSize joinDim (shps: int64 list list) =
             shps |> List.map (fun shp -> shp.[joinDim]) |> List.sum
 
         let joinShape joinDim shps =
@@ -1404,7 +1408,7 @@ module ArrayND =
         let tmplArray = Option.get (anyArray bs)
         let joinedShape = joinedBlocksShape 0 bs
         let joined = newCOfSameType joinedShape tmplArray
-        let startPos = List.replicate (List.length joinedShape) 0
+        let startPos = List.replicate (List.length joinedShape) 0L
 
         for pos, ary in blockPosAndContents 0 startPos bs do
             let slice = List.map2 (fun p s -> Rng(Some p, Some (p + s))) pos (shape ary)
@@ -1424,14 +1428,14 @@ module ArrayND =
                 let aElem = get pos a
                 Array (aElem * b)
             | dim ->
-                seq {for p in 0 .. aShp.[dim] - 1 -> generate (pos @ [p])}
+                seq {for p in 0L .. aShp.[dim] - 1L -> generate (pos @ [p])}
                     |> Seq.toList |> Blocks
 
         generate [] |> blockArray
    
     type ArrayNDT<'T> with
         /// tensor product
-        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
     /// tensor product
     let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
@@ -1504,11 +1508,11 @@ module ArrayND =
         checkAxis ax a
         let shftRng = 
             [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (Some 1, None)
+                if d = ax then yield Rng (Some 1L, None)
                 else yield RngAll]
         let cutRng = 
             [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2))
+                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2L))
                 else yield RngAll]
         a.[shftRng] - a.[cutRng]
 
@@ -1542,13 +1546,13 @@ module ArrayND =
 
         // copy tensors into concatenated tensor
         let cc = List.head arys |> newCOfSameType concatShape
-        let mutable pos = 0
+        let mutable pos = 0L
         for ary in arys do
             let aryLen = ary.Shape.[dim]
-            if aryLen > 0 then
+            if aryLen > 0L then
                 let ccRng = 
                     List.init shp.Length (fun idx ->
-                        if idx = dim then Rng (Some pos, Some (pos + aryLen - 1))
+                        if idx = dim then Rng (Some pos, Some (pos + aryLen - 1L))
                         else RngAll)
                 cc.[ccRng] <- ary
                 pos <- pos + aryLen
@@ -1557,14 +1561,14 @@ module ArrayND =
     /// Replicates the tensor the given number of repetitions along the given axis.
     let replicate dim reps (ary: #ArrayNDT<'T>) =
         ary |> checkAxis dim
-        if reps < 0 then
+        if reps < 0L then
             invalidArg "reps" "number of repetitions cannot be negative"
 
         // 1. insert axis of size one left to repetition axis
         // 2. broadcast along the new axis to number of repetitions
         // 3. reshape to result shape
         ary 
-        |> reshape (ary.Shape |> List.insert dim 1)
+        |> reshape (ary.Shape |> List.insert dim 1L)
         |> broadcastDim dim reps
         |> reshape (ary.Shape |> List.set dim (reps * ary.Shape.[dim]))
 
@@ -1577,8 +1581,8 @@ module ArrayND =
     /// If maxElems is zero, then the elements per dimension are unlimited.
     let pretty maxElems (a: ArrayNDT<'T>) =
         let maxElems =
-            if maxElems > 0 then maxElems
-            else Microsoft.FSharp.Core.int.MaxValue
+            if maxElems > 0L then maxElems
+            else Microsoft.FSharp.Core.int64.MaxValue
 
         let rec prettyDim lineSpace a =
             let ls () = (shape a).[0]
@@ -1589,13 +1593,13 @@ module ArrayND =
                 |> Seq.toList                   
             let subStrs () = 
                 if ls() <= maxElems then
-                    subPrint (seq {0 .. ls() - 1})
+                    subPrint (seq {0L .. ls() - 1L})
                 else
-                    let leftTo = maxElems / 2 - 1
-                    let remaining = maxElems - 1 - leftTo - 1
+                    let leftTo = maxElems / 2L - 1L
+                    let remaining = maxElems - 1L - leftTo - 1L
                     let rightFrom = ls() - remaining
-                    let leftIdx = seq {0 .. leftTo}
-                    let rightIdx = seq {rightFrom .. (ls()-1)}
+                    let leftIdx = seq {0L .. leftTo}
+                    let rightIdx = seq {rightFrom .. (ls()-1L)}
                     let elipsis =
                         match typeof<'T> with
                         | t when t=typeof<single> -> "      ..."
@@ -1612,6 +1616,7 @@ module ArrayND =
                 if   typeof<'T>.Equals(typeof<single>) then sprintf "%9.4f" (v |> box :?> single)
                 elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
                 elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
+                elif typeof<'T>.Equals(typeof<int64>)  then sprintf "%4d"  (v |> box :?> int64)
                 elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
                 elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
                 else sprintf "%A;" v
@@ -1622,10 +1627,10 @@ module ArrayND =
 
     type ArrayNDT<'T> with
         /// pretty contents string
-        member this.Pretty = pretty 10 this
+        member this.Pretty = pretty 10L this
 
         /// full contents string
-        member this.Full = pretty 0 this
+        member this.Full = pretty 0L this
 
 
 [<AutoOpen>]

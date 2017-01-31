@@ -40,9 +40,9 @@ module RecurrentLayer =
 
     /// default hyper-parameters
     let defaultHyperPars = {
-        NInput                      = SizeSpec.fix 0
-        NRecurrent                  = SizeSpec.fix 0
-        NOutput                     = SizeSpec.fix 0
+        NInput                      = SizeSpec.fix 0L
+        NRecurrent                  = SizeSpec.fix 0L
+        NOutput                     = SizeSpec.fix 0L
         RecurrentActivationFunc     = Tanh
         OutputActivationFunc        = SoftMax
         OneHotIndexInput            = false
@@ -69,14 +69,14 @@ module RecurrentLayer =
         HyperPars:         HyperPars
     }
 
-    let internal initWeights seed (shp: int list) : ArrayNDHostT<'T> = 
+    let internal initWeights seed (shp: int64 list) : ArrayNDHostT<'T> = 
         let fanIn = float shp.[1] 
         let r = 1.0 / sqrt fanIn       
         (System.Random seed).SeqDouble(-1.0, 1.0)
         |> Seq.map conv<'T>
         |> ArrayNDHost.ofSeqWithShape shp
         
-    let internal initBias seed (shp: int list) : ArrayNDHostT<'T> =
+    let internal initBias seed (shp: int64 list) : ArrayNDHostT<'T> =
         Seq.initInfinite (fun _ -> conv<'T> 0)
         |> ArrayNDHost.ofSeqWithShape shp
 
@@ -148,15 +148,15 @@ module RecurrentLayer =
             Expr.Length = nSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
                                  chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
         }
 
-        let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1; nRecurrent]
+        let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1L; nRecurrent]
         let states  = Expr.loop loopSpec chState  [input; initial]
         let outputs = Expr.loop loopSpec chOutput [input; initial]
-        let final = states.[*, nSteps-1, *]
+        let final = states.[*, nSteps-1L, *]
 
         final, outputs
 

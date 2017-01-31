@@ -23,11 +23,10 @@ module ArrayNDManikinTypes =
     type MemAllocManikinT = {
         Id:             int
         TypeName:       TypeNameT
-        Elements:       int
+        Elements:       int64
         Kind:           MemAllocKindT
     } with
-        member this.ByteSize =
-            this.Elements * TypeName.size this.TypeName
+        member this.ByteSize = this.Elements * int64 (TypeName.size this.TypeName)
 
     type MemConstManikinT = {
         Id:             int
@@ -97,7 +96,7 @@ module ArrayNDManikinTypes =
             let cppDataType = Util.cppType this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
-                else "<" + (shp |> Util.intToStrSeq |> String.concat ",") + ">"
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
             sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
                 dims cppDataType dims shapeStr dims        
 
@@ -140,7 +139,7 @@ module ArrayNDManikin =
         let smplShp = shape.[0..nd-3]
         let matRows, matCols = shape.[nd-2], shape.[nd-1]
         let matElems = matRows * matCols
-        let rec smplStride (shp: int list) =
+        let rec smplStride (shp: int64 list) =
             match shp with
             | [] -> []
             | [l] -> [matElems]
@@ -148,9 +147,9 @@ module ArrayNDManikin =
                 match smplStride (lp::lrest) with 
                 | sp::srest -> (lp*sp)::sp::srest
                 | [] -> failwith "unexpected"           
-        let stride = smplStride smplShp @ [1; matRows]
+        let stride = smplStride smplShp @ [1L; matRows]
         
-        let layout = {Shape=shape; Stride=stride; Offset=0}
+        let layout = {Shape=shape; Stride=stride; Offset=0L}
         ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
@@ -160,7 +159,7 @@ module ArrayNDManikin =
 
     /// creates a new ArrayNDManikinT with specified strides and using the specified storage
     let external storage shape stride =
-        let layout = {Shape=shape; Stride=stride; Offset=0}
+        let layout = {Shape=shape; Stride=stride; Offset=0L}
         ArrayNDManikinT (layout, storage)
 
     /// storage
@@ -177,15 +176,15 @@ module ArrayNDManikin =
 
     /// offset in bytes
     let offsetInBytes ary =
-        (typeSize ary) * (ArrayND.offset ary)
+        int64 (typeSize ary) * ArrayND.offset ary
 
     /// address of given element in bytes (relative to start of array)
     let addrInBytes idx ary =
-        (typeSize ary) * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
+        int64 (typeSize ary) * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
 
     /// size in bytes 
     let sizeInBytes ary =
-        (typeSize ary) * (ArrayND.nElems ary)
+        int64 (typeSize ary) * ArrayND.nElems ary
 
     /// True if array can be target of BLAS operation.
     let canBeBlasTarget ary =
@@ -194,7 +193,7 @@ module ArrayNDManikin =
             let st = ArrayND.stride ary
             let shp = ArrayND.shape ary
             match st.[nd-2 ..] with
-            | [1; ld] when ld >= 1 && ld >= shp.[nd-2] -> true
+            | [1L; ld] when ld >= 1L && ld >= shp.[nd-2] -> true
             | _ -> false
         else false
 

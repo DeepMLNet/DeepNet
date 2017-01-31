@@ -16,7 +16,7 @@ let ``Simple loop`` (device: IDevice) =
     let n = SizeSpec.symbol "n"
 
     let prevA = Expr.var<single> "prevA" [m; n]
-    let initialA = Expr.var<single> "initialA" [SizeSpec.fix 1; m; n]
+    let initialA = Expr.var<single> "initialA" [SizeSpec.fix 1L; m; n]
 
     let ch = "A"
     let chExpr = prevA + 1.0f
@@ -24,7 +24,7 @@ let ``Simple loop`` (device: IDevice) =
     let loopSpec = {
         Expr.Length = nIters
         Expr.Vars = Map [Expr.extractVar prevA, 
-                         Expr.PreviousChannel {Channel=ch; Delay=SizeSpec.fix 1; InitialArg=0}]
+                         Expr.PreviousChannel {Channel=ch; Delay=SizeSpec.fix 1L; InitialArg=0}]
         Expr.Channels = Map [ch,
                             {LoopValueT.Expr=chExpr; LoopValueT.SliceDim=0}]    
     }
@@ -33,15 +33,15 @@ let ``Simple loop`` (device: IDevice) =
     let result = Expr.loop loopSpec ch [initialA]
     printfn "result :\n%A" result
 
-    let symSizes = Map [SizeSpec.extractSymbol nIters, SizeSpec.fix 5; 
-                        SizeSpec.extractSymbol m, SizeSpec.fix 3; 
-                        SizeSpec.extractSymbol n, SizeSpec.fix 2]
+    let symSizes = Map [SizeSpec.extractSymbol nIters, SizeSpec.fix 5L; 
+                        SizeSpec.extractSymbol m, SizeSpec.fix 3L; 
+                        SizeSpec.extractSymbol n, SizeSpec.fix 2L]
     let result = result |> Expr.substSymSizes symSizes
     printfn "result after substitution:\n%A" result
 
     let resultFn = Func.make<single> device.DefaultFactory result |> arg1 initialA
     
-    let initialAv = ArrayNDHost.zeros<single> [1; 3; 2]
+    let initialAv = ArrayNDHost.zeros<single> [1L; 3L; 2L]
     printfn "initialAv=\n%A" initialAv
 
     let resultVal = resultFn initialAv
@@ -112,9 +112,9 @@ let ``Build complicated loop 1`` () =
 
     
 let ``Values for complicated loop 1`` () =
-    let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1; 3; 2]
-    let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3; 2; 2]
-    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [2; 5; 3]
+    let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1L; 3L; 2L]
+    let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3L; 2L; 2L]
+    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [2L; 5L; 3L]
     let constAv   = ArrayNDHost.ofList [0.001f; 0.0004f] 
     printfn "initialAv=\n%A" initialAv
     printfn "initialBv=\n%A" initialBv
@@ -205,13 +205,13 @@ let ``Trace compare: Derivative of complicated loop 1`` () =
 
 [<Fact>]
 let ``Derivative compare: Complicated loop 1`` () =
-    randomDerivativeCheck 1e-4 [[1; 3; 2]; [3; 2; 2]; [2; 5; 3]; [2]] 
+    randomDerivativeCheck 1e-4 [[1L; 3L; 2L]; [3L; 2L; 2L]; [2L; 5L; 3L]; [2L]] 
         (fun [initialA; initialB; seqA; constAExt] ->
-            let nIters = SizeSpec.fix 5
-            let m = SizeSpec.fix 3
-            let n = SizeSpec.fix 2
-            let delayA = SizeSpec.fix 1
-            let delayB = SizeSpec.fix 2
+            let nIters = SizeSpec.fix 5L
+            let m = SizeSpec.fix 3L
+            let n = SizeSpec.fix 2L
+            let delayA = SizeSpec.fix 1L
+            let delayB = SizeSpec.fix 2L
 
             let prevA = Expr.var<float> "prevA" [m; n]
             let prevB = Expr.var<float> "prevB" [m; n]
@@ -240,11 +240,11 @@ let ``Derivative compare: Complicated loop 1`` () =
 
 [<Fact>]
 let ``Derivative compare: Simple loop 1`` () =
-    randomDerivativeCheck 1e-4 [[1; 2]] 
+    randomDerivativeCheck 1e-4 [[1L; 2L]] 
         (fun [initialA] ->
-            let nIters = SizeSpec.fix 3
-            let n = SizeSpec.fix 2
-            let delayA = SizeSpec.fix 1
+            let nIters = SizeSpec.fix 3L
+            let n = SizeSpec.fix 2L
+            let delayA = SizeSpec.fix 1L
 
             let prevA = Expr.var<float> "prevA" [n]
 

@@ -16,10 +16,10 @@ module Program =
         | Slack of string
         | TokenLimit of int
         | MaxIters of int
-        | BatchSize of int
+        | BatchSize of int64
         | [<Mandatory>] Data of string
-        | Steps of int
-        | Hiddens of int
+        | Steps of int64
+        | Hiddens of int64
         | CheckpointInterval of int
         | DropState of float
         | PrintSamples
@@ -69,9 +69,9 @@ module Program =
         let parser = ArgumentParser.Create<CLIArgs> (helpTextMessage="Language learning RNN",
                                                      errorHandler = ProcessExiter())
         let args = parser.ParseCommandLine argv
-        let batchSize = args.GetResult (<@BatchSize@>, 250)
-        let stepsPerSmpl = args.GetResult (<@Steps@>, 25)
-        let embeddingDim = args.GetResult (<@Hiddens@>, 128)
+        let batchSize = args.GetResult (<@BatchSize@>, 250L)
+        let stepsPerSmpl = args.GetResult (<@Steps@>, 25L)
+        let embeddingDim = args.GetResult (<@Hiddens@>, 128L)
         let checkpointInterval = args.GetResult (<@CheckpointInterval@>, 10)
         let dropState = args.GetResult (<@DropState@>, 0.0)
         let multiStepLoss = args.Contains <@MultiStepLoss@>
@@ -80,12 +80,12 @@ module Program =
         let data = WordData (dataPath      = args.GetResult <@Data@>,
                              vocSizeLimit  = None,
                              stepsPerSmpl  = stepsPerSmpl,
-                             minSamples    = int (float batchSize / 0.90),
+                             minSamples    = int64 (float batchSize / 0.90),
                              tokenLimit    = args.TryGetResult <@TokenLimit@>,
                              useChars      = args.Contains <@UseChars@>)
 
         // instantiate model
-        let model = GRUInst (VocSize       = data.VocSize,
+        let model = GRUInst (VocSize       = int64 data.VocSize,
                              EmbeddingDim  = embeddingDim,
                              MultiStepLoss = multiStepLoss)
 
@@ -105,7 +105,7 @@ module Program =
                 LearningRates      = [1e-2; 1e-3; 1e-4; 1e-5; 1e-6]
                 //LearningRates      = [1e-3; 1e-4; 1e-5; 1e-6]
                 //LearningRates      = [1e-4; 1e-5; 1e-6]
-                BatchSize          = System.Int32.MaxValue
+                BatchSize          = System.Int64.MaxValue
                 SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
                 CheckpointDir      = Some "."

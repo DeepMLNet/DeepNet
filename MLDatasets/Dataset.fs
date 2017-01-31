@@ -46,12 +46,12 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
     /// checks arguments for being in range
     let checkRange smpl =
-        if not (0 <= smpl && smpl < nSamples) then
+        if not (0L <= smpl && smpl < nSamples) then
             failwithf "sample index %d is out of range (have %d samples)" smpl nSamples
 
     /// checks step argumetn to be in range
     let checkStepRange step =
-        if not (0 <= step && step < nSteps()) then
+        if not (0L <= step && step < nSteps()) then
             failwithf "step index %d is out of range (have %d steps)" step (nSteps())
 
     /// Creates a non-sequence dataset using the specified field storages.
@@ -65,7 +65,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
         // ary.[smpl,field] : IArrayNDT[,]
         let nFields = Array.length (FSharpValue.GetRecordFields (Seq.head samples))
-        let nSamples = Seq.length samples
+        let nSamples = Seq.length samples 
         let ary = Array2D.zeroCreate nSamples nFields
         for smpl, value in Seq.indexed samples do
             ary.[smpl, *] <-
@@ -85,12 +85,12 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
         // build data storage
         let fieldStorage (fieldSmpls: IArrayNDT seq) =
             let maxSmplShp = maxShape fieldSmpls
-            let storShp = nSamples :: maxSmplShp
+            let storShp = (int64 nSamples) :: maxSmplShp
             let fieldTyp = (Seq.head fieldSmpls).DataType
             let stor = ArrayNDHost.newCOfType fieldTyp storShp 
             for smpl, smplVal in Seq.indexed fieldSmpls do
-                if stor.[smpl, Fill].Shape = smplVal.Shape then
-                    stor.[smpl, Fill] <- smplVal
+                if stor.[int64 smpl, Fill].Shape = smplVal.Shape then
+                    stor.[int64 smpl, Fill] <- smplVal
                 else
                     failwithf "the sample with index %d has shape %A but shape %A was expected"
                               smpl smplVal.Shape stor.[smpl, Fill].Shape
@@ -102,7 +102,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
     /// Returns a record of type 'S containing the sample with the given index.
     member this.Item 
-        with get (smpl: int) =
+        with get (smpl: int64) =
             checkRange smpl
             let smplData =
                 [| for fs in fieldStorages -> fs.[smpl, Fill] |> box |]
@@ -111,14 +111,14 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
     /// For a sequence dataset, 
     /// returns a record of type 'S containing the sample and slot with the given indices.
     member this.Item
-        with get (smpl: int, step: int) =
+        with get (smpl: int64, step: int64) =
             checkRange smpl; checkStepRange step
             let smplData =
                 [| for fs in fieldStorages -> fs.[smpl, step, Fill] |> box |]
             FSharpValue.MakeRecord (typeof<'S>, smplData) :?> 'S
 
     /// Returns a record of type 'S containing a slice of samples.
-    member this.GetSlice (start: int option, stop: int option) =
+    member this.GetSlice (start: int64 option, stop: int64 option) =
         start |> Option.iter checkRange; stop |> Option.iter checkRange
         let sliceData =
             [| for fs in fieldStorages -> fs.[[Rng (start, stop); RngAllFill]] |> box |]
@@ -126,8 +126,8 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
     /// For a sequence dataset,
     /// returns a record of type 'S containing a slice of samples and slots.
-    member this.GetSlice (startSmpl: int option, stopSmpl: int option,
-                          startStep: int option, stopStep: int option) =
+    member this.GetSlice (startSmpl: int64 option, stopSmpl: int64 option,
+                          startStep: int64 option, stopStep: int64 option) =
         startSmpl |> Option.iter checkRange; stopSmpl |> Option.iter checkRange
         startStep |> Option.iter checkStepRange; stopStep |> Option.iter checkStepRange
         let sliceData =
@@ -168,22 +168,22 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
 
         // create padded last batch, if necessary
         let lastBatch =
-            if lastBatchElems = 0 then None
+            if lastBatchElems = 0L then None
             else                   
                 fieldStorages
                 |> List.map (fun fsAll ->
                     let shpAll = ArrayND.shape fsAll
                     let shpBatch = shpAll |> List.set 0 batchSize                    
                     let fsBatch = fsAll |> ArrayND.newCOfSameType shpBatch 
-                    fsBatch.[0 .. lastBatchElems-1, Fill] <- fsAll.[lastBatchStart .. nSamples-1, Fill]
+                    fsBatch.[0L .. lastBatchElems-1L, Fill] <- fsAll.[lastBatchStart .. nSamples-1L, Fill]
                     fsBatch)
                 |> Some
 
         fun () ->                    
             seq {
                 // all batches except last batch if padding was necessary
-                for start in 0 .. batchSize .. lastBatchStart-1 do
-                    let stop = start + batchSize - 1
+                for start in 0L .. batchSize .. lastBatchStart-1L do
+                    let stop = start + batchSize - 1L
                     yield this.[start .. stop]  
                     
                 // padded last batch if necessary
@@ -204,12 +204,12 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
         let lastBatchStart = nSamples - lastBatchElems
         seq {
             // all batches except last batch 
-            for start in 0 .. batchSize .. lastBatchStart-1 do
-                let stop = start + batchSize - 1
+            for start in 0L .. batchSize .. lastBatchStart-1L do
+                let stop = start + batchSize - 1L
                 yield! batchFn (start, stop)                    
             // last batch 
             if lastBatchStart < nSamples then
-                yield! batchFn (lastBatchStart, nSamples-1)
+                yield! batchFn (lastBatchStart, nSamples-1L)
         }          
 
     /// returns a sequence of all slots for the given batch
@@ -219,12 +219,12 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
         let lastSlotStart = nSteps - lastSlotElems
         seq { 
             // all time slots except last slot
-            for slotStart in 0 .. slotSize .. lastSlotStart-1 do
-                let slotStop = slotStart + slotSize - 1
+            for slotStart in 0L .. slotSize .. lastSlotStart-1L do
+                let slotStop = slotStart + slotSize - 1L
                 yield this.[batchStart .. batchStop, slotStart .. slotStop]
             // last time slot
             if lastSlotStart < nSteps then
-                yield this.[batchStart .. batchStop, lastSlotStart .. nSteps-1]
+                yield this.[batchStart .. batchStop, lastSlotStart .. nSteps-1L]
         }
 
     /// Returns a sequence of batches with the given size of this dataset.
@@ -241,7 +241,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
     // enumerator interfaces
     interface IEnumerable<'S> with
         member this.GetEnumerator() =
-            (seq { for idx in 0 .. nSamples - 1 -> this.[idx] }).GetEnumerator()
+            (seq { for idx in 0L .. nSamples-1L -> this.[idx] }).GetEnumerator()
     interface IEnumerable with
         member this.GetEnumerator() =
             (this :> IEnumerable<'S>).GetEnumerator() :> IEnumerator
@@ -314,13 +314,13 @@ module Dataset =
             ds.FieldStorages
             |> List.map (fun fs ->
                 let fsPart, _ =
-                    (0, List.indexed ratios)
+                    (0L, List.indexed ratios)
                     ||> List.mapFold (fun pos (idx, ratio) ->
                         let isLast = (idx = List.length ratios - 1)
                         let smpls =
                             if isLast then ds.NSamples - pos
-                            else int (ratio / ratioSum * (float ds.NSamples))
-                        fs.[pos .. pos+smpls-1, Fill], pos+smpls)    
+                            else int64 (ratio / ratioSum * (float ds.NSamples))
+                        fs.[pos .. pos+smpls-1L, Fill], pos+smpls)    
                 fsPart)
             |> List.transpose
         partitionedFieldStorages |> List.map (fun fs -> Dataset<'S> (fs, ds.IsSeq))
@@ -345,7 +345,7 @@ module Dataset =
     /// Cuts each sequence in the dataset into multiple chunks of length `stepsPerCut`.
     let cutSequences stepsPerCut (ds: Dataset<_>) =
         let nSteps = ds.NSteps
-        let nCuts = (nSteps + stepsPerCut - 1) / stepsPerCut
+        let nCuts = (nSteps + stepsPerCut - 1L) / stepsPerCut
         let padSteps = nCuts * stepsPerCut
         let cutFs =         
             ds.FieldStorages |> List.map (fun fs ->
@@ -354,7 +354,7 @@ module Dataset =
                     // pad if necessary
                     if padSteps > nSteps then
                         let z = fs |> ArrayND.zerosOfSameType ([ds.NSamples; padSteps] @ rShp)
-                        z.[*, 0 .. nSteps-1, Fill] <- fs.[Fill]; z
+                        z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]; z
                     else fs
                 fs |> ArrayND.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
         Dataset (cutFs, true)
@@ -364,8 +364,8 @@ module Dataset =
     /// then the function returns the dataset unaltered.
     let cutToMinSamples minSamples (ds: Dataset<_>) =
         if ds.NSamples < minSamples then
-            let nCuts = (minSamples + ds.NSamples - 1) / ds.NSamples
-            let stepsPerCut = max 1 (ds.NSteps / nCuts)
+            let nCuts = (minSamples + ds.NSamples - 1L) / ds.NSamples
+            let stepsPerCut = max 1L (ds.NSteps / nCuts)
             ds |> cutSequences stepsPerCut
         else ds
 

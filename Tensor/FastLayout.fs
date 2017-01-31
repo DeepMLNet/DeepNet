@@ -7,10 +7,10 @@ module FastLayoutTypes =
     [<Struct>]
     type FastLayoutT = 
         val NDims   : int
-        val NElems  : int
-        val Offset  : int
-        val Shape   : int []
-        val Stride  : int []
+        val NElems  : int64
+        val Offset  : int64
+        val Shape   : int64 []
+        val Stride  : int64 []
 
         new (layout: ArrayNDLayoutT) = {
             NDims   = ArrayNDLayout.nDims layout
@@ -33,7 +33,7 @@ module FastLayout =
         else
             let pos = Array.zeroCreate fl.NDims
             let mutable addr = fl.Offset
-            let mutable moreElements = fl.NElems > 0
+            let mutable moreElements = fl.NElems > 0L
                 
             while moreElements do
                 yield addr
@@ -41,15 +41,15 @@ module FastLayout =
                 let mutable increment = true
                 let mutable dim = fl.NDims - 1
                 while increment && dim >= 0 do
-                    if pos.[dim] = fl.Shape.[dim] - 1 then
+                    if pos.[dim] = fl.Shape.[dim] - 1L then
                         // was last element of that axis
                         addr <- addr - pos.[dim] * fl.Stride.[dim]
-                        pos.[dim] <- 0
+                        pos.[dim] <- 0L
                         dim <- dim - 1
                     else
                         // can increment this axis
                         addr <- addr + fl.Stride.[dim]
-                        pos.[dim] <- pos.[dim] + 1
+                        pos.[dim] <- pos.[dim] + 1L
                         increment <- false  
                             
                 if dim < 0 then 

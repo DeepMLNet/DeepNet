@@ -17,10 +17,10 @@ module VarEnvTypes =
     type VarLocsT = Map<VarSpecT, ArrayLocT>
 
     /// specification of variable strides
-    type VarStridesT = Map<VarSpecT, int list>
+    type VarStridesT = Map<VarSpecT, int64 list>
 
     /// specification of channel strides
-    type ChannelStridesT = Map<ChannelT, int list>
+    type ChannelStridesT = Map<ChannelT, int64 list>
 
 
 /// Variable value collection.
@@ -81,7 +81,7 @@ module VarEnv =
                         if f .= svVal then env
                         else failShape ()
                     | Broadcast ->
-                        if 1 = svVal then env
+                        if 1L = svVal then env
                         else failShape ()
                     | Multinom m -> failShape ()
                 ) env)

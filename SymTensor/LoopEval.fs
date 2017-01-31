@@ -69,7 +69,7 @@ module LoopEval =
         varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
-    let buildInOut (iter: int) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
+    let buildInOut (iter: int64) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
                    (vars: Map<VarSpecT, LoopInputT>)
                    (args: IArrayNDT list) (channels: Map<ChannelT, LoopChannelInfoT>)
                    : VarEnvT * Map<ChannelT, IArrayNDT> =
@@ -95,7 +95,7 @@ module LoopEval =
                         let delay = SizeSpec.eval delay
                         let dim = channels.[ch].SliceDim
                         let prvIter = iter - delay
-                        if prvIter >= 0 then
+                        if prvIter >= 0L then
                             let slice = rngAllBut channels.[ch].Target dim (RngElem prvIter)
                             channels.[ch].Target.[slice]
                         else

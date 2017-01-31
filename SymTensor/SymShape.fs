@@ -8,15 +8,15 @@ module Utils =
     /// greatest common divisor of a and b 
     let rec gcd a b =
         // Euclidean algorithm
-        if a < 0 then gcd -a b
-        elif b < 0 then gcd a -b
-        elif a = 0 then b
-        elif b = 0 then a
+        if a < 0L then gcd -a b
+        elif b < 0L then gcd a -b
+        elif a = 0L then b
+        elif b = 0L then a
         elif a < b then gcd b a
         else
             //let q = a / b
             let r = a % b
-            if r = 0 then b
+            if r = 0L then b
             else gcd b r
 
     /// least common multiple of a and b
@@ -38,18 +38,18 @@ module SizeSymbolTypes =
     [<Struct>]
     /// a rational number
     type FracT = 
-        val Nom: int
-        val Dnm: int
+        val Nom: int64
+        val Dnm: int64
 
         new (nom, dnm) = 
             let nom, dnm =
                 match dnm with
-                | 0 -> failwith "denominator cannot be zero"
-                | _ when dnm < 0 -> -nom, -dnm
+                | 0L -> failwith "denominator cannot be zero"
+                | _ when dnm < 0L -> -nom, -dnm
                 | _ -> nom, dnm
             let cd = gcd nom dnm
             {Nom=nom/cd; Dnm=dnm/cd}
-        new (value) = FracT (value, 1)               
+        new (value) = FracT (value, 1L)               
 
         static member (~-) (a: FracT) = FracT (-a.Nom, a.Dnm)
         static member (+) (a: FracT, b: FracT) = FracT (a.Nom * b.Dnm + b.Nom * a.Dnm, a.Dnm * b.Dnm)
@@ -58,29 +58,29 @@ module SizeSymbolTypes =
         static member (/) (a: FracT, b: FracT) = FracT (a.Nom * b.Dnm, a.Dnm * b.Nom)
         static member (.=) (a: FracT, b: FracT) = a = b
         static member (.<>) (a: FracT, b: FracT) = a <> b
-        static member get_Zero () = FracT (0)
-        static member get_One () = FracT (1)
+        static member get_Zero () = FracT (0L)
+        static member get_One () = FracT (1L)
 
-        static member (+) (a: FracT, b: int) = a + FracT b
-        static member (-) (a: FracT, b: int) = a - FracT b
-        static member (*) (a: FracT, b: int) = a * FracT b
-        static member (/) (a: FracT, b: int) = a / FracT b
-        static member (.=) (a: FracT, b: int) = a .= FracT b
-        static member (.<>) (a: FracT, b: int) = a .<> FracT b
+        static member (+) (a: FracT, b: int64) = a + FracT b
+        static member (-) (a: FracT, b: int64) = a - FracT b
+        static member (*) (a: FracT, b: int64) = a * FracT b
+        static member (/) (a: FracT, b: int64) = a / FracT b
+        static member (.=) (a: FracT, b: int64) = a .= FracT b
+        static member (.<>) (a: FracT, b: int64) = a .<> FracT b
 
-        static member (+) (a: int, b: FracT) = FracT a + b
-        static member (-) (a: int, b: FracT) = FracT a - b
-        static member (*) (a: int, b: FracT) = FracT a * b
-        static member (/) (a: int, b: FracT) = FracT a / b
-        static member (.=) (a: int, b: FracT) = FracT a .= b
-        static member (.<>) (a: int, b: FracT) = FracT a .<> b
+        static member (+) (a: int64, b: FracT) = FracT a + b
+        static member (-) (a: int64, b: FracT) = FracT a - b
+        static member (*) (a: int64, b: FracT) = FracT a * b
+        static member (/) (a: int64, b: FracT) = FracT a / b
+        static member (.=) (a: int64, b: FracT) = FracT a .= b
+        static member (.<>) (a: int64, b: FracT) = FracT a .<> b
          
         member this.IntValue = 
-            if this.Dnm = 1 then this.Nom
+            if this.Dnm = 1L then this.Nom
             else failwithf "%A is not an integer" this
 
         member this.Pretty =
-            if this.Dnm = 1 then sprintf "%d" this.Nom
+            if this.Dnm = 1L then sprintf "%d" this.Nom
             else sprintf "(%d/%d)" this.Nom this.Dnm
 
     /// elementary size specification, can be either a symbol or a fixed quantity
@@ -117,10 +117,10 @@ module Frac =
         frac.IntValue
 
     let zero =
-        FracT (0)
+        FracT (0L)
 
     let one =
-        FracT (1)
+        FracT (1L)
 
     let (|Zero|_|) frac =
         if frac = zero then Some ()
@@ -131,31 +131,31 @@ module Frac =
         else None
 
     let (|Integral|_|) (frac: FracT) =
-        if frac.Dnm = 1 then Some frac.Nom
+        if frac.Dnm = 1L then Some frac.Nom
         else None
 
     let roundTowardZero (f: FracT) =
         FracT (f.Nom / f.Dnm)
 
     let roundAwayFromZero (f: FracT) =
-        if f.Nom % f.Dnm = 0 then
+        if f.Nom % f.Dnm = 0L then
             FracT (f.Nom / f.Dnm)
-        elif f.Nom > 0 then
-            FracT (f.Nom / f.Dnm + 1)
+        elif f.Nom > 0L then
+            FracT (f.Nom / f.Dnm + 1L)
         else
-            FracT (f.Nom / f.Dnm - 1)
+            FracT (f.Nom / f.Dnm - 1L)
 
 //[<AutoOpen>]
 module SizeProductTypes = 
       
     /// product of elementary size specifications
     [<StructuredFormatDisplay("{Pretty}")>]
-    type SizeProductT(symbols: Map<SizeSymbolT, int>) =
-        let symbols = symbols |> Map.filter (fun _ sPower -> sPower <> 0)
+    type SizeProductT(symbols: Map<SizeSymbolT, int64>) =
+        let symbols = symbols |> Map.filter (fun _ sPower -> sPower <> 0L)
   
         new() = SizeProductT(Map.empty)
-        new(b: SizeSymbolT) = SizeProductT(b, 1)
-        new(b: SizeSymbolT, pow: int) = SizeProductT(Map.empty |> Map.add b pow)
+        new(b: SizeSymbolT) = SizeProductT(b, 1L)
+        new(b: SizeSymbolT, pow: int64) = SizeProductT(Map.empty |> Map.add b pow)
 
         member this.Symbols = symbols
 
@@ -177,7 +177,7 @@ module SizeProductTypes =
             |> Map.toSeq
             |> Seq.map 
                 (fun (tBase, tPower) ->
-                    if tPower = 1 then sprintf "%A" tBase 
+                    if tPower = 1L then sprintf "%A" tBase 
                     else sprintf "%A**%d" tBase tPower)
             |> Seq.toList
             |> String.concat " * "
@@ -214,7 +214,7 @@ module SizeProduct =
         match List.length mc with
         | 1 -> 
             let bs, power = mc.[0]
-            if power = 1 then Some bs else None
+            if power = 1L then Some bs else None
         | _ -> None
 
     /// matches if product is empty (equal to 1)
@@ -231,13 +231,13 @@ module SizeMultinomTypes =
     type SizeMultinomT (products: Map<SizeProductT, FracT>) =
         let products = products |> Map.filter (fun _ fac -> fac .<> Frac.zero)
 
-        new (bs: BaseSizeT) = SizeMultinomT (Frac.one, bs, 1)
-        new (bs: BaseSizeT, pow: int) = SizeMultinomT (Frac.one, bs, pow)
-        new (fac: FracT, bs: BaseSizeT, pow: int) =
+        new (bs: BaseSizeT) = SizeMultinomT (Frac.one, bs, 1L)
+        new (bs: BaseSizeT, pow: int64) = SizeMultinomT (Frac.one, bs, pow)
+        new (fac: FracT, bs: BaseSizeT, pow: int64) =
             let m =
                 match bs with
                 | Sym s -> Map [SizeProductT (s, pow), fac]
-                | Fixed f -> Map [SizeProductT (), fac * (pown f pow)]
+                | Fixed f -> Map [SizeProductT (), fac * (pown f (int32 pow))]
             SizeMultinomT (m)
 
         member this.Products = products
@@ -353,18 +353,18 @@ module SizeSpecTypes =
             | Base ba, Base bb -> Multinom (SizeMultinomT(ba) * SizeMultinomT(bb))
             |> SizeSpecT.Simplify
 
-        static member Pow (ssa: SizeSpecT, pow: int) =
+        static member Pow (ssa: SizeSpecT, pow: int64) =
             match pow with
-            | 0 -> Base (Fixed Frac.one)
-            | 1 -> ssa
+            | 0L -> Base (Fixed Frac.one)
+            | 1L -> ssa
             | _ ->
                 match ssa with
-                | Base (Fixed f) -> Base (Fixed (pown f pow))
+                | Base (Fixed f) -> Base (Fixed (pown f (int32 pow)))
                 | Base (Sym s) -> Multinom (SizeMultinomT (Sym s, pow))
                 | Broadcast -> Broadcast
                 | Multinom m ->
                     m
-                    |> Seq.replicate pow
+                    |> Seq.replicate (int32 pow)
                     |> Seq.reduce (*)
                     |> Multinom
             |> SizeSpecT.Simplify
@@ -378,12 +378,12 @@ module SizeSpecTypes =
         static member (*) (ssa: FracT, ssb: SizeSpecT) = (Base (Fixed ssa)) * ssb
 
         // operations with int
-        static member (+) (ssa: SizeSpecT, ssb: int) = ssa + FracT ssb
-        static member (+) (ssa: int, ssb: SizeSpecT) = FracT ssa + ssb
-        static member (-) (ssa: SizeSpecT, ssb: int) = ssa - FracT ssb
-        static member (-) (ssa: int, ssb: SizeSpecT) = FracT ssa - ssb
-        static member (*) (ssa: SizeSpecT, ssb: int) = ssa * FracT ssb
-        static member (*) (ssa: int, ssb: SizeSpecT) = FracT ssa * ssb
+        static member (+) (ssa: SizeSpecT, ssb: int64) = ssa + FracT ssb
+        static member (+) (ssa: int64, ssb: SizeSpecT) = FracT ssa + ssb
+        static member (-) (ssa: SizeSpecT, ssb: int64) = ssa - FracT ssb
+        static member (-) (ssa: int64, ssb: SizeSpecT) = FracT ssa - ssb
+        static member (*) (ssa: SizeSpecT, ssb: int64) = ssa * FracT ssb
+        static member (*) (ssa: int64, ssb: SizeSpecT) = FracT ssa * ssb
 
         /// equal size with broadcastability
         static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = 
@@ -488,7 +488,7 @@ module SizeSpec =
     let tryEval ss =
         match simplify ss with
         | Base (Fixed (Frac.Integral i)) -> Some i
-        | Broadcast -> Some 1
+        | Broadcast -> Some 1L
         | _ -> None
 
     /// true, if evaluation to numeric shape is possible
@@ -521,7 +521,7 @@ module ShapeSpecTypes =
     type ShapeSpecT = SizeSpecT list
 
     /// evaluated shape specification of a tensor
-    type NShapeSpecT = int list
+    type NShapeSpecT = int64 list
 
 
 /// shape specification of a tensor

@@ -28,7 +28,7 @@ module Decomposition =
                 invalidArg "data" "data must be a matrix"            
             let nFeatures = data.Shape.[1]
             let nComps = defaultArg nComps nFeatures
-            if not (0 < nComps && nComps <= nFeatures) then
+            if not (0L < nComps && nComps <= nFeatures) then
                 invalidArg "nComps" "nComps must be between 0 and the number of features"
              
             // center data
@@ -47,14 +47,15 @@ module Decomposition =
                 |> List.indexed 
                 |> List.sortByDescending snd
                 |> List.map fst
+                |> List.map int64
                 |> ArrayNDHost.ofList
             let variances = variances |> ArrayND.gather [Some sortIdx]
             let axesIdx = ArrayND.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
             let axes = axes |> ArrayND.gather [None; Some axesIdx]
 
             // limit number of components if desired
-            let variances = variances.[0 .. nComps-1]
-            let axes = axes.[*, 0 .. nComps-1]
+            let variances = variances.[0L .. nComps-1L]
+            let axes = axes.[*, 0L .. nComps-1L]
 
             // transform data into new coordinate system
             // [smpl, feature] .* [feature, comp]

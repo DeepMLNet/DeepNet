@@ -38,12 +38,12 @@ let build device batch =
 
     // set sizes
     mc.SetSize batchSize batch
-    mc.SetSize nInput 784
-    mc.SetSize nTarget 10
+    mc.SetSize nInput 784L
+    mc.SetSize nTarget 10L
 
     // set strides
-    mc.SetStride input (ArrayNDLayout.cStride [batch; 784])
-    mc.SetStride target (ArrayNDLayout.cStride [batch; 10])
+    mc.SetStride input (ArrayNDLayout.cStride [batch; 784L])
+    mc.SetStride target (ArrayNDLayout.cStride [batch; 10L])
 
     // instantiate model
     let mi = mc.Instantiate (device, canDelay=false)
@@ -67,13 +67,13 @@ let build device batch =
 let getMnist device samples =
     let cut (x: ArrayNDT<_>) =
         match samples with
-        | Some samples -> x.[0..samples-1, *]
+        | Some samples -> x.[0L .. samples-1L, *]
         | None -> x
 
     let mnist = Mnist.loadRaw mnistPath
     let tstImgs =  
         mnist.TstImgs
-        |> ArrayND.reshape [mnist.TstImgs.Shape.[0]; -1]
+        |> ArrayND.reshape [mnist.TstImgs.Shape.[0]; -1L]
         |> cut
         |> post device
     let tstLbls =  
@@ -105,21 +105,21 @@ let ``MNIST loads`` () =
 [<Trait("Category", "Skip_CI")>]
 let ``Neural net compiles for GPU`` () =
     let sw = Stopwatch.StartNew()
-    build DevCuda 10000 |> ignore
+    build DevCuda 10000L |> ignore
     printfn "Model build time: %A" sw.Elapsed
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Loss decreases during training on GPU`` () =
     let sw = Stopwatch.StartNew()
-    let initialLoss, finalLoss = train DevCuda 1000 50
+    let initialLoss, finalLoss = train DevCuda 1000L 50
     finalLoss |> should lessThan (initialLoss - 0.001f)
     printfn "Model build and train time: %A" sw.Elapsed
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``CPU and GPU have same trace during training`` () =
-    let diffs = compareTraces (fun dev -> train dev 10 1 |> ignore) false
+    let diffs = compareTraces (fun dev -> train dev 10L 1 |> ignore) false
     diffs |> should equal 0
 
     

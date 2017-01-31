@@ -337,7 +337,7 @@ module CudaRecipe =
     type private ResultInfoT = {
         TransferUExpr:  UExprT
         Var:            VarSpecT option
-        Stride:         int list option
+        Stride:         int64 list option
         Allocator:      unit -> IArrayNDT
     }
 
@@ -395,7 +395,7 @@ module CudaRecipe =
             printfn "Sub-recipe generation:  %A" timeForSubrecipes
         if Debug.ResourceUsage then
             let memUsage = euData.MemAllocs |> List.sumBy (fun ma -> ma.ByteSize)
-            printfn "Used CUDA memory:       %.3f MiB" (float memUsage / 2.**20.)
+            printfn "Used CUDA memory:       %d MB" (memUsage / pown 2L 20)
             printfn "Used CUDA streams:      %d" streams.Length
             printfn "Used CUDA events:       %d" eventObjCnt
             printfn "Total CUDA exec calls:  %d" execCalls.Length
@@ -434,7 +434,7 @@ module CudaRecipe =
                     | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> IArrayNDT  
                     | l -> failwithf "CUDA cannot work with result location %A" l      
 
-                if List.fold (*) 1 nshp > 0 then
+                if List.fold (*) 1L nshp > 0L then
                     // expression has data that needs to be stored       
                     // create variable that will be inserted into expression
                     let resVarName = sprintf "__%s__" channel
@@ -447,7 +447,7 @@ module CudaRecipe =
                     // insert StoreToVar op in expression
                     let metadata = {
                         ChannelType  = Map [dfltChId, tn]
-                        ChannelShape = Map [dfltChId, [0]]
+                        ChannelShape = Map [dfltChId, [0L]]
                         Expr         = None
                     }
                     {
@@ -487,7 +487,7 @@ module CudaRecipe =
             // no expressions
             | [] -> UExpr (UNaryOp Expr.Discard, [], 
                            {ChannelType  = Map [dfltChId, TypeName.ofType<int>]
-                            ChannelShape = Map [dfltChId, [0]]
+                            ChannelShape = Map [dfltChId, [0L]]
                             Expr         = None})
             // single expression
             | [_, {TransferUExpr=uexpr}] -> uexpr
@@ -496,7 +496,7 @@ module CudaRecipe =
                 let allUExprs = resInfos |> Map.toList |> List.map (fun (ch, ri) -> ri.TransferUExpr)
                 UExpr (UNaryOp Expr.Discard, allUExprs,
                        {ChannelType  = Map [dfltChId, TypeName.ofType<int>]
-                        ChannelShape = Map [dfltChId, [0]]
+                        ChannelShape = Map [dfltChId, [0L]]
                         Expr         = None})                       
 
         // compile expression and create workspace

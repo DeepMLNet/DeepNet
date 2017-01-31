@@ -55,7 +55,7 @@ type CurveDataset () =
     
     [<Fact>]
     member this.``Batching`` () =
-        let batchSize = 11
+        let batchSize = 11L
         let batchGen = dataset.PaddedBatches batchSize
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
@@ -98,30 +98,30 @@ let ``Loading CSV datasets`` () =
         printfn ""
 
 
-type SeqSample = {SeqData: ArrayNDT<int>}
+type SeqSample = {SeqData: ArrayNDT<int64>}
 
 type SequenceDataset () = 
-    let smpl1 = {SeqData = ArrayNDHost.arange 98}
-    let smpl2 = {SeqData = 100 + ArrayNDHost.arange 98}
-    let smpl3 = {SeqData = 200 + ArrayNDHost.arange 98}
+    let smpl1 = {SeqData = ArrayNDHost.arange 98L}
+    let smpl2 = {SeqData = 100L + ArrayNDHost.arange 98L}
+    let smpl3 = {SeqData = 200L + ArrayNDHost.arange 98L}
     let dataset = Dataset.ofSeqSamples [smpl1; smpl2; smpl3]
 
     [<Fact>]
     member this.``Slot batches`` () =
         printfn "Dataset: %A" dataset
-        for idx, sb in Seq.indexed (dataset.SlotBatches 2 4) do
+        for idx, sb in Seq.indexed (dataset.SlotBatches 2L 4L) do
             printfn "Slotbatch %d:" idx
             printfn "%A" sb.SeqData
         printfn ""
 
     [<Fact>]
     member this.``Cut sequence`` () =
-        let minSmpls = 15
+        let minSmpls = 15L
         printfn "Original: %A" dataset
         printfn "cutting to minimum of %d samples" minSmpls
         let ds = dataset |> Dataset.cutToMinSamples minSmpls
         printfn "Cut: %A" ds
-        for idx, sb in Seq.indexed (ds.SlotBatches 2 4) do
+        for idx, sb in Seq.indexed (ds.SlotBatches 2L 4L) do
             printfn "Slotbatch %d:" idx
             printfn "%A" sb.SeqData
         printfn ""

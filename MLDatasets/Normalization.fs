@@ -22,7 +22,7 @@ module NormalizationTypes =
         | ScaleToUnitLength
         /// Apply Principal Component Analysis (PCA) whitening. 
         /// Optionally specify how many components to keep.
-        | PCAWhitening of nComponents:int option
+        | PCAWhitening of nComponents:int64 option
         /// Apply ZCA whitening.
         /// Optionally specify how many dimensions to keep.
         | ZCAWhitening 

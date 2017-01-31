@@ -115,7 +115,7 @@ module ElemExprDeriv =
                                 match sol.LeftValues |> Map.tryFind exprDimSym with
                                 | Some ss -> yield FixedDim (ss, exprDimSym)
                                 | None -> yield SummingDim (newSumSymbol(),
-                                                            SizeSpec.zero, exprShp.[exprDim]-1,
+                                                            SizeSpec.zero, exprShp.[exprDim]-1L,
                                                             exprDimSym)
                         ]              
                         // build indices for eg

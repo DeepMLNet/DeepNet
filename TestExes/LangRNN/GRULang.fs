@@ -20,8 +20,8 @@ module GRULang =
     }
 
     let defaultHyperPars = {
-        NWords                      = SizeSpec.fix 0
-        EmbeddingDim                = SizeSpec.fix 0
+        NWords                      = SizeSpec.fix 0L
+        EmbeddingDim                = SizeSpec.fix 0L
         MultiStepLoss               = false
     }
 
@@ -41,11 +41,11 @@ module GRULang =
         HyperPars:       HyperPars
     }
 
-    let internal initWeights seed (shp: int list) = 
+    let internal initWeights seed (shp: int64 list) = 
         let r = 1.0f / sqrt (single shp.[1])       
         (System.Random seed).SeqSingle(-r, r) |> ArrayNDHost.ofSeqWithShape shp
         
-    let internal initBias seed (shp: int list) =
+    let internal initBias seed (shp: int64 list) =
         ArrayNDHost.zeros<single> shp
 
     let pars (mb: ModelBuilder<_>) hp = {
@@ -83,12 +83,12 @@ module GRULang =
         // output           [smpl, step, word]
 
         let nBatch = words.Shape.[0]
-        let nSteps = words.Shape.[1] - 1
+        let nSteps = words.Shape.[1] - 1L
         let embeddingDim = pars.HyperPars.EmbeddingDim
         let nWords = pars.HyperPars.NWords
 
-        let initial      = initialSlice |> Expr.reshape [nBatch; SizeSpec.fix 1; embeddingDim]
-        let genFirstWord = genFirstWord |> Expr.reshape [nBatch; SizeSpec.fix 1]
+        let initial      = initialSlice |> Expr.reshape [nBatch; SizeSpec.fix 1L; embeddingDim]
+        let genFirstWord = genFirstWord |> Expr.reshape [nBatch; SizeSpec.fix 1L]
 
         // build loop
         let step       = Expr.var<int>    "Step"        []
@@ -120,9 +120,9 @@ module GRULang =
                 Expr.Length = nSteps
                 Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                                  Expr.extractVar prevOutput,
-                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1; InitialArg=2}
+                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1L; InitialArg=2}
                                  Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}
                                  Expr.extractVar step, Expr.IterationIndex]
                 Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
                                      chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}
@@ -133,41 +133,41 @@ module GRULang =
                 Expr.Length = nSteps
                 Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                                  Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
                 Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
                                      chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]
               }
-        let input         = words.[*, 0 .. nSteps-1]
-        let initialOutput = Expr.zeros<single> [nBatch; SizeSpec.fix 1; nWords]
+        let input         = words.[*, 0L .. nSteps-1L]
+        let initialOutput = Expr.zeros<single> [nBatch; SizeSpec.fix 1L; nWords]
         let loopArgs      = if pars.HyperPars.MultiStepLoss then [input; initial; initialOutput] else [input; initial]
 
         let states        = Expr.loop loopSpec chState       loopArgs
         let logWordProbs  = Expr.loop loopSpec chLogWordProb loopArgs
-        let finalState    = states.[*, nSteps-1, *]
+        let finalState    = states.[*, nSteps-1L, *]
         let target        = words.[*, 1 .. nSteps]
         let loss          = logWordProbs |> Expr.gather [None; None; Some target] |> Expr.mean 
 
         // generating loop
-        let genSteps = SizeSpec.fix 200
+        let genSteps = SizeSpec.fix 200L
         let genLoopSpec = {
             Expr.Length = genSteps
             Expr.Vars = Map [Expr.extractVar inputSlice, 
-                                    Expr.PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1; InitialArg=0}
+                                    Expr.PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1L; InitialArg=0}
                              Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1; InitialArg=1}]
+                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
             Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
                                  chPred,   {LoopValueT.Expr=pred;   LoopValueT.SliceDim=1}]    
         }
         let states        = Expr.loop genLoopSpec chState  [genFirstWord; initial; initialSlice]
         let generated     = Expr.loop genLoopSpec chPred   [genFirstWord; initial; initialSlice]
-        let genFinalState = states.[*, genSteps-1, *]
+        let genFinalState = states.[*, genSteps-1L, *]
 
         (finalState, logWordProbs, loss), (genFinalState, generated)
 
 
 
-type GRUInst (VocSize:       int,
-              EmbeddingDim:  int,
+type GRUInst (VocSize:       int64,
+              EmbeddingDim:  int64,
               MultiStepLoss: bool) =
 
     let mb = ModelBuilder<single> ("M")
@@ -203,9 +203,9 @@ type GRUInst (VocSize:       int,
             let state =
                 match stateOpt with
                 | Some state when state.Shape.[0] = nBatch && not dropState -> state
-                | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1, *]
+                | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1L, *]
                 | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
-            if smpl.Words.Shape.[1] < 2 then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
+            if smpl.Words.Shape.[1] < 2L then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
             VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
 
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
@@ -226,10 +226,10 @@ type GRUInst (VocSize:       int,
                 |> ArrayNDCuda.toDev :> ArrayNDT<_>
         let primed = 
             // last word of array is not actually processed
-            if nStart > 1 then processFn initial sw.[*, 0 .. nStart-1]
+            if nStart > 1L then processFn initial sw.[*, 0L .. nStart-1L]
             else initial        
 
-        let final, gen = generateFn primed sw.[*, nStart-1]
+        let final, gen = generateFn primed sw.[*, nStart-1L]
         {Words=gen}
 
 

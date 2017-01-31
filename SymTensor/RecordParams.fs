@@ -9,7 +9,7 @@ open ArrayNDNS
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLocStride<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (stride: int list option) (mi: ModelInstance<'T>) =
+    static member PublishLocStride<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (stride: int64 list option) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
         match stride with
         | Some stride -> mi.SetStride expr stride

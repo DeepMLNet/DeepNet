@@ -13,6 +13,7 @@ open VarSpec
 module Expr =
     open ArrayND
 
+    /// cache for ExprT hashes by reference
     let private exprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
 
     /// boxes the contents of an option
@@ -23,7 +24,7 @@ module Expr =
 
     /// start plus the specified number of (symbolic elements)
     type PlusElems (elems: SizeSpecT) =
-        new (intElems: int) = PlusElems (SizeSpec.fix intElems)
+        new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
         member this.Elems = elems
 
     /// arity of an op
@@ -471,7 +472,7 @@ module Expr =
 
         | Unary (ArgMinAxis _, _)
         | Unary (ArgMaxAxis _, _)
-            -> TypeName.ofType<int>
+            -> TypeName.ofType<int64>
 
         | Binary (Equal, _, _)
         | Binary (Less, _, _)
@@ -566,7 +567,7 @@ module Expr =
                     (srs, shapeOf a)
                     ||> List.map2 (fun sr shp ->
                          match sr with
-                         | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1 - s
+                         | SRSSymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1L - s
                          | SRSDynStartSymSize (_, size) -> size)
                 | Unary(ReverseAxis _, a) -> shapeOf a
                 | Unary(Held ([], ReplicateTo (dim, s)), a) -> shapeOf a |> ShapeSpec.set dim s
@@ -793,8 +794,8 @@ module Expr =
                         | None -> failwith "gather needs at least one specified index expression"  
                     for dim, idx in List.indexed indices do
                         match idx with
-                        | Some idx when idx.Type <> typeof<int> ->
-                            failwithf "all index arrays for gather must be of type int, but got type %A" idx.Type
+                        | Some idx when idx.Type <> typeof<int64> ->
+                            failwithf "all index arrays for gather must be of type int64, but got type %A" idx.Type
                         | Some idx when idx.Shape <> trgtShape ->
                             failwithf "all gather indices must have equal shape, but got %A"
                                 (indices |> List.map (Option.map shapeOf))
@@ -805,8 +806,8 @@ module Expr =
                 | Scatter (indices, shp) ->
                     for dim, idx in List.indexed indices do
                         match idx with
-                        | Some idx when idx.Type <> typeof<int> ->
-                            failwithf "all index arrays for scatter must be of type int, but got type %A" idx.Type
+                        | Some idx when idx.Type <> typeof<int64> ->
+                            failwithf "all index arrays for scatter must be of type int64, but got type %A" idx.Type
                         | Some idx when idx.Shape <> a.Shape ->
                             failwithf "all scatter indices must have shape of source %A, but got %A" a.Shape
                                 (indices |> List.map (Option.map shapeOf))
@@ -1628,8 +1629,8 @@ module Expr =
             /// converts ints to SizeSpecTs
             let intToSizeSpec (arg: obj) =
                 match arg with
-                | :? int as f -> SizeSpec.fix f :> obj
-                | :? (int option) as fo -> 
+                | :? int64 as f -> SizeSpec.fix f :> obj
+                | :? (int64 option) as fo -> 
                     match fo with
                     | Some f -> Some (SizeSpec.fix f) :> obj
                     | None -> None :> obj
@@ -1672,7 +1673,7 @@ module Expr =
                 | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape
                 | RSDynElem e :: rngs, _::shps -> splitFRS rngs shps (SRSDynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
                 | RSSymStartSymEnd (so, fo) :: rngs, size::shps -> 
-                    let size = (fo |? (size-1)) - (so |? SizeSpec.zero) + 1
+                    let size = (fo |? (size-1L)) - (so |? SizeSpec.zero) + 1L
                     splitFRS rngs shps (SRSSymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
                 | RSDynStartSymSize (s, size) :: rngs, _::shps ->
                     splitFRS rngs shps (SRSDynStartSymSize (s, size)::simpleRs) (size::newShape)
@@ -1943,7 +1944,7 @@ module Expr =
                 let len = e.Shape.[dim]
                 let slice : FullExprRngsSpecT = 
                     List.replicate e.NDims RSAll
-                    |> List.set dim (RSSymStartSymEnd (Some pos, Some (pos + len - 1)))
+                    |> List.set dim (RSSymStartSymEnd (Some pos, Some (pos + len - 1L)))
                 setSubtensor concatSoFar.[slice] e, pos + len)
         concatenated
 

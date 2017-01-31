@@ -16,7 +16,7 @@ module CudaExecUnitTypes =
 
     /// information for executing a loop
     type ExecLoopInfoT = {
-        Length:                int
+        Length:                int64
         Channels:              Map<ChannelT, LoopEval.LoopChannelInfoT>
         Vars:                  Map<VarSpecT, LoopInputT>
         Workspace:             SubWorkspaceT
@@ -167,8 +167,8 @@ module CudaExecUnit =
     let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
         let st, shp = ArrayND.stride manikin, ArrayND.shape manikin
         match st.[st.Length-2 ..], shp.[st.Length-2 ..] with
-        | [m; 1], [ms; ns] when m >= max 1 ns && not (shared && willOverwrite) -> BlasArgId
-        | [1; n], [ms; ns] when n >= max 1 ms && not (shared && willOverwrite) -> BlasArgTranspose
+        | [m;  1L], [ms; ns] when m >= max 1L ns && not (shared && willOverwrite) -> BlasArgId
+        | [1L; n],  [ms; ns] when n >= max 1L ms && not (shared && willOverwrite) -> BlasArgTranspose
         | _ -> BlasArgCopy
 
 
@@ -465,7 +465,7 @@ module CudaExecUnit =
             | LocHost ->
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
-                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
                 if not (ArrayNDLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
@@ -654,13 +654,13 @@ module CudaExecUnit =
     /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
     let workDimForElemwise trgt hetero =
         match ArrayND.nDims trgt with
-        | _ when hetero -> (ArrayND.nElems trgt, 1, 1)
-        | 0 -> (1, 1, 1)
-        | 1 -> ((ArrayND.shape trgt).[0], 1, 1)
-        | 2 -> ((ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0], 1)
+        | _ when hetero -> (ArrayND.nElems trgt, 1L, 1L)
+        | 0 -> (1L, 1L, 1L)
+        | 1 -> ((ArrayND.shape trgt).[0], 1L, 1L)
+        | 2 -> ((ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0], 1L)
         | 3 -> ((ArrayND.shape trgt).[2], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0])
         | d ->
-            let rest = {0 .. d-3} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1 
+            let rest = {0 .. d-3} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1L 
             ((ArrayND.shape trgt).[d-1], (ArrayND.shape trgt).[d-2], rest)
 
     /// returns the C++ template instantiation code for the given template and argument list
@@ -773,7 +773,7 @@ module CudaExecUnit =
     let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =
         // Apply symbolic ranges to src, and leave dynamic axes unharmed.
         // (0 is added to offset and their size is changed appropriately)
-        let basStatic = bas.[SimpleRangesSpec.eval (fun _ -> 0) rngs] :?> ArrayNDManikinT
+        let basStatic = bas.[SimpleRangesSpec.eval (fun _ -> 0L) rngs] :?> ArrayNDManikinT
 
         // convert simplified range specification to array of pointers to expressions calculating
         // the indices
@@ -859,7 +859,7 @@ module CudaExecUnit =
     let trimUnitaryBatchedBlasDims (manikin: ArrayNDManikinT) =
         let nd = manikin.NDims
         if nd > 2 then
-            let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1)
+            let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1L)
             if isUnitary then
                 let mutable m = manikin
                 for i=0 to nd-3 do m <- ArrayND.cutLeft m
@@ -892,7 +892,7 @@ module CudaExecUnit =
     /// exection items to reduce src over the last axis into trgt
     let rec batchReduceLastAxis (memAllocator: MemAllocatorT) reduceFn (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) 
             : CudaExecItemT list =
-        let reduceBatchSize = 16
+        let reduceBatchSize = 16L
         let nReduceElems = src.Shape.[src.NDims - 1]
 
         if nReduceElems <= reduceBatchSize then
@@ -914,17 +914,17 @@ module CudaExecUnit =
 
             // create temporary target
             let tmpShp = 
-                if reduceRem = 0 then trgt.Shape @ [reduceBatches]
-                else trgt.Shape @ [reduceBatches + 1]
+                if reduceRem = 0L then trgt.Shape @ [reduceBatches]
+                else trgt.Shape @ [reduceBatches + 1L]
             let tmpTrgt = ArrayNDManikin.newC memAllocator trgt.TypeName tmpShp
 
             // perform reduction of batch
-            let batchTrgt = tmpTrgt.[Fill, 0 .. reduceBatches-1] :?> ArrayNDManikinT
+            let batchTrgt = tmpTrgt.[Fill, 0L .. reduceBatches-1L] :?> ArrayNDManikinT
             let batchExecItems = reduceFn batchTrgt batchSrc
 
             // perform reduction of remaining elements, if necessary
             let remExecItems =
-                if reduceRem = 0 then []
+                if reduceRem = 0L then []
                 else
                     let remSrc = src.[Fill, reduceBatches*reduceBatchSize ..] :?> ArrayNDManikinT
                     let remTrgt = tmpTrgt.[Fill, reduceBatches] :?> ArrayNDManikinT
@@ -1135,7 +1135,7 @@ module CudaExecUnit =
 
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
-                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0}
+                let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
                 if not (ArrayNDLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
@@ -1148,7 +1148,7 @@ module CudaExecUnit =
         | UUnaryOp (Print msg) -> [PrintWithMsg (msg, firstSrcDfltCh())]
         | UUnaryOp (Dump name) -> [DumpValue (name, firstSrcDfltCh())]
         | UUnaryOp (CheckFinite name) ->
-            let nonFiniteCount = ArrayNDManikin.newC memAllocator TypeName.ofType<int> [1]
+            let nonFiniteCount = ArrayNDManikin.newC memAllocator TypeName.ofType<int> [1L]
             let initItems = [MemsetUInt32 (0u, ArrayNDDevMemRngTmpl nonFiniteCount)]
             let countItems = execItemsForElemwise (dfltChTrgt()) (CheckFiniteIEOpArgTmpl (nonFiniteCount, name)) (srcsDfltCh())
             let checkItems = [CheckNonFiniteCounter (name, nonFiniteCount)]
