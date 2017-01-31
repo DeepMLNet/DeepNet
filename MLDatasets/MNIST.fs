@@ -41,7 +41,7 @@ module Mnist =
         let dataShape = ArrayND.shape data.[0]
         let ds = ArrayNDHost.zeros (nSamples :: dataShape)
 
-        data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)
+        data |> List.iteri (fun smpl d -> ds.[int64 smpl, Fill] <- d)
         ds
 
     let private swapEndians (value: int32) =
