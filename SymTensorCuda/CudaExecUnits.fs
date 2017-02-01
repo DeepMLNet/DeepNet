@@ -853,6 +853,27 @@ module CudaExecUnit =
                 (ArrayND.nElems trgt) (ArrayND.nElems src)
         execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
+    /// Generates ExecItems to copy srcView into newly allocated memory in C-order.
+    /// Broadcasted dimensions of srcView for which broadcastAllowed is true are kept broadcasted.
+    let copyKeepingBroadcasted memAllocator (broadcastAllowed: bool list) (src: ArrayNDManikinT) =
+        assert (broadcastAllowed.Length = src.NDims)
+        let isBroadcasted = 
+            List.zip src.Layout.Shape src.Layout.Stride
+            |> List.map (fun (size, str) -> size > 1L && str = 0L)
+        let tmpShp, srcRngs = 
+            List.zip3 src.Shape isBroadcasted broadcastAllowed
+            |> List.map (fun (size, isB, allowed) -> 
+                            match size, isB, allowed with
+                            | _, false, _ -> size, RngAll                    // not broadcasted
+                            | _, true, true -> 1L, Rng (Some 0L, Some 0L)    // keep broadcasted
+                            | _, true, false -> size, RngAll)                // unbroadcast by copying
+            |> List.unzip
+        let srcView = src.[srcRngs] :?> ArrayNDManikinT
+        let tmpView = ArrayNDManikin.newC memAllocator src.TypeName tmpShp
+        let copyOps = copyExecItems tmpView srcView
+        let dstView = tmpView |> ArrayND.broadcastToShape src.Shape
+        dstView, copyOps                             
+
     /// If all batch dimensions (all dimensions but the last two) of the array are of
     /// size one, a view of the last two dimensions is returned.
     /// Otherwise the original array is returned.
@@ -877,8 +898,10 @@ module CudaExecUnit =
         | BlasArgId        -> manikin, BlasTranspose, [], shared
         | BlasArgTranspose -> ArrayND.transpose manikin, BlasId, [], shared
         | BlasArgCopy -> 
-            let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
-            let copyOps = copyExecItems tmpView manikin
+            let bcAllowed = (List.replicate (manikin.NDims - 2) true) @ [false; false]
+            let tmpView, copyOps = copyKeepingBroadcasted memAllocator bcAllowed manikin
+            //let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
+            //let copyOps = copyExecItems tmpView manikin
             tmpView, BlasTranspose, copyOps, false
 
     /// BLAS target argument passing, so that orientation is preserved
