@@ -174,17 +174,21 @@ module ArrayNDManikin =
     let typeSize ary =
         ary |> typeName |> TypeName.size
 
+    /// size of the used data type as int64
+    let typeSize64 ary =
+        ary |> typeName |> TypeName.size64
+
     /// offset in bytes
     let offsetInBytes ary =
-        int64 (typeSize ary) * ArrayND.offset ary
+        typeSize64 ary * ArrayND.offset ary
 
     /// address of given element in bytes (relative to start of array)
     let addrInBytes idx ary =
-        int64 (typeSize ary) * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
+        typeSize64 ary * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
 
     /// size in bytes 
     let sizeInBytes ary =
-        int64 (typeSize ary) * ArrayND.nElems ary
+        typeSize64 ary * ArrayND.nElems ary
 
     /// True if array can be target of BLAS operation.
     let canBeBlasTarget ary =

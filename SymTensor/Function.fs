@@ -309,6 +309,7 @@ module Func =
                 }
 
                 // show UExpr visualization, if requested
+                if Debug.VisualizeUExpr then printfn "Visualizing UExpr in separate window..."
                 UExprVisualizer.show ()
                 UExprVisualizer.finish ()
 

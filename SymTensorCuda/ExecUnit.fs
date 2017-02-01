@@ -507,9 +507,6 @@ module ExecUnit =
                     let trgtManikins = 
                         trgtChannelsAndShared |> extractChannels |> Map.toList |> List.map snd                        
 
-                    // submit manikins to visualizer
-                    UExprVisualizer.addManikins erqExpr (trgtChannelsAndShared |> extractChannels) srcManikins
-
                     // emit execution unit 
                     let eu = {
                         Id         = newExecUnitId()
@@ -521,7 +518,11 @@ module ExecUnit =
                     }                                    
                     submitted <- true
                     submitExecUnit eu
-                           
+
+                    // submit manikins to visualizer
+                    UExprVisualizer.addManikins eu.Id erqExpr (trgtChannelsAndShared |> extractChannels) srcManikins
+
+                    // complete request                           
                     let result = {ExecUnitId=eu.Id; Channels=trgtChannelsAndShared}
                     for erq in erqsForExpr do
                         erq.OnCompletion result

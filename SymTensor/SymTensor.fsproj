@@ -71,6 +71,7 @@
     <Compile Include="Hold.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />
+    <Compile Include="ArrayNDManikin.fs" />
     <Compile Include="UExprVisualize.fs" />
     <Compile Include="Dump.fs" />
     <Compile Include="Trace.fs" />
