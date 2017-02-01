@@ -462,19 +462,25 @@ module ExecUnit =
                 if srcs |> List.forall (fun s -> subreqResults.ContainsKey s) && not submitted then  
                     // continuation, when eval requests for all sources have been processed                     
 
+                    // function for logging allocated memory
+                    let allocatedMemory = ResizeArray<MemManikinT> ()
+                    let newMemoryWithLogging typ elems kind =
+                        let mem = newMemory typ elems kind
+                        allocatedMemory.Add mem
+                        mem
+
                     // determine our definitive target storage
                     let srcChannelsAndShared, srcExeUnitIds = 
                         srcs 
                         |> List.map (fun s -> subreqResults.[s].Channels, subreqResults.[s].ExecUnitId) 
                         |> List.unzip
                     let trgtChannelsAndShared =
-                        gen.TrgtGivenSrcs {MemAllocator=newMemory
+                        gen.TrgtGivenSrcs {MemAllocator=newMemoryWithLogging
                                            TargetRequest=erqChannelReqs
                                            Op=op
                                            Metadata=metadata
                                            Srcs=srcChannelsAndShared}
-                        |> Map.map (fun ch (manikin, shared) -> 
-                                        manikin, shared || erqResultShared)
+                        |> Map.map (fun ch (manikin, shared) -> manikin, shared || erqResultShared)
 
                     // build channel lists
                     let extractChannels (chsAndShared: ChannelManikinsAndSharedT) : ChannelManikinsT = 
@@ -487,7 +493,7 @@ module ExecUnit =
                                                       Target=extractChannels trgtChannelsAndShared
                                                       Expr=erqExpr}
                             else []
-                        @ gen.ExecItemsForOp {MemAllocator=newMemory
+                        @ gen.ExecItemsForOp {MemAllocator=newMemoryWithLogging
                                               Target=extractChannels trgtChannelsAndShared
                                               Op=op
                                               Metadata=metadata
@@ -499,13 +505,20 @@ module ExecUnit =
                                                        Expr=erqExpr}
                             else []
 
-                    // extract manikin from all channels
+                    // extract manikin from all channels 
                     let srcManikins = 
                         srcChannelsAndShared
                         |> List.map (extractChannels >> Map.toList >> List.map snd)
                         |> List.concat
                     let trgtManikins = 
                         trgtChannelsAndShared |> extractChannels |> Map.toList |> List.map snd                        
+                    let trgtAndSrcManikins = trgtManikins @ srcManikins
+
+                    // calculate extra memory
+                    let extraMemory =
+                        allocatedMemory
+                        |> Seq.filter (fun mem -> trgtAndSrcManikins |> List.exists (fun m -> m.Storage = mem) |> not)
+                        |> List.ofSeq
 
                     // emit execution unit 
                     let eu = {
@@ -513,14 +526,15 @@ module ExecUnit =
                         Items      = items
                         DependsOn  = srcExeUnitIds
                         Expr       = erqExpr
-                        Manikins   = trgtManikins @ srcManikins
+                        Manikins   = trgtAndSrcManikins
                         RerunAfter = []
                     }                                    
                     submitted <- true
                     submitExecUnit eu
 
                     // submit manikins to visualizer
-                    UExprVisualizer.addManikins eu.Id erqExpr (trgtChannelsAndShared |> extractChannels) srcManikins
+                    UExprVisualizer.addManikins eu.Id erqExpr 
+                                                (trgtChannelsAndShared |> extractChannels) srcManikins extraMemory
 
                     // complete request                           
                     let result = {ExecUnitId=eu.Id; Channels=trgtChannelsAndShared}

@@ -33,19 +33,32 @@ module UExprVisualizer =
     type VisManikinUExprRelation =
         | Target of string
         | Src of int
+        | Extra
         override this.ToString () =
             match this with
             | Target ch -> sprintf "Target %s" ch
             | Src src -> sprintf "Src %d" src
+            | Extra -> "Extra"
 
     type VisArrayNDManikin =
-        {Manikin:  ArrayNDManikinT
+        {Manikin:  ArrayNDManikinT option
+         Storage:  MemManikinT option
          EuId:     int
          UExpr:    UExprT
          Relation: VisManikinUExprRelation}        
-        member this.Type = sprintf "%A" this.Manikin.TypeName
-        member this.Shape = sprintf "%A" this.Manikin.Shape
-        member this.MemManikin = {VisMemManikin.Manikin = this.Manikin.Storage}
+        member this.Type = 
+            match this.Manikin with
+            | Some m -> sprintf "%A" m.TypeName
+            | None -> ""
+        member this.Shape = 
+            match this.Manikin with
+            | Some m -> sprintf "%A" m.Shape
+            | None -> ""
+        member this.MemManikin = 
+            match this.Manikin, this.Storage with
+            | Some m, None -> {VisMemManikin.Manikin = m.Storage}
+            | None, Some s -> {VisMemManikin.Manikin = s}
+            | _, _ -> failwith "invalid combination of manikin/storage"
 
 
     type Visualizer (rootExprs: UExprT list) =
@@ -238,20 +251,30 @@ module UExprVisualizer =
 
             exprs |> List.map build, Map.ofDictionary nodeForExpr
 
-        // edge blinking
+        // blinking
+        let mutable blinkMarked = false
         let mutable blinkEdges : List<Edge> = []
         let mutable blinkOriginalEdgeColor : List<Edge * Color> = []
+        let mutable blinkNodes : List<Node> = []
+        let mutable blinkOriginalNodeColor : List<Node * Color> = []
         let doBlinkUpdate () =
-            if blinkOriginalEdgeColor.IsEmpty then
+            if not blinkMarked then
                 blinkOriginalEdgeColor <- blinkEdges
                                           |> List.map (fun e -> 
                                                 let origColor = e.Attr.Color
                                                 e.Attr.Color <- Color.Blue
                                                 e, origColor)
+                blinkOriginalNodeColor <- blinkNodes
+                                          |> List.map (fun n -> 
+                                                let origColor = n.Attr.FillColor
+                                                n.Attr.FillColor <- Color.Blue
+                                                n, origColor)
             else
                 for e, origColor in blinkOriginalEdgeColor do
                     e.Attr.Color <- origColor
-                blinkOriginalEdgeColor <- []
+                for n, origColor in blinkOriginalNodeColor do
+                    n.Attr.FillColor <- origColor
+            blinkMarked <- not blinkMarked
             viewer.Refresh()
 
         /// nodes for storages
@@ -275,15 +298,18 @@ module UExprVisualizer =
         /// adds manikin information
         member this.AddManikins (euId: int) (uExpr: UExprT) 
                                 (trgtManikins: Map<string, ArrayNDManikinT>) 
-                                (srcManikins: ArrayNDManikinT list) =
+                                (srcManikins: ArrayNDManikinT list)
+                                (extraMems: MemManikinT list) =
             match nodeForExpr.TryFind uExpr with
             | Some node -> nodeForEuId.[euId] <- node
             | None -> ()
 
             for KeyValue(ch, manikin) in trgtManikins do
-                arrayNDManikins.Add {Manikin=manikin; EuId=euId; UExpr=uExpr; Relation=Target ch} 
+                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Target ch} 
             for src, manikin in List.indexed srcManikins do
-                arrayNDManikins.Add {Manikin=manikin; EuId=euId; UExpr=uExpr; Relation=Src src}
+                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Src src}
+            for extraMem in extraMems do
+                arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=euId; UExpr=uExpr; Relation=Extra}
 
         /// shows the graph
         member this.Show () = 
@@ -309,8 +335,8 @@ module UExprVisualizer =
 
             // MemManikins data binding
             let visMemManikins = 
-                arrayNDManikins
-                |> Seq.map (fun a -> a.MemManikin)
+                arrayNDManikins 
+                |> Seq.map (fun a -> a.MemManikin) 
                 |> Set.ofSeq
                 |> Set.toList
                 |> List.sortByDescending (fun m -> match m.Manikin with
@@ -384,15 +410,24 @@ module UExprVisualizer =
                 | _ -> ())
 
             arrayNDManikinView.SelectionChanged.Add (fun _ ->
-                let edges = 
+                let vis = 
                     arrayNDManikinView.SelectedRows
                     |> Seq.cast<DataGridViewRow>
-                    |> Seq.map (fun row -> row.DataBoundItem :?> VisArrayNDManikin)
-                    |> Seq.choose (function | {UExpr=uExpr; Relation=Src src} -> Some (uExpr, src)
-                                            | _ -> None)
-                    |> Seq.choose (fun (uexpr, src) -> srcEdges.TryFind (uexpr, src))
-                    |> List.ofSeq
-                blinkEdges <- edges)
+                    |> Seq.choose (fun row -> if row.DataBoundItem <> null then 
+                                                  Some (row.DataBoundItem :?> VisArrayNDManikin)
+                                              else None)
+                    |> Seq.toList
+                let edges = 
+                    vis
+                    |> List.choose (function | {UExpr=uExpr; Relation=Src src} -> Some (uExpr, src)
+                                             | _ -> None)
+                    |> List.choose (fun (uexpr, src) -> srcEdges.TryFind (uexpr, src))
+                let nodes =
+                    vis
+                    |> List.choose (function | {EuId=euId; Relation=Extra} -> nodeForEuId.TryFind euId
+                                             | _ -> None)
+                blinkEdges <- edges
+                blinkNodes <- nodes)
 
             // blink timer
             let blinkTimer = new Timer(Interval=500)
@@ -424,9 +459,9 @@ module UExprVisualizer =
     let finish () =
         active.Value <- None
 
-    let addManikins euId uExpr trgtManikins srcManikins =
+    let addManikins euId uExpr trgtManikins srcManikins extraMem =
         if Debug.VisualizeUExpr then
-            getActive().AddManikins euId uExpr trgtManikins srcManikins
+            getActive().AddManikins euId uExpr trgtManikins srcManikins extraMem
 
             
 
