@@ -57,7 +57,7 @@ let buildVars<'T> shps =
         let name = sprintf "v%d" idx
         let sshp = 
             shp 
-            |> List.map (function | -1 -> SizeSpec.broadcastable
+            |> List.map (function | -1L -> SizeSpec.broadcastable
                                   | s -> SizeSpec.fix s)
         yield Expr.var<'T> name sshp]
 
@@ -65,7 +65,7 @@ let buildVars<'T> shps =
 let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) =
     (VarEnv.empty, List.zip vars shps)
     ||> List.fold (fun varEnv (var, shp) ->
-        let shp = shp |> List.map (function | -1 -> 1  | s -> s)
+        let shp = shp |> List.map (function | -1L -> 1L | s -> s)
         let value = rng.UniformArrayND (conv<'T> -1.0, conv<'T> 1.0) shp |> dev.ToDev
         varEnv |> VarEnv.add var value
     )
@@ -92,7 +92,7 @@ let requireEqualTracesWithRandomDataLogic shps (exprFn: ExprT list -> ExprT) =
     |> should equal 0
 
 let requireEqualTracesWithRandomDataIdx shps (exprFn: ExprT list -> ExprT) =
-    compareTraces (randomEval<single, int> shps exprFn) false
+    compareTraces (randomEval<single, int64> shps exprFn) false
     |> should equal 0
 
 let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =

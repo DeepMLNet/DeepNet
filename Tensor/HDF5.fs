@@ -34,11 +34,11 @@ module HDF5Support =
     let hdfType<'T> =  
         hdfTypeInst typeof<'T>
 
-    let hdfShape shape =
+    let hdfShape (shape: int64 list) =
         shape |> List.map uint64 |> List.toArray
 
     let intShape (shape: uint64 array) =
-        shape |> Array.toList |> List.map int
+        shape |> Array.toList |> List.map int64
 
 
 [<AutoOpen>]
@@ -68,10 +68,10 @@ module HDF5Types =
             |> check
 
         let checkShape data shape =
-            let nElems = List.fold (*) 1 shape
-            if Array.length data <> nElems then
+            let nElems = List.fold (*) 1L shape
+            if int64 (Array.length data) < nElems then
                 failwithf "shape %A does not match number of elements in data array" shape
-            if List.exists ((>) 0) shape then
+            if List.exists ((>) 0L) shape then
                 failwithf "shape %A has negative elements" shape
 
         let checkDisposed () =
@@ -102,11 +102,15 @@ module HDF5Types =
 
         /// Splits a HDF5 path string into a list.
         static member private SplitPath (path: string) =
-            path.Split('/') |> List.ofArray
+            path.Split('/') 
+            |> List.ofArray
+            |> List.filter (fun d -> String.length d > 0)
 
         /// Combines a list of groups into a HDF5 path string.
         static member private CombinePath (dirs: string list) =
-            String.concat "/" dirs
+            dirs
+            |> List.filter (fun d -> String.length d > 0)
+            |> String.concat "/" 
             
         /// Checks whether an object (array or group) with the given name exists.
         member this.Exists (name: string) =
@@ -135,7 +139,8 @@ module HDF5Types =
                         let groupHnd = H5G.create(fileHnd, nextPrefixPath) |> check 
                         H5G.close groupHnd |> check |> ignore
                     create nextPrefix dirs
-            create [] (HDF5.SplitPath path)                
+            if path.Length > 0 then
+                create [] (HDF5.SplitPath path)                
 
         /// Create all necessary parent groups for the given path.
         member private this.CreateParentGroups (path: string) =
@@ -149,7 +154,7 @@ module HDF5Types =
                 |> this.CreateGroups
 
         /// Write data array using specified name and shape.
-        member this.Write (name: string, data: 'T array, shape: int list) =
+        member this.Write (name: string, data: 'T array, shape: int64 list) =
             checkDisposed ()
             if mode <> HDF5Overwrite then
                 failwithf "HDF5 file %s is opened for reading" path
@@ -186,7 +191,7 @@ module HDF5Types =
             let shape : uint64 array = Array.zeroCreate nDims
             let maxShape : uint64 array = Array.zeroCreate nDims
             H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
-            let nElems = Array.fold (*) (uint64 1) shape |> int
+            let nElems = Array.fold (*) 1UL shape |> int
 
             let data : 'T array = Array.zeroCreate nElems
             let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)

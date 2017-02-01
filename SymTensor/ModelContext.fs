@@ -9,7 +9,7 @@ open ArrayNDNS
 module ModelContextTypes =
 
     /// function that returns an initialization value for a parameter
-    type Initializer<'T> = int -> int list -> ArrayNDHostT<'T>
+    type Initializer<'T> = int -> int64 list -> ArrayNDHostT<'T>
 
     /// model parameter
     type ParameterInfo<'T> = {
@@ -64,7 +64,7 @@ module ModelContextTypes =
             (startIdxs, shapes)
             ||> List.map2 (fun startIdx shp ->
                 let elems = ShapeSpec.nElem shp
-                let v = flatVar.[startIdx .. startIdx + elems - 1]
+                let v = flatVar.[startIdx .. startIdx + elems - 1L]
                 Expr.reshape shp v)
             |> List.zip pars
             |> Map.ofList
@@ -140,8 +140,8 @@ module ModelContextTypes =
         let parameterVals = 
             (nStartIdxs, nShapes)
             ||> List.map2 (fun startIdx shp ->
-                let elems = List.fold (*) 1 shp
-                let v = dataVal.[startIdx .. startIdx + elems - 1]
+                let elems = List.fold (*) 1L shp
+                let v = dataVal.[startIdx .. startIdx + elems - 1L]
                 ArrayND.reshapeView shp v)
             |> List.zip parameterSet.Parameters
             |> Map.ofList
@@ -212,16 +212,16 @@ module ModelContextTypes =
             shapeObj |> List.map
                 (function
                 | :? string as symName -> toSizeSpec symName
-                | :? int as f when f = -1 -> SizeSpec.broadcastable
-                | :? int as f when f >= 0 -> SizeSpec.fix f
+                | :? int64 as f when f = -1L -> SizeSpec.broadcastable
+                | :? int64 as f when f >= 0L -> SizeSpec.fix f
                 | r -> failwithf "size must be either a size symbol name (string), \
-                                  a fixed size (positive integer) or -1 for broadcast, but got %A" r)
+                                  a fixed size (positive int64) or -1L for broadcast, but got %A" r)
 
         let checkVar var =
             if not (vars |> Set.contains var) then
                 failwithf "this ModelBuilder does not contain the variable %A" var
 
-        let defaultInitializer (seed: int) (shp: int list) =
+        let defaultInitializer (seed: int) (shp: int64 list) =
             let rng = Random(seed)
             rng.SeqDouble (-0.01, 0.01) 
             |> Seq.map conv<'T>
@@ -264,9 +264,9 @@ module ModelContextTypes =
             symSizes <- s :: symSizes
             s
 
-        /// Returns a fixed size. If size is -1 then a broadcastable size one is created.
+        /// Returns a fixed size. If size is -1L then a broadcastable size one is created.
         member this.Fix size =
-            if size = -1 then SizeSpec.broadcastable
+            if size = -1L then SizeSpec.broadcastable
             else SizeSpec.fix size
            
         /// context name
@@ -343,7 +343,7 @@ module ModelContextTypes =
 
         /// instantiates the model with numeric sizes for all size symbols and initializes 
         /// the parameter values
-        member this.Instantiate (device: IDevice, ?sizeValues: Map<SizeSpecT, int>, ?canDelay: bool) =
+        member this.Instantiate (device: IDevice, ?sizeValues: Map<SizeSpecT, int64>, ?canDelay: bool) =
             let canDelay = defaultArg canDelay true
             let sizeValues = defaultArg sizeValues Map.empty
             if isSubModule then failwith "a submoule cannot be instantiated"

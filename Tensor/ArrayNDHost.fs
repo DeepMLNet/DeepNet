@@ -26,14 +26,14 @@ module ArrayNDHostTypes =
     /// Information for calling BLAS/LAPACK routines.
     type private BlasInfo (memory: PinnedMemoryT,
                            offset: nativeint,
-                           rows:   int,
-                           cols:   int,
-                           ld:     int) =
+                           rows:   int64,
+                           cols:   int64,
+                           ld:     int64) =
 
         member this.Ptr  : nativeint  = memory.Ptr + offset
-        member this.Rows : lapack_int = int64 rows
-        member this.Cols : lapack_int = int64 cols
-        member this.Ld   : lapack_int = int64 ld
+        member this.Rows : lapack_int = rows
+        member this.Cols : lapack_int = cols
+        member this.Ld   : lapack_int = ld
 
         interface IDisposable with
             member this.Dispose() = (memory :> IDisposable).Dispose()
@@ -50,7 +50,7 @@ module ArrayNDHostTypes =
         inherit IArrayNDT
         abstract Pin: unit -> PinnedMemoryT
         abstract DataObj: obj
-        abstract DataSizeInBytes: int
+        abstract DataSizeInBytes: int64
 
     /// an ArrayNDT that can be copied to an ArrayNDHostT
     type IToArrayNDHostT<'T> =
@@ -65,7 +65,11 @@ module ArrayNDHostTypes =
 
         /// a new ArrayND in host memory using a managed array as storage
         new (layout: ArrayNDLayoutT) =
-            ArrayNDHostT<'T>(layout, Array.zeroCreate (ArrayNDLayout.nElems layout))
+            let nElems = ArrayNDLayout.nElems layout
+            if nElems > int64 Microsoft.FSharp.Core.int32.MaxValue then
+                failwithf "The current ArrayNDHostT implementation is limited to %d elements."
+                          Microsoft.FSharp.Core.int32.MaxValue
+            ArrayNDHostT<'T>(layout, Array.zeroCreate (int32 nElems))
 
         /// underlying data array
         member this.Data = data
@@ -76,10 +80,10 @@ module ArrayNDHostTypes =
         /// pins the underlying data array and returns the corresponding GCHandle
         member this.Pin () =
             let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-            new PinnedMemoryT (gcHnd, data.LongLength * int64 sizeof<'T>) 
+            new PinnedMemoryT (gcHnd, data.LongLength * sizeof64<'T>) 
 
         /// size of underlying data array in bytes
-        member this.DataSizeInBytes = data.Length * sizeof<'T>
+        member this.DataSizeInBytes = int64 data.Length * sizeof64<'T>
 
         interface IArrayNDHostT with
             member this.Pin () = this.Pin ()
@@ -92,10 +96,10 @@ module ArrayNDHostTypes =
         override this.Location = LocHost
 
         override this.Item
-            with get pos = data.[ArrayNDLayout.addr pos layout]
+            with get pos = data.[int32 (ArrayNDLayout.addr pos layout)]
             and set pos value = 
                 ArrayND.doCheckFinite value
-                data.[ArrayNDLayout.addr pos layout] <- value 
+                data.[int32 (ArrayNDLayout.addr pos layout)] <- value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             ArrayNDHostT<'T>(layout) :> ArrayNDT<'T>
@@ -121,7 +125,7 @@ module ArrayNDHostTypes =
                     let destAddrs = FastLayout.allAddr dest.FastLayout
                     let thisAddrs = FastLayout.allAddr this.FastLayout
                     for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
-                        destData.[destAddr] <- data.[thisAddr]
+                        destData.[int32 destAddr] <- data.[int32 thisAddr]
 
             | _ -> base.CopyTo dest
 
@@ -131,12 +135,12 @@ module ArrayNDHostTypes =
             let destAddrs = FastLayout.allAddr dest.FastLayout
             let thisAddrs = FastLayout.allAddr this.FastLayout
             for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
-                destData.[destAddr] <- f data.[thisAddr]
+                destData.[int32 destAddr] <- f data.[int32 thisAddr]
 
         override this.MapInplaceImpl (f: 'T -> 'T) = 
             let thisAddrs = FastLayout.allAddr this.FastLayout
             for thisAddr in thisAddrs do
-                data.[thisAddr] <- f data.[thisAddr]
+                data.[int32 thisAddr] <- f data.[int32 thisAddr]
 
         override this.Map2Impl (f: 'T -> 'T -> 'R) (other: ArrayNDT<'T>) (dest: ArrayNDT<'R>) =
             let dest = dest :?> ArrayNDHostT<'R>
@@ -147,7 +151,7 @@ module ArrayNDHostTypes =
             let thisAddrs = FastLayout.allAddr this.FastLayout
             let otherAddrs = FastLayout.allAddr other.FastLayout
             for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
-                destData.[destAddr] <- f data.[thisAddr] otherData.[otherAddr]
+                destData.[int32 destAddr] <- f data.[int32 thisAddr] otherData.[int32 otherAddr]
 
         override this.IfThenElseImpl (cond: ArrayNDT<bool>) (elseVal: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
             let cond = cond :?> ArrayNDHostT<bool>
@@ -163,13 +167,13 @@ module ArrayNDHostTypes =
             let destAddrs = FastLayout.allAddr dest.FastLayout
             for destAddr, condAddr, (ifValAddr, elseValAddr) in 
                     Seq.zip3 destAddrs condAddrs (Seq.zip ifValAddrs elseValAddrs) do
-                destData.[destAddr] <- 
-                    if condData.[condAddr] then ifValData.[ifValAddr] else elseValData.[elseValAddr]
+                destData.[int32 destAddr] <- 
+                    if condData.[int32 condAddr] then ifValData.[int32 ifValAddr] else elseValData.[int32 elseValAddr]
 
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
                 FastLayout.allAddr this.FastLayout
-                |> Seq.map (fun addr -> this.Data.[addr])
+                |> Seq.map (fun addr -> this.Data.[int32 addr])
                 |> fun s -> s.GetEnumerator()
             member this.GetEnumerator() =
                 (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
@@ -210,11 +214,11 @@ module ArrayNDHostTypes =
         /// (in column-major order).
         member private this.GetTransposedBlas copyAllowed =
             if this.NDims <> 2 then failwithf "require a matrix but got shape %A" this.Shape
-            if not (this.Shape.[0] > 0 && this.Shape.[1] > 0) then 
+            if not (this.Shape.[0] > 0L && this.Shape.[1] > 0L) then 
                 failwithf "require a non-empty matrix but got shape %A" this.Shape
             let str = stride this
-            if str.[0] >= 1 && str.[0] >= this.Shape.[1] && str.[1] = 1 then
-                new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof<'T>),
+            if str.[0] >= 1L && str.[0] >= this.Shape.[1] && str.[1] = 1L then
+                new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof64<'T>),
                               this.Shape.[1], this.Shape.[0], str.[0])
             else
                 if copyAllowed then (ArrayND.copy this).GetTransposedBlas copyAllowed
@@ -240,7 +244,7 @@ module ArrayNDHostTypes =
 
                 // compute LU factorization
                 use a = aAry.GetTransposedBlas false
-                let ipiv : lapack_int[] = Array.zeroCreate aAry.Shape.[0]
+                let ipiv : lapack_int[] = Array.zeroCreate (int32 aAry.Shape.[0])
                 let info =
                     blasTypeChoose<'T, lapack_int> 
                         (fun () -> LAPACKE_sgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
@@ -265,7 +269,7 @@ module ArrayNDHostTypes =
             let size = this.Shape.[0]
 
             let eigVecs = ArrayND.copy this
-            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [1; size]) :?> ArrayNDHostT<'T>
+            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [1L; size]) :?> ArrayNDHostT<'T>
 
             use a = eigVecs.GetTransposedBlas false
             use w = eigVals.GetTransposedBlas false
@@ -276,7 +280,7 @@ module ArrayNDHostTypes =
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
 
-            eigVals.[0, *] :> ArrayNDT<'T>, eigVecs.T 
+            eigVals.[0L, *] :> ArrayNDT<'T>, eigVecs.T 
 
 
 module ArrayNDHost = 
@@ -338,13 +342,13 @@ module ArrayNDHost =
         a
 
     /// Creates a new ArrayNDHostT of the given shape and uses the given function to initialize it.
-    let initIndexed<'T> shp (f: int list -> 'T) =
+    let initIndexed<'T> shp f =
         let a = newC<'T> shp
         ArrayND.fillIndexed f a
         a   
 
     /// Creates a new vector with linearly spaced values from start to (including) stop.
-    let inline linSpaced (start: 'T) (stop: 'T) (nElems: int) =
+    let inline linSpaced (start: 'T) (stop: 'T) nElems =
         let a = newC<'T> [nElems]
         ArrayND.fillLinSpaced start stop a
         a          
@@ -365,6 +369,7 @@ module ArrayNDHost =
     /// The data is referenced, not copied.
     let ofArray (data: 'T []) =
         let shp = [Array.length data]
+        let shp = shp |> List.map int64
         let layout = ArrayNDLayout.newC shp
         ArrayNDHostT<'T> (layout, data) 
 
@@ -372,28 +377,32 @@ module ArrayNDHost =
     /// The data is copied.
     let ofArray2D (data: 'T [,]) =
         let shp = [Array2D.length1 data; Array2D.length2 data]
-        initIndexed shp (fun idx -> data.[idx.[0], idx.[1]])
+        let shp = shp |> List.map int64
+        initIndexed shp (fun idx -> data.[int32 idx.[0], int32 idx.[1]])
 
     /// Creates a three-dimensional ArrayNDT using the specified data. 
     /// The data is copied.
     let ofArray3D (data: 'T [,,]) =
         let shp = [Array3D.length1 data; Array3D.length2 data; Array3D.length3 data]
-        initIndexed shp (fun idx -> data.[idx.[0], idx.[1], idx.[2]])
+        let shp = shp |> List.map int64
+        initIndexed shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2]])
 
     /// Creates a four-dimensional ArrayNDT using the specified data. 
     /// The data is copied.
     let ofArray4D (data: 'T [,,,]) =
-        let shp = [Array4D.length1 data; Array4D.length2 data; Array4D.length3 data; Array4D.length4 data]
-        initIndexed shp (fun idx -> data.[idx.[0], idx.[1], idx.[2], idx.[3]])
+        let shp = [Array4D.length1 data; Array4D.length2 data; 
+                   Array4D.length3 data; Array4D.length4 data]
+        let shp = shp |> List.map int64
+        initIndexed shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2], int32 idx.[3]])
 
     /// Creates a one-dimensional ArrayNDT using the specified sequence.       
     let ofSeq (data: 'T seq) =
         data |> Array.ofSeq |> ofArray
 
     /// Creates a one-dimensional ArrayNDT using the specified sequence and shape.       
-    let ofSeqWithShape (shape: int list) (data: 'T seq) =
-        let nElems = shape |> List.fold (*) 1
-        data |> Seq.take nElems |> ofSeq |> ArrayND.reshape shape
+    let ofSeqWithShape shape (data: 'T seq) =
+        let nElems = shape |> List.fold (*) 1L
+        data |> Seq.take (int32 nElems) |> ofSeq |> ArrayND.reshape shape
 
     /// Creates a one-dimensional ArrayNDT using the specified list.       
     let ofList (data: 'T list) =
@@ -407,30 +416,34 @@ module ArrayNDHost =
     let toArray (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
         let shp = ArrayND.shape ary
-        Array.init shp.[0] (fun i0 -> ary.[[i0]])
+        let shp = shp |> List.map int32
+        Array.init shp.[0] (fun i0 -> ary.[[int64 i0]])
 
     /// Creates an Array2D from the data in this ArrayNDT. The data is copied.
     let toArray2D (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 2 then failwith "ArrayNDT must have 2 dimensions"
         let shp = ArrayND.shape ary
-        Array2D.init shp.[0] shp.[1] (fun i0 i1 -> ary.[[i0; i1]])
+        let shp = shp |> List.map int32
+        Array2D.init shp.[0] shp.[1] (fun i0 i1 -> ary.[[int64 i0; int64 i1]])
 
     /// Creates an Array3D from the data in this ArrayNDT. The data is copied.
     let toArray3D (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 3 then failwith "ArrayNDT must have 3 dimensions"
         let shp = ArrayND.shape ary
-        Array3D.init shp.[0] shp.[1] shp.[2] (fun i0 i1 i2 -> ary.[[i0; i1; i2]])
+        let shp = shp |> List.map int32
+        Array3D.init shp.[0] shp.[1] shp.[2] (fun i0 i1 i2 -> ary.[[int64 i0; int64 i1; int64 i2]])
        
     /// Creates an Array4D from the data in this ArrayNDT. The data is copied.
     let toArray4D (ary: ArrayNDHostT<_>) =
         if ArrayND.nDims ary <> 4 then failwith "ArrayNDT must have 4 dimensions"
         let shp = ArrayND.shape ary
-        Array4D.init shp.[0] shp.[1] shp.[2] shp.[3] (fun i0 i1 i2 i3 -> ary.[[i0; i1; i2; i3]])
+        let shp = shp |> List.map int32
+        Array4D.init shp.[0] shp.[1] shp.[2] shp.[3] (fun i0 i1 i2 i3 -> ary.[[int64 i0; int64 i1; int64 i2; int64 i3]])
 
     /// Creates a list from the data in this ArrayNDT. The data is copied.
     let toList (ary: ArrayNDHostT<_>) =
         ary |> toArray |> Array.toList
 
-    /// One-dimensional int tensor containing the numbers [0; 1; ...; size-1].
+    /// One-dimensional int tensor containing the numbers [0L; 1L; ...; size-1L].
     let arange size =
-        {0 .. size-1} |> ofSeq
+        {0L .. size-1L} |> ofSeq

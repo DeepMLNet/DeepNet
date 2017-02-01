@@ -395,7 +395,7 @@ module Deriv =
                 let slice = [
                     yield RSAll                         // function element axis
                     for d=0 to liDims-1 do yield RSAll  // derivative axes
-                    yield RSSymElem (spec.Length - 1)   // sequence slice axis
+                    yield RSSymElem (spec.Length - 1L)  // sequence slice axis
                 ]
                 argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=None} |> ignore
 
@@ -447,7 +447,7 @@ module Deriv =
                     for d=0 to sliceDim-1 do yield RSAll        // derivative axes
                     yield RSSymStartSymEnd                      // sequence slice axis
                         (Some (spec.Length - pp.Delay),
-                            Some (spec.Length - 1))                
+                            Some (spec.Length - 1L))                
                     for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
                 ]
                 argIdxDerivs.[pp.InitialArg].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore

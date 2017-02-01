@@ -77,12 +77,12 @@ type SlackBot (data:      WordData,
                             words 
                             |> data.Tokenize 
                             |> ArrayNDHost.ofList
-                            |> ArrayND.reshape [1; -1]
+                            |> ArrayND.reshape [1L; -1L]
                             |> ArrayNDCuda.toDev
 
                         // generate and detokenize
                         let genTokens = model.Generate seed {Words=startTokens}
-                        let genTokens = genTokens.Words.[0, *] |> ArrayNDHost.fetch 
+                        let genTokens = genTokens.Words.[0L, *] |> ArrayNDHost.fetch 
                         let genWords = genTokens |> List.ofSeq |> data.Detokenize 
 
                         // format response

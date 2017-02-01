@@ -150,12 +150,12 @@ module CsvLoader =
         | OrderedInt -> idx |> single |> ArrayNDHost.scalar
         | OneHot ->
             match Set.count categorySet with
-            | 1 -> ArrayNDHost.zeros<single> [0]
-            | 2 when idx=0 && not isTarget -> ArrayNDHost.zeros<single> [1]
-            | 2 when idx=1 && not isTarget -> ArrayNDHost.ones<single> [1]
+            | 1 -> ArrayNDHost.zeros<single> [0L]
+            | 2 when idx=0 && not isTarget -> ArrayNDHost.zeros<single> [1L]
+            | 2 when idx=1 && not isTarget -> ArrayNDHost.ones<single> [1L]
             | _ ->
-                let v = ArrayNDHost.zeros<single> [Set.count categorySet]
-                v.[[idx]] <- 1.0f
+                let v = ArrayNDHost.zeros<single> [Set.count categorySet |> int64]
+                v.[[int64 idx]] <- 1.0f
                 v        
 
     let private fieldsToArrayNDs (missing: MissingHandling) (categoryEncoding: CategoryEnconding) 
@@ -174,9 +174,9 @@ module CsvLoader =
                 let isTarget = targetCols |> List.contains colIdx
                 match col, colType with
                 | Category c, Categorical cs -> categoryArrayND categoryEncoding cs isTarget categoryTable.[c]
-                | Number n, Numerical -> n |> single |> ArrayNDHost.scalar |> ArrayND.reshape [1]
+                | Number n, Numerical -> n |> single |> ArrayNDHost.scalar |> ArrayND.reshape [1L]
                 | Missing, Categorical cs -> categoryArrayND categoryEncoding cs isTarget 0
-                | Missing, Numerical -> ArrayNDHost.zeros<single> [1]
+                | Missing, Numerical -> ArrayNDHost.zeros<single> [1L]
                 | _ -> failwithf "data inconsistent with column type: %A for %A" col colType))
 
     let private toCsvSamples (targetCols: int list) (data: seq<ArrayNDHostT<single> list>) =

@@ -44,16 +44,16 @@ let ``Eval: sum`` () =
 
     printfn "======= Testing evaluation sum:"
 
-    let is = SizeSpec.fix 3
-    let js = SizeSpec.fix 3
+    let is = SizeSpec.fix 3L
+    let js = SizeSpec.fix 3L
 
     let k = ElemExpr.idx 0   
     let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
-    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
+    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1L) (x [l; k]))
 
     let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
-    let xVal = xVal + ArrayNDHost.ones [3; 3]
+    let xVal = xVal + ArrayNDHost.ones [3L; 3L]
     let res = ElemExprHostEval.eval expr [xVal] [xVal.Shape.[0]]
 
     printfn "Expr:\n%A" expr
@@ -114,13 +114,13 @@ let ``Deriv: sum`` () =
 
     printfn "======= Testing derivative sum:"
 
-    let is = SizeSpec.fix 3
-    let js = SizeSpec.fix 3
+    let is = SizeSpec.fix 3L
+    let js = SizeSpec.fix 3L
 
     let k = ElemExpr.idx 0   
     let x = ElemExpr.argElem<float> 0
     let l = ElemExpr.sumIdx "l"
-    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1) (x [l; k]))
+    let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1L) (x [l; k]))
     let dExpr = ElemExprDeriv.buildDerivElemExpr expr [is] 1
 
     printfn "Expr:\n%A" expr
@@ -135,8 +135,8 @@ let ``Eval and deriv: KSE`` () =
 
     printfn "======= Testing KSE:"
 
-    let nGps = SizeSpec.fix 1
-    let nSmpls = SizeSpec.fix 3
+    let nGps = SizeSpec.fix 1L
+    let nSmpls = SizeSpec.fix 3L
     let gp = ElemExpr.idx 0   
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
@@ -153,16 +153,16 @@ let ``Eval and deriv: KSE`` () =
 
     let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
     let lVal = [0.5] |> ArrayNDHost.ofList
-    let kseVal = ElemExprHostEval.eval kse [xVal; lVal] [1; 3; 3]
+    let kseVal = ElemExprHostEval.eval kse [xVal; lVal] [1L; 3L; 3L]
 
     printfn "x=\n%A" xVal
     printfn "l=\n%A" lVal
     printfn "kse=\n%A" kseVal
 
-    let dKseVal = kseVal |> ArrayND.reshape [1; 1; 3; 3]
+    let dKseVal = kseVal |> ArrayND.reshape [1L; 1L; 3L; 3L]
 
-    let dKSe0Val = ElemExprHostEval.eval dKse.[0] [xVal; lVal; dKseVal] [1; 1; 3]
-    let dKSe1Val = ElemExprHostEval.eval dKse.[1] [xVal; lVal; dKseVal] [1; 1]
+    let dKSe0Val = ElemExprHostEval.eval dKse.[0] [xVal; lVal; dKseVal] [1L; 1L; 3L]
+    let dKSe1Val = ElemExprHostEval.eval dKse.[1] [xVal; lVal; dKseVal] [1L; 1L]
     printfn "dkse / dx=\n%A" dKSe0Val
     printfn "dkse / dl=\n%A" dKSe1Val
 
@@ -171,8 +171,8 @@ let ``Eval and deriv: KSE`` () =
 let ``Codegen: KSE`` () =  
     printfn "======= Testing KSE codegen:"
 
-    let nGps = SizeSpec.fix 1
-    let nSmpls = SizeSpec.fix 3
+    let nGps = SizeSpec.fix 1L
+    let nSmpls = SizeSpec.fix 3L
     let gp = ElemExpr.idx 0   
     let smpl1 = ElemExpr.idx 1
     let smpl2 = ElemExpr.idx 2
@@ -306,8 +306,8 @@ let kseElemExpr () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: KSE`` () =    
-    let nGps = 2
-    let nSmpls = 3
+    let nGps = 2L
+    let nSmpls = 3L
     requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
         let elemExpr = kseElemExpr ()
         let kse = 
@@ -319,8 +319,8 @@ let ``Trace compare: KSE`` () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: dKSE/dX`` () =    
-    let nGps = 2
-    let nSmpls = 3
+    let nGps = 2L
+    let nSmpls = 3L
     requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
         let elemExpr = kseElemExpr ()
         let kse = 
@@ -333,8 +333,8 @@ let ``Trace compare: dKSE/dX`` () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: dKSE/dL`` () =    
-    let nGps = 2
-    let nSmpls = 3
+    let nGps = 2L
+    let nSmpls = 3L
     requireEqualTracesWithRandomData [[nGps; nSmpls]; [nGps]] (fun [xTensor; lTensor] ->
         let elemExpr = kseElemExpr ()
         let kse = 
@@ -357,8 +357,8 @@ let ``Eval and derive: lkse`` () =
 
     printfn "======= Testing lk:"
 
-    let nGps = SizeSpec.fix 2
-    let nSmpls = SizeSpec.fix 3
+    let nGps = SizeSpec.fix 2L
+    let nSmpls = SizeSpec.fix 3L
     let gp = ElemExpr.idx 0
     let smpl = ElemExpr.idx 1
 
@@ -379,7 +379,7 @@ let ``Eval and derive: lkse`` () =
     let lVal = [0.5;0.6] |> ArrayNDHost.ofList
     let muVal = [1.0;0.5] |> ArrayNDHost.ofList
     let sigmaVal = [[0.4;0.2];[0.2;0.8]] |> ArrayNDHost.ofList2D
-    let lkseVal = ElemExprHostEval.eval lkse [muVal;sigmaVal;xVal;lVal] [2;3]
+    let lkseVal = ElemExprHostEval.eval lkse [muVal;sigmaVal;xVal;lVal] [2L; 3L]
 
     printfn "mu=\n%A" muVal
     printfn "sigma=\n%A" sigmaVal
@@ -387,12 +387,12 @@ let ``Eval and derive: lkse`` () =
     printfn "l=\n%A" lVal
     printfn "lkse=\n%A" lkseVal
 
-    let dlkseVal = lkseVal |> ArrayND.reshape [1; 2; 3]
+    let dlkseVal = lkseVal |> ArrayND.reshape [1L; 2L; 3L]
 
-    let dlk0Val = ElemExprHostEval.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
-    let dlk1Val = ElemExprHostEval.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;2]
-    let dlk2Val = ElemExprHostEval.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2;3]
-    let dlk3Val = ElemExprHostEval.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1;2]
+    let dlk0Val = ElemExprHostEval.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L]
+    let dlk1Val = ElemExprHostEval.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L; 2L]
+    let dlk2Val = ElemExprHostEval.eval dLkse.[2] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L; 3L]
+    let dlk3Val = ElemExprHostEval.eval dLkse.[3] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L]
     printfn "dlkse / dmu=\n%A" dlk0Val
     printfn "dlkse / dsigma=\n%A" dlk1Val
     printfn "dlkse / dx=\n%A" dlk2Val
@@ -411,8 +411,8 @@ let ``DerivTest: GP Predict`` () =
         Expr.elements [sizeX; sizeY] kse [x; y; l; sigf]
 
     // variables
-    let nTrnSmpls = SizeSpec.fix 5
-    let nTstSmpls = SizeSpec.fix 4
+    let nTrnSmpls = SizeSpec.fix 5L
+    let nTstSmpls = SizeSpec.fix 4L
     let l = Expr.var<double> "l" []
     let sigf = Expr.var<double> "sigf" []
     let x = Expr.var<double> "x" [nTrnSmpls]
@@ -426,8 +426,8 @@ let ``DerivTest: GP Predict`` () =
     let mean = k' .* (Expr.invert k) .* t
 
     // do check
-    let xv = ArrayNDHost.linSpaced -4.0 4.0 5
-    let x'v = ArrayNDHost.linSpaced -3.0 3.0 4
+    let xv = ArrayNDHost.linSpaced -4.0 4.0 5L
+    let x'v = ArrayNDHost.linSpaced -3.0 3.0 4L
     let varEnv = VarEnv.ofSeq [l, ArrayNDHost.scalar 1.0
                                sigf, ArrayNDHost.scalar 1.0
                                x, xv
@@ -452,8 +452,8 @@ let ``DerivTest: GP Predict2`` () =
         Expr.elements [sizeX; sizeY] kse [x; y; l; sigf]
 
     // variables
-    let nTrnSmpls = SizeSpec.fix 15
-    let nTstSmpls = SizeSpec.fix 10
+    let nTrnSmpls = SizeSpec.fix 15L
+    let nTstSmpls = SizeSpec.fix 10L
     let l = Expr.scalar 1.0
     let sigf = Expr.scalar 1.0
     let x = Expr.var<double> "x" [nTrnSmpls]
@@ -472,8 +472,8 @@ let ``DerivTest: GP Predict2`` () =
     printfn "%A" dmean
 
     // do check
-    let xv = ArrayNDHost.linSpaced -4.0 4.0 15
-    let x'v = ArrayNDHost.linSpaced -3.0 3.0 10
+    let xv = ArrayNDHost.linSpaced -4.0 4.0 15L
+    let x'v = ArrayNDHost.linSpaced -3.0 3.0 10L
     let varEnv = VarEnv.ofSeq [                               
                                x, xv
                                t, xv |> ArrayND.map tanh

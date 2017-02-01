@@ -35,9 +35,9 @@ let main argv =
     let target : ExprT = mb.Var<single> "Target" [nBatch; nClass]
 
     // instantiate model
-    mb.SetSize nInput mnist.Trn.[0].Input.Shape.[0]
-    mb.SetSize nClass mnist.Trn.[0].Target.Shape.[0]
-    mb.SetSize nHidden 100
+    mb.SetSize nInput mnist.Trn.[0L].Input.Shape.[0]
+    mb.SetSize nClass mnist.Trn.[0L].Target.Shape.[0]
+    mb.SetSize nHidden 100L
     let mi = mb.Instantiate device
 
     // loss expression
@@ -56,7 +56,7 @@ let main argv =
         Train.defaultCfg with
             Seed               = 100   
             //BatchSize          = 10 
-            BatchSize          = 10000 
+            BatchSize          = 10000L
             LossRecordInterval = 10                                   
             Termination        = Train.ItersWithoutImprovement 100
             MinImprovement     = 1e-7  

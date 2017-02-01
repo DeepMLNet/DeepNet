@@ -6,6 +6,20 @@
 #include <stdio.h>
 #endif
 
+#ifdef __CUDACC_RTC__
+// integer types
+typedef char int8_t;
+typedef unsigned char uint8_t;
+typedef short int16_t;
+typedef unsigned short uint16_t;
+typedef int int32_t;
+typedef unsigned int uint32_t;
+typedef long long int64_t;
+typedef unsigned long long uint64_t;
+#else
+#include <stdint.h>
+#endif
+
 #define _dev __host__ __device__ __forceinline__ 
 #define _devonly __device__ __forceinline__
 
@@ -33,8 +47,8 @@ template <typename T> T tex2D(cudaTextureObject_t texObj, float x, float y);
 template <typename T> T tex3D(cudaTextureObject_t texObj, float x, float y, float z);
 #endif
 
-
-typedef int idx_t;
+// type for indices and sizes
+typedef int64_t idx_t;
 
 
 template <typename T>

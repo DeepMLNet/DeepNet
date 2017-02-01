@@ -27,9 +27,9 @@ module RNNLang =
 //    let NMaxSamples = 10000
 
     //let NWords      = 300
-    let NBatch      = 1000
-    let NSteps      = 35
-    let NRecurrent  = 100
+    let NBatch      = 1000L
+    let NSteps      = 35L
+    let NRecurrent  = 100L
     //let NMaxSamples = 1000
 
 
@@ -88,8 +88,8 @@ module RNNLang =
                 | Some state -> state :> IArrayNDT
                 | None -> zeroInitial :> IArrayNDT
             let n = smpl.Words.Shape.[1]
-            VarEnv.ofSeq [input,   smpl.Words.[*, 0 .. n-2] :> IArrayNDT
-                          target,  smpl.Words.[*, 1 .. n-1] :> IArrayNDT
+            VarEnv.ofSeq [input,   smpl.Words.[*, 0L .. n-2L] :> IArrayNDT
+                          target,  smpl.Words.[*, 1L .. n-1L] :> IArrayNDT
                           initial, state]
                           
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg

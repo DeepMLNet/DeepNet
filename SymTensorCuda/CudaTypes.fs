@@ -23,7 +23,7 @@ module Types =
         /// base memory
         Base: MemManikinT
         /// offset in elements
-        Offset: int
+        Offset: int64
     }
 
     /// pre-allocated host memory 
@@ -31,7 +31,7 @@ module Types =
     /// host memory pointer
     type HostMemPtrT = {
         Base: HostExternalMemT
-        Offset: int
+        Offset: int64
     }
 
     /// a CUDA texture object
@@ -58,7 +58,7 @@ module Types =
         /// storage location of variables
         VarStorLoc:                 Map<VarSpecT, ArrayLocT>
         /// optional stride specification for variables
-        VarStrides:                 Map<VarSpecT, int list>
+        VarStrides:                 Map<VarSpecT, int64 list>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
         /// texture objects
@@ -130,15 +130,15 @@ module Types =
     /// CUDA device memory range
     type DevMemRngT = {
         DeviceMem:              CudaDeviceVariable<byte>
-        OffsetInBytes:          int
-        LengthInBytes:          int
+        OffsetInBytes:          int64
+        LengthInBytes:          int64
     }
 
     /// CUDA host memory range
     type HostMemRngT = {
         HostMem:                CudaRegisteredHostMemory<byte>
-        OffsetInBytes:          int
-        LengthInBytes:          int
+        OffsetInBytes:          int64
+        LengthInBytes:          int64
     }
 
     /// BLAS transpose operation
@@ -161,7 +161,7 @@ module CudaCompileEnv =
 
     /// creates a new texture object
     let newTextureObject contents descriptor (env: CudaCompileEnvT) =
-        if not (ArrayND.isC contents && contents.Layout.Offset = 0) then
+        if not (ArrayND.isC contents && contents.Layout.Offset = 0L) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
             Contents   = contents
@@ -202,14 +202,14 @@ module CudaExecEnv =
     /// Gets device memory and offset in bytes for an internal allocation or external reference.
     let getDevMem (env: CudaExecEnvT) (memManikin: MemManikinT) =
         match memManikin with
-        | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0), 0
-        | MemAlloc im -> env.InternalMem.[im], 0
+        | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0L), SizeT 0L), 0L
+        | MemAlloc im -> env.InternalMem.[im], 0L
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            ev.Storage.ByteData, (ArrayND.offset ev) * Marshal.SizeOf (ev.DataType)
+            ev.Storage.ByteData, (ArrayND.offset ev) * int64 (Marshal.SizeOf (ev.DataType))
         | MemConst mc -> 
             let ary = env.ConstantValues.[mc]
-            ary.Storage.ByteData, 0            
+            ary.Storage.ByteData, 0L            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -220,7 +220,7 @@ module CudaExecEnv =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]
-            if ArrayND.offset hv = 0 && ArrayND.isC hv then
+            if ArrayND.offset hv = 0L && ArrayND.isC hv then
                 ArrayNDHostReg.getCudaRegisteredMemory hv
             else
                 failwithf "host variable %A was expected to be contiguous \
@@ -322,7 +322,7 @@ module ArgTemplates =
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. int32"
                 if ArrayND.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
-                if ArrayND.offset manikin <> 0 then 
+                if ArrayND.offset manikin <> 0L then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must have zero offset"
             | None -> ()
 
@@ -401,12 +401,12 @@ module ArgTemplates =
 
         let stride, shape = ArrayND.stride manikin, ArrayND.shape manikin
         match stride.[nDims-2 ..], shape.[nDims-2 ..] with
-        | [0; _], _ -> 
+        | [0L; _], _ -> 
             failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
         | [m; _], [_; ms] when m < ms -> 
             failwithf "ArrayND for use with BLAS must have leading stride >= last dimension \
                        but has shape %A and stride %A" shape stride
-        | [_; n], _ when n <> 1 -> 
+        | [_; n], _ when n <> 1L -> 
             failwithf "ArrayND for use with BLAS must be continguous in last dimension \
                        but has shape %A and stride stride %A" shape stride
         | _ , _-> ()
@@ -452,8 +452,8 @@ module ArgTemplates =
         member this.GetVar env =
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin
             let offset = memOffset + ArrayNDManikin.offsetInBytes manikin
-            new CudaDeviceVariable<single>(devVar.DevicePointer + BasicTypes.SizeT(offset), 
-                                            devVar.SizeInBytes - offset)
+            new CudaDeviceVariable<single>(devVar.DevicePointer + SizeT offset, 
+                                           devVar.SizeInBytes - SizeT offset)
 
         interface ICudaArgTmpl with
             member this.CPPTypeName = "float"
@@ -469,12 +469,12 @@ module ArgTemplates =
         let rowDim = nDims - 2
         let colDim = nDims - 1
         let batchShp = manikin.Shape.[0 .. nDims-3]
-        let nSmpls = batchShp |> List.fold (*) 1      
+        let nSmpls = batchShp |> List.fold (*) 1L      
 
         do checkBlasManikin true manikin   
             
         new (manikin: ArrayNDManikinT, memAllocator: MemAllocatorT) =
-            let nSmpls = manikin.Shape.[0 .. manikin.NDims-3] |> List.fold (*) 1      
+            let nSmpls = manikin.Shape.[0 .. manikin.NDims-3] |> List.fold (*) 1L      
             let ptrAryDevMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocDev
             let ptrAryHostMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocRegHost
             BlasTransposedMatrixBatchTmpl(manikin, ptrAryDevMem, ptrAryHostMem)        
@@ -502,14 +502,14 @@ module ArgTemplates =
         member this.GetPointerArrayValues env = 
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
             [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
-                let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0; 0]) manikin
+                let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0L; 0L]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
 
         member this.PointerArrayCacheKey env =
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
             devVar.DevicePointer, memOffset
 
-        member val PointerArrayCacheKeyOnDevice : (CUdeviceptr * int) option = None with get, set
+        member val PointerArrayCacheKeyOnDevice : (CUdeviceptr * int64) option = None with get, set
             
         member this.GetPointerArrayDevice env = 
             let devVar, _ = CudaExecEnv.getDevMem env ptrAryDevMem
@@ -526,7 +526,7 @@ module ArgTemplates =
     /// BLAS int array. For example it is used for pivot and info arrays of CUDA LAPACK routines.
     type BlasIntArrayTmpl (mem: MemManikinT) =
 
-        new (size: int, memAllocator: MemAllocatorT) = 
+        new (size: int64, memAllocator: MemAllocatorT) = 
             let mem = memAllocator TypeName.ofType<int> size MemAllocDev
             BlasIntArrayTmpl mem
 
@@ -548,6 +548,7 @@ module ArgTemplates =
             member this.GetArg env strm = 
                 match value with
                 | ConstInt    n -> ConstEOpArg n |> box
+                | ConstInt64  n -> ConstEOpArg n |> box
                 | ConstDouble n -> ConstEOpArg n |> box
                 | ConstSingle n -> ConstEOpArg n |> box
                 | ConstBool   n -> ConstEOpArg n |> box

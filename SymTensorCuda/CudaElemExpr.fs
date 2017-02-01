@@ -22,6 +22,7 @@ module CudaElemExpr =
         try
             match tn with
             | _ when tn = TypeName.ofType<int> -> sprintf "%d" (c.GetConvertedValue<int>())
+            | _ when tn = TypeName.ofType<int64> -> sprintf "%d" (c.GetConvertedValue<int64>())
             | _ when tn = TypeName.ofType<single> -> sprintf "%e" (c.GetConvertedValue<single>())
             | _ when tn = TypeName.ofType<double> -> sprintf "%e" (c.GetConvertedValue<double>())
             | _ -> failwithf "unsupported type: %A" tn
@@ -32,7 +33,8 @@ module CudaElemExpr =
 
     let private cppType tn =
         match tn with
-        | _ when tn = TypeName.ofType<int> -> "int"
+        | _ when tn = TypeName.ofType<int> -> "int32_t"
+        | _ when tn = TypeName.ofType<int64> -> "int64_t"
         | _ when tn = TypeName.ofType<single> -> "float"
         | _ when tn = TypeName.ofType<double> -> "double"
         | _ -> failwithf "unsupported type: %A" tn
@@ -40,12 +42,12 @@ module CudaElemExpr =
 
     let generateSizeSpecCode (sizeSymVars: Map<SizeSymbolT, VarNameT>) (ss: SizeSpecT) =
         match SizeSpec.tryEval ss with
-        | Some v -> sprintf "%d" v
+        | Some v -> sprintf "%dLL" v
         | None ->
             match SizeSpec.simplify ss with 
-            | Base (Fixed c) -> sprintf "%d" c.IntValue
+            | Base (Fixed c) -> sprintf "%dLL" c.IntValue
             | Base (Sym sym) -> sizeSymVars.[sym]
-            | Broadcast -> "1"
+            | Broadcast -> "1LL"
             | Multinom m ->
                 m.Products
                 |> Map.toSeq
@@ -53,9 +55,9 @@ module CudaElemExpr =
                     sp.Symbols
                     |> Map.toSeq
                     |> Seq.map (fun (sym, pow) ->
-                        [for p=0 to pow-1 do yield sizeSymVars.[sym]]
+                        [for p in 0L .. pow-1L do yield sizeSymVars.[sym]]
                         |> String.concat "*")
-                    |> Seq.append (Seq.singleton (sprintf "%d" fac.IntValue))
+                    |> Seq.append (Seq.singleton (sprintf "%dLL" fac.IntValue))
                     |> String.concat " * ")
                 |> String.concat " + "
 

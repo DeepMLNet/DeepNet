@@ -75,7 +75,7 @@ module NPYFile =
         let m = Regex.Match(shapeStr, shapeRegex)
         let rec extractShape (m: Match) =
             if m.Success then
-                (int m.Value) :: extractShape (m.NextMatch())
+                (int64 m.Value) :: extractShape (m.NextMatch())
             else []
         let shp = extractShape m
         
@@ -106,16 +106,16 @@ module NPYFile =
         let nElems = ArrayNDLayout.nElems layout
 
         // read data
-        let sizeInBytes = nElems * sizeof<'T>
-        let dataBytes : byte[] = Array.zeroCreate sizeInBytes
-        let nRead = stream.Read (dataBytes, 0, sizeInBytes)
-        if nRead <> sizeInBytes then
+        let sizeInBytes = nElems * sizeof64<'T>
+        let dataBytes : byte[] = Array.zeroCreate (int32 sizeInBytes)
+        let nRead = stream.Read (dataBytes, 0, int32 sizeInBytes)
+        if nRead <> int32 sizeInBytes then
             failwithf "premature end of .npy file after reading %d bytes but expecting %d bytes in %s"
                 nRead sizeInBytes name
 
         // convert to correct data type
-        let data : 'T[] = Array.zeroCreate nElems
-        Buffer.BlockCopy (dataBytes, 0, data, 0, sizeInBytes)
+        let data : 'T[] = Array.zeroCreate (int32 nElems)
+        Buffer.BlockCopy (dataBytes, 0, data, 0, int32 sizeInBytes)
 
         // create ArrayNDHostT
         ArrayNDHostT (layout, data)

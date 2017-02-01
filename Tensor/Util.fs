@@ -179,6 +179,10 @@ module UtilTypes =
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
+    /// size of 'T as int64
+    let sizeof64<'T> =
+        int64 sizeof<'T>
+
     /// Default value for options. Returns b if a is None, else the value of a.
     let inline (|?) (a: 'a option) b = 
         match a with
@@ -274,18 +278,16 @@ module Util =
                      ErrorModes.SEM_NOOPENFILEERRORBOX)
         |> ignore
 
-    /// converts sequence of ints to sequence of strings
-    let intToStrSeq items =
-        Seq.map (sprintf "%d") items
-
     /// C++ data type for given type
     let cppType (typ: System.Type) = 
         match typ with
         | _ when typ = typeof<double>   -> "double"
         | _ when typ = typeof<single>   -> "float"
-        | _ when typ = typeof<int32>    -> "int"
-        | _ when typ = typeof<uint32>   -> "unsigned int"
-        | _ when typ = typeof<byte>     -> "unsigned char"
+        | _ when typ = typeof<int32>    -> "int32_t"
+        | _ when typ = typeof<uint32>   -> "uint32_t"
+        | _ when typ = typeof<int64>    -> "int64_t"
+        | _ when typ = typeof<uint64>   -> "uint64_t"
+        | _ when typ = typeof<byte>     -> "uint8_t"
         | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
 

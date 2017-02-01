@@ -16,7 +16,7 @@ module DerivCheck =
 
         let jac = ArrayND.zerosOfSameType [yElems; xElems] x
         let xd = x |> ArrayND.reshape [xElems] |> ArrayND.copy
-        for xi = 0 to xElems - 1 do
+        for xi in 0L .. xElems-1L do
             let xiVal = xd.[[xi]]
 
             // f (x+epsilon)

@@ -8,20 +8,20 @@ module ArrayNDLayoutTypes =
     // layout (shape, offset, stride) of an ArrayND
     type ArrayNDLayoutT = {
         /// shape
-        Shape:  int list
+        Shape:  int64 list
         /// offset in elements
-        Offset: int
+        Offset: int64
         /// stride in elements
-        Stride: int list
+        Stride: int64 list
     }
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]
     type RangeT = 
         /// single element
-        | RngElem of int
+        | RngElem of int64
         /// range from / to (including)
-        | Rng of (int option) * (int option)
+        | Rng of (int64 option) * (int64 option)
         /// insert broadcastable axis of size 1
         | RngNewAxis
         /// fill (...)
@@ -49,13 +49,13 @@ module ArrayNDLayout =
         if a.Shape.Length <> a.Stride.Length then
             failwithf "shape and stride must have same number of entries: %A" a
         for s in a.Shape do
-            if s < 0 then failwithf "shape cannot have negative entries: %A" a
+            if s < 0L then failwithf "shape cannot have negative entries: %A" a
 
     /// checks that the given index is valid for the given shape
     let inline checkIndex shp idx =
         if List.length shp <> List.length idx then
             failwithf "index %A has other dimensionality than shape %A" idx shp
-        if not (List.forall2 (fun s i -> 0 <= i && i < s) shp idx) then 
+        if not (List.forall2 (fun s i -> 0L <= i && i < s) shp idx) then 
             failwithf "index %A out of range for shape %A" idx shp
 
     /// address of element
@@ -76,7 +76,7 @@ module ArrayNDLayout =
     let inline nDims a = List.length (shape a)
 
     /// number of elements 
-    let inline nElems a = List.fold (*) 1 (shape a)
+    let inline nElems a = List.fold (*) 1L (shape a)
 
     /// checks that the given axis is valid 
     let inline checkAxis ax a =
@@ -87,7 +87,7 @@ module ArrayNDLayout =
     let rec allIdxOfShape shp = seq {
         match shp with
         | l::ls ->
-            for i=0 to l - 1 do
+            for i=0L to l - 1L do
                 for is in allIdxOfShape ls do
                     yield i::is
         | [] -> yield []
@@ -99,7 +99,7 @@ module ArrayNDLayout =
 
     /// all indices of the given dimension
     let inline allIdxOfDim dim a =
-        { 0 .. a.Shape.[dim] - 1}
+        { 0L .. a.Shape.[dim] - 1L}
 
     /// Computes the strides for the given shape using the specified ordering.
     /// The axis that is first in the ordering gets stride 1.
@@ -107,7 +107,7 @@ module ArrayNDLayout =
     /// that appears last in the ordering.
     /// A C-order stride corresponds to the ordering: [n; n-1; ...; 2; 1; 0].
     /// A Fortran-order stride corresponds to the ordering: [0; 1; 2; ...; n-1; n].
-    let orderedStride (shape: int list) (order: int list) =
+    let orderedStride (shape: int64 list) (order: int list) =
         if not (Permutation.is order) then
             failwithf "the stride order %A is not a permutation" order
         if order.Length <> shape.Length then
@@ -116,36 +116,36 @@ module ArrayNDLayout =
             match order with
             | o :: os -> cumElems :: build (cumElems * shape.[o]) os
             | [] -> []
-        build 1 order |> List.permute (fun i -> order.[i])
+        build 1L order |> List.permute (fun i -> order.[i])
 
     /// computes the stride given the shape for the ArrayND to be in C-order (row-major)
-    let cStride (shape: int list) =
+    let cStride (shape: int64 list) =
         orderedStride shape (List.rev [0 .. shape.Length-1])
 
     /// computes the stride given the shape for the ArrayND to be in Fortran-order (column-major)
-    let fStride (shape: int list) =
+    let fStride (shape: int64 list) =
         orderedStride shape [0 .. shape.Length-1]
 
     /// a ArrayND layout of the given shape and stride order
     let newOrdered shp strideOrder =
-        {Shape=shp; Stride=orderedStride shp strideOrder; Offset=0}
+        {Shape=shp; Stride=orderedStride shp strideOrder; Offset=0L}
 
     /// a C-order (row-major) ArrayND layout of the given shape 
     let newC shp =
-        {Shape=shp; Stride=cStride shp; Offset=0}
+        {Shape=shp; Stride=cStride shp; Offset=0L}
 
     /// a Fortran-order (column-major) ArrayND layout of the given shape 
     let newF shp =
-        {Shape=shp; Stride=fStride shp; Offset=0}
+        {Shape=shp; Stride=fStride shp; Offset=0L}
 
     /// an ArrayND layout for an empty (zero elements) vector (1D)
     let emptyVector =
-        {Shape=[0]; Stride=[1]; Offset=0;}
+        {Shape=[0L]; Stride=[1L]; Offset=0L}
 
     /// True if strides are equal at all dimensions with size > 1.
-    let stridesEqual (shp: int list) (aStr: int list) (bStr: int list) =
+    let stridesEqual (shp: int64 list) (aStr: int64 list) (bStr: int64 list) =
         List.zip3 shp aStr bStr
-        |> List.forall (fun (s, a, b) -> if s > 1 then a = b else true)
+        |> List.forall (fun (s, a, b) -> if s > 1L then a = b else true)
 
     /// true if the ArrayND is contiguous
     let isC a = 
@@ -162,18 +162,18 @@ module ArrayNDLayout =
 
     /// adds a new dimension of size one to the left
     let padLeft a =
-        {a with Shape=1::a.Shape; Stride=0::a.Stride}
+        {a with Shape=1L::a.Shape; Stride=0L::a.Stride}
 
     /// adds a new dimension of size one to the right
     let padRight a =
-        {a with Shape=a.Shape @ [1]; Stride=a.Stride @ [0]}
+        {a with Shape=a.Shape @ [1L]; Stride=a.Stride @ [0L]}
 
     /// Inserts an axis of size 1 before the specified position.
     let insertAxis ax a =
         if not (0 <= ax && ax <= nDims a) then
             failwithf "axis %d out of range for array with shape %A" ax a.Shape
-        {a with Shape = a.Shape |> List.insert ax 1
-                Stride = a.Stride |> List.insert ax 0}        
+        {a with Shape = a.Shape |> List.insert ax 1L
+                Stride = a.Stride |> List.insert ax 0L}        
 
     /// cuts one dimension from the left
     let cutLeft a =
@@ -188,9 +188,9 @@ module ArrayNDLayout =
 
     /// broadcast the given dimension to the given size
     let broadcastDim dim size a =
-        if size < 0 then invalidArg "size" "size must be positive"
+        if size < 0L then invalidArg "size" "size must be positive"
         match (shape a).[dim] with
-        | 1 -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0 a.Stride}
+        | 1L -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0L a.Stride}
         | _ -> failwithf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
 
     /// pads shapes from the left until they have same rank
@@ -221,8 +221,8 @@ module ArrayNDLayout =
                     (shape ain) (shape bin) d |> CannotBroadcast |> raise                    
             match (shape a).[d], (shape b).[d] with
             | al, bl when al = bl -> ()
-            | al, bl when al = 1 -> a <- broadcastDim d bl a
-            | al, bl when bl = 1 -> b <- broadcastDim d al b
+            | al, bl when al = 1L -> a <- broadcastDim d bl a
+            | al, bl when bl = 1L -> b <- broadcastDim d al b
             | _ -> 
                 sprintf "cannot broadcast shapes %A and %A to same size in dimensions %A" 
                     (shape ain) (shape bin) dims |> CannotBroadcast |> raise
@@ -236,8 +236,8 @@ module ArrayNDLayout =
                 sprintf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
                 |> CannotBroadcast |> raise 
             let ls = sas |> List.map (fun sa -> sa.Shape.[d])
-            if ls |> List.exists ((=) 1) then
-                let nonBc = ls |> List.filter (fun l -> l <> 1)
+            if ls |> List.exists ((=) 1L) then
+                let nonBc = ls |> List.filter (fun l -> l <> 1L)
                 match Set nonBc |> Set.count with
                 | 0 -> ()
                 | 1 ->
@@ -286,14 +286,14 @@ module ArrayNDLayout =
         for d = 0 to bsDim - 1 do
             match (shape a).[d], bs.[d] with
             | al, bl when al = bl -> ()
-            | al, bl when al = 1 -> a <- broadcastDim d bl a
+            | al, bl when al = 1L -> a <- broadcastDim d bl a
             | _ -> failwithf "cannot broadcast shape %A to shape %A" (shape ain) bs
         a
 
     /// returns true if at least one dimension is broadcasted
     let isBroadcasted a =
         (shape a, stride a)
-        ||> List.exists2 (fun shp str -> str = 0 && shp > 1)
+        ||> List.exists2 (fun shp str -> str = 0L && shp > 1L)
 
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
@@ -302,19 +302,19 @@ module ArrayNDLayout =
             invalidArg "a" "layout must be contiguous for reshape"
 
         let shp =
-            match List.filter ((=) -1) shp |> List.length with
+            match List.filter ((=) -1L) shp |> List.length with
             | 0 -> shp
             | 1 ->
-                let elemsSoFar = List.fold (*) -1 shp
+                let elemsSoFar = List.fold (*) -1L shp
                 let elemsNeeded = nElems a
-                if elemsNeeded % elemsSoFar = 0 then
-                    List.map (fun s -> if s = -1 then elemsNeeded / elemsSoFar else s) shp
+                if elemsNeeded % elemsSoFar = 0L then
+                    List.map (fun s -> if s = -1L then elemsNeeded / elemsSoFar else s) shp
                 else
                     failwithf "cannot reshape from %A to %A because %d / %d is not an integer" 
                         (shape a) shp elemsNeeded elemsSoFar
             | _ -> failwithf "only the size of one dimension can be determined automatically, but shape was %A" shp
           
-        let shpElems = List.fold (*) 1 shp
+        let shpElems = List.fold (*) 1L shp
         if shpElems <> nElems a then
             failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
                 (shape a) (nElems a) shp shpElems
@@ -347,14 +347,14 @@ module ArrayNDLayout =
     /// Reverses the elements in the specified dimension.
     let reverseAxis ax a =
         checkAxis ax a
-        {a with Offset = a.Offset + (a.Shape.[ax] - 1) * a.Stride.[ax]
+        {a with Offset = a.Offset + (a.Shape.[ax] - 1L) * a.Stride.[ax]
                 Stride = a.Stride |> List.set ax (-a.Stride.[ax])}
 
     /// creates a subview layout
     let rec view ranges a =
         let checkElementRange isEnd nElems i =
-            let nElems = if isEnd then nElems + 1 else nElems
-            if not (0 <= i && i < nElems) then
+            let nElems = if isEnd then nElems + 1L else nElems
+            if not (0L <= i && i < nElems) then
                 failwithf "index %d out of range in slice %A for shape %A" i ranges (shape a)
         let failIncompatible () =
             failwithf "slice %A is incompatible with shape %A" ranges (shape a)
@@ -376,9 +376,9 @@ module ArrayNDLayout =
                              Stride = ra.Stride;
                              Shape = ra.Shape} 
                 | Rng(start, stop) ->
-                    let start = defaultArg start 0
-                    let stop = defaultArg stop (shp - 1)
-                    if start = stop + 1 then
+                    let start = defaultArg start 0L
+                    let stop = defaultArg stop (shp - 1L)
+                    if start = stop + 1L then
                         // allow slices starting at the element past the last 
                         // element and are empty
                         checkElementRange true shp start
@@ -386,13 +386,13 @@ module ArrayNDLayout =
                         checkElementRange false shp start
                     checkElementRange true shp stop
                     {ra with Offset = ra.Offset + start*str;
-                                Shape = (stop + 1 - start)::ra.Shape;
-                                Stride = str::ra.Stride} 
+                              Shape = (stop + 1L - start)::ra.Shape;
+                              Stride = str::ra.Stride} 
                 | RngAllFill | RngNewAxis -> failwith "impossible"
             | RngNewAxis::rRanges, _, _ ->
                 let ra = recView rRanges a
-                {ra with Shape = 1::ra.Shape; 
-                         Stride = 0::ra.Stride}
+                {ra with Shape = 1L::ra.Shape; 
+                         Stride = 0L::ra.Stride}
             | [], [], _ -> a 
             | _ -> failIncompatible ()         
 
@@ -410,7 +410,7 @@ module ArrayNDLayout =
                     for is, ws in rest do
                         yield RngAll::is, ws
                 else
-                    for i=0 to l - 1 do
+                    for i=0L to l - 1L do
                         for is, ws in rest do
                             yield RngElem i::is, i::ws
             | [] -> yield [], []

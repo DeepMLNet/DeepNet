@@ -69,7 +69,7 @@ module Interpolator =
         if maxArg.Length <> nDims || outside.Length <> nDims then
             failwith "minArg, maxArg and outside have inconsistent lengths"
         if tbl.NDims <> nDims then failwith "interpolation table has wrong number of dimensions"
-        if tbl.Shape |> List.exists (fun e -> e < 2) then failwith "interpolation table must contain at least 2 entries"
+        if tbl.Shape |> List.exists (fun e -> e < 2L) then failwith "interpolation table must contain at least 2 entries"
         match derivative with
         | Some ds -> 
             if ds.Length <> nDims then
@@ -85,7 +85,7 @@ module Interpolator =
             MinArg = minArg
             MaxArg = maxArg
             Resolution = List.zip3 minArg maxArg tbl.Shape
-                         |> List.map (fun (min, max, nElems) -> (max - min) / float (nElems - 1))
+                         |> List.map (fun (min, max, nElems) -> (max - min) / float (nElems - 1L))
             Mode = mode
             Outside = outside
             Derivative = derivative
@@ -136,7 +136,7 @@ module Interpolator =
                                             ArrayND.scalarOfSameType tbl (conv<'T> ip.Resolution.[dd]) 
                                         let zeroShp =
                                             [for d, s in List.indexed tbl.Shape do
-                                                if d = dd then yield 1
+                                                if d = dd then yield 1L
                                                 else yield s]
                                         let zero = ArrayND.zerosOfSameType zeroShp diffTbl
                                         ArrayND.concat dd [diffTbl; zero]
@@ -169,7 +169,7 @@ module Interpolator =
         let tbl : ArrayNDT<'T> = getTable ip
 
         /// returns interpolation in dimensions to the right of leftIdxs
-        let rec interpolateInDim (leftIdxs: int list) (x: float list) =
+        let rec interpolateInDim (leftIdxs: int64 list) (x: float list) =
             let d = leftIdxs.Length
             if d = ip.NDims then
                 conv<float> tbl.[leftIdxs]
@@ -177,15 +177,15 @@ module Interpolator =
                 let pos = (x.[d] - ip.MinArg.[d]) / ip.Resolution.[d]
                 let posLeft = floor pos 
                 let fac = pos - posLeft
-                let idx = int posLeft 
+                let idx = int64 posLeft 
                 match idx, ip.Outside.[d], ip.Mode with
-                | _, Nearest, _ when idx < 0                 -> interpolateInDim (leftIdxs @ [0]) x
-                | _, Zero,    _ when idx < 0                 -> 0.0
-                | _, Nearest, _ when idx > tbl.Shape.[d] - 2 -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1]) x
-                | _, Zero,    _ when idx > tbl.Shape.[d] - 2 -> 0.0
+                | _, Nearest, _ when idx < 0L                  -> interpolateInDim (leftIdxs @ [0L]) x
+                | _, Zero,    _ when idx < 0L                  -> 0.0
+                | _, Nearest, _ when idx > tbl.Shape.[d] - 2L  -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1L]) x
+                | _, Zero,    _ when idx > tbl.Shape.[d] - 2L  -> 0.0
                 | _, _, InterpolateLinearaly -> 
                     let left = interpolateInDim (leftIdxs @ [idx]) x
-                    let right = interpolateInDim (leftIdxs @ [idx+1]) x
+                    let right = interpolateInDim (leftIdxs @ [idx+1L]) x
                     (1.0 - fac) * left + fac * right
                 | _, _, InterpolateToLeft -> 
                     interpolateInDim (leftIdxs @ [idx]) x

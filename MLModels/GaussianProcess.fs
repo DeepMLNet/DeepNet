@@ -56,12 +56,12 @@ module GaussianProcess =
 
 
     ///Iitializes the lengthscale.
-    let  initLengthscale l seed (shp: int list)  : ArrayNDHostT<single> =
+    let  initLengthscale l seed (shp: int64 list)  : ArrayNDHostT<single> =
         ArrayNDHost.scalar l
     
 
     /// Initializes the signal variance.
-    let  initSignalVariance s seed (shp: int list) : ArrayNDHostT<single> =
+    let  initSignalVariance s seed (shp: int64 list) : ArrayNDHostT<single> =
         ArrayNDHost.scalar s
 
 
@@ -128,9 +128,9 @@ module GaussianProcess =
                 let nTrnSmpls =x.NElems
                 let nSmpls = xStar.NElems
                 let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let xLast = x.[nTrnSmpls - 1L] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
                 let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
-                let yLast = y.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
+                let yLast = y.[nTrnSmpls - 1L] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
 //                let xFirst = x.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
 //                let xLast = x.[nTrnSmpls - 1] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]
 //                let yFirst = y.[0] |> Expr.reshape [SizeSpec.broadcastable]|> Expr.broadcast [nSmpls]

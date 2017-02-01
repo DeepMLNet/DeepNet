@@ -36,12 +36,12 @@ module Mnist =
 
     let private assemble dataSeq =
         let data = List.ofSeq dataSeq
-        let nSamples = List.length data
+        let nSamples = List.length data |> int64
 
         let dataShape = ArrayND.shape data.[0]
         let ds = ArrayNDHost.zeros (nSamples :: dataShape)
 
-        data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)
+        data |> List.iteri (fun smpl d -> ds.[int64 smpl, Fill] <- d)
         ds
 
     let private swapEndians (value: int32) =
@@ -63,21 +63,21 @@ module Mnist =
         let nSamples = labelReader.ReadInt32() |> swapEndians
         if imageReader.ReadInt32() |> swapEndians <> nSamples then failwith "number of samples mismatch in MNIST"
 
-        let nRows = imageReader.ReadInt32() |> swapEndians
-        let nCols = imageReader.ReadInt32() |> swapEndians
+        let nRows = imageReader.ReadInt32() |> swapEndians 
+        let nCols = imageReader.ReadInt32() |> swapEndians 
 
         let nSamples = 
             if TestDataset then min 2000 nSamples
             else nSamples
 
         for smpl in 0 .. nSamples - 1 do
-            let label = labelReader.ReadByte() |> int
-            let labelHot : ArrayNDHostT<single> = ArrayNDHost.zeros [10];
+            let label = labelReader.ReadByte() |> int64
+            let labelHot : ArrayNDHostT<single> = ArrayNDHost.zeros [10L];
             labelHot.[[label]] <- 1.0f
 
             let image = imageReader.ReadBytes (nRows * nCols)           
             let imageSingle = Array.map (fun p -> single p / 255.0f) image
-            let imageMat = ArrayNDHost.ofArray imageSingle |> ArrayND.reshape [nRows; nCols]
+            let imageMat = ArrayNDHost.ofArray imageSingle |> ArrayND.reshape [int64 nRows; int64 nCols]
 
             yield labelHot, imageMat
     }
@@ -127,8 +127,8 @@ module Mnist =
             invalidArg "valRatio" "valRatio must be between 0.0 and 1.0"
         
         let raw = loadRaw directory
-        let trnImgsFlat = raw.TrnImgs |> ArrayND.reshape [raw.TrnImgs.Shape.[0]; -1]
-        let tstImgsFlat = raw.TstImgs |> ArrayND.reshape [raw.TstImgs.Shape.[0]; -1]
+        let trnImgsFlat = raw.TrnImgs |> ArrayND.reshape [raw.TrnImgs.Shape.[0]; -1L]
+        let tstImgsFlat = raw.TstImgs |> ArrayND.reshape [raw.TstImgs.Shape.[0]; -1L]
         let orgTrn = Dataset<InputTargetSampleT> [trnImgsFlat; raw.TrnLbls]
 
         let trn, vali =

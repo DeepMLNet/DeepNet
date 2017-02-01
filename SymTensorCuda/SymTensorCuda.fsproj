@@ -60,7 +60,6 @@
     <Compile Include="ArrayByVal.fs" />
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaSup.fs" />
-    <Compile Include="ArrayNDManikin.fs" />
     <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaElemExpr.fs" />

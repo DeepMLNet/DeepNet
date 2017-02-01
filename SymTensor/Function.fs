@@ -17,10 +17,10 @@ module VarEnvTypes =
     type VarLocsT = Map<VarSpecT, ArrayLocT>
 
     /// specification of variable strides
-    type VarStridesT = Map<VarSpecT, int list>
+    type VarStridesT = Map<VarSpecT, int64 list>
 
     /// specification of channel strides
-    type ChannelStridesT = Map<ChannelT, int list>
+    type ChannelStridesT = Map<ChannelT, int64 list>
 
 
 /// Variable value collection.
@@ -81,7 +81,7 @@ module VarEnv =
                         if f .= svVal then env
                         else failShape ()
                     | Broadcast ->
-                        if 1 = svVal then env
+                        if 1L = svVal then env
                         else failShape ()
                     | Multinom m -> failShape ()
                 ) env)
@@ -297,17 +297,26 @@ module Func =
                 let uexprs = UExpr.toUExprs exprs
                 if Debug.Timing then printfn "Converting to UExprs took %A" sw.Elapsed
 
-                // visualize UExprs, if requested
-                if Debug.VisualizeUExpr then
-                    UExprVisualize.show uexprs
+                // build UExpr visualization
+                UExprVisualizer.build uexprs 
 
                 // compile
-                Some {
+                let compileRes = {
                     Exprs=uexprs
                     CompileEnv=compileEnv
                     Eval=compiler.Compile compileEnv uexprs
                     NeededVars=neededVars
                 }
+
+                // show UExpr visualization, if requested
+                if Debug.VisualizeUExpr then printfn "Visualizing UExpr in separate window..."
+                UExprVisualizer.show ()
+                UExprVisualizer.finish ()
+
+                // terminate program, if requested for debugging
+                if Debug.TerminateAfterCompilation then exit 0
+
+                Some compileRes
             else None
 
         /// Performs evaluation of a compiled function.

@@ -1,16 +1,74 @@
 ﻿namespace SymTensor
 
+open System.Threading
+open System.Windows.Forms
+
 open Microsoft.Msagl
 open Microsoft.Msagl.Drawing
 open Microsoft.Msagl.GraphViewerGdi
 
 open Basics
+open SymTensor.Compiler
 
 
-module UExprVisualize =
+module UExprVisualizer =
 
-    let fromUExpr rootExprs =
+    type VisMemManikin =
+        {Manikin: MemManikinT}
+        member this.Kind =
+            match this.Manikin with
+            | MemZero _ -> "Zero"
+            | MemAlloc _ -> "Alloc"
+            | MemExternal _ -> "External"
+            | MemConst _ -> "Const"
+        member this.AllocId =
+            match this.Manikin with
+            | MemAlloc a -> a.Id
+            | _ -> 0
+        member this.SizeInKB =
+            match this.Manikin with
+            | MemAlloc a -> a.ByteSize / 1024L
+            | _ -> 0L
+
+    type VisManikinUExprRelation =
+        | Target of string
+        | Src of int
+        | Extra
+        override this.ToString () =
+            match this with
+            | Target ch -> sprintf "Target %s" ch
+            | Src src -> sprintf "Src %d" src
+            | Extra -> "Extra"
+
+    type VisArrayNDManikin =
+        {Manikin:  ArrayNDManikinT option
+         Storage:  MemManikinT option
+         EuId:     int
+         UExpr:    UExprT
+         Relation: VisManikinUExprRelation}        
+        member this.Type = 
+            match this.Manikin with
+            | Some m -> sprintf "%A" m.TypeName
+            | None -> ""
+        member this.Shape = 
+            match this.Manikin with
+            | Some m -> sprintf "%A" m.Shape
+            | None -> ""
+        member this.MemManikin = 
+            match this.Manikin, this.Storage with
+            | Some m, None -> {VisMemManikin.Manikin = m.Storage}
+            | None, Some s -> {VisMemManikin.Manikin = s}
+            | _, _ -> failwith "invalid combination of manikin/storage"
+
+
+    type Visualizer (rootExprs: UExprT list) =
+
+        let arrayNDManikins = ResizeArray<VisArrayNDManikin> ()
+        let srcEdges = Dictionary<UExprT * int, Edge> ()
+
         let graph = Graph ("UExpr")
+        let viewer = new GViewer(Dock=DockStyle.Fill, 
+                                 PanButtonPressed=true, ToolBarIsVisible=false)
 
         let mutable ids = 0
         let newId () =
@@ -178,43 +236,232 @@ module UExprVisualize =
                         nodeForExpr.[expr] <- opNode
 
                         for i, arg in List.indexed args do
-                            match arg with
-                            | UExpr (UExtraOp (Channel ch), [chSrc], _) ->
-                                let argNode = build chSrc
-                                let lbl = if args.Length > 1 then sprintf "%d=%s" i ch else ch
-                                newEdge argNode opNode lbl |> ignore
-                            | _ -> 
-                                let argNode = build arg
-                                let lbl = if args.Length > 1 then sprintf "%d" i else ""
-                                newEdge argNode opNode lbl |> ignore
+                            let edge = 
+                                match arg with
+                                | UExpr (UExtraOp (Channel ch), [chSrc], _) ->
+                                    let argNode = build chSrc
+                                    let lbl = if args.Length > 1 then sprintf "%d=%s" i ch else ch
+                                    newEdge argNode opNode lbl 
+                                | _ -> 
+                                    let argNode = build arg
+                                    let lbl = if args.Length > 1 then sprintf "%d" i else ""
+                                    newEdge argNode opNode lbl 
+                            srcEdges.[(expr, i)] <- edge
                         opNode
 
             exprs |> List.map build, Map.ofDictionary nodeForExpr
 
-        // build main graph
-        let resNodes, _ = nodesForExprs graph.RootSubgraph rootExprs
-        for i, resNode in List.indexed resNodes do
-            let resLabelNode = newNode graph.RootSubgraph
-            resLabelNode.LabelText <- sprintf "Result %d" i
-            resLabelNode.Attr.FillColor <- Color.Blue
-            resLabelNode.Label.FontColor <- Color.White
-            newEdge resNode resLabelNode "" |> ignore
+        // blinking
+        let mutable blinkMarked = false
+        let mutable blinkEdges : List<Edge> = []
+        let mutable blinkOriginalEdgeColor : List<Edge * Color> = []
+        let mutable blinkNodes : List<Node> = []
+        let mutable blinkOriginalNodeColor : List<Node * Color> = []
+        let doBlinkUpdate () =
+            if not blinkMarked then
+                blinkOriginalEdgeColor <- blinkEdges
+                                          |> List.map (fun e -> 
+                                                let origColor = e.Attr.Color
+                                                e.Attr.Color <- Color.Blue
+                                                e, origColor)
+                blinkOriginalNodeColor <- blinkNodes
+                                          |> List.map (fun n -> 
+                                                let origColor = n.Attr.FillColor
+                                                n.Attr.FillColor <- Color.Blue
+                                                n, origColor)
+            else
+                for e, origColor in blinkOriginalEdgeColor do
+                    e.Attr.Color <- origColor
+                for n, origColor in blinkOriginalNodeColor do
+                    n.Attr.FillColor <- origColor
+            blinkMarked <- not blinkMarked
+            viewer.Refresh()
 
-        graph
+        /// nodes for storages
+        //let nodeForStorage = Dictionary<string, Node> ()
+
+        /// nodes for execution units
+        let nodeForEuId = Dictionary<int, Node> ()
+
+        // build graph
+        let resNodes, nodeForExpr = nodesForExprs graph.RootSubgraph rootExprs
+
+        do
+            // add result nodes
+            for i, resNode in List.indexed resNodes do
+                let resLabelNode = newNode graph.RootSubgraph
+                resLabelNode.LabelText <- sprintf "Result %d" i
+                resLabelNode.Attr.FillColor <- Color.Blue
+                resLabelNode.Label.FontColor <- Color.White
+                newEdge resNode resLabelNode "" |> ignore
+
+        /// adds manikin information
+        member this.AddManikins (euId: int) (uExpr: UExprT) 
+                                (trgtManikins: Map<string, ArrayNDManikinT>) 
+                                (srcManikins: ArrayNDManikinT list)
+                                (extraMems: MemManikinT list) =
+            match nodeForExpr.TryFind uExpr with
+            | Some node -> nodeForEuId.[euId] <- node
+            | None -> ()
+
+            for KeyValue(ch, manikin) in trgtManikins do
+                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Target ch} 
+            for src, manikin in List.indexed srcManikins do
+                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Src src}
+            for extraMem in extraMems do
+                arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=euId; UExpr=uExpr; Relation=Extra}
+
+        /// shows the graph
+        member this.Show () = 
+            // add execution unit id to nodes
+            for KeyValue(euId, node) in Map.ofDictionary nodeForEuId do
+                node.LabelText <- sprintf "%d: %s" euId node.LabelText
+
+            // form
+            let form = new System.Windows.Forms.Form(Text=graph.Label.Text, 
+                                                     Width=1000, Height=600)
+            form.SuspendLayout()
+            form.WindowState <- System.Windows.Forms.FormWindowState.Maximized
+
+            // graph viewer
+            viewer.Graph <- graph
+            form.Controls.Add viewer
+
+            // splitter ArrayNDManikins / MemManikins
+            let manikinSplitter = new SplitContainer(Orientation=Orientation.Horizontal, 
+                                                     Dock=DockStyle.Right,
+                                                     Width=350)            
+            form.Controls.Add manikinSplitter
+
+            // MemManikins data binding
+            let visMemManikins = 
+                arrayNDManikins 
+                |> Seq.map (fun a -> a.MemManikin) 
+                |> Set.ofSeq
+                |> Set.toList
+                |> List.sortByDescending (fun m -> match m.Manikin with
+                                                   | MemAlloc a -> a.ByteSize
+                                                   | _ -> 0L)
+            let memManikinBinding = new BindingSource()
+            for visMemManikin in visMemManikins do
+                memManikinBinding.Add visMemManikin |> ignore
+
+            // MemManikins viewer
+            let memManikinView = new DataGridView(Dock=DockStyle.Fill, 
+                                                  DataSource=memManikinBinding,
+                                                  AutoGenerateColumns=false,
+                                                  AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.AllCells,
+                                                  AllowUserToResizeRows=false,
+                                                  SelectionMode=DataGridViewSelectionMode.FullRowSelect,
+                                                  MultiSelect=false, RowHeadersVisible=false)
+            memManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Kind", 
+                                                                      DataPropertyName="Kind",
+                                                                      SortMode=DataGridViewColumnSortMode.Automatic)) |> ignore
+            memManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Id", 
+                                                                      DataPropertyName="AllocId",
+                                                                      SortMode=DataGridViewColumnSortMode.Automatic)) |> ignore
+            memManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Size (KB)", 
+                                                                      DataPropertyName="SizeInKB",
+                                                                      SortMode=DataGridViewColumnSortMode.Automatic)) |> ignore
+            //memManikinView.Sort(memManikinView.Columns.[2], System.ComponentModel.ListSortDirection.Descending)
+            memManikinView.AutoResizeColumns()
+            manikinSplitter.Panel1.Controls.Add memManikinView
+
+            // MemManikins info text
+            let memManikinInfo = new TextBox(ReadOnly=true, Dock=DockStyle.Bottom, Height=40)
+            manikinSplitter.Panel1.Controls.Add memManikinInfo
+            let manikinsTotalSize = visMemManikins |> List.sumBy (fun v -> v.SizeInKB)
+            memManikinInfo.Text <- sprintf "Total allocated memory: %.3f MB" (float manikinsTotalSize / 1024.0)
+
+            // ArrayNDManikins viewer
+            let arrayNDManikinBinding = new BindingSource()
+            let arrayNDManikinView = new DataGridView(Dock=DockStyle.Fill,
+                                                      DataSource=arrayNDManikinBinding,
+                                                      AutoGenerateColumns=false,
+                                                      AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.AllCells,
+                                                      AllowUserToResizeRows=false,
+                                                      SelectionMode=DataGridViewSelectionMode.FullRowSelect,
+                                                      MultiSelect=true, RowHeadersVisible=false)
+            arrayNDManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="ExecUnit", 
+                                                                          DataPropertyName="EuId")) |> ignore
+            arrayNDManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Relation", 
+                                                                          DataPropertyName="Relation")) |> ignore
+            arrayNDManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Type", 
+                                                                          DataPropertyName="Type")) |> ignore
+            arrayNDManikinView.Columns.Add (new DataGridViewTextBoxColumn(Name="Shape", 
+                                                                          DataPropertyName="Shape")) |> ignore
+            manikinSplitter.Panel2.Controls.Add arrayNDManikinView
+
+            let updateArrayNDManikinView visMemManikin = 
+                let visArrayNDManikins =
+                    arrayNDManikins
+                    |> Seq.filter (fun a -> a.MemManikin = visMemManikin)
+                    |> Seq.sortBy (fun a -> a.EuId)
+                arrayNDManikinBinding.Clear()
+                for visArrayNDManikin in visArrayNDManikins do
+                    arrayNDManikinBinding.Add visArrayNDManikin |> ignore
+                arrayNDManikinView.AutoResizeColumns()
+                arrayNDManikinView.SelectAll()
+
+            memManikinView.SelectionChanged.Add (fun _ -> 
+                match memManikinView.SelectedRows.Count with
+                | 0 -> arrayNDManikinBinding.Clear()
+                | 1 -> updateArrayNDManikinView (memManikinView.SelectedRows.[0].DataBoundItem :?> VisMemManikin)
+                | _ -> ())
+
+            arrayNDManikinView.SelectionChanged.Add (fun _ ->
+                let vis = 
+                    arrayNDManikinView.SelectedRows
+                    |> Seq.cast<DataGridViewRow>
+                    |> Seq.choose (fun row -> if row.DataBoundItem <> null then 
+                                                  Some (row.DataBoundItem :?> VisArrayNDManikin)
+                                              else None)
+                    |> Seq.toList
+                let edges = 
+                    vis
+                    |> List.choose (function | {UExpr=uExpr; Relation=Src src} -> Some (uExpr, src)
+                                             | _ -> None)
+                    |> List.choose (fun (uexpr, src) -> srcEdges.TryFind (uexpr, src))
+                let nodes =
+                    vis
+                    |> List.choose (function | {EuId=euId; Relation=Extra} -> nodeForEuId.TryFind euId
+                                             | _ -> None)
+                blinkEdges <- edges
+                blinkNodes <- nodes)
+
+            // blink timer
+            let blinkTimer = new Timer(Interval=500)
+            blinkTimer.Tick.Add (fun _ -> doBlinkUpdate())
+            blinkTimer.Start()
+
+            // show
+            form.ResumeLayout()
+            form.ShowDialog () |> ignore
 
 
-    let showGraph (graph: Graph) = 
-        let form = new System.Windows.Forms.Form(Text=graph.Label.Text, 
-                                                 Width=1000, Height=600)
-        form.WindowState <- System.Windows.Forms.FormWindowState.Maximized
-        let viewer = new GViewer(Graph=graph, Dock=System.Windows.Forms.DockStyle.Fill)
-        viewer.PanButtonPressed <- true
-        viewer.ToolBarIsVisible <- false
-        form.Controls.Add viewer
-        //form.Show()
-        form.ShowDialog () |> ignore
+    /// active visualizer
+    let active = new ThreadLocal<Visualizer option> ()   
 
-    let show exprs =
-        let graph = fromUExpr exprs
-        showGraph graph 
+    let build rootExprs = 
+        if Debug.VisualizeUExpr then
+            let v = Visualizer (rootExprs)
+            active.Value <- Some v
+
+    let getActive () =
+        match active.Value with
+        | Some v -> v
+        | None -> failwith "no UExprVisualizer is active on the current thread"
+
+    let show () =
+        if Debug.VisualizeUExpr then
+            getActive().Show()
+
+    let finish () =
+        active.Value <- None
+
+    let addManikins euId uExpr trgtManikins srcManikins extraMem =
+        if Debug.VisualizeUExpr then
+            getActive().AddManikins euId uExpr trgtManikins srcManikins extraMem
+
+            
 

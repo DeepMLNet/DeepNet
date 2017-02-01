@@ -37,7 +37,7 @@ type CurveNormalizationTests () =
         
     [<Fact>]
     member this.``PCA Whitening 10`` () =
-        let normalizers = [PCAWhitening (Some 10)]
+        let normalizers = [PCAWhitening (Some 10L)]
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
@@ -80,7 +80,7 @@ type CurveNormalizationTests () =
 
     [<Fact>]
     member this.``Standardization`` () =
-        let normalizers = [Standardization]
+        let normalizers = [Standardization true]
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
@@ -95,3 +95,16 @@ type CurveNormalizationTests () =
         ArrayND.almostEqualWithTol 1e-3 1e-4 stdevs (ArrayND.onesLike stdevs) |> ArrayND.value |> should equal true
         ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
 
+    [<Fact>]
+    member this.``ScaleToUnitLength`` () =
+        let normalizers = [ScaleToUnitLength]
+        let infos, normalized = dataset |> Normalization.perform normalizers
+        let reversed = normalized |> Normalization.reverse infos
+
+        let lengths = ArrayND.normAxis 1 normalized.All.Data 
+
+        printfn "after standardization:"
+        printfn "lengths=\n%A" lengths.Full
+
+        ArrayND.almostEqualWithTol 1e-3 1e-4 lengths (ArrayND.onesLike lengths) |> ArrayND.value |> should equal true
+        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true

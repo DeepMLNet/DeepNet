@@ -60,7 +60,7 @@ module HostEval =
                 EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
-                    (fun intExpr -> EvalT.Eval<int> (evalEnv, intExpr) |> ArrayND.value)
+                    (fun intExpr -> EvalT.Eval<int64> (evalEnv, intExpr) |> ArrayND.value)
             let toBool (v : ArrayNDHostT<'V>) : ArrayNDHostT<bool> = v |> box |> unbox
             let toT (v: ArrayNDHostT<'V>) : ArrayNDHostT<'T> = v |> box |> unbox
             let toR (v: ArrayNDHostT<'V>) : ArrayNDHostT<'R> = v |> box |> unbox
@@ -121,12 +121,12 @@ module HostEval =
                         | Gather indices ->
                             let vIndices = 
                                 indices 
-                                |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
+                                |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
                             ArrayND.gather vIndices av
                         | Scatter (indices, trgtShp) ->
                             let vIndices = 
                                 indices 
-                                |> List.map (Option.map (fun idx -> EvalT.Eval<int> (evalEnv, idx)))
+                                |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
                             ArrayND.scatter vIndices (shapeEval trgtShp) av                        
                         | Subtensor sr -> av.[rngEval sr]
                         | StoreToVar vs -> 
@@ -187,7 +187,7 @@ module HostEval =
 
                 | Nary(op, es) ->
                     match op with 
-                    | Discard -> ArrayNDHost.zeros<'R> [0] |> box
+                    | Discard -> ArrayNDHost.zeros<'R> [0L] |> box
                     | Elements (resShape, elemExpr) -> 
                         let esv = es |> List.map subEval |> List.map (fun v -> v :> ArrayNDT<'T>)
                         let nResShape = shapeEval resShape
@@ -214,8 +214,8 @@ module HostEval =
 
             // iteration index variables
             let nIters = SizeSpec.eval spec.Length
-            let iterAry = ArrayNDHost.zeros<int> []
-            let itersRemAry = ArrayNDHost.zeros<int> []
+            let iterAry = ArrayNDHost.zeros<int64> []
+            let itersRemAry = ArrayNDHost.zeros<int64> []
 
             // create channel information
             let channelInfos =
@@ -230,12 +230,12 @@ module HostEval =
                     })
 
             // perform loop
-            for iter=0 to nIters-1 do            
+            for iter in 0L .. nIters-1L do            
                 if Trace.isActive () then Trace.setLoopIter iter
                    
                 // set iteration indices
                 iterAry.[[]] <- iter
-                itersRemAry.[[]] <- nIters - iter - 1
+                itersRemAry.[[]] <- nIters - iter - 1L
 
                 // calculate and store channel values
                 let iterVarEnv, iterChannelEnv =

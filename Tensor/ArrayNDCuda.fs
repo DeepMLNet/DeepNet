@@ -39,11 +39,11 @@ module ArrayNDCudaTypes =
     type CudaStorageT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                     (data: CudaDeviceVariable<'T>) =
 
-        new (elems: int) =
+        new (elems: int64) =
             CudaContext.init ()
 
             // CUDA cannot allocate memory of size zero
-            let elems = if elems > 0 then elems else 1
+            let elems = if elems > 0L then elems else 1L
             CudaStorageT<'T> (new CudaDeviceVariable<'T> (SizeT elems))
 
         member this.Data = data
@@ -68,22 +68,22 @@ module ArrayNDCudaTypes =
                                      storage:   CudaStorageT<'T>) = 
         inherit ArrayNDT<'T>(layout)
        
-        let getElement index =
+        let getElement (index: int64) =
             if typeof<'T> = typeof<bool> then
                 let hostBuf : byte ref = ref 0uy
-                (storage :> ICudaStorage).ByteData.CopyToHost(hostBuf, SizeT (index * sizeof<byte>))
+                (storage :> ICudaStorage).ByteData.CopyToHost(hostBuf, SizeT (index * sizeof64<byte>))
                 !hostBuf <> 0uy |> box |> unbox
             else
                 let hostBuf = ref (new 'T())
-                storage.Data.CopyToHost(hostBuf, SizeT (index * sizeof<'T>))
+                storage.Data.CopyToHost(hostBuf, SizeT (index * sizeof64<'T>))
                 !hostBuf
 
-        let setElement index (value: 'T) =
+        let setElement (index: int64) (value: 'T) =
             if typeof<'T> = typeof<bool> then
                 let byteVal = if (box value :?> bool) then 1uy else 0uy
-                (storage :> ICudaStorage).ByteData.CopyToDevice(byteVal, SizeT (index * sizeof<bool>))
+                (storage :> ICudaStorage).ByteData.CopyToDevice(byteVal, SizeT (index * sizeof64<byte>))
             else
-                storage.Data.CopyToDevice(value, SizeT (index * sizeof<'T>))
+                storage.Data.CopyToDevice(value, SizeT (index * sizeof64<'T>))
 
         /// a new ArrayND stored on the GPU using newly allocated device memory
         new (layout: ArrayNDLayoutT) =
@@ -171,9 +171,9 @@ module ArrayNDCudaTypes =
                     h :> IDisposable, h.Ptr
 
             dst.Storage.Data.CopyToDevice(srcMemPtr, 
-                                          SizeT (sizeof<'T> * ArrayND.offset src), 
-                                          SizeT (sizeof<'T> * ArrayND.offset dst),
-                                          SizeT (sizeof<'T> * ArrayND.nElems src))
+                                          SizeT (sizeof64<'T> * ArrayND.offset src), 
+                                          SizeT (sizeof64<'T> * ArrayND.offset dst),
+                                          SizeT (sizeof64<'T> * ArrayND.nElems src))
             srcMemHnd.Dispose()
 
         /// Copies the specified ArrayNDHostT to the device
@@ -189,7 +189,6 @@ module ArrayNDCudaTypes =
                 invalidArg "dst" "dst and src must be of same shape"
             if not (ArrayND.isC dst) then
                 invalidArg "dst" "dst must be contiguous"
-            //printfn "CopyIntoHost: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
 
             let src = ArrayND.ensureC src 
             let dstMemHnd, dstMemPtr =
@@ -200,10 +199,15 @@ module ArrayNDCudaTypes =
                     let h = dst.Pin()
                     h :> IDisposable, h.Ptr
 
+            //printfn "CopyIntoHost: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
+            //printfn "ArrayNDCuda.CopyIntoHost: srcBase=0x%x dstBase=0x%x bytes=%d" 
+            //    (nativeint src.Storage.Data.DevicePointer.Pointer) dstMemPtr
+            //    (sizeof<'T> * ArrayND.nElems src)
+
             src.Storage.Data.CopyToHost(dstMemPtr, 
-                                        SizeT (sizeof<'T> * ArrayND.offset src), 
-                                        SizeT (sizeof<'T> * ArrayND.offset dst), 
-                                        SizeT (sizeof<'T> * ArrayND.nElems src))
+                                        SizeT (sizeof64<'T> * ArrayND.offset src), 
+                                        SizeT (sizeof64<'T> * ArrayND.offset dst), 
+                                        SizeT (sizeof64<'T> * ArrayND.nElems src))
             dstMemHnd.Dispose ()
             
 
@@ -215,9 +219,9 @@ module ArrayNDCudaTypes =
                         ArrayND.stride this = ArrayND.stride dest then
                     // use fast CUDA memcpy
                     dest.Storage.Data.CopyToDevice (this.Storage.Data, 
-                                                    SizeT (sizeof<'T> * ArrayND.offset this),
-                                                    SizeT (sizeof<'T> * ArrayND.offset dest),
-                                                    SizeT (sizeof<'T> * ArrayND.nElems this))
+                                                    SizeT (sizeof64<'T> * ArrayND.offset this),
+                                                    SizeT (sizeof64<'T> * ArrayND.offset dest),
+                                                    SizeT (sizeof64<'T> * ArrayND.nElems this))
                 else
                     // use slow element by element copy over host
                     base.CopyTo dest
