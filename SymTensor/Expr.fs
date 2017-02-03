@@ -850,7 +850,7 @@ module Expr =
                             failwithf "incompatible shapes for dot product: %A and %A" sa sb
                     | na, nb when na = nb -> 
                         if sa.[na-1] .<> sb.[nb-2] || 
-                                [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
+                           [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
                             failwithf "incompatible shapes for batched dot product: %A and %A" sa sb
                     | _ -> failwithf "cannot compute dot product between arrays of shapes %A and %A" sa sb  
                 | TensorProduct when nda <> ndb ->
