@@ -11,6 +11,22 @@ module Optimizer =
     let private combined = Dictionary<ExprT, ExprT> () 
     let private fullOptimized = Dictionary<ExprT, ExprT> () 
 
+    /// Broadcast information
+    type BroadcastInfoT =
+        /// axis is broadcasted to specific size
+        | Broadcasted of SizeSpecT
+        /// axis is not broadcasted and has specific size
+        | NotBroadcasted of SizeSpecT
+        /// true if axis is broadcasted
+        member this.IsBC =
+            match this with
+            | Broadcasted _ -> true
+            | NotBroadcasted _ -> false
+        /// final size
+        member this.Size = 
+            match this with
+            | Broadcasted s | NotBroadcasted s -> s
+
     /// Returns a list containing one element each axis of the expression.
     /// The element is true if the axis is broadcasted.
     let axesBroadcasted expr =
@@ -18,10 +34,11 @@ module Optimizer =
         | Unary (DoBroadcast bc, a) ->
             List.zip bc (Expr.shapeOf a)
             |> List.map (fun (bcDim, aDim) -> 
-                aDim = SizeSpec.broadcastable && bcDim <> aDim)
+                if aDim = SizeSpec.broadcastable && bcDim <> aDim then Broadcasted bcDim
+                else NotBroadcasted aDim)
         | _ ->
             Expr.shapeOf expr
-            |> List.map (fun _ -> false)
+            |> List.map (fun aDim -> NotBroadcasted aDim)
 
 
     /// Returns a list containing one element for each axis in the result of the elements expression.
@@ -43,7 +60,7 @@ module Optimizer =
                 | ElemExpr.Leaf (ElemExpr.ArgElement ((arg, sa), _)) ->
                     List.zip sa argsBroadcasted.[arg]
                     |> List.exists (fun (dimSs, dimBc) ->
-                        dimSs.ContainsSymbol dimSym && not dimBc)
+                        dimSs.ContainsSymbol dimSym && not dimBc.IsBC)
                 | ElemExpr.Leaf _ -> false
 
                 | ElemExpr.Unary (ElemExpr.Sum (_, first, last), a) ->
@@ -397,6 +414,30 @@ module Optimizer =
                 | Unary (UnaryElemwiseOp as op, Unary (DoBroadcast _ as lop, a)) ->
                     Unary (lop, Unary (op, a)) |> optRec
 
+                // pull broadcast over batched dimensions through Diag
+                | Unary ((Diag (ax1, ax2) as op), (Unary (DoBroadcast _, a) as ba))
+                            when List.indexed (axesBroadcasted ba)
+                                 |> List.exists (fun (d, bc) -> d <> ax1 && d <> ax2 && bc.IsBC) ->
+                    let aOptBc =
+                        List.indexed (axesBroadcasted ba)   
+                        |> List.map (function | d, bc when d = ax1 || d = ax2 -> bc.Size
+                                              | _, Broadcasted _ -> SizeSpec.broadcastable
+                                              | _, NotBroadcasted s -> s)
+                    let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
+                    Unary (DoBroadcast (shapeOf expr), Unary (op, baOpt)) |> optRec
+
+                // pull broadcast over batched dimensions through DiagMat 
+                | Unary ((DiagMat (ax1, _) as op), (Unary (DoBroadcast _, a) as ba))
+                            when List.indexed (axesBroadcasted ba)
+                                 |> List.exists (fun (d, bc) -> d <> ax1 && bc.IsBC) ->
+                    let aOptBc =
+                        List.indexed (axesBroadcasted ba)   
+                        |> List.map (function | d, bc when d = ax1 -> bc.Size
+                                              | _, Broadcasted _ -> SizeSpec.broadcastable
+                                              | _, NotBroadcasted s -> s)
+                    let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
+                    Unary (DoBroadcast (shapeOf expr), Unary (op, baOpt)) |> optRec
+
                 // pull matching permute, broadcast and reshape through binary elementwise ops
                 | Binary (BinaryElemwiseOp as op, Unary (PermuteAxes _ as lopa, a),
                                                   Unary (PermuteAxes _ as lopb, b))
@@ -411,15 +452,14 @@ module Optimizer =
                 | Binary (Dot, (Unary (DoBroadcast _, a) as ba), (Unary (DoBroadcast _, b) as bb))
                         when List.zip (axesBroadcasted ba) (axesBroadcasted bb)
                              |> List.indexed
-                             |> List.exists (fun (d, (aBced, bBced)) -> d < ba.NDims - 2 && aBced && bBced) ->
-                    let pullBc = 
-                        List.zip (axesBroadcasted ba) (axesBroadcasted bb)
-                         |> List.indexed
-                         |> List.map (fun (d, (aBced, bBced)) -> d < ba.NDims - 2 && aBced && bBced)
+                             |> List.exists (fun (d, (aBc, bBc)) -> d < ba.NDims - 2 && aBc.IsBC 
+                                                                                     && bBc.IsBC) ->
                     let aOptBc, bOptBc =
-                        List.zip3 pullBc (shapeOf ba) (shapeOf bb)
-                        |> List.map (fun (p, sba, sbb) -> if p then SizeSpec.broadcastable, SizeSpec.broadcastable
-                                                          else sba, sbb)
+                        List.zip (axesBroadcasted ba) (axesBroadcasted bb)
+                        |> List.indexed
+                        |> List.map (function | d, (aBc, bBc) when d >= ba.NDims-2 -> aBc.Size, bBc.Size
+                                              | _, (Broadcasted _, Broadcasted _) -> SizeSpec.broadcastable, SizeSpec.broadcastable
+                                              | _, (aBc, bBc) -> aBc.Size, bBc.Size)
                         |> List.unzip
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
                     let bbOpt = Unary (DoBroadcast bOptBc, b) |> optRec

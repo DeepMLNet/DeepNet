@@ -900,8 +900,6 @@ module CudaExecUnit =
         | BlasArgCopy -> 
             let bcAllowed = (List.replicate (manikin.NDims - 2) true) @ [false; false]
             let tmpView, copyOps = copyKeepingBroadcasted memAllocator bcAllowed manikin
-            //let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
-            //let copyOps = copyExecItems tmpView manikin
             tmpView, BlasTranspose, copyOps, false
 
     /// BLAS target argument passing, so that orientation is preserved
