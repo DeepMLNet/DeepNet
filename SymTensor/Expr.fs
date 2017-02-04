@@ -278,7 +278,7 @@ module Expr =
     /// and returns one tensor.
     and IOp =
         inherit System.IComparable
-       
+      
         /// Should return the shape of the result, given the shape of the arguments.
         abstract Shape: argShapes: ShapeSpecT list -> ShapeSpecT      
         
@@ -419,7 +419,6 @@ module Expr =
         | Or
             -> Some ()
         | _ -> None
-
 
     /// Traverses the op tree and for each op calls a function on its arguments and replaces 
     /// them by the function's return value(s).

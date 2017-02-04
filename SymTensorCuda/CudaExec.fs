@@ -682,7 +682,7 @@ module CudaExprWorkspaceTypes =
 
                 // extension 
                 | ExecItem (ExtensionExecItem eei, strm) ->
-                    eei.Execute execEnv strm
+                    eei.Execute execEnv (getStream strm)
 
                 // misc
                 | ExecItem (PrintWithMsg (msg, res), strm) ->

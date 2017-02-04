@@ -237,6 +237,12 @@ module UtilTypes =
         if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
         else s
 
+    /// Compares two objects of possibly different types.
+    let compareObjs (this: 'A when 'A :> System.IComparable<'A>) (other: obj) =
+        if this.GetType() = other.GetType() then
+            (this :> System.IComparable<'A>).CompareTo (other :?> 'A)
+        else compare (this.GetType().FullName) (other.GetType().FullName)
+
 
 module Util =
 
