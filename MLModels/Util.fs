@@ -23,6 +23,8 @@ module ActivationFuncTypes =
         | Sigmoid        
         /// soft-max transfer function
         | SoftMax
+        /// logarithm of soft-max transfer function
+        | LogSoftmax
         /// no transfer function
         | Identity
 
