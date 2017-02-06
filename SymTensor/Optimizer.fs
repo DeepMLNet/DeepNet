@@ -7,9 +7,9 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<ExprT, ExprT> () 
-    let private combined = Dictionary<ExprT, ExprT> () 
-    let private fullOptimized = Dictionary<ExprT, ExprT> () 
+    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
+    let private combined = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
+    let private fullOptimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
 
     /// Broadcast information
     type BroadcastInfoT =
@@ -515,7 +515,10 @@ module Optimizer =
         | Some opt -> opt
         | None ->
             let opt = expr |> optRec |> Expr.check
-            let opt = combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+            let opt = 
+                if not Debug.DisableCombineIntoElementsOptimization then
+                    combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+                else opt
             fullOptimized.LockedSet (expr, opt)
             fullOptimized.LockedSet (opt, opt)
             opt

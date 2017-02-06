@@ -254,8 +254,9 @@ module UExpr =
                 | Expr.Unary (Expr.Scatter (indices, _), a) ->
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
                     extra (Scatter idxArgNos) (a::idxArgs)
-                | Expr.Unary (Expr.Held (_, heldOp), a) ->
-                    failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
+                | Expr.Unary (Expr.Held (_, heldOp) as holdOp, a) ->
+                    failwithf "the held op %A must be expanded before conversion to UExpr \
+                              (shape of argument is %A and Hold is %A)" heldOp a.Shape holdOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->
