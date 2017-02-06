@@ -695,7 +695,7 @@ module Expr =
             failwithf "invalid axis %d for expression of shape %A" ax (shapeOf expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<ExprT> ()
+    let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT) =
