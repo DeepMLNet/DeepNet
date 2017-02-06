@@ -26,7 +26,7 @@ module RandomExtensions =
         
         /// Generates an infinite sequence of random doubles x ~ N(mean,variance)
         member this.NormalDouble mean variance =
-            let normal = Normal.WithMeanVariance (mean, variance)
+            let normal = Normal.WithMeanVariance (mean, variance,this)
             Seq.initInfinite (fun _ -> normal.Sample())
         
         /// Generates an infinite sequence of random singles x ~ N(mean,variance)
