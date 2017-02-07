@@ -161,15 +161,23 @@ module UtilTypes =
             | Some v -> v
             | None -> dflt
 
+    type System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue> with
+        member this.TryFindReadOnly key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
+
     type System.Collections.Generic.Queue<'T> with
         member this.TryPeek =
             if this.Count > 0 then Some (this.Peek())
             else None
 
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
+    type IReadOnlyDictionary<'TKey, 'TValue> = System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue>
+    type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
     type HashSet<'T> = System.Collections.Generic.HashSet<'T>
     type Queue<'T> = System.Collections.Generic.Queue<'T>
-    type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
+    type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>
 
     /// convert given value to specified type and return as obj
     let convTo (typ: System.Type) value =

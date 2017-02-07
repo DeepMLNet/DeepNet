@@ -256,7 +256,7 @@ module Optimizer =
         /// new element expression if the argument is not an element expression.
         let rec getArgElemExpr argExpr =            
             let combinable () = 
-                Set.count (exprInfo.DependantsStructural argExpr) = 1 ||
+                (exprInfo.DependantsStructural argExpr).Count = 1 ||
                 Set.count (Expr.extractVars argExpr) = 0
             //let combinable () = false
             match subComb argExpr with
@@ -357,6 +357,7 @@ module Optimizer =
                     Nary (op, es |> List.map subComb)
 
             combined.LockedSet (expr, comb)
+            combined.LockedSet (comb, comb)
             comb
 
     /// Optimizes an expression.

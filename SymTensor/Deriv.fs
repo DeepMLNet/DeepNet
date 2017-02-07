@@ -610,7 +610,7 @@ module Deriv =
 
         /// adds the specified Jacobian coming from `source` to `target`
         let transmitJacobian source target jacobian =
-            let neededSources = exprInfo.Dependants target
+            let neededSources = exprInfo.Dependants target |> Set.ofSeq
 
             // add jacobian
             match incomingJacobian.TryFind target with

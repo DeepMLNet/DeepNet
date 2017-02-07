@@ -3,8 +3,6 @@
 open Basics
 open Expr
 
-
-
 type MultiChannelOpUsageT = MultiChannelOpT * List<ExprT>
 
 type ExprInfoT (expr: ExprT) =
@@ -58,8 +56,6 @@ type ExprInfoT (expr: ExprT) =
         doBuild expr
         dependants
 
-    let dependantsStructural = lazy (Dictionary<ExprT, HashSet<ExprT>> (dependants, HashIdentity.Structural))
-
     // build sets of used channels
     let usedChannels = lazy (
         let processed = HashSet<ExprT> (HashIdentity.Reference)
@@ -94,15 +90,15 @@ type ExprInfoT (expr: ExprT) =
     /// Comparison is done based on reference equality.
     member this.Dependants expr =
         match dependants.TryFind expr with
-        | Some deps -> deps |> Set.ofSeq
-        | None -> Set.empty
+        | Some deps -> deps :> IReadOnlyCollection<_>
+        | None -> HashSet<_> () :> IReadOnlyCollection<_>
 
     /// Returns all expressions that depend on expr.
     /// Comparison is done based on structural equality.
     member this.DependantsStructural expr =
-        match dependantsStructural.Force().TryFind expr with
-        | Some deps -> deps |> Set.ofSeq
-        | None -> Set.empty
+        match knownExprs.TryFind expr with
+        | Some expr -> this.Dependants expr
+        | None -> HashSet<_> () :> IReadOnlyCollection<_>
 
     /// Returns the list of used channles for the multi-channel op
     /// with the specified arguments.
