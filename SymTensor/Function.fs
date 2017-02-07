@@ -215,12 +215,7 @@ module Func =
         if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
    
         if Debug.TraceCompile then printfn "Releasing held expressions..."
-        let rec releaseExpr expr = 
-            printfn "releae loop"
-            let released = Hold.tryRelease expr
-            if released <> expr then releaseExpr released
-            else expr
-        let releasedExpr = releaseExpr substExpr
+        let releasedExpr = Hold.tryRelease substExpr
         if Debug.Timing then printfn "Releasing held expressions took %A" sw.Elapsed        
 
         let sw = Stopwatch.StartNew ()

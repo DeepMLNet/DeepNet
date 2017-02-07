@@ -57,9 +57,27 @@ module Hold =
                             failwithf "held op %A must not contain their input value in their derivative" heldOp
                         dWrt |> tryRelease
 
+                // pass-throguh
                 | Leaf _ -> expr
+
+                | Unary (Gather indices, a) ->
+                    let indices = indices |> List.map (Option.map tryRelease)
+                    Unary (Gather indices, tryRelease a)
+                | Unary (Scatter (indices, shp), a) ->
+                    let indices = indices |> List.map (Option.map tryRelease)
+                    Unary (Scatter (indices, shp), tryRelease a)
+                | Unary (AssumeJacobian jac, a) -> 
+                    Unary (AssumeJacobian (tryRelease jac), tryRelease jac)
                 | Unary (op, a) -> Unary (op, tryRelease a)
+
+                | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (tryRelease c), tryRelease a, tryRelease b)
                 | Binary (op, a, b) -> Binary (op, tryRelease a, tryRelease b)
+
+                | Nary (Channel (Loop spec, channel), es) ->
+                    let spec = 
+                        {spec with Channels = spec.Channels 
+                                              |> Map.map (fun _ lv -> {lv with Expr=tryRelease lv.Expr})}
+                    Nary (Channel (Loop spec, channel), es |> List.map tryRelease)
                 | Nary (op, es) -> Nary (op, es |> List.map tryRelease)
             
             released.[expr] <- rel

@@ -353,16 +353,19 @@ module UExpr =
     and removeUnusedChannels (uexprs: UExprT list) =
         // build set of used channels
         let usedChannels = Dictionary<UExprT, HashSet<ChannelT>> (HashIdentity.Reference)
-        let rec buildUsed (UExpr (op, args, _)) =
-            match op with
-            | UExtraOp (Channel ch) ->
-                let multichannelExpr = args.Head
-                if not (usedChannels.ContainsKey multichannelExpr) then
-                    usedChannels.[multichannelExpr] <- HashSet<_> ()
-                usedChannels.[multichannelExpr].Add ch |> ignore
-            | _ -> ()
-            for arg in args do
-                buildUsed arg
+        let visited = HashSet<UExprT> (HashIdentity.Reference)
+        let rec buildUsed (UExpr (op, args, _) as uexpr) =
+            if not (visited.Contains uexpr) then
+                match op with
+                | UExtraOp (Channel ch) ->
+                    let multichannelExpr = args.Head
+                    if not (usedChannels.ContainsKey multichannelExpr) then
+                        usedChannels.[multichannelExpr] <- HashSet<_> ()
+                    usedChannels.[multichannelExpr].Add ch |> ignore
+                | _ -> ()
+                for arg in args do
+                    buildUsed arg
+                visited.Add uexpr |> ignore
         uexprs |> List.iter buildUsed 
 
         // filter unused channels
@@ -378,6 +381,7 @@ module UExpr =
                         removeUnusedLoopChannels (Set.ofSeq usedChannels.[origExpr]) expr
                     | _ -> expr
                 processed.[origExpr] <- replacement
+                processed.[replacement] <- replacement
                 replacement
         uexprs |> List.map rebuild 
 
