@@ -5,7 +5,6 @@ open System.Diagnostics
 open System.Collections.Generic
 
 open Basics
-open ArrayNDNS
 open SymTensor
 open UExprTypes
 
@@ -48,7 +47,6 @@ module ExecUnitsTypes =
     type EvalReqT = {
         Id:             int 
         Expr:           UExprT
-        Multiplicity:   int
         ChannelReqs:    ChannelReqsT
         OnCompletion:   EvalResultT -> unit
     }
@@ -386,7 +384,7 @@ module ExecUnit =
             printfn "UExpr contains %d unique ops" (UExpr.countUniqueOps expr)
 
         // number of occurrences of subexpressions
-        let exprOccurrences = UExpr.subExprOccurrences expr
+        let exprInfo = UExprInfoT expr
 
         // execution units
         let execUnits = ResizeArray<ExecUnitT<'e>>()
@@ -409,33 +407,27 @@ module ExecUnit =
             MemAlloc mem
 
         // evaluation request
-        let evalReqsByExpr = Dictionary<UExprT, ResizeArray<EvalReqT>>(HashIdentity.Reference)
-        let evalReqMultiplicities = Dictionary<UExprT, int>(HashIdentity.Reference)
-        let exprsWithReqMultiplicity = Queue<UExprT>()
+        let evalReqsByExpr = Dictionary<UExprT, ResizeArray<EvalReqT>> (HashIdentity.Reference)
+        let exprsReadyToProcess = Queue<UExprT>()
         let mutable evalReqCnt = 0
-        let submitEvalRequest expr multiplicity storage onCompletion =
+        let submitEvalRequest expr isInitialRequest storage onCompletion =
             evalReqCnt <- evalReqCnt + 1
-            let evalReq = {Id=evalReqCnt; Expr=expr; Multiplicity=multiplicity; 
+            let evalReq = {Id=evalReqCnt; Expr=expr; 
                            ChannelReqs=storage; OnCompletion=onCompletion}
 
             if not (evalReqsByExpr.ContainsKey expr) then
                 evalReqsByExpr.[expr] <- ResizeArray<EvalReqT>()
             evalReqsByExpr.[expr].Add evalReq
 
-            if not (evalReqMultiplicities.ContainsKey expr) then
-                evalReqMultiplicities.[expr] <- 0
-            evalReqMultiplicities.[expr] <- evalReqMultiplicities.[expr] + evalReq.Multiplicity
-            
-            if evalReqMultiplicities.[expr] = exprOccurrences expr then
-                exprsWithReqMultiplicity.Enqueue expr
+            if evalReqsByExpr.[expr].Count = (exprInfo.Dependants expr).Count || isInitialRequest then
+                exprsReadyToProcess.Enqueue expr
 
         /// takes an evaluation request from the evaluation request queue and processes it
         let processEvalRequest () =   
-            let erqExpr = exprsWithReqMultiplicity.Dequeue ()
+            let erqExpr = exprsReadyToProcess.Dequeue ()
             let erqsForExpr = evalReqsByExpr.[erqExpr] |> List.ofSeq
             
             // calculate how many requests are there and extract expression
-            let erqMultiplicity = erqsForExpr |> List.sumBy (fun r -> r.Multiplicity)
             let erqRequestors = erqsForExpr |> List.length
             let erqResultShared = erqRequestors > 1
 
@@ -550,7 +542,7 @@ module ExecUnit =
                                  Metadata=metadata
                                  SrcShapes=List.map UExpr.channelShapes srcs}
                 for src, srcReqStorage in List.zip srcs srcReqStorages do
-                    submitEvalRequest src erqMultiplicity srcReqStorage (fun res ->
+                    submitEvalRequest src false srcReqStorage (fun res ->
                         subreqResults.[src] <- res
                         onMaybeCompleted())     
 
@@ -558,11 +550,11 @@ module ExecUnit =
         // create initial evaluation request
         let mutable exprRes = None
         let trgtReq = Map.empty |> Map.add dfltChId None
-        submitEvalRequest expr 1 trgtReq (fun res -> exprRes <- Some res)
+        submitEvalRequest expr true trgtReq (fun res -> exprRes <- Some res)
 
         // processing loop
         let mutable uniqueProcessedRequests = 0
-        while exprsWithReqMultiplicity.Count > 0 do
+        while exprsReadyToProcess.Count > 0 do
             processEvalRequest ()
             uniqueProcessedRequests <- uniqueProcessedRequests + 1
         let execUnits = List.ofSeq execUnits

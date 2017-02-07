@@ -343,7 +343,31 @@ module Expr =
         interface System.IEquatable<ExprT> with
             member this.Equals other = 
                 if obj.ReferenceEquals (this, other) then true
-                else this.Proxy = other.Proxy
+                elif this.GetHashCode() <> other.GetHashCode() then false
+                else 
+                    let knownEqualTo = Dictionary<ExprT, HashSet<ExprT>> (HashIdentity.Reference)
+                    let rec treeCompare t o =
+                        match knownEqualTo.TryFind t with
+                        | Some k when k.Contains o -> true
+                        | _ ->
+                            let eq = 
+                                match t, o with
+                                | Leaf tOp, Leaf oOp -> 
+                                    tOp = oOp
+                                | Unary (tOp, ta), Unary (oOp, oa) -> 
+                                    tOp = oOp && treeCompare ta oa
+                                | Binary (tOp, ta, tb), Binary (oOp, oa, ob) -> 
+                                    tOp = oOp && treeCompare ta oa && treeCompare tb ob
+                                | Nary (tOp, tes), Nary(oOp, oes) ->
+                                    tOp = oOp && List.forall2 (fun te oe -> treeCompare te oe) tes oes
+                                | _ -> false
+                            if eq then
+                                if not (knownEqualTo.ContainsKey t) then
+                                    knownEqualTo.[t] <- HashSet<ExprT> (HashIdentity.Reference)
+                                knownEqualTo.[t].Add o |> ignore
+                            eq
+                    treeCompare this other
+                    //this.Proxy = other.Proxy
         override this.GetHashCode() =
             match exprHashCache.TryFind this with
             | Some h -> h
@@ -649,28 +673,38 @@ module Expr =
     let broadcastIfNecessary ss expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
+    /// Caches for extracted variables.
+    let private extractedVars = Dictionary<ExprT, Set<VarSpecT>> () 
+
     /// extract all variables from an expression
     let rec extractVars expr =
-        match expr with
-        | Leaf (Var vs) -> Set.singleton vs
-        | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
-        | Unary (Gather indices, a) ->
-            let indicesVars = indices |> List.choose (Option.map extractVars)
-            Set.unionMany (extractVars a :: indicesVars)
-        | Unary (Scatter (indices, _), a) ->
-            let indicesVars = indices |> List.choose (Option.map extractVars)
-            Set.unionMany (extractVars a :: indicesVars)
-        | Unary (AssumeJacobian jac, a) -> 
-            Set.union (extractVars jac) (extractVars a)
-        | Binary (IfThenElse cond, a, b) -> 
-            Set.unionMany [extractVars cond; extractVars a; extractVars b]
-        | Nary (ExtensionOp eop, es) ->
-            Set.unionMany (eop.ContainedVars :: (es |> List.map extractVars))
+        match extractedVars.LockedTryFind expr with
+        | Some evs -> evs
+        | None ->
+            let evs =
+                match expr with
+                | Leaf (Var vs) -> Set.singleton vs
+                | Unary (StoreToVar vs, a) -> extractVars a |> Set.add vs
+                | Unary (Gather indices, a) ->
+                    let indicesVars = indices |> List.choose (Option.map extractVars)
+                    Set.unionMany (extractVars a :: indicesVars)
+                | Unary (Scatter (indices, _), a) ->
+                    let indicesVars = indices |> List.choose (Option.map extractVars)
+                    Set.unionMany (extractVars a :: indicesVars)
+                | Unary (AssumeJacobian jac, a) -> 
+                    Set.union (extractVars jac) (extractVars a)
+                | Binary (IfThenElse cond, a, b) -> 
+                    Set.unionMany [extractVars cond; extractVars a; extractVars b]
+                | Nary (ExtensionOp eop, es) ->
+                    Set.unionMany (eop.ContainedVars :: (es |> List.map extractVars))
 
-        | Leaf _ -> Set.empty
-        | Unary (_, a) -> extractVars a
-        | Binary (_, a, b) -> Set.union (extractVars a) (extractVars b)
-        | Nary (_, es) -> Set.unionMany (es |> List.map extractVars)
+                | Leaf _ -> Set.empty
+                | Unary (_, a) -> extractVars a
+                | Binary (_, a, b) -> Set.union (extractVars a) (extractVars b)
+                | Nary (_, es) -> Set.unionMany (es |> List.map extractVars)
+
+            extractedVars.[expr] <- evs
+            evs
 
     type ExprT with
         /// symbolic shape
@@ -694,7 +728,7 @@ module Expr =
             failwithf "invalid axis %d for expression of shape %A" ax (shapeOf expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<ExprT> ()
+    let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
     let rec checkExpr (expr: ExprT) =
@@ -1019,6 +1053,8 @@ module Expr =
                 subst
         sSub expr
 
+    let private exprsWithEvalableSymSizes = HashSet<ExprT> ()
+
     /// tests if all symbolic sizes can be evaluated
     let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
         let subTest = testEvalAllSymSizes failIfNot
@@ -1026,53 +1062,57 @@ module Expr =
         let tShp = ShapeSpec.canEval
         let tSrs = SimpleRangesSpec.canEvalSymbols
         let evalable =
-            match expr with
-            | Leaf (Identity (ss, tn)) -> tSize ss
-            | Leaf (SizeValue (sc, tn)) -> tSize sc
-            | Leaf (Var vs) -> tShp (VarSpec.shape vs)
-            | Leaf (Arange (size, tn)) -> tSize size
-            | Leaf _ -> true
+            if exprsWithEvalableSymSizes.LockedContains expr then true
+            else 
+                match expr with
+                | Leaf (Identity (ss, tn)) -> tSize ss
+                | Leaf (SizeValue (sc, tn)) -> tSize sc
+                | Leaf (Var vs) -> tShp (VarSpec.shape vs)
+                | Leaf (Arange (size, tn)) -> tSize size
+                | Leaf _ -> true
 
-            | Unary (Reshape ss, a) -> tShp ss && subTest a
-            | Unary (DoBroadcast ss, a) -> tShp ss && subTest a
-            | Unary (StoreToVar vs, a) -> tShp (VarSpec.shape vs) && subTest a
-            | Unary (Subtensor srs, a) -> tSrs srs && subTest a
-            | Unary (Held (derivsShp, heldOp), a) ->
-                let canEvalOp =
-                    match heldOp with 
-                    | ReplicateTo (dim, s) -> tSize s
-                List.forall tShp derivsShp && canEvalOp && subTest a
-            | Unary (Gather indices, a) ->
-                let someIndices = indices |> List.choose id
-                List.forall subTest someIndices && subTest a
-            | Unary (Scatter (indices, shp), a) ->
-                let someIndices = indices |> List.choose id
-                List.forall subTest someIndices && tShp shp && subTest a
-            | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
-            | Unary (op, a) -> subTest a
+                | Unary (Reshape ss, a) -> tShp ss && subTest a
+                | Unary (DoBroadcast ss, a) -> tShp ss && subTest a
+                | Unary (StoreToVar vs, a) -> tShp (VarSpec.shape vs) && subTest a
+                | Unary (Subtensor srs, a) -> tSrs srs && subTest a
+                | Unary (Held (derivsShp, heldOp), a) ->
+                    let canEvalOp =
+                        match heldOp with 
+                        | ReplicateTo (dim, s) -> tSize s
+                    List.forall tShp derivsShp && canEvalOp && subTest a
+                | Unary (Gather indices, a) ->
+                    let someIndices = indices |> List.choose id
+                    List.forall subTest someIndices && subTest a
+                | Unary (Scatter (indices, shp), a) ->
+                    let someIndices = indices |> List.choose id
+                    List.forall subTest someIndices && tShp shp && subTest a
+                | Unary (AssumeJacobian jac, a) -> subTest jac && subTest a
+                | Unary (op, a) -> subTest a
 
-            | Binary (SetSubtensor srs, a, b) -> 
-                tSrs srs && subTest a && subTest b
-            | Binary (IfThenElse c, a, b) ->
-                subTest c && subTest a && subTest b 
-            | Binary (op, a, b) -> subTest a && subTest b
+                | Binary (SetSubtensor srs, a, b) -> 
+                    tSrs srs && subTest a && subTest b
+                | Binary (IfThenElse c, a, b) ->
+                    subTest c && subTest a && subTest b 
+                | Binary (op, a, b) -> subTest a && subTest b
 
-            | Nary (Elements (trgtShp, elemExpr), es) -> 
-                tShp trgtShp && 
-                ElemExpr.canEvalAllSymSizes elemExpr && 
-                List.forall subTest es
-            | Nary (Channel (Loop spec, channel), es) ->
-                (tSize spec.Length) 
-                &&
-                (spec.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
-                    tShp vs.Shape &&
-                    match li with
-                    | PreviousChannel pc -> tSize pc.Delay
-                    | _ -> true)) 
-                &&
-                (spec.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> subTest lv.Expr))                
-            | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall subTest es
-            | Nary (op, es) -> List.forall subTest es
+                | Nary (Elements (trgtShp, elemExpr), es) -> 
+                    tShp trgtShp && 
+                    ElemExpr.canEvalAllSymSizes elemExpr && 
+                    List.forall subTest es
+                | Nary (Channel (Loop spec, channel), es) ->
+                    (tSize spec.Length) 
+                    &&
+                    (spec.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
+                        tShp vs.Shape &&
+                        match li with
+                        | PreviousChannel pc -> tSize pc.Delay
+                        | _ -> true)) 
+                    &&
+                    (spec.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> subTest lv.Expr))                
+                | Nary (ExtensionOp eop, es) -> eop.CanEvalAllSymSizes && List.forall subTest es
+                | Nary (op, es) -> List.forall subTest es
+        
+        if evalable then exprsWithEvalableSymSizes.LockedAdd expr |> ignore
         if failIfNot && not evalable then
             failwithf "expression %A contains a symbolic size that cannot be evaluated to \
                        a numeric value" expr

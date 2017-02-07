@@ -211,14 +211,18 @@ module Func =
     let private exprGenerate baseExpr symSizes =
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Substituting symbolic sizes..."
-        let substExpr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
+        let substExpr = baseExpr |> Expr.substSymSizes symSizes 
         if Debug.Timing then printfn "Substituting symbolic sizes took %A" sw.Elapsed
    
+        if Debug.TraceCompile then printfn "Releasing held expressions..."
+        let releasedExpr = Hold.tryRelease substExpr
+        if Debug.Timing then printfn "Releasing held expressions took %A" sw.Elapsed        
+
         let sw = Stopwatch.StartNew ()
         if Debug.TraceCompile then printfn "Optimizing expression..." 
         let optimizedExpr = 
-            if Debug.DisableOptimizer then substExpr
-            else Optimizer.optimize substExpr
+            if Debug.DisableOptimizer then releasedExpr
+            else Optimizer.optimize releasedExpr
         if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
         if Debug.PrintOptimizerStatistics then
             printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 

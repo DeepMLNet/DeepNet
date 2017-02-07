@@ -7,9 +7,9 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<ExprT, ExprT> () 
-    let private combined = Dictionary<ExprT, ExprT> () 
-    let private fullOptimized = Dictionary<ExprT, ExprT> () 
+    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
+    let private combined = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
+    let private fullOptimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
 
     /// Broadcast information
     type BroadcastInfoT =
@@ -256,7 +256,7 @@ module Optimizer =
         /// new element expression if the argument is not an element expression.
         let rec getArgElemExpr argExpr =            
             let combinable () = 
-                Set.count (exprInfo.DependantsStructural argExpr) = 1 ||
+                (exprInfo.DependantsStructural argExpr).Count = 1 ||
                 Set.count (Expr.extractVars argExpr) = 0
             //let combinable () = false
             match subComb argExpr with
@@ -357,6 +357,7 @@ module Optimizer =
                     Nary (op, es |> List.map subComb)
 
             combined.LockedSet (expr, comb)
+            combined.LockedSet (comb, comb)
             comb
 
     /// Optimizes an expression.
@@ -515,7 +516,10 @@ module Optimizer =
         | Some opt -> opt
         | None ->
             let opt = expr |> optRec |> Expr.check
-            let opt = combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+            let opt = 
+                if not Debug.DisableCombineIntoElementsOptimization then
+                    combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
+                else opt
             fullOptimized.LockedSet (expr, opt)
             fullOptimized.LockedSet (opt, opt)
             opt
