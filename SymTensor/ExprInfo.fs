@@ -9,8 +9,6 @@ type MultiChannelOpUsageT = MultiChannelOpT * List<ExprT>
 
 type ExprInfoT (expr: ExprT) =
     
-    //do printfn "creating ExprInfoT"
-
     /// expression cache
     static let knownExprs = ConcurrentDictionary<ExprT, ExprT> () //(HashIdentity.Structural)   
 
