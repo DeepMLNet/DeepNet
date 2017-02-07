@@ -38,7 +38,6 @@ module Hold =
                         else aRep
 
                     | _ -> 
-                        printfn "cannot release %A for shp %A" op a.Shape
                         Unary (op, a)
 
                 // derivatives
