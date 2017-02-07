@@ -10,6 +10,10 @@ module Debug =
     /// If true, expressions are not optimized during function creation.
     let mutable DisableOptimizer = false
 
+    /// If true, individual operations are not combined into an element expression
+    /// during optimization.
+    let mutable DisableCombineIntoElementsOptimization = false
+
     /// If ture, optimizer statistics are printed.
     let mutable PrintOptimizerStatistics = false
 
