@@ -23,6 +23,8 @@ module ActivationFuncTypes =
         | Sigmoid        
         /// soft-max transfer function
         | SoftMax
+        /// logarithm of soft-max transfer function
+        | LogSoftmax
         /// no transfer function
         | Identity
 
@@ -60,10 +62,11 @@ module ActivationFunc =
     /// applies the specified activation function
     let apply af x =
         match af with
-        | Tanh     -> tanh x
-        | Sigmoid  -> sigmoid x
-        | SoftMax  -> softmax x
-        | Identity -> id x
+        | Tanh       -> tanh x
+        | Sigmoid    -> sigmoid x
+        | SoftMax    -> softmax x
+        | LogSoftmax -> logSoftmax x
+        | Identity   -> id x
 
 /// Regularization expressions.
 module Regularization =

@@ -28,7 +28,7 @@ module CudaExecUnitTypes =
     /// A custom CUDA execution item.
     type ICudaExecItem =
         /// Asynchronously execute the item on the specified CUDA stream.
-        abstract Execute: CudaExecEnvT -> StreamT -> unit
+        abstract Execute: CudaExecEnvT -> ManagedCuda.BasicTypes.CUstream -> unit
 
     /// a CUDA operation that will be assigned to and executed in a CUDA stream
     type CudaExecItemT =
@@ -86,6 +86,10 @@ module CudaExecUnitTypes =
         SrcsDfltCh:                         unit -> ArrayNDManikinT list
         /// Default channel is shared for all sources?
         SrcsDfltChShared:                   unit -> bool list   
+        /// True if the specified manikin overlaps with any source.
+        OverlappingWithAnySrc:              ArrayNDManikinT -> bool
+        /// True if the default channel target shape and type match the specified manikin.
+        MatchingDfltChTypeAndShape:         ArrayNDManikinT -> bool
         /// The view request for the default channel of the target.
         TrgtDefChReq:                       unit -> ArrayNDManikinT option
         /// Target for default channel.
@@ -94,6 +98,9 @@ module CudaExecUnitTypes =
         NewDfltChTrgt:                      unit -> ChannelManikinsAndSharedT
         /// default channel target that shares no elements with any srcView 
         DfltChOutplaceTrgt:                 unit -> ChannelManikinsAndSharedT     
+        /// default channel target that shares no elements with any srcView 
+        /// and has C-continguous memory layout
+        DfltChOutplaceCTrgt:                unit -> ChannelManikinsAndSharedT     
         /// default channel target that shares no elements with any srcView 
         /// and can be used for BLAS   
         DfltChOutplaceBlasTrgt:             unit -> ChannelManikinsAndSharedT
@@ -395,23 +402,31 @@ module CudaExecUnit =
             |> List.exists (Map.exists (fun ch (view, shared) -> 
                                             ArrayNDManikin.maybeOverlapping rv view))
 
+        /// True if type and shape of default target channel match with specified manikin.
+        let matchingDfltChTypeAndShape (rv: ArrayNDManikinT) =
+            rv.TypeName = trgtTypenames.[dfltChId] && rv.Shape = trgtShapes.[dfltChId] 
+
         /// default channel target that shares no elements with any srcView 
         let dfltChOutplaceTrgt () =
             match trgtDefChReq () with
             | Some rv when not (overlappingWithAnySrc rv) && 
-                           not (ArrayND.isBroadcasted rv) &&
-                           rv.TypeName = trgtTypenames.[dfltChId] &&
-                           rv.Shape = trgtShapes.[dfltChId] 
+                           not (ArrayND.isBroadcasted rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
              
+        /// default channel target that shares no elements with any srcView and has C-continguous layout
+        let dfltChOutplaceCTrgt () =
+            match trgtDefChReq () with
+            | Some rv when ArrayND.isC rv &&
+                           not (overlappingWithAnySrc rv) && matchingDfltChTypeAndShape rv
+                -> dfltChTrgt rv false
+            | _ -> newDfltChTrgt () 
+
         /// default channel target that shares no elements with any srcView and can be used for BLAS
         let dfltChOutplaceBlasTrgt () = 
             match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv && 
-                           not (overlappingWithAnySrc rv) &&
-                           rv.TypeName = trgtTypenames.[dfltChId] &&
-                           rv.Shape = trgtShapes.[dfltChId] 
+                           not (overlappingWithAnySrc rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> 
                 dfltChTrgt (ArrayNDManikin.newBlasTarget memAllocator 
@@ -421,9 +436,7 @@ module CudaExecUnit =
         let dfltChOutplaceTransposedBlasTrgt () = 
             match trgtDefChReq () with
             | Some rv when ArrayNDManikin.canBeBlasTarget rv.T && 
-                           not (overlappingWithAnySrc rv) &&
-                           rv.TypeName = trgtTypenames.[dfltChId] &&
-                           rv.Shape = trgtShapes.[dfltChId]
+                           not (overlappingWithAnySrc rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> 
                 dfltChTrgt (ArrayNDManikin.newC memAllocator 
@@ -435,8 +448,7 @@ module CudaExecUnit =
             match srcs 
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
-                                    view.TypeName = trgtTypenames.[dfltChId] &&
-                                    view.Shape = trgtShapes.[dfltChId] &&
+                                    matchingDfltChTypeAndShape view &&
                                     not (ArrayND.isBroadcasted view) && 
                                     not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]
@@ -445,10 +457,13 @@ module CudaExecUnit =
         let helpers = {
             SrcsDfltCh                          = srcsDfltCh
             SrcsDfltChShared                    = srcsDfltChShared
+            OverlappingWithAnySrc               = overlappingWithAnySrc
+            MatchingDfltChTypeAndShape          = matchingDfltChTypeAndShape
             TrgtDefChReq                        = trgtDefChReq
             DfltChTrgt                          = dfltChTrgt
             NewDfltChTrgt                       = newDfltChTrgt
             DfltChOutplaceTrgt                  = dfltChOutplaceTrgt
+            DfltChOutplaceCTrgt                 = dfltChOutplaceCTrgt
             DfltChOutplaceBlasTrgt              = dfltChOutplaceBlasTrgt
             DfltChOutplaceTransposedBlasTrgt    = dfltChOutplaceTransposedBlasTrgt
             DfltChInplaceOvrwrtTrgt             = dfltChInplaceOvrwrtTrgt
@@ -900,8 +915,6 @@ module CudaExecUnit =
         | BlasArgCopy -> 
             let bcAllowed = (List.replicate (manikin.NDims - 2) true) @ [false; false]
             let tmpView, copyOps = copyKeepingBroadcasted memAllocator bcAllowed manikin
-            //let tmpView = ArrayNDManikin.newC memAllocator (ArrayNDManikin.typeName manikin) (ArrayND.shape manikin)
-            //let copyOps = copyExecItems tmpView manikin
             tmpView, BlasTranspose, copyOps, false
 
     /// BLAS target argument passing, so that orientation is preserved

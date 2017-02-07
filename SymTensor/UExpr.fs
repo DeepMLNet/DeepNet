@@ -254,8 +254,9 @@ module UExpr =
                 | Expr.Unary (Expr.Scatter (indices, _), a) ->
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
                     extra (Scatter idxArgNos) (a::idxArgs)
-                | Expr.Unary (Expr.Held (_, heldOp), a) ->
-                    failwithf "the held op %A must be expanded before conversion to UExpr" heldOp
+                | Expr.Unary (Expr.Held (_, heldOp) as holdOp, a) ->
+                    failwithf "the held op %A must be expanded before conversion to UExpr \
+                              (shape of argument is %A and Hold is %A)" heldOp a.Shape holdOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->
@@ -352,16 +353,19 @@ module UExpr =
     and removeUnusedChannels (uexprs: UExprT list) =
         // build set of used channels
         let usedChannels = Dictionary<UExprT, HashSet<ChannelT>> (HashIdentity.Reference)
-        let rec buildUsed (UExpr (op, args, _)) =
-            match op with
-            | UExtraOp (Channel ch) ->
-                let multichannelExpr = args.Head
-                if not (usedChannels.ContainsKey multichannelExpr) then
-                    usedChannels.[multichannelExpr] <- HashSet<_> ()
-                usedChannels.[multichannelExpr].Add ch |> ignore
-            | _ -> ()
-            for arg in args do
-                buildUsed arg
+        let visited = HashSet<UExprT> (HashIdentity.Reference)
+        let rec buildUsed (UExpr (op, args, _) as uexpr) =
+            if not (visited.Contains uexpr) then
+                match op with
+                | UExtraOp (Channel ch) ->
+                    let multichannelExpr = args.Head
+                    if not (usedChannels.ContainsKey multichannelExpr) then
+                        usedChannels.[multichannelExpr] <- HashSet<_> ()
+                    usedChannels.[multichannelExpr].Add ch |> ignore
+                | _ -> ()
+                for arg in args do
+                    buildUsed arg
+                visited.Add uexpr |> ignore
         uexprs |> List.iter buildUsed 
 
         // filter unused channels
@@ -377,6 +381,7 @@ module UExpr =
                         removeUnusedLoopChannels (Set.ofSeq usedChannels.[origExpr]) expr
                     | _ -> expr
                 processed.[origExpr] <- replacement
+                processed.[replacement] <- replacement
                 replacement
         uexprs |> List.map rebuild 
 
@@ -428,20 +433,35 @@ module UExpr =
                 |> fun n -> n + 1
         doCount uexpr
 
-    /// counts how many times subExpr occurs in unified expression uexpr
-    let subExprOccurrences uexpr =
-        let cnt = Dictionary<UExprT, int>(HashIdentity.Reference)
-        let rec build (UExpr (_, subExprs, _) as uexpr) =
-            if cnt.ContainsKey(uexpr) then
-                cnt.[uexpr] <- cnt.[uexpr] + 1
-            else
-                cnt.[uexpr] <- 1
 
-            for subExpr in subExprs do
-                build subExpr
-        build uexpr
+/// Information about a unified expression.
+type UExprInfoT (expr: UExprT) =
+      
+    // build sets of dependants for each subexpression
+    let dependants = 
+        let processed = HashSet<UExprT> (HashIdentity.Reference)
+        let dependants = Dictionary<UExprT, ResizeArray<UExprT>> (HashIdentity.Reference)              
+        let addDependant node dependant =
+            if not (dependants.ContainsKey node) then
+                dependants.[node] <- ResizeArray<UExprT> ()
+            dependants.[node].Add dependant
+        let rec doBuild (UExpr(_, args, _) as expr) =
+            if not (processed.Contains expr) then
+                // update dependants recursively
+                for arg in args do
+                    addDependant arg expr
+                for arg in args do
+                    doBuild arg
+                processed.Add expr |> ignore
+        doBuild expr
+        dependants
 
-        fun subExpr ->
-            if cnt.ContainsKey(subExpr) then cnt.[subExpr]
-            else 0
+    /// Contained unified expression.
+    member this.Expr = expr 
 
+    /// Returns all expressions that depend on expr.
+    /// A dependant will occur as many times as it references expr through its arguments.
+    member this.Dependants expr =
+        match dependants.TryFind expr with
+        | Some deps -> deps.AsReadOnly()
+        | None -> (ResizeArray<_> ()).AsReadOnly()

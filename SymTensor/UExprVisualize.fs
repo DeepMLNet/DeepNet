@@ -180,7 +180,7 @@ module UExprVisualizer =
                 |> Map.ofList
 
             // annotate loop variables
-            for KeyValue(expr, node) in nodeForExpr do
+            for KeyValue(expr, node : Node) in nodeForExpr do
                 match expr with
                 | UExpr (ULeafOp (Expr.Var vs), _, _) ->
                     let li = loopSpec.Vars.[vs]
@@ -210,7 +210,7 @@ module UExprVisualizer =
 
             subgraph
 
-        and nodesForExprs (subgraph: Subgraph) exprs : Node list * Map<UExprT, Node> =
+        and nodesForExprs (subgraph: Subgraph) exprs : Node list * IReadOnlyDictionary<_,_> =
             let nodeForExpr = Dictionary<UExprT, Node> (HashIdentity.Reference)
             let rec build expr =
                 match nodeForExpr.TryFind expr with
@@ -249,7 +249,7 @@ module UExprVisualizer =
                             srcEdges.[(expr, i)] <- edge
                         opNode
 
-            exprs |> List.map build, Map.ofDictionary nodeForExpr
+            exprs |> List.map build, nodeForExpr :> IReadOnlyDictionary<_,_>
 
         // blinking
         let mutable blinkMarked = false
@@ -277,13 +277,11 @@ module UExprVisualizer =
             blinkMarked <- not blinkMarked
             viewer.Refresh()
 
-        /// nodes for storages
-        //let nodeForStorage = Dictionary<string, Node> ()
-
         /// nodes for execution units
         let nodeForEuId = Dictionary<int, Node> ()
 
         // build graph
+        do printfn "Building UExpr visualization..."
         let resNodes, nodeForExpr = nodesForExprs graph.RootSubgraph rootExprs
 
         do
@@ -300,7 +298,7 @@ module UExprVisualizer =
                                 (trgtManikins: Map<string, ArrayNDManikinT>) 
                                 (srcManikins: ArrayNDManikinT list)
                                 (extraMems: MemManikinT list) =
-            match nodeForExpr.TryFind uExpr with
+            match nodeForExpr.TryFindReadOnly uExpr with
             | Some node -> nodeForEuId.[euId] <- node
             | None -> ()
 
