@@ -210,15 +210,23 @@ module HDF5Types =
             if not (this.Exists name) then
                 failwithf "HDF5 object %s does not exist in file %s" name path
 
-            let elementType, data =
-                if typeof<'T>.IsArray then typeof<'T>.GetElementType(), box value :?> Array
+            let valType = value.GetType()
+            let hdfValType, data, dataLength =
+                if valType = typeof<string> then
+                    let bytes = System.Text.Encoding.UTF8.GetBytes (box value :?> string) |> box :?> Array
+                    let strType = H5T.copy(H5T.C_S1) |> check
+                    H5T.set_size(strType, nativeint bytes.LongLength) |> check |> ignore
+                    strType, bytes, 1UL
+                elif valType.IsArray then 
+                    let ary = box value :?> Array
+                    hdfTypeInst (valType.GetElementType()), ary, uint64 ary.LongLength
                 else 
-                    let ary = Array.CreateInstance(typeof<'T>, 1)
+                    let ary = Array.CreateInstance(valType, 1)
                     ary.SetValue (value, 0)
-                    typeof<'T>, ary
+                    hdfTypeInst valType, ary, 1UL
 
-            let typeHnd = H5T.copy (hdfTypeInst elementType) |> check
-            let shapeHnd = H5S.create_simple (1, [|uint64 data.Length|], [|uint64 data.Length|]) |> check
+            let typeHnd = H5T.copy hdfValType |> check
+            let shapeHnd = H5S.create_simple (1, [|dataLength|], [|dataLength|]) |> check
 
             if H5A.exists_by_name (fileHnd, name, atrName) > 0 then
                 H5A.delete_by_name (fileHnd, name, atrName) |> check |> ignore
