@@ -56,6 +56,9 @@
     <None Include="DeepNet.nuspec" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Data.DesignTime">
+      <HintPath>..\..\..\..\..\..\..\Local\surban\dev\Deep\DeepPrivate\DeepNet\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
+    </Reference>
     <Reference Include="HDF.PInvoke">
       <HintPath>..\Tensor\HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>

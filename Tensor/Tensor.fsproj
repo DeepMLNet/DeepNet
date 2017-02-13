@@ -60,6 +60,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
+    <Compile Include="CudaSup.fs" />
     <Compile Include="MKL.fs" />
     <Compile Include="ArrayNDLayout.fs" />
     <Compile Include="FastLayout.fs" />
@@ -103,6 +104,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="CudaBlas">
+      <HintPath>..\..\..\..\..\..\..\Local\surban\dev\Deep\DeepPrivate\packages\ManagedCuda-CUBLAS.8.0.13\lib\net46\CudaBlas.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="HDF.PInvoke">
       <HintPath>HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>

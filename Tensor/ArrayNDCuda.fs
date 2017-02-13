@@ -6,6 +6,7 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Basics
+open Basics.Cuda
 open ArrayND
 open ArrayNDHost
 
@@ -247,6 +248,10 @@ module ArrayNDCudaTypes =
 
         override this.SymmetricEigenDecomposition () =
             failwith "not implemented"
+
+        /// device pointer to first element of this array
+        member this.DevicePtr : nativeint =
+            CudaSup.getIntPtr this.Storage.Data.DevicePointer + nativeint (this.Layout.Offset * sizeof64<'T>)
 
 
 module ArrayNDCuda = 

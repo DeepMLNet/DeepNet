@@ -96,10 +96,23 @@ let requireEqualTracesWithRandomDataIdx shps (exprFn: ExprT list -> ExprT) =
     compareTraces (randomEval<single, int64> shps exprFn) false
     |> should equal 0
 
-let randomDerivativeCheck tolerance shps (exprFn: ExprT list -> ExprT) =
+let randomDerivativeCheckTree device tolerance shps (exprFn: ExprT list -> ExprT) =
     let rng = System.Random(123)
     let vars = buildVars<float> shps
     let expr = exprFn vars
-    let varEnv = buildVarEnv<float> vars shps rng DevHost
-    DerivCheck.checkExprTree DevHost tolerance 1e-7 varEnv expr
+    let varEnv = buildVarEnv<float> vars shps rng device
+    DerivCheck.checkExprTree device tolerance 1e-7 varEnv expr
+
+let randomDerivativeCheckTreeOnHost = randomDerivativeCheckTree DevHost
+let randomDerivativeCheckTreeOnCuda = randomDerivativeCheckTree DevCuda
+
+let randomDerivativeCheck device tolerance shps (exprFn: ExprT list -> ExprT) =
+    let rng = System.Random(123)
+    let vars = buildVars<float> shps
+    let expr = exprFn vars
+    let varEnv = buildVarEnv<float> vars shps rng device
+    DerivCheck.checkExpr device tolerance 1e-7 varEnv expr
+
+let randomDerivativeCheckOnHost = randomDerivativeCheck DevHost
+let randomDerivativeCheckOnCuda = randomDerivativeCheck DevCuda
 

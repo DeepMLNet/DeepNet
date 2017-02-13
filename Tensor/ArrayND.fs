@@ -561,6 +561,15 @@ module ArrayND =
     let inline ensureCAndOffsetFree a = 
         if isC a && offset a = 0L then a else copy a 
 
+    /// If the ArrayND is not in Fortran order, returns a copy in Fortran order; 
+    /// otherwise it is returned unchanged.
+    let inline ensureF a =
+        if isF a then a 
+        else 
+            let cpy = newFOfSameType (shape a) a
+            copyTo a cpy
+            cpy
+
     /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
         relayout (ArrayNDLayout.padLeft (layout a)) a

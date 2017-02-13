@@ -205,7 +205,7 @@ let ``Trace compare: Derivative of complicated loop 1`` () =
 
 [<Fact>]
 let ``Derivative compare: Complicated loop 1`` () =
-    randomDerivativeCheck 1e-4 [[1L; 3L; 2L]; [3L; 2L; 2L]; [2L; 5L; 3L]; [2L]] 
+    randomDerivativeCheckTreeOnHost 1e-4 [[1L; 3L; 2L]; [3L; 2L; 2L]; [2L; 5L; 3L]; [2L]] 
         (fun [initialA; initialB; seqA; constAExt] ->
             let nIters = SizeSpec.fix 5L
             let m = SizeSpec.fix 3L
@@ -240,7 +240,7 @@ let ``Derivative compare: Complicated loop 1`` () =
 
 [<Fact>]
 let ``Derivative compare: Simple loop 1`` () =
-    randomDerivativeCheck 1e-4 [[1L; 2L]] 
+    randomDerivativeCheckTreeOnHost 1e-4 [[1L; 2L]] 
         (fun [initialA] ->
             let nIters = SizeSpec.fix 3L
             let n = SizeSpec.fix 2L
