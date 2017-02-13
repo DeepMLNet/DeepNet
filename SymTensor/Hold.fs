@@ -66,7 +66,7 @@ module Hold =
                     let indices = indices |> List.map (Option.map tryRelease)
                     Unary (Scatter (indices, shp), tryRelease a)
                 | Unary (AssumeJacobian jac, a) -> 
-                    Unary (AssumeJacobian (tryRelease jac), tryRelease jac)
+                    Unary (AssumeJacobian (tryRelease jac), tryRelease a)
                 | Unary (op, a) -> Unary (op, tryRelease a)
 
                 | Binary (IfThenElse c, a, b) -> Binary (IfThenElse (tryRelease c), tryRelease a, tryRelease b)
