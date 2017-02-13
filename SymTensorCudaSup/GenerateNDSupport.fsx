@@ -4,7 +4,7 @@ open System.IO
 //exit 0
 
 let maxDims = 7
-let maxArity = 30
+let maxArity = 35
 
 let combineWith sep items =    
     let rec combine items = 

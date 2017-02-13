@@ -92,7 +92,6 @@ module Optimizer =
     let rec pullSumOutOfElements elements =
         match elements with
         | Nary (Elements (resShape, elemExpr), args) ->
-
             let nDims = ShapeSpec.nDim resShape
             let mutable nArgs = args.Length 
             let newArg () =
@@ -103,8 +102,6 @@ module Optimizer =
             let rec splitSum elemExpr =
                 match elemExpr with
                 | ElemExpr.Unary (ElemExpr.Sum (sym, first, last), summand) ->     
-                    //printfn "Pulling out summand:\n%A" summand
-                                 
                     // replace sum by argument access
                     let typ = (ElemExpr.typeName elemExpr).Type
                     let sumArgPos = newArg ()
@@ -515,6 +512,7 @@ module Optimizer =
         match fullOptimized.LockedTryFind expr with
         | Some opt -> opt
         | None ->
+            Expr.checkExpr expr
             let opt = expr |> optRec |> Expr.check
             let opt = 
                 if not Debug.DisableCombineIntoElementsOptimization then
