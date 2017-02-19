@@ -105,7 +105,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
-      <HintPath>..\..\..\..\..\..\..\Local\surban\dev\Deep\DeepPrivate\packages\ManagedCuda-CUBLAS.8.0.13\lib\net46\CudaBlas.dll</HintPath>
+      <HintPath>..\..\packages\ManagedCuda-CUBLAS.8.0.13\lib\net46\CudaBlas.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="HDF.PInvoke">
