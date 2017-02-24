@@ -40,7 +40,7 @@ module Utils =
             let nPlots = List.length plots |> float
             let shape = 
                 let side1 = ceil(sqrt nPlots)
-                let side2 =  ceil(nPlots/side1)
+                let side2 =  side1 //ceil(nPlots/side1)
                 let side1,side2 = (int side1), (int side2)
                 [side2;side1]
             R.par2 ("mfrow", shape)
