@@ -50,20 +50,6 @@ module LossLayer =
 /// A layer of neurons (perceptrons).
 module NeuralLayer = 
 
-    /// Transfer (activation) functions.
-    type TransferFuncs =
-        /// tanh transfer function
-        | Tanh
-        /// sigmoid transfer function 
-        | Sigmoid
-        /// soft-max transfer function 
-        /// (use SoftMaxCrossEntropy loss measure if possible)
-        | Softmax
-        /// logarithm of soft-max transfer function
-        | LogSoftmax
-        /// no transfer function
-        | Identity
-
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
@@ -71,7 +57,7 @@ module NeuralLayer =
         /// number of outputs
         NOutput:            SizeSpecT
         /// transfer (activation) function
-        TransferFunc:       TransferFuncs
+        TransferFunc:       ActivationFunc
         /// weights trainable
         WeightsTrainable:   bool
         /// bias trainable
@@ -141,12 +127,7 @@ module NeuralLayer =
             if pars.HyperPars.BiasTrainable then pars.Bias
             else Expr.assumeZeroDerivative pars.Bias
         let act = input .* weights.T + bias
-        match pars.HyperPars.TransferFunc with
-        | Tanh     -> ActivationFunc.tanh act
-        | Sigmoid  -> ActivationFunc.sigmoid act
-        | Softmax  -> ActivationFunc.softmax act
-        | LogSoftmax -> ActivationFunc.logSoftmax act
-        | Identity -> act
+        ActivationFunc.apply pars.HyperPars.TransferFunc act
 
     /// Calculates sum of all regularization terms of this layer.
     let regularizationTerm pars  =
