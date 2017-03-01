@@ -25,6 +25,8 @@ module ActivationFuncTypes =
         | SoftMax
         /// logarithm of soft-max transfer function
         | LogSoftmax
+        /// rectifier unit transfer function
+        | Relu
         /// no transfer function
         | Identity
 
@@ -59,6 +61,10 @@ module ActivationFunc =
         let c = x |> Expr.maxKeepingAxis 1
         x - c - log (Expr.sumKeepingAxis 1 (exp (x - c))) 
 
+    /// Rectifier Unit function: max(x, 0)
+    let relu (x: ExprT) =
+        x |> Expr.zerosLike |> Expr.maxElemwise x
+
     /// applies the specified activation function
     let apply af x =
         match af with
@@ -66,6 +72,7 @@ module ActivationFunc =
         | Sigmoid    -> sigmoid x
         | SoftMax    -> softmax x
         | LogSoftmax -> logSoftmax x
+        | Relu       -> relu x
         | Identity   -> id x
 
 /// Regularization expressions.
