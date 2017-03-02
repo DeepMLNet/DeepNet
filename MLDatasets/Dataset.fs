@@ -39,7 +39,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
                 failwith "fields must be at least two-dimensional for a sequence dataset"
             let nSteps = fieldStorages.[0].Shape.[1]
             if fieldStorages |> List.exists (fun fs -> fs.NDims < 2 || fs.Shape.[1] <> nSteps) then
-                printfn "WARNING: unequal number of steps in fields"        
+                failwith "unequal number of steps in fields"        
             nSteps
         else failwith "not a sequence dataset"
     do if isSeq then nSteps () |> ignore
