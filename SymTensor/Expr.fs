@@ -95,6 +95,10 @@ module Expr =
         | Sum                           
         /// summation over given dimension
         | SumAxis of int
+        /// product of all elements
+        | Product                          
+        /// product over given dimension
+        | ProductAxis of int
         /// maximum over given dimension                
         | MaxAxis of int
         /// minimum over given dimension
@@ -574,7 +578,9 @@ module Expr =
 
                 // reductions
                 | Unary(Sum, _) -> ShapeSpec.scalar
+                | Unary(Product, _) -> ShapeSpec.scalar
                 | Unary(SumAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(ProductAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
                 | Unary(MaxAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
                 | Unary(MinAxis ax, a) -> shapeOf a |> ShapeSpec.withoutAxis ax
 
@@ -757,6 +763,7 @@ module Expr =
                 match op with
                 | Not -> reqBool op a
                 | SumAxis(ax)
+                | ProductAxis(ax)
                 | MaxAxis(ax) 
                 | MinAxis(ax) 
                 | ArgMaxAxis(ax) 
@@ -1464,6 +1471,12 @@ module Expr =
 
     /// summation over given dimension
     let sumAxis ax a = Unary(SumAxis(ax), a) |> check
+
+    /// product of all elements
+    let product a = Unary(Product, a) |> check
+
+    /// summation over given dimension
+    let productAxis ax a = Unary(ProductAxis(ax), a) |> check
 
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
     let sumKeepingAxis ax a =

@@ -26,8 +26,8 @@ let main argv =
     // define model parameters
     let mlp = 
         MLP.pars (mb.Module "MLP") 
-            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=NeuralLayer.Tanh}
-                        {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=NeuralLayer.Softmax}]
+            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=ActivationFunc.Tanh}
+                        {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=ActivationFunc.SoftMax}]
               LossMeasure = LossLayer.CrossEntropy }
 
     // define variables

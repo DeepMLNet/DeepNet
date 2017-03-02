@@ -144,7 +144,7 @@ module GPPlots =
                 namedParams [   
                      "x",       box (sX @ revX)
                      "y",       box (lowerStdev @ upperStdev)
-                     "col",     box "beige"
+                     "col",     box "khaki1"
                      "border" , box "NA"]
                 |> R.polygon |>ignore
                 namedParams [ 
