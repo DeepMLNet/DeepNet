@@ -1472,15 +1472,19 @@ module Expr =
     /// summation over given dimension
     let sumAxis ax a = Unary(SumAxis(ax), a) |> check
 
-    /// product of all elements
-    let product a = Unary(Product, a) |> check
-
-    /// summation over given dimension
-    let productAxis ax a = Unary(ProductAxis(ax), a) |> check
-
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
     let sumKeepingAxis ax a =
         a |> sumAxis ax |> insertBroadcastAxis ax
+
+    /// product of all elements
+    let product a = Unary(Product, a) |> check
+
+    /// product over given dimension
+    let productAxis ax a = Unary(ProductAxis(ax), a) |> check
+
+    /// product over given dimension, while keeping the axis with one (broadcastable) element
+    let productKeepingAxis ax a =
+        a |> productAxis ax |> insertBroadcastAxis ax
 
     /// maximum over given dimension
     let maxAxis ax a = Unary(MaxAxis(ax), a) |> check

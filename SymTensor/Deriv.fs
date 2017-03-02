@@ -116,7 +116,6 @@ module Deriv =
             | Truncate -> zeroJacobian a
             
             | Not -> zeroJacobian a
-                //failLogic op
 
             | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
             | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
@@ -157,6 +156,17 @@ module Deriv =
             | SumAxis ax -> 
                 let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
                 bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+            | Product -> 
+                // This division method incorrectly returns NaN for zero elements.
+                // But currently I do not see any efficient alternative.
+                let aBc = a |> reshape (SizeSpec.broadcastable :: ShapeSpec.flatten (shapeOf a))
+                let pBc = expr |> reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
+                (eg |> enableBroadcast 1) * (pBc / aBc)
+            | ProductAxis ax ->
+                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                let aBc = padLeft a
+                let pBc = a |> productKeepingAxis ax |> padLeft
+                bcEgExp * (pBc / aBc) |> collapse
             | MaxAxis ax 
             | MinAxis ax ->
                 let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
@@ -218,12 +228,10 @@ module Deriv =
             | GreaterEqual
             | NotEqual
                 -> zeroJacobian a .+ zeroJacobian b
-                //-> failLogic op
 
             | And 
             | Or 
                 -> zeroJacobian a .+ zeroJacobian b
-                //-> failLogic op
 
             | IfThenElse cond -> ifThenElseJac cond a b
 

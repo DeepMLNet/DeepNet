@@ -250,6 +250,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltSrcWithNoViewReq ()
         | UUnaryOp (SumAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp Product -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (ProductAxis _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (MaxAxis _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (MinAxis _) -> dfltSrcWithNoViewReq ()
 
@@ -535,6 +537,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltChOutplaceTrgt ()
         | UUnaryOp (SumAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp Product -> dfltChOutplaceTrgt ()
+        | UUnaryOp (ProductAxis _) -> dfltChOutplaceTrgt ()
         | UUnaryOp (MaxAxis _) -> dfltChOutplaceTrgt ()
         | UUnaryOp (MinAxis _) -> dfltChOutplaceTrgt ()
 
@@ -1095,6 +1099,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> execItemsForReduce memAllocator "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp Product -> execItemsForReduce memAllocator "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ProductAxis ax) -> execItemsForReduceAxis memAllocator ax "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (ConstSpec.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (ConstSpec.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
 

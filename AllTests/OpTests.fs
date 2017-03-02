@@ -108,6 +108,20 @@ let ``Trace compare: large sum axis`` () =
 
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
+let ``Trace compare: product`` () =
+    requireEqualTracesWithRandomData [[7L; 3L; 4L; 5L]] (fun [a] ->
+        Expr.product a
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
+let ``Trace compare: product axis 1`` () =
+    requireEqualTracesWithRandomData [[7L; 3L; 4L; 5L]] (fun [a] ->
+        Expr.productAxis 1 a
+    )
+
+[<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Singular matrix inverse`` () =
     let a = Expr.var<single> "a" [SizeSpec.fix 3L; SizeSpec.fix 3L]
     let expr = Expr.invert a
