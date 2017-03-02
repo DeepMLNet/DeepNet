@@ -110,6 +110,8 @@ module HostEval =
                         | Invert -> ArrayND.invert av
                         | Sum -> ArrayND.sum av
                         | SumAxis ax -> ArrayND.sumAxis ax av
+                        | Product -> ArrayND.product av
+                        | ProductAxis ax -> ArrayND.productAxis ax av
                         | MaxAxis ax -> ArrayND.maxAxis ax av
                         | MinAxis ax -> ArrayND.minAxis ax av
                         | ArgMaxAxis _

@@ -30,7 +30,7 @@ let build device batch =
     // model parameters
     let pars = NeuralLayer.pars (mc.Module "Layer1") 
                 {NeuralLayer.defaultHyperPars with
-                  NInput=nInput; NOutput=nTarget; TransferFunc=NeuralLayer.Softmax}
+                  NInput=nInput; NOutput=nTarget; TransferFunc=ActivationFunc.SoftMax}
      
     // input / output variables
     let input =  mc.Var<single> "Input"  [batchSize; nInput]
