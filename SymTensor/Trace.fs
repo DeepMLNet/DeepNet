@@ -259,8 +259,8 @@ module Trace =
 
     let compare = compareCustom maxSimilar
 
-    let dump file trace =
-        let out fmt = fprintfn file fmt
+    let dump txtFile (hdfFile: HDF5) trace =
+        let out fmt = fprintfn txtFile fmt
         out "Trace session %s" trace.Name
         out "Start: %A" trace.Start
         let endStr =
@@ -271,8 +271,8 @@ module Trace =
         out ""
 
         for exprEval in trace.ExprEvals do
-            out "Evaluation of expression(s) %A" 
-                (exprEval.Exprs |> List.map UExpr.toExpr)
+            let exprsStr = sprintf "%A" (exprEval.Exprs |> List.map UExpr.toExpr)
+            out "Evaluation of expression(s) %s" exprsStr
             out "Id:       %d" exprEval.Id
             out "Compiler: %s" exprEval.Compiler
             out "Start:    %A" exprEval.Start
@@ -281,37 +281,57 @@ module Trace =
                 | Some e -> sprintf "%A" e
                 | None -> "in progress"
             out "End:      %s" endStr
+
+            let hdfGroup = sprintf "%05d" exprEval.Id
+            hdfFile.CreateGroups(hdfGroup)
+            hdfFile.SetAttribute(hdfGroup, "Expressions", exprsStr)
+            hdfFile.SetAttribute(hdfGroup, "Compiler", exprEval.Compiler)
+            hdfFile.SetAttribute(hdfGroup, "Start", sprintf "%A" exprEval.Start)
+            hdfFile.SetAttribute(hdfGroup, "End", sprintf "%A" exprEval.End)
+
             out ""
             out "==== Begin of trace ===="
             out ""
 
-            for idx, evnt in Seq.indexed exprEval.Trace do
+            for idx, evnt in Seq.indexed exprEval.Trace do                
                 out "Event index: %d" idx
                 match evnt with
                 | EnteringLoop uexpr -> out "Entering loop:\n%A" uexpr
                 | LeavingLoop uexpr -> out "Leaving loop:\n%A" uexpr
                 | LoopIteration li -> out "Performing loop iteration %d" li.Iter
                 | ExprEvaled (uexpr, ls, res, msg) ->
-                    match UExpr.tryToExpr uexpr with
-                    | Some expr -> out "Expression: %A" expr
-                    | None -> out "Unified expression: %A" uexpr
-                    out "Loop stack: %A" (ls |> List.map (fun l -> l.Iter))
+                    let exprStr =
+                        match UExpr.tryToExpr uexpr with
+                        | Some expr -> sprintf "%A" expr
+                        | None -> sprintf "%A" uexpr
+                    let loopStackStr =
+                        sprintf "%A" (ls |> List.map (fun l -> l.Iter))
+
+                    out "(Unified) expression: %s" exprStr
+                    out "Loop stack: %s" loopStackStr
                     out "Result:\n%A" res
                     if WithMessage then out "Message: %s" msg
+
+                    let hdfPath = sprintf "%s/%05d" hdfGroup idx
+                    ArrayNDHDF.writeUntyped hdfFile hdfPath (res :?> IArrayNDHostT)
+                    hdfFile.SetAttribute(hdfPath, "Expression", exprStr)
+                    hdfFile.SetAttribute(hdfPath, "LoopStack", loopStackStr)
                 out ""
 
             out "==== End of trace ===="
             out ""
 
-    let dumpToFile path trace =
-        use file = File.CreateText path
-        dump file trace
+    let dumpToFile txtPath hdfPath trace =
+        use txtFile = File.CreateText txtPath
+        use hdfFile = HDF5.OpenWrite hdfPath
+        dump txtFile hdfFile trace
 
-    let dumpActiveTrace file =
-        getActiveTraceSession () |> dump file
+    let dumpActiveTrace txtFile hdfFile =
+        getActiveTraceSession () |> dump txtFile hdfFile
 
     let extractLoop uexpr =
         match uexpr with
         | UExpr (UExtraOp (Channel _), [UExpr (UExtraOp (Loop _), _, _) as uLoop], _) -> uLoop
         | _ -> failwith "not a loop channel expression"
+
 

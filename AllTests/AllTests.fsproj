@@ -150,11 +150,6 @@
       <Project>{c6ea7c8a-c74f-44df-828b-7c16b8a06329}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\MLPlots\MLPlots.fsproj">
-      <Name>MLPlots</Name>
-      <Project>{853082be-359e-4f7e-b35c-7b10c8bd3970}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\SymTensorCuda\SymTensorCuda.fsproj">
       <Name>SymTensorCuda</Name>
       <Project>{816e58da-85a0-4272-b042-682bc6f0aa5b}</Project>

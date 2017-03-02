@@ -732,11 +732,13 @@ module CudaExprWorkspaceTypes =
                         | None -> ()
                         printfn "Expression was %A" uexpr
 
-                        let crashTraceFile = "CudaCrashTrace.txt"
-                        use tw = File.CreateText crashTraceFile
+                        let crashTraceFileTxt, crashTraceFileHdf = "CudaCrashTrace.txt", "CudaCrashTrace.h5"
+                        use tw = File.CreateText crashTraceFileTxt
+                        use hdf = HDF5.OpenWrite crashTraceFileHdf
                         Trace.WithMessage <- true
-                        Trace.dumpActiveTrace tw
-                        printfn "Dumped active trace to %s" (Path.GetFullPath crashTraceFile)
+                        Trace.dumpActiveTrace tw hdf
+                        printfn "Dumped active trace to %s and %s" 
+                                (Path.GetFullPath crashTraceFileTxt) (Path.GetFullPath crashTraceFileHdf)
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res

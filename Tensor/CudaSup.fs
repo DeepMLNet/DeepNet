@@ -109,13 +109,16 @@ module CudaSup =
     let setContext () =
         context.SetCurrent ()
 
+    /// Is equivalent to int64 (ceil(float a / float b)).
+    let divCeil a b = 
+        if a % b = 0L then a / b 
+        else a / b + 1L
+
     /// Computes CUDA launch dimensions from work dimensions and maximum block size.
     /// It is possible that the calculated launch dimensions will be smaller than the
     /// specified work dimensions, since the maximum block and grid sizes are limited.
     let computeLaunchDim (workDim: WorkDimT) maxBlockSize =
-        let (./) a b =
-            if a % b = 0L then a / b 
-            else a / b + 1L
+        let (./) a b = divCeil a b
 
         let wx, wy, wz = workDim
         let mbx, mby, mbz = maxBlockDim

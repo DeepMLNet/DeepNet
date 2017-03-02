@@ -13,44 +13,44 @@ open TestUtils
 
 [<Fact>]
 let ``Plus`` () =
-    randomDerivativeCheck 1e-4 [[3L; 3L]; [3L; 3L]] (fun [a; b] ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[3L; 3L]; [3L; 3L]] (fun [a; b] ->
         a + b 
     )
 
 [<Fact>]
 let ``Inverse`` () =
-    randomDerivativeCheck 1e-4 [[2L; 2L]] (fun [a] ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[2L; 2L]] (fun [a] ->
         Expr.invert a
     ) 
 
 [<Fact>]
 let ``Batch inverse`` () =
-    randomDerivativeCheck 1e-4 [[3L; 2L; 2L]] (fun [a] ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[3L; 2L; 2L]] (fun [a] ->
         Expr.invert a
     ) 
 
 
 [<Fact>]
 let ``Dot`` () =
-    randomDerivativeCheck 1e-4 [[2L; 3L]; [3L; 2L]] (fun [a; b] ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[2L; 3L]; [3L; 2L]] (fun [a; b] ->
         a .* b 
     )
 
 [<Fact>]
 let ``Batched Dot`` () =
-    randomDerivativeCheck 1e-4 [[2L; 3L; 3L]; [2L; 3L]] (fun [a; b] ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[2L; 3L; 3L]; [2L; 3L]] (fun [a; b] ->
         a .* b 
     )
 
 [<Fact>]
 let ``Max, min`` () =
-    randomDerivativeCheck 1e-4  [[3L; 3L]; [3L; 3L]; [3L; 3L]] (fun [a; b; c]  ->
+    randomDerivativeCheckTreeOnHost 1e-4  [[3L; 3L]; [3L; 3L]; [3L; 3L]] (fun [a; b; c]  ->
         Expr.minElemwise (Expr.maxElemwise a b) c
     )
 
 [<Fact>]
 let ``ReplicateTo`` () =
-    randomDerivativeCheck 1e-4 [[7L; 5L]] (fun [a]  ->
+    randomDerivativeCheckTreeOnHost 1e-4 [[7L; 5L]] (fun [a]  ->
         a |> Expr.replicateTo 0 (SizeSpec.fix 21L) |> Expr.replicateTo 1 (SizeSpec.fix 13L)
     )
 
