@@ -292,10 +292,25 @@ module DiagnosticsVisualizer =
                 resLabelNode.Label.FontColor <- Color.White
                 newEdge resNode resLabelNode "" |> ignore
 
-            // add manikin information
+            // add information from ExecUnits
             for eu in diagnostics.ExecUnits do
+
                 match nodeForExpr.TryFindReadOnly eu.Expr with
-                | Some node -> nodeForEuId.[eu.Id] <- node
+                | Some euNode -> 
+                    nodeForEuId.[eu.Id] <- euNode
+
+                    let text = 
+                        eu.Items
+                        |> List.indexed
+                        |> List.map (fun (eiIdx, ei) -> 
+                            sprintf "#%d: %s" eiIdx ei.VisualizationText)
+                        |> String.concat "\n"
+                    if Debug.VisualizeExecItems && text.Length > 0 then
+                        let eiNode = newNode graph.RootSubgraph
+                        eiNode.LabelText <- text
+                        eiNode.Attr.FillColor <- Color.Black
+                        eiNode.Label.FontColor <- Color.White
+                        newEdge euNode eiNode "" |> ignore
                 | None -> ()
 
                 for KeyValue(ch, (manikin, shrd)) in eu.Channels do
@@ -303,8 +318,7 @@ module DiagnosticsVisualizer =
                 for src, manikin in List.indexed eu.Srcs do
                     arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=eu.Id; UExpr=eu.Expr; Relation=Src src}
                 for extraMem in eu.ExtraMem do
-                    arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=eu.Id; UExpr=eu.Expr; Relation=Extra}                
-
+                    arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=eu.Id; UExpr=eu.Expr; Relation=Extra}             
                 
         /// shows the visualization
         member this.Show () = 

@@ -1,6 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
 open System
+open Microsoft.FSharp.Reflection
 
 open Basics
 open Basics.Cuda
@@ -68,7 +69,9 @@ module CudaExecUnitTypes =
         | ExtensionExecItem     of ICudaExecItem
 
         interface IExecItem with
-            member this.VisualizationText = failwith "todo"
+            member this.VisualizationText = 
+                match FSharpValue.GetUnionFields (this, typeof<CudaExecItemT>) with
+                | case, _ -> case.Name
 
 
     type SrcReqsHelpersT = {

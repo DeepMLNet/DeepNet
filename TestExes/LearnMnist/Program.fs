@@ -70,7 +70,7 @@ let main argv =
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
     Debug.VisualizeUExpr <- true
-    Debug.TerminateAfterCompilation <- true
+    //Debug.TerminateAfterCompilation <- true
     //let ts = Trace.startSession "LearnMnist"
 
     let lossFn = mi.Func loss |> arg2 input target
