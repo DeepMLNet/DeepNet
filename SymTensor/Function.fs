@@ -131,6 +131,8 @@ module VarEnv =
 [<AutoOpen>]
 module EnvTypes =
 
+    open SymTensor.Compiler
+
     /// Information necessary to evaluate an expression.
     /// Currently this just holds the variable values, but may contain further information in the future.
     type EvalEnvT = {
@@ -147,13 +149,27 @@ module EnvTypes =
         CanDelay:           bool
     }
 
-    /// a function that evaluates into a numeric value given variable values
-    type CompiledUExprT = EvalEnvT -> IArrayNDT list
+    /// an evaluation function
+    type EvalFn = EvalEnvT -> IArrayNDT list
+
+    /// The result of the compilation of an expression.
+    type CompiledUExprsT = {
+        /// the expressions involved in this compilation
+        Exprs:              UExprT list
+        /// the CompileEnvT used for this compilation
+        CompileEnv:         CompileEnvT
+        /// the variables necessary to evaluate the expressions
+        NeededVars:         Set<VarSpecT>
+        /// the evaluation function
+        Eval:               EvalFn
+        /// diagnostic information
+        Diagnostics:        CompileDiagnosticsT option
+    }
 
     /// a function that compiles a unified expression into a function
     type IUExprCompiler = 
         abstract Name:     string
-        abstract Compile:  CompileEnvT -> UExprT list -> CompiledUExprT
+        abstract Compile:  CompileEnvT -> UExprT list -> EvalFn * (CompileDiagnosticsT option)
 
     /// compile specification, consisting of a compiler and a compile environment
     type CompileSpecT = IUExprCompiler * CompileEnvT
@@ -242,13 +258,6 @@ module Func =
         if failIfNotEvalable then Expr.failOnNotEvalableSymSize expr
         vars, Expr.canEvalAllSymSizes expr
 
-    type private CompileResultT = {
-        Exprs:      UExprT list
-        Eval:       CompiledUExprT
-        NeededVars: Set<VarSpecT>
-        CompileEnv: CompileEnvT
-    }
-
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) 
             : (VarEnvT -> IArrayNDT list) =     
              
@@ -306,21 +315,24 @@ module Func =
                 let uexprs = UExpr.toUExprs exprs
                 if Debug.Timing then printfn "Converting to UExprs took %A" sw.Elapsed
 
-                // build UExpr visualization
-                UExprVisualizer.build uexprs 
-
                 // compile
+                let evalFn, diagnostics = compiler.Compile compileEnv uexprs
                 let compileRes = {
-                    Exprs=uexprs
-                    CompileEnv=compileEnv
-                    Eval=compiler.Compile compileEnv uexprs
-                    NeededVars=neededVars
+                    Exprs       = uexprs
+                    CompileEnv  = compileEnv
+                    NeededVars  = neededVars
+                    Eval        = evalFn
+                    Diagnostics = diagnostics
                 }
 
-                // show UExpr visualization, if requested
-                if Debug.VisualizeUExpr then printfn "Visualizing UExpr in separate window..."
-                UExprVisualizer.show ()
-                UExprVisualizer.finish ()
+                // show diagnostics visualization, if requested
+                if Debug.VisualizeUExpr then 
+                    match compileRes.Diagnostics with
+                    | Some diag ->
+                        printfn "Visualizing UExpr in new window..."
+                        DiagnosticsVisualizer.visualize diag
+                    | None -> 
+                        printfn "No compilation diagnostics available."
 
                 // terminate program, if requested for debugging
                 if Debug.TerminateAfterCompilation then exit 0

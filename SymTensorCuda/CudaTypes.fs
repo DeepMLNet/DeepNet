@@ -47,6 +47,7 @@ module Types =
     type CudaRecipeDescT = {
         CompileEnv:                 CompileEnvT
         UExprs:                     Map<ChannelT, UExprT>
+        OwnerUExpr:                 UExprT option
     }
 
     /// additional environment informations for CUDA

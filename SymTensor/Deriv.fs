@@ -181,11 +181,9 @@ module Deriv =
             | AssumeJacobian jac ->
                 match eg.Shape.[0], jac.Shape.[0] with
                 | fl, jl when fl = jl -> jac
-                | fl, jl when jl = SizeSpec.broadcastable ->
-                    jac |> Expr.broadcast [fl; jac.Shape.[1]]
-                | _ -> 
-                    failwithf "cannot broadcast specified Jacobian of shape %A to required 
-                                Jacobian shape %A" jac.Shape eg.Shape
+                | fl, jl when jl = SizeSpec.broadcastable -> jac |> Expr.broadcast [fl; jac.Shape.[1]]
+                | _ -> failwithf "cannot broadcast specified Jacobian of shape %A to required 
+                                  Jacobian shape %A" jac.Shape eg.Shape
 
             | Print _ -> eg 
             | Dump _ -> eg 

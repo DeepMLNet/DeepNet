@@ -59,7 +59,6 @@
     <Compile Include="Native.fs" />
     <Compile Include="ArrayByVal.fs" />
     <Compile Include="DiskMap.fs" />
-    <Compile Include="ExecUnit.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaElemExpr.fs" />
     <Compile Include="CudaExecUnits.fs" />

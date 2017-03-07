@@ -15,8 +15,8 @@ module CudaCmdTypes =
     type EventPlaceHolderT = EventT option ref
 
     /// a command executed on a stream
-    type CudaCmdT<'e> =
-        | Perform                   of 'e
+    type CudaCmdT =
+        | Perform                   of CudaExecItemT
         | WaitOnEvent               of EventT
         | EmitEvent                 of EventPlaceHolderT
         | WaitOnRerunEvent          of EventT
@@ -26,7 +26,7 @@ module CudaCmdTypes =
         | ExecUnitEnd               of ExecUnitIdT
 
     /// a sequence of commands executed on a stream
-    type StreamCmdsT<'e> = CudaCmdT<'e> list
+    type StreamCmdsT = CudaCmdT list
 
 
 module CudaStreamSeq =
@@ -51,7 +51,7 @@ module CudaStreamSeq =
     }
 
     /// converts execution units to stream commands
-    let execUnitsToStreams (execUnits: ExecUnitT<'e> list) : (StreamCmdsT<'e> list * int) =
+    let execUnitsToStreams (execUnits: ExecUnitT list) : (StreamCmdsT list * int) =
         /// collection of ExecUnits we have to process
         let coll = ExecUnit.Collection execUnits
 
@@ -60,7 +60,7 @@ module CudaStreamSeq =
         /// correlation counter
         let mutable correlationCnt = 0
         /// all allocated streams
-        let streams = ResizeArray<ResizeArray<CudaCmdT<'e>>> ()
+        let streams = ResizeArray<ResizeArray<CudaCmdT>> ()
         /// rerun events
         let rerunEvent = Dictionary<ExecUnitIdT, EventPlaceHolderT> ()
         /// stream reuse information
@@ -84,14 +84,14 @@ module CudaStreamSeq =
 
         /// creates a new stream
         let newStream () =
-            streams.Add (ResizeArray<CudaCmdT<'e>> ())
+            streams.Add (ResizeArray<CudaCmdT> ())
             streams.Count - 1
 
         /// length of a stream
         let streamLength (s: int) = streams.[s].Count
 
         /// emits an ExeOp to the given streams
-        let emitToStream s (exeOp: CudaCmdT<'e>) =
+        let emitToStream s (exeOp: CudaCmdT) =
             streams.[s].Add exeOp
 
         /// true if all ExecUnits that eu depends on have already been processed
@@ -260,7 +260,7 @@ module CudaStreamSeq =
 
                 // emit our instructions
                 for cmd in eu.Items do
-                    Perform cmd |> emitToStream euStream
+                    Perform (cmd :?> CudaExecItemT) |> emitToStream euStream
 
                 // emit an event placeholder to allow for synchronization
                 let evtPh = ref None

@@ -1,4 +1,5 @@
-﻿open SymTensor
+﻿open ArrayNDNS
+open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
 open Datasets
@@ -66,16 +67,19 @@ let main argv =
             LearningRates      = [1e-3; 1e-4; 1e-5]                               
     } 
 
-
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
+    Debug.VisualizeUExpr <- true
+    Debug.TerminateAfterCompilation <- true
+    //let ts = Trace.startSession "LearnMnist"
 
-//    let ts = Trace.startSession "LearnMnist"
-
+    let lossFn = mi.Func loss |> arg2 input target
+    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
+    printfn "Initial training loss: %f" initialLoss
     let result = Train.train trainable mnist trainCfg
 
-//    let ts = ts.End ()
-//    ts |> Trace.dumpToFile "LearnMNIST.txt"
+    //let ts = ts.End ()
+    //ts |> Trace.dumpToFile "LearnMNIST.txt"
 
     0
 

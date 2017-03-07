@@ -67,6 +67,9 @@ module CudaExecUnitTypes =
         // extension item
         | ExtensionExecItem     of ICudaExecItem
 
+        interface IExecItem with
+            member this.VisualizationText = failwith "todo"
+
 
     type SrcReqsHelpersT = {
         /// Creates a channel request for the default channel.
@@ -143,7 +146,7 @@ module CudaExecUnitTypes =
         /// Returns the execution items for the op.
         /// It must read from the given source manikin and write to the target manikin.
         /// Additional memory may be allocated for temporary results.
-        abstract ExecItems: CudaCompileEnvT -> ExecItemsForOpArgs<CudaExecItemT> -> 
+        abstract ExecItems: CudaCompileEnvT -> ExecItemsForOpArgs -> 
                             ExecItemsHelpersT -> CudaExecItemT list
 
 
@@ -1013,6 +1016,7 @@ module CudaExecUnit =
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
                                     Target=trgtChs
                                     Op=op
+                                    UExpr=uExpr
                                     Metadata=metadata
                                     Srcs=srcsAndShared
                                     SubmitInitItems=submitInit} as args) =
@@ -1301,6 +1305,7 @@ module CudaExecUnit =
                                ResultLoc      = LocDev
                                CanDelay       = false}
                 UExprs      = loopSpec.Channels |> Map.map (fun ch lv -> lv.UExpr) 
+                OwnerUExpr  = Some uExpr
             }
 
             // emit loop executor
@@ -1388,12 +1393,15 @@ module CudaExecUnit =
             | Some dfltChTrgt -> [Trace (uexpr, dfltChTrgt)]
             | None -> []
 
+    let toIExecItem items =
+        items |> List.map (fun i -> i :> IExecItem)
+
     /// generates CUDA execution units that will evaluate the given unified expression
-    let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
+    let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =                
         ExecUnit.exprToExecUnits {
-            ExecItemsForOp=execItemsForOp compileEnv
-            TracePreItemsForExpr=tracePreItemsForExpr compileEnv
-            TracePostItemsForExpr=tracePostItemsForExpr compileEnv
+            ExecItemsForOp=execItemsForOp compileEnv >> toIExecItem
+            TracePreItemsForExpr=tracePreItemsForExpr compileEnv >> toIExecItem
+            TracePostItemsForExpr=tracePostItemsForExpr compileEnv >> toIExecItem
             TrgtGivenSrcs=trgtGivenSrcs compileEnv
             SrcReqs=srcReqs compileEnv
         } 
