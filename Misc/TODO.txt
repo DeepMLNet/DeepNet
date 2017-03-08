@@ -7,14 +7,15 @@ TODO:
 	- extend element expression to multiple outputs
 	- make derivative of element expression use multiple outputs
 
+SetSubtensor combination:
+	- introduce BuildTensor op: 
+		- Nary
+		- parameters are range indices 
+		- arguments are values
+		- unspecified ranges have value zero
+	- optimize
+		- rewrite SetSubtensor (Zero, Value) into BuildTensor
+		- combine Add (BuildTensor, BuildTensor) into BuildTensor
 
-Subrecipes visualization:
-	- general idea is that we collect diagnostics for each UExpr => that makes sense
-	- but viewer needs to know where to display which expression
-	- Function deals with set of UExprs
-	- but these UExprs are merged and modified by the CudaRecipe first, before being compiled
-		=> we need another way to match subgraphs
-	- so make the structure recursive
-	- but how to avoid understanding the loop logic from the visualizer?
-	- one idea would be to attach this information to the loop execution item?
+
 

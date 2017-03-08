@@ -63,7 +63,7 @@ let main argv =
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
     Debug.VisualizeUExpr <- true
-    //Debug.DisableCombineIntoElementsOptimization <- true
+    Debug.DisableCombineIntoElementsOptimization <- true
     //Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
 

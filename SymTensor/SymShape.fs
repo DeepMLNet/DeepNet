@@ -751,6 +751,11 @@ module ShapeSpec =
 [<AutoOpen>]
 module RangeSpecTypes =
 
+    /// basic range specification for one dimension
+    type BaseRangeSpecT = SizeSpecT * SizeSpecT
+    /// basic range specification for multiple dimensions
+    type BaseRangesSpecT = BaseRangeSpecT list
+
     /// symbolic/dynamic range specification for one dimension
     type RangeSpecT<'Dyn> = 
         // ranges with symbolic size (length)
@@ -771,20 +776,21 @@ module RangeSpecTypes =
     // symbolic/dynamic subtensor specification
     type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list
 
-    /// simple range specification
+    /// simple range specification for one dimension
     [<StructuredFormatDisplay("{Pretty}")>]
     type SimpleRangeSpecT<'Dyn> =
         | SRSSymStartSymEnd     of SizeSpecT * (SizeSpecT option)
         | SRSDynStartSymSize    of 'Dyn * SizeSpecT                    
-
         member this.Pretty =
             match this with
             | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
             | SRSSymStartSymEnd (first, None) -> sprintf "%A.." first
             | SRSDynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
 
+    /// all elements
     let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
         
+    /// simple range specification for multiple dimensions
     type SimpleRangesSpecT<'Dyn> = SimpleRangeSpecT<'Dyn> list
 
 module SimpleRangeSpec =
