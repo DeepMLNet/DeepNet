@@ -409,16 +409,21 @@ module UElemExpr =
     }
 
     /// converts an element expression to a unified element expression
-    let rec toUElemExpr (elemExpr: ElemExprT) =
-        let tn = ElemExpr.typeName elemExpr
-        let leaf uop        = UElemExpr (ULeafOp uop, [], tn)
-        let unary uop a     = UElemExpr (UUnaryOp uop, [toUElemExpr a], tn)
-        let binary uop a b  = UElemExpr (UBinaryOp uop, [toUElemExpr a; toUElemExpr b], tn)
-
-        match elemExpr with
-        | Leaf op -> leaf op
-        | Unary (op, a) -> unary op a
-        | Binary (op, a, b) -> binary op a b           
+    let toUElemExpr (elemExpr: ElemExprT) =
+        let cache = Dictionary<ElemExprT, UElemExprT> ()
+        let rec build elemExpr =
+            match cache.TryFind elemExpr with
+            | Some uElemExpr -> uElemExpr
+            | None ->
+                let uElemExpr =
+                    let tn = ElemExpr.typeName elemExpr
+                    match elemExpr with
+                    | Leaf op -> UElemExpr (ULeafOp op, [], tn)
+                    | Unary (op, a) -> UElemExpr (UUnaryOp op, [build a], tn)
+                    | Binary (op, a, b) -> UElemExpr (UBinaryOp op, [build a; build b], tn)
+                cache.[elemExpr] <- uElemExpr
+                uElemExpr
+        build elemExpr
 
     /// converts an element expression to a unified element function
     let toUElemFunc elemExpr nDims nArgs =
