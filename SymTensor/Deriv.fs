@@ -600,8 +600,8 @@ module Deriv =
     and computeWithRootJacobian (rootJacobian: ExprT) (rootExpr: ExprT) : DerivT =
 
         // build expression info and unify common subexpressions
-        let exprInfo = ExprInfoT rootExpr
-        let rootExpr = exprInfo.Expr
+        let exprInfo = ExprInfoT [rootExpr]
+        let rootExpr = List.exactlyOne exprInfo.Exprs
 
         /// map from an expression to the sum of incoming Jacobians
         let incomingJacobian = Dictionary<ExprT, ExprT> (HashIdentity.Reference)

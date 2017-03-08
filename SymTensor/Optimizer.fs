@@ -254,8 +254,8 @@ module Optimizer =
         let rec getArgElemExpr argExpr =            
             let combinable () = 
                 (exprInfo.DependantsStructural argExpr).Count = 1 ||
-                Set.count (Expr.extractVars argExpr) = 0
-            //let combinable () = false
+                Set.count (Expr.extractVars argExpr) = 0            
+
             match subComb argExpr with
             | Nary (Elements (_, argElemExpr), argArgs) when combinable() -> argElemExpr, argArgs
             | Unary (DoBroadcast shp, a) when combinable() ->
@@ -465,13 +465,13 @@ module Optimizer =
 
                 // optimize gather and scatter index arguments
                 | Unary (Gather indices, a) ->
-                    Unary (Gather (indices |> List.map (Option.map optimize)), optRec a)
+                    Unary (Gather (indices |> List.map (Option.map optRec)), optRec a)
                 | Unary (Scatter (indices, shp), a) ->
-                    Unary (Scatter (indices |> List.map (Option.map optimize), shp), optRec a)
+                    Unary (Scatter (indices |> List.map (Option.map optRec), shp), optRec a)
 
                 // optimize IfThenElse condition
                 | Binary (IfThenElse cond, a, b) ->
-                    Binary (IfThenElse (optimize cond), optRec a, optRec b)
+                    Binary (IfThenElse (optRec cond), optRec a, optRec b)
 
                 // optimize elements expressions
                 | Nary (Elements (resShape, elemExpr), args) ->
@@ -484,11 +484,16 @@ module Optimizer =
                 // optmize loops
                 | Nary (Channel (Loop loopSpec, ch), args) ->
                     let args = args |> List.map optRec
-                    let loopSpec = {
-                        loopSpec with
-                            Channels = loopSpec.Channels 
-                                       |> Map.map (fun ch lv -> {lv with Expr=optimize lv.Expr})
-                    }
+                    let optChExprs = 
+                        Map.toList loopSpec.Channels                        
+                        |> List.map (fun (ch, lv) -> lv.Expr)
+                        |> optimize
+                    let channels =
+                        Map.toList loopSpec.Channels
+                        |> List.zip optChExprs
+                        |> List.map (fun (optExpr, (ch, lv)) -> ch, {lv with Expr=optExpr})
+                        |> Map.ofList
+                    let loopSpec = {loopSpec with Channels=channels}
                     Nary (Channel (Loop loopSpec, ch), args)
 
                 // pass through
@@ -507,19 +512,18 @@ module Optimizer =
             optimized.LockedSet (opt, opt)
             opt
 
-    /// Optimizes an expression.
-    and optimize (expr: ExprT) : ExprT =
-        match fullOptimized.LockedTryFind expr with
-        | Some opt -> opt
-        | None ->
+    /// Optimizes a group of expressions.
+    and optimize (exprs: ExprT list) : ExprT list =
+        for expr in exprs do
             Expr.checkExpr expr
-            let opt = expr |> optRec |> Expr.check
-            let opt = 
-                if not Debug.DisableCombineIntoElementsOptimization then
-                    combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
-                else opt
-            fullOptimized.LockedSet (expr, opt)
-            fullOptimized.LockedSet (opt, opt)
-            opt
+        let exprs = exprs |> List.map (optRec >> Expr.check)
+        let exprs = 
+            if not Debug.DisableCombineIntoElementsOptimization then
+                let exprsInfo = ExprInfoT exprs
+                exprs |> List.map (combineIntoElementsRec exprsInfo >> Expr.check)
+            else exprs
+        exprs
+
+
 
 

@@ -33,7 +33,7 @@ module Debug =
     let mutable VisualizeUExpr = false
 
     /// if true, ExecItems are included in the visualization of the expression tree
-    let mutable VisualizeExecItems = true
+    let mutable VisualizeExecItems = false
 
     /// terminates the program after an expression is compiled
     let mutable TerminateAfterCompilation = false

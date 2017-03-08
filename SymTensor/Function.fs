@@ -238,19 +238,7 @@ module Func =
         if Debug.Timing then printfn "Releasing held expressions took %A" sw.Elapsed        
         Expr.checkExpr releasedExpr
 
-        let sw = Stopwatch.StartNew ()
-        if Debug.TraceCompile then printfn "Optimizing expression..." 
-        let optimizedExpr = 
-            if Debug.DisableOptimizer then releasedExpr
-            else Optimizer.optimize releasedExpr
-        if Debug.Timing then printfn "Optimizing expression took %A" sw.Elapsed
-        if Debug.PrintOptimizerStatistics then
-            printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 
-                (Expr.countOps baseExpr) (Expr.countOps optimizedExpr)
-                (Expr.countUniqueOps baseExpr) (Expr.countUniqueOps optimizedExpr)
-        Expr.checkExpr optimizedExpr
-
-        optimizedExpr
+        releasedExpr
 
     let private uExprVarSpecsAndEvalable baseExpr failIfNotEvalable symSizes =
         let expr = baseExpr |> Expr.substSymSizes symSizes |> Hold.tryRelease
@@ -304,15 +292,27 @@ module Func =
 
             // if everything is available, then compile
             if allSizesAvail && allLocsAvail && allStridesAvail then 
-                // build optimized exprs
+                // build exprs with substituted sizes
                 let exprs = 
                     baseExprGens 
                     |> List.map (fun gen -> gen.Generate compileEnv.SymSizes) 
 
+                // optimize expression group
+                let sw = Stopwatch.StartNew ()
+                if Debug.TraceCompile then printfn "Optimizing expression group..." 
+                let optExprs = 
+                    if Debug.DisableOptimizer then exprs
+                    else Optimizer.optimize exprs
+                if Debug.Timing then printfn "Optimizing expression group took %A" sw.Elapsed
+                if Debug.PrintOptimizerStatistics then
+                    printfn "Optimization:    ops: %6d => %6d    unique ops: %6d => %6d" 
+                        (List.sumBy Expr.countOps exprs) (List.sumBy Expr.countOps optExprs)
+                        (List.sumBy Expr.countUniqueOps exprs) (List.sumBy Expr.countUniqueOps optExprs)
+
                 // convert to UExprs
                 let sw = Stopwatch.StartNew ()
                 if Debug.TraceCompile then printfn "Converting to UExprs..."
-                let uexprs = UExpr.toUExprs exprs
+                let uexprs = UExpr.toUExprs optExprs
                 if Debug.Timing then printfn "Converting to UExprs took %A" sw.Elapsed
 
                 // compile

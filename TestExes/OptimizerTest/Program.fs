@@ -63,6 +63,8 @@ let main argv =
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
     Debug.VisualizeUExpr <- true
+    //Debug.DisableCombineIntoElementsOptimization <- true
+    //Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
 
     let lossFn = mi.Func loss |> arg2 input target
