@@ -19,7 +19,13 @@ type ExprInfoT (exprs: ExprT list) =
                 let unifiedExpr =
                     match expr with
                     | Leaf _ -> expr
+                    | Unary (Gather indices, a) -> 
+                        Unary (Gather (List.map (Option.map doUnify) indices), doUnify a)
+                    | Unary (Scatter (indices, shp), a) -> 
+                        Unary (Scatter (List.map (Option.map doUnify) indices, shp), doUnify a)
                     | Unary (op, a) -> Unary (op, doUnify a)
+                    | Binary (IfThenElse cond, a, b) -> 
+                        Binary (IfThenElse (doUnify cond), doUnify a, doUnify b)
                     | Binary (op, a, b) -> Binary (op, doUnify a, doUnify b)
                     | Nary (op, es) -> Nary (op, es |> List.map doUnify)
                 knownExprs.[expr] <- unifiedExpr

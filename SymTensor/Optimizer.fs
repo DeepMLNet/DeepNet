@@ -324,6 +324,10 @@ module Optimizer =
                         |> optimizeElements
                     | None -> expr
         
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (List.map (Option.map subComb) indices), subComb a)
+                | Unary (Scatter (indices, shp), a) ->
+                    Unary (Scatter (List.map (Option.map subComb) indices, shp), subComb a)
                 | Unary (op, aExpr) ->
                     match unaryOpToElemOp op with
                     | Some elemOp ->       
@@ -333,6 +337,8 @@ module Optimizer =
                         |> optimizeElements
                     | None -> Unary (op, subComb aExpr)
                     
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (subComb cond), subComb a, subComb b)
                 | Binary (op, aExpr, bExpr) ->
                     match binaryOpToElemOp op with
                     | Some elemOp ->
