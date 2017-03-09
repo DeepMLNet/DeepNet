@@ -793,6 +793,17 @@ module RangeSpecTypes =
     /// simple range specification for multiple dimensions
     type SimpleRangesSpecT<'Dyn> = SimpleRangeSpecT<'Dyn> list
 
+
+module BaseRangesSpec =
+
+    /// True if any two ranges are overlapping.
+    let areOverlapping (brs: BaseRangesSpecT list) =
+        // How to do that?
+        // 
+        failwith "todo"
+
+
+
 module SimpleRangeSpec =
     open ArrayNDNS
 
@@ -817,18 +828,32 @@ module SimpleRangeSpec =
         | SRSDynStartSymSize _ -> true
         | _ -> false
 
+    let (|Dynamic|Static|) rs =
+        if isDynamic rs then Dynamic else Static
+
+    let toBaseRangeSpec (size: SizeSpecT) rs =
+        match rs with
+        | SRSSymStartSymEnd (first, Some last) -> first, last
+        | SRSSymStartSymEnd (first, None) -> first, size - 1L
+        | _ -> failwithf "cannot convert %A to BaseRangeSpec" rs
+
 module SimpleRangesSpec =
 
     /// evaluate a RangesSpecT to a RangeT list
     let eval dynEvaluator rs =
-        rs
-        |> List.map (SimpleRangeSpec.eval dynEvaluator)
+        rs |> List.map (SimpleRangeSpec.eval dynEvaluator)
 
     let isDynamic rs =
-        rs
-        |> List.exists SimpleRangeSpec.isDynamic
+        rs |> List.exists SimpleRangeSpec.isDynamic
 
     let canEvalSymbols rs =
-        rs
-        |> List.forall SimpleRangeSpec.canEvalSymbols
+        rs |> List.forall SimpleRangeSpec.canEvalSymbols
+
+    let (|Dynamic|Static|) rs =
+        if isDynamic rs then Dynamic else Static
+
+    let toBaseRangesSpec (shape: ShapeSpecT) rs =
+        (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
+
+
 

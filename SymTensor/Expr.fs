@@ -1202,6 +1202,20 @@ module Expr =
                 subst
         subSubst expr |> check
 
+    /// True if expression is zero.
+    /// False does not indicate that expression is non-zero.
+    let rec isZero expr =
+        match expr with
+        | Leaf (ScalarConst ConstZero) -> true
+        | Unary (Reshape _, a) -> isZero a
+        | Unary (DoBroadcast _, a) -> isZero a
+        | Unary (PermuteAxes _, a) -> isZero a
+        | _ -> false
+
+    /// Matches expressions with value zero.
+    let (|ZeroExpr|_|) expr =
+        if isZero expr then Some () else None
+
     /// counts operators, not counting repeating subexpressions
     let countUniqueOps expr  =
         let visited = HashSet<ExprT> (HashIdentity.Structural)
