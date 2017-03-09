@@ -9,8 +9,8 @@ open Optimizers
 [<EntryPoint>]
 let main argv =
 
-    //let device = DevHost
-    let device = DevCuda
+    let device = DevHost
+    //let device = DevCuda
 
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist

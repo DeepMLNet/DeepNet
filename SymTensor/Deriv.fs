@@ -267,6 +267,8 @@ module Deriv =
 
         | Nary(op, es) ->
             match op with
+            | BuildTensor _ ->
+                failwith "BuildTensor is used for optimization only and cannot be derived"
             | Elements (resShape, elemExpr) ->
                 let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape es.Length
                 List.zip es desElemExprs

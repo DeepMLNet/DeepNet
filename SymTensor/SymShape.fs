@@ -796,12 +796,31 @@ module RangeSpecTypes =
 
 module BaseRangesSpec =
 
-    /// True if any two ranges are overlapping.
-    let areOverlapping (brs: BaseRangesSpecT list) =
-        // How to do that?
-        // 
-        failwith "todo"
+    /// checks that the BaseRangesSpec is valid
+    let check (rng: BaseRangesSpecT) =
+        for first, last in rng do
+            if last < first then 
+                failwithf "invalid BaseRangesSpec: %A" rng
 
+    /// True if two BaseRangesSpec overlap.
+    let overlapping (a: BaseRangesSpecT) (b: BaseRangesSpecT) =
+        check a; check b
+        (a, b)
+        ||> List.forall2 (fun (aFirst, aLast) (bFirst, bLast) ->
+            aFirst <= bFirst && bFirst <= aLast ||
+            aFirst <= bLast  && bLast  <= aLast ||
+            bFirst <= aFirst && aLast  <= bLast)
+
+    /// True if any two ranges are overlapping.
+    /// This has complexity O(N^2) currently.
+    let areOverlapping (rngs: BaseRangesSpecT list) =       
+        let rec testOvlp nonOvlp cands =
+            match cands with
+            | cand::rCands ->
+                if nonOvlp |> List.exists (overlapping cand) then true
+                else testOvlp (cand::nonOvlp) rCands
+            | [] -> false
+        testOvlp [] rngs
 
 
 module SimpleRangeSpec =

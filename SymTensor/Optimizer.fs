@@ -9,7 +9,6 @@ module Optimizer =
     /// Cache of optimized expressions.
     let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
     let private combined = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
-    let private fullOptimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
 
     /// Broadcast information
     type BroadcastInfoT =
@@ -482,6 +481,7 @@ module Optimizer =
                 // tranform SetSubtensor(Zero, X) into BuildTensor(X)
                 | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), ZeroExpr, part) ->
                     let shp = shapeOf expr
+                    printfn "SetSubtensor -> BuildTensor"
                     Expr.buildTensor shp [SimpleRangesSpec.toBaseRangesSpec shp rngs] [optRec part]
                 // combine Add(BuildTensor, BuildTensor) into BuildTensor if ranges are not overlapping
                 | Binary (Add, Nary (BuildTensor (aShp, aRngs), aParts),
@@ -489,6 +489,7 @@ module Optimizer =
                         aShp=bShp && not (BaseRangesSpec.areOverlapping (aRngs @ bRngs)) ->
                     let aParts = aParts |> List.map optRec
                     let bParts = bParts |> List.map optRec
+                    printfn "Add(BuildTensor, BuildTensor) -> BuildTensor"
                     Expr.buildTensor aShp (aRngs @ bRngs) (aParts @ bParts)
 
                 // optimize elements expressions
