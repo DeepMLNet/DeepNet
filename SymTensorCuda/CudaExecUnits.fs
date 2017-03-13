@@ -328,6 +328,15 @@ module CudaExecUnit =
         | UNaryOp Discard -> dfltSrcWithNoViewReq ()
         | UNaryOp (Interpolate _) -> inplaceFirstSrcReq ()
 
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            match trgtDfltChReq () with
+            | Some req when not (ArrayND.isBroadcasted req) -> 
+                rngs |> List.map (fun rng ->
+                    let aryRng = rng |> List.map (fun (first, last) -> 
+                        Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    dfltChReq (Some (req.[aryRng] :?> ArrayNDManikinT)))
+            | _ -> dfltSrcWithNoViewReq ()            
+
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op
 
@@ -605,6 +614,13 @@ module CudaExecUnit =
         // nary
         | UNaryOp Discard -> dfltChOutplaceTrgt ()
         | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()  
+
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            match trgtDefChReq () with
+            | Some req when not (ArrayND.isBroadcasted req) -> 
+                let anySrcShared = srcsDfltChShared() |> List.exists id
+                dfltChTrgt req anySrcShared
+            | _ -> newDfltChTrgt ()            
         
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op
@@ -1263,6 +1279,15 @@ module CudaExecUnit =
         | UNaryOp Discard -> []
         | UNaryOp (Interpolate ip) -> 
             execItemsForElemwise (dfltChTrgt()) (InterpolateEOpArgTmpl (ip, compileEnv)) (srcsDfltCh())
+
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            let parts = rngs |> List.map (fun rng ->
+                let aryRng = rng |> List.map (fun (first, last) -> 
+                    Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                dfltChTrgt().[aryRng] :?> ArrayNDManikinT)            
+            List.zip (srcsDfltCh()) parts |> List.collect (fun (src, part) ->
+                if src = part then []
+                else copyExecItems part src)
 
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op

@@ -9,8 +9,8 @@ open Optimizers
 [<EntryPoint>]
 let main argv =
 
-    let device = DevHost
-    //let device = DevCuda
+    //let device = DevHost
+    let device = DevCuda
 
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
@@ -63,8 +63,8 @@ let main argv =
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
     Debug.VisualizeUExpr <- true
-    Debug.DisableCombineIntoElementsOptimization <- true
-    //Debug.VisualizeExecItems <- true
+    //Debug.DisableCombineIntoElementsOptimization <- true
+    Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
 
     let lossFn = mi.Func loss |> arg2 input target
