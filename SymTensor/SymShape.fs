@@ -796,16 +796,43 @@ module RangeSpecTypes =
 
 module BaseRangesSpec =
 
+    /// Try to evalualte a BaseRangesSpecT to a numeric range.
+    let tryEval (rng: BaseRangesSpecT) =
+        let rec doEval rng =
+            match rng with
+            | (first, last) :: rrng ->
+                match SizeSpec.tryEval first, SizeSpec.tryEval last, doEval rrng with
+                | Some first, Some last, Some rrng -> Some ((first, last) :: rrng)
+                | _ -> None
+            | [] -> Some []
+        doEval rng
+
+    /// True if a BaseRangesSpecT can be evaluated to a numeric range.
+    let canEval (rng: BaseRangesSpecT) =
+        match tryEval rng with
+        | Some _ -> true
+        | None -> false
+
+    /// Evaluates a BaseRangesSpecT to a numeric range.
+    let eval (rng: BaseRangesSpecT) =
+        match tryEval rng with
+        | Some rng -> rng
+        | None -> failwithf "cannot evaluate BaseRangesSpecT %A to numeric range" rng
+
     /// checks that the BaseRangesSpec is valid
     let check (rng: BaseRangesSpecT) =
-        for first, last in rng do
-            if last < first then 
-                failwithf "invalid BaseRangesSpec: %A" rng
+        match tryEval rng with
+        | Some rng ->
+            for first, last in rng do
+                if last < first then 
+                    failwithf "invalid BaseRangesSpec: %A" rng
+        | None -> ()
 
     /// True if two BaseRangesSpec overlap.
+    /// Both BaseRangesSpec must be evaluateble to numeric ranges.
     let overlapping (a: BaseRangesSpecT) (b: BaseRangesSpecT) =
         check a; check b
-        (a, b)
+        (eval a, eval b)
         ||> List.forall2 (fun (aFirst, aLast) (bFirst, bLast) ->
             aFirst <= bFirst && bFirst <= aLast ||
             aFirst <= bLast  && bLast  <= aLast ||
@@ -813,6 +840,7 @@ module BaseRangesSpec =
 
     /// True if any two ranges are overlapping.
     /// This has complexity O(N^2) currently.
+    /// All BaseRangesSpec must be evaluateble to numeric ranges.
     let areOverlapping (rngs: BaseRangesSpecT list) =       
         let rec testOvlp nonOvlp cands =
             match cands with
@@ -821,6 +849,23 @@ module BaseRangesSpec =
                 else testOvlp (cand::nonOvlp) rCands
             | [] -> false
         testOvlp [] rngs
+
+    /// True if the BaseRangesSpecTs cover a tensor of the specified shape completely without overlap.
+    /// All BaseRangesSpecT and the ShapeSpecT must be evaluatable to numeric ranges and a
+    /// numeric shape respectively.
+    let areCoveringWithoutOverlap (shp: ShapeSpecT) (rngs: BaseRangesSpecT list) =       
+        if areOverlapping rngs then false
+        else
+            let shpElems = 
+                shp 
+                |> ShapeSpec.eval 
+                |> List.fold (*) 1L
+            let rngElems = 
+                rngs
+                |> List.map eval
+                |> List.map (List.fold (fun p (first, last) -> p * (last - first + 1L)) 1L)
+                |> List.sum
+            shpElems = rngElems
 
 
 module SimpleRangeSpec =

@@ -330,7 +330,8 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDfltChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) -> 
+            | Some req when not (ArrayND.isBroadcasted req) && 
+                    BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
                         Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
@@ -1281,13 +1282,21 @@ module CudaExecUnit =
             execItemsForElemwise (dfltChTrgt()) (InterpolateEOpArgTmpl (ip, compileEnv)) (srcsDfltCh())
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
+            let zeroItems =
+                if BaseRangesSpec.areCoveringWithoutOverlap shp rngs then []
+                else 
+                    let cs = ConstSpec.zero (trgtDfltChType().Type)                    
+                    execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
             let parts = rngs |> List.map (fun rng ->
                 let aryRng = rng |> List.map (fun (first, last) -> 
                     Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
                 dfltChTrgt().[aryRng] :?> ArrayNDManikinT)            
-            List.zip (srcsDfltCh()) parts |> List.collect (fun (src, part) ->
-                if src = part then []
-                else copyExecItems part src)
+            let copyItems = 
+                List.zip (srcsDfltCh()) parts 
+                |> List.collect (fun (src, part) ->
+                    if src = part then []
+                    else copyExecItems part src)
+            zeroItems @ copyItems
 
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op

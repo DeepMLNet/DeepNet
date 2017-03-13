@@ -1127,7 +1127,7 @@ module Expr =
 
                 | Nary (BuildTensor (shp, rngs), es) -> 
                     tShp shp && 
-                    List.forall (List.forall (fun (f,l) -> tSize f && tSize l)) rngs &&
+                    List.forall BaseRangesSpec.canEval rngs &&
                     List.forall subTest es
                 | Nary (Elements (trgtShp, elemExpr), es) -> 
                     tShp trgtShp && 

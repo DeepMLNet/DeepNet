@@ -192,10 +192,10 @@ module HostEval =
                     | Discard -> ArrayNDHost.zeros<'R> [0L] |> box
                     | BuildTensor (shp, rngs) ->
                         let trgt = ArrayNDHost.zeros<'R> (shapeEval shp)
-                        for rng, es in List.zip rngs es do                            
+                        for rng, e in List.zip rngs es do                            
                             let aryRng = rng |> List.map (fun (first, last) -> 
                                 Rng (Some (sizeEval first), Some (sizeEval last)))
-                            trgt.[aryRng] <- subEval es |> toR
+                            trgt.[aryRng] <- subEval e |> toR
                         trgt |> box
                     | Elements (resShape, elemExpr) -> 
                         let esv = es |> List.map subEval |> List.map (fun v -> v :> ArrayNDT<'T>)
