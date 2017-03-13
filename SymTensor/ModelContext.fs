@@ -34,7 +34,7 @@ module ModelContextTypes =
             member this.ToHost ary =    ary :?> ArrayNDHostT<_>
             member this.Compiler =      { new IUExprCompiler with 
                                             member this.Name = "Host"
-                                            member this.Compile env exprs = onHost env exprs, None }
+                                            member this.Compile env exprs = onHost env exprs }
             member this.DefaultLoc =    LocHost
             member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
     }

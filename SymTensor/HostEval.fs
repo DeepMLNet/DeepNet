@@ -7,6 +7,7 @@ open Basics
 open UExprTypes
 open ArrayNDNS
 open ArrayNDNS.ArrayND
+open SymTensor.Compiler
 
 
 module HostEval =
@@ -271,15 +272,32 @@ module HostEval =
 
 [<AutoOpen>]
 module HostEvalTypes =
+
     /// evaluates expression on host using interpreter
     let onHost (compileEnv: CompileEnvT) (uexprs: UExprT list) = 
+
+        // check requirements
         if compileEnv.ResultLoc <> LocHost then
             failwith "host evaluator needs host result location"
         for KeyValue(vs, loc) in compileEnv.VarLocs do
             if loc <> LocHost then
                 failwithf "host evaluator cannot evaluate expression with variable %A located in %A" vs loc
 
-        fun evalEnv -> HostEval.evalUExprs evalEnv uexprs
+        // evaluation function
+        let evalFn = fun evalEnv -> HostEval.evalUExprs evalEnv uexprs
+
+        // build diagnostics information
+        let joinedExpr = 
+            UExpr (UNaryOp Expr.Discard, uexprs, {ChannelType=Map.empty; ChannelShape=Map.empty; Expr=None})
+        let diag : CompileDiagnosticsT = {
+            UExpr          = joinedExpr
+            ExecUnits      = []
+            SubDiagnostics = Map.empty
+        }
+
+        evalFn, Some diag
+
+        
 
 
         
