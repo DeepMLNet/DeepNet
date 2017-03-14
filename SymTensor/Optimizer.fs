@@ -274,11 +274,11 @@ module Optimizer =
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
-                let rec insertBcAxes srcDim srcShp rsShp elemExpr =
+                let rec insertBcAxes substStartDim srcShp rsShp elemExpr =
                     match srcShp, rsShp with
                     | [], [] -> elemExpr
                     | _, rsSize::remRsShp when rsSize = SizeSpec.broadcastable ->
-                        let dimRng = [srcDim .. argExpr.NDims-1]
+                        let dimRng = [substStartDim .. argExpr.NDims-1]
                         let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
                         let insSubst1 =
                             dimRng
@@ -290,12 +290,11 @@ module Optimizer =
                             |> Map.ofList
                         let substExpr = 
                             elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
-                        insertBcAxes srcDim srcShp remRsShp substExpr
+                        insertBcAxes (substStartDim+1) srcShp remRsShp substExpr
                     | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
-                        insertBcAxes (srcDim + 1) remSrcShp remRsShp elemExpr
+                        insertBcAxes (substStartDim+1) remSrcShp remRsShp elemExpr
                     | _ -> failwith "invalid reshape for broadcast axes insertion"
-                let res = insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
-                res
+                insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
             | combArgExpr -> 
                 let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
                 ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
