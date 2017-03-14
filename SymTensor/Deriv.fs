@@ -181,11 +181,9 @@ module Deriv =
             | AssumeJacobian jac ->
                 match eg.Shape.[0], jac.Shape.[0] with
                 | fl, jl when fl = jl -> jac
-                | fl, jl when jl = SizeSpec.broadcastable ->
-                    jac |> Expr.broadcast [fl; jac.Shape.[1]]
-                | _ -> 
-                    failwithf "cannot broadcast specified Jacobian of shape %A to required 
-                                Jacobian shape %A" jac.Shape eg.Shape
+                | fl, jl when jl = SizeSpec.broadcastable -> jac |> Expr.broadcast [fl; jac.Shape.[1]]
+                | _ -> failwithf "cannot broadcast specified Jacobian of shape %A to required 
+                                  Jacobian shape %A" jac.Shape eg.Shape
 
             | Print _ -> eg 
             | Dump _ -> eg 
@@ -269,6 +267,8 @@ module Deriv =
 
         | Nary(op, es) ->
             match op with
+            | BuildTensor _ ->
+                failwith "BuildTensor is used for optimization only and cannot be derived"
             | Elements (resShape, elemExpr) ->
                 let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape es.Length
                 List.zip es desElemExprs
@@ -602,8 +602,8 @@ module Deriv =
     and computeWithRootJacobian (rootJacobian: ExprT) (rootExpr: ExprT) : DerivT =
 
         // build expression info and unify common subexpressions
-        let exprInfo = ExprInfoT rootExpr
-        let rootExpr = exprInfo.Expr
+        let exprInfo = ExprInfoT [rootExpr]
+        let rootExpr = List.exactlyOne exprInfo.Exprs
 
         /// map from an expression to the sum of incoming Jacobians
         let incomingJacobian = Dictionary<ExprT, ExprT> (HashIdentity.Reference)

@@ -1,0 +1,9 @@
+TODO:
+	- run simple test program to see graph => DONE
+	- optimize building of gradient => DONE
+	- allow showing of ExecItems in graph => DONE
+	- implement element expression with two inputs
+	- compute gradient and see graph
+	- extend element expression to multiple outputs
+	- make derivative of element expression use multiple outputs
+

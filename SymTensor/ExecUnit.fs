@@ -9,126 +9,33 @@ open SymTensor
 open UExprTypes
 
 
-[<AutoOpen>]
-module ExecUnitsTypes = 
-
-    /// Id of an ExecUnitT
-    type ExecUnitIdT = int
-
-    /// a group of commands that must be executed sequentially
-    type ExecUnitT<'e> = {
-        Id:           ExecUnitIdT 
-        DependsOn:    ExecUnitIdT list
-        Items:        'e list
-        Expr:         UExprT
-        Manikins:     ArrayNDManikinT list
-        RerunAfter:   ExecUnitIdT list
-    }
-
-    /// a channel id
-    type ChannelIdT = string
-
-    /// manikins representing the data in each channel
-    type ChannelManikinsT = Map<ChannelIdT, ArrayNDManikinT>
-
-    /// manikins representing the data in each channel and flag if it is shared
-    type ChannelManikinsAndSharedT = Map<ChannelIdT, ArrayNDManikinT * bool>
-
-    /// requests for manikins representing the data in each channel
-    type ChannelReqsT = Map<ChannelIdT, ArrayNDManikinT option>
-
-    /// result of an evaluation request
-    type EvalResultT = {
-        ExecUnitId:     ExecUnitIdT 
-        Channels:       ChannelManikinsAndSharedT
-    }
-
-    /// an evaluation request
-    type EvalReqT = {
-        Id:             int 
-        Expr:           UExprT
-        ChannelReqs:    ChannelReqsT
-        OnCompletion:   EvalResultT -> unit
-    }
-
-    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKindT -> MemManikinT
-
-    type ExecItemsForOpArgs<'e> = {
-        MemAllocator:       MemAllocatorT
-        Target:             ChannelManikinsT
-        Op:                 UOpT
-        Metadata:           UMetadata
-        Srcs:               ChannelManikinsAndSharedT list
-        SubmitInitItems:    'e list -> unit
-    }
-
-    type TraceItemsForExprArgs = {
-        MemAllocator:       MemAllocatorT
-        Target:             ChannelManikinsT
-        Expr:               UExprT
-    }
-
-    type TrgtGivenSrcsArgs = {
-        MemAllocator:       MemAllocatorT
-        TargetRequest:      ChannelReqsT
-        Op:                 UOpT
-        Metadata:           UMetadata
-        Srcs:               ChannelManikinsAndSharedT list    
-    }
-
-    type SrcReqsArgs = {
-        TargetRequest:      ChannelReqsT
-        Op:                 UOpT
-        Metadata:           UMetadata
-        SrcShapes:          Map<ChannelT, NShapeSpecT> list 
-    }
-
-    /// record containing functions called by the ExecUnitT generator
-    type ExecUnitsGeneratorT<'e> = {
-        ExecItemsForOp:         ExecItemsForOpArgs<'e> -> 'e list
-        TracePreItemsForExpr:   TraceItemsForExprArgs -> 'e list
-        TracePostItemsForExpr:  TraceItemsForExprArgs -> 'e list
-        TrgtGivenSrcs:          TrgtGivenSrcsArgs -> ChannelManikinsAndSharedT
-        SrcReqs:                SrcReqsArgs -> ChannelReqsT list
-    }
-
-    /// generated ExecUnits for an expression
-    type ExecUnitsForExprT<'e> = {
-        Expr:           UExprT
-        ExecUnits:      ExecUnitT<'e> list
-        Result:         EvalResultT
-        MemAllocs:      MemAllocManikinT list
-        InitItems:      'e list
-    }
-
 
 module ExecUnit =
 
-    type private ExecUnitList<'e> = ResizeArray<ExecUnitT<'e>>
+    type private ExecUnitList = ResizeArray<ExecUnitT>
 
     /// a collection of ExecUnits
-    type Collection<'e> (eus: ExecUnitT<'e> list) =     
+    type Collection (eus: ExecUnitT list) =     
               
-        do if Compiler.Cuda.Debug.TraceCompile then
-            printfn "Creating ExecUnit collection..."
+        do if Debug.TraceCompile then printfn "Creating ExecUnit collection..."
         let sw = Stopwatch.StartNew()
 
-        let byIdMap = Dictionary<ExecUnitIdT, ExecUnitT<'e>> ()
+        let byIdMap = Dictionary<ExecUnitIdT, ExecUnitT> ()
         do for eu in eus do
             byIdMap.Add (eu.Id, eu) |> ignore
 
-        let dependants = Dictionary<ExecUnitIdT, ExecUnitList<'e>> ()
+        let dependants = Dictionary<ExecUnitIdT, ExecUnitList> ()
         do
             for eu in eus do
-                dependants.Add (eu.Id, ResizeArray<ExecUnitT<'e>> ())
+                dependants.Add (eu.Id, ResizeArray<ExecUnitT> ())
             for eu in eus do
                 for d in eu.DependsOn do
                     dependants.[d].Add eu
 
-        let sortedByDep = ResizeArray<ExecUnitT<'e>> ()
+        let sortedByDep = ResizeArray<ExecUnitT> ()
         do
             let satisfied = HashSet<ExecUnitIdT> ()
-            let rec addWithDependencies (eu: ExecUnitT<'e>) =
+            let rec addWithDependencies (eu: ExecUnitT) =
                 if not (satisfied.Contains eu.Id) then
                     for dep in eu.DependsOn do
                         addWithDependencies byIdMap.[dep]
@@ -138,7 +45,7 @@ module ExecUnit =
                 addWithDependencies eu
 
         let storesByVar =
-            let build = Dictionary<VarSpecT, List<ExecUnitT<_>>> ()
+            let build = Dictionary<VarSpecT, List<ExecUnitT>> ()
             for eu in eus do
                 match eu.Expr with
                 | UExpr (UUnaryOp (Expr.StoreToVar vs), _, _) ->
@@ -147,7 +54,7 @@ module ExecUnit =
                 | _ -> ()
             build         
             
-        do if Compiler.Cuda.Debug.Timing then
+        do if Debug.Timing then
             printfn "Creating ExecUnit collection took %A" sw.Elapsed
 
         /// list of all execution unit contained in this collection
@@ -157,23 +64,23 @@ module ExecUnit =
         member this.ById id = byIdMap.[id]
 
         /// all ExecUnits that depend directly on eu
-        member this.DependantsOf (eu: ExecUnitT<'e>) = dependants.[eu.Id].AsReadOnly () :> seq<_>
+        member this.DependantsOf (eu: ExecUnitT) = dependants.[eu.Id].AsReadOnly () :> seq<_>
 
         /// all ExecUnits that eu directly depends on
-        member this.DependsOn (eu: ExecUnitT<'e>) = eu.DependsOn |> List.map this.ById
+        member this.DependsOn (eu: ExecUnitT) = eu.DependsOn |> List.map this.ById
 
         /// a list of ExecUnits in this collection so that an ExecUnit comes after all ExecUnits it depends on
         member this.SortedByDep = sortedByDep |> List.ofSeq
        
         /// returns all successors of eu (execution units that depend (indirectly) on eu)
-        member this.AllSuccessorsOf (eu: ExecUnitT<'e>) = seq {
+        member this.AllSuccessorsOf (eu: ExecUnitT) = seq {
             for deu in dependants.[eu.Id] do
                 yield deu
                 yield! this.AllSuccessorsOf deu
         }
 
         /// returns all predecessors of eu (execution units on which eu depends (indirectly))
-        member this.AllPredecessorsOf (eu: ExecUnitT<'e>) = seq {
+        member this.AllPredecessorsOf (eu: ExecUnitT) = seq {
             for peuId in eu.DependsOn do
                 let peu = this.ById peuId
                 yield peu
@@ -181,7 +88,7 @@ module ExecUnit =
         }
 
         /// true if a is a successor of b. (a depends (indirectly) on b)
-        member this.IsSuccessorOf (a: ExecUnitT<'e>) (b: ExecUnitT<'e>) =
+        member this.IsSuccessorOf (a: ExecUnitT) (b: ExecUnitT) =
             this.AllSuccessorsOf b |> Seq.exists (fun eu -> eu.Id = a.Id)
 
         /// all StoreToVar ExecUnits that store into the given variable
@@ -192,7 +99,7 @@ module ExecUnit =
         /// Walks all ExecUnits contained in this collection calling processFn for each.
         /// The order is so that each execution unit is visited after all the nodes it 
         /// depends on have been visited.
-        member this.WalkByDeps (processFn: (ExecUnitT<'e> -> HashSet<ExecUnitIdT> -> unit))  =          
+        member this.WalkByDeps (processFn: (ExecUnitT -> HashSet<ExecUnitIdT> -> unit))  =          
          
             // create list of all ExecUnits that have no predecessors
             let nodesWithoutPredecessors = 
@@ -232,7 +139,7 @@ module ExecUnit =
 
     /// Builds a map that for every storage contains a set of the ids of the ExecUnits
     /// that will access it last during execution.
-    let private buildLastStorageAccess (coll: Collection<'e>) : Map<MemManikinT, Set<ExecUnitIdT>> =
+    let private buildLastStorageAccess (coll: Collection) : Map<MemManikinT, Set<ExecUnitIdT>> =
                 
         // map of last storage access taking into account the key ExecUnit and its predecessors
         let lastStorageAccessInOrAbove = 
@@ -345,7 +252,7 @@ module ExecUnit =
 
                     // By rerunning after mraEu, we are also rerunning after all successors of it.
                     // Thus we add them to euCombinedRerunningAfter.
-                    let rec addExecUnitAndSuccessors (eu: ExecUnitT<_>) =
+                    let rec addExecUnitAndSuccessors (eu: ExecUnitT) =
                         euCombinedRerunningAfter.Add eu.Id |> ignore
 
                         for dep in coll.DependantsOf eu do
@@ -378,16 +285,16 @@ module ExecUnit =
              
 
     /// generates execution units that will evaluate the given unified expression
-    let exprToExecUnits (gen: ExecUnitsGeneratorT<'e>) (expr: UExprT) : ExecUnitsForExprT<'e> =
+    let exprToExecUnits (gen: ExecUnitsGeneratorT) (expr: UExprT) : ExecUnitsForExprT =
 
-        if SymTensor.Compiler.Cuda.Debug.TraceCompile then
+        if Debug.TraceCompile then
             printfn "UExpr contains %d unique ops" (UExpr.countUniqueOps expr)
 
         // number of occurrences of subexpressions
         let exprInfo = UExprInfoT expr
 
         // execution units
-        let execUnits = ResizeArray<ExecUnitT<'e>>()
+        let execUnits = ResizeArray<ExecUnitT>()
         let mutable execUnitIdCnt = 0
         let newExecUnitId () =
             execUnitIdCnt <- execUnitIdCnt + 1
@@ -395,8 +302,8 @@ module ExecUnit =
         let submitExecUnit eu =
             execUnits.Add eu
 
-        let initItems = ResizeArray<'e>()
-        let submitInitItems (ii: 'e list) =
+        let initItems = ResizeArray()
+        let submitInitItems (ii: IExecItem list) =
             initItems.AddRange ii
 
         // storage space
@@ -488,6 +395,7 @@ module ExecUnit =
                         @ gen.ExecItemsForOp {MemAllocator=newMemoryWithLogging
                                               Target=extractChannels trgtChannelsAndShared
                                               Op=op
+                                              UExpr=erqExpr
                                               Metadata=metadata
                                               Srcs=srcChannelsAndShared
                                               SubmitInitItems=submitInitItems}
@@ -519,14 +427,13 @@ module ExecUnit =
                         DependsOn  = srcExeUnitIds
                         Expr       = erqExpr
                         Manikins   = trgtAndSrcManikins
+                        Channels   = trgtChannelsAndShared
+                        Srcs       = srcManikins
+                        ExtraMem   = extraMemory
                         RerunAfter = []
                     }                                    
                     submitted <- true
                     submitExecUnit eu
-
-                    // submit manikins to visualizer
-                    UExprVisualizer.addManikins eu.Id erqExpr 
-                                                (trgtChannelsAndShared |> extractChannels) srcManikins extraMemory
 
                     // complete request                           
                     let result = {ExecUnitId=eu.Id; Channels=trgtChannelsAndShared}
@@ -558,7 +465,7 @@ module ExecUnit =
             processEvalRequest ()
             uniqueProcessedRequests <- uniqueProcessedRequests + 1
         let execUnits = List.ofSeq execUnits
-        if Compiler.Cuda.Debug.TraceCompile then
+        if Debug.TraceCompile then
             printfn "Processed %d unique evaluation requests and created %d execution units." 
                 uniqueProcessedRequests execUnits.Length
         
@@ -580,7 +487,7 @@ module ExecUnit =
 
         // add extra dependencies to ExecUnits that execute a StoreToVar operation
         let sw = Stopwatch.StartNew()
-        if Compiler.Cuda.Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
+        if Debug.TraceCompile then printfn "Adding StoreToVar dependencies..."
         let execUnits =
             execUnits
             |> List.map (fun eu ->
@@ -606,16 +513,15 @@ module ExecUnit =
                     {eu with DependsOn = eu.DependsOn @ varAccessEus}                
                 | _ -> eu
             )
-        if Compiler.Cuda.Debug.Timing then
+        if Debug.Timing then
             printfn "Adding StoreToVar dependencies took %A" sw.Elapsed
 
         // Build RerunAfter dependencies.
         #if !DISABLE_RERUN_AFTER
-        if Compiler.Cuda.Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
+        if Debug.TraceCompile then printfn "Building RerunAfter dependencies..."
         let sw = Stopwatch.StartNew()
         let execUnits = buildRerunAfter execUnits 
-        if Compiler.Cuda.Debug.Timing then
-            printfn "Building RerunAfter dependencies took %A" sw.Elapsed
+        if Debug.Timing then printfn "Building RerunAfter dependencies took %A" sw.Elapsed
         #endif 
 
         {

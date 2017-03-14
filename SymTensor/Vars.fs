@@ -73,7 +73,7 @@ module ConstSpecTypes =
             member this.TypeName = 
                 match this with
                 | ConstInt _    -> TypeName.ofType<int>
-                | ConstInt64 _    -> TypeName.ofType<int64>
+                | ConstInt64 _  -> TypeName.ofType<int64>
                 | ConstDouble _ -> TypeName.ofType<double>
                 | ConstSingle _ -> TypeName.ofType<single>
                 | ConstBool _   -> TypeName.ofType<bool>
@@ -103,7 +103,16 @@ module ConstSpecTypes =
             /// gets the value converting it to type 'T
             member this.GetConvertedValue<'T>() : 'T =   
                 this.Value |> conv<'T>          
-
+    
+    /// matches a zero constant of any type
+    let (|ConstZero|_|) cs =
+        match cs with
+        | ConstInt 0
+        | ConstInt64 0L
+        | ConstSingle 0.0f
+        | ConstDouble 0.0 -> Some ()
+        | _ -> None
+        
 
 /// scalar constant value
 module ConstSpec =
@@ -168,6 +177,11 @@ module ConstSpec =
         | _ when typ = typeof<bool>   -> ConstBool true
         | _ -> failwithf "unsupported type %A" typ
 
+    /// true if constant is zero
+    let isZero cs =
+        match cs with
+        | ConstZero -> true
+        | _ -> false
 
 
 [<AutoOpen>]

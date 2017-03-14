@@ -204,6 +204,8 @@ module Expr =
 
         /// evaluate all subexpressions but discard them
         | Discard        
+        /// build tensor using numeric ranges
+        | BuildTensor of shp:ShapeSpecT * rngs:BaseRangesSpecT list
         /// elementwise calculated tensor
         | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
@@ -371,7 +373,6 @@ module Expr =
                                 knownEqualTo.[t].Add o |> ignore
                             eq
                     treeCompare this other
-                    //this.Proxy = other.Proxy
         override this.GetHashCode() =
             match exprHashCache.TryFind this with
             | Some h -> h
@@ -648,6 +649,7 @@ module Expr =
 
                 // misc
                 | Nary(Discard, _) -> ShapeSpec.emptyVector 
+                | Nary(BuildTensor (shp, _), _) -> shp
                 | Nary(Elements (resShape, elemExpr), _) -> resShape
                 | Nary(Interpolate _, es) -> shapeOf es.Head
                 | Nary(Channel (Loop spec, channel), es) -> loopOutputShapes spec |> Map.find channel
@@ -915,6 +917,24 @@ module Expr =
                     let tns = es |> List.map typename
                     ElemExpr.check elemExpr |> ignore
                     ElemExpr.checkCompatibility elemExpr ss tns trgtShp
+                | BuildTensor (shp, rngs) ->
+                    if List.length rngs <> List.length es then
+                        failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments"
+                                  rngs.Length es.Length
+                    match ShapeSpec.tryEval shp with
+                    | Some shp ->
+                        for rng, arg in List.zip rngs es do
+                            if rng.Length <> shp.Length then
+                                failwithf "BuildTensor range %A has wrong dimensionality for shape %A" rng shp
+                            for (start, stop), size, argSize in List.zip3 rng shp (shapeOf arg) do
+                                if argSize <> stop - start + 1L then
+                                    failwithf "BuildTensor range %A is invalid for argument of shape %A" rng (shapeOf arg)
+                                match SizeSpec.tryEval start, SizeSpec.tryEval stop with
+                                | Some start, Some stop when not (0L <= start && start < size && 0L <= stop && 
+                                                                  stop < size && start <= stop) ->
+                                    failwithf "BuildTensor range %A is invalid for shape %A" rng shp
+                                | _, _ -> ()
+                    | None -> ()                                          
                 | Interpolate ip ->
                     checkEqualTypes()
                     let nDims = ip.MinArg.Length
@@ -1034,6 +1054,9 @@ module Expr =
                     | Binary (SetSubtensor srs, a, b) -> Binary (SetSubtensor (sSrs srs), sSub a, sSub b)
                     | Binary (op, a, b) -> Binary (op, sSub a, sSub b)
 
+                    | Nary (BuildTensor (shp, rngs), es) ->
+                        Nary (BuildTensor (sShp shp, rngs |> List.map (List.map (fun (f,l) -> sSize f, sSize l))), 
+                              List.map sSub es)
                     | Nary (Elements (trgtShp, elemExpr), es) -> 
                         Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
                     | Nary (Channel (Loop spec, channel), es) ->
@@ -1102,6 +1125,10 @@ module Expr =
                     subTest c && subTest a && subTest b 
                 | Binary (op, a, b) -> subTest a && subTest b
 
+                | Nary (BuildTensor (shp, rngs), es) -> 
+                    tShp shp && 
+                    List.forall BaseRangesSpec.canEval rngs &&
+                    List.forall subTest es
                 | Nary (Elements (trgtShp, elemExpr), es) -> 
                     tShp trgtShp && 
                     ElemExpr.canEvalAllSymSizes elemExpr && 
@@ -1174,6 +1201,20 @@ module Expr =
                 substituted.[expr] <- subst
                 subst
         subSubst expr |> check
+
+    /// True if expression is zero.
+    /// False does not indicate that expression is non-zero.
+    let rec isZero expr =
+        match expr with
+        | Leaf (ScalarConst ConstZero) -> true
+        | Unary (Reshape _, a) -> isZero a
+        | Unary (DoBroadcast _, a) -> isZero a
+        | Unary (PermuteAxes _, a) -> isZero a
+        | _ -> false
+
+    /// Matches expressions with value zero.
+    let (|ZeroExpr|_|) expr =
+        if isZero expr then Some () else None
 
     /// counts operators, not counting repeating subexpressions
     let countUniqueOps expr  =
@@ -1900,34 +1941,6 @@ module Expr =
                 vars <- vars |> Map.add vs lv
                 vs
 
-//        /// true if expr depends on any loop variable
-//        let dependsOnLoopVars expr = 
-//            vars |> Map.exists (fun vs _ -> expr |> contains (makeVar vs))
-//
-//        /// true if expr contains a variable
-//        let dependsOnVars expr =
-//            expr |> extractVars |> Set.isEmpty |> not
-//
-//        /// pulls out expression parts that do not depend on loop variables
-//        let rec lift expr =
-//            match expr with                   
-//            | Leaf (Var vs) when not (vars |> Map.containsKey vs) ->
-//                let vs = addConstVar expr
-//                makeVar vs                  
-//
-//            | Unary (Gather indices, a) ->
-//                Unary (Gather (indices |> List.map (Option.map lift)), lift a)
-//            | Unary (Scatter (indices, trgtShp), a) ->
-//                Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
-//
-//            | Binary (IfThenElse cond, a, b) ->
-//                Binary (IfThenElse (lift cond), lift a, lift b)
-//
-//            | Leaf _ -> expr
-//            | Unary (op, a) -> Unary (op, lift a)
-//            | Binary (op, a, b) -> Binary (op, lift a, lift b)
-//            | Nary (op, es) -> Nary (op, es |> List.map lift)
-
         let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
         let lifted = Dictionary<ExprT, ExprT> ()
 
@@ -2004,6 +2017,9 @@ module Expr =
                 setSubtensor concatSoFar.[slice] e, pos + len)
         concatenated
 
+    /// Build tensor from numeric ranges.
+    let internal buildTensor shp rngs srcs =
+        Nary (BuildTensor (shp, rngs), srcs) |> check
 
 
 [<AutoOpen>]

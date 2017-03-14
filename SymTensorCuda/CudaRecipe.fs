@@ -172,10 +172,10 @@ module CudaRecipe =
             [CallCFunc(TmplInstCache.instCPPTmplFunc ti cache, dlgte, strm, args)]
         | cmd -> [ExecItem (cmd, strm)]
 
-    type private StreamQueue<'c> = Queue<CudaCmdT<'c>>
+    type private StreamQueue = Queue<CudaCmdT>
 
     /// generates a sequence of CUDA calls from streams
-    let generateCalls (streams: StreamCmdsT<CudaExecItemT> list) cache =    
+    let generateCalls (streams: StreamCmdsT list) cache =    
         let calls = ResizeArray<CudaCallT> ()
 
         /// the number of times WaitOnEvent is called for a particular correlation
@@ -330,9 +330,9 @@ module CudaRecipe =
         eventDisposeCalls @ streamDisposeCalls @ memDisposeCalls @ textureDisposeCalls @ subWorkspaceDisposeCalls
 
     /// generate initalization CUDA calls
-    let generateInitCalls initItems cache =
+    let generateInitCalls (initItems: seq<IExecItem>) cache =
         [for cmd in initItems do
-            yield! callsForExecItem cmd cache 0]
+            yield! callsForExecItem (cmd :?> CudaExecItemT) cache 0]
 
     type private ResultInfoT = {
         TransferUExpr:  UExprT
@@ -378,10 +378,15 @@ module CudaRecipe =
         // compile recipes for sub-workspaces
         if Debug.TraceCompile then printfn "Generating sub-recipes..."
         let sw = Stopwatch.StartNew()
-        let subRecipes = 
-            cudaCompileEnv.SubWorkspaces 
-            |> Seq.mapi (fun subWs desc -> subWs, buildFromDesc desc)
-            |> Map.ofSeq
+        let subRecipes, subRecipeDiags =
+            cudaCompileEnv.SubWorkspaces
+            |> Seq.toList
+            |> List.mapi (fun (sw: SubWorkspaceT) desc -> 
+                let recipe, diag = buildFromDesc desc
+                (sw, recipe), (desc.OwnerUExpr.Value, diag))
+            |> List.unzip
+        let subRecipes = subRecipes |> Map.ofList
+        let subRecipeDiags = subRecipeDiags |> Map.ofList
         let timeForSubrecipes = sw.Elapsed      
 
         // diagnostic output
@@ -400,7 +405,7 @@ module CudaRecipe =
             printfn "Used CUDA events:       %d" eventObjCnt
             printfn "Total CUDA exec calls:  %d" execCalls.Length
 
-        {
+        let recipe = {
             ChannelVars       = cudaCompileEnv.ChannelVars
             ChannelAllocators = cudaCompileEnv.ChannelAllocators
             VarStrides        = cudaCompileEnv.VarStrides
@@ -413,11 +418,17 @@ module CudaRecipe =
             ConstantValues    = cudaCompileEnv.ConstantValues |> Map.ofDictionary
             SubRecipes        = subRecipes
         }
+        let diagnostics : CompileDiagnosticsT = { 
+            UExpr             = expr
+            ExecUnits         = euData.ExecUnits
+            SubDiagnostics    = subRecipeDiags            
+        }
+        recipe, diagnostics
 
 
     /// builds a recipe for evaluating the specified expressions and storing
     /// their results into automatically generated variables
-    and buildFromDesc {CompileEnv=compileEnv; UExprs=uexprs} =         
+    and buildFromDesc {CompileEnv=compileEnv; UExprs=uexprs} : CudaRecipeT * CompileDiagnosticsT =         
         // add storage op for results
         let resInfos = 
             uexprs
