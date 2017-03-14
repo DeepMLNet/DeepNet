@@ -1,6 +1,7 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
 open System
+open Microsoft.FSharp.Reflection
 
 open Basics
 open Basics.Cuda
@@ -66,6 +67,11 @@ module CudaExecUnitTypes =
         | CheckNonFiniteCounter of string * ArrayNDManikinT
         // extension item
         | ExtensionExecItem     of ICudaExecItem
+
+        interface IExecItem with
+            member this.VisualizationText = 
+                match FSharpValue.GetUnionFields (this, typeof<CudaExecItemT>) with
+                | case, _ -> case.Name
 
 
     type SrcReqsHelpersT = {
@@ -143,7 +149,7 @@ module CudaExecUnitTypes =
         /// Returns the execution items for the op.
         /// It must read from the given source manikin and write to the target manikin.
         /// Additional memory may be allocated for temporary results.
-        abstract ExecItems: CudaCompileEnvT -> ExecItemsForOpArgs<CudaExecItemT> -> 
+        abstract ExecItems: CudaCompileEnvT -> ExecItemsForOpArgs -> 
                             ExecItemsHelpersT -> CudaExecItemT list
 
 
@@ -250,6 +256,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltSrcWithNoViewReq ()
         | UUnaryOp (SumAxis _) -> dfltSrcWithNoViewReq ()
+        | UUnaryOp Product -> dfltSrcWithNoViewReq ()
+        | UUnaryOp (ProductAxis _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (MaxAxis _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (MinAxis _) -> dfltSrcWithNoViewReq ()
 
@@ -319,6 +327,16 @@ module CudaExecUnit =
         // nary
         | UNaryOp Discard -> dfltSrcWithNoViewReq ()
         | UNaryOp (Interpolate _) -> inplaceFirstSrcReq ()
+
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            match trgtDfltChReq () with
+            | Some req when not (ArrayND.isBroadcasted req) && 
+                    BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
+                rngs |> List.map (fun rng ->
+                    let aryRng = rng |> List.map (fun (first, last) -> 
+                        Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    dfltChReq (Some (req.[aryRng] :?> ArrayNDManikinT)))
+            | _ -> dfltSrcWithNoViewReq ()            
 
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op
@@ -535,6 +553,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> dfltChOutplaceTrgt ()
         | UUnaryOp (SumAxis _) -> dfltChOutplaceTrgt ()
+        | UUnaryOp Product -> dfltChOutplaceTrgt ()
+        | UUnaryOp (ProductAxis _) -> dfltChOutplaceTrgt ()
         | UUnaryOp (MaxAxis _) -> dfltChOutplaceTrgt ()
         | UUnaryOp (MinAxis _) -> dfltChOutplaceTrgt ()
 
@@ -595,6 +615,13 @@ module CudaExecUnit =
         // nary
         | UNaryOp Discard -> dfltChOutplaceTrgt ()
         | UNaryOp (Interpolate _) -> dfltChInplaceOvrwrtTrgt ()  
+
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            match trgtDefChReq () with
+            | Some req when not (ArrayND.isBroadcasted req) -> 
+                let anySrcShared = srcsDfltChShared() |> List.exists id
+                dfltChTrgt req anySrcShared
+            | _ -> newDfltChTrgt ()            
         
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op
@@ -1009,6 +1036,7 @@ module CudaExecUnit =
     let execItemsForOp compileEnv ({MemAllocator=memAllocator
                                     Target=trgtChs
                                     Op=op
+                                    UExpr=uExpr
                                     Metadata=metadata
                                     Srcs=srcsAndShared
                                     SubmitInitItems=submitInit} as args) =
@@ -1095,6 +1123,8 @@ module CudaExecUnit =
         // reductions
         | UUnaryOp Sum -> execItemsForReduce memAllocator "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp Product -> execItemsForReduce memAllocator "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ProductAxis ax) -> execItemsForReduceAxis memAllocator ax "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (ConstSpec.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
         | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (ConstSpec.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
 
@@ -1251,6 +1281,23 @@ module CudaExecUnit =
         | UNaryOp (Interpolate ip) -> 
             execItemsForElemwise (dfltChTrgt()) (InterpolateEOpArgTmpl (ip, compileEnv)) (srcsDfltCh())
 
+        | UNaryOp (BuildTensor (shp, rngs)) ->
+            let zeroItems =
+                if BaseRangesSpec.areCoveringWithoutOverlap shp rngs then []
+                else 
+                    let cs = ConstSpec.zero (trgtDfltChType().Type)                    
+                    execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
+            let parts = rngs |> List.map (fun rng ->
+                let aryRng = rng |> List.map (fun (first, last) -> 
+                    Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                dfltChTrgt().[aryRng] :?> ArrayNDManikinT)            
+            let copyItems = 
+                List.zip (srcsDfltCh()) parts 
+                |> List.collect (fun (src, part) ->
+                    if src = part then []
+                    else copyExecItems part src)
+            zeroItems @ copyItems
+
         // extra
         | UUnaryOp (Expr.Held _) -> needExtra op
 
@@ -1295,6 +1342,7 @@ module CudaExecUnit =
                                ResultLoc      = LocDev
                                CanDelay       = false}
                 UExprs      = loopSpec.Channels |> Map.map (fun ch lv -> lv.UExpr) 
+                OwnerUExpr  = Some uExpr
             }
 
             // emit loop executor
@@ -1382,12 +1430,15 @@ module CudaExecUnit =
             | Some dfltChTrgt -> [Trace (uexpr, dfltChTrgt)]
             | None -> []
 
+    let toIExecItem items =
+        items |> List.map (fun i -> i :> IExecItem)
+
     /// generates CUDA execution units that will evaluate the given unified expression
-    let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =
+    let exprToCudaExecUnits (compileEnv: CudaCompileEnvT) =                
         ExecUnit.exprToExecUnits {
-            ExecItemsForOp=execItemsForOp compileEnv
-            TracePreItemsForExpr=tracePreItemsForExpr compileEnv
-            TracePostItemsForExpr=tracePostItemsForExpr compileEnv
+            ExecItemsForOp=execItemsForOp compileEnv >> toIExecItem
+            TracePreItemsForExpr=tracePreItemsForExpr compileEnv >> toIExecItem
+            TracePostItemsForExpr=tracePostItemsForExpr compileEnv >> toIExecItem
             TrgtGivenSrcs=trgtGivenSrcs compileEnv
             SrcReqs=srcReqs compileEnv
         } 

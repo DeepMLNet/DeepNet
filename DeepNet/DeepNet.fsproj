@@ -62,7 +62,6 @@
   <ItemGroup>
     <Reference Include="FSharp.Data">
       <HintPath>..\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\packages\FSharp.Data.2.3.2\lib\net40\FSharp.Data.DesignTime.dll</HintPath>

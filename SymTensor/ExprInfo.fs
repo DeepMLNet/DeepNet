@@ -5,13 +5,13 @@ open Expr
 
 type MultiChannelOpUsageT = MultiChannelOpT * List<ExprT>
 
-type ExprInfoT (expr: ExprT) =
+type ExprInfoT (exprs: ExprT list) =
     
     /// expression cache
-    static let knownExprs = ConcurrentDictionary<ExprT, ExprT> () //(HashIdentity.Structural)   
+    let knownExprs = Dictionary<ExprT, ExprT> () 
 
     // rebuilt expression so that equal subtrees point to the same object instance
-    let expr =
+    let exprs =
         let rec doUnify expr =
             match knownExprs.TryFind expr with
             | Some knownExpr -> knownExpr
@@ -19,12 +19,18 @@ type ExprInfoT (expr: ExprT) =
                 let unifiedExpr =
                     match expr with
                     | Leaf _ -> expr
+                    | Unary (Gather indices, a) -> 
+                        Unary (Gather (List.map (Option.map doUnify) indices), doUnify a)
+                    | Unary (Scatter (indices, shp), a) -> 
+                        Unary (Scatter (List.map (Option.map doUnify) indices, shp), doUnify a)
                     | Unary (op, a) -> Unary (op, doUnify a)
+                    | Binary (IfThenElse cond, a, b) -> 
+                        Binary (IfThenElse (doUnify cond), doUnify a, doUnify b)
                     | Binary (op, a, b) -> Binary (op, doUnify a, doUnify b)
                     | Nary (op, es) -> Nary (op, es |> List.map doUnify)
                 knownExprs.[expr] <- unifiedExpr
                 unifiedExpr
-        doUnify expr
+        exprs |> List.map doUnify 
     
     // build sets of dependants for each subexpression
     let dependants = 
@@ -53,7 +59,9 @@ type ExprInfoT (expr: ExprT) =
                     for e in es do
                         doBuild e
                 processed.Add expr |> ignore
-        doBuild expr
+
+        for expr in exprs do
+            doBuild expr
         dependants
 
     // build sets of used channels
@@ -78,13 +86,14 @@ type ExprInfoT (expr: ExprT) =
                 | Nary (op, es) -> for e in es do doBuild e
                 processed.Add expr |> ignore
 
-        doBuild expr
+        for expr in exprs do
+            doBuild expr
         usedChannels      
     )
 
-    /// Contained expression.
+    /// Contained expressions.
     /// It is ensured that equal sub-expression are the same object instance.
-    member this.Expr = expr 
+    member this.Exprs = exprs
 
     /// Returns all expressions that depend on expr.
     /// Comparison is done based on reference equality.

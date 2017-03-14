@@ -18,11 +18,13 @@ module CudaEval =
         let channelExprs = List.zip channels uexprs |> Map.ofList
 
         // build recipe and create workspace
-        let rcpt = CudaRecipe.buildFromDesc {CompileEnv=compileEnv; UExprs=channelExprs}
+        let rcpt, diagnostics = 
+            {CompileEnv=compileEnv; UExprs=channelExprs; OwnerUExpr=None}
+            |> CudaRecipe.buildFromDesc 
         let workspace = new CudaExprWorkspace (rcpt)
 
         // evaluator
-        fun (evalEnv: EvalEnvT) ->           
+        let evalFn = fun (evalEnv: EvalEnvT) ->           
             // create arrays for results and add them to VarEnv
             let resArrays = rcpt.ChannelAllocators |> Map.map (fun _ alloc -> alloc ())
             let varEnv =
@@ -35,6 +37,8 @@ module CudaEval =
             // evaluate
             workspace.Eval varEnv
             channels |> List.map (fun ch -> resArrays.[ch])
+
+        evalFn, Some diagnostics
 
 
 [<AutoOpen>]

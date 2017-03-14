@@ -283,9 +283,9 @@ module UExpr =
     /// converts a list of expressions to a list of unified expressions
     and toUExprs (exprs: ExprT list) =
         let caches = {
-            UExprForExpr    = Dictionary<ExprT, UExprT> () //(HashIdentity.LimitedStructural 10)
-            UExprs          = Dictionary<UExprT, UExprT>()        
-            ULoopSpecs      = Dictionary<LoopSpecT, ULoopSpecT> () //(HashIdentity.LimitedStructural 10)
+            UExprForExpr    = Dictionary<ExprT, UExprT> () 
+            UExprs          = Dictionary<UExprT, UExprT> ()        
+            ULoopSpecs      = Dictionary<LoopSpecT, ULoopSpecT> () 
         }     
         exprs 
         |> List.map Expr.check

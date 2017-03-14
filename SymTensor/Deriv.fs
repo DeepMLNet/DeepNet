@@ -116,7 +116,6 @@ module Deriv =
             | Truncate -> zeroJacobian a
             
             | Not -> zeroJacobian a
-                //failLogic op
 
             | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
             | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
@@ -157,6 +156,17 @@ module Deriv =
             | SumAxis ax -> 
                 let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
                 bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+            | Product -> 
+                // This division method incorrectly returns NaN for zero elements.
+                // But currently I do not see any efficient alternative.
+                let aBc = a |> reshape (SizeSpec.broadcastable :: ShapeSpec.flatten (shapeOf a))
+                let pBc = expr |> reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
+                (eg |> enableBroadcast 1) * (pBc / aBc)
+            | ProductAxis ax ->
+                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                let aBc = padLeft a
+                let pBc = a |> productKeepingAxis ax |> padLeft
+                bcEgExp * (pBc / aBc) |> collapse
             | MaxAxis ax 
             | MinAxis ax ->
                 let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
@@ -171,11 +181,9 @@ module Deriv =
             | AssumeJacobian jac ->
                 match eg.Shape.[0], jac.Shape.[0] with
                 | fl, jl when fl = jl -> jac
-                | fl, jl when jl = SizeSpec.broadcastable ->
-                    jac |> Expr.broadcast [fl; jac.Shape.[1]]
-                | _ -> 
-                    failwithf "cannot broadcast specified Jacobian of shape %A to required 
-                                Jacobian shape %A" jac.Shape eg.Shape
+                | fl, jl when jl = SizeSpec.broadcastable -> jac |> Expr.broadcast [fl; jac.Shape.[1]]
+                | _ -> failwithf "cannot broadcast specified Jacobian of shape %A to required 
+                                  Jacobian shape %A" jac.Shape eg.Shape
 
             | Print _ -> eg 
             | Dump _ -> eg 
@@ -218,12 +226,10 @@ module Deriv =
             | GreaterEqual
             | NotEqual
                 -> zeroJacobian a .+ zeroJacobian b
-                //-> failLogic op
 
             | And 
             | Or 
                 -> zeroJacobian a .+ zeroJacobian b
-                //-> failLogic op
 
             | IfThenElse cond -> ifThenElseJac cond a b
 
@@ -261,6 +267,8 @@ module Deriv =
 
         | Nary(op, es) ->
             match op with
+            | BuildTensor _ ->
+                failwith "BuildTensor is used for optimization only and cannot be derived"
             | Elements (resShape, elemExpr) ->
                 let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape es.Length
                 List.zip es desElemExprs
@@ -594,8 +602,8 @@ module Deriv =
     and computeWithRootJacobian (rootJacobian: ExprT) (rootExpr: ExprT) : DerivT =
 
         // build expression info and unify common subexpressions
-        let exprInfo = ExprInfoT rootExpr
-        let rootExpr = exprInfo.Expr
+        let exprInfo = ExprInfoT [rootExpr]
+        let rootExpr = List.exactlyOne exprInfo.Exprs
 
         /// map from an expression to the sum of incoming Jacobians
         let incomingJacobian = Dictionary<ExprT, ExprT> (HashIdentity.Reference)

@@ -13,23 +13,19 @@ let main argv =
     let device = DevCuda
 
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
-
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
 
-    let mb = ModelBuilder<single> "NeuralNetModel"
-
     // define symbolic sizes
+    let mb = ModelBuilder<single> "NeuralNetModel"
     let nBatch  = mb.Size "nBatch"
     let nInput  = mb.Size "nInput"
     let nClass  = mb.Size "nClass"
-    let nHidden = mb.Size "nHidden"
 
     // define model parameters
     let mlp = 
         MLP.pars (mb.Module "MLP") 
-            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=ActivationFunc.Tanh}
-                        {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=ActivationFunc.SoftMax}]
-              LossMeasure = LossLayer.CrossEntropy }
+            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nClass; TransferFunc=ActivationFunc.Tanh}]
+              LossMeasure = LossLayer.MSE }
 
     // define variables
     let input  : ExprT = mb.Var<single> "Input"  [nBatch; nInput]
@@ -38,21 +34,18 @@ let main argv =
     // instantiate model
     mb.SetSize nInput mnist.Trn.[0L].Input.Shape.[0]
     mb.SetSize nClass mnist.Trn.[0L].Target.Shape.[0]
-    mb.SetSize nHidden 100L
     let mi = mb.Instantiate device
 
-    // loss expression
+    let pred = MLP.pred mlp input
     let loss = MLP.loss mlp input target
-    //let loss = loss |> Expr.checkFinite "loss"
 
     let smplVarEnv (smpl: InputTargetSampleT) =
         VarEnv.empty
         |> VarEnv.add input smpl.Input
         |> VarEnv.add target smpl.Target
     let trainable =
-        //Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
-        Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
-
+        Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
+        
     let trainCfg : Train.Cfg = {    
         Train.defaultCfg with
             Seed               = 100   
@@ -69,17 +62,16 @@ let main argv =
 
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
-    //Debug.VisualizeUExpr <- true
+    Debug.VisualizeUExpr <- true
+    //Debug.DisableCombineIntoElementsOptimization <- true
+    Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
-    //let ts = Trace.startSession "LearnMnist"
 
     let lossFn = mi.Func loss |> arg2 input target
     let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
     printfn "Initial training loss: %f" initialLoss
     let result = Train.train trainable mnist trainCfg
 
-    //let ts = ts.End ()
-    //ts |> Trace.dumpToFile "LearnMNIST.txt"
 
     0
 

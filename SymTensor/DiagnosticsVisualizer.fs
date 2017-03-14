@@ -11,7 +11,7 @@ open Basics
 open SymTensor.Compiler
 
 
-module UExprVisualizer =
+module DiagnosticsVisualizer =
 
     type VisMemManikin =
         {Manikin: MemManikinT}
@@ -61,7 +61,7 @@ module UExprVisualizer =
             | _, _ -> failwith "invalid combination of manikin/storage"
 
 
-    type Visualizer (rootExprs: UExprT list) =
+    type Visualizer (diagnostics: CompileDiagnosticsT) =
 
         let arrayNDManikins = ResizeArray<VisArrayNDManikin> ()
         let srcEdges = Dictionary<UExprT * int, Edge> ()
@@ -281,8 +281,7 @@ module UExprVisualizer =
         let nodeForEuId = Dictionary<int, Node> ()
 
         // build graph
-        do printfn "Building UExpr visualization..."
-        let resNodes, nodeForExpr = nodesForExprs graph.RootSubgraph rootExprs
+        let resNodes, nodeForExpr = nodesForExprs graph.RootSubgraph [diagnostics.UExpr]
 
         do
             // add result nodes
@@ -293,23 +292,35 @@ module UExprVisualizer =
                 resLabelNode.Label.FontColor <- Color.White
                 newEdge resNode resLabelNode "" |> ignore
 
-        /// adds manikin information
-        member this.AddManikins (euId: int) (uExpr: UExprT) 
-                                (trgtManikins: Map<string, ArrayNDManikinT>) 
-                                (srcManikins: ArrayNDManikinT list)
-                                (extraMems: MemManikinT list) =
-            match nodeForExpr.TryFindReadOnly uExpr with
-            | Some node -> nodeForEuId.[euId] <- node
-            | None -> ()
+            // add information from ExecUnits
+            for eu in diagnostics.ExecUnits do
 
-            for KeyValue(ch, manikin) in trgtManikins do
-                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Target ch} 
-            for src, manikin in List.indexed srcManikins do
-                arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=euId; UExpr=uExpr; Relation=Src src}
-            for extraMem in extraMems do
-                arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=euId; UExpr=uExpr; Relation=Extra}
+                match nodeForExpr.TryFindReadOnly eu.Expr with
+                | Some euNode -> 
+                    nodeForEuId.[eu.Id] <- euNode
 
-        /// shows the graph
+                    let text = 
+                        eu.Items
+                        |> List.indexed
+                        |> List.map (fun (eiIdx, ei) -> 
+                            sprintf "#%d: %s" eiIdx ei.VisualizationText)
+                        |> String.concat "\n"
+                    if Debug.VisualizeExecItems && text.Length > 0 then
+                        let eiNode = newNode graph.RootSubgraph
+                        eiNode.LabelText <- text
+                        eiNode.Attr.FillColor <- Color.Black
+                        eiNode.Label.FontColor <- Color.White
+                        newEdge euNode eiNode "" |> ignore
+                | None -> ()
+
+                for KeyValue(ch, (manikin, shrd)) in eu.Channels do
+                    arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=eu.Id; UExpr=eu.Expr; Relation=Target ch} 
+                for src, manikin in List.indexed eu.Srcs do
+                    arrayNDManikins.Add {Manikin=Some manikin; Storage=None; EuId=eu.Id; UExpr=eu.Expr; Relation=Src src}
+                for extraMem in eu.ExtraMem do
+                    arrayNDManikins.Add {Manikin=None; Storage=Some extraMem; EuId=eu.Id; UExpr=eu.Expr; Relation=Extra}             
+                
+        /// shows the visualization
         member this.Show () = 
             // add execution unit id to nodes
             for KeyValue(euId, node) in Map.ofDictionary nodeForEuId do
@@ -323,6 +334,7 @@ module UExprVisualizer =
 
             // graph viewer
             viewer.Graph <- graph
+            //viewer.tool
             form.Controls.Add viewer
 
             // splitter ArrayNDManikins / MemManikins
@@ -437,29 +449,11 @@ module UExprVisualizer =
             form.ShowDialog () |> ignore
 
 
-    /// active visualizer
-    let active = new ThreadLocal<Visualizer option> ()   
+    /// Visualizes compilation information.
+    let visualize (diagnostics: CompileDiagnosticsT) =
+        let vis = Visualizer diagnostics
+        vis.Show()
 
-    let build rootExprs = 
-        if Debug.VisualizeUExpr then
-            let v = Visualizer (rootExprs)
-            active.Value <- Some v
-
-    let getActive () =
-        match active.Value with
-        | Some v -> v
-        | None -> failwith "no UExprVisualizer is active on the current thread"
-
-    let show () =
-        if Debug.VisualizeUExpr then
-            getActive().Show()
-
-    let finish () =
-        active.Value <- None
-
-    let addManikins euId uExpr trgtManikins srcManikins extraMem =
-        if Debug.VisualizeUExpr then
-            getActive().AddManikins euId uExpr trgtManikins srcManikins extraMem
 
             
 

@@ -110,6 +110,16 @@ module ArrayNDManikinTypes =
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
                 storage layout.Shape layout.Stride
 
+        override this.Equals other =
+            match other with
+            | :? ArrayNDManikinT as other -> 
+                this.Layout = other.Layout && this.Storage = other.Storage
+            | _ -> false
+
+        override this.GetHashCode () =
+            hash (this.Layout, this.Storage)
+
+
 module ArrayNDManikin =
     open ArrayND
 

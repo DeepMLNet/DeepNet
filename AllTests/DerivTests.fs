@@ -18,6 +18,36 @@ let ``Plus`` () =
     )
 
 [<Fact>]
+let ``Sum`` () =
+    randomDerivativeCheckTreeOnHost 1e-4 [[3L; 3L]] (fun [a] ->
+        Expr.sum a 
+    )
+
+[<Fact>]
+let ``Sum Axis 1`` () =
+    randomDerivativeCheckTreeOnHost 1e-4 [[4L; 3L; 2L]] (fun [a] ->
+        Expr.sumAxis 1 a 
+    )
+
+[<Fact>]
+let ``Product`` () =
+    randomDerivativeCheckTreeOnHost 1e-4 [[3L; 3L]] (fun [a] ->
+        Expr.product a 
+    )
+
+[<Fact>]
+let ``Product Axis 1`` () =
+    randomDerivativeCheckTreeOnHost 1e-4 [[4L; 3L; 2L]] (fun [a] ->
+        Expr.productAxis 1 a 
+    )
+
+[<Fact>]
+let ``Product Axis 2`` () =
+    randomDerivativeCheckTreeOnHost 1e-4 [[3L; 2L]] (fun [a] ->
+        Expr.productAxis 1 a 
+    )
+
+[<Fact>]
 let ``Inverse`` () =
     randomDerivativeCheckTreeOnHost 1e-4 [[2L; 2L]] (fun [a] ->
         Expr.invert a
@@ -28,7 +58,6 @@ let ``Batch inverse`` () =
     randomDerivativeCheckTreeOnHost 1e-4 [[3L; 2L; 2L]] (fun [a] ->
         Expr.invert a
     ) 
-
 
 [<Fact>]
 let ``Dot`` () =
@@ -131,7 +160,6 @@ let ``Gather`` () =
     let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
 
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
-
 
 [<Fact>]
 let ``Scatter`` () =

@@ -9,7 +9,6 @@ module Optimizer =
     /// Cache of optimized expressions.
     let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
     let private combined = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
-    let private fullOptimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
 
     /// Broadcast information
     type BroadcastInfoT =
@@ -254,8 +253,8 @@ module Optimizer =
         let rec getArgElemExpr argExpr =            
             let combinable () = 
                 (exprInfo.DependantsStructural argExpr).Count = 1 ||
-                Set.count (Expr.extractVars argExpr) = 0
-            //let combinable () = false
+                Set.count (Expr.extractVars argExpr) = 0            
+
             match subComb argExpr with
             | Nary (Elements (_, argElemExpr), argArgs) when combinable() -> argElemExpr, argArgs
             | Unary (DoBroadcast shp, a) when combinable() ->
@@ -275,11 +274,11 @@ module Optimizer =
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
-                let rec insertBcAxes srcDim srcShp rsShp elemExpr =
+                let rec insertBcAxes substStartDim srcShp rsShp elemExpr =
                     match srcShp, rsShp with
                     | [], [] -> elemExpr
                     | _, rsSize::remRsShp when rsSize = SizeSpec.broadcastable ->
-                        let dimRng = [srcDim .. argExpr.NDims-1]
+                        let dimRng = [substStartDim .. argExpr.NDims-1]
                         let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
                         let insSubst1 =
                             dimRng
@@ -291,12 +290,11 @@ module Optimizer =
                             |> Map.ofList
                         let substExpr = 
                             elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
-                        insertBcAxes srcDim srcShp remRsShp substExpr
+                        insertBcAxes (substStartDim+1) srcShp remRsShp substExpr
                     | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
-                        insertBcAxes (srcDim + 1) remSrcShp remRsShp elemExpr
+                        insertBcAxes (substStartDim+1) remSrcShp remRsShp elemExpr
                     | _ -> failwith "invalid reshape for broadcast axes insertion"
-                let res = insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
-                res
+                insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
             | combArgExpr -> 
                 let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
                 ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
@@ -324,6 +322,10 @@ module Optimizer =
                         |> optimizeElements
                     | None -> expr
         
+                | Unary (Gather indices, a) ->
+                    Unary (Gather (List.map (Option.map subComb) indices), subComb a)
+                | Unary (Scatter (indices, shp), a) ->
+                    Unary (Scatter (List.map (Option.map subComb) indices, shp), subComb a)
                 | Unary (op, aExpr) ->
                     match unaryOpToElemOp op with
                     | Some elemOp ->       
@@ -333,6 +335,8 @@ module Optimizer =
                         |> optimizeElements
                     | None -> Unary (op, subComb aExpr)
                     
+                | Binary (IfThenElse cond, a, b) ->
+                    Binary (IfThenElse (subComb cond), subComb a, subComb b)
                 | Binary (op, aExpr, bExpr) ->
                     match binaryOpToElemOp op with
                     | Some elemOp ->
@@ -465,13 +469,25 @@ module Optimizer =
 
                 // optimize gather and scatter index arguments
                 | Unary (Gather indices, a) ->
-                    Unary (Gather (indices |> List.map (Option.map optimize)), optRec a)
+                    Unary (Gather (indices |> List.map (Option.map optRec)), optRec a)
                 | Unary (Scatter (indices, shp), a) ->
-                    Unary (Scatter (indices |> List.map (Option.map optimize), shp), optRec a)
+                    Unary (Scatter (indices |> List.map (Option.map optRec), shp), optRec a)
 
                 // optimize IfThenElse condition
                 | Binary (IfThenElse cond, a, b) ->
-                    Binary (IfThenElse (optimize cond), optRec a, optRec b)
+                    Binary (IfThenElse (optRec cond), optRec a, optRec b)
+
+                // tranform SetSubtensor(Zero, X) into BuildTensor(X)
+                | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), ZeroExpr, part) ->
+                    let shp = shapeOf expr
+                    Expr.buildTensor shp [SimpleRangesSpec.toBaseRangesSpec shp rngs] [optRec part]
+                // combine Add(BuildTensor, BuildTensor) into BuildTensor if ranges are not overlapping
+                | Binary (Add, Nary (BuildTensor (aShp, aRngs), aParts),
+                               Nary (BuildTensor (bShp, bRngs), bParts)) when 
+                        aShp=bShp && not (BaseRangesSpec.areOverlapping (aRngs @ bRngs)) ->
+                    let aParts = aParts |> List.map optRec
+                    let bParts = bParts |> List.map optRec
+                    Expr.buildTensor aShp (aRngs @ bRngs) (aParts @ bParts)
 
                 // optimize elements expressions
                 | Nary (Elements (resShape, elemExpr), args) ->
@@ -484,11 +500,16 @@ module Optimizer =
                 // optmize loops
                 | Nary (Channel (Loop loopSpec, ch), args) ->
                     let args = args |> List.map optRec
-                    let loopSpec = {
-                        loopSpec with
-                            Channels = loopSpec.Channels 
-                                       |> Map.map (fun ch lv -> {lv with Expr=optimize lv.Expr})
-                    }
+                    let optChExprs = 
+                        Map.toList loopSpec.Channels                        
+                        |> List.map (fun (ch, lv) -> lv.Expr)
+                        |> optimize
+                    let channels =
+                        Map.toList loopSpec.Channels
+                        |> List.zip optChExprs
+                        |> List.map (fun (optExpr, (ch, lv)) -> ch, {lv with Expr=optExpr})
+                        |> Map.ofList
+                    let loopSpec = {loopSpec with Channels=channels}
                     Nary (Channel (Loop loopSpec, ch), args)
 
                 // pass through
@@ -507,19 +528,18 @@ module Optimizer =
             optimized.LockedSet (opt, opt)
             opt
 
-    /// Optimizes an expression.
-    and optimize (expr: ExprT) : ExprT =
-        match fullOptimized.LockedTryFind expr with
-        | Some opt -> opt
-        | None ->
+    /// Optimizes a group of expressions.
+    and optimize (exprs: ExprT list) : ExprT list =
+        for expr in exprs do
             Expr.checkExpr expr
-            let opt = expr |> optRec |> Expr.check
-            let opt = 
-                if not Debug.DisableCombineIntoElementsOptimization then
-                    combineIntoElementsRec (ExprInfoT opt) opt |> Expr.check
-                else opt
-            fullOptimized.LockedSet (expr, opt)
-            fullOptimized.LockedSet (opt, opt)
-            opt
+        let exprs = exprs |> List.map (optRec >> Expr.check)
+        let exprs = 
+            if not Debug.DisableCombineIntoElementsOptimization then
+                let exprsInfo = ExprInfoT exprs
+                exprs |> List.map (combineIntoElementsRec exprsInfo >> Expr.check)
+            else exprs
+        exprs
+
+
 
 
