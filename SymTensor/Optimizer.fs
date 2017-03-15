@@ -289,16 +289,14 @@ module Optimizer =
                     |> Map.ofSeq
                 let bcElemExpr, bcArgs = getArgElemExpr a
                 bcElemExpr |> ElemExpr.substSymSizes bcSubst, bcArgs
-            | Unary (Reshape rsShp, src) when 
-                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape &&
-                    combinable() ->
+            | Unary (Reshape rsShp, src) when combinable() &&
+                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape ->
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
                 insertBcAxes SizeSpec.broadcastable 0 src.Shape rsShp rsElemExpr, rsArgs
-            | Unary (Reshape rsShp, src) when 
-                    (rsShp |> List.withoutValue SizeSpec.one) = src.Shape &&
-                    combinable() ->
+            | Unary (Reshape rsShp, src) when combinable() && 
+                    (rsShp |> List.withoutValue SizeSpec.one) = src.Shape ->
                 // replace insertion of singleton axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
