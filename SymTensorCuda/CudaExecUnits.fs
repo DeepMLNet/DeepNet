@@ -564,10 +564,9 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
-            // TODO: optimize: check if copy is really necessary
-            if ArrayND.isC (firstSrcDfltCh()) then
-                dfltChTrgt (ArrayND.reshapeView (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared()) 
-            else dfltChOutplaceTrgt () // will copy
+            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            | Some reshapedSrc -> dfltChTrgt reshapedSrc (firstSrcDfltChShared()) 
+            | None -> dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
             dfltChTrgt (ArrayND.broadcastToShape (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (PermuteAxes perm) ->
@@ -1169,9 +1168,11 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->
-            if dfltChTrgt() <> firstSrcDfltCh() then 
+            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            | Some reshapedSrc when reshapedSrc = dfltChTrgt() -> []
+            | _ ->
+                //printfn "Reshape: copying from\n%A\nto\n%A." (firstSrcDfltCh()) (dfltChTrgt())
                 copyExecItems (dfltChTrgt()) (firstSrcDfltCh())
-            else []
         | UUnaryOp (DoBroadcast _) -> []
         | UUnaryOp (PermuteAxes _) -> []
         | UUnaryOp (ReverseAxis _) -> []
