@@ -1,7 +1,6 @@
 TODO:
-	- run simple test program to see graph => DONE
-	- optimize building of gradient => DONE
-	- allow showing of ExecItems in graph => DONE
+	- improve memory usage of loop gradient w.r.t. const inputs
+
 	- implement element expression with two inputs
 	- compute gradient and see graph
 	- extend element expression to multiple outputs

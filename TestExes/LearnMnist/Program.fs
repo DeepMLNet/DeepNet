@@ -70,6 +70,7 @@ let main argv =
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
     //Debug.VisualizeUExpr <- true
+    //Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
     //let ts = Trace.startSession "LearnMnist"
 
