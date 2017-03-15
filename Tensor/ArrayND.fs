@@ -621,13 +621,25 @@ module ArrayND =
     let inline isBroadcasted a =
         ArrayNDLayout.isBroadcasted (layout a)
 
-    /// Reshape array assuming a contiguous (row-major) memory layout.
-    /// The current memory layout (as given by the strides) has no influence 
-    /// on the reshape operation.
-    /// If the array is not contiguous, an error is raised. No copy is performed.
+    /// Tries to reshape array assuming a contiguous (row-major) memory layout without copying.
+    /// If this is not possible, None is returned.
+    /// The number of elements must not change.
+    let inline tryReshapeView shp a =
+        match ArrayNDLayout.tryReshape shp (layout a) with
+        | Some newLayout -> a |> relayout newLayout |> Some
+        | None -> None
+
+    /// Reshape array assuming a contiguous (row-major) memory layout without copying.
+    /// If this is not possible, an error is raised. 
     /// The number of elements must not change.
     let inline reshapeView shp a =
-        relayout (ArrayNDLayout.reshape shp (layout a)) a
+        a |> relayout (ArrayNDLayout.reshape shp (layout a))
+
+    /// Returns true if the array can be reshaped without copying.
+    let inline canReshapeView shp a =
+        match tryReshapeView shp a with
+        | Some _ -> true
+        | None -> false
 
     /// Reshape array assuming a contiguous (row-major) memory layout.
     /// The current memory layout (as given by the strides) has no influence 

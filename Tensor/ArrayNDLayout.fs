@@ -297,10 +297,11 @@ module ArrayNDLayout =
 
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
-    let reshape shp a =
-        if not (isC a) then
-            invalidArg "a" "layout must be contiguous for reshape"
-
+    /// Returns Some newLayout when reshape is possible without copy
+    /// Returns None when a copy is required.
+    let tryReshape shp a =
+        // replace on occurence of -1 in new shape with required size to keep number of
+        // elements constant
         let shp =
             match List.filter ((=) -1L) shp |> List.length with
             | 0 -> shp
@@ -311,14 +312,48 @@ module ArrayNDLayout =
                     List.map (fun s -> if s = -1L then elemsNeeded / elemsSoFar else s) shp
                 else
                     failwithf "cannot reshape from %A to %A because %d / %d is not an integer" 
-                        (shape a) shp elemsNeeded elemsSoFar
+                              (shape a) shp elemsNeeded elemsSoFar
             | _ -> failwithf "only the size of one dimension can be determined automatically, but shape was %A" shp
           
+        // check that number of elements does not change
         let shpElems = List.fold (*) 1L shp
         if shpElems <> nElems a then
             failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
-                (shape a) (nElems a) shp shpElems
-        {a with Shape=shp; Stride=cStride shp}
+                      (shape a) (nElems a) shp shpElems
+
+        // try to transform stride using singleton insertions and removals
+        let rec tfStride newStr newShp aStr aShp =
+            match newShp, aStr, aShp with
+            | nSize::newShps, aStr::aStrs, aSize::aShps when nSize=aSize ->
+                tfStride (newStr @ [aStr]) newShps aStrs aShps
+            | 1L::newShps, _, _ ->
+                tfStride (newStr @ [0L]) newShps aStr aShp
+            | _, _::aStrs, 1L::aShps ->
+                tfStride newStr newShp aStrs aShps
+            | [], [], [] -> Some newStr
+            | _ -> None
+
+        match tfStride [] shp a.Stride a.Shape with
+        | _ when isC a -> Some {a with Shape=shp; Stride=cStride shp}
+        | Some newStr -> 
+            //printfn "Using stride transform to reshape from\n%A\nto\n%A\n" a {a with Shape=shp; Stride=newStr}
+            Some {a with Shape=shp; Stride=newStr}
+        | None -> None
+
+    /// Returns true if a can be reshaped into shp without copying.
+    /// The number of elements must not change.
+    let canReshape shp a =
+        match tryReshape shp a with
+        | Some _ -> true
+        | None -> false
+
+    /// Reshape layout under the assumption that it is contiguous.
+    /// The number of elements must not change.
+    /// An error is raised, if reshape is impossible without copying.
+    let reshape shp a =
+        match tryReshape shp a with
+        | Some layout -> layout
+        | None -> failwithf "cannot reshape layout %A into shape %A without copying" a shp
 
     /// swaps the given dimensions
     let swapDim ax1 ax2 a =
