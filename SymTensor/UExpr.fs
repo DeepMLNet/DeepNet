@@ -5,6 +5,7 @@ open System.Reflection
 open System.Collections.Generic
 
 open Basics
+open ArrayNDNS
 open Expr
 
 
@@ -35,8 +36,9 @@ module UExprTypes =
     }
 
     type ULoopValueT = {
-        UExpr:      UExprT
-        SliceDim:   int
+        UExpr:       UExprT
+        SliceDim:    int
+        OutputFrom:  int64
     }
 
     and ULoopSpecT = {
@@ -59,8 +61,7 @@ module UExprTypes =
         | Scatter of IndexArgs
         | ExtensionExtraOp of IUOp        
 
-    /// unified op of any arity and type
-    
+    /// unified op of any arity and type    
     and UOpT =
         | ULeafOp of Expr.LeafOpT
         | UUnaryOp of Expr.UnaryOpT
@@ -175,6 +176,7 @@ module UExprRngsSpec =
             | SRSDynStartSymSize _ -> ())        
         
 
+/// Functions for dealing with unified expressions.
 module UExpr =
 
     type private UExprCaches = {
@@ -256,7 +258,7 @@ module UExpr =
                     extra (Scatter idxArgNos) (a::idxArgs)
                 | Expr.Unary (Expr.Held (_, heldOp) as holdOp, a) ->
                     failwithf "the held op %A must be expanded before conversion to UExpr \
-                              (shape of argument is %A and Hold is %A)" heldOp a.Shape holdOp
+                               (shape of argument is %A and Hold is %A)" heldOp a.Shape holdOp
                 | Expr.Nary (Expr.ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->
@@ -305,7 +307,8 @@ module UExpr =
             let chUExprs = toUExprs (channels |> List.map (fun (_, lv) -> lv.Expr))
             let uChannels = 
                 List.zip channels chUExprs
-                |> List.map (fun ((ch, lv), uexpr) -> ch, {UExpr=uexpr; SliceDim=lv.SliceDim})
+                |> List.map (fun ((ch, lv), uexpr) -> 
+                    ch, {UExpr=uexpr; SliceDim=lv.SliceDim; OutputFrom=0L})
             let uLoopSpec = {
                 Length   = SizeSpec.eval loopSpec.Length
                 Vars     = loopSpec.Vars
@@ -314,75 +317,127 @@ module UExpr =
             caches.ULoopSpecs.[loopSpec] <- uLoopSpec
             uLoopSpec
 
-    /// removes unused loop channels from a loop expression
-    and private removeUnusedLoopChannels (externallyUsedChannels: Set<ChannelT>) uexpr  =
-        match uexpr with
-        | UExpr (UExtraOp (Loop uLoopSpec), args, metadata) ->
-            let rec usedChannelsAndVars prevUsedChs =
-                let usedVars =
-                    uLoopSpec.Channels
-                    |> Map.filter (fun ch _ -> prevUsedChs |> Set.contains ch)
-                    |> Map.toSeq
-                    |> Seq.map (fun (ch, lv) -> extractVars lv.UExpr) 
-                    |> Set.unionMany
-
-                let usedChs =
-                    (prevUsedChs, usedVars)
-                    ||> Seq.fold (fun ucs vs ->
-                        match uLoopSpec.Vars.[vs] with
-                        | PreviousChannel {Channel=channel} -> ucs |> Set.add channel
-                        | _ -> ucs)     
-
-                if usedChs <> prevUsedChs then usedChannelsAndVars usedChs
-                else usedChs, usedVars
-
-            let usedChs, usedVars = usedChannelsAndVars externallyUsedChannels               
-            let filterChs chMap = chMap |> Map.filter (fun ch _ -> usedChs.Contains ch) 
-            let uLoopSpec = 
-                {uLoopSpec with 
-                    Vars     = uLoopSpec.Vars |> Map.filter (fun var _ -> usedVars.Contains var)
-                    Channels = filterChs uLoopSpec.Channels}
-            let metadata = 
-                {metadata with
-                    ChannelShape = filterChs metadata.ChannelShape
-                    ChannelType  = filterChs metadata.ChannelType}
-            UExpr (UExtraOp (Loop uLoopSpec), args, metadata)
-        | _ -> failwith "not a loop expression"
-        
     /// removes unused channels from multi-channels ops in a set of unified expressions
     and removeUnusedChannels (uexprs: UExprT list) =
-        // build set of used channels
-        let usedChannels = Dictionary<UExprT, HashSet<ChannelT>> (HashIdentity.Reference)
+        // build set of used channels and slices
+        let loopChFirst = 
+            Dictionary<UExprT, Dictionary<ChannelT, int64>> (HashIdentity.Reference)
         let visited = HashSet<UExprT> (HashIdentity.Reference)
-        let rec buildUsed (UExpr (op, args, _) as uexpr) =
+        let registerLoopCh loopExpr channel first =
+            if not (loopChFirst.ContainsKey loopExpr) then
+                loopChFirst.[loopExpr] <- Dictionary<_, _> ()
+            loopChFirst.[loopExpr].[channel] <-
+                match loopChFirst.[loopExpr].TryFind channel with
+                | Some pFirst -> min pFirst first
+                | None -> first               
+        let rec buildUsed uexpr =
             if not (visited.Contains uexpr) then
-                match op with
-                | UExtraOp (Channel ch) ->
-                    let multichannelExpr = args.Head
-                    if not (usedChannels.ContainsKey multichannelExpr) then
-                        usedChannels.[multichannelExpr] <- HashSet<_> ()
-                    usedChannels.[multichannelExpr].Add ch |> ignore
-                | _ -> ()
-                for arg in args do
-                    buildUsed arg
+                match uexpr with
+                // slice of loop channel output
+                | UExpr (UExtraOp (Subtensor (SimpleRangesSpec.Static as rng)), 
+                         [UExpr (UExtraOp (Channel ch), 
+                                 [UExpr (UExtraOp (Loop loopSpec), loopArgs, _) as loopExpr], _)], _) ->
+                    let sliceRng = 
+                        rng.[loopSpec.Channels.[ch].SliceDim] 
+                        |> SimpleRangeSpec.eval (fun _ -> failwith "static")
+                    let first = 
+                        match sliceRng with
+                        | Rng (Some first, _) -> first
+                        | Rng (None, _) -> 0L
+                        | RngElem elem -> elem
+                        | RngNewAxis | RngAllFill -> failwith "unexpected range"
+                    registerLoopCh loopExpr ch first               
+                    for arg in loopArgs do
+                        buildUsed arg
+                // full loop channel output
+                | UExpr (UExtraOp (Channel ch), 
+                         [UExpr (UExtraOp (Loop loopSpec), loopArgs, _) as loopExpr], _) ->
+                    registerLoopCh loopExpr ch 0L
+                    for arg in loopArgs do
+                        buildUsed arg
+                // other expression
+                | UExpr (_, args, _) -> 
+                    for arg in args do
+                        buildUsed arg
                 visited.Add uexpr |> ignore
         uexprs |> List.iter buildUsed 
 
-        // filter unused channels
         let processed = Dictionary<UExprT, UExprT> (HashIdentity.Reference)
-        let rec rebuild (UExpr (op, args, metadata) as origExpr) =
-            match processed.TryFind origExpr with
-            | Some replacement -> replacement
+        let rec rebuild uexpr =
+            match processed.TryFind uexpr with
+            | Some repl -> repl
             | None ->
-                let expr = UExpr (op, args |> List.map rebuild, metadata)
-                let replacement = 
-                    match op with
-                    | UExtraOp (Loop _) -> 
-                        removeUnusedLoopChannels (Set.ofSeq usedChannels.[origExpr]) expr
-                    | _ -> expr
-                processed.[origExpr] <- replacement
-                processed.[replacement] <- replacement
-                replacement
+                let repl = 
+                    match uexpr with
+                    // adjust ranges of loop output slices
+                    | UExpr (UExtraOp (Subtensor (SimpleRangesSpec.Static as rng)), 
+                             [UExpr (UExtraOp (Channel ch), 
+                                     [UExpr (UExtraOp (Loop loopSpec), loopArgs, _) as loopExpr], 
+                                     _) as channelExpr], metadata) ->
+                        let sliceDim = loopSpec.Channels.[ch].SliceDim
+                        let offset = loopChFirst.[loopExpr].[ch]
+                        let offsetSliceRng =
+                            match rng.[sliceDim] with
+                            | SRSSymStartSymEnd (first, Some last) -> 
+                                SRSSymStartSymEnd (first - offset, Some (last - offset))
+                            | SRSSymStartSymEnd (first, None) -> 
+                                SRSSymStartSymEnd (first - offset, None)
+                            | _ -> failwith "static range expected"
+                        let offsetRng = rng |> List.set sliceDim offsetSliceRng
+                        UExpr (UExtraOp (Subtensor offsetRng), [rebuild channelExpr], metadata)
+                    // update channel selection metadata due to shape change
+                    | UExpr (UExtraOp (Channel ch), [UExpr (UExtraOp (Loop _), _, _) as loopExpr], metadata) ->
+                        let UExpr (_, _, loopMetadata) as loopRepl = rebuild loopExpr
+                        let metadata = 
+                            {metadata with ChannelShape = Map [dfltChId, loopMetadata.ChannelShape.[ch]]}
+                        UExpr (UExtraOp (Channel ch), [loopRepl], metadata)
+                    // remove unused channels from loop specification and update output range
+                    | UExpr (UExtraOp (Loop loopSpec), loopArgs, metadata) as loopExpr ->
+                        let rec usedChannelsAndVars prevUsedChs =
+                            let usedVars =
+                                loopSpec.Channels
+                                |> Map.filter (fun ch _ -> prevUsedChs |> Set.contains ch)
+                                |> Map.toSeq
+                                |> Seq.map (fun (ch, lv) -> extractVars lv.UExpr) 
+                                |> Set.unionMany
+                            let usedChs =
+                                (prevUsedChs, usedVars)
+                                ||> Seq.fold (fun ucs vs ->
+                                    match loopSpec.Vars.[vs] with
+                                    | PreviousChannel {Channel=channel} -> ucs |> Set.add channel
+                                    | _ -> ucs)     
+                            if usedChs <> prevUsedChs then usedChannelsAndVars usedChs
+                            else usedChs, usedVars
+                        let usedChs, usedVars = usedChannelsAndVars (Set.ofSeq loopChFirst.[loopExpr].Keys)               
+                        let filterChs chMap = chMap |> Map.filter (fun ch _ -> usedChs.Contains ch) 
+                        let trimChs chMap =                             
+                            chMap |> Map.map (fun ch lv -> 
+                                match loopChFirst.[loopExpr].TryFind ch with
+                                | Some first -> {lv with OutputFrom = lv.OutputFrom + first}
+                                | None -> {lv with OutputFrom = loopSpec.Length})
+                        let trimChShapes chShps =
+                            chShps |> Map.map (fun ch (shp: NShapeSpecT) ->
+                                let sliceDim = loopSpec.Channels.[ch].SliceDim
+                                let outputSize = 
+                                    match loopChFirst.[loopExpr].TryFind ch with
+                                    | Some first -> shp.[sliceDim] - first
+                                    | None -> 0L
+                                shp |> List.set sliceDim outputSize)                                
+                        let uLoopSpec = 
+                            {loopSpec with 
+                                Vars     = loopSpec.Vars |> Map.filter (fun var _ -> usedVars.Contains var)
+                                Channels = loopSpec.Channels |> filterChs |> trimChs}
+                        let metadata = 
+                            {metadata with
+                                ChannelShape = metadata.ChannelShape |> filterChs |> trimChShapes
+                                ChannelType  = metadata.ChannelType |> filterChs}
+                        UExpr (UExtraOp (Loop uLoopSpec), loopArgs |> List.map rebuild, metadata)
+                    // other expression
+                    | UExpr (op, args, metadata) -> 
+                        UExpr (op, args |> List.map rebuild, metadata)
+                processed.[uexpr] <- repl
+                processed.[repl] <- repl
+                repl
         uexprs |> List.map rebuild 
 
     /// Converts a unified expression to an expression if the unified expression

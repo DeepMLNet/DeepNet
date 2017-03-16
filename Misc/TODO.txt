@@ -6,3 +6,48 @@ TODO:
 	- extend element expression to multiple outputs
 	- make derivative of element expression use multiple outputs
 
+Loop:
+    - output contains a time axis with all values over time
+	- usually this is useful
+	- but it is too large when it contains the gradient for all time steps
+	- we could enhance the loop specification by storing what element should be returned
+	- but, in fact, we can only return the last element or all elements
+	- so, a Channel needs an output mode, that can either be All or Last
+	- now, how to make sure it is Last for the gradient?
+	   - probably the gradient calculator can see that only the last value is required => verify 
+	     => yes, it does the slicing, immedietly after the loop expression, so it could change the spec accordingly
+	   - alternative is to use the optimizer, but the optimizer must be sure that there is no other usage of this loop channel
+	   - ExprInfo could be used to find all usages of the channel and verify that they use the same slice as well
+    - so to support gradients w.r.t. initial argument with delay>1 we need to support Last X elements...
+	- so we need to:
+	    - check if host eval and CUDA implementation can be adjused
+		- check if gradient calculator can deal with such an output
+		   => leads to gradient only being specified for the Last XXX steps of the output
+		- modify loop specification to allow for Last XXX elements in channel specification
+		- adjust host eval implementation
+		- adjust CUDA implementation and see if it is feasible
+		- refactor code creating loops to add this field
+		- refactor gradient consuming that field
+	- then:
+		- modify gradient output (easier)
+		OR
+		- modify optimizer (more general)
+	- drawback: modification of loop specification with implementation details
+		- solution: put the logic into ULoopSpecT generation
+		- so it would check the consumers and decide appropriately
+		- advantages: no change of LoopSpecT, no change of gradient
+		- disadvantage: is it doable? dependants need to be changed during UExpr conversion...
+	                    need to match on slice of loop output in toUExpr
+
+
+	- UExpr builder
+		- can check afterwards for SubTensor(Channel(Loop))
+		- for each channel store the SubTensor expression
+		- then check if replacement is doable
+		- but the loop must be replaced everywhere, even for other channels, so that it is unique
+		- finally rebuild the expression tree
+		- try to implement it
+
+	- now adjust loop calculation code to produce desired output
+
+
