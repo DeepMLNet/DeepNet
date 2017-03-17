@@ -637,7 +637,7 @@ module CudaExecUnit =
         | UExtraOp (Loop loopspec) ->      
             // Create targets with strides so that the slice dimension is the slowest, thus
             // the loop length does not affect the stride.
-            trgtShapes
+            trgtShapes 
             |> Map.map (fun ch shp ->
                 let sliceDim = loopspec.Channels.[ch].SliceDim
                 let strideOrder = [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev

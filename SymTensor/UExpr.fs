@@ -292,7 +292,7 @@ module UExpr =
         exprs 
         |> List.map Expr.check
         |> List.map (toUExprRec caches)
-        |> removeUnusedChannels
+        |> trimULoops
 
     /// converts an expression to a unified expression
     and toUExpr (expr: ExprT) =
@@ -317,8 +317,8 @@ module UExpr =
             caches.ULoopSpecs.[loopSpec] <- uLoopSpec
             uLoopSpec
 
-    /// removes unused channels from multi-channels ops in a set of unified expressions
-    and removeUnusedChannels (uexprs: UExprT list) =
+    /// removes unused channels from loops and trims their outputs when it is sliced
+    and private trimULoops (uexprs: UExprT list) =
         // build set of used channels and slices
         let loopChFirst = 
             Dictionary<UExprT, Dictionary<ChannelT, int64>> (HashIdentity.Reference)
@@ -346,6 +346,15 @@ module UExpr =
                         | Rng (None, _) -> 0L
                         | RngElem elem -> elem
                         | RngNewAxis | RngAllFill -> failwith "unexpected range"
+                    let maxDelay = 
+                        loopSpec.Vars
+                        |> Map.toSeq
+                        |> Seq.choose (function
+                                       | _, PreviousChannel pCh when pCh.Channel=ch -> 
+                                           Some (SizeSpec.eval pCh.Delay)
+                                       | _ -> None)
+                        |> Seq.fold max 0L             
+                    let first = min first (max 0L (loopSpec.Length - maxDelay))
                     registerLoopCh loopExpr ch first               
                     for arg in loopArgs do
                         buildUsed arg

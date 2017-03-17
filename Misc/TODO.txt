@@ -49,5 +49,23 @@ Loop:
 		- try to implement it
 
 	- now adjust loop calculation code to produce desired output
+	- what is to do there?
+		- the target needs to be adjusted
+		- but we have to adjust the write code as well
+		- so see where the target is used
+		- so buildInOut builds the output slices
+		- so output array must be as large as maximum delay at least
+		- loop values are stored in round-robin fashion in array
+			- then we need to make sure that at the end they are in the expected successive order
+			- it should be possible to ensure this, by choosing the start element of the round-robin pointer appropriately => DONE
+			- so we need to ensure that output buffer is large enough and slices are correct => DONE
+			- to do so we need to obtain the maximum delay and include it in the calculation of the output slice size => DONE
+			- so adjust the UExpr code accordingly => DONE
+			- so we can now allocate only required memory => DONE
+			- buildInOut needs to slice accordingly => DONE
+		- alternative: store loop values for delays in temporary array
+			- then copy to target at the end
+			- but this introduces an unnecessary copy
+
 
 

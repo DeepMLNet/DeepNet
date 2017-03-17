@@ -249,7 +249,7 @@ module HostEval =
 
                 // calculate and store channel values
                 let iterVarEnv, iterChannelEnv =
-                    LoopEval.buildInOut iter iterAry itersRemAry spec.Vars args channelInfos
+                    LoopEval.buildInOut nIters iter iterAry itersRemAry spec.Vars args channelInfos
                 let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
                 for KeyValue(ch, lv) in spec.Channels do
                     iterChannelEnv.[ch].[Fill] <- EvalT.EvalTypeNeutral (iterEvalEnv, lv.Expr)
