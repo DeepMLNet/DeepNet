@@ -255,6 +255,27 @@ module Optimizer =
                 (exprInfo.DependantsStructural argExpr).Count = 1 ||
                 Set.count (Expr.extractVars argExpr) = 0            
 
+            let rec insertBcAxes substSize substStartDim srcShp rsShp elemExpr =
+                match srcShp, rsShp with
+                | [], [] -> elemExpr
+                | _, rsSize::remRsShp when rsSize = substSize ->
+                    let dimRng = [substStartDim .. argExpr.NDims-1]
+                    let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
+                    let insSubst1 =
+                        dimRng
+                        |> List.map (fun d -> ElemExpr.idxSymbol d, Base (Sym (rplSym d)))
+                        |> Map.ofList
+                    let insSubst2 =
+                        dimRng
+                        |> List.map (fun d -> rplSym d, ElemExpr.idx (d+1))
+                        |> Map.ofList
+                    let substExpr = 
+                        elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
+                    insertBcAxes substSize (substStartDim+1) srcShp remRsShp substExpr
+                | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
+                    insertBcAxes substSize (substStartDim+1) remSrcShp remRsShp elemExpr
+                | _ -> failwith "invalid reshape for broadcast axes insertion"
+
             match subComb argExpr with
             | Nary (Elements (_, argElemExpr), argArgs) when combinable() -> argElemExpr, argArgs
             | Unary (DoBroadcast shp, a) when combinable() ->
@@ -268,33 +289,18 @@ module Optimizer =
                     |> Map.ofSeq
                 let bcElemExpr, bcArgs = getArgElemExpr a
                 bcElemExpr |> ElemExpr.substSymSizes bcSubst, bcArgs
-            | Unary (Reshape rsShp, src) when 
-                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape &&
-                    combinable() ->
+            | Unary (Reshape rsShp, src) when combinable() &&
+                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape ->
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
-                let rec insertBcAxes substStartDim srcShp rsShp elemExpr =
-                    match srcShp, rsShp with
-                    | [], [] -> elemExpr
-                    | _, rsSize::remRsShp when rsSize = SizeSpec.broadcastable ->
-                        let dimRng = [substStartDim .. argExpr.NDims-1]
-                        let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
-                        let insSubst1 =
-                            dimRng
-                            |> List.map (fun d -> ElemExpr.idxSymbol d, Base (Sym (rplSym d)))
-                            |> Map.ofList
-                        let insSubst2 =
-                            dimRng
-                            |> List.map (fun d -> rplSym d, ElemExpr.idx (d+1))
-                            |> Map.ofList
-                        let substExpr = 
-                            elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
-                        insertBcAxes (substStartDim+1) srcShp remRsShp substExpr
-                    | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
-                        insertBcAxes (substStartDim+1) remSrcShp remRsShp elemExpr
-                    | _ -> failwith "invalid reshape for broadcast axes insertion"
-                insertBcAxes 0 src.Shape rsShp rsElemExpr, rsArgs
+                insertBcAxes SizeSpec.broadcastable 0 src.Shape rsShp rsElemExpr, rsArgs
+            | Unary (Reshape rsShp, src) when combinable() && 
+                    (rsShp |> List.withoutValue SizeSpec.one) = src.Shape ->
+                // replace insertion of singleton axes using Reshape op by insertion of
+                // axes into element expression
+                let rsElemExpr, rsArgs = getArgElemExpr src
+                insertBcAxes SizeSpec.one 0 src.Shape rsShp rsElemExpr, rsArgs
             | combArgExpr -> 
                 let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
                 ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  

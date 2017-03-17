@@ -69,7 +69,7 @@ module LoopEval =
         varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
-    let buildInOut (iter: int64) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
+    let buildInOut (nIters: int64) (iter: int64) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
                    (vars: Map<VarSpecT, LoopInputT>)
                    (args: IArrayNDT list) (channels: Map<ChannelT, LoopChannelInfoT>)
                    : VarEnvT * Map<ChannelT, IArrayNDT> =
@@ -78,6 +78,18 @@ module LoopEval =
         let rngAllBut ary dim dimSlice = 
             List.replicate (ArrayND.nDims ary) RngAll
             |> List.set dim dimSlice
+
+        /// The slice of the channel's target for the specified iteration.
+        let targetSlice ch iter =
+            let dim = channels.[ch].SliceDim
+            let trgtSize = channels.[ch].Target.Shape.[dim]
+            // calculate offset so that last loop iteration is written into last element of
+            // channel's target
+            let offset = trgtSize - 1L - ((nIters - 1L) % trgtSize)
+            assert ((offset + nIters - 1L) % trgtSize = trgtSize - 1L)
+            let pos = (offset + iter) % trgtSize
+            let slice = rngAllBut channels.[ch].Target dim (RngElem pos)
+            channels.[ch].Target.[slice]
 
         // build variable environment for value sources
         let srcVarEnv = 
@@ -94,10 +106,11 @@ module LoopEval =
                     | PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
                         let delay = SizeSpec.eval delay
                         let dim = channels.[ch].SliceDim
+                        if channels.[ch].Target.Shape.[dim] < delay then
+                            failwithf "target for channel %A has insufficient size %d for delay %d"
+                                       ch channels.[ch].Target.Shape.[dim] delay
                         let prvIter = iter - delay
-                        if prvIter >= 0L then
-                            let slice = rngAllBut channels.[ch].Target dim (RngElem prvIter)
-                            channels.[ch].Target.[slice]
+                        if prvIter >= 0L then targetSlice ch prvIter
                         else
                             let initialIter = args.[ivIdx].Shape.[dim] + prvIter
                             let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
@@ -115,9 +128,7 @@ module LoopEval =
 
         // slice outputs into channel targets
         let targets =
-            channels |> Map.map (fun ch lci ->
-                let slice = rngAllBut lci.Target lci.SliceDim (RngElem iter)
-                lci.Target.[slice])
+            channels |> Map.map (fun ch _ -> targetSlice ch iter)
 
         srcVarEnv, targets
 
