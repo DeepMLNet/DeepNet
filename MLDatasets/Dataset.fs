@@ -141,6 +141,12 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
             [| for fs in fieldStorages -> fs |> box |]
         FSharpValue.MakeRecord (typeof<'S>, allData) :?> 'S            
 
+    /// Returns a new dataset containing the samples from start to stop.
+    member this.Part (start: int64, stop: int64) =        
+        let partData =
+            fieldStorages |> List.map (fun fs -> fs.[[Rng (Some start, Some stop); RngAllFill]])
+        Dataset<'S> (partData, isSeq)
+
     /// number of samples
     member this.NSamples = nSamples
 
