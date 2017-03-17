@@ -653,16 +653,18 @@ module CudaExprWorkspaceTypes =
                         iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1L), getStream strm)
 
                         // obtain real ArrayNDCudaTs for array manikins
-                        let lcis = info.Channels |> Map.map (fun ch ci -> 
-                            {ci with 
-                              LoopEval.Target = 
+                        let lcis = 
+                            info.Channels 
+                            |> Map.map (fun ch ci -> 
+                                {ci with 
+                                  LoopEval.Target = 
                                    CudaExecEnv.getArrayNDForManikin execEnv (ci.Target :?> ArrayNDManikinT)})
                         let args = 
                             info.Args 
                             |> List.map (fun manikin -> 
                                 manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> IArrayNDT)
                         let srcVarEnv, resTrgts =
-                            LoopEval.buildInOut iter iterAry iterRemAry info.Vars args lcis
+                            LoopEval.buildInOut info.Length iter iterAry iterRemAry info.Vars args lcis
 
                         // add result variables to VarEnv
                         let chVars = recipe.SubRecipes.[info.Workspace].ChannelVars
