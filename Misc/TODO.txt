@@ -6,4 +6,24 @@ TODO:
 
 
 
+ElemExpr multiple outputs:
+	- need channel expressions like for loops
+	- ElemExpr then needs to consists of multiple ElemExpr
+	- these multiple ElemExprs must be unified together?
+	- derivative must support multiple outputs
 
+
+Implementation plan:
+	- add channels to ElemExpr
+	- implement calculation of multiple channel, i.e. adjust kernel generation code
+	- implement derivative of multiple channels
+	- implement derivative resulting in multiple channels
+	- how to handle multiple shapes?
+	- and what about derivative that has multiple output shapes?
+	- input can have various shapes because indices can be swapped etc...
+	- but for calculating the derivative this makes it not easy
+	- how would threads be mapped to elements??
+	- that is not easy
+	- but isn't it that only the element access would be different for an expression?
+	- i.e. actually in the forward pass all nodes use the output shape, expect for the argument accessors
+	- so perhaps we should view a graph of a GP Elementexpression
