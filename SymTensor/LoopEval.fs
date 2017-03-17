@@ -107,7 +107,8 @@ module LoopEval =
                         let delay = SizeSpec.eval delay
                         let dim = channels.[ch].SliceDim
                         if channels.[ch].Target.Shape.[dim] < delay then
-                            failwithf "Target for channel %A has insufficient size for delay %d" ch delay
+                            failwithf "target for channel %A has insufficient size %d for delay %d"
+                                       ch channels.[ch].Target.Shape.[dim] delay
                         let prvIter = iter - delay
                         if prvIter >= 0L then targetSlice ch prvIter
                         else

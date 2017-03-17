@@ -322,15 +322,30 @@ module UExpr =
         // build set of used channels and slices
         let loopChFirst = 
             Dictionary<UExprT, Dictionary<ChannelT, int64>> (HashIdentity.Reference)
-        let visited = HashSet<UExprT> (HashIdentity.Reference)
-        let registerLoopCh loopExpr channel first =
+
+        let regLoopChSlice loopExpr channel first =
             if not (loopChFirst.ContainsKey loopExpr) then
                 loopChFirst.[loopExpr] <- Dictionary<_, _> ()
             loopChFirst.[loopExpr].[channel] <-
                 match loopChFirst.[loopExpr].TryFind channel with
                 | Some pFirst -> min pFirst first
-                | None -> first               
-        let rec buildUsed uexpr =
+                | None -> first       
+
+        let getChFirst loopExpr loopSpec channel =
+            let maxDelay = 
+                loopSpec.Vars
+                |> Map.toSeq
+                |> Seq.choose (function
+                                | _, PreviousChannel pCh when pCh.Channel=channel -> 
+                                    Some (SizeSpec.eval pCh.Delay)
+                                | _ -> None)
+                |> Seq.fold max 0L   
+            match loopChFirst.[loopExpr].TryFind channel with
+            | Some first -> min first (max 0L (loopSpec.Length - maxDelay))
+            | None -> loopSpec.Length - maxDelay
+
+        let visited = HashSet<UExprT> (HashIdentity.Reference)           
+        let rec buildChFirst uexpr =
             if not (visited.Contains uexpr) then
                 match uexpr with
                 // slice of loop channel output
@@ -346,30 +361,21 @@ module UExpr =
                         | Rng (None, _) -> 0L
                         | RngElem elem -> elem
                         | RngNewAxis | RngAllFill -> failwith "unexpected range"
-                    let maxDelay = 
-                        loopSpec.Vars
-                        |> Map.toSeq
-                        |> Seq.choose (function
-                                       | _, PreviousChannel pCh when pCh.Channel=ch -> 
-                                           Some (SizeSpec.eval pCh.Delay)
-                                       | _ -> None)
-                        |> Seq.fold max 0L             
-                    let first = min first (max 0L (loopSpec.Length - maxDelay))
-                    registerLoopCh loopExpr ch first               
+                    regLoopChSlice loopExpr ch first               
                     for arg in loopArgs do
-                        buildUsed arg
+                        buildChFirst arg
                 // full loop channel output
                 | UExpr (UExtraOp (Channel ch), 
                          [UExpr (UExtraOp (Loop loopSpec), loopArgs, _) as loopExpr], _) ->
-                    registerLoopCh loopExpr ch 0L
+                    regLoopChSlice loopExpr ch 0L
                     for arg in loopArgs do
-                        buildUsed arg
+                        buildChFirst arg
                 // other expression
                 | UExpr (_, args, _) -> 
                     for arg in args do
-                        buildUsed arg
+                        buildChFirst arg
                 visited.Add uexpr |> ignore
-        uexprs |> List.iter buildUsed 
+        uexprs |> List.iter buildChFirst 
 
         let processed = Dictionary<UExprT, UExprT> (HashIdentity.Reference)
         let rec rebuild uexpr =
@@ -384,7 +390,7 @@ module UExpr =
                                      [UExpr (UExtraOp (Loop loopSpec), loopArgs, _) as loopExpr], 
                                      _) as channelExpr], metadata) ->
                         let sliceDim = loopSpec.Channels.[ch].SliceDim
-                        let offset = loopChFirst.[loopExpr].[ch]
+                        let offset = getChFirst loopExpr loopSpec ch
                         let offsetSliceRng =
                             match rng.[sliceDim] with
                             | SRSSymStartSymEnd (first, Some last) -> 
@@ -393,6 +399,7 @@ module UExpr =
                                 SRSSymStartSymEnd (first - offset, None)
                             | _ -> failwith "static range expected"
                         let offsetRng = rng |> List.set sliceDim offsetSliceRng
+                        //printfn "Adjusting channel %A slice from %A to %A." ch rng offsetRng
                         UExpr (UExtraOp (Subtensor offsetRng), [rebuild channelExpr], metadata)
                     // update channel selection metadata due to shape change
                     | UExpr (UExtraOp (Channel ch), [UExpr (UExtraOp (Loop _), _, _) as loopExpr], metadata) ->
@@ -421,17 +428,14 @@ module UExpr =
                         let filterChs chMap = chMap |> Map.filter (fun ch _ -> usedChs.Contains ch) 
                         let trimChs chMap =                             
                             chMap |> Map.map (fun ch lv -> 
-                                match loopChFirst.[loopExpr].TryFind ch with
-                                | Some first -> {lv with OutputFrom = lv.OutputFrom + first}
-                                | None -> {lv with OutputFrom = loopSpec.Length})
+                                {lv with OutputFrom = lv.OutputFrom + getChFirst loopExpr loopSpec ch})
                         let trimChShapes chShps =
                             chShps |> Map.map (fun ch (shp: NShapeSpecT) ->
                                 let sliceDim = loopSpec.Channels.[ch].SliceDim
-                                let outputSize = 
-                                    match loopChFirst.[loopExpr].TryFind ch with
-                                    | Some first -> shp.[sliceDim] - first
-                                    | None -> 0L
-                                shp |> List.set sliceDim outputSize)                                
+                                let outputSize = shp.[sliceDim] - getChFirst loopExpr loopSpec ch
+                                let trimedShp = shp |> List.set sliceDim outputSize
+                                //printfn "Trimming loop channel %A from %A to %A." ch shp trimedShp
+                                trimedShp)                                
                         let uLoopSpec = 
                             {loopSpec with 
                                 Vars     = loopSpec.Vars |> Map.filter (fun var _ -> usedVars.Contains var)
