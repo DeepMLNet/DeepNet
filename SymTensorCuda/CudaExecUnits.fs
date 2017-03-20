@@ -809,6 +809,11 @@ module CudaExecUnit =
 
         let funcName, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews
         let workDims = workDimForElemwise trgt false
+
+        let strideStats = CudaElemExpr.strideStats trgt srcViews elemFunc
+        printfn "Element expression of shape %A is using work dims %A and has stride stats:\n%A\n"
+                trgt.Shape workDims strideStats
+
         execItemsForKernel funcName args args workDims
 
     let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =

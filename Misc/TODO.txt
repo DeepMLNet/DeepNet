@@ -27,3 +27,30 @@ Implementation plan:
 	- but isn't it that only the element access would be different for an expression?
 	- i.e. actually in the forward pass all nodes use the output shape, expect for the argument accessors
 	- so perhaps we should view a graph of a GP Elementexpression
+	- perhaps that information is not worth it, because of sums that occur...
+
+
+Alternative:
+	- construct multiple outputs using optimizer
+	- this would also help with elementwise operations
+
+Can we do something to make the kernels faster?
+	- i.e. shared memory usage
+	- we could first try loading neighbouring elements
+	- seems like kernel generation is a research problem
+	- we could try to make sure that memory access is coalescealed by choosing the 
+	  thread X dimension appropirately
+	- to see if this would be helpful we need to:
+		- perform statistics for the work dimension
+		- how to represent the statisticis?
+		- we need to know which dimension is used by the work X dimension
+		- so just get the stride of the last output dimension?
+			- this would show how good it is but not the optimization potential
+		- then get the stride of every output dimension, so that we see how good it would be
+		  to have this dimension as last dimension
+		- but some reads appear more often then others?
+		- like in a loop it happens multiple times
+		- also the output dimensionality affects how many times a read happens?
+			- yes, because each output dimension corresponds to a thread
+	- so we can calculate the stride stats now
+	- let's just output them for now during 

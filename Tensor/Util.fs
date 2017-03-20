@@ -85,17 +85,42 @@ module List =
         |> set elem1 lst.[elem2]
         |> set elem2 lst.[elem1]
 
+    /// Elementwise addition of two list. If one list is shorter, it is padded with zeros.
+    let inline addElemwise a b =
+        let rec build a b =
+            match a, b with
+            | av::ra, bv::rb -> (av+bv)::(build ra rb)
+            | av::ra, [] -> av::(build ra [])
+            | [], bv::rb -> bv::(build [] rb)
+            | [], [] -> []
+        build a b
+
+    /// Elementwise summation of lists. All lists are padded to the same size with zeros.
+    let inline sumElemwise (ls: 'a list seq) =
+        ([], ls) ||> Seq.fold addElemwise
+
 
 module Map = 
     /// adds all items from q to p
     let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
         Map(Seq.concat [(Map.toSeq p); (Map.toSeq q)])    
 
+    /// merges two maps by adding the values of the same key
+    let inline addSameKeys (p:Map<'a,'b>) (q:Map<'a,'b>) = 
+        (p, q) ||> Map.fold (fun res key value ->
+            match res |> Map.tryFind key with
+            | Some oldValue -> res |> Map.add key (oldValue + value)
+            | None -> res |> Map.add key value)
+
+    /// merges two maps by summing the values of the same key      
+    let inline sum (ps:Map<'a,'b> seq) =
+        (Map.empty, ps) ||> Seq.fold addSameKeys
+
     /// Creates a map from a System.Collection.Generic.Dictionary<_,_>.
     let ofDictionary dictionary = 
         (dictionary :> seq<_>)
         |> Seq.map (|KeyValue|)
-        |> Map.ofSeq
+        |> Map.ofSeq    
 
 module String =
 

@@ -225,3 +225,34 @@ module CudaElemExpr =
         functorCode
 
 
+    /// Returns a map from dimension to the number of stride one reads/writes that would occur
+    /// if this dimension was the X work dimension of the CUDA kernel calculating the elements
+    /// expression.
+    let strideStats (trgt: ArrayNDManikinT) (srcs: ArrayNDManikinT list) 
+                    {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} =
+        
+        let rec srcStats expr =
+            match expr with
+            | UElemExpr (ULeafOp (ArgElement ((Arg argIdx, idxs), _)), _, _) -> 
+                let arg = srcs.[argIdx]
+                List.init nTrgtDims (fun warpDim ->
+                    idxs
+                    |> List.indexed
+                    |> List.filter (fun (_, pos) -> pos = ElemExpr.idx warpDim)
+                    |> List.sumBy (fun (argDim, _) -> (ArrayND.stride arg).[argDim])
+                    |> fun strIncr -> if strIncr = 1L then 1L else 0L)
+            | UElemExpr (UUnaryOp (Sum (sumSym, first, last)), [summand], _) ->
+                let iters = SizeSpec.eval last - SizeSpec.eval first + 1L 
+                srcStats summand |> List.map (fun oneStrs -> oneStrs * iters)
+            | UElemExpr (_, args, _) ->
+                args |> List.map srcStats |> List.sumElemwise
+
+        let trgtStats =         
+            List.init nTrgtDims (fun warpDim ->
+                if (ArrayND.stride trgt).[warpDim] = 1L then 1L else 0L)
+
+        List.addElemwise (srcStats expr) trgtStats
+        |> List.mapi (fun warpDim oneStrs -> oneStrs * trgt.Shape.[warpDim])
+
+
+    
