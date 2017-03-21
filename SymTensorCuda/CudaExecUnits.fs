@@ -692,17 +692,21 @@ module CudaExecUnit =
         }    
         [LaunchKernel (cFuncTmpl, workDim, argTmpls)]
 
-    /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
-    let workDimForElemwise trgt hetero =
-        match ArrayND.nDims trgt with
-        | _ when hetero -> (ArrayND.nElems trgt, 1L, 1L)
+    /// returns the CUDA work dimensions (x, y, z) for work of given size
+    let workDimForWorkSize workSize hetero =
+        match List.length workSize with
+        | _ when hetero -> (List.fold (*) 1L workSize, 1L, 1L)
         | 0 -> (1L, 1L, 1L)
-        | 1 -> ((ArrayND.shape trgt).[0], 1L, 1L)
-        | 2 -> ((ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0], 1L)
-        | 3 -> ((ArrayND.shape trgt).[2], (ArrayND.shape trgt).[1], (ArrayND.shape trgt).[0])
+        | 1 -> (workSize.[0], 1L, 1L)
+        | 2 -> (workSize.[1], workSize.[0], 1L)
+        | 3 -> (workSize.[2], workSize.[1], workSize.[0])
         | d ->
-            let rest = {0 .. d-3} |> Seq.map (fun i -> (ArrayND.shape trgt).[i]) |> Seq.fold (*) 1L 
-            ((ArrayND.shape trgt).[d-1], (ArrayND.shape trgt).[d-2], rest)
+            let rest = {0 .. d-3} |> Seq.map (fun i -> workSize.[i]) |> Seq.fold (*) 1L 
+            (workSize.[d-1], workSize.[d-2], rest)
+
+    /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
+    let workDimForElemwise (trgt: IArrayNDT) hetero =
+        workDimForWorkSize trgt.Shape hetero
 
     /// returns the C++ template instantiation code for the given template and argument list
     let cppTemplateInstantiation tmpl args =
@@ -778,38 +782,50 @@ module CudaExecUnit =
         execItemsForKernel funcName args args (workDimForElemwise trgt false)
 
     /// function name of elements wrapper and its arguments for the given target, operation and sources
-    let elementsFuncnameAndArgs trgt cOp srcViews =
+    let elementsFuncnameAndArgs trgt cOp srcViews workSize =
         let args = 
             (cOp :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             (List.map (fun v -> (ArrayNDArgTmpl v) :> ICudaArgTmpl) srcViews)
-
+        let tmpls =
+            args @
+            (workSize |> List.map (fun ws -> sprintf "%dLL" ws |> CPPTemplateValue :> ICudaArgTmpl))
         let nSrc = List.length srcViews
         let dimsStr = sprintf "%dD" (ArrayND.nDims trgt)
         let funcName = sprintf "elements%dAry%s" nSrc dimsStr 
-        funcName, args
+        funcName, tmpls, args
 
     /// execution items for an element-wise operation
     let execItemsForElements compileEnv trgt elemFunc srcViews =
+        let posOrder = 
+            if Debug.DisableElementsWorkOrdering then Permutation.identity (ArrayND.nDims trgt)
+            else CudaElemExpr.bestPosOrder trgt srcViews elemFunc
+        let inst = {UElemFunc=elemFunc; PosOrder=posOrder}
         let opName = 
-            match compileEnv.ElemFuncsOpNames |> Map.tryFind elemFunc with
+            match compileEnv.ElemFuncsOpNames |> Map.tryFind inst with
             | Some opName -> opName
             | None ->
                 let id = compileEnv.ElemFuncsOpNames |> Map.toSeq |> Seq.length
                 let opName = sprintf "ElemFunc%dOp" id
-                compileEnv.ElemFuncsOpNames <- compileEnv.ElemFuncsOpNames |> Map.add elemFunc opName
+                compileEnv.ElemFuncsOpNames <- compileEnv.ElemFuncsOpNames |> Map.add inst opName
                 opName
         let opTmplArgs = 
-            srcViews
+            trgt::srcViews
             |> List.map (fun (manikin: ArrayNDManikinT) -> manikin.CPPType)
             |> String.concat ", "       
         let opTypeName = 
             if opTmplArgs = "" then opName
             else sprintf "%s<%s>" opName opTmplArgs
 
-        let funcName, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews
-        let workDims = workDimForElemwise trgt false
-        execItemsForKernel funcName args args workDims
+        let workSize = trgt.Shape |> Permutation.apply (Permutation.invert posOrder)
+        let funcName, tmpls, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews workSize
+        let workDims = workDimForWorkSize workSize false
+
+        //let strideStats = CudaElemExpr.strideStats trgt srcViews elemFunc
+        //printfn "Element expression of shape %A is using work size %A and work dims %A and has stride stats %A and pos order %A"
+        //        trgt.Shape workSize workDims strideStats posOrder
+
+        execItemsForKernel funcName tmpls args workDims
 
     let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =
         // Apply symbolic ranges to src, and leave dynamic axes unharmed.

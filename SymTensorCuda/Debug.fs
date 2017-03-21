@@ -50,3 +50,5 @@ module Debug =
     /// terminates the program when a non-finite tensor was found by the CheckFinite op
     let mutable TerminateWhenNonFinite = true
 
+    /// disables ordering of element expressions work to increase coalesced memory access
+    let mutable DisableElementsWorkOrdering = false

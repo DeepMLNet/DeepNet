@@ -114,8 +114,8 @@ module TmplInstCache =
             cName
 
     /// instantiates an element calculation functor
-    let instElemOp (elemFunc: UElemExpr.UElemFuncT) opName cache =
-        let functorCode = CudaElemExpr.generateFunctor opName elemFunc
+    let instElemOp {UElemFunc=elemFunc; PosOrder=posOrder} opName cache =
+        let functorCode = CudaElemExpr.generateFunctor opName elemFunc posOrder
         cache.Code <- (KernelFunc, functorCode) :: cache.Code
 
 
