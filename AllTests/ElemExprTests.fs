@@ -4,6 +4,7 @@
 open Xunit
 open FsUnit.Xunit
 
+open Basics
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -186,9 +187,9 @@ let ``Codegen: KSE`` () =
     let uKse = UElemExpr.toUElemFunc kse 3 2 
     let udKsedX = UElemExpr.toUElemFunc dKsedX (2+1) (2+1) 
     let udKsedL = UElemExpr.toUElemFunc dKsedL (1+1) (2+1) 
-    let kseCode = CudaElemExpr.generateFunctor "KSE" uKse
-    let dKsedXCode =  CudaElemExpr.generateFunctor "dKSEdX" udKsedX 
-    let dKsedLCode =  CudaElemExpr.generateFunctor "dKSEdL" udKsedL 
+    let kseCode = CudaElemExpr.generateFunctor "KSE" uKse (Permutation.identity uKse.NDims)
+    let dKsedXCode = CudaElemExpr.generateFunctor "dKSEdX" udKsedX (Permutation.identity udKsedX.NDims)
+    let dKsedLCode = CudaElemExpr.generateFunctor "dKSEdL" udKsedL (Permutation.identity udKsedL.NDims)
 
     printfn "Code:\n%s%s%s" kseCode dKsedXCode dKsedLCode
 

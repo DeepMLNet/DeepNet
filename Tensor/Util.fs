@@ -402,6 +402,10 @@ module Permutation =
         check perm
         perm = [0 .. (length perm)-1]
 
+    /// identity permutation of given size
+    let identity (size: int) =
+        [0 .. size-1]
+
     /// inverts the given permutation
     let invert (perm: int list) =
         check perm

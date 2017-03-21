@@ -1,8 +1,6 @@
 ﻿open System.Text
 open System.IO
 
-//exit 0
-
 let maxDims = 7
 let maxArity = 35
 
@@ -178,24 +176,28 @@ for dims = 0 to maxDims do
     wrt "};"
     wrt ""
 
-    let elementwiseLoop workAry workDims withPosArray fBody =
+    let arrayWorkSize name =
+        [for d in 0 .. maxDims-1 -> d, sprintf "%s.shape(%d)" name d]
+        |> Map.ofList
+
+    let elementwiseLoop (workSize: Map<int, string>) workDims withPosArray fBody =
         if workDims > 3 then
             let restElements = 
-                {0 .. workDims-3} |> Seq.map (sprintf "%s.shape(%d)" workAry) |> combineWith " * "
+                {0 .. workDims-3} |> Seq.map (fun d -> workSize.[d]) |> combineWith " * "
             wrt " const idx_t restElems = %s;" restElements
             wrt " for (idx_t posR = threadIdx.z + blockIdx.z * blockDim.z; posR < restElems;     posR += gridDim.z * blockDim.z) {"
             wrt " idx_t pos%d = posR;" (workDims-3)
             for d = 0 to workDims-4 do
                 let incr = 
-                    {d+1 .. workDims-3} |> Seq.map (sprintf "%s.shape(%d)" workAry) |> combineWith " * "
+                    {d+1 .. workDims-3} |> Seq.map (fun d -> workSize.[d]) |> combineWith " * "
                 wrt " const idx_t pos%d = pos%d / (%s);" d (workDims-3) incr
                 wrt " pos%d -= pos%d * (%s);" (workDims-3) d incr
         if workDims = 3 then
-            wrt " for (idx_t pos%d = threadIdx.z + blockIdx.z * blockDim.z; pos%d < %s.shape(%d); pos%d += gridDim.z * blockDim.z) {" (workDims-3) (workDims-3) workAry (workDims-3) (workDims-3)
+            wrt " for (idx_t pos%d = threadIdx.z + blockIdx.z * blockDim.z; pos%d < %s; pos%d += gridDim.z * blockDim.z) {" (workDims-3) (workDims-3) workSize.[workDims-3] (workDims-3)
         if workDims >= 2 then
-            wrt " for (idx_t pos%d = threadIdx.y + blockIdx.y * blockDim.y; pos%d < %s.shape(%d); pos%d += gridDim.y * blockDim.y) {" (workDims-2) (workDims-2) workAry (workDims-2) (workDims-2)
+            wrt " for (idx_t pos%d = threadIdx.y + blockIdx.y * blockDim.y; pos%d < %s; pos%d += gridDim.y * blockDim.y) {" (workDims-2) (workDims-2) workSize.[workDims-2] (workDims-2)
         if workDims >= 1 then
-            wrt " for (idx_t pos%d = threadIdx.x + blockIdx.x * blockDim.x; pos%d < %s.shape(%d); pos%d += gridDim.x * blockDim.x) {" (workDims-1) (workDims-1) workAry (workDims-1) (workDims-1)
+            wrt " for (idx_t pos%d = threadIdx.x + blockIdx.x * blockDim.x; pos%d < %s; pos%d += gridDim.x * blockDim.x) {" (workDims-1) (workDims-1) workSize.[workDims-1] (workDims-1)
 
         if withPosArray then
             let poses = ad |> Seq.map (sprintf "pos%d")
@@ -228,7 +230,7 @@ for dims = 0 to maxDims do
         let indexedName = if withIndexes then "Indexed" else ""
         wrt "_dev void elemwise%dAry%dD%s (%s) {" ary dims indexedName (allArgDecls |> cw ", ")
 
-        elementwiseLoop "trgt" dims withIndexes (fun dims ->      
+        elementwiseLoop (arrayWorkSize "trgt") dims withIndexes (fun dims ->      
             let poses = ad |>> prn "pos%d" |> cw ", "
             let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d.element(%s)" a poses) |> Seq.toList
             let allArgs = if withIndexes then "pos" :: sprintf "%d" dims :: srcArgs else srcArgs
@@ -244,7 +246,7 @@ for dims = 0 to maxDims do
         let idxStr = if indexed then "Idx" else ""
         wrt "template <typename TElemwiseOp, typename TInitialOp, typename TTarget, typename TSrc>" 
         wrt "_dev void reduce%sTo%dD (const TElemwiseOp &op, const TInitialOp &initialOp, TTarget &trgt, const TSrc &src) {" idxStr dims
-        elementwiseLoop "trgt" dims false (fun dims ->      
+        elementwiseLoop (arrayWorkSize "trgt") dims false (fun dims ->      
             let trgtPoses = ad |>> prn "pos%d" |> cw ", "           
             let srcPoses = Seq.append (ad |>> prn "pos%d") (Seq.singleton "reducePos") |> cw ", "
             if indexed then
@@ -272,20 +274,24 @@ for dims = 0 to maxDims do
 
     let elementsWrapper ary =
         let srcTmpl = 
-            {0 .. ary - 1} |> Seq.map (sprintf "typename TSrc%d") |> Seq.toList
-        let allTmpl = "typename TTarget" :: srcTmpl
-        wrt "template <typename TElementsOp, %s>" (allTmpl |> cw ", ")
+            [0 .. ary-1] |> List.map (sprintf "typename TSrc%d") 
+        let workSizeTmpl =
+            [0 .. dims-1] |> List.map (sprintf "idx_t workSize%d") 
+        let allTmpl = ["typename TElementsOp"; "typename TTarget"] @ srcTmpl @ workSizeTmpl
+        wrt "template <%s>" (allTmpl |> cw ", ")
 
         let srcArgDecls =
-            {0 .. ary - 1} |> Seq.map (fun i -> sprintf "const TSrc%d &src%d" i i) |> Seq.toList
+            [0 .. ary-1] |> List.map (fun i -> sprintf "const TSrc%d &src%d" i i) 
         let allArgDecls = "const TElementsOp &op" :: "TTarget &trgt" :: srcArgDecls
         wrt "_dev void elements%dAry%dD (%s) {" ary dims (allArgDecls |> cw ", ")
 
-        elementwiseLoop "trgt" dims false (fun dims ->      
+        let workSize =
+            [for d in 0 .. dims-1 -> d, sprintf "workSize%d" d] |> Map.ofList
+        elementwiseLoop workSize dims false (fun dims ->      
             let poses = ad |>> prn "pos%d" |> Seq.toList
-            let srcArgs = {0 .. ary - 1} |> Seq.map (fun a -> sprintf "src%d" a) |> Seq.toList
-            let opArgs = poses @ srcArgs 
-            wrt "  trgt.element(%s) = op(%s);" (poses |> cw ", ") (opArgs |> cw ", "))        
+            let srcArgs = [0 .. ary-1] |> List.map (fun a -> sprintf "src%d" a) 
+            let opArgs = ["trgt"] @ poses @ srcArgs 
+            wrt "  op(%s);" (opArgs |> cw ", "))        
         wrt "}"
         wrt ""
 
@@ -322,7 +328,7 @@ for dims = 0 to maxDims do
         let allArgDecls = "TTarget &trgt" :: "const TSrc &src" :: idxArgDecls
         wrt "_dev void gather%dDTo%dD (%s) {" srcDims trgtDims (allArgDecls |> cw ", ")
 
-        elementwiseLoop "trgt" trgtDims false (fun _ ->      
+        elementwiseLoop (arrayWorkSize "trgt") trgtDims false (fun _ ->      
             let trgtPoses = {0 .. trgtDims-1} |>> prn "pos%d" |> Seq.toList
             let srcPoses = [0 .. srcDims-1] |> List.map (fun d -> 
                 if d < trgtDims then
@@ -348,7 +354,7 @@ for dims = 0 to maxDims do
         let allArgDecls = "TTarget &trgt" :: "const TSrc &src" :: idxArgDecls
         wrt "_dev void scatter%dDTo%dD (%s) {" srcDims trgtDims (allArgDecls |> cw ", ")
 
-        elementwiseLoop "src" srcDims false (fun dims ->      
+        elementwiseLoop (arrayWorkSize "src") srcDims false (fun dims ->      
             let srcPoses = {0 .. srcDims-1} |>> prn "pos%d" |> Seq.toList
             let trgtPoses = [0 .. trgtDims-1] |> List.map (fun d -> 
                 if d < srcDims then
