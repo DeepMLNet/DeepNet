@@ -331,6 +331,7 @@ module Train =
         // initialize model parameters
         printfn "Initializing model parameters for training"
         trainable.InitModel cfg.Seed
+        trainable.InitOptState ()
         trainable.PrintInfo ()
 
         /// training function
@@ -463,6 +464,7 @@ module Train =
                     match log.Best with
                     | Some (_, bestPv) -> trainable.ModelParameters <- bestPv
                     | None -> ()
+                    trainable.InitOptState ()
 
                 match faith with
                 | NoImprovement 
