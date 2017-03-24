@@ -49,6 +49,12 @@ module Types =
         UExprs:                     Map<ChannelT, UExprT>
         OwnerUExpr:                 UExprT option
     }
+    
+    /// instantiation (with pos order) of an UElemFunc
+    type UElemFuncInstT = {
+        UElemFunc:                  UElemExpr.UElemFuncT
+        PosOrder:                   int list
+    }
 
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
@@ -61,7 +67,7 @@ module Types =
         /// optional stride specification for variables
         VarStrides:                 Map<VarSpecT, int64 list>
         /// op names for each elements function
-        mutable ElemFuncsOpNames:   Map<UElemExpr.UElemFuncT, string>
+        mutable ElemFuncsOpNames:   Map<UElemFuncInstT, string>
         /// texture objects
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator

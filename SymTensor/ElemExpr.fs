@@ -72,7 +72,7 @@ module ElemExpr =
             let ta, tb = typeName a, typeName b
             if ta <> tb then
                 failwithf "ElemExpr must be of one type only but got types %A and %A"
-                    ta.Type tb.Type
+                          ta.Type tb.Type
             ta
 
     type ElemExprT with
@@ -163,12 +163,19 @@ module ElemExpr =
     let idx dim =
         Base (Sym (idxSymbol dim)) 
 
+    /// tuple of 1 index symbol
     let idx1 = idx 0
+    /// tuple of 2 index symbols
     let idx2 = idx 0, idx 1
+    /// tuple of 3 index symbols
     let idx3 = idx 0, idx 1, idx 2
+    /// tuple of 4 index symbols
     let idx4 = idx 0, idx 1, idx 2, idx 3
+    /// tuple of 5 index symbols
     let idx5 = idx 0, idx 1, idx 2, idx 3, idx 4
+    /// tuple of 6 index symbols
     let idx6 = idx 0, idx 1, idx 2, idx 3, idx 4, idx 5
+    /// tuple of 7 index symbols
     let idx7 = idx 0, idx 1, idx 2, idx 3, idx 4, idx 6, idx 7
 
     /// summation symbol of given name
@@ -204,18 +211,25 @@ module ElemExpr =
     let argElemWithType typ pos idx =
         Leaf (ArgElement ((Arg pos, idx), TypeName.ofTypeInst typ)) |> check
 
+    /// tuple of 1 argument
     [<RequiresExplicitTypeArguments>]
     let arg1<'T> = argElem<'T> 0
+    /// tuple of 2 arguments
     [<RequiresExplicitTypeArguments>]
     let arg2<'T> = argElem<'T> 0, argElem<'T> 1
+    /// tuple of 3 arguments
     [<RequiresExplicitTypeArguments>]
     let arg3<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2
+    /// tuple of 4 arguments
     [<RequiresExplicitTypeArguments>]
     let arg4<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3
+    /// tuple of 5 arguments
     [<RequiresExplicitTypeArguments>]
     let arg5<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4
+    /// tuple of 6 arguments
     [<RequiresExplicitTypeArguments>]
     let arg6<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4, argElem<'T> 5
+    /// tuple of 7 arguments
     [<RequiresExplicitTypeArguments>]
     let arg7<'T> = argElem<'T> 0, argElem<'T> 1, argElem<'T> 2, argElem<'T> 3, argElem<'T> 4, argElem<'T> 5, argElem<'T> 6
 

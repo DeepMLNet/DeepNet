@@ -122,7 +122,10 @@ module CudaElemExpr =
 
 
     /// generates a functor that evaluates the UElemFuncT
-    let generateFunctor name {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} =
+    let generateFunctor name {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} posOrder =
+
+        if not (Permutation.is posOrder && List.length posOrder = nTrgtDims) then
+            invalidArg "posOrder" "posOrder must be a permutation of the target dimensions"
 
         let mutable varCount = 0
         let newVar () : VarNameT =
@@ -191,37 +194,79 @@ module CudaElemExpr =
                     let exprVars = exprVars |> Map.add expr myVarName                             
                     myVarName, exprVars, code + myCode
 
-                
         // build arguments vars
         let argVars = 
             seq {for a=0 to nArgs-1 do yield (ElemExpr.Arg a), sprintf "a%d" a}
             |> Map.ofSeq
         let posVars =
-            seq {for d=0 to nTrgtDims-1 do yield (ElemExpr.idxSymbol d), sprintf "p%d" d}
+            seq {for d=0 to nTrgtDims-1 do yield ElemExpr.idxSymbol d, sprintf "p%d" d}
             |> Map.ofSeq
-
+        
         // generate calculation code
         let resVar, _, calcCode = genExpr expr Map.empty argVars posVars 4
 
         // generate functor code
-        let tmplArgs = [for a=0 to nArgs-1 do yield sprintf "typename Ta%d" a]
-        let retType = match expr with UElemExpr (_, _, tn) -> cppType tn
+        let tmplArgs = [
+            yield "typename TTrgt"
+            for a=0 to nArgs-1 do yield sprintf "typename Ta%d" a
+        ]
         let funcArgs = [
-            for d=0 to nTrgtDims-1 do yield sprintf "const idx_t p%d" d
+            yield "TTrgt &trgt"
+            for d in posOrder do yield sprintf "const idx_t p%d" d
             for a=0 to nArgs-1 do yield sprintf "const Ta%d &a%d" a a
         ]
+        let trgtIdxStr =
+            seq {for d=0 to nTrgtDims-1 do yield generateSizeSpecCode posVars (ElemExpr.idx d)}
+            |> String.concat ", "
         let functorCode =    
             let tmpl =         
                 if List.isEmpty tmplArgs then ""
                 else sprintf "template <%s>\n" (tmplArgs |> String.concat ", ") 
             tmpl +
             sprintf "struct %s {\n" name +
-            sprintf "  _dev %s operator() (%s) const {\n" retType (funcArgs |> String.concat ", ") +
+            sprintf "  _dev void operator() (%s) const {\n" (funcArgs |> String.concat ", ") +
             calcCode +
-            sprintf "    return %s;\n" resVar +
+            sprintf "    trgt.element(%s) = %s;\n" trgtIdxStr resVar +
             sprintf "  }\n" +
             sprintf "};\n\n"
             
         functorCode
 
 
+    /// Returns a map from dimension to the number of stride one reads/writes that would occur
+    /// if this dimension was the X work dimension of the CUDA kernel calculating the elements
+    /// expression.
+    let strideStats (trgt: ArrayNDManikinT) (srcs: ArrayNDManikinT list) 
+                    {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} =
+        
+        let rec srcStats expr =
+            match expr with
+            | UElemExpr (ULeafOp (ArgElement ((Arg argIdx, idxs), _)), _, _) -> 
+                let arg = srcs.[argIdx]
+                List.init nTrgtDims (fun warpDim ->
+                    idxs
+                    |> List.indexed
+                    |> List.filter (fun (_, pos) -> pos = ElemExpr.idx warpDim)
+                    |> List.sumBy (fun (argDim, _) -> (ArrayND.stride arg).[argDim])
+                    |> fun strIncr -> if strIncr = 1L then 1L else 0L)
+            | UElemExpr (UUnaryOp (Sum (sumSym, first, last)), [summand], _) ->
+                let iters = SizeSpec.eval last - SizeSpec.eval first + 1L 
+                srcStats summand |> List.map (fun oneStrs -> oneStrs * iters)
+            | UElemExpr (_, args, _) ->
+                args |> List.map srcStats |> List.sumElemwise
+
+        let trgtStats =         
+            List.init nTrgtDims (fun warpDim ->
+                if (ArrayND.stride trgt).[warpDim] = 1L then 1L else 0L)
+
+        List.addElemwise (srcStats expr) trgtStats
+        |> List.mapi (fun warpDim oneStrs -> oneStrs * trgt.Shape.[warpDim])
+
+
+    /// Returns the best position ordering so that coalesced memory access is maximized.
+    let bestPosOrder trgt srcs uElemFunc =
+        strideStats trgt srcs uElemFunc
+        |> List.indexed
+        |> List.sortBy snd
+        |> List.map fst
+    

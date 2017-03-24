@@ -12,6 +12,9 @@ let main argv =
     //let device = DevHost
     let device = DevCuda
 
+    Debug.VisualizeUExpr <- true
+
+
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
 
@@ -28,20 +31,29 @@ let main argv =
               LossMeasure = LossLayer.MSE }
 
     // define variables
-    let input  : ExprT = mb.Var<single> "Input"  [nBatch; nInput]
+    let input1 : ExprT = mb.Var<single> "Input1" [nBatch; nInput]
+    let input2 : ExprT = mb.Var<single> "Input2" [nBatch; nInput]
     let target : ExprT = mb.Var<single> "Target" [nBatch; nClass]
+
+
+    let inputB = Expr.sumKeepingAxis 1 input1
+    let a0, a1 = ElemExpr.arg2<single>
+    let i0, i1 = ElemExpr.idx2
+    let input3 = 
+        Expr.elements [nBatch; nInput] (a0[i0; i1] * a1[i0; SizeSpec.fix 0L]) [input1; inputB]
 
     // instantiate model
     mb.SetSize nInput mnist.Trn.[0L].Input.Shape.[0]
     mb.SetSize nClass mnist.Trn.[0L].Target.Shape.[0]
     let mi = mb.Instantiate device
 
-    let pred = MLP.pred mlp input
-    let loss = MLP.loss mlp input target
+    let pred = MLP.pred mlp input3
+    let loss = MLP.loss mlp input3 target
 
     let smplVarEnv (smpl: InputTargetSampleT) =
         VarEnv.empty
-        |> VarEnv.add input smpl.Input
+        |> VarEnv.add input1 smpl.Input
+        |> VarEnv.add input2 smpl.Input
         |> VarEnv.add target smpl.Target
     let trainable =
         Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
@@ -62,14 +74,23 @@ let main argv =
 
     //Debug.Timing <- true
     //Debug.TraceCompile <- true
-    Debug.VisualizeUExpr <- true
+    //Debug.VisualizeUExpr <- true
     //Debug.DisableCombineIntoElementsOptimization <- true
     Debug.VisualizeExecItems <- true
     //Debug.TerminateAfterCompilation <- true
 
-    let lossFn = mi.Func loss |> arg2 input target
-    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
+    let lossFn = mi.Func loss |> arg3 input1 input2 target
+    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
     printfn "Initial training loss: %f" initialLoss
+
+    printfn "Computing dLoss / dInput1."
+    Debug.VisualizeUExpr <- true
+    let dLoss = Deriv.compute loss |> Deriv.ofVar input1
+    let dLossFn = mi.Func dLoss |> arg3 input1 input2 target
+    let dLossVal = 
+        dLossFn (mnist.Trn.Part(0L,10L).All.Input) (mnist.Trn.Part(0L,10L).All.Input) (mnist.Trn.Part(0L,10L).All.Target)
+    printfn "Done."
+
     let result = Train.train trainable mnist trainCfg
 
 
