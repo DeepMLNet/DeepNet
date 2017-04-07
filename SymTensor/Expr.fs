@@ -88,7 +88,9 @@ module Expr =
         /// build diagonal matrix along given axes
         | DiagMat of int * int
         /// matrix inverse
-        | Invert
+        | Invert 
+        /// log determinant
+        | LogDeterminant of int
 
         // ==== reductions ====
         /// summation of all elements
@@ -575,6 +577,7 @@ module Expr =
                 | Unary(Diag(ax1, ax2), a) -> shapeOf a |> ShapeSpec.withoutAxis ax2
                 | Unary(DiagMat(ax1, ax2), a) ->  shapeOf a |> List.insert ax2 (shapeOf a).[ax1]
                 | Unary(Invert, a) -> shapeOf a
+                | Unary(LogDeterminant(ax), a) -> shapeOf a |> ShapeSpec.withoutAxis ax
 
                 // reductions
                 | Unary(Sum, _) -> ShapeSpec.scalar
@@ -809,7 +812,12 @@ module Expr =
                     if nda < 2 then
                         failwithf "need at least a matrix to invert but got shape %A" sa
                     if sa.[nda-2] .<> sa.[nda-1] then
-                        failwithf "cannot invert non-square matrix %A along last two axes" sa 
+                        failwithf "cannot invert non-square matrix %A along last two axes" sa
+                | LogDeterminant(ax) ->
+                    if nda < 2 then
+                        failwithf "need at least a matrix to compute log determinant but got shape %A" sa
+                    if sa.[nda-2] .<> sa.[nda-1] then
+                        failwithf "cannot compute log determinant of non-square matrix %A along last two axes" sa 
                 | AssumeJacobian jac ->
                     checkExpr jac
                     if typename jac <> typename expr then
@@ -1808,6 +1816,12 @@ module Expr =
     /// No error is raised in that case.
     let invert a =
         Unary(Invert, a) |> check
+    
+    let logDeterminant a =
+        let nd = shapeOf a |> ShapeSpec.nDim
+        if nd < 2 then
+            failwith "need at least a two dimensional array for log determinant"    
+        Unary(LogDeterminant (nd-1), a)
 
     /// calculates a tensor elementwise using the given element expression and
     /// result shape

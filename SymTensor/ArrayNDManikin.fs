@@ -105,6 +105,9 @@ module ArrayNDManikinTypes =
 
         override this.SymmetricEigenDecomposition () =
             failwith "ArrayNDManikin does not store data"
+        
+        override this.LogDeterminant () =
+            failwith "ArrayNDManikin does not store data"
 
         member this.Pretty = 
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 

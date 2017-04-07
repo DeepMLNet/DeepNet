@@ -282,6 +282,34 @@ module ArrayNDHostTypes =
 
             eigVals.[0L, *] :> ArrayNDT<'T>, eigVecs.T 
 
+        override this.LogDeterminant () =
+            let nd = this.NDims
+            if nd < 2 then 
+                failwithf "require at least a two-dimensional tensor \
+                           for log determinant computation but got %A" this.Shape
+            if this.Shape.[nd-2] <> this.Shape.[nd-1] then
+                failwithf "cannot  compute log determinant of matrix of shape %A" this.Shape
+            let batchShp = this.Shape.[0 .. nd-3]
+
+            let facLU = ArrayND.copy this
+            // iterate over all batch dimensions
+            for batchIdx in ArrayNDLayout.allIdxOfShape batchShp do
+                let batchRng = batchIdx |> List.map RngElem
+                let rng = batchRng @ [RngAll; RngAll]                  
+                let aAry = facLU.[rng]
+
+                // compute LU factorization
+                use a = aAry.GetTransposedBlas false
+                let ipiv : lapack_int[] = Array.zeroCreate (int32 aAry.Shape.[0])
+                let info =
+                    blasTypeChoose<'T, lapack_int> 
+                        (fun () -> LAPACKE_sgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
+                        (fun () -> LAPACKE_dgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
+                if info < 0L then failwithf "LAPACK argument error %d" info
+                if info > 0L then raise (SingularMatrixError "cannot compute log determinant of singular matrix")
+                
+                /// TODO: take ipiv into acount for determinant, how to deal with negative det? replace abs
+            facLU |> ArrayND.diag |> ArrayND.productAxis (nd-2) |> abs |> log :> ArrayNDT<'T>
 
 module ArrayNDHost = 
 

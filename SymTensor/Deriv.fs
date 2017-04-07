@@ -121,6 +121,7 @@ module Deriv =
             | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
             | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
             | Invert -> -(padLeft expr.T) .* egExp .* (padLeft expr.T) |> collapse 
+            | LogDeterminant (ax)-> trace ((invert a) .* eg) |> collapse 
             | PermuteAxes perm -> 
                 let backPerm = Permutation.invert perm
                 let egePerm = 

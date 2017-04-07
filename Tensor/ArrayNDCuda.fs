@@ -247,7 +247,9 @@ module ArrayNDCudaTypes =
 
         override this.SymmetricEigenDecomposition () =
             failwith "not implemented"
-
+        
+        override this.LogDeterminant () =
+            failwith "not yet implemented"
 
 module ArrayNDCuda = 
 

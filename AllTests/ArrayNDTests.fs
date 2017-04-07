@@ -288,4 +288,46 @@ let ``Disperse 3`` () =
     printfn "idxs=\n%A" idxs
     printfn "disperse idxs shp a=\n%A" s
 
+[<Fact>]
+let ``Log determinant 1`` () =
+    let a = ArrayNDHost.ofList2D [[3.0;2.0;3.0]
+                                  [4.0;8.0;9.0]
+                                  [1.0;4.0;5.0]]
+    let logDet = ArrayND.logDeterminant a
+    let ld = ArrayNDHost.scalar (log 14.0)
+    printfn "logDet =\n %A" logDet
+    printfn "ld = \n%A" ld
+    ArrayND.almostEqual logDet ld |> ArrayND.value |> Assert.True
 
+[<Fact>]
+let ``Log determinant 2`` () =
+    let aofAofA = [|[|[|2.0;6.0|];
+                      [|1.0;5.0|]|];
+                    [|[|3.0;4.0|];
+                      [|2.0;6.0|]|];
+                    [|[|5.0;4.0|];
+                      [|2.0;2.0|]|]|]
+    let a = ArrayNDHost.ofArray3D (Array3D.init 3 2 2 (fun i j k -> aofAofA.[i].[j].[k]) )
+    let logDet = ArrayND.logDeterminant a
+    let ld = ArrayNDHost.ofList [log(4.0); log(10.0);log(2.0)]
+    printfn "logDet =\n %A"  logDet
+    printfn "ld = \n%A" ld
+    ArrayND.almostEqual logDet ld |> ArrayND.value |> Assert.True
+
+[<Fact>]
+let ``Log determinant 3`` () =
+    let aofAofA = [|[|[|2.0;6.0;2.0|];
+                      [|2.0;3.0;1.0|];
+                      [|1.0;5.0;3.0|]|];
+                    [|[|3.0;4.0;3.0|];
+                      [|2.0;4.0;1.0|];
+                      [|2.0;6.0;1.0|]|];
+                    [|[|5.0;4.0;3.0|];
+                      [|1.0;4.0;3.0|];
+                      [|2.0;2.0;2.0|]|]|]
+    let a = ArrayNDHost.ofArray3D (Array3D.init 3 3 3 (fun i j k -> aofAofA.[i].[j].[k]) )
+    let logDet = ArrayND.logDeterminant a
+    let ld = ArrayNDHost.ofList [log(8.0); log(6.0);log(8.0)]
+    printfn "logDet =\n %A"  logDet
+    printfn "ld = \n%A" ld
+    ArrayND.almostEqual logDet ld |> ArrayND.value |> Assert.True

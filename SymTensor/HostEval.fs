@@ -108,6 +108,7 @@ module HostEval =
                         | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
                         | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
                         | Invert -> ArrayND.invert av
+                        | LogDeterminant(ax) -> ArrayND.logDeterminant av
                         | Sum -> ArrayND.sum av
                         | SumAxis ax -> ArrayND.sumAxis ax av
                         | Product -> ArrayND.product av

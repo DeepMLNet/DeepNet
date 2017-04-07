@@ -323,6 +323,9 @@ module ArrayND =
         /// corresponding eigenvalue in 'vals'.
         abstract SymmetricEigenDecomposition: unit -> ArrayNDT<'T> * ArrayNDT<'T>
 
+        /// computes the log determinant
+        abstract LogDeterminant : unit -> ArrayNDT<'T>
+
         // enumerator interfaces
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
@@ -1502,6 +1505,12 @@ module ArrayND =
     let symmetricEigenDecomposition (a: 'A when 'A :> ArrayNDT<_>) : 'A * 'A =
         let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
         eigVals :?> 'A, eigVecs :?> 'A
+    
+    /// Computes the log determinant of the givev matrix.
+    /// If the specified tensor has more than two dimensions, the log determinant
+    /// of the matricesconsisting of the last two dimensions are computed.
+    let logDeterminant  (a: 'A when 'A :> ArrayNDT<_>) : 'A =
+        a.LogDeterminant () :?> 'A
 
     /// calculates the pairwise differences along the given axis
     let diffAxis ax (a: #ArrayNDT<'T>) =
