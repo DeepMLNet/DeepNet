@@ -48,7 +48,7 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
         let rng = System.Random ()
         let rec performTry nRetries =
             try ioFunc ()
-            with :? IOException as excp when nRetries < 100 ->
+            with :? IOException as excp when nRetries < 10 ->
                 printfn "DiskMap: retrying due to IOException while writing: %s" excp.Message
                 Thread.Sleep 100 
                 Thread.Sleep (rng.Next(100))

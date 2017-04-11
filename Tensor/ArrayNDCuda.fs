@@ -36,6 +36,16 @@ module ArrayNDCudaTypes =
     type ICudaStorage =
         abstract ByteData: CudaDeviceVariable<byte>
 
+    /// create a new CUDA device variable
+    let private newCudaDeviceVariable<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+            (elems: int64) = 
+        try new CudaDeviceVariable<'T> (SizeT elems)
+        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
+                                        || e.CudaError = CUResult.ErrorUnknown ->
+            let sizeInBytes = elems * sizeof64<'T>
+            failwithf "CUDA memory allocation of %d MB failed (%A)" 
+                      (sizeInBytes / pown 2L 20) e.CudaError
+
     /// CUDA memory allocation
     type CudaStorageT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                     (data: CudaDeviceVariable<'T>) =
@@ -45,7 +55,7 @@ module ArrayNDCudaTypes =
 
             // CUDA cannot allocate memory of size zero
             let elems = if elems > 0L then elems else 1L
-            CudaStorageT<'T> (new CudaDeviceVariable<'T> (SizeT elems))
+            CudaStorageT<'T> (newCudaDeviceVariable<'T> elems)
 
         member this.Data = data
 
