@@ -87,5 +87,5 @@ type RMSprop<'T when 'T: equality and 'T: comparison>
         member this.Use f = this.Use f
         member this.CfgWithLearningRate learningRate cfg = {cfg with Step=conv<'T> learningRate}
         member this.InitialState cfg parVals = this.InitialState cfg parVals
-        member this.LoadState path = rpState.LoadValue path
-        member this.SaveState path state = rpState.SaveValue path state
+        member this.LoadState hdf prefix = rpState.LoadValue hdf prefix
+        member this.SaveState hdf prefix state = rpState.SaveValue hdf prefix state

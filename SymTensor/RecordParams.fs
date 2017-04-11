@@ -133,34 +133,32 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
         )
 
     /// Saves the record values as a HDF5 file.
-    member this.SaveValue path (value: 'RVal) =
-        use hdf = HDF5.OpenWrite path
+    member this.SaveValue hdf prefix (value: 'RVal) =
         let values = FSharpValue.GetRecordFields value
         for fi, value in Seq.zip fieldInfos values do
             match fi.ValueType with
             | Scalar typ ->
                 let mi = typeof<VarRecordHelpers>.GetMethod("WriteScalarToHDF", allBindingFlags)
                 let m = mi.MakeGenericMethod typ
-                m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name; value|]) |> ignore
+                m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
             | Array typ ->
                 let mi = typeof<VarRecordHelpers>.GetMethod("WriteArrayToHDF", allBindingFlags)
                 let m = mi.MakeGenericMethod typ
-                m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name; value|]) |> ignore
+                m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
 
-    /// Load the record value from a HDF5 file.
-    member this.LoadValue path : 'RVal =
-        use hdf = HDF5.OpenRead path
+    /// Load the record value from a HDF5 file using the specifed prefix
+    member this.LoadValue hdf prefix : 'RVal =
         let values = seq {
             for fi in fieldInfos do
                 match fi.ValueType with
                 | Scalar typ ->
                     let mi = typeof<VarRecordHelpers>.GetMethod("ReadScalarFromHDF", allBindingFlags)
                     let m = mi.MakeGenericMethod typ
-                    yield m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name|]) 
+                    yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|]) 
                 | Array typ ->
                     let mi = typeof<VarRecordHelpers>.GetMethod("ReadArrayFromHDF", allBindingFlags)
                     let m = mi.MakeGenericMethod typ
-                    yield m.Invoke(null, [|box hdf; box dev; box fi.VarSpec.Name|])         
+                    yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|])         
         }
         FSharpValue.MakeRecord (typeof<'RVal>, Array.ofSeq values) :?> 'RVal
 
