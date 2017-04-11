@@ -64,7 +64,8 @@ let main argv =
             TargetLoss         = None  
             MinIters           = Some 100 
             MaxIters           = None  
-            LearningRates      = [1e-3; 1e-4; 1e-5]                               
+            LearningRates      = [1e-3; 1e-4; 1e-5]       
+            CheckpointFile     = Some "MNIST-Checkpoint.h5"
     } 
 
     //Debug.Timing <- true

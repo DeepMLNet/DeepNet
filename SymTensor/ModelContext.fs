@@ -166,20 +166,20 @@ module ModelContextTypes =
         member this.Use varEnv =
             varEnv |> VarEnv.add parameterSet.Flat this.Flat
 
-        /// Loads the parameter values from a previously saved HDF5 file.
-        member this.Load filename = 
-            use hdf = HDF5.OpenRead filename
+        /// Loads the parameter values from a previously saved HDF5 file using the specified prefix.
+        member this.Load (hdf, ?prefix) = 
+            let prefix = defaultArg prefix ""
             for KeyValue(vs, vsView) in parameterVals do
-                let value = ArrayNDHDF.read hdf vs.Name
+                let value = ArrayNDHDF.read hdf (prefix + "/" + vs.Name)
                 vsView.[Fill] <- device.ToDev value
 
         /// Saves the parameter values to a HDF5 file.
-        /// Each parameter is stored in a separate HDF5 record under its name.
-        member this.Save filename =
-            use hdf = HDF5.OpenWrite filename
+        /// Each parameter is stored in a separate HDF5 record under its name using the specified prefixed.
+        member this.Save (hdf, ?prefix) =
+            let prefix = defaultArg prefix ""
             for KeyValue(vs, vsView) in parameterVals do
                 let value = device.ToHost vsView
-                ArrayNDHDF.write hdf vs.Name value
+                ArrayNDHDF.write hdf (prefix + "/" + vs.Name) value
 
         /// prints the shapes of all parameters contained in this ParameterStorage
         member this.PrintShapes () =
@@ -499,10 +499,10 @@ module ModelContextTypes =
             compileEnv <- {compileEnv with VarStrides = compileEnv.VarStrides |> Map.add uvs stride}
 
         /// Load parameter values.
-        member this.LoadPars filename = this.ParameterStorage.Load filename
+        member this.LoadPars (hdf, ?prefix) = this.ParameterStorage.Load (hdf, ?prefix=prefix)
 
         /// Save parameter values.
-        member this.SavePars filename = this.ParameterStorage.Save filename
+        member this.SavePars (hdf, ?prefix) = this.ParameterStorage.Save (hdf, ?prefix=prefix)
 
         /// Initializes the specified paramter value using the initialization function.
         member this.InitPar (seed: int) (ps: VarSpecT) = 
