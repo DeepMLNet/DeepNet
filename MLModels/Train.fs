@@ -331,20 +331,24 @@ module Train =
         // initialize model parameters
         printfn "Initializing model parameters for training"
         trainable.InitModel cfg.Seed
+        trainable.InitOptState ()
         trainable.PrintInfo ()
+
+        // dumping helpers
+        let origDumpPrefix = Dump.prefix
+        let setDumpPrefix iter partition =
+            match cfg.DumpPrefix with
+            | Some dp -> Dump.prefix <- sprintf "%s/%d/%s" dp iter partition
+            | None -> ()            
 
         /// training function
         let rec doTrain iter learningRate log =
 
             if not Console.IsInputRedirected then printf "%6d \r" iter
 
-            /// set dump prefix
-            match cfg.DumpPrefix with
-            | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter
-            | None -> ()
-
             // execute training
             trainable.ResetModelState ()
+            setDumpPrefix iter "trn"
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
@@ -361,8 +365,10 @@ module Train =
 
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
                 trainable.ResetModelState ()
+                setDumpPrefix iter "val"
                 let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
                 trainable.ResetModelState ()
+                setDumpPrefix iter "tst"
                 let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
 
                 // compute and log primary validation & test loss
@@ -463,6 +469,7 @@ module Train =
                     match log.Best with
                     | Some (_, bestPv) -> trainable.ModelParameters <- bestPv
                     | None -> ()
+                    trainable.InitOptState ()
 
                 match faith with
                 | NoImprovement 
@@ -552,6 +559,9 @@ module Train =
                     bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
         | None ->
             printfn "No training was performed."
+
+        // restore original dump prefix
+        Dump.prefix <- origDumpPrefix
 
         {
             History             = List.rev log.History

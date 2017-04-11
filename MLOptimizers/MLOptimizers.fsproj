@@ -28,6 +28,7 @@
     <Compile Include="Optimizer.fs" />
     <Compile Include="GradientDescent.fs" />
     <Compile Include="Adam.fs" />
+    <Compile Include="RMSprop.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
