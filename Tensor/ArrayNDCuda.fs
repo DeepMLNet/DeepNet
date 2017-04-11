@@ -41,7 +41,7 @@ module ArrayNDCudaTypes =
             (elems: int64) = 
         try new CudaDeviceVariable<'T> (SizeT elems)
         with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
-                                        || e.CudaError = CUResult.ErrorUnknown ->
+                                     || e.CudaError = CUResult.ErrorUnknown ->
             let sizeInBytes = elems * sizeof64<'T>
             failwithf "CUDA memory allocation of %d MB failed (%A)" 
                       (sizeInBytes / pown 2L 20) e.CudaError
