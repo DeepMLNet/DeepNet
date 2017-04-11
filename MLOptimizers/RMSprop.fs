@@ -18,11 +18,11 @@ module RMSprop =
     }
 
     type State<'T> = {
-        EstMom2:        ArrayNDT<'T>
+        EstMomSq:       ArrayNDT<'T>
     } 
 
     type StateExpr = {
-        EstMom2:        ExprT
+        EstMomSq:       ExprT
     }
 
 open RMSprop
@@ -39,7 +39,7 @@ type RMSprop<'T when 'T: equality and 'T: comparison>
     }
 
     let state = {
-        StateExpr.EstMom2   = Expr.var<'T> "RMSprop.State.EstMom2"     (Expr.shapeOf pars)          
+        StateExpr.EstMomSq  = Expr.var<'T> "RMSprop.State.EstMom2"     (Expr.shapeOf pars)          
     }
 
     let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
@@ -56,27 +56,23 @@ type RMSprop<'T when 'T: equality and 'T: comparison>
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
         let shp = ArrayND.shape parVals
         {
-            EstMom2     = ArrayNDHost.zeros shp |> dev.ToDev
+            EstMomSq     = ArrayNDHost.zeros shp |> dev.ToDev
         }
 
     member this.Minimize : ExprT =
         let gradient = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars) 
-        //let gradient = gradient |> Expr.checkFinite "gradient"
 
         let oneHalf         = Expr.scalarOfSameType loss 0.5
         let two             = Expr.scalarOfSameType loss 2
         let onePointNine    = Expr.scalarOfSameType loss 0.9
         let onePointOne     = Expr.scalarOfSameType loss 0.1
 
-        let o = cfg.Offset
-
-
-        let estMom2 = onePointOne * gradient ** two + onePointNine * state.EstMom2
-        let step = cfg.Step * gradient / (estMom2 ** oneHalf + o)
+        let estMomSq = onePointOne * gradient ** two + onePointNine * state.EstMomSq
+        let step = cfg.Step * gradient / (estMomSq ** oneHalf + cfg.Offset)
            
         Expr.discard [
             Expr.storeToVar pars (pars - step)
-            Expr.storeToVar state.EstMom2 estMom2
+            Expr.storeToVar state.EstMomSq estMomSq
         ]            
 
     member this.Use f =
