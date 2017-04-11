@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Linq
 open Nessos.FsPickler
+open System.Threading
 
 
 let binarySerializer = FsPickler.CreateBinarySerializer()
@@ -27,17 +28,32 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
         Guid.NewGuid().ToString()
 
     let tryGetDirAndValueForKey (key: byte []) =
-        if Directory.Exists (hashDirForKey key) then
-            Directory.EnumerateDirectories (hashDirForKey key)
-            |> Seq.tryPick (fun dir ->
-                let keyPath = Path.Combine (dir, keyFilename)
-                let valuePath = Path.Combine (dir, valueFilename)
-                if File.Exists keyPath && File.Exists valuePath then
-                    if key.SequenceEqual (File.ReadAllBytes keyPath) then
-                        Some (dir, File.ReadAllBytes valuePath)
-                    else None
-                else None)
-        else None
+        try
+            if Directory.Exists (hashDirForKey key) then
+                Directory.EnumerateDirectories (hashDirForKey key)
+                |> Seq.tryPick (fun dir ->
+                    let keyPath = Path.Combine (dir, keyFilename)
+                    let valuePath = Path.Combine (dir, valueFilename)
+                    if File.Exists keyPath && File.Exists valuePath then
+                        if key.SequenceEqual (File.ReadAllBytes keyPath) then
+                            Some (dir, File.ReadAllBytes valuePath)
+                        else None
+                    else None)
+            else None
+        with :? IOException as excp ->
+            printfn "DiskMap: IOException while reading: %s" excp.Message
+            None
+
+    let tryIOWrite ioFunc = 
+        let rng = System.Random ()
+        let rec performTry nRetries =
+            try ioFunc ()
+            with :? IOException as excp when nRetries < 60 ->
+                printfn "DiskMap: retrying due to IOException while writing: %s" excp.Message
+                Thread.Sleep 1000 
+                Thread.Sleep (rng.Next(1000))
+                performTry (nRetries + 1)
+        performTry 0
 
     new (baseDir: string) = DiskBinaryMap(baseDir, "key.dat", "value.dat")
         
@@ -53,7 +69,7 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
 
     member this.Remove key =
         match tryGetDirAndValueForKey key with
-        | Some (dir, _) -> Directory.Delete (dir, true)
+        | Some (dir, _) -> tryIOWrite (fun () -> Directory.Delete (dir, true))
         | None -> raise (System.Collections.Generic.KeyNotFoundException())
 
     member this.Set key value =
@@ -61,15 +77,16 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
             match tryGetDirAndValueForKey key with
             | Some (dir, _) -> dir
             | None -> Path.Combine (hashDirForKey key, newGuidStr ())
-        Directory.CreateDirectory dir |> ignore
-
         let keyPath = Path.Combine (dir, keyFilename)
         let valuePath = Path.Combine (dir, valueFilename)
-        File.WriteAllBytes (keyPath, key)
-        File.WriteAllBytes (valuePath, value)
+
+        tryIOWrite (fun () ->
+            Directory.CreateDirectory dir |> ignore
+            File.WriteAllBytes (keyPath, key)
+            File.WriteAllBytes (valuePath, value))
 
     member this.Clear () =
-        Directory.Delete (baseDir, true)
+        tryIOWrite (fun () -> Directory.Delete (baseDir, true))
 
 
 /// a filesystem backed map for arbitrary keys and values
