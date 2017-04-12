@@ -100,7 +100,7 @@ module RNNLang =
                 //MaxIters     = Some 10
                 BatchSize      = NBatch
                 BestOn         = Training
-                CheckpointDir  = Some "."
+                CheckpointFile  = Some "."
         }
         Train.train trainable dataset trainCfg |> ignore
 

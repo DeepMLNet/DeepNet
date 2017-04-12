@@ -108,7 +108,7 @@ module Program =
                 BatchSize          = System.Int64.MaxValue
                 SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
-                CheckpointDir      = Some "."
+                CheckpointFile      = Some "."
                 CheckpointInterval = Some checkpointInterval
                 PerformTraining    = args.Contains <@Train@>
         }
