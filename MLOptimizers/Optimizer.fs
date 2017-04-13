@@ -1,5 +1,6 @@
 ﻿namespace Optimizers
 
+open Basics
 open ArrayNDNS
 open SymTensor
 
@@ -21,11 +22,11 @@ module OptimizerTypes =
         /// Initial optimizer state.
         abstract member InitialState: cfg:'OptCfg -> parameterValues:IArrayNDT -> 'OptState
 
-        /// Loads the optimizer state from disk.
-        abstract member LoadState: path:string -> 'OptState
+        /// Loads the optimizer state from a HDF5 file with given prefix.
+        abstract member LoadState: hdf:HDF5 -> prefix:string -> 'OptState
 
-        /// Saves the optimizer state to disk.
-        abstract member SaveState: path:string -> state:'OptState -> unit
+        /// Saves the optimizer state to a HDF5 file with given prefix.
+        abstract member SaveState: hdf:HDF5 -> prefix:string -> state:'OptState -> unit
 
 
         

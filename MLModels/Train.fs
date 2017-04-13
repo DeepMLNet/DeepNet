@@ -114,8 +114,10 @@ module Train =
         /// Learning rates that will be used. After training terminates with
         /// one learning rate, it continues using the next learning rate from this list.
         LearningRates:                  float list
-        /// Checkpoint storage directory. (is created if it does not exist)
-        CheckpointDir:                  string option
+        /// Path to a checkpoint file (HDF5 format).
+        /// Used to save the training state if training is interrupted and/or periodically.
+        /// If the file exists, the training state is loaded from it and training resumes.
+        CheckpointFile:                 string option
         /// number of iterations between automatic writing of checkpoints
         CheckpointInterval:             int option
         /// If true, checkpoint is not loaded from disk.
@@ -141,7 +143,7 @@ module Train =
         MinIters                    = Some 100
         MaxIters                    = None
         LearningRates               = [1e-3; 1e-4; 1e-5; 1e-6]
-        CheckpointDir               = None
+        CheckpointFile              = None
         CheckpointInterval          = None
         DiscardCheckpoint           = false
         PerformTraining             = true
@@ -183,9 +185,9 @@ module Train =
         /// Initializes the model using the given random seed.
         abstract member InitModel: seed:int -> unit
         /// Load model parameters from specified file.
-        abstract member LoadModel: path:string -> unit
+        abstract member LoadModel: hdf:HDF5 -> prefix:string -> unit
         /// Save model parameters to specified file.
-        abstract member SaveModel: path:string -> unit
+        abstract member SaveModel: hdf:HDF5 -> prefix:string -> unit
         /// Model parameter values (i.e. weights).
         abstract member ModelParameters: ArrayNDT<'T> with get, set
         /// Resets the internal model state. (for example the latent state of an RNN)
@@ -193,9 +195,9 @@ module Train =
         /// Initialize optimizer state.
         abstract member InitOptState: unit -> unit
         /// Load optimizer state from specified file.
-        abstract member LoadOptState: path: string -> unit
+        abstract member LoadOptState: hdf:HDF5 -> prefix:string -> unit
         /// Save optimizer state to specified file.
-        abstract member SaveOptState: path: string -> unit
+        abstract member SaveOptState: hdf:HDF5 -> prefix:string -> unit
 
     /// Constructs an ITrainable<_> from expressions.
     let internal newTrainable
@@ -244,15 +246,15 @@ module Train =
                 lazy (losses |> List.map (ArrayND.value >> conv<float>))
             member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
             member this.InitModel seed = modelInstance.InitPars seed
-            member this.LoadModel path = modelInstance.LoadPars path
-            member this.SaveModel path = modelInstance.SavePars path
+            member this.LoadModel hdf prefix = modelInstance.LoadPars (hdf, prefix)
+            member this.SaveModel hdf prefix = modelInstance.SavePars (hdf, prefix)
             member this.ModelParameters
                 with get () = modelInstance.ParameterValues
                 and set (value) = modelInstance.ParameterValues <- value
             member this.ResetModelState () = modelState <- None
             member this.InitOptState () = optState <- opt.InitialState optCfg modelInstance.ParameterValues
-            member this.LoadOptState path = optState <- opt.LoadState path
-            member this.SaveOptState path = opt.SaveState path optState    
+            member this.LoadOptState hdf prefix = optState <- opt.LoadState hdf prefix
+            member this.SaveOptState hdf prefix = opt.SaveState hdf prefix optState    
         }
 
     /// Constructs an ITrainable<_> for the given stateful model using the specified loss
@@ -268,24 +270,8 @@ module Train =
     let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
         trainableFromLossExprs modelInstance [loss] varEnvBuilder optNew optCfg
 
-    type private CheckpointFiles (cfg: Cfg) = 
-        let dir = Path.GetFullPath cfg.CheckpointDir.Value    
-        member this.Directory = dir       
-        member this.ModelFile = Path.Combine (dir, "model.h5")
-        member this.BestModelFile = Path.Combine (dir, "bestmodel.h5")
-        member this.OptStateFile = Path.Combine (dir, "optstate.h5")
-        member this.TrainStateFile = Path.Combine (dir, "trainstate.json")
-        member this.Exists = 
-            File.Exists this.ModelFile && File.Exists this.BestModelFile && 
-            File.Exists this.OptStateFile && File.Exists this.TrainStateFile 
-        member this.Mkdir () = Directory.CreateDirectory dir |> ignore
-        member this.Remove () =
-            if File.Exists this.ModelFile then File.Delete this.ModelFile
-            if File.Exists this.BestModelFile then File.Delete this.BestModelFile
-            if File.Exists this.OptStateFile then File.Delete this.OptStateFile
-            if File.Exists this.TrainStateFile then File.Delete this.TrainStateFile
-            try Directory.Delete (dir, false) with :? IOException -> ()
 
+    /// Current training state for checkpoints.
     type private TrainState = {
         History:        TrainingLog.Entry list
         BestEntry:      TrainingLog.Entry option
@@ -298,22 +284,14 @@ module Train =
     /// Returns the training history.
     let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
         // checkpoint data
-        let cp =
-            match cfg.CheckpointDir with
-            | Some _ -> 
-                let cp = CheckpointFiles cfg
-                if cfg.DiscardCheckpoint then cp.Remove ()
-                Some cp
-            | None -> None
         let mutable lastCheckpointIter = 0
         let mutable checkpointRequested = false
         use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
-            match cp with
+            match cfg.CheckpointFile with
             | Some _ when evt.SpecialKey = ConsoleSpecialKey.ControlBreak ->
                 checkpointRequested <- true
                 evt.Cancel <- true
-            | _ -> ()
-        )
+            | _ -> ())
 
         // batches
         let getBatches part = 
@@ -331,20 +309,24 @@ module Train =
         // initialize model parameters
         printfn "Initializing model parameters for training"
         trainable.InitModel cfg.Seed
+        trainable.InitOptState ()
         trainable.PrintInfo ()
+
+        // dumping helpers
+        let origDumpPrefix = Dump.prefix
+        let setDumpPrefix iter partition =
+            match cfg.DumpPrefix with
+            | Some dp -> Dump.prefix <- sprintf "%s/%d/%s" dp iter partition
+            | None -> ()            
 
         /// training function
         let rec doTrain iter learningRate log =
 
             if not Console.IsInputRedirected then printf "%6d \r" iter
 
-            /// set dump prefix
-            match cfg.DumpPrefix with
-            | Some dp -> Dump.prefix <- sprintf "%s%d" dp iter
-            | None -> ()
-
             // execute training
             trainable.ResetModelState ()
+            setDumpPrefix iter "trn"
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
@@ -361,8 +343,10 @@ module Train =
 
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
                 trainable.ResetModelState ()
+                setDumpPrefix iter "val"
                 let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
                 trainable.ResetModelState ()
+                setDumpPrefix iter "tst"
                 let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
 
                 // compute and log primary validation & test loss
@@ -463,6 +447,7 @@ module Train =
                     match log.Best with
                     | Some (_, bestPv) -> trainable.ModelParameters <- bestPv
                     | None -> ()
+                    trainable.InitOptState ()
 
                 match faith with
                 | NoImprovement 
@@ -476,20 +461,21 @@ module Train =
         
         // initialize or load checkpoint
         let log, learningRates, duration, faith =
-            match cp with
-            | Some cp when cp.Exists ->
-                printfn "Loading checkpoint from %s" cp.Directory
-                let state : TrainState = Json.load cp.TrainStateFile
+            match cfg.CheckpointFile with
+            | Some cpFilename when File.Exists cpFilename && not cfg.DiscardCheckpoint ->
+                printfn "Loading checkpoint from %s" cpFilename
+                use cp = HDF5.OpenRead cpFilename               
+                let state : TrainState = cp.GetAttribute ("/", "TrainState") |> Json.deserialize
                 let best =
                     match state.BestEntry with
                     | Some bestEntry ->
-                        trainable.LoadModel cp.BestModelFile
+                        trainable.LoadModel cp "BestModel"
                         Some (bestEntry, trainable.ModelParameters |> ArrayND.copy)
                     | None -> None
                 let log = {TrainingLog.create cfg.MinImprovement cfg.BestOn with 
                             Best=best; History=state.History}
-                trainable.LoadOptState cp.OptStateFile
-                trainable.LoadModel cp.ModelFile
+                trainable.LoadOptState cp "OptState"
+                trainable.LoadModel cp "Model"               
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
                 TrainingLog.create cfg.MinImprovement cfg.BestOn, cfg.LearningRates, TimeSpan.Zero, Continue
@@ -506,29 +492,37 @@ module Train =
                 let duration = duration + watch.Elapsed
 
                 // save checkpoint 
-                match cp with
-                | Some cp ->
+                match cfg.CheckpointFile with
+                | Some cpFilename ->
                     if faith <> CheckpointIntervalReached then
-                        printfn "Saving checkpoint to %s" cp.Directory
-                    cp.Mkdir ()
-                    trainable.SaveOptState cp.OptStateFile
-                    trainable.SaveModel cp.ModelFile
-                    let bestEntry =
-                        match log.Best with
-                        | Some (bestEntry, bestPars) ->
-                            let curPars = trainable.ModelParameters |> ArrayND.copy
-                            trainable.ModelParameters <- bestPars
-                            trainable.SaveModel cp.BestModelFile
-                            trainable.ModelParameters <- curPars
-                            Some bestEntry
-                        | None -> None
-                    Json.save cp.TrainStateFile {
-                        History = log.History
-                        BestEntry = bestEntry
-                        LearningRates = learningRates
-                        Duration = duration
-                        Faith = faith
-                    }
+                        printfn "Saving checkpoint to %s" cpFilename
+
+                    // write to temporary file
+                    let cpTmpFilename = cpFilename + ".tmp"
+                    using (HDF5.OpenWrite cpTmpFilename) (fun cp ->
+                        trainable.SaveOptState cp "OptState"
+                        trainable.SaveModel cp "Model"
+                        let bestEntry =
+                            match log.Best with
+                            | Some (bestEntry, bestPars) ->
+                                let curPars = trainable.ModelParameters |> ArrayND.copy
+                                trainable.ModelParameters <- bestPars
+                                trainable.SaveModel cp "BestModel"
+                                trainable.ModelParameters <- curPars
+                                Some bestEntry
+                            | None -> None
+                        let trainState = {
+                            History = log.History
+                            BestEntry = bestEntry
+                            LearningRates = learningRates
+                            Duration = duration
+                            Faith = faith
+                        }
+                        cp.SetAttribute ("/", "TrainState", Json.serialize trainState))
+
+                    // rename to checkpoint file
+                    if File.Exists cpFilename then File.Replace (cpTmpFilename, cpFilename, null)
+                    else File.Move (cpTmpFilename, cpFilename)
                 | None -> ()
 
                 match faith with
@@ -552,6 +546,9 @@ module Train =
                     bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
         | None ->
             printfn "No training was performed."
+
+        // restore original dump prefix
+        Dump.prefix <- origDumpPrefix
 
         {
             History             = List.rev log.History

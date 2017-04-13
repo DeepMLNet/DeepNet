@@ -249,14 +249,18 @@ module HDF5Types =
                 failwithf "HDF5 attribute %s does not exist on object %s in file %s" atrName name path
 
             let elementType =
-                if typeof<'T>.IsArray then typeof<'T>.GetElementType()
+                if typeof<'T> = typeof<string> then typeof<byte>
+                elif typeof<'T>.IsArray then typeof<'T>.GetElementType()
                 else typeof<'T>
 
             let atrHnd = H5A.open_by_name (fileHnd, name, atrName) |> check
             let typeHnd = H5A.get_type atrHnd |> check
             let shapeHnd = H5A.get_space (atrHnd) |> check
 
-            if H5T.equal (hdfTypeInst elementType, typeHnd) = 0 then
+            if typeof<'T> = typeof<string> then
+                if H5T.get_class (typeHnd) <> H5T.class_t.STRING then
+                    failwithf "HDF5 attribute %s on object %s is not a string" atrName name
+            elif H5T.equal (hdfTypeInst elementType, typeHnd) = 0 then
                 failwithf "HDF5 attribute %s on object %s has other type than %A" atrName name elementType
 
             if H5S.is_simple (shapeHnd) = 0 then
@@ -267,8 +271,10 @@ module HDF5Types =
             let shape : uint64 array = Array.zeroCreate nDims
             let maxShape : uint64 array = Array.zeroCreate nDims
             H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
-            let nElems = shape.[0] |> int
-            if nElems <> 1 && not typeof<'T>.IsArray then
+            let nElems = 
+                if typeof<'T> = typeof<string> then H5T.get_size(typeHnd) |> int
+                else shape.[0] |> int
+            if typeof<'T> <> typeof<string> && nElems <> 1 && not typeof<'T>.IsArray then
                 failwithf "HDF5 attribute %s on object %s has %d elements, but a scalar is expected"
                     atrName name nElems
 
@@ -281,7 +287,9 @@ module HDF5Types =
             H5S.close shapeHnd |> check |> ignore
             H5T.close typeHnd |> check |> ignore
 
-            if typeof<'T>.IsArray then
+            if typeof<'T> = typeof<string> then
+                System.Text.Encoding.UTF8.GetString (data :?> byte[]) |> box :?> 'T
+            elif typeof<'T>.IsArray then
                 box data :?> 'T
             else
                 data.GetValue(0) :?> 'T
