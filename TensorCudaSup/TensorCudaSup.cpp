@@ -1,3 +1,3 @@
-#include "TensorCudaSup.h"
+#include "Tensor.h"
 
 
