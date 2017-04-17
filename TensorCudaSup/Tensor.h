@@ -63,7 +63,9 @@ struct Tensor
 		return linearPos;
 	}
 
-	inline T &operator[] (const TIdxs &pos) { return Base[LinearPos(pos)]; }
+	inline T &operator[] (const TIdxs &pos) { 
+		return Base[LinearPos(pos)]; 
+	}
 
 };
 
