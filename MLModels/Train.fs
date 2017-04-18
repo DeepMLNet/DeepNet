@@ -553,8 +553,9 @@ module Train =
                     else File.Move (cpTmpFilename, cpFilename)
 
                     // copy to checkpoint iteration file
-                    if faith = CheckpointIntervalReached then
-                        File.Copy (cpFilename, checkpointFilename (Some (TrainingLog.lastIter log)), true)
+                    let cpIterFilename = checkpointFilename (Some (TrainingLog.lastIter log))
+                    if faith = CheckpointIntervalReached && cpFilename <> cpIterFilename then
+                        File.Copy (cpFilename, cpIterFilename, true)
 
                 | None -> ()
 
