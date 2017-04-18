@@ -41,6 +41,10 @@ let main argv =
     mb.SetSize nHidden 100L
     let mi = mb.Instantiate device
 
+    // prediction
+    let pred = MLP.pred mlp input
+    let predFn = mi.Func pred |> arg1 input
+
     // loss expression
     let loss = MLP.loss mlp input target
     //let loss = loss |> Expr.checkFinite "loss"
@@ -53,12 +57,29 @@ let main argv =
         //Train.trainableFromLossExpr mi loss smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
+    let misclassificationRate inputs targets =
+        let preds = predFn inputs |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
+        let targets = targets |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
+        let isErr = ArrayND.ifThenElse (preds ==== targets) (ArrayND.zerosLike preds) (ArrayND.onesLike preds)
+        let errCnt = ArrayND.sum isErr |> ArrayND.value
+        let errRate = float errCnt / float inputs.Shape.[0]
+        errRate        
+
+    let userQuality () =
+        let qual = {
+            TrnQuality = misclassificationRate mnist.Trn.All.Input mnist.Trn.All.Target
+            ValQuality = misclassificationRate mnist.Val.All.Input mnist.Val.All.Target
+            TstQuality = misclassificationRate mnist.Tst.All.Input mnist.Tst.All.Target
+        }
+        Map ["misclassificationRate", qual]        
+
     let trainCfg : Train.Cfg = {    
         Train.defaultCfg with
             Seed               = 100   
             //BatchSize          = 10 
             BatchSize          = 10000L
-            LossRecordInterval = 10                                   
+            LossRecordInterval = 10               
+            UserQualityFunc    = userQuality
             Termination        = Train.ItersWithoutImprovement 100
             MinImprovement     = 1e-7  
             TargetLoss         = None  

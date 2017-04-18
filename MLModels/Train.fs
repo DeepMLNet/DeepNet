@@ -12,9 +12,28 @@ open SymTensor
 open Optimizers
 
 
-type Partition =
-    | Training
-    | Validation
+[<AutoOpen>]
+module TrainingTypes = 
+
+    /// Partition of the dataset.
+    type Partition =
+        /// training parition of the dataset
+        | Training
+        /// validation partition of the dataset
+        | Validation
+
+    /// User-defined quality metric values
+    type UserQuality = {
+        /// quality on training set
+        TrnQuality: float
+        /// quality on test set
+        ValQuality: float
+        /// quality on validation set
+        TstQuality: float
+    }
+
+    /// User-defined quality metrics
+    type UserQualities = Map<string, UserQuality>
 
 
 /// Training history module.
@@ -25,6 +44,10 @@ module TrainingLog =
         TrnLoss:            float
         ValLoss:            float
         TstLoss:            float
+        MultiTrnLoss:       float list
+        MultiValLoss:       float list
+        MultiTstLoss:       float list
+        UserQualities:      UserQualities
         LearningRate:       float
     }
 
@@ -75,6 +98,7 @@ module TrainingLog =
     let removeToIter iter (log: Log<_>) =
         {log with History = log.History |> List.skipWhile (fun {Iter=i} -> i > iter)}
 
+
 /// Generic training module.
 module Train =
 
@@ -99,6 +123,9 @@ module Train =
         LossRecordInterval:             int
         /// function that is called after loss has been evaluated
         LossRecordFunc:                 TrainingLog.Entry -> unit
+        /// function that calculates one or more user-defined quality metrics 
+        /// using the current model state
+        UserQualityFunc:                unit -> UserQualities
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -140,6 +167,7 @@ module Train =
         SlotSize                    = None
         LossRecordInterval          = 10
         LossRecordFunc              = fun _ -> ()
+        UserQualityFunc             = fun () -> Map.empty
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
         BestOn                      = Validation
@@ -335,18 +363,19 @@ module Train =
 
             if not Console.IsInputRedirected then printf "%6d \r" iter
 
-            // execute training
+            // execute training and calculate training loss
             trainable.ResetModelState ()
             setDumpPrefix iter "trn"
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
-            // record loss
+            // record loss if needed
             let recordBecauseCP = 
                 match cfg.CheckpointInterval with 
                 | Some interval -> iter % interval = 0
                 | None -> false
             if iter % cfg.LossRecordInterval = 0 || recordBecauseCP then
 
+                // compute validation & test losses
                 let multiAvg lls =
                     let mutable n = 1
                     lls
@@ -355,7 +384,6 @@ module Train =
                         List.zip ll1 ll2
                         |> List.map (fun (l1, l2) -> l1 + l2))
                     |> List.map (fun l -> l / float n)
-
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
                 trainable.ResetModelState ()
                 setDumpPrefix iter "val"
@@ -364,28 +392,43 @@ module Train =
                 setDumpPrefix iter "tst"
                 let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
 
-                // compute and log primary validation & test loss
+                // compute user qualities
+                trainable.ResetModelState ()
+                setDumpPrefix iter "userQuality"
+                let userQualities = cfg.UserQualityFunc ()
+
+                // log primary losses and user quality
                 let entry = {
-                    TrainingLog.Iter    = iter
-                    TrainingLog.TrnLoss = multiTrnLosses.Head
-                    TrainingLog.ValLoss = multiValLosses.Head
-                    TrainingLog.TstLoss = multiTstLosses.Head
-                    TrainingLog.LearningRate = learningRate
+                    TrainingLog.Iter          = iter
+                    TrainingLog.TrnLoss       = multiTrnLosses.Head
+                    TrainingLog.ValLoss       = multiValLosses.Head
+                    TrainingLog.TstLoss       = multiTstLosses.Head
+                    TrainingLog.MultiTrnLoss  = multiTrnLosses
+                    TrainingLog.MultiValLoss  = multiValLosses
+                    TrainingLog.MultiTstLoss  = multiTstLosses
+                    TrainingLog.UserQualities = userQualities
+                    TrainingLog.LearningRate  = learningRate
                 }
                 let log = log |> TrainingLog.record entry trainable.ModelParameters
-                printf "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f   " iter entry.TrnLoss entry.ValLoss entry.TstLoss
                 cfg.LossRecordFunc entry
 
-                // print secondary losses
+                // display primary and secondary losses
+                printf "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f   " iter entry.TrnLoss entry.ValLoss entry.TstLoss
                 match multiTrnLosses, multiValLosses, multiTstLosses with
-                | [_], [_], [_] -> printfn ""
+                | [_], [_], [_] -> printf ""
                 | _::secTrnLosses, _::secValLosses, _::secTstLosses ->
                     printf "("
                     for secTrnLoss, secValLoss, secTstLoss in 
                             List.zip3 secTrnLosses secValLosses secTstLosses do
                         printf "trn=%7.4f  val=%7.4f  tst=%7.4f; " secTrnLoss secValLoss secTstLoss
-                    printfn ")"
+                    printf ")"
                 | _ -> failwith "inconsistent losses"
+
+                // display user qualities
+                for KeyValue(name, qual) in entry.UserQualities do
+                    printf "[%s:  trn=%7.4f  val=%7.4f  tst=%7.4f] " 
+                           name qual.TrnQuality qual.ValQuality qual.TstQuality
+                printfn "   "
 
                 // check termination criteria
                 let mutable faith = Continue
