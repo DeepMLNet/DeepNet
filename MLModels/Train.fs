@@ -123,9 +123,10 @@ module Train =
         LossRecordInterval:             int
         /// function that is called after loss has been evaluated
         LossRecordFunc:                 TrainingLog.Entry -> unit
-        /// function that calculates one or more user-defined quality metrics 
-        /// using the current model state
-        UserQualityFunc:                unit -> UserQualities
+        /// Function that takes the current iteration number and 
+        /// calculates one or more user-defined quality metrics 
+        /// using the current model state.
+        UserQualityFunc:                int -> UserQualities
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -167,7 +168,7 @@ module Train =
         SlotSize                    = None
         LossRecordInterval          = 10
         LossRecordFunc              = fun _ -> ()
-        UserQualityFunc             = fun () -> Map.empty
+        UserQualityFunc             = fun _ -> Map.empty
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
         BestOn                      = Validation
@@ -395,7 +396,7 @@ module Train =
                 // compute user qualities
                 trainable.ResetModelState ()
                 setDumpPrefix iter "userQuality"
-                let userQualities = cfg.UserQualityFunc ()
+                let userQualities = cfg.UserQualityFunc iter
 
                 // log primary losses and user quality
                 let entry = {

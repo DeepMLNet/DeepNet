@@ -65,7 +65,7 @@ let main argv =
         let errRate = float errCnt / float inputs.Shape.[0]
         errRate        
 
-    let userQuality () =
+    let userQuality iter =
         let qual = {
             TrnQuality = misclassificationRate mnist.Trn.All.Input mnist.Trn.All.Target
             ValQuality = misclassificationRate mnist.Val.All.Input mnist.Val.All.Target
