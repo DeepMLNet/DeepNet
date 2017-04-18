@@ -65,7 +65,8 @@ let main argv =
             MinIters           = Some 100 
             MaxIters           = None  
             LearningRates      = [1e-3; 1e-4; 1e-5]       
-            CheckpointFile     = Some "MNIST-Checkpoint.h5"
+            CheckpointFile     = Some "MNIST-%ITER%.h5"
+            CheckpointInterval = Some 50
     } 
 
     //Debug.Timing <- true

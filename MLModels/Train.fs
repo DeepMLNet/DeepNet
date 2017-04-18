@@ -57,7 +57,7 @@ module TrainingLog =
     let lastIter (log: Log<_>) =
         match log.History with
         | {Iter=iter}::_ -> iter
-        | [] -> 0
+        | [] -> -1
 
     let bestIter (log: Log<_>) =
         match log.Best with
@@ -117,11 +117,15 @@ module Train =
         /// Path to a checkpoint file (HDF5 format).
         /// Used to save the training state if training is interrupted and/or periodically.
         /// If the file exists, the training state is loaded from it and training resumes.
+        /// The string %ITER% in the filename is replaced with the iteration number.
         CheckpointFile:                 string option
         /// number of iterations between automatic writing of checkpoints
         CheckpointInterval:             int option
         /// If true, checkpoint is not loaded from disk.
         DiscardCheckpoint:              bool
+        /// If specified, loads the checkpoint corresponding to the specified iteration.
+        /// Otherwise, the latest checkpoint is loaded.
+        LoadCheckpointIter:             int option
         /// If false, no training is performed after loading the checkpoint.
         PerformTraining:                bool
         /// If set, during each iteration the dump prefix will be set to the given string
@@ -146,6 +150,7 @@ module Train =
         CheckpointFile              = None
         CheckpointInterval          = None
         DiscardCheckpoint           = false
+        LoadCheckpointIter          = None
         PerformTraining             = true
         DumpPrefix                  = None
     }
@@ -273,18 +278,17 @@ module Train =
 
     /// Current training state for checkpoints.
     type private TrainState = {
-        History:        TrainingLog.Entry list
-        BestEntry:      TrainingLog.Entry option
-        LearningRates:  float list
-        Duration:       TimeSpan
-        Faith:          Faith
+        History:            TrainingLog.Entry list
+        BestEntry:          TrainingLog.Entry option
+        LearningRates:      float list
+        Duration:           TimeSpan
+        Faith:              Faith
     }
 
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
     let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
         // checkpoint data
-        let mutable lastCheckpointIter = 0
         let mutable checkpointRequested = false
         use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
             match cfg.CheckpointFile with
@@ -292,6 +296,13 @@ module Train =
                 checkpointRequested <- true
                 evt.Cancel <- true
             | _ -> ())
+        let checkpointFilename iter = 
+            match cfg.CheckpointFile with
+            | Some cpBasename -> 
+                match iter with
+                | Some iter -> cpBasename.Replace("%ITER%", sprintf "%06d" iter)
+                | None -> cpBasename.Replace("%ITER%", "latest")
+            | None -> failwith "checkpointing is off"
 
         // batches
         let getBatches part = 
@@ -330,7 +341,11 @@ module Train =
             let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
 
             // record loss
-            if iter % cfg.LossRecordInterval = 0 then
+            let recordBecauseCP = 
+                match cfg.CheckpointInterval with 
+                | Some interval -> iter % interval = 0
+                | None -> false
+            if iter % cfg.LossRecordInterval = 0 || recordBecauseCP then
 
                 let multiAvg lls =
                     let mutable n = 1
@@ -421,8 +436,7 @@ module Train =
 
                 // process checkpoint request
                 match cfg.CheckpointInterval with
-                | Some interval when iter >= lastCheckpointIter + interval && faith = Continue -> 
-                    lastCheckpointIter <- iter
+                | Some interval when iter % interval = 0 && faith = Continue -> 
                     faith <- CheckpointIntervalReached
                 | _ -> ()
                 if checkpointRequested then faith <- CheckpointRequested
@@ -460,11 +474,24 @@ module Train =
             | [] -> failwith "no learning rates"
         
         // initialize or load checkpoint
+        let cpLoadFilename = 
+            match cfg.CheckpointFile, cfg.LoadCheckpointIter with
+            | _ when cfg.DiscardCheckpoint -> None
+            | Some _, Some _ -> 
+                if File.Exists (checkpointFilename cfg.LoadCheckpointIter) then
+                    Some (checkpointFilename cfg.LoadCheckpointIter)
+                else failwithf "Checkpoint %s does not exist." 
+                               (checkpointFilename cfg.LoadCheckpointIter)
+            | Some _, None -> 
+                if File.Exists (checkpointFilename None) then
+                    Some (checkpointFilename None)
+                else None
+            | None, _ -> None
         let log, learningRates, duration, faith =
-            match cfg.CheckpointFile with
-            | Some cpFilename when File.Exists cpFilename && not cfg.DiscardCheckpoint ->
-                printfn "Loading checkpoint from %s" cpFilename
-                use cp = HDF5.OpenRead cpFilename               
+            match cpLoadFilename with
+            | Some filename ->
+                printfn "Loading checkpoint from %s" filename
+                use cp = HDF5.OpenRead filename               
                 let state : TrainState = cp.GetAttribute ("/", "TrainState") |> Json.deserialize
                 let best =
                     match state.BestEntry with
@@ -493,7 +520,8 @@ module Train =
 
                 // save checkpoint 
                 match cfg.CheckpointFile with
-                | Some cpFilename ->
+                | Some _ ->
+                    let cpFilename = checkpointFilename None
                     if faith <> CheckpointIntervalReached then
                         printfn "Saving checkpoint to %s" cpFilename
 
@@ -512,17 +540,22 @@ module Train =
                                 Some bestEntry
                             | None -> None
                         let trainState = {
-                            History = log.History
-                            BestEntry = bestEntry
-                            LearningRates = learningRates
-                            Duration = duration
-                            Faith = faith
+                            History            = log.History
+                            BestEntry          = bestEntry
+                            LearningRates      = learningRates
+                            Duration           = duration
+                            Faith              = faith
                         }
                         cp.SetAttribute ("/", "TrainState", Json.serialize trainState))
 
                     // rename to checkpoint file
                     if File.Exists cpFilename then File.Replace (cpTmpFilename, cpFilename, null)
                     else File.Move (cpTmpFilename, cpFilename)
+
+                    // copy to checkpoint iteration file
+                    if faith = CheckpointIntervalReached then
+                        File.Copy (cpFilename, checkpointFilename (Some (TrainingLog.lastIter log)), true)
+
                 | None -> ()
 
                 match faith with
