@@ -48,9 +48,11 @@ module CudaRegMemTypes =
                     if not disposed then 
                         if CudaRegMemSupport.decrRefCount hostArray then            
                             // unregister memory
-                            cudaMem.Unregister() 
+                            try cudaMem.Unregister() 
+                            with :? CudaException -> ()
                             // release cuda memory handle 
-                            cudaMem.Dispose()
+                            try cudaMem.Dispose()
+                            with :? CudaException -> ()
                             // unpin managed memory
                             (pinHnd :> IDisposable).Dispose()
                     disposed <- true
