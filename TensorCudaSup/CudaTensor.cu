@@ -1,11 +1,11 @@
 #include "CudaTensor.cuh"
 
-extern "C"
-__global__ void FillElementwise_Float_Float_3(
-	Tensor<float, 3> trgt,
-	Tensor<float, 3> src1) {
+#define _dllkernel_ extern "C" __declspec(dllexport) __global__
 
-	FillElementwise(trgt, src1);
+extern "C" __global__
+void Copy_Float_Float_3(Tensor<float, 3> trgt, Tensor<float, 3> src) {
+	Copy(trgt, src);
 }
+
 
 

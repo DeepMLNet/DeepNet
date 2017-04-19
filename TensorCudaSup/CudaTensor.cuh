@@ -1,38 +1,35 @@
 #pragma once
 
-#include <functional>
-
+#include <nvfunctional>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
 #include "Tensor.h"
 
-#define _dev __host__ __device__ __forceinline__ 
-#define _devonly __device__ __forceinline__
 
-struct WorkFunc1 {
-	Tensor<float, 3> trgt;
-	Tensor<float, 3> src1;
-	void operator() (Idxs<3> pos) {
-		trgt[pos] = src1[pos];
+template<dim_t TWorkDims, dim_t TDim, dim_t TRestDims>
+struct FillRestPos {
+	static inline _dev_ 
+	void Do(const Idxs<TWorkDims> &workSize, Idxs<TWorkDims> &pos, idx_t rest) {
+		idx_t size = 1;
+		for (dim_t d = TDim + 1; d < TWorkDims - 2; d++)
+			size *= workSize[d];
+		pos[TDim] = rest / size;
+		rest -= pos[TDim] * size;
+		FillRestPos<TWorkDims, TDim + 1, TRestDims - 1>::Do(workSize, pos, rest);
+	}
+};
+
+template<dim_t TWorkDims, dim_t TDim>
+struct FillRestPos<TWorkDims, TDim, (dim_t)0> {
+	static inline _dev_ 
+	void Do(const Idxs<TWorkDims> &workSize, Idxs<TWorkDims> &pos, idx_t rest) {
 	}
 };
 
 
-template<dim_t TWorkDims, dim_t TDim>
-inline _dev void FillPosFromRest(const Idxs<TWorkDims> &workSize, Idxs<TWorkDims> &pos, idx_t rest) {
-	idx_t size = 1;
-	for (dim_t d = TDim + 1; d < TWorkDims - 2; d++)
-		size *= workSize[d];
-	pos[TDim] = rest / size;
-	rest -= pos[TDim] * size;
-	if (TDim < TWorkDims - 2)
-		FillPosFromRest<TWorkDims, TDim + 1>(workSize, pos, rest);
-}
-
-
-template<typename TWorkFn, dim_t TWorkDims>
-__device__ void PerformWork(TWorkFn &workFn, const Idxs<TWorkDims> &workSize) {
+template<typename TWorkFn, dim_t TWorkDims> _dev_
+void PerformWork(TWorkFn &workFn, const Idxs<TWorkDims> &workSize) {
 	Idxs<TWorkDims> pos;
 	if (TWorkDims == 0) {
 		workFn(pos);
@@ -77,7 +74,7 @@ __device__ void PerformWork(TWorkFn &workFn, const Idxs<TWorkDims> &workSize) {
 		for (idx_t rest = threadIdx.z + blockIdx.z * blockDim.z;
 			 rest < restWork;
 			 rest += gridDim.z * blockDim.z) {
-			FillPosFromRest<TWorkDims, 0>(workSize, pos, rest);
+			FillRestPos<TWorkDims, 0, TWorkDims-2>::Do(workSize, pos, rest);
 			for (pos[TWorkDims - 2] = threadIdx.y + blockIdx.y * blockDim.y;
 				 pos[TWorkDims - 2] < workSize[TWorkDims - 2];
 				 pos[TWorkDims - 2] += gridDim.y * blockDim.y) {
@@ -92,65 +89,40 @@ __device__ void PerformWork(TWorkFn &workFn, const Idxs<TWorkDims> &workSize) {
 };
 
 
-
-// - generic work function for homogeneous work is written
-// - write a kernel that uses it for testing and instantiate the template
-
-//template<dim_t TWorkDims>
-//_dev void CopyWorkFn(const Idxs<TWorkDims> &pos) {
-//
-//}
-
 template<typename TTrgtT, typename TSrc1T, dim_t TWorkDims>
 struct UnaryElemwiseApplyWorkFn {
-	std::function<TTrgtT(TSrc1T)> ElemwiseFn;
+	nvstd::function<TTrgtT(TSrc1T)> ElemwiseFn;
 	Tensor<TTrgtT, TWorkDims> Trgt;
 	const Tensor<TSrc1T, TWorkDims> Src1;
 
-	UnaryElemwiseApplyWorkFn(
-		std::function<TTrgtT(TSrc1T)> elemwiseFn,
-		Tensor<TTrgtT, TWorkDims> trgt,
-		Tensor<TSrc1T, TWorkDims> src1)
+	inline _dev_ 
+	UnaryElemwiseApplyWorkFn(nvstd::function<TTrgtT(TSrc1T)> elemwiseFn,
+	                         Tensor<TTrgtT, TWorkDims> trgt,
+	                         Tensor<TSrc1T, TWorkDims> src1)
 		: ElemwiseFn(elemwiseFn), Trgt(trgt), Src1(src1) {
 
 	}
 
+	inline _dev_ 
 	void operator() (const Idxs<TWorkDims> &pos) {
 		Trgt[pos] = ElemwiseFn(Src1[pos]);
 	}
 };
 
+template<typename TTrgtT, typename TSrc1T, dim_t TWorkDims> _dev_
+void PerfomUnaryElemwiseWork(nvstd::function<TTrgtT(TSrc1T)> elemwiseFn,
+							 Tensor<TTrgtT, TWorkDims> &trgt,
+                             const Tensor<TSrc1T, TWorkDims> &src1) {
+	UnaryElemwiseApplyWorkFn<TTrgtT, TSrc1T, TWorkDims> workFn (elemwiseFn, trgt, src1);
+	PerformWork(workFn, trgt.Shape);
+}
 
-template<typename TTrgtT, typename TSrc1T, dim_t TWorkDims>
-_dev void FillElementwise(
-	Tensor<TTrgtT, TWorkDims> &trgt,
-	const Tensor<TSrc1T, TWorkDims> &src1) {
-
-	UnaryElemwiseApplyWorkFn<TTrgtT, TSrc1T, TWorkDims> workFn 
-		([](TSrc1T val1) { return val1; }, trgt, src1);
-	PerformWork<UnaryElemwiseApplyWorkFn<TTrgtT, TSrc1T, TWorkDims>, TWorkDims> 
-		(workFn, trgt.Shape());
+template<typename TTrgtT, typename TSrcT, dim_t TWorkDims> _dev_
+void Copy(Tensor<TTrgtT, TWorkDims> &trgt, const Tensor<TSrcT, TWorkDims> &src) {
+	PerfomUnaryElemwiseWork<TTrgtT, TSrcT, TWorkDims> ([](TSrcT x) { return x; }, 
+		                                               trgt, src);
 };
 
 
-
-
-
-/*
-template<typename TUnaryOp, typename TTrgt, typename TA>
-void FillElementwise(TUnaryOp &op, TTrgt &trgt, TA &a) {
-	// need generic loop over arbitrary number of dimensions.
-	// also should this be a kernel or a function
-	// - if it is a kernel, then there should be no loop but index need to be derived
-	//   from threadIdx and blockIdx
-	// - actually we need a generic function for translating the threadIdx and blockIdx
-	//   into a position
-	// - but this also might involve a loop if there is too much work
-	// - so we need this loop as a generic function
-	// - but actually it could be a device function template, accepting a functor
-	// - and then we call it from approproiate kernels
-
-}
-*/
 
 
