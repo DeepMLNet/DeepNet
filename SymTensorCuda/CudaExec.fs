@@ -137,6 +137,8 @@ module Compile =
                 krnlPtxCache.Set cacheKey ptx                
                 ptx    
 
+        if not Debug.KeepCompileDir then removeCompileDir compileDir
+
         #if !CUDA_DUMMY
 
         let sw = Stopwatch.StartNew ()
@@ -798,8 +800,6 @@ module CudaExprWorkspaceTypes =
                     if not Debug.KeepCompileDir then
                         Compile.removeCompileDir cCompileDir
                 | _ -> ()
-                if not Debug.KeepCompileDir && krnlCompileDir <> null then
-                    Compile.removeCompileDir krnlCompileDir
                 disposed <- true
 
         override this.Finalize() =
