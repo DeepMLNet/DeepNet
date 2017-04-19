@@ -5,9 +5,12 @@ open System.IO
 open System.Linq
 open Nessos.FsPickler
 open System.Threading
+open System.Security.Cryptography
+open ArrayNDNS.ArrayND
 
 
 let binarySerializer = FsPickler.CreateBinarySerializer()
+let sha1 = SHA1CryptoServiceProvider()
 
 
 /// a filesystem backed map for binary keys and values
@@ -17,16 +20,17 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
         if baseDir.Length = 0 then 
             invalidArg "baseDir" "baseDir cannot be empty"
 
-    let stableHash data =
-        // TODO: is this stable?
-        hash data
-
-    let hashDirForKey key =
-        Path.Combine(baseDir, sprintf "%016x" (stableHash key))
-
-    let newGuidStr () =
-        Guid.NewGuid().ToString()
-
+    let hashDirForKey (key: byte[]) =
+        let keyHash = 
+            sha1.ComputeHash key 
+            |> Convert.ToBase64String
+            |> fun s -> [yield 'K'
+                         for c in s.ToLower() do 
+                             if 'a' <= c && c <= 'z' then yield c]
+            |> List.toArray 
+            |> String
+        Path.Combine(baseDir, keyHash)
+       
     let tryGetDirAndValueForKey (key: byte []) =
         try
             if Directory.Exists (hashDirForKey key) then
@@ -76,7 +80,7 @@ type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string)
         let dir =
             match tryGetDirAndValueForKey key with
             | Some (dir, _) -> dir
-            | None -> Path.Combine (hashDirForKey key, newGuidStr ())
+            | None -> Path.Combine (hashDirForKey key, Guid.NewGuid().ToString())
         let keyPath = Path.Combine (dir, keyFilename)
         let valuePath = Path.Combine (dir, valueFilename)
 
