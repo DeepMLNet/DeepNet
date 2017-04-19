@@ -41,6 +41,8 @@ module CudaRegMemTypes =
                         cudaMem:    CudaRegisteredHostMemory<byte>) =
            
         let mutable disposed = false
+        let checkDisposed () =
+            if disposed then raise (ObjectDisposedException "CudaRegMemHnd")
 
         interface IDisposable with
             member this.Dispose() =          
@@ -63,13 +65,13 @@ module CudaRegMemTypes =
 
         /// the data array
         member this.HostArray = 
-            if disposed then failwith "CudaRegMemHnd is disposed"
+            checkDisposed ()
             hostArray
         member internal this.HostArrayPriv = hostArray
 
         /// GC memory pin handle
         member this.PinHnd = 
-            if disposed then failwith "CudaRegMemHnd is disposed"
+            checkDisposed ()
             pinHnd
         member internal this.PinHndPriv = pinHnd
 
@@ -79,7 +81,7 @@ module CudaRegMemTypes =
 
         /// the CudaRegisteredHostMemory
         member this.CudaRegisteredMemory = 
-            if disposed then failwith "CudaRegMemHnd is disposed"
+            checkDisposed ()
             cudaMem
         member internal this.CudaRegisteredMemoryPriv = cudaMem
 
