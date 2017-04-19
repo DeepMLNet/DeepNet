@@ -58,13 +58,18 @@ module HDF5Types =
         
         let mutable disposed = false
 
+        let fileAccessProps = H5P.create(H5P.FILE_ACCESS) |> check
+        do  
+            H5P.set_libver_bounds(fileAccessProps, H5F.libver_t.LATEST, H5F.libver_t.LATEST) 
+            |> check |> ignore
+
         let fileHnd =
             match mode with
             | HDF5Read -> 
                 if not (File.Exists path) then 
                     raise (FileNotFoundException (sprintf "HDF5 file not found: %s" path, path))
-                H5F.``open`` (path, H5F.ACC_RDONLY)
-            | HDF5Overwrite -> H5F.create (path, H5F.ACC_TRUNC)
+                H5F.``open`` (path, H5F.ACC_RDONLY, plist=fileAccessProps)
+            | HDF5Overwrite -> H5F.create (path, H5F.ACC_TRUNC, access_plist=fileAccessProps)
             |> check
 
         let checkShape data shape =
@@ -85,6 +90,8 @@ module HDF5Types =
             if not disposed then             
                 if fileHnd >= 0 then
                     H5F.close fileHnd |> check |> ignore
+                if fileAccessProps >= 0 then
+                    H5P.close fileAccessProps |> check |> ignore
                 disposed <- true
 
         interface IDisposable with
