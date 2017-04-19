@@ -1,0 +1,60 @@
+template <typename TTrgtT, typename TSrc1T, dim_t TWorkDims>
+using UnaryElemwiseFn = nvstd::function<TTrgtT(const Idxs<TWorkDims> &, TSrc1T)>;
+
+template<typename TTrgtT, typename TSrc1T, dim_t TWorkDims>
+struct UnaryElemwiseApplyWorkFn {
+	UnaryElemwiseFn ElemwiseFn;
+	Tensor<TTrgtT, TWorkDims> Trgt;
+	const Tensor<TSrc1T, TWorkDims> Src1;
+
+	inline _dev_ 
+	UnaryElemwiseApplyWorkFn(UnaryElemwiseFn elemwiseFn,
+	                         Tensor<TTrgtT, TWorkDims> trgt,
+	                         Tensor<TSrc1T, TWorkDims> src1)
+		: ElemwiseFn(elemwiseFn), Trgt(trgt), Src1(src1) {
+
+	}
+
+	inline _dev_ 
+	void operator() (const Idxs<TWorkDims> &pos) {
+		Trgt[pos] = ElemwiseFn(pos, Src1[pos]);
+	}
+};
+
+template<typename TTrgtT, typename TSrc1T, dim_t TWorkDims> _dev_
+void PerfomUnaryElemwiseWork(UnaryElemwiseFn elemwiseFn,
+							 Tensor<TTrgtT, TWorkDims> &trgt,
+                             const Tensor<TSrc1T, TWorkDims> &src1) {
+	UnaryElemwiseApplyWorkFn<TTrgtT, TSrc1T, TWorkDims> workFn (elemwiseFn, trgt, src1);
+	PerformWork(workFn, trgt.Shape);
+}
+
+
+//
+//template<typename TTrgtT, typename TTrgtDims, typename TSrc1T, dim_t TSrc1Dims>
+//using UnaryHeterogenousElemwiseFn = nvstd::function<TTrgtT(const Idxs<TTrgtDims> &, 
+//	                                                       const Idxs<TSrc1Dims> &, 
+//	                                                       TSrc1T)>;
+//
+//
+//template<typename TTrgtT, typename TTrgtDims, typename TSrc1T, dim_t TSrc1Dims>
+//struct UnaryHeterogenousElemwiseApplyWorkFn {
+//	nvstd::function<TTrgtT(TSrc1T)> ElemwiseFn;
+//	Tensor<TTrgtT, TTrgtDims> Trgt;
+//	const Tensor<TSrc1T, TSrc1Dims> Src1;
+//
+//	inline _dev_ 
+//		UnaryElemwiseApplyWorkFn(nvstd::function<TTrgtT(TSrc1T)> elemwiseFn,
+//			Tensor<TTrgtT, TWorkDims> trgt,
+//			Tensor<TSrc1T, TWorkDims> src1)
+//		: ElemwiseFn(elemwiseFn), Trgt(trgt), Src1(src1) {
+//
+//	}
+//
+//	inline _dev_ 
+//		void operator() (const Idxs<TWorkDims> &pos) {
+//		Trgt[pos] = ElemwiseFn(Src1[pos]);
+//	}
+//};
+//
+//

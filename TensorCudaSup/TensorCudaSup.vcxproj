@@ -156,8 +156,13 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CudaTensor.cuh" />
-    <ClInclude Include="Tensor.h" />
+    <ClInclude Include="Common.cuh" />
+    <ClInclude Include="CudaTensor.cuh">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="Idxs.cuh" />
+    <ClInclude Include="Tensor.cuh" />
+    <ClInclude Include="Work.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -174,10 +179,14 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="TensorCudaSup.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="CudaTensor.cu" />
+    <CudaCompile Include="CudaTensor.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="OldCode.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
