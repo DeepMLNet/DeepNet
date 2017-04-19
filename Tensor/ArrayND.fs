@@ -1139,7 +1139,8 @@ module ArrayND =
       
     /// applies the given reduction function over the given dimension
     let inline axisReduceTypeChange (f: ArrayNDT<'T> -> ArrayNDT<'R>) dim (a: ArrayNDT<'T>) : ArrayNDT<'R> =
-        let c = newCOfType (List.without dim (shape a)) a
+        checkAxis dim a
+        let c = newCOfType (shape a |> List.without dim) a
         for srcRng, dstIdx in ArrayNDLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
             set dstIdx (f (view srcRng a) |> get []) c
         c
