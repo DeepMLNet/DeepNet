@@ -60,7 +60,7 @@ module Interpolator =
     /// Creates an n-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
-    let create (tbl: ArrayNDT<'T>) (minArg: float list) (maxArg: float list) 
+    let create (tbl: Tensor<'T>) (minArg: float list) (maxArg: float list) 
                (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
                (derivative: InterpolatorT list option) =
         
@@ -103,7 +103,7 @@ module Interpolator =
 
     /// Gets the function value table for the specified one-dimensional interpolator.
     let getTable<'T> ip =
-        getTableAsIArrayNDT ip :?> ArrayNDT<'T>
+        getTableAsIArrayNDT ip :?> Tensor<'T>
 
     type private GetDerivative =
         static member Do<'T> (derivDim: int, ip: InterpolatorT) =
@@ -123,7 +123,7 @@ module Interpolator =
                         let tbl, wasOnDev = 
                             match tbl with
                             | :? ArrayNDHostT<'T> -> tbl, false
-                            | _ -> ArrayNDHost.fetch tbl :> ArrayNDT<'T>, true
+                            | _ -> ArrayNDHost.fetch tbl :> Tensor<'T>, true
 
                         let ipds = 
                             [0 .. ip.NDims-1]
@@ -145,7 +145,7 @@ module Interpolator =
 
                                 // hack to work around slow ArrayNDCuda operations
                                 let diffTbl =
-                                    if wasOnDev then ArrayNDCuda.toDevUntyped (box diffTbl :?> IArrayNDHostT) :?> ArrayNDT<'T>
+                                    if wasOnDev then ArrayNDCuda.toDevUntyped (box diffTbl :?> IArrayNDHostT) :?> Tensor<'T>
                                     else diffTbl
 
                                 let outside =
@@ -166,7 +166,7 @@ module Interpolator =
 
     /// Performs interpolation on host.
     let interpolate (ip: InterpolatorT) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
-        let tbl : ArrayNDT<'T> = getTable ip
+        let tbl : Tensor<'T> = getTable ip
 
         /// returns interpolation in dimensions to the right of leftIdxs
         let rec interpolateInDim (leftIdxs: int64 list) (x: float list) =

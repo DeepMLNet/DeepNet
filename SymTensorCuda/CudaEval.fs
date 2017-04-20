@@ -46,16 +46,16 @@ module CudaEvalTypes =
 
     type private HelperT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (shp: NShapeSpecT) : ArrayNDT<'T> =
+                (shp: NShapeSpecT) : Tensor<'T> =
             let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newC shp 
-            ary :> ArrayNDT<'T>
+            ary :> Tensor<'T>
 
         static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: ArrayNDHostT<'T>) : ArrayNDT<'T> =
-            ArrayNDCuda.toDev ary :> ArrayNDT<'T>
+                (ary: ArrayNDHostT<'T>) : Tensor<'T> =
+            ArrayNDCuda.toDev ary :> Tensor<'T>
 
         static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: ArrayNDT<'T>) : ArrayNDHostT<'T> =
+                (ary: Tensor<'T>) : ArrayNDHostT<'T> =
             ArrayNDCuda.toHost (ary :?> ArrayNDCudaT<'T>)
 
     let private invokeHelperMethod<'T> name args = 
@@ -69,8 +69,8 @@ module CudaEvalTypes =
         new IDevice with
             
             #if !CUDA_DUMMY
-            member this.Allocator shp : ArrayNDT<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
-            member this.ToDev ary : ArrayNDT<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
+            member this.Allocator shp : Tensor<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
+            member this.ToDev ary : Tensor<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
             member this.ToHost ary : ArrayNDHostT<'T2>  = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
 
             #else

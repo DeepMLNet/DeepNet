@@ -56,7 +56,7 @@ module ElemExprHostEval =
         conv<'T> (sign x)
 
     /// evaluates the specified element of an element expression
-    let evalElement (expr: ElemExprT) (args: ArrayNDT<'T> list) (idxs: ShapeSpecT) : 'T =
+    let evalElement (expr: ElemExprT) (args: Tensor<'T> list) (idxs: ShapeSpecT) : 'T =
         let retType = (ElemExpr.typeName expr).Type
         if retType <> typeof<'T> then
             failwithf "elements expression of type %A does not match eval function of type %A"
@@ -134,7 +134,7 @@ module ElemExprHostEval =
 
 
     /// evaluates all elements of an element expression
-    let eval (expr: ElemExprT) (args: ArrayNDT<'T> list) (resShape: NShapeSpecT) =
+    let eval (expr: ElemExprT) (args: Tensor<'T> list) (resShape: NShapeSpecT) =
         let res = ArrayNDHost.zeros<'T> resShape
         for idx in TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix

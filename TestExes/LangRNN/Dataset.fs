@@ -15,7 +15,7 @@ open Datasets
 
 
 type WordSeq = {
-    Words:  ArrayNDT<int>
+    Words:  Tensor<int>
 }
 
 exception UnknownWord of string

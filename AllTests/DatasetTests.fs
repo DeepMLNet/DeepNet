@@ -11,7 +11,7 @@ open Datasets
 
 let dataDir = Util.assemblyDirectory + "/../../TestData/curve"
 
-type Arrayf = ArrayNDT<float>
+type Arrayf = Tensor<float>
 type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
 
 let dataSamples = 
@@ -98,7 +98,7 @@ let ``Loading CSV datasets`` () =
         printfn ""
 
 
-type SeqSample = {SeqData: ArrayNDT<int64>}
+type SeqSample = {SeqData: Tensor<int64>}
 
 type SequenceDataset () = 
     let smpl1 = {SeqData = ArrayNDHost.arange 98L}

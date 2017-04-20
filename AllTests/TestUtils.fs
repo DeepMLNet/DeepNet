@@ -13,8 +13,8 @@ open Datasets
 open Optimizers
 
 
-let post device (x: ArrayNDT<'T>) =
-    if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> ArrayNDT<'T>
+let post device (x: Tensor<'T>) =
+    if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> Tensor<'T>
     else x 
     
 let compareTracesLock = obj ()

@@ -16,7 +16,7 @@ module GradientDescent =
     }
 
     type State<'T> = {
-        LastStep:       ArrayNDT<'T>       
+        LastStep:       Tensor<'T>       
     }
 
     type StateExpr = {

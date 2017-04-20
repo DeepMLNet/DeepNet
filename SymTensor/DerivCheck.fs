@@ -9,7 +9,7 @@ open System
 module DerivCheck =
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let inline numDerivEpsilon (epsilon: 'T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
+    let inline numDerivEpsilon (epsilon: 'T) (f: Tensor<'T> -> Tensor<'T>) (x: Tensor<'T>) =
         let y = f x
         let xElems, yElems = Tensor.nElems x, Tensor.nElems y
         let xShp = Tensor.shape x

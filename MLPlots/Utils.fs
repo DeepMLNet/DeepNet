@@ -14,7 +14,7 @@ module Utils =
 
 
     /// Transforms an ArrayND<single> to a float list that can be used by RProvider.
-    let toFloatList (x: ArrayNDT<single>) : float list = 
+    let toFloatList (x: Tensor<single>) : float list = 
         x |> ArrayNDHost.fetch |> ArrayNDHost.convert |> ArrayNDHost.toList
     
 

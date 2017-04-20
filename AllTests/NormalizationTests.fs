@@ -8,7 +8,7 @@ open Basics
 open ArrayNDNS
 open Datasets
 
-type TestSample = {Data: ArrayNDT<double>}
+type TestSample = {Data: Tensor<double>}
 
 type CurveNormalizationTests () =
     let dataFile = NPZFile.Open (Util.assemblyDirectory + "/../../TestData/PCA.npz")

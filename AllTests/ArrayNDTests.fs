@@ -48,9 +48,9 @@ let ``Slicing works`` () =
 
 [<Fact>]
 let ``Pretty printing works`` () =
-    printfn "3x4 one matrix:       \n%A" (ArrayNDHost.ones [3L; 4L] :> ArrayNDT<float>)
-    printfn "6 zero vector:        \n%A" (ArrayNDHost.zeros [6L] :> ArrayNDT<float>)
-    printfn "5x5 identity matrix:  \n%A" (ArrayNDHost.identity 5L :> ArrayNDT<float>)
+    printfn "3x4 one matrix:       \n%A" (ArrayNDHost.ones [3L; 4L] :> Tensor<float>)
+    printfn "6 zero vector:        \n%A" (ArrayNDHost.zeros [6L] :> Tensor<float>)
+    printfn "5x5 identity matrix:  \n%A" (ArrayNDHost.identity 5L :> Tensor<float>)
 
 [<Fact>]
 let ``Batched matrix-matrix dot product`` () =

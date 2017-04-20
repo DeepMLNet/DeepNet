@@ -26,12 +26,12 @@ module Adam =
     }
 
     type State<'T> = {
-        Iter:           ArrayNDT<'T>  
-        LastStep:       ArrayNDT<'T>
-        EstMom1:        ArrayNDT<'T>
-        EstMom2:        ArrayNDT<'T>
-        EstMom1B:       ArrayNDT<'T>
-        EstMom2B:       ArrayNDT<'T>
+        Iter:           Tensor<'T>  
+        LastStep:       Tensor<'T>
+        EstMom1:        Tensor<'T>
+        EstMom2:        Tensor<'T>
+        EstMom1B:       Tensor<'T>
+        EstMom2B:       Tensor<'T>
     } 
 
     type StateExpr = {

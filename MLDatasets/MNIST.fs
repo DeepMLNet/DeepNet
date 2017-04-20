@@ -11,14 +11,14 @@ open ArrayNDNS
 /// Raw MNIST dataset
 type MnistRawT = {
     /// 2d training images of shape [60000; 28; 28]
-    TrnImgs:      ArrayNDT<single>
+    TrnImgs:      Tensor<single>
     /// one-hot training labels of shape [60000; 10]
-    TrnLbls:      ArrayNDT<single>
+    TrnLbls:      Tensor<single>
 
     /// 2d test images of shape [10000; 28; 28]
-    TstImgs:      ArrayNDT<single>
+    TstImgs:      Tensor<single>
     /// one-hot test labels of shape [10000; 10]
-    TstLbls:      ArrayNDT<single>   
+    TstLbls:      Tensor<single>   
 } with 
     /// copies this dataset to the CUDA GPU
     member this.ToCuda () =

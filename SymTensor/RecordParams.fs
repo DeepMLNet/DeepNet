@@ -18,11 +18,11 @@ type private VarRecordHelpers () =
         ArrayNDHost.scalar value |> dev.ToDev :> ITensor
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
         Expr.extractVar expr
-    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
+    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: Tensor<'T>) =
         value |> dev.ToHost |> ArrayNDHDF.write hdf name
     static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
         value |> ArrayNDHost.scalar |> ArrayNDHDF.write hdf name
-    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : ArrayNDT<'T> =
+    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : Tensor<'T> =
         ArrayNDHDF.read hdf name |> dev.ToDev
     static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
         ArrayNDHDF.read hdf name |> Tensor.value
@@ -61,7 +61,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 // get value type and corresponding expression type
                 let baseType, valueType, exprType =                   
                     if valField.PropertyType.IsGenericType && 
-                            valField.PropertyType.GetGenericTypeDefinition() = typedefof<ArrayNDT<_>> then
+                            valField.PropertyType.GetGenericTypeDefinition() = typedefof<Tensor<_>> then
                         // ArrayNDT<'T> => ExprT
                         let bt = valField.PropertyType.GetGenericArguments().[0]
                         bt, Array bt, typeof<ExprT>

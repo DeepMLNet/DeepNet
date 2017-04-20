@@ -19,9 +19,9 @@ module ModelContextTypes =
 
     /// Model evaluation device specification.
     type IDevice =
-        abstract member Allocator:      NShapeSpecT -> ArrayNDT<'T> 
-        abstract member ToDev:          ArrayNDHostT<'T> -> ArrayNDT<'T>
-        abstract member ToHost:         ArrayNDT<'T> -> ArrayNDHostT<'T>
+        abstract member Allocator:      NShapeSpecT -> Tensor<'T> 
+        abstract member ToDev:          ArrayNDHostT<'T> -> Tensor<'T>
+        abstract member ToHost:         Tensor<'T> -> ArrayNDHostT<'T>
         abstract member Compiler:       IUExprCompiler
         abstract member DefaultLoc:     ArrayLocT
         abstract member DefaultFactory: IUExprCompiler * CompileEnvT
@@ -29,8 +29,8 @@ module ModelContextTypes =
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
-            member this.Allocator shp = ArrayNDHost.newC shp :> ArrayNDT<_>
-            member this.ToDev ary =     ary :> ArrayNDT<_>
+            member this.Allocator shp = ArrayNDHost.newC shp :> Tensor<_>
+            member this.ToDev ary =     ary :> Tensor<_>
             member this.ToHost ary =    ary :?> ArrayNDHostT<_>
             member this.Compiler =      { new IUExprCompiler with 
                                             member this.Name = "Host"
@@ -153,13 +153,13 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: VarSpecT) : ArrayNDT<'T> = parameterVals.[par]
-            and set (par: VarSpecT) (value: ArrayNDT<'T>) = parameterVals.[par].[Fill] <- value
+            with get (par: VarSpecT) : Tensor<'T> = parameterVals.[par]
+            and set (par: VarSpecT) (value: Tensor<'T>) = parameterVals.[par].[Fill] <- value
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : ArrayNDT<'T> = this.[Expr.extractVar par]
-            and set (par: ExprT) (value: ArrayNDT<'T>) = this.[Expr.extractVar par] <- value
+            with get (par: ExprT) : Tensor<'T> = this.[Expr.extractVar par]
+            and set (par: ExprT) (value: Tensor<'T>) = this.[Expr.extractVar par] <- value
 
         /// Uses the values of this ParameterStorageT for the the corresponding
         /// ParameterSetT in the given variable environment.
@@ -323,7 +323,7 @@ module ModelContextTypes =
 
         /// Infers variable location, variable strides and symbolic sizes by 
         /// matching a symbolic variable to the given value.
-        member this.UseTmplVal var (value: ArrayNDT<'T>) =
+        member this.UseTmplVal var (value: Tensor<'T>) =
             // infer symbolic sizes
             let inferredSizes = 
                 VarEnv.empty 
@@ -519,8 +519,8 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : ArrayNDT<'T> = this.ParameterStorage.[par]
-            and set (par: ExprT) (value: ArrayNDT<'T>) = this.ParameterStorage.[par] <- value
+            with get (par: ExprT) : Tensor<'T> = this.ParameterStorage.[par]
+            and set (par: ExprT) (value: Tensor<'T>) = this.ParameterStorage.[par] <- value
 
         member this.Func (resultLoc: ArrayLocT, exprs: ExprT list) =
             let exprs = exprs |> List.map this.Use 

@@ -65,7 +65,7 @@ let build device batch =
     lossFun, optFun, optCfg, opt.InitialState optCfg mi.ParameterValues
 
 let getMnist device samples =
-    let cut (x: ArrayNDT<_>) =
+    let cut (x: Tensor<_>) =
         match samples with
         | Some samples -> x.[0L .. samples-1L, *]
         | None -> x

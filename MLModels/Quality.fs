@@ -11,7 +11,7 @@ module Accuracy =
     /// Calculates the number of correctly classified samples.
     /// Target must be in one-hot encoding.
     /// Shapes: pred[smpl, class], target[smpl, class]
-    let correctlyClassified (trgt: ArrayNDT<'T>) (pred: ArrayNDT<'T>) =     
+    let correctlyClassified (trgt: Tensor<'T>) (pred: Tensor<'T>) =     
         if Tensor.nDims pred <> 2 || Tensor.nDims trgt <> 2 then
             failwith "pred and target must be two-dimensional"      
         let pred = pred |> ArrayNDHost.fetch
@@ -26,7 +26,7 @@ module Accuracy =
 
     /// Calculates the accuracies of a classifier on the training, validation and test sets.
     let ofClassifier (dataset: TrnValTst<'S>) batchSize 
-            (trgtFn: 'S -> ArrayNDT<'T>) (predFn: 'S -> ArrayNDT<'T>) =
+            (trgtFn: 'S -> Tensor<'T>) (predFn: 'S -> Tensor<'T>) =
         dataset |> TrnValTst.apply (fun part ->
             part 
             |> Dataset.batches batchSize 
@@ -41,7 +41,7 @@ module SSE =
 
     /// Calculates the sum squared error.
     /// Shapes: pred[smpl, ...], target[smpl, ...]
-    let error (trgt: ArrayNDT<'T>) (pred: ArrayNDT<'T>) =
+    let error (trgt: Tensor<'T>) (pred: Tensor<'T>) =
         let pred = pred |> ArrayNDHost.fetch |> Tensor.float
         let trgt = trgt |> ArrayNDHost.fetch |> Tensor.float
 
@@ -57,12 +57,12 @@ module MSE =
     /// The mean is taken over the samples. The error is summed over all
     /// other dimensions.
     /// Shapes: pred[smpl, ...], target[smpl, ...]
-    let error (trgt: ArrayNDT<'T>) (pred: ArrayNDT<'T>) =
+    let error (trgt: Tensor<'T>) (pred: Tensor<'T>) =
         SSE.error trgt pred / float trgt.Shape.[0]
         
     /// Calculates the MSE of a predictor on the training, validation and test sets.
     let ofPredictor (dataset: TrnValTst<'S>) batchSize 
-            (trgtFn: 'S -> ArrayNDT<'T>) (predFn: 'S -> ArrayNDT<'T>) =
+            (trgtFn: 'S -> Tensor<'T>) (predFn: 'S -> Tensor<'T>) =
         dataset |> TrnValTst.apply (fun part ->
             part 
             |> Dataset.batches batchSize 

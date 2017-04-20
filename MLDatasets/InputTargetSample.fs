@@ -8,7 +8,7 @@ open Util
 /// A data sample consisting of an input and target array.
 type InputTargetSampleT = {
     /// the input array
-    Input:  ArrayNDT<single>
+    Input:  Tensor<single>
     /// the target array
-    Target: ArrayNDT<single>
+    Target: Tensor<single>
 }

@@ -190,24 +190,24 @@ module Trace =
         match a.DataType, b.DataType with
         | ta, tb when ta <> tb -> false
         | t, _ when t = typeof<float> ->
-            let a = a :?> ArrayNDT<float>
-            let b = b :?> ArrayNDT<float>
+            let a = a :?> Tensor<float>
+            let b = b :?> Tensor<float>
             Tensor.almostEqualWithTol 1e-5 1e-5 a b |> Tensor.value
         | t, _ when t = typeof<single> ->
-            let a = a :?> ArrayNDT<single>
-            let b = b :?> ArrayNDT<single>
+            let a = a :?> Tensor<single>
+            let b = b :?> Tensor<single>
             Tensor.almostEqualWithTol 1e-5f 1e-5f a b |> Tensor.value
         | t, _ when t = typeof<bool> ->
-            let a = a :?> ArrayNDT<bool>
-            let b = b :?> ArrayNDT<bool>
+            let a = a :?> Tensor<bool>
+            let b = b :?> Tensor<bool>
             Tensor.all (a ==== b) |> Tensor.value
         | t, _ when t = typeof<int> ->
-            let a = a :?> ArrayNDT<int>
-            let b = b :?> ArrayNDT<int>
+            let a = a :?> Tensor<int>
+            let b = b :?> Tensor<int>
             Tensor.all (a ==== b) |> Tensor.value
         | t, _ when t = typeof<int64> ->
-            let a = a :?> ArrayNDT<int64>
-            let b = b :?> ArrayNDT<int64>
+            let a = a :?> Tensor<int64>
+            let b = b :?> Tensor<int64>
             Tensor.all (a ==== b) |> Tensor.value
         | t -> failwithf "unsupported trace data type %A" t
 

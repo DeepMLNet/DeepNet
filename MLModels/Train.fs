@@ -54,7 +54,7 @@ module TrainingLog =
     type Log<'P> = {
         MinImprovement:     float
         BestOn:             Partition
-        Best:               (Entry * ArrayNDT<'P>) option
+        Best:               (Entry * Tensor<'P>) option
         History:            Entry list
     }
 
@@ -223,7 +223,7 @@ module Train =
         /// Save model parameters to specified file.
         abstract member SaveModel: hdf:HDF5 -> prefix:string -> unit
         /// Model parameter values (i.e. weights).
-        abstract member ModelParameters: ArrayNDT<'T> with get, set
+        abstract member ModelParameters: Tensor<'T> with get, set
         /// Resets the internal model state. (for example the latent state of an RNN)
         abstract member ResetModelState: unit -> unit
         /// Initialize optimizer state.
@@ -238,7 +238,7 @@ module Train =
             (modelInstance: ModelInstance<'T>) 
             (losses: ExprT list) 
             (nextStateExpr: ExprT option)
-            (varEnvBuilder: ArrayNDT<'T> option -> 'Smpl -> VarEnvT)
+            (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnvT)
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    

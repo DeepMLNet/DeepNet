@@ -18,7 +18,7 @@ module RMSprop =
     }
 
     type State<'T> = {
-        EstMomSq:       ArrayNDT<'T>
+        EstMomSq:       Tensor<'T>
     } 
 
     type StateExpr = {

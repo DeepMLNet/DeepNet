@@ -197,14 +197,14 @@ type GRUInst (VocSize:       int64,
 
     member this.Train (dataset: TrnValTst<WordSeq>) dropStateProb trainCfg =
         let rng = System.Random 1
-        let smplVarEnv (stateOpt: ArrayNDT<single> option) (smpl: WordSeq) =
+        let smplVarEnv (stateOpt: Tensor<single> option) (smpl: WordSeq) =
             let nBatch = smpl.Words.Shape.[0]
             let dropState = rng.NextDouble() < dropStateProb 
             let state =
                 match stateOpt with
                 | Some state when state.Shape.[0] = nBatch && not dropState -> state
                 | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1L, *]
-                | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
+                | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> Tensor<_>
             if smpl.Words.Shape.[1] < 2L then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
             VarEnv.ofSeq [words, smpl.Words :> ITensor; initial, state :> ITensor]
 
@@ -219,11 +219,11 @@ type GRUInst (VocSize:       int64,
 
         let initial = 
             if seed = 0 then 
-                ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+                ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> Tensor<single>
             else
                 let rng = System.Random seed 
                 rng.UniformArrayND (-0.1f, 0.1f) [nBatch; EmbeddingDim]
-                |> ArrayNDCuda.toDev :> ArrayNDT<_>
+                |> ArrayNDCuda.toDev :> Tensor<_>
         let primed = 
             // last word of array is not actually processed
             if nStart > 1L then processFn initial sw.[*, 0L .. nStart-1L]

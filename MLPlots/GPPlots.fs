@@ -60,8 +60,8 @@ module GPPlots =
         /// Creates num samples from in range minValue to maxValue with constant distance.
         /// Calculates mean covariance and standerdDeviation of these samples given a Gaussian process
         /// with hyper parameters hyperPars, training noise sigmaN train values trnX and train targets trnT.
-        static member predictGP hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
-                (trnT: ArrayNDT<single>) (minValue, maxValue) nPoints =
+        static member predictGP hyperPars (sigmaN: Tensor<single>) (trnX: Tensor<single>) 
+                (trnT: Tensor<single>) (minValue, maxValue) nPoints =
             let config = {HyperPars = hyperPars
                           NTrain = trnX.NElems
                           NTest = nPoints}
@@ -82,8 +82,8 @@ module GPPlots =
             sX, sMean, sCov, sStd
 
 
-        static member predictGPDeriv hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
-                (trnT: ArrayNDT<single>) (minValue:single, maxValue) nPoints =
+        static member predictGPDeriv hyperPars (sigmaN: Tensor<single>) (trnX: Tensor<single>) 
+                (trnT: Tensor<single>) (minValue:single, maxValue) nPoints =
             let config = {HyperPars = hyperPars
                           NTrain = trnX.NElems
                           NTest = nPoints}
@@ -107,7 +107,7 @@ module GPPlots =
         /// train values trnX and train targets trnT.
         /// Step is the distance between two sample, smaller step => higher plot smoothness and accuraccy,
         /// longer plot creation. 
-        static member simplePlot (hyperPars, trnSigma: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
+        static member simplePlot (hyperPars, trnSigma: Tensor<single>, trnX: Tensor<single>, trnT: Tensor<single>, 
                                   ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
         
             let nPoints = defaultArg nPoints 20L
