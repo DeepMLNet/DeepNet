@@ -20,6 +20,39 @@ module FastLayoutTypes =
             Stride  = TensorLayout.stride layout |> List.toArray
         }
 
+        member inline this.Addr (idx: int64[]) =
+            let mutable addr = this.Offset
+            for d=0 to this.NDims-1 do
+                addr <- addr + idx.[d] * this.Stride.[d]
+            addr
+
+    let inline private checkedInt layout (x: int64) =
+        if int64 FSharp.Core.int.MinValue <= x && x <= int64 FSharp.Core.int.MaxValue then
+            int x
+        else failwithf "Cannot convert tensor layout %A to 32-bit integer" layout
+
+    [<Struct>]
+    type FastLayout32 = 
+        val NDims   : int
+        val NElems  : int
+        val Offset  : int
+        val Shape   : int []
+        val Stride  : int []
+
+        new (layout: TensorLayout) = {
+            NDims   = TensorLayout.nDims layout
+            NElems  = TensorLayout.nElems layout |> checkedInt layout
+            Offset  = TensorLayout.offset layout |> checkedInt layout
+            Shape   = TensorLayout.shape layout |> List.toArray |> Array.map (checkedInt layout)
+            Stride  = TensorLayout.stride layout |> List.toArray |> Array.map (checkedInt layout)
+        }
+
+        member inline this.Addr (idx: int[]) =
+            let mutable addr = this.Offset
+            for d=0 to this.NDims-1 do
+                addr <- addr + idx.[d] * this.Stride.[d]
+            addr
+
 
 module FastLayout =
 

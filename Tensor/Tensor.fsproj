@@ -10,7 +10,7 @@
     <RootNamespace>ArrayND</RootNamespace>
     <AssemblyName>Tensor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Name>Tensor</Name>
     <TargetFrameworkProfile />
@@ -65,14 +65,16 @@
     <Compile Include="TensorLayout.fs" />
     <Compile Include="FastLayout.fs" />
     <Compile Include="Tensor.fs" />
-    <Compile Include="ArrayNDHost.fs" />
-    <Compile Include="ArrayNDHostReg.fs" />
-    <Compile Include="ArrayNDCuda.fs" />
-    <Compile Include="HDF5.fs" />
-    <Compile Include="ArrayNDHDF.fs" />
-    <Compile Include="NumpyFiles.fs" />
-    <Compile Include="Random.fs" />
-    <Compile Include="Decomposition.fs" />
+    <Compile Include="HostBackend.fs" />
+    <Compile Include="CudaBackend.fs" />
+    <None Include="ArrayNDHost.fs" />
+    <None Include="ArrayNDHostReg.fs" />
+    <None Include="ArrayNDCuda.fs" />
+    <None Include="HDF5.fs" />
+    <None Include="ArrayNDHDF.fs" />
+    <None Include="NumpyFiles.fs" />
+    <None Include="Random.fs" />
+    <None Include="Decomposition.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
     <None Include="build\Tensor.targets">
@@ -128,6 +130,10 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors">
+      <HintPath>..\packages\System.Numerics.Vectors.4.3.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <Target Name="BeforeBuild">
   </Target>

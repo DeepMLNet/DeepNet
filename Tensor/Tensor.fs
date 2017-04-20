@@ -28,421 +28,543 @@ module TensorTypes =
     let unsupLoc loc =
         failwithf "location %A is unsupported for this operation" loc
 
-    /// singular matrix encountered
-    exception SingularMatrixError of string
+/// singular matrix encountered
+exception SingularMatrixError of string
 
-    /// ArrayND of any type
-    type ITensor =
-        abstract Layout:            TensorLayout
-        abstract Shape:             int64 list
-        abstract NDims:             int
-        abstract NElems:            int64
-        abstract CPPType:           string
-        abstract NewView:           TensorLayout -> ITensor
-        abstract NewOfSameType:     TensorLayout -> ITensor
-        abstract NewOfType:         TensorLayout -> System.Type -> ITensor
-        abstract DataType:          System.Type
-        abstract Location:          ArrayLocT
-        abstract Copy:              unit -> ITensor
-        abstract CopyTo:            ITensor -> unit
-        abstract GetSlice:          [<System.ParamArray>] args: obj [] -> ITensor
-        abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
-        abstract Item:              [<System.ParamArray>] allArgs: obj [] -> ITensor with get
-        abstract Item:              obj -> ITensor with set
-        abstract Item:              obj * obj -> ITensor with set
-        abstract Item:              obj * obj * obj -> ITensor with set
-        abstract Item:              obj * obj * obj * obj -> ITensor with set
-        abstract Item:              obj * obj * obj * obj * obj -> ITensor with set
-        abstract Item:              obj * obj * obj * obj * obj * obj -> ITensor with set
-        abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
+type SpecialAxisT =
+    | NewAxis
+    | Fill
+
+/// Type-neutral interface to Tensor<'T> of any type
+type ITensor =
+    abstract Layout:            TensorLayout
+    abstract Shape:             int64 list
+    abstract NDims:             int
+    abstract NElems:            int64
+    abstract CPPType:           string
+    abstract NewView:           TensorLayout -> ITensor
+    abstract NewOfSameType:     TensorLayout -> ITensor
+    abstract NewOfType:         TensorLayout -> System.Type -> ITensor
+    abstract DataType:          System.Type
+    abstract Location:          ArrayLocT
+    abstract Copy:              unit -> ITensor
+    abstract CopyTo:            ITensor -> unit
+    abstract GetSlice:          [<System.ParamArray>] args: obj [] -> ITensor
+    abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
+    abstract Item:              [<System.ParamArray>] allArgs: obj [] -> ITensor with get
+    abstract Item:              obj -> ITensor with set
+    abstract Item:              obj * obj -> ITensor with set
+    abstract Item:              obj * obj * obj -> ITensor with set
+    abstract Item:              obj * obj * obj * obj -> ITensor with set
+    abstract Item:              obj * obj * obj * obj * obj -> ITensor with set
+    abstract Item:              obj * obj * obj * obj * obj * obj -> ITensor with set
+    abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
 
 
-    type SpecialAxisT =
-        | NewAxis
-        | Fill
+type ITensorStorage<'T> =
+    abstract Backend:       TensorLayout -> ITensorBackend<'T>
+
+and ITensorBackend<'T> =
+    abstract Item:          int64 list -> 'T with get, set
+    abstract Plus:          src1:ITensorBackend<'T> -> src2:ITensorBackend<'T> -> unit
+
+type ITensorStorageFactory =
+    abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 
-module Tensor =
+
+/// An N-dimensional array with elements of type 'T.
+[<StructuredFormatDisplay("{Pretty}")>]
+type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
+    do TensorLayout.check layout
+    let backend = storage.Backend layout
 
     /// true if warning about fallback copy was shown
-    let mutable internal SlowCopyWarningShown = false
+    static let mutable SlowCopyWarningShown = false
 
-    /// an N-dimensional array with reshape and subview abilities
-    [<AbstractClass>]
-    [<StructuredFormatDisplay("{Pretty}")>]
-    type Tensor<'T> (layout: TensorLayout) =
-        do TensorLayout.check layout
+    /// value zero of type 'T
+    static member Zero = conv<'T> 0
 
-        /// layout
-        member this.Layout = layout
+    /// value one of type 'T
+    static member One = conv<'T> 1
 
-        /// value zero (if defined for 'T)
-        static member Zero = conv<'T> 0
+    /// layout of this tensor (shape, offset and strides)
+    member this.Layout = layout
 
-        /// value one (if defined for 'T)
-        static member One = conv<'T> 1
+    /// storage of this tensor
+    member this.Storage = storage
 
-        /// item access
-        abstract Item : int64 list -> 'T with get, set
+    /// address of specified index
+    member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
 
-        /// a new ArrayND of same type and new storage allocation for given layout
-        abstract NewOfSameType : TensorLayout -> Tensor<'T>
+    /// access to a single item
+    member this.Item
+        with get (idx: int64 list) : 'T = backend.[idx]
+        and set (idx: int64 list) (value: 'T) = backend.[idx] <- value
 
-        /// a new ArrayND of given type and new storage allocation for given layout
-        abstract NewOfType<'N> : TensorLayout -> Tensor<'N>
+    /// a new ArrayND of same type and new storage allocation for given layout
+    //abstract NewOfSameType : TensorLayout -> Tensor<'T>
 
-        /// a new ArrayND of same type with same storage allocation but new layout
-        abstract NewView : TensorLayout -> Tensor<'T>
+    /// a new ArrayND of given type and new storage allocation for given layout
+    //abstract NewOfType<'N> : TensorLayout -> Tensor<'N>
 
-        /// C++ type name
-        member this.CPPType = 
-            let dims = TensorLayout.nDims layout
-            let shp = TensorLayout.shape layout
-            let str = TensorLayout.stride layout
-            let ofst = TensorLayout.offset layout
-            let cppDataType = Util.cppType this.DataType
-            let shapeStr = 
-                if dims = 0 then "" 
-                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-            let strideStr = 
-                "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
-                dims cppDataType dims shapeStr dims strideStr            
+    /// a new ArrayND of same type with same storage allocation but new layout
+    //abstract NewView : TensorLayout -> Tensor<'T>
 
-        /// type of data in this ArrayND
-        abstract DataType: System.Type
-        default this.DataType = typeof<'T>
+#if false
+    /// C++ type name
+    member this.CPPType = 
+        let dims = TensorLayout.nDims layout
+        let shp = TensorLayout.shape layout
+        let str = TensorLayout.stride layout
+        let ofst = TensorLayout.offset layout
+        let cppDataType = Util.cppType this.DataType
+        let shapeStr = 
+            if dims = 0 then "" 
+            else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+        let strideStr = 
+            "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+        sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+            dims cppDataType dims shapeStr dims strideStr            
 
-        /// storage location of the ArrayND
-        abstract Location: ArrayLocT
+    /// type of data in this ArrayND
+    abstract DataType: System.Type
+    default this.DataType = typeof<'T>
 
-        /// unchecked cast to NDArrayT<'A>
-        member this.Cast<'A> () =
-            let thisBoxed = box this
-            let thisCasted = unbox<Tensor<'A>> thisBoxed
-            thisCasted
+    /// storage location of the ArrayND
+    abstract Location: ArrayLocT
 
-        /// unchecked cast of v to NDArrayT<'T> (this type)
-        member this.CastToMe (v: Tensor<'A>) = v.Cast<'T> ()
+    /// unchecked cast to NDArrayT<'A>
+    member this.Cast<'A> () =
+        let thisBoxed = box this
+        let thisCasted = unbox<Tensor<'A>> thisBoxed
+        thisCasted
 
-        /// checks that two ArrayNDs have the same shape
-        static member inline CheckSameShape (a: Tensor<'T>) (b: Tensor<'T>) =
-            if (TensorLayout.shape a.Layout) <> (TensorLayout.shape b.Layout) then
-                failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
-                    (TensorLayout.shape a.Layout) (TensorLayout.shape b.Layout)
+    /// unchecked cast of v to NDArrayT<'T> (this type)
+    member this.CastToMe (v: Tensor<'A>) = v.Cast<'T> ()
 
-        /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
-        /// Both ArrayNDTs must be of same shape.
-        abstract CopyTo : Tensor<'T> -> unit
-        default this.CopyTo (dest: Tensor<'T>) =
-            // slow element-wise fallback copy
-            if not SlowCopyWarningShown then
-                printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
-                         (this message is only shown once)"
-                SlowCopyWarningShown <- true
-            Tensor<'T>.CheckSameShape this dest
-            for idx in TensorLayout.allIdx this.Layout do
-                dest.[idx] <- this.[idx]
+    /// checks that two ArrayNDs have the same shape
+    static member inline CheckSameShape (a: Tensor<'T>) (b: Tensor<'T>) =
+        if (TensorLayout.shape a.Layout) <> (TensorLayout.shape b.Layout) then
+            failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
+                (TensorLayout.shape a.Layout) (TensorLayout.shape b.Layout)
 
-        /// a view of this ArrayNDT over the given range 
-        member this.View rng =
-            this.NewView (TensorLayout.view rng this.Layout)
+    /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
+    /// Both ArrayNDTs must be of same shape.
+    abstract CopyTo : Tensor<'T> -> unit
+    default this.CopyTo (dest: Tensor<'T>) =
+        // slow element-wise fallback copy
+        if not SlowCopyWarningShown then
+            printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
+                        (this message is only shown once)"
+            SlowCopyWarningShown <- true
+        Tensor<'T>.CheckSameShape this dest
+        for idx in TensorLayout.allIdx this.Layout do
+            dest.[idx] <- this.[idx]
 
-        /// shape
-        member this.Shape = TensorLayout.shape this.Layout
+    /// a view of this ArrayNDT over the given range 
+    member this.View rng =
+        this.NewView (TensorLayout.view rng this.Layout)
 
-        /// number of dimensions
-        member this.NDims = TensorLayout.nDims this.Layout
+    /// shape
+    member this.Shape = TensorLayout.shape this.Layout
 
-        /// number of elements
-        member this.NElems = TensorLayout.nElems this.Layout
+    /// number of dimensions
+    member this.NDims = TensorLayout.nDims this.Layout
 
-        /// broadcasts this and other to the same shape if possible
-        member this.BroadcastToSame (other: Tensor<_>) =
-            let lThis, lOther = TensorLayout.broadcastToSame this.Layout other.Layout
-            this.NewView lThis, other.NewView lOther
+    /// number of elements
+    member this.NElems = TensorLayout.nElems this.Layout
 
-        /// broadcasts this and other1 and other2 to the same shape if possible
-        member this.BroadcastToSame3 (other1: Tensor<_>) (other2: Tensor<_>) =
-            let layouts = TensorLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
-            match layouts with
-            | [lThis; lOther1; lOther2] ->
-                this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
-            | _ -> failwith "impossible"
+    /// broadcasts this and other to the same shape if possible
+    member this.BroadcastToSame (other: Tensor<_>) =
+        let lThis, lOther = TensorLayout.broadcastToSame this.Layout other.Layout
+        this.NewView lThis, other.NewView lOther
 
-        /// broadcast the list of arrays to the same shape if possible
-        static member BroadcastToSameMany (arys: 'A list when 'A :> Tensor<'T>) =
-            let layouts = TensorLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
-            List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
+    /// broadcasts this and other1 and other2 to the same shape if possible
+    member this.BroadcastToSame3 (other1: Tensor<_>) (other2: Tensor<_>) =
+        let layouts = TensorLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
+        match layouts with
+        | [lThis; lOther1; lOther2] ->
+            this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
+        | _ -> failwith "impossible"
 
-        /// broadcasts this array to the given shape if possible
-        member this.BroadcastToShape shp = 
-            let l = TensorLayout.broadcastToShape shp this.Layout
-            this.NewView l
+    /// broadcast the list of arrays to the same shape if possible
+    static member BroadcastToSameMany (arys: 'A list when 'A :> Tensor<'T>) =
+        let layouts = TensorLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
+        List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
 
-        /// implements a storage specific version of map
-        abstract MapImpl: ('T -> 'R) -> Tensor<'R> -> unit
-        default this.MapImpl f result =
-            // slow fallback mapping
-            for idx in TensorLayout.allIdx this.Layout do
-                result.[idx] <- f this.[idx]
+    /// broadcasts this array to the given shape if possible
+    member this.BroadcastToShape shp = 
+        let l = TensorLayout.broadcastToShape shp this.Layout
+        this.NewView l
 
-        /// maps all elements using the specified function into a new ArrayNDT
-        member this.Map (f: 'T -> 'R) =
-            let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
-            this.MapImpl f res
-            res
+    /// implements a storage specific version of map
+    abstract MapImpl: ('T -> 'R) -> Tensor<'R> -> unit
+    default this.MapImpl f result =
+        // slow fallback mapping
+        for idx in TensorLayout.allIdx this.Layout do
+            result.[idx] <- f this.[idx]
 
-        abstract MapInplaceImpl: ('T -> 'T) -> unit
-        default this.MapInplaceImpl f = 
-            // slow fallback mapping
-            for idx in TensorLayout.allIdx this.Layout do
-                this.[idx] <- f this.[idx]
+    /// maps all elements using the specified function into a new ArrayNDT
+    member this.Map (f: 'T -> 'R) =
+        let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
+        this.MapImpl f res
+        res
 
-        /// maps all elements using the specified function in-place
-        member this.MapInplace (f: 'T -> 'T) =
-            this.MapInplaceImpl f
+    abstract MapInplaceImpl: ('T -> 'T) -> unit
+    default this.MapInplaceImpl f = 
+        // slow fallback mapping
+        for idx in TensorLayout.allIdx this.Layout do
+            this.[idx] <- f this.[idx]
 
-        abstract Map2Impl: ('T -> 'T -> 'R) -> Tensor<'T> -> Tensor<'R> -> unit
-        default this.Map2Impl f other result =
-            for idx in TensorLayout.allIdx this.Layout do
-                result.[idx] <- f this.[idx] other.[idx]
+    /// maps all elements using the specified function in-place
+    member this.MapInplace (f: 'T -> 'T) =
+        this.MapInplaceImpl f
 
-        /// maps all elements of this and other using the specified function into a new ArrayNDT
-        member this.Map2 (f: 'T -> 'T -> 'R) (other: #Tensor<'T>) =
-            if other.GetType() <> this.GetType() then
-                failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
-                    (this.GetType()) (other.GetType())
-            let this, other = this.BroadcastToSame other
-            let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
-            this.Map2Impl f other res
-            res
+    abstract Map2Impl: ('T -> 'T -> 'R) -> Tensor<'T> -> Tensor<'R> -> unit
+    default this.Map2Impl f other result =
+        for idx in TensorLayout.allIdx this.Layout do
+            result.[idx] <- f this.[idx] other.[idx]
 
-        abstract IfThenElseImpl: Tensor<bool> -> Tensor<'T> -> Tensor<'T> -> unit
-        default this.IfThenElseImpl cond elseVal result =
-            for idx in TensorLayout.allIdx this.Layout do
-                result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
+    /// maps all elements of this and other using the specified function into a new ArrayNDT
+    member this.Map2 (f: 'T -> 'T -> 'R) (other: #Tensor<'T>) =
+        if other.GetType() <> this.GetType() then
+            failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
+                (this.GetType()) (other.GetType())
+        let this, other = this.BroadcastToSame other
+        let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
+        this.Map2Impl f other res
+        res
 
-        /// elementwise uses elements from this if cond is true, 
-        /// otherwise elements from elseVal
-        member this.IfThenElse (cond: #Tensor<bool>) (elseVal: #Tensor<'T>) =
-            if elseVal.GetType() <> this.GetType() then
-                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
-                    (this.GetType()) (elseVal.GetType())
-            if cond.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
-                failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
-                    (this.GetType()) (cond.GetType())
-            let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
-            let res = this.NewOfSameType (TensorLayout.newC ifVal.Shape)
-            ifVal.IfThenElseImpl cond elseVal res
-            res
+    abstract IfThenElseImpl: Tensor<bool> -> Tensor<'T> -> Tensor<'T> -> unit
+    default this.IfThenElseImpl cond elseVal result =
+        for idx in TensorLayout.allIdx this.Layout do
+            result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
 
-        abstract GatherImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
-        default trgt.GatherImpl indices src =
-            for trgtIdx in TensorLayout.allIdx trgt.Layout do
-                let srcIdx = 
-                    indices 
-                    |> List.mapi (fun dim idx ->
-                        match idx with
-                        | Some di -> di.[trgtIdx]
-                        | None -> trgtIdx.[dim])
-                trgt.[trgtIdx] <- src.[srcIdx]
-     
+    /// elementwise uses elements from this if cond is true, 
+    /// otherwise elements from elseVal
+    member this.IfThenElse (cond: #Tensor<bool>) (elseVal: #Tensor<'T>) =
+        if elseVal.GetType() <> this.GetType() then
+            failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                (this.GetType()) (elseVal.GetType())
+        if cond.GetType().GetGenericTypeDefinition() <> this.GetType().GetGenericTypeDefinition() then
+            failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
+                (this.GetType()) (cond.GetType())
+        let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
+        let res = this.NewOfSameType (TensorLayout.newC ifVal.Shape)
+        ifVal.IfThenElseImpl cond elseVal res
+        res
+
+    abstract GatherImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
+    default trgt.GatherImpl indices src =
+        for trgtIdx in TensorLayout.allIdx trgt.Layout do
+            let srcIdx = 
+                indices 
+                |> List.mapi (fun dim idx ->
+                    match idx with
+                    | Some di -> di.[trgtIdx]
+                    | None -> trgtIdx.[dim])
+            trgt.[trgtIdx] <- src.[srcIdx]    
                        
-        /// Sets the values of this array by selecting from the sources array according to the specified
-        /// indices. If an index array is set to None then the target index is used as the source index.
-        member trgt.Gather (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
-            if src.GetType() <> trgt.GetType() then
+    /// Sets the values of this array by selecting from the sources array according to the specified
+    /// indices. If an index array is set to None then the target index is used as the source index.
+    member trgt.Gather (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
+        if src.GetType() <> trgt.GetType() then
+            failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
+                (trgt.GetType()) (src.GetType())
+        match indices |> List.tryPick id with
+        | Some ih ->
+            if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
                 failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
-                    (trgt.GetType()) (src.GetType())
-            match indices |> List.tryPick id with
-            | Some ih ->
-                if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
-                    failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
-                        (trgt.GetType()) (indices.GetType())
-            | None -> ()
-            if src.NDims <> indices.Length then
-                failwithf "must specify an index array for each dimension of src"
-            if indices |> List.skip trgt.NDims |> List.exists Option.isNone then
-                failwithf "index dimensions beyond the number of target dimensions must not be None"
-            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
-            trgt.GatherImpl indices src
+                    (trgt.GetType()) (indices.GetType())
+        | None -> ()
+        if src.NDims <> indices.Length then
+            failwithf "must specify an index array for each dimension of src"
+        if indices |> List.skip trgt.NDims |> List.exists Option.isNone then
+            failwithf "index dimensions beyond the number of target dimensions must not be None"
+        let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
+        trgt.GatherImpl indices src
 
-        abstract ScatterImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
-        default trgt.ScatterImpl indices src = 
-            let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
-            let addInt64 a b = (a |> box |> unbox<int64>) + (b |> box |> unbox<int64>) |> box |> unbox<'T>
-            let addSingle a b = (a |> box |> unbox<single>) + (b |> box |> unbox<single>) |> box |> unbox<'T>
-            let addDouble a b = (a |> box |> unbox<double>) + (b |> box |> unbox<double>) |> box |> unbox<'T>
-            let addBool a b = ((a |> box |> unbox<bool>) || (b |> box |> unbox<bool>)) |> box |> unbox<'T>
-            let add =
-                match typeof<'T> with
-                | t when t=typeof<int> -> addInt
-                | t when t=typeof<int64> -> addInt64
-                | t when t=typeof<single> -> addSingle
-                | t when t=typeof<double> -> addDouble
-                | t when t=typeof<bool> -> addBool
-                | t -> failwithf "unsupported type: %A" t
-            for srcIdx in TensorLayout.allIdx src.Layout do
-                let trgtIdx =
-                    indices
-                    |> List.mapi (fun dim idx ->
-                        match idx with
-                        | Some di -> di.[srcIdx]
-                        | None -> srcIdx.[dim])
-                trgt.[trgtIdx] <- add trgt.[trgtIdx] src.[srcIdx]
+    abstract ScatterImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
+    default trgt.ScatterImpl indices src = 
+        let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
+        let addInt64 a b = (a |> box |> unbox<int64>) + (b |> box |> unbox<int64>) |> box |> unbox<'T>
+        let addSingle a b = (a |> box |> unbox<single>) + (b |> box |> unbox<single>) |> box |> unbox<'T>
+        let addDouble a b = (a |> box |> unbox<double>) + (b |> box |> unbox<double>) |> box |> unbox<'T>
+        let addBool a b = ((a |> box |> unbox<bool>) || (b |> box |> unbox<bool>)) |> box |> unbox<'T>
+        let add =
+            match typeof<'T> with
+            | t when t=typeof<int> -> addInt
+            | t when t=typeof<int64> -> addInt64
+            | t when t=typeof<single> -> addSingle
+            | t when t=typeof<double> -> addDouble
+            | t when t=typeof<bool> -> addBool
+            | t -> failwithf "unsupported type: %A" t
+        for srcIdx in TensorLayout.allIdx src.Layout do
+            let trgtIdx =
+                indices
+                |> List.mapi (fun dim idx ->
+                    match idx with
+                    | Some di -> di.[srcIdx]
+                    | None -> srcIdx.[dim])
+            trgt.[trgtIdx] <- add trgt.[trgtIdx] src.[srcIdx]
 
-        /// Sets the values of this array by summing elements from the sources array into the elements
-        /// of this array specified by the indices.
-        /// If an index array is set to None then the target index is used as the source index.
-        member trgt.Scatter (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
-            if src.GetType() <> trgt.GetType() then
+    /// Sets the values of this array by summing elements from the sources array into the elements
+    /// of this array specified by the indices.
+    /// If an index array is set to None then the target index is used as the source index.
+    member trgt.Scatter (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
+        if src.GetType() <> trgt.GetType() then
+            failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
+                (trgt.GetType()) (src.GetType())
+        match indices |> List.tryPick id with
+        | Some ih ->
+            if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
                 failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
-                    (trgt.GetType()) (src.GetType())
-            match indices |> List.tryPick id with
-            | Some ih ->
-                if ih.GetType().GetGenericTypeDefinition() <> trgt.GetType().GetGenericTypeDefinition() then
-                    failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
-                        (trgt.GetType()) (indices.GetType())
-                if ih.Shape <> src.Shape then
-                    failwithf "index arrays have shapes %A that do not match source shape %A"
-                        (indices |> List.map (Option.map (fun a -> a.Shape))) src.Shape
-            | None -> ()
-            if trgt.NDims <> indices.Length then
-                failwithf "must specify an index array for each dimension of the target"
-            if indices |> List.skip src.NDims |> List.exists Option.isNone then
-                failwithf "index dimensions beyond the number of source dimensions must not be None"
-            let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape src.Shape))
-            trgt.ScatterImpl indices src
+                    (trgt.GetType()) (indices.GetType())
+            if ih.Shape <> src.Shape then
+                failwithf "index arrays have shapes %A that do not match source shape %A"
+                    (indices |> List.map (Option.map (fun a -> a.Shape))) src.Shape
+        | None -> ()
+        if trgt.NDims <> indices.Length then
+            failwithf "must specify an index array for each dimension of the target"
+        if indices |> List.skip src.NDims |> List.exists Option.isNone then
+            failwithf "index dimensions beyond the number of source dimensions must not be None"
+        let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape src.Shape))
+        trgt.ScatterImpl indices src
 
-        /// invert the matrix
-        abstract Invert : unit -> Tensor<'T>
+    /// invert the matrix
+    abstract Invert : unit -> Tensor<'T>
 
-        /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
-        /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
-        /// corresponding eigenvalue in 'vals'.
-        abstract SymmetricEigenDecomposition: unit -> Tensor<'T> * Tensor<'T>
+    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+    /// corresponding eigenvalue in 'vals'.
+    abstract SymmetricEigenDecomposition: unit -> Tensor<'T> * Tensor<'T>
 
-        // enumerator interfaces
-        interface IEnumerable<'T> with
-            member this.GetEnumerator() =
-                TensorLayout.allIdx this.Layout
-                |> Seq.map (fun idx -> this.[idx])
-                |> fun s -> s.GetEnumerator()
-            member this.GetEnumerator() =
-                (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
+    // enumerator interfaces
+    interface IEnumerable<'T> with
+        member this.GetEnumerator() =
+            TensorLayout.allIdx this.Layout
+            |> Seq.map (fun idx -> this.[idx])
+            |> fun s -> s.GetEnumerator()
+        member this.GetEnumerator() =
+            (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
 
-        /// converts .Net item/ranges to RangeT list
-        member internal this.ToRng (allArgs: obj []) =
-            let rec toRng (args: obj list) =
-                match args with
-                // direct range specification
-                | [:? (TensorRng list) as rngs] -> rngs
-                // slices
-                | (:? (int64 option) as so) :: (:? (int64 option) as fo)  :: rest ->
-                    Rng (so, fo) :: toRng rest
-                // items
-                | (:? int64 as i)           :: rest ->
-                    RngElem i :: toRng rest
-                | (:? SpecialAxisT as sa) :: rest ->
-                    match sa with
-                    | NewAxis -> RngNewAxis :: toRng rest
-                    | Fill    -> RngAllFill :: toRng rest
-                // special cases
-                | [] -> []
-                | _  -> failwithf "invalid item/slice specification: %A" allArgs 
+    /// converts .Net item/ranges to RangeT list
+    member internal this.ToRng (allArgs: obj []) =
+        let rec toRng (args: obj list) =
+            match args with
+            // direct range specification
+            | [:? (TensorRng list) as rngs] -> rngs
+            // slices
+            | (:? (int64 option) as so) :: (:? (int64 option) as fo)  :: rest ->
+                Rng (so, fo) :: toRng rest
+            // items
+            | (:? int64 as i)           :: rest ->
+                RngElem i :: toRng rest
+            | (:? SpecialAxisT as sa) :: rest ->
+                match sa with
+                | NewAxis -> RngNewAxis :: toRng rest
+                | Fill    -> RngAllFill :: toRng rest
+            // special cases
+            | [] -> []
+            | _  -> failwithf "invalid item/slice specification: %A" allArgs 
 
-            allArgs |> Array.toList |> toRng
+        allArgs |> Array.toList |> toRng
 
-        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            this.View (this.ToRng allArgs) 
+    member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+        this.View (this.ToRng allArgs) 
 
-        member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
-            let rngArgs = allArgs.[0 .. allArgs.Length - 2] 
-            let trgt = this.View (this.ToRng rngArgs) 
-            let valueObj = Array.last allArgs
-            match valueObj with
-            | :? Tensor<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
-            | :? ITensor as ov -> 
-                failwithf "cannot assign data type %A to array of data type %A" 
-                          ov.DataType this.DataType
-            | _ -> failwithf "need array of same type to assign, but got type %A" 
-                        (valueObj.GetType())
+    member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
+        let rngArgs = allArgs.[0 .. allArgs.Length - 2] 
+        let trgt = this.View (this.ToRng rngArgs) 
+        let valueObj = Array.last allArgs
+        match valueObj with
+        | :? Tensor<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
+        | :? ITensor as ov -> 
+            failwithf "cannot assign data type %A to array of data type %A" 
+                        ov.DataType this.DataType
+        | _ -> failwithf "need array of same type to assign, but got type %A" 
+                    (valueObj.GetType())
                 
-        // item setter does not accept <ParamArray>, thus we have to write it out
+    // item setter does not accept <ParamArray>, thus we have to write it out
+    member this.Item
+        with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
+        and set (arg0: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
+    member this.Item
+        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
+            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
+
+#endif
+
+#if false
+    /// pretty contents string
+    member this.Pretty = pretty 10L this
+
+    /// full contents string
+    member this.Full = pretty 0L this
+
+
+    // element-wise unary
+    static member (~+)      (a: #Tensor<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
+    static member (~-)      (a: #Tensor<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
+    static member Abs       (a: #Tensor<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
+    static member SignT     (a: #Tensor<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
+    static member Log       (a: #Tensor<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
+    static member Log10     (a: #Tensor<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
+    static member Exp       (a: #Tensor<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
+    static member Sin       (a: #Tensor<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
+    static member Cos       (a: #Tensor<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
+    static member Tan       (a: #Tensor<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
+    static member Asin      (a: #Tensor<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
+    static member Acos      (a: #Tensor<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
+    static member Atan      (a: #Tensor<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
+    static member Sinh      (a: #Tensor<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
+    static member Cosh      (a: #Tensor<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
+    static member Tanh      (a: #Tensor<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
+    static member Sqrt      (a: #Tensor<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
+    static member Ceiling   (a: #Tensor<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
+    static member Floor     (a: #Tensor<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
+    static member Round     (a: #Tensor<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
+    static member Truncate  (a: #Tensor<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
+
+    // element-wise unary logic
+    static member (~~~~)    (a: #Tensor<bool>) = map not a
+
+    // element-wise binary
+    static member (+) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
+    static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
+    static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
+    static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
+    static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
+    static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
+
+    // element-wise binary logic
+    static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
+    static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
+
+    // element-wise binary comparison
+    static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
+    static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
+    static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
+    static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
+    static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
+    static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
+
+    // element-wise binary with scalars
+    static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
+    static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
+    static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
+    static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
+    static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
+    static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
+    static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
+    static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
+    static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
+    static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
+    static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
+    static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
+    static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
+    static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
+
+    static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
+    static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
+    static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
+    static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
+    static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
+    static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
+    static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
+    static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
+    static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
+    static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
+    static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
+    static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
+    static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
+    static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
+
+    /// dot product
+    static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
+
+    /// tensor product
+    static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        
+
+    // transposition
+    member this.T = transpose this
+
+#endif
+
+#if false
+    interface ITensor with
+        member this.Layout = this.Layout
+        member this.CPPType = this.CPPType   
+        member this.Shape = this.Shape
+        member this.NDims = this.NDims
+        member this.NElems = this.NElems      
+        member this.NewView layout = this.NewView layout :> ITensor    
+        member this.NewOfSameType layout = this.NewOfSameType layout :> ITensor
+        member this.NewOfType layout typ = 
+            let gm = this.GetType().GetMethod("NewOfType")
+            let m = gm.MakeGenericMethod [|typ|]
+            m.Invoke(this, [|box layout|]) :?> ITensor
+        member this.DataType = this.DataType
+        member this.Location = this.Location
+        member this.Copy () = 
+            let shp = TensorLayout.shape this.Layout
+            let trgt = this.NewOfSameType (TensorLayout.newC shp)
+            this.CopyTo trgt
+            trgt :> ITensor
+        member this.CopyTo dest = 
+            match dest with
+            | :? Tensor<'T> as dest -> this.CopyTo dest
+            | _ -> failwith "destination must be of same type as source"
+        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+            this.GetSlice (allArgs) :> ITensor
+        member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
+            this.SetSlice (allArgs)
         member this.Item
-            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: Tensor<'T>) = 
+            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> ITensor
+            and set (arg0: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ITensor) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
+#endif            
 
-        interface ITensor with
-            member this.Layout = this.Layout
-            member this.CPPType = this.CPPType   
-            member this.Shape = this.Shape
-            member this.NDims = this.NDims
-            member this.NElems = this.NElems      
-            member this.NewView layout = this.NewView layout :> ITensor    
-            member this.NewOfSameType layout = this.NewOfSameType layout :> ITensor
-            member this.NewOfType layout typ = 
-                let gm = this.GetType().GetMethod("NewOfType")
-                let m = gm.MakeGenericMethod [|typ|]
-                m.Invoke(this, [|box layout|]) :?> ITensor
-            member this.DataType = this.DataType
-            member this.Location = this.Location
-            member this.Copy () = 
-                let shp = TensorLayout.shape this.Layout
-                let trgt = this.NewOfSameType (TensorLayout.newC shp)
-                this.CopyTo trgt
-                trgt :> ITensor
-            member this.CopyTo dest = 
-                match dest with
-                | :? Tensor<'T> as dest -> this.CopyTo dest
-                | _ -> failwith "destination must be of same type as source"
-            member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-                this.GetSlice (allArgs) :> ITensor
-            member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
-                this.SetSlice (allArgs)
-            member this.Item
-                with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> ITensor
-                and set (arg0: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
-            member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ITensor) = 
-                    this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
+#if false
+
+module Tensor = 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element access
@@ -996,86 +1118,6 @@ module Tensor =
 
     type Tensor<'T> with    
 
-        // element-wise unary
-        static member (~+)      (a: #Tensor<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
-        static member (~-)      (a: #Tensor<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
-        static member Abs       (a: #Tensor<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
-        static member SignT     (a: #Tensor<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
-        static member Log       (a: #Tensor<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
-        static member Log10     (a: #Tensor<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
-        static member Exp       (a: #Tensor<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
-        static member Sin       (a: #Tensor<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
-        static member Cos       (a: #Tensor<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
-        static member Tan       (a: #Tensor<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
-        static member Asin      (a: #Tensor<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
-        static member Acos      (a: #Tensor<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
-        static member Atan      (a: #Tensor<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
-        static member Sinh      (a: #Tensor<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
-        static member Cosh      (a: #Tensor<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
-        static member Tanh      (a: #Tensor<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
-        static member Sqrt      (a: #Tensor<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
-        static member Ceiling   (a: #Tensor<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
-        static member Floor     (a: #Tensor<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
-        static member Round     (a: #Tensor<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
-        static member Truncate  (a: #Tensor<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
-
-        // element-wise unary logic
-        static member (~~~~)    (a: #Tensor<bool>) = map not a
-
-        // element-wise binary
-        static member (+) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
-        static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
-        static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
-        static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
-        static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
-        static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
-
-        // element-wise binary logic
-        static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
-        static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
-
-        // element-wise binary comparison
-        static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
-        static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
-        static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
-        static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
-        static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
-        static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
-
-        // element-wise binary with scalars
-        static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
-        static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
-        static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
-        static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
-        static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
-        static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
-        static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
-        static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
-        static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
-        static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
-        static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
-        static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
-        static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
-        static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
-
-        static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
-        static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
-        static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
-        static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
-        static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
-        static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
-        static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
-        static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
-        static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
-        static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
-        static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
-        static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
-        static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
-        static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
-
-        // transposition
-        member this.T = transpose this
-
     /// sign keeping type
     let inline signt (a: #Tensor<'T>) =
         Tensor<'T>.SignT a 
@@ -1369,10 +1411,6 @@ module Tensor =
                 failwithf "cannot compute dot product between arrays of shapes %A and %A" 
                     (shape a) (shape b)
 
-    type Tensor<'T> with   
-        /// dot product
-        static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
-
     /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dot a b =
         a .* b
@@ -1454,11 +1492,7 @@ module Tensor =
                     |> Seq.toList |> Blocks
 
         generate [] |> blockArray
-   
-    type Tensor<'T> with
-        /// tensor product
-        static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
-        
+
     /// tensor product
     let inline tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) : Tensor<'T> = a %* b
 
@@ -1647,16 +1681,8 @@ module Tensor =
 
         prettyDim " " a                       
 
-    type Tensor<'T> with
-        /// pretty contents string
-        member this.Pretty = pretty 10L this
-
-        /// full contents string
-        member this.Full = pretty 0L this
 
 
-[<AutoOpen>]
-module TensorTypes2 =
-    type Tensor<'T> = Tensor.Tensor<'T>
+#endif
 
 

@@ -13,7 +13,11 @@ module TensorLayoutTypes =
         Offset: int64
         /// stride in elements
         Stride: int64 list
-    }
+    } with
+        /// number of dimensions
+        member this.NDims = List.length this.Shape
+        /// number of elements
+        member this.NElems = List.fold (*) 1L this.Shape
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]
