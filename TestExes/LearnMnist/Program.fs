@@ -58,10 +58,10 @@ let main argv =
         Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
     let misclassificationRate inputs targets =
-        let preds = predFn inputs |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
-        let targets = targets |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
-        let isErr = ArrayND.ifThenElse (preds ==== targets) (ArrayND.zerosLike preds) (ArrayND.onesLike preds)
-        let errCnt = ArrayND.sum isErr |> ArrayND.value
+        let preds = predFn inputs |> ArrayNDHost.fetch |> Tensor.argMaxAxis 1
+        let targets = targets |> ArrayNDHost.fetch |> Tensor.argMaxAxis 1
+        let isErr = Tensor.ifThenElse (preds ==== targets) (Tensor.zerosLike preds) (Tensor.onesLike preds)
+        let errCnt = Tensor.sum isErr |> Tensor.value
         let errRate = float errCnt / float inputs.Shape.[0]
         errRate        
 
@@ -98,7 +98,7 @@ let main argv =
     //let ts = Trace.startSession "LearnMnist"
 
     let lossFn = mi.Func loss |> arg2 input target
-    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
+    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> Tensor.value
     printfn "Initial training loss: %f" initialLoss
     let result = Train.train trainable mnist trainCfg
 

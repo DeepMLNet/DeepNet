@@ -24,7 +24,7 @@ let ``Eval: simple`` () =
     let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
 
-    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
+    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> Tensor.diagMat
     let yVal = [[4.0; 5.0; 6.0]
                 [7.0; 8.0; 9.0]] |> ArrayNDHost.ofList2D
     let res = ElemExprHostEval.eval expr [xVal; yVal] [xVal.Shape.[0]]
@@ -35,7 +35,7 @@ let ``Eval: simple`` () =
     printfn "result=\n%A" res
 
     let expected = [6.0; 9.0; 12.0] |> ArrayNDHost.ofList
-    ArrayND.almostEqual res expected |> ArrayND.value |> should equal true
+    Tensor.almostEqual res expected |> Tensor.value |> should equal true
 
 
 [<Fact>]
@@ -53,7 +53,7 @@ let ``Eval: sum`` () =
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1L) (x [l; k]))
 
-    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> ArrayND.diagMat
+    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> Tensor.diagMat
     let xVal = xVal + ArrayNDHost.ones [3L; 3L]
     let res = ElemExprHostEval.eval expr [xVal] [xVal.Shape.[0]]
 
@@ -62,7 +62,7 @@ let ``Eval: sum`` () =
     printfn "result=\n%A" res
 
     let expected = [8.0; 10.0; 12.0] |> ArrayNDHost.ofList
-    ArrayND.almostEqual res expected |> ArrayND.value |> should equal true
+    Tensor.almostEqual res expected |> Tensor.value |> should equal true
 
 [<Fact>]
 let ``Deriv: 1`` () =   
@@ -160,7 +160,7 @@ let ``Eval and deriv: KSE`` () =
     printfn "l=\n%A" lVal
     printfn "kse=\n%A" kseVal
 
-    let dKseVal = kseVal |> ArrayND.reshape [1L; 1L; 3L; 3L]
+    let dKseVal = kseVal |> Tensor.reshape [1L; 1L; 3L; 3L]
 
     let dKSe0Val = ElemExprHostEval.eval dKse.[0] [xVal; lVal; dKseVal] [1L; 1L; 3L]
     let dKSe1Val = ElemExprHostEval.eval dKse.[1] [xVal; lVal; dKseVal] [1L; 1L]
@@ -388,7 +388,7 @@ let ``Eval and derive: lkse`` () =
     printfn "l=\n%A" lVal
     printfn "lkse=\n%A" lkseVal
 
-    let dlkseVal = lkseVal |> ArrayND.reshape [1L; 2L; 3L]
+    let dlkseVal = lkseVal |> Tensor.reshape [1L; 2L; 3L]
 
     let dlk0Val = ElemExprHostEval.eval dLkse.[0] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L]
     let dlk1Val = ElemExprHostEval.eval dLkse.[1] [muVal;sigmaVal;xVal;lVal;dlkseVal] [1L; 2L; 2L]
@@ -432,8 +432,8 @@ let ``DerivTest: GP Predict`` () =
     let varEnv = VarEnv.ofSeq [l, ArrayNDHost.scalar 1.0
                                sigf, ArrayNDHost.scalar 1.0
                                x, xv
-                               t, xv |> ArrayND.map tanh
-                               sign, 0.001 * ArrayND.onesLike xv
+                               t, xv |> Tensor.map tanh
+                               sign, 0.001 * Tensor.onesLike xv
                                x', x'v
                               ]
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv mean
@@ -477,8 +477,8 @@ let ``DerivTest: GP Predict2`` () =
     let x'v = ArrayNDHost.linSpaced -3.0 3.0 10L
     let varEnv = VarEnv.ofSeq [                               
                                x, xv
-                               t, xv |> ArrayND.map tanh
-                               sign, 0.001 * ArrayND.onesLike xv
+                               t, xv |> Tensor.map tanh
+                               sign, 0.001 * Tensor.onesLike xv
                                x', x'v
                               ]
     //SymTensor.Debug.VisualizeUExpr <- true

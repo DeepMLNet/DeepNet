@@ -24,7 +24,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
 
     // make sure that all field storages are in C-order
     do for fs in fieldStorages do
-        if not (ArrayND.isC fs) then
+        if not (Tensor.isC fs) then
             failwith "all field storages in must be in C-order"
 
     /// number of samples
@@ -74,9 +74,9 @@ type Dataset<'S> (fieldStorages: ITensor list,
 
         // find largest shape of each field over all samples
         let maxShape (fieldSmpls: ITensor seq) =
-            let mutable maxShape = Seq.head fieldSmpls |> ArrayND.shape
+            let mutable maxShape = Seq.head fieldSmpls |> Tensor.shape
             for smpl in fieldSmpls do
-                let smplShape = ArrayND.shape smpl
+                let smplShape = Tensor.shape smpl
                 if List.length smplShape <> List.length maxShape then
                     failwith "dimensionality of a field must be equal over all samples"
                 maxShape <- (maxShape, smplShape) ||> List.map2 max
@@ -178,9 +178,9 @@ type Dataset<'S> (fieldStorages: ITensor list,
             else                   
                 fieldStorages
                 |> List.map (fun fsAll ->
-                    let shpAll = ArrayND.shape fsAll
+                    let shpAll = Tensor.shape fsAll
                     let shpBatch = shpAll |> List.set 0 batchSize                    
-                    let fsBatch = fsAll |> ArrayND.newCOfSameType shpBatch 
+                    let fsBatch = fsAll |> Tensor.newCOfSameType shpBatch 
                     fsBatch.[0L .. lastBatchElems-1L, Fill] <- fsAll.[lastBatchStart .. nSamples-1L, Fill]
                     fsBatch)
                 |> Some
@@ -359,10 +359,10 @@ module Dataset =
                 let fs =
                     // pad if necessary
                     if padSteps > nSteps then
-                        let z = fs |> ArrayND.zerosOfSameType ([ds.NSamples; padSteps] @ rShp)
+                        let z = fs |> Tensor.zerosOfSameType ([ds.NSamples; padSteps] @ rShp)
                         z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]; z
                     else fs
-                fs |> ArrayND.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
+                fs |> Tensor.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
         Dataset (cutFs, true)
 
     /// Cuts each sequence in the dataset into multiple chunks so that at least `minSamples` are 

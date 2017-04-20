@@ -85,7 +85,7 @@ type Adam<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
-        let shp = ArrayND.shape parVals
+        let shp = Tensor.shape parVals
         {
             Iter        = ArrayNDHost.zeros []  |> dev.ToDev
             LastStep    = ArrayNDHost.zeros shp |> dev.ToDev

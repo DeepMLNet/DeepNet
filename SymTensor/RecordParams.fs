@@ -25,7 +25,7 @@ type private VarRecordHelpers () =
     static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : ArrayNDT<'T> =
         ArrayNDHDF.read hdf name |> dev.ToDev
     static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
-        ArrayNDHDF.read hdf name |> ArrayND.value
+        ArrayNDHDF.read hdf name |> Tensor.value
 
 type private ValueType =
     | Scalar of Type

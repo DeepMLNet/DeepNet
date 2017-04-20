@@ -64,11 +64,11 @@ module VarEnv =
     let inferSymSizes (symSizeEnv: SymSizeEnvT) (varEnv: VarEnvT) : SymSizeEnvT =
         (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
-                if VarSpec.nDims vSym <> ArrayND.nDims vVal then
+                if VarSpec.nDims vSym <> Tensor.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
-                        (ArrayND.shape vVal) vSym
+                        (Tensor.shape vVal) vSym
 
-                (VarSpec.shape vSym, ArrayND.shape vVal)
+                (VarSpec.shape vSym, Tensor.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     let failShape () =
@@ -103,9 +103,9 @@ module VarEnv =
 
             let ss = VarSpec.shape vs
             match ShapeSpec.tryEval ss with
-            | Some ns when ArrayND.shape value <> ns ->
+            | Some ns when Tensor.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A was provided" vs.Name ns ss (ArrayND.shape value)
+                           value with shape %A waTensorded" vs.Name ns ss (Tensor.shape value)
             | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
             | _ -> ()
         )
@@ -116,11 +116,11 @@ module VarEnv =
 
     /// gets the locations of the variable value arrays
     let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> ArrayND.location vVal)
+        varEnv |> Map.map (fun _ vVal -> Tensor.location vVal)
 
     /// gets the strides of the variable value arrays
     let valueStrides (varEnv: VarEnvT) : VarStridesT =
-        varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
+        varEnv |> Map.map (fun _ vVal -> Tensor.stride vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
     let ofSeq (entries: (ExprT * #ITensor) seq) =

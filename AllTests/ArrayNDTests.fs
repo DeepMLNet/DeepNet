@@ -11,7 +11,7 @@ open Datasets
 [<Fact>]
 let ``Basic arithmetic works`` () =
     let v1val : ArrayNDHostT<float> = ArrayNDHost.ones [3L]
-    let v2val = ArrayNDHost.scalar 3.0 |> ArrayND.padLeft |> ArrayND.broadcastToShape [3L]
+    let v2val = ArrayNDHost.scalar 3.0 |> Tensor.padLeft |> Tensor.broadcastToShape [3L]
     let v3val = -v2val
     let v4val = v1val + v3val
 
@@ -64,7 +64,7 @@ let ``Batched matrix-matrix dot product`` () =
     for n in 0L .. N-1L do
         for m in 0L .. M-1L do
             cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
-    ArrayND.almostEqual c cr |> ArrayND.value |> Assert.True
+    Tensor.almostEqual c cr |> Tensor.value |> Assert.True
     
 [<Fact>]
 let ``Batched matrix-vector dot product`` () =
@@ -78,7 +78,7 @@ let ``Batched matrix-vector dot product`` () =
     for n in 0L .. N-1L do
         for m in 0L .. M-1L do
             cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
-    ArrayND.almostEqual c cr |> ArrayND.value |> Assert.True
+    Tensor.almostEqual c cr |> Tensor.value |> Assert.True
     
 
 [<Fact>]
@@ -86,13 +86,13 @@ let ``Build and extract diagonal`` () =
     let N = 3L
     let rng = System.Random 123
     let v = rng.UniformArrayND (-1., 1.) [N]
-    let dm = ArrayND.diagMat v
+    let dm = Tensor.diagMat v
     
     printfn "v=%A" v
     printfn "diag(v)=\n%A" dm
 
-    let vv = ArrayND.diag dm
-    ArrayND.almostEqual v vv |> ArrayND.value |> Assert.True
+    let vv = Tensor.diag dm
+    Tensor.almostEqual v vv |> Tensor.value |> Assert.True
 
 
 [<Fact>]
@@ -101,28 +101,28 @@ let ``Batched build and extract diagonal`` () =
     let N = 4L
     let rng = System.Random 123
     let v = rng.UniformArrayND (-1., 1.) [S1; S2; N]
-    let dm = ArrayND.diagMat v
+    let dm = Tensor.diagMat v
     
     printfn "v=\n%A" v
     printfn "diag(v)=\n%A" dm
 
-    let vv = ArrayND.diag dm
-    ArrayND.almostEqual v vv |> ArrayND.value |> Assert.True
+    let vv = Tensor.diag dm
+    Tensor.almostEqual v vv |> Tensor.value |> Assert.True
 
 
 [<Fact>]
 let ``Batched trace`` () =
     let v = [[1; 2; 3]; [4; 5; 6]] |> ArrayNDHost.ofList2D
-    let dm = ArrayND.diagMat v
+    let dm = Tensor.diagMat v
     
-    let tr = ArrayND.trace dm
-    let trv = ArrayND.sumAxis 1 v
+    let tr = Tensor.trace dm
+    let trv = Tensor.sumAxis 1 v
 
     printfn "v=\n%A" v
     printfn "trace(diag(v))=%A" tr
     printfn "sum(v)=%A" trv
 
-    ArrayND.almostEqual tr trv |> ArrayND.value |> Assert.True
+    Tensor.almostEqual tr trv |> Tensor.value |> Assert.True
 
 
 
@@ -130,43 +130,43 @@ let ``Batched trace`` () =
 let ``Invert diagonal matrix`` () =
     let v = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList
 
-    let dm = ArrayND.diagMat v
-    let dmInv = ArrayND.invert dm
-    let dmInvInv = ArrayND.invert dmInv
+    let dm = Tensor.diagMat v
+    let dmInv = Tensor.invert dm
+    let dmInvInv = Tensor.invert dmInv
 
     printfn "dm=\n%A" dm
     printfn "dm^-1=\n%A" dmInv
     printfn "dm^-1^-1=\n%A" dmInvInv
 
-    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+    Tensor.almostEqual dm dmInvInv |> Tensor.value |> Assert.True
 
 [<Fact>]
 let ``Invert random matrix`` () =
     let rng = System.Random 123
 
     let dm = rng.UniformArrayND (-1.0, 1.0) [4L; 4L]
-    let dmInv = ArrayND.invert dm
-    let dmInvInv = ArrayND.invert dmInv
+    let dmInv = Tensor.invert dm
+    let dmInvInv = Tensor.invert dmInv
 
     printfn "dm=\n%A" dm
     printfn "dm^-1=\n%A" dmInv
     printfn "dm^-1^-1=\n%A" dmInvInv
 
-    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+    Tensor.almostEqual dm dmInvInv |> Tensor.value |> Assert.True
 
 [<Fact>]
 let ``Batch invert random matrices`` () =
     let rng = System.Random 123
 
     let dm = rng.UniformArrayND (-1.0, 1.0) [2L; 4L; 3L; 3L]
-    let dmInv = ArrayND.invert dm
-    let dmInvInv = ArrayND.invert dmInv
+    let dmInv = Tensor.invert dm
+    let dmInvInv = Tensor.invert dmInv
 
     printfn "dm=\n%A" dm
     printfn "dm^-1=\n%A" dmInv
     printfn "dm^-1^-1=\n%A" dmInvInv
 
-    ArrayND.almostEqual dm dmInvInv |> ArrayND.value |> Assert.True
+    Tensor.almostEqual dm dmInvInv |> Tensor.value |> Assert.True
 
 
 [<Fact>]
@@ -175,7 +175,7 @@ let ``Invert singular matrix`` () =
                                    [1.0; 2.0; 0.0]
                                    [1.0; 0.0; 0.0]]
 
-    shouldFail (fun () -> ArrayND.invert dm |> ignore)
+    shouldFail (fun () -> Tensor.invert dm |> ignore)
 
 
 [<Fact>]
@@ -183,7 +183,7 @@ let ``Invert Kk matrix`` () =
     use hdf = HDF5.OpenRead "MatInv.h5"
     let Kk : ArrayNDHostT<single> = ArrayNDHDF.read hdf "Kk"
 
-    let Kkinv = ArrayND.invert Kk   
+    let Kkinv = Tensor.invert Kk   
     let id = Kkinv .* Kk
 
     printfn "Kk=\n%A" Kk
@@ -193,21 +193,21 @@ let ``Invert Kk matrix`` () =
     let s = Kk.Shape.[0]
     let n = Kk.Shape.[1]
 
-    let ids = ArrayND.concat 0 [for i in 0L .. s-1L do yield (ArrayNDHost.identity n).[NewAxis, *, *]]
+    let ids = Tensor.concat 0 [for i in 0L .. s-1L do yield (ArrayNDHost.identity n).[NewAxis, *, *]]
 
     let diff = id - ids
-    printfn "maxdiff: %f" (ArrayND.max diff |> ArrayND.value)
-    ArrayND.almostEqualWithTol 1e-5f 1e-5f id ids |> ArrayND.value |> Assert.True
+    printfn "maxdiff: %f" (Tensor.max diff |> Tensor.value)
+    Tensor.almostEqualWithTol 1e-5f 1e-5f id ids |> Tensor.value |> Assert.True
 
 
 [<Fact>]
 let ``Select`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0 = [1L; 2L; 0L; 3L] |> ArrayNDHost.ofList |> ArrayND.padRight |> ArrayND.broadcastDim 1 2L
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0 = [1L; 2L; 0L; 3L] |> ArrayNDHost.ofList |> Tensor.padRight |> Tensor.broadcastDim 1 2L
     let idxs = [Some i0; None]
 
-    let s = a |> ArrayND.gather idxs
+    let s = a |> Tensor.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -216,11 +216,11 @@ let ``Select`` () =
 [<Fact>]
 let ``Select 2`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let idxs = [Some i0; None]
 
-    let s = a |> ArrayND.gather idxs
+    let s = a |> Tensor.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -229,12 +229,12 @@ let ``Select 2`` () =
 [<Fact>]
 let ``Select 3`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1 = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+    let i1 = [0L; 0L; 1L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let idxs = [Some i0; Some i1]
 
-    let s = a |> ArrayND.gather idxs
+    let s = a |> Tensor.gather idxs
 
     printfn "a=\n%A" a
     printfn "idxs=\n%A" idxs
@@ -244,13 +244,13 @@ let ``Select 3`` () =
 [<Fact>]
 let ``Disperse 1`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1 = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+    let i1 = [0L; 0L; 1L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let idxs = [Some i0; Some i1]
     let shp = [3L; 3L]
 
-    let s = a |> ArrayND.scatter idxs shp
+    let s = a |> Tensor.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp
@@ -261,12 +261,12 @@ let ``Disperse 1`` () =
 [<Fact>]
 let ``Disperse 2`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0 = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let idxs = [Some i0; None]
     let shp = [3L; 3L]
 
-    let s = a |> ArrayND.scatter idxs shp
+    let s = a |> Tensor.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp
@@ -277,11 +277,11 @@ let ``Disperse 2`` () =
 [<Fact>]
 let ``Disperse 3`` () =
 
-    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
+    let a = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
     let idxs = [None; None]
     let shp = [5L; 3L]
 
-    let s = a |> ArrayND.scatter idxs shp
+    let s = a |> Tensor.scatter idxs shp
 
     printfn "a=\n%A" a
     printfn "shp=%A" shp

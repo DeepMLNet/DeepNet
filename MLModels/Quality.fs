@@ -12,17 +12,17 @@ module Accuracy =
     /// Target must be in one-hot encoding.
     /// Shapes: pred[smpl, class], target[smpl, class]
     let correctlyClassified (trgt: ArrayNDT<'T>) (pred: ArrayNDT<'T>) =     
-        if ArrayND.nDims pred <> 2 || ArrayND.nDims trgt <> 2 then
+        if Tensor.nDims pred <> 2 || Tensor.nDims trgt <> 2 then
             failwith "pred and target must be two-dimensional"      
         let pred = pred |> ArrayNDHost.fetch
         let trgt = trgt |> ArrayNDHost.fetch
 
-        let predClass = pred |> ArrayND.argMaxAxis 1
-        let trgtClass = trgt |> ArrayND.argMaxAxis 1
+        let predClass = pred |> Tensor.argMaxAxis 1
+        let trgtClass = trgt |> Tensor.argMaxAxis 1
 
-        ArrayND.ifThenElse (predClass ==== trgtClass) (ArrayNDHost.scalar 1.0) (ArrayNDHost.scalar 0.0)
-        |> ArrayND.sum
-        |> ArrayND.value 
+        Tensor.ifThenElse (predClass ==== trgtClass) (ArrayNDHost.scalar 1.0) (ArrayNDHost.scalar 0.0)
+        |> Tensor.sum
+        |> Tensor.value 
 
     /// Calculates the accuracies of a classifier on the training, validation and test sets.
     let ofClassifier (dataset: TrnValTst<'S>) batchSize 
@@ -42,12 +42,12 @@ module SSE =
     /// Calculates the sum squared error.
     /// Shapes: pred[smpl, ...], target[smpl, ...]
     let error (trgt: ArrayNDT<'T>) (pred: ArrayNDT<'T>) =
-        let pred = pred |> ArrayNDHost.fetch |> ArrayND.float
-        let trgt = trgt |> ArrayNDHost.fetch |> ArrayND.float
+        let pred = pred |> ArrayNDHost.fetch |> Tensor.float
+        let trgt = trgt |> ArrayNDHost.fetch |> Tensor.float
 
         (pred - trgt) ** 2.0
-        |> ArrayND.sum
-        |> ArrayND.value
+        |> Tensor.sum
+        |> Tensor.value
 
 
 /// Mean over samples of squared error.

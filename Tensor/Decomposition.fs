@@ -32,13 +32,13 @@ module Decomposition =
                 invalidArg "nComps" "nComps must be between 0 and the number of features"
              
             // center data
-            let means = data |> ArrayND.meanAxis 0
+            let means = data |> Tensor.meanAxis 0
             let centered = data - means.[NewAxis, *] // centered[smpl, feature]
 
             // compute covariance matrix and its eigen decomposition
             let n = ArrayNDHost.scalar (conv<'T> data.Shape.[0])
-            let cov = (ArrayND.transpose centered .* centered) / n 
-            let variances, axes = ArrayND.symmetricEigenDecomposition cov 
+            let cov = (Tensor.transpose centered .* centered) / n 
+            let variances, axes = Tensor.symmetricEigenDecomposition cov 
 
             // sort axes by their variances in descending order
             let sortIdx = 
@@ -49,9 +49,9 @@ module Decomposition =
                 |> List.map fst
                 |> List.map int64
                 |> ArrayNDHost.ofList
-            let variances = variances |> ArrayND.gather [Some sortIdx]
-            let axesIdx = ArrayND.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
-            let axes = axes |> ArrayND.gather [None; Some axesIdx]
+            let variances = variances |> Tensor.gather [Some sortIdx]
+            let axesIdx = Tensor.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
+            let axes = axes |> Tensor.gather [None; Some axesIdx]
 
             // limit number of components if desired
             let variances = variances.[0L .. nComps-1L]
@@ -72,7 +72,7 @@ module Decomposition =
             if whitened.NDims <> 2 then
                 invalidArg "whitened" "whitened must be a matrix" 
             let pcaed = whitened * sqrt variances.[NewAxis, *]
-            let centered = pcaed .* ArrayND.transpose axes // [smpl, comp] .* [comp, feature]
+            let centered = pcaed .* Tensor.transpose axes // [smpl, comp] .* [comp, feature]
             centered + means.[NewAxis, *]
 
 
@@ -84,7 +84,7 @@ module Decomposition =
         /// Returns a tensor of the form [sample, component].
         static member Perform (data: ArrayNDHostT<'T>) =        
             let whitened, info = PCA.Perform data
-            whitened .* ArrayND.transpose info.Axes, info
+            whitened .* Tensor.transpose info.Axes, info
 
         /// Reverses ZCA whitening.
         /// `whitened` must be of the form [sample, component].

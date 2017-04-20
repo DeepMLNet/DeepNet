@@ -73,7 +73,7 @@ module ElemExprHostEval =
                 | ArgElement ((Arg n, argIdxs), _) ->
                     let argIdxs = ShapeSpec.substSymbols symVals argIdxs
                     let argIdxsVal = ShapeSpec.eval argIdxs
-                    args.[n] |> ArrayND.get argIdxsVal
+                    args.[n] |> Tensor.get argIdxsVal
 
             | Unary (op, a) ->
                 let av () = doEval symVals a
@@ -139,5 +139,5 @@ module ElemExprHostEval =
         for idx in TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix
             let ev = evalElement expr args symIdx 
-            ArrayND.set idx ev res
+            Tensor.set idx ev res
         res

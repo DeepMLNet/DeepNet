@@ -12,7 +12,7 @@ let mnistPath = Util.assemblyDirectory + "../../../../Data/MNIST"
 [<Fact>]
 let ``Load MNIST`` () =
     let mnist = Mnist.loadRaw mnistPath
-    printfn "MNIST shape: %A" (ArrayND.shape mnist.TrnImgs)
+    printfn "MNIST shape: %A" (Tensor.shape mnist.TrnImgs)
 
 [<Fact>]
 let ``Save MNIST as HDF5`` () =

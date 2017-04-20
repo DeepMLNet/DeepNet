@@ -76,7 +76,7 @@ module LoopEval =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 
-            List.replicate (ArrayND.nDims ary) RngAll
+            List.replicate (Tensor.nDims ary) RngAll
             |> List.set dim dimSlice
 
         /// The slice of the channel's target for the specified iteration.

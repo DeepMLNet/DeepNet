@@ -37,11 +37,11 @@ type CurveDataset () =
         printfn "\naccessing elements:"
         for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) |> Seq.take 3 do
             printfn "idx %d has sample biotac %A pos %A" 
-                idx (smpl.Biotac |> ArrayND.shape) (smpl.Pos |> ArrayND.shape)
-            smpl.Biotac ==== orig.Biotac |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Pos ==== orig.Pos |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Vels ==== orig.Vels |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Biotac ==== orig.Biotac |> ArrayND.all |> ArrayND.value |> should equal true
+                idx (smpl.Biotac |> Tensor.shape) (smpl.Pos |> Tensor.shape)
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> Tensor.value |> should equal true
+            smpl.Pos ==== orig.Pos |> Tensor.all |> Tensor.value |> should equal true
+            smpl.Vels ==== orig.Vels |> Tensor.all |> Tensor.value |> should equal true
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> Tensor.value |> should equal true
 
     [<Fact>]
     member this.``Partitioning`` () =
@@ -60,8 +60,8 @@ type CurveDataset () =
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 
-                idx (batch.Biotac |> ArrayND.shape) (batch.Pos |> ArrayND.shape)
-            batch.Biotac |> ArrayND.shape |> List.head |> should equal batchSize
+                idx (batch.Biotac |> Tensor.shape) (batch.Pos |> Tensor.shape)
+            batch.Biotac |> Tensor.shape |> List.head |> should equal batchSize
 
     [<Fact>]
     [<Trait("Category", "Skip_CI")>]

@@ -33,7 +33,7 @@ module Cifar10 =
         let data = List.ofSeq dataSeq
         let nSamples = List.length data |> int64
 
-        let dataShape = ArrayND.shape data.[0]
+        let dataShape = Tensor.shape data.[0]
         let ds = ArrayNDHost.zeros (nSamples :: dataShape)
 
         data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)

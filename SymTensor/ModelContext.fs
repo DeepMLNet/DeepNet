@@ -142,7 +142,7 @@ module ModelContextTypes =
             ||> List.map2 (fun startIdx shp ->
                 let elems = List.fold (*) 1L shp
                 let v = dataVal.[startIdx .. startIdx + elems - 1L]
-                ArrayND.reshapeView shp v)
+                Tensor.reshapeView shp v)
             |> List.zip parameterSet.Parameters
             |> Map.ofList
 
@@ -332,8 +332,8 @@ module ModelContextTypes =
             symSizeEnv <- Map.join symSizeEnv inferredSizes
 
             // infer location and strides
-            varLocs <- varLocs |> Map.add (Expr.extractVar var) (ArrayND.location value)
-            varStrides <- varStrides |> Map.add (Expr.extractVar var) (ArrayND.stride value)
+            varLocs <- varLocs |> Map.add (Expr.extractVar var) (Tensor.location value)
+            varStrides <- varStrides |> Map.add (Expr.extractVar var) (Tensor.stride value)
 
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
@@ -428,10 +428,10 @@ module ModelContextTypes =
             let psVal = parameterStorage.Flat
             let varLocs =
                 compileEnv.VarLocs
-                |> Map.add psVar (ArrayND.location psVal)
+                |> Map.add psVar (Tensor.location psVal)
             let varStrides =
                 compileEnv.VarStrides
-                |> Map.add psVar (ArrayND.stride psVal)
+                |> Map.add psVar (Tensor.stride psVal)
 
             device.Compiler, {compileEnv with ResultLoc  = resultLoc
                                               VarLocs    = varLocs

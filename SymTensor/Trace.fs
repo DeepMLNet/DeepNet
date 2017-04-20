@@ -179,7 +179,7 @@ module Trace =
             let first, last = es.StoreResultEventRng
             let first, last = first |? 0, last |? Int32.MaxValue
             let resVal =
-                if (first <= id && id <= last) then ArrayND.copyUntyped (res.Force())
+                if (first <= id && id <= last) then Tensor.copyUntyped (res.Force())
                 else empty
             ee.Trace.Add (ExprEvaled (uexpr, loopStack(), resVal, msg))
             
@@ -192,23 +192,23 @@ module Trace =
         | t, _ when t = typeof<float> ->
             let a = a :?> ArrayNDT<float>
             let b = b :?> ArrayNDT<float>
-            ArrayND.almostEqualWithTol 1e-5 1e-5 a b |> ArrayND.value
+            Tensor.almostEqualWithTol 1e-5 1e-5 a b |> Tensor.value
         | t, _ when t = typeof<single> ->
             let a = a :?> ArrayNDT<single>
             let b = b :?> ArrayNDT<single>
-            ArrayND.almostEqualWithTol 1e-5f 1e-5f a b |> ArrayND.value
+            Tensor.almostEqualWithTol 1e-5f 1e-5f a b |> Tensor.value
         | t, _ when t = typeof<bool> ->
             let a = a :?> ArrayNDT<bool>
             let b = b :?> ArrayNDT<bool>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            Tensor.all (a ==== b) |> Tensor.value
         | t, _ when t = typeof<int> ->
             let a = a :?> ArrayNDT<int>
             let b = b :?> ArrayNDT<int>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            Tensor.all (a ==== b) |> Tensor.value
         | t, _ when t = typeof<int64> ->
             let a = a :?> ArrayNDT<int64>
             let b = b :?> ArrayNDT<int64>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            Tensor.all (a ==== b) |> Tensor.value
         | t -> failwithf "unsupported trace data type %A" t
 
     let compareCustom isSimilar a b =

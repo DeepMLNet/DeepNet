@@ -49,9 +49,9 @@ let ``Loading of .npz files`` () =
     printfn "dtRefEqual:\n%A" dtRefEqual
     printfn "distortionActivesEqual:\n%A" distortionActivesEqual
 
-    ArrayND.all curvePosEqual |> ArrayND.value |> should equal true
-    ArrayND.all dtRefEqual |> ArrayND.value |> should equal true
-    ArrayND.all distortionActivesEqual |> ArrayND.value |> should equal true
+    Tensor.all curvePosEqual |> Tensor.value |> should equal true
+    Tensor.all dtRefEqual |> Tensor.value |> should equal true
+    Tensor.all distortionActivesEqual |> Tensor.value |> should equal true
 
 
 

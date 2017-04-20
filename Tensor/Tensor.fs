@@ -62,7 +62,7 @@ module TensorTypes =
         | Fill
 
 
-module ArrayND =
+module Tensor =
 
     /// true if warning about fallback copy was shown
     let mutable internal SlowCopyWarningShown = false
@@ -1657,6 +1657,6 @@ module ArrayND =
 
 [<AutoOpen>]
 module ArrayNDTypes2 =
-    type ArrayNDT<'T> = ArrayND.Tensor<'T>
+    type ArrayNDT<'T> = Tensor.Tensor<'T>
 
 

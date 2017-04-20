@@ -7,7 +7,7 @@ open ManagedCuda.BasicTypes
 
 open Basics
 open Basics.Cuda
-open ArrayND
+open Tensor
 open ArrayNDHost
 
 
@@ -109,7 +109,7 @@ module ArrayNDCudaTypes =
         override this.Item
             with get pos = getElement (TensorLayout.addr pos layout)
             and set pos value = 
-                ArrayND.doCheckFinite value            
+                Tensor.doCheckFinite value            
                 setElement (TensorLayout.addr pos layout) value 
 
         override this.NewOfSameType (layout: TensorLayout) = 
@@ -124,7 +124,7 @@ module ArrayNDCudaTypes =
             ArrayNDCudaT<'T> (layout, storage) :> Tensor<'T>
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            ArrayND.view (this.ToRng allArgs) this
+            Tensor.view (this.ToRng allArgs) this
         member this.Item
             with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
             and set (arg0: obj) (value: Tensor<'T>) = 
@@ -166,13 +166,13 @@ module ArrayNDCudaTypes =
         /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.
         /// Both must of same shape. dst must also be contiguous and with offset zero.
         static member CopyIntoDev (dst: ArrayNDCudaT<'T>) (src: ArrayNDHostT<'T>) =
-            if ArrayND.shape dst <> ArrayND.shape src then
+            if Tensor.shape dst <> Tensor.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isC dst) then
+            if not (Tensor.isC dst) then
                 invalidArg "dst" "dst must be contiguous"
             //printfn "CopyIntoDev: src: isC=%A  offset=%d" (ArrayND.isC src) (ArrayND.offset src)
 
-            let src = ArrayND.ensureC src 
+            let src = Tensor.ensureC src 
             let srcMemHnd, srcMemPtr =
                 try
                     let h = ArrayNDHostReg.lock src
@@ -182,26 +182,26 @@ module ArrayNDCudaTypes =
                     h :> IDisposable, h.Ptr
 
             dst.Storage.Data.CopyToDevice(srcMemPtr, 
-                                          SizeT (sizeof64<'T> * ArrayND.offset src), 
-                                          SizeT (sizeof64<'T> * ArrayND.offset dst),
-                                          SizeT (sizeof64<'T> * ArrayND.nElems src))
+                                          SizeT (sizeof64<'T> * Tensor.offset src), 
+                                          SizeT (sizeof64<'T> * Tensor.offset dst),
+                                          SizeT (sizeof64<'T> * Tensor.nElems src))
             srcMemHnd.Dispose()
 
         /// Copies the specified ArrayNDHostT to the device
         static member OfHost (src: ArrayNDHostT<'T>) =
-            let dst = ArrayNDCudaT<_>.NewC (ArrayND.shape src)
+            let dst = ArrayNDCudaT<_>.NewC (Tensor.shape src)
             ArrayNDCudaT<_>.CopyIntoDev dst src
             dst
 
         /// Copies a ArrayNDCudaT into the specified ArrayNDHostT.
         /// Both must of same shape. dst must also be contiguous and with offset zero.
         static member CopyIntoHost (dst: ArrayNDHostT<'T>) (src: ArrayNDCudaT<'T>) =
-            if ArrayND.shape dst <> ArrayND.shape src then
+            if Tensor.shape dst <> Tensor.shape src then
                 invalidArg "dst" "dst and src must be of same shape"
-            if not (ArrayND.isC dst) then
+            if not (Tensor.isC dst) then
                 invalidArg "dst" "dst must be contiguous"
 
-            let src = ArrayND.ensureC src 
+            let src = Tensor.ensureC src 
             let dstMemHnd, dstMemPtr =
                 try
                     let h = ArrayNDHostReg.lock dst
@@ -216,9 +216,9 @@ module ArrayNDCudaTypes =
             //    (sizeof<'T> * ArrayND.nElems src)
 
             src.Storage.Data.CopyToHost(dstMemPtr, 
-                                        SizeT (sizeof64<'T> * ArrayND.offset src), 
-                                        SizeT (sizeof64<'T> * ArrayND.offset dst), 
-                                        SizeT (sizeof64<'T> * ArrayND.nElems src))
+                                        SizeT (sizeof64<'T> * Tensor.offset src), 
+                                        SizeT (sizeof64<'T> * Tensor.offset dst), 
+                                        SizeT (sizeof64<'T> * Tensor.nElems src))
             dstMemHnd.Dispose ()
             
 
@@ -226,23 +226,23 @@ module ArrayNDCudaTypes =
             Tensor<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDCudaT<'T> as dest ->
-                if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
-                        ArrayND.stride this = ArrayND.stride dest then
+                if Tensor.hasContiguousMemory this && Tensor.hasContiguousMemory dest &&
+                        Tensor.stride this = Tensor.stride dest then
                     // use fast CUDA memcpy
                     dest.Storage.Data.CopyToDevice (this.Storage.Data, 
-                                                    SizeT (sizeof64<'T> * ArrayND.offset this),
-                                                    SizeT (sizeof64<'T> * ArrayND.offset dest),
-                                                    SizeT (sizeof64<'T> * ArrayND.nElems this))
+                                                    SizeT (sizeof64<'T> * Tensor.offset this),
+                                                    SizeT (sizeof64<'T> * Tensor.offset dest),
+                                                    SizeT (sizeof64<'T> * Tensor.nElems this))
                 else
                     // use slow element by element copy over host
                     base.CopyTo dest
-            | :? ArrayNDHostT<'T> as dest when ArrayND.isC dest ->
+            | :? ArrayNDHostT<'T> as dest when Tensor.isC dest ->
                 ArrayNDCudaT<'T>.CopyIntoHost dest this
             | _ -> base.CopyTo dest
 
         /// Copies this ArrayNDCudaT to the host
         member this.ToHost () =
-            let dst = ArrayNDHost.newC (ArrayND.shape this) 
+            let dst = ArrayNDHost.newC (Tensor.shape this) 
             ArrayNDCudaT<_>.CopyIntoHost dst this
             dst
 
@@ -277,7 +277,7 @@ module ArrayNDCuda =
     /// ArrayNDCudaT with zero dimensions (scalar) and given value
     let scalar value =
         let a = newC [] 
-        ArrayND.set [] value a
+        Tensor.set [] value a
         a
 
     /// ArrayNDCudaT of given shape filled with zeros.
@@ -287,13 +287,13 @@ module ArrayNDCuda =
     /// ArrayNDCudaT of given shape filled with ones.
     let ones<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> shape : ArrayNDCudaT<'T> =
         let a = newC shape
-        ArrayND.fillWithOnes a
+        Tensor.fillWithOnes a
         a
 
     /// ArrayNDCudaT identity matrix
     let identity<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> size : ArrayNDCudaT<'T> =
         let a = zeros [size; size]
-        ArrayND.fillDiagonalWithOnes a
+        Tensor.fillDiagonalWithOnes a
         a
 
     /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.

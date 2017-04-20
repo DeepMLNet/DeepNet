@@ -50,7 +50,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> = {
-        LastStep    = ArrayNDHost.zeros (ArrayND.shape parVals) |> dev.ToDev
+        LastStep    = ArrayNDHost.zeros (Tensor.shape parVals) |> dev.ToDev
     }
 
     member this.Minimize =

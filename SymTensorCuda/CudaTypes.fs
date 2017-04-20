@@ -168,7 +168,7 @@ module CudaCompileEnv =
 
     /// creates a new texture object
     let newTextureObject contents descriptor (env: CudaCompileEnvT) =
-        if not (ArrayND.isC contents && contents.Layout.Offset = 0L) then
+        if not (Tensor.isC contents && contents.Layout.Offset = 0L) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
             Contents   = contents
@@ -213,7 +213,7 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im], 0L
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            ev.Storage.ByteData, (ArrayND.offset ev) * int64 (Marshal.SizeOf (ev.DataType))
+            ev.Storage.ByteData, (Tensor.offset ev) * int64 (Marshal.SizeOf (ev.DataType))
         | MemConst mc -> 
             let ary = env.ConstantValues.[mc]
             ary.Storage.ByteData, 0L            
@@ -227,7 +227,7 @@ module CudaExecEnv =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]
-            if ArrayND.offset hv = 0L && ArrayND.isC hv then
+            if Tensor.offset hv = 0L && Tensor.isC hv then
                 ArrayNDHostReg.getCudaRegisteredMemory hv
             else
                 failwithf "host variable %A was expected to be contiguous \
@@ -327,9 +327,9 @@ module ArgTemplates =
             | Some manikin ->
                 if manikin.DataType <> typeof<int32> then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. int32"
-                if ArrayND.nDims manikin <> 0 then 
+                if Tensor.nDims manikin <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
-                if ArrayND.offset manikin <> 0L then 
+                if Tensor.offset manikin <> 0L then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must have zero offset"
             | None -> ()
 
@@ -378,7 +378,7 @@ module ArgTemplates =
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
+        do if not (Tensor.isC manikin) then failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
                 let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
@@ -388,7 +388,7 @@ module ArgTemplates =
     
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
+        do if not (Tensor.isC manikin) then failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =
                 {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;
@@ -397,7 +397,7 @@ module ArgTemplates =
 
     /// checks that the specified manikin is usable with BLAS
     let checkBlasManikin isBatch manikin =
-        let nDims = ArrayND.nDims manikin
+        let nDims = Tensor.nDims manikin
         match isBatch with
         | true when nDims < 2 -> failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
         | false when nDims <> 2 -> failwith "ArrayND for use with BLAS must be 2-dimensional" 
@@ -406,7 +406,7 @@ module ArgTemplates =
         if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
             failwith "CUBLAS currently requires single values"
 
-        let stride, shape = ArrayND.stride manikin, ArrayND.shape manikin
+        let stride, shape = Tensor.stride manikin, Tensor.shape manikin
         match stride.[nDims-2 ..], shape.[nDims-2 ..] with
         | [0L; _], _ -> 
             failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
@@ -434,13 +434,13 @@ module ArgTemplates =
         member this.Manikin = manikin
 
         member this.GetLeadingDimension env =
-            (ArrayND.stride manikin).[0] 
+            (Tensor.stride manikin).[0] 
 
         member this.GetColumns env =
-            (ArrayND.shape manikin).[0]
+            (Tensor.shape manikin).[0]
 
         member this.GetRows env =
-            (ArrayND.shape manikin).[1]
+            (Tensor.shape manikin).[1]
 
         member this.GetColumnsForOp env op =
             match op with 
@@ -472,7 +472,7 @@ module ArgTemplates =
                                         ptrAryDevMem:    MemManikinT,
                                         ptrAryHostMem:   MemManikinT) =
 
-        let nDims = ArrayND.nDims manikin
+        let nDims = Tensor.nDims manikin
         let rowDim = nDims - 2
         let colDim = nDims - 1
         let batchShp = manikin.Shape.[0 .. nDims-3]
@@ -488,9 +488,9 @@ module ArgTemplates =
 
         member this.NSamples = nSmpls
         member this.Manikin = manikin
-        member this.LeadingDimension = (ArrayND.stride manikin).[rowDim] 
-        member this.Columns = (ArrayND.shape manikin).[rowDim]
-        member this.Rows = (ArrayND.shape manikin).[colDim]
+        member this.LeadingDimension = (Tensor.stride manikin).[rowDim] 
+        member this.Columns = (Tensor.shape manikin).[rowDim]
+        member this.Rows = (Tensor.shape manikin).[colDim]
 
         member this.GetColumnsForOp op =
             match op with 

@@ -38,7 +38,7 @@ module Mnist =
         let data = List.ofSeq dataSeq
         let nSamples = List.length data |> int64
 
-        let dataShape = ArrayND.shape data.[0]
+        let dataShape = Tensor.shape data.[0]
         let ds = ArrayNDHost.zeros (nSamples :: dataShape)
 
         data |> List.iteri (fun smpl d -> ds.[int64 smpl, Fill] <- d)
@@ -77,7 +77,7 @@ module Mnist =
 
             let image = imageReader.ReadBytes (nRows * nCols)           
             let imageSingle = Array.map (fun p -> single p / 255.0f) image
-            let imageMat = ArrayNDHost.ofArray imageSingle |> ArrayND.reshape [int64 nRows; int64 nCols]
+            let imageMat = ArrayNDHost.ofArray imageSingle |> Tensor.reshape [int64 nRows; int64 nCols]
 
             yield labelHot, imageMat
     }
@@ -127,8 +127,8 @@ module Mnist =
             invalidArg "valRatio" "valRatio must be between 0.0 and 1.0"
         
         let raw = loadRaw directory
-        let trnImgsFlat = raw.TrnImgs |> ArrayND.reshape [raw.TrnImgs.Shape.[0]; -1L]
-        let tstImgsFlat = raw.TstImgs |> ArrayND.reshape [raw.TstImgs.Shape.[0]; -1L]
+        let trnImgsFlat = raw.TrnImgs |> Tensor.reshape [raw.TrnImgs.Shape.[0]; -1L]
+        let tstImgsFlat = raw.TstImgs |> Tensor.reshape [raw.TstImgs.Shape.[0]; -1L]
         let orgTrn = Dataset<InputTargetSampleT> [trnImgsFlat; raw.TrnLbls]
 
         let trn, vali =

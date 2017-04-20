@@ -77,7 +77,7 @@ type SlackBot (data:      WordData,
                             words 
                             |> data.Tokenize 
                             |> ArrayNDHost.ofList
-                            |> ArrayND.reshape [1L; -1L]
+                            |> Tensor.reshape [1L; -1L]
                             |> ArrayNDCuda.toDev
 
                         // generate and detokenize

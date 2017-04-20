@@ -174,7 +174,7 @@ module CsvLoader =
                 let isTarget = targetCols |> List.contains colIdx
                 match col, colType with
                 | Category c, Categorical cs -> categoryArrayND categoryEncoding cs isTarget categoryTable.[c]
-                | Number n, Numerical -> n |> single |> ArrayNDHost.scalar |> ArrayND.reshape [1L]
+                | Number n, Numerical -> n |> single |> ArrayNDHost.scalar |> Tensor.reshape [1L]
                 | Missing, Categorical cs -> categoryArrayND categoryEncoding cs isTarget 0
                 | Missing, Numerical -> ArrayNDHost.zeros<single> [1L]
                 | _ -> failwithf "data inconsistent with column type: %A for %A" col colType))
@@ -185,9 +185,9 @@ module CsvLoader =
             let targets, inputs =
                 List.indexed smpl
                 |> List.partition (fun (idx, _) -> targetCols |> List.contains idx)
-            let targets = targets |> List.map snd |> List.map ArrayND.atLeast1D
-            let inputs = inputs |> List.map snd |> List.map ArrayND.atLeast1D
-            {Input=ArrayND.concat 0 inputs; Target=ArrayND.concat 0  targets}
+            let targets = targets |> List.map snd |> List.map Tensor.atLeast1D
+            let inputs = inputs |> List.map snd |> List.map Tensor.atLeast1D
+            {Input=Tensor.concat 0 inputs; Target=Tensor.concat 0  targets}
         ) 
 
     let printInfo (pars: Parameters) (rowTypes: RowTypes) (data: RowData seq) (samples: InputTargetSampleT seq) =

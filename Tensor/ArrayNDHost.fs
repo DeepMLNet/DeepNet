@@ -5,7 +5,7 @@ open System.Runtime.InteropServices
 open System.Collections.Generic
 
 open Basics
-open ArrayND
+open Tensor
 open MKL
 
 
@@ -98,7 +98,7 @@ module ArrayNDHostTypes =
         override this.Item
             with get pos = data.[int32 (TensorLayout.addr pos layout)]
             and set pos value = 
-                ArrayND.doCheckFinite value
+                Tensor.doCheckFinite value
                 data.[int32 (TensorLayout.addr pos layout)] <- value 
 
         override this.NewOfSameType (layout: TensorLayout) = 
@@ -114,8 +114,8 @@ module ArrayNDHostTypes =
             Tensor<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDHostT<'T> as dest ->
-                if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
-                        ArrayND.stride this = ArrayND.stride dest then
+                if Tensor.hasContiguousMemory this && Tensor.hasContiguousMemory dest &&
+                        Tensor.stride this = Tensor.stride dest then
                     // use array block copy
                     let nElems = TensorLayout.nElems this.Layout
                     Array.Copy (this.Data, this.Layout.Offset, dest.Data, dest.Layout.Offset, nElems)
@@ -179,7 +179,7 @@ module ArrayNDHostTypes =
                 (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
                               
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            ArrayND.view (this.ToRng allArgs) this
+            Tensor.view (this.ToRng allArgs) this
         member this.Item
             with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
             and set (arg0: obj) (value: Tensor<'T>) = 
@@ -221,7 +221,7 @@ module ArrayNDHostTypes =
                 new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof64<'T>),
                               this.Shape.[1], this.Shape.[0], str.[0])
             else
-                if copyAllowed then (ArrayND.copy this).GetTransposedBlas copyAllowed
+                if copyAllowed then (Tensor.copy this).GetTransposedBlas copyAllowed
                 else failwith "ArrayNDHost incompatible with BLAS but copying not allowed"
                
         /// Computes the matrix inverse.    
@@ -234,7 +234,7 @@ module ArrayNDHostTypes =
                 failwithf "cannot invert non-square matrix of shape %A" this.Shape
             let batchShp = this.Shape.[0 .. nd-3]
 
-            let inv = ArrayND.copy this
+            let inv = Tensor.copy this
 
             // iterate over all batch dimensions
             for batchIdx in TensorLayout.allIdxOfShape batchShp do
@@ -268,7 +268,7 @@ module ArrayNDHostTypes =
                 failwithf "require a square matrix for symmetric eigen decomposition but got %A" this.Shape
             let size = this.Shape.[0]
 
-            let eigVecs = ArrayND.copy this
+            let eigVecs = Tensor.copy this
             let eigVals = this.NewOfSameType (TensorLayout.newC [1L; size]) :?> ArrayNDHostT<'T>
 
             use a = eigVecs.GetTransposedBlas false
@@ -310,7 +310,7 @@ module ArrayNDHost =
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let scalar value =
         let a = newC [] 
-        ArrayND.set [] value a
+        Tensor.set [] value a
         a
 
     /// ArrayNDHostT of given shape filled with zeros.
@@ -320,37 +320,37 @@ module ArrayNDHost =
     /// ArrayNDHostT of given shape filled with ones.
     let ones<'T> shape : ArrayNDHostT<'T> =
         let a = newC shape
-        ArrayND.fillWithOnes a
+        Tensor.fillWithOnes a
         a
 
     /// ArrayNDHostT of given shape filled with the given value.
     let filled shape (value: 'T) : ArrayNDHostT<'T> =
         let a = newC shape
-        a |> ArrayND.fillConst value
+        a |> Tensor.fillConst value
         a       
 
     /// ArrayNDHostT identity matrix
     let identity<'T> size : ArrayNDHostT<'T> =
         let a = zeros [size; size]
-        ArrayND.fillDiagonalWithOnes a
+        Tensor.fillDiagonalWithOnes a
         a
 
     /// Creates a new ArrayNDHostT of the given shape and uses the given function to initialize it.
     let init<'T> shp (f: unit -> 'T) =
         let a = newC<'T> shp
-        ArrayND.fill f a
+        Tensor.fill f a
         a
 
     /// Creates a new ArrayNDHostT of the given shape and uses the given function to initialize it.
     let initIndexed<'T> shp f =
         let a = newC<'T> shp
-        ArrayND.fillIndexed f a
+        Tensor.fillIndexed f a
         a   
 
     /// Creates a new vector with linearly spaced values from start to (including) stop.
     let inline linSpaced (start: 'T) (stop: 'T) nElems =
         let a = newC<'T> [nElems]
-        ArrayND.fillLinSpaced start stop a
+        Tensor.fillLinSpaced start stop a
         a          
 
     /// If the specified tensor is on a device, copies it to the host and returns the copy.
@@ -363,7 +363,7 @@ module ArrayNDHost =
 
     /// converts the from one data type to another
     let convert (a: ArrayNDHostT<'T>) : ArrayNDHostT<'C> =
-        a |> ArrayND.convert :> Tensor<'C> :?> ArrayNDHostT<'C>
+        a |> Tensor.convert :> Tensor<'C> :?> ArrayNDHostT<'C>
 
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.
@@ -402,7 +402,7 @@ module ArrayNDHost =
     /// Creates a one-dimensional ArrayNDT using the specified sequence and shape.       
     let ofSeqWithShape shape (data: 'T seq) =
         let nElems = shape |> List.fold (*) 1L
-        data |> Seq.take (int32 nElems) |> ofSeq |> ArrayND.reshape shape
+        data |> Seq.take (int32 nElems) |> ofSeq |> Tensor.reshape shape
 
     /// Creates a one-dimensional ArrayNDT using the specified list.       
     let ofList (data: 'T list) =
@@ -414,29 +414,29 @@ module ArrayNDHost =
 
     /// Creates an Array from the data in this ArrayNDT. The data is copied.
     let toArray (ary: ArrayNDHostT<_>) =
-        if ArrayND.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
-        let shp = ArrayND.shape ary
+        if Tensor.nDims ary <> 1 then failwith "ArrayNDT must have 1 dimension"
+        let shp = Tensor.shape ary
         let shp = shp |> List.map int32
         Array.init shp.[0] (fun i0 -> ary.[[int64 i0]])
 
     /// Creates an Array2D from the data in this ArrayNDT. The data is copied.
     let toArray2D (ary: ArrayNDHostT<_>) =
-        if ArrayND.nDims ary <> 2 then failwith "ArrayNDT must have 2 dimensions"
-        let shp = ArrayND.shape ary
+        if Tensor.nDims ary <> 2 then failwith "ArrayNDT must have 2 dimensions"
+        let shp = Tensor.shape ary
         let shp = shp |> List.map int32
         Array2D.init shp.[0] shp.[1] (fun i0 i1 -> ary.[[int64 i0; int64 i1]])
 
     /// Creates an Array3D from the data in this ArrayNDT. The data is copied.
     let toArray3D (ary: ArrayNDHostT<_>) =
-        if ArrayND.nDims ary <> 3 then failwith "ArrayNDT must have 3 dimensions"
-        let shp = ArrayND.shape ary
+        if Tensor.nDims ary <> 3 then failwith "ArrayNDT must have 3 dimensions"
+        let shp = Tensor.shape ary
         let shp = shp |> List.map int32
         Array3D.init shp.[0] shp.[1] shp.[2] (fun i0 i1 i2 -> ary.[[int64 i0; int64 i1; int64 i2]])
        
     /// Creates an Array4D from the data in this ArrayNDT. The data is copied.
     let toArray4D (ary: ArrayNDHostT<_>) =
-        if ArrayND.nDims ary <> 4 then failwith "ArrayNDT must have 4 dimensions"
-        let shp = ArrayND.shape ary
+        if Tensor.nDims ary <> 4 then failwith "ArrayNDT must have 4 dimensions"
+        let shp = Tensor.shape ary
         let shp = shp |> List.map int32
         Array4D.init shp.[0] shp.[1] shp.[2] shp.[3] (fun i0 i1 i2 i3 -> ary.[[int64 i0; int64 i1; int64 i2; int64 i3]])
 

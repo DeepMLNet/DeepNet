@@ -62,7 +62,7 @@ module RandomExtensions =
             |> Seq.toList
             |> List.sort
             |> ArrayNDNS.ArrayNDHost.ofList
-            |> ArrayNDNS.ArrayND.reshape shp
+            |> ArrayNDNS.Tensor.reshape shp
         
         /// Generates an array of random elements x ~ N(mean,variance)
         member this.NormalArrayND (mean: 'T, variance: 'T) shp  =

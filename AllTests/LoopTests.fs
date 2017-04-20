@@ -177,10 +177,10 @@ let ``Derivative of complicated loop 1`` (device: IDevice) =
 
     let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
     let resultV, dInitialAV, dInitialBV, dSeqAV, dConstAExtV = resultFn initialAv initialBv seqAv constAv
-    let dInitialAV = dInitialAV |> ArrayND.reshape initialAv.Shape
-    let dInitialBV = dInitialBV |> ArrayND.reshape initialBv.Shape
-    let dSeqAV = dSeqAV |> ArrayND.reshape seqAv.Shape
-    let dConstAExtV = dConstAExtV |> ArrayND.reshape constAv.Shape
+    let dInitialAV = dInitialAV |> Tensor.reshape initialAv.Shape
+    let dInitialBV = dInitialBV |> Tensor.reshape initialBv.Shape
+    let dSeqAV = dSeqAV |> Tensor.reshape seqAv.Shape
+    let dConstAExtV = dConstAExtV |> Tensor.reshape constAv.Shape
     printfn "resultV=\n%A" resultV
     printfn "dInitialAV=\n%A" dInitialAV.Full
     printfn "dInitialBV=\n%A" dInitialBV.Full

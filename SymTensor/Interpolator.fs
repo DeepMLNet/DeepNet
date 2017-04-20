@@ -132,16 +132,16 @@ module Interpolator =
                                     match ip.Mode with
                                     | InterpolateLinearaly ->
                                         let diffTbl = 
-                                            ArrayND.diffAxis dd tbl / 
-                                            ArrayND.scalarOfSameType tbl (conv<'T> ip.Resolution.[dd]) 
+                                            Tensor.diffAxis dd tbl / 
+                                            Tensor.scalarOfSameType tbl (conv<'T> ip.Resolution.[dd]) 
                                         let zeroShp =
                                             [for d, s in List.indexed tbl.Shape do
                                                 if d = dd then yield 1L
                                                 else yield s]
-                                        let zero = ArrayND.zerosOfSameType zeroShp diffTbl
-                                        ArrayND.concat dd [diffTbl; zero]
+                                        let zero = Tensor.zerosOfSameType zeroShp diffTbl
+                                        Tensor.concat dd [diffTbl; zero]
                                     | InterpolateToLeft ->
-                                        ArrayND.zerosLike tbl
+                                        Tensor.zerosLike tbl
 
                                 // hack to work around slow ArrayNDCuda operations
                                 let diffTbl =
@@ -190,8 +190,8 @@ module Interpolator =
                 | _, _, InterpolateToLeft -> 
                     interpolateInDim (leftIdxs @ [idx]) x
 
-        let res = ArrayND.zerosLike es.Head
-        for idx in ArrayND.allIdx res do
+        let res = Tensor.zerosLike es.Head
+        for idx in Tensor.allIdx res do
             let x = es |> List.map (fun src -> conv<float> src.[idx])
             res.[idx] <- interpolateInDim [] x |> conv<'T>
         res    

@@ -10,7 +10,7 @@ open UExprTypes
 
 [<AutoOpen>]
 module ArrayNDManikinTypes = 
-    open ArrayND
+    open Tensor
 
     /// memory allocation type
     type MemAllocKindT =
@@ -190,22 +190,22 @@ module ArrayNDManikin =
 
     /// offset in bytes
     let offsetInBytes ary =
-        typeSize64 ary * ArrayND.offset ary
+        typeSize64 ary * Tensor.offset ary
 
     /// address of given element in bytes (relative to start of array)
     let addrInBytes idx ary =
-        typeSize64 ary * (ary |> ArrayND.layout |> TensorLayout.addr idx)
+        typeSize64 ary * (ary |> Tensor.layout |> TensorLayout.addr idx)
 
     /// size in bytes 
     let sizeInBytes ary =
-        typeSize64 ary * ArrayND.nElems ary
+        typeSize64 ary * Tensor.nElems ary
 
     /// True if array can be target of BLAS operation.
     let canBeBlasTarget ary =
-        let nd = ArrayND.nDims ary
+        let nd = Tensor.nDims ary
         if nd >= 2 then
-            let st = ArrayND.stride ary
-            let shp = ArrayND.shape ary
+            let st = Tensor.stride ary
+            let shp = Tensor.shape ary
             match st.[nd-2 ..] with
             | [1L; ld] when ld >= 1L && ld >= shp.[nd-2] -> true
             | _ -> false

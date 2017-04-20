@@ -6,7 +6,7 @@ open System.Reflection
 open Basics
 open UExprTypes
 open ArrayNDNS
-open ArrayNDNS.ArrayND
+open ArrayNDNS.Tensor
 open SymTensor.Compiler
 
 
@@ -61,7 +61,7 @@ module HostEval =
                 EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
-                    (fun intExpr -> EvalT.Eval<int64> (evalEnv, intExpr) |> ArrayND.value)
+                    (fun intExpr -> EvalT.Eval<int64> (evalEnv, intExpr) |> Tensor.value)
             let toBool (v : ArrayNDHostT<'V>) : ArrayNDHostT<bool> = v |> box |> unbox
             let toT (v: ArrayNDHostT<'V>) : ArrayNDHostT<'T> = v |> box |> unbox
             let toR (v: ArrayNDHostT<'V>) : ArrayNDHostT<'R> = v |> box |> unbox
@@ -74,20 +74,20 @@ module HostEval =
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | Arange (ss, tn) -> 
                         ArrayNDHost.arange (sizeEval ss) 
-                        |> ArrayND.convert :> Tensor<'T> :?> ArrayNDHostT<'T>
+                        |> Tensor.convert :> Tensor<'T> :?> ArrayNDHostT<'T>
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
                 | Unary(op, a) ->
                     let av = subEval a
                     match op with
-                    | ArgMaxAxis ax -> ArrayND.argMaxAxis ax av |> box |> unbox
-                    | ArgMinAxis ax -> ArrayND.argMinAxis ax av |> box |> unbox
+                    | ArgMaxAxis ax -> Tensor.argMaxAxis ax av |> box |> unbox
+                    | ArgMinAxis ax -> Tensor.argMinAxis ax av |> box |> unbox
                     | _ ->
                         match op with
                         | Negate -> -av
                         | Abs -> abs av
-                        | SignT -> ArrayND.signt av
+                        | SignT -> Tensor.signt av
                         | Log -> log av
                         | Log10 -> log10 av
                         | Exp -> exp av
@@ -106,36 +106,36 @@ module HostEval =
                         | Round -> round av
                         | Truncate -> truncate av
                         | Not -> ~~~~(toBool av) |> toT
-                        | Diag(ax1, ax2) -> ArrayND.diagAxis ax1 ax2 av
-                        | DiagMat(ax1, ax2) -> ArrayND.diagMatAxis ax1 ax2 av
-                        | Invert -> ArrayND.invert av
-                        | Sum -> ArrayND.sum av
-                        | SumAxis ax -> ArrayND.sumAxis ax av
-                        | Product -> ArrayND.product av
-                        | ProductAxis ax -> ArrayND.productAxis ax av
-                        | MaxAxis ax -> ArrayND.maxAxis ax av
-                        | MinAxis ax -> ArrayND.minAxis ax av
+                        | Diag(ax1, ax2) -> Tensor.diagAxis ax1 ax2 av
+                        | DiagMat(ax1, ax2) -> Tensor.diagMatAxis ax1 ax2 av
+                        | Invert -> Tensor.invert av
+                        | Sum -> Tensor.sum av
+                        | SumAxis ax -> Tensor.sumAxis ax av
+                        | Product -> Tensor.product av
+                        | ProductAxis ax -> Tensor.productAxis ax av
+                        | MaxAxis ax -> Tensor.maxAxis ax av
+                        | MinAxis ax -> Tensor.minAxis ax av
                         | ArgMaxAxis _
                         | ArgMinAxis _ -> failwith "implemented above"
-                        | Reshape ss -> ArrayND.reshape (shapeEval ss) av
-                        | DoBroadcast ss -> ArrayND.broadcastToShape (shapeEval ss) av
-                        | PermuteAxes perm -> ArrayND.permuteAxes perm av
-                        | ReverseAxis ax -> ArrayND.reverseAxis ax av
+                        | Reshape ss -> Tensor.reshape (shapeEval ss) av
+                        | DoBroadcast ss -> Tensor.broadcastToShape (shapeEval ss) av
+                        | PermuteAxes perm -> Tensor.permuteAxes perm av
+                        | ReverseAxis ax -> Tensor.reverseAxis ax av
                         | Gather indices ->
                             let vIndices = 
                                 indices 
                                 |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
-                            ArrayND.gather vIndices av
+                            Tensor.gather vIndices av
                         | Scatter (indices, trgtShp) ->
                             let vIndices = 
                                 indices 
                                 |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
-                            ArrayND.scatter vIndices (shapeEval trgtShp) av                        
+                            Tensor.scatter vIndices (shapeEval trgtShp) av                        
                         | Subtensor sr -> av.[rngEval sr]
                         | StoreToVar vs -> 
                             // TODO: stage variable write to avoid overwrite of used variables
-                            ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
-                            ArrayND.relayout TensorLayout.emptyVector av
+                            Tensor.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
+                            Tensor.relayout TensorLayout.emptyVector av
                         | NullifyJacobian -> av
                         | AssumeJacobian _ -> av
                         | Print msg ->
@@ -145,7 +145,7 @@ module HostEval =
                             Dump.dumpValue name av
                             av
                         | CheckFinite name ->
-                            if not (ArrayND.allFinite av |> ArrayND.value) then
+                            if not (Tensor.allFinite av |> Tensor.value) then
                                 printfn "Infinity or NaN encountered in %s with value:\n%A" name av
                                 failwithf "Infinity or NaN encountered in %s" name
                             av
@@ -173,17 +173,17 @@ module HostEval =
                         | Divide -> av / bv
                         | Modulo -> av % bv
                         | Power -> av ** bv
-                        | MaxElemwise -> ArrayND.maxElemwise av bv 
-                        | MinElemwise -> ArrayND.minElemwise av bv 
+                        | MaxElemwise -> Tensor.maxElemwise av bv 
+                        | MinElemwise -> Tensor.minElemwise av bv 
                         | Dot -> av .* bv
                         | TensorProduct -> av %* bv
                         | And -> (toBool av) &&&& (toBool bv) |> toT
                         | Or -> (toBool av) |||| (toBool bv) |> toT
                         | IfThenElse cond ->
                             let condVal = EvalT.Eval<bool> (evalEnv, cond) 
-                            ArrayND.ifThenElse condVal av bv
+                            Tensor.ifThenElse condVal av bv
                         | SetSubtensor sr -> 
-                            let v = ArrayND.copy av
+                            let v = Tensor.copy av
                             v.[rngEval sr] <- bv
                             v                        
                         |> box |> unbox

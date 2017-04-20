@@ -52,24 +52,24 @@ module Normalization =
         | NoNormalizer ->
             NotNormalized, data
         | Rescaling -> 
-            let minVals = data |> ArrayND.minAxis 0
-            let maxVals = data |> ArrayND.maxAxis 0
-            let maxVals = ArrayND.maxElemwise maxVals (minVals + epsilon)
+            let minVals = data |> Tensor.minAxis 0
+            let maxVals = data |> Tensor.maxAxis 0
+            let maxVals = Tensor.maxElemwise maxVals (minVals + epsilon)
             Rescaled (minVals, maxVals), (data - minVals.[NewAxis, *]) / (maxVals - minVals).[NewAxis, *]
         | Standardization keepZeroOne ->
-            let zero = ArrayND.scalarOfSameType data (conv<'T> 0)
-            let one = ArrayND.scalarOfSameType data (conv<'T> 1)
-            let means = data |> ArrayND.meanAxis 0
-            let stds = (data |> ArrayND.stdAxis 0) + epsilon
+            let zero = Tensor.scalarOfSameType data (conv<'T> 0)
+            let one = Tensor.scalarOfSameType data (conv<'T> 1)
+            let means = data |> Tensor.meanAxis 0
+            let stds = (data |> Tensor.stdAxis 0) + epsilon
             let standardized = (data - means.[NewAxis, *]) / stds.[NewAxis, *]
             let res, onlyZeroOne = 
                 if keepZeroOne then
-                    let onlyZeroOne = (data ==== zero) |||| (data ==== one) |> ArrayND.allAxis 0
-                    ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] data standardized, Some onlyZeroOne
+                    let onlyZeroOne = (data ==== zero) |||| (data ==== one) |> Tensor.allAxis 0
+                    Tensor.ifThenElse onlyZeroOne.[NewAxis, *] data standardized, Some onlyZeroOne
                 else standardized, None
             Standardized (means, stds, onlyZeroOne), res
         | ScaleToUnitLength ->
-            let lengths = (data |> ArrayND.normAxis 1) + epsilon
+            let lengths = (data |> Tensor.normAxis 1) + epsilon
             ScaledToUnitLength lengths, data / lengths.[*, NewAxis]
         | PCAWhitening nComps ->
             let whitened, info = Decomposition.PCA.Perform (data, ?nComps=nComps)
@@ -87,7 +87,7 @@ module Normalization =
         | Standardized (means, stds, onlyZeroOne) ->
             let unstd = nData * stds.[NewAxis, *] + means.[NewAxis, *]
             match onlyZeroOne with
-            | Some onlyZeroOne -> ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] nData unstd
+            | Some onlyZeroOne -> Tensor.ifThenElse onlyZeroOne.[NewAxis, *] nData unstd
             | None -> unstd            
         | ScaledToUnitLength lengths ->
             nData * lengths.[*, NewAxis]

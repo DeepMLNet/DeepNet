@@ -178,7 +178,7 @@ module CudaExecUnit =
 
     /// Returns the operation that blasArg will perform.
     let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
-        let st, shp = ArrayND.stride manikin, ArrayND.shape manikin
+        let st, shp = Tensor.stride manikin, Tensor.shape manikin
         match st.[st.Length-2 ..], shp.[st.Length-2 ..] with
         | [m;  1L], [ms; ns] when m >= max 1L ns && not (shared && willOverwrite) -> BlasArgId
         | [1L; n],  [ms; ns] when n >= max 1L ms && not (shared && willOverwrite) -> BlasArgTranspose
@@ -268,17 +268,17 @@ module CudaExecUnit =
         // shape operations
         | UUnaryOp (Reshape _) ->        
             match trgtDfltChReq () with
-            | Some rv when ArrayND.isC rv ->
-                [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0].[dfltChId] rv))]
+            | Some rv when Tensor.isC rv ->
+                [dfltChReq (Some (Tensor.reshapeView srcShapes.[0].[dfltChId] rv))]
             | _ -> dfltSrcWithNoViewReq ()
         | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (PermuteAxes perm) ->
             match trgtDfltChReq () with
-            | Some rv -> [dfltChReq (Some (ArrayND.permuteAxes (Permutation.invert perm) rv))]
+            | Some rv -> [dfltChReq (Some (Tensor.permuteAxes (Permutation.invert perm) rv))]
             | _ -> dfltSrcWithNoViewReq ()
         | UUnaryOp (ReverseAxis ax) ->
             match trgtDfltChReq () with
-            | Some rv -> [dfltChReq (Some (ArrayND.reverseAxis ax rv))]
+            | Some rv -> [dfltChReq (Some (Tensor.reverseAxis ax rv))]
             | _ -> dfltSrcWithNoViewReq ()
 
         // variable access
@@ -330,7 +330,7 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDfltChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) && 
+            | Some req when not (Tensor.isBroadcasted req) && 
                     BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
@@ -355,7 +355,7 @@ module CudaExecUnit =
             // but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
             match trgtDfltChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) -> inplaceFirstSrcReq ()
+            | Some req when not (Tensor.isBroadcasted req) -> inplaceFirstSrcReq ()
             | _ -> dfltSrcWithNoViewReq ()            
 
         | UNaryOp (Expr.Elements _) -> needExtra op
@@ -428,14 +428,14 @@ module CudaExecUnit =
         let dfltChOutplaceTrgt () =
             match trgtDefChReq () with
             | Some rv when not (overlappingWithAnySrc rv) && 
-                           not (ArrayND.isBroadcasted rv) && matchingDfltChTypeAndShape rv
+                           not (Tensor.isBroadcasted rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
              
         /// default channel target that shares no elements with any srcView and has C-continguous layout
         let dfltChOutplaceCTrgt () =
             match trgtDefChReq () with
-            | Some rv when ArrayND.isC rv &&
+            | Some rv when Tensor.isC rv &&
                            not (overlappingWithAnySrc rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
@@ -467,7 +467,7 @@ module CudaExecUnit =
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
                                     matchingDfltChTypeAndShape view &&
-                                    not (ArrayND.isBroadcasted view) && 
+                                    not (Tensor.isBroadcasted view) && 
                                     not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]
             | None -> dfltChOutplaceTrgt ()     
@@ -505,7 +505,7 @@ module CudaExecUnit =
                 // We will transfer variable from host to device during execution.
                 // We allocate contiguous device memory for that.
                 match trgtDefChReq () with
-                | Some rv when ArrayND.isC rv -> dfltChTrgt rv false
+                | Some rv when Tensor.isC rv -> dfltChTrgt rv false
                 | _ -> 
                     dfltChTrgt (ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape) false    
             | loc -> unsupLoc loc     
@@ -540,7 +540,7 @@ module CudaExecUnit =
 
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
-            dfltChTrgt (ArrayND.diagAxis ax1 ax2 (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (Tensor.diagAxis ax1 ax2 (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (DiagMat (ax1, ax2)) -> dfltChOutplaceTrgt ()
         | UUnaryOp Invert -> 
             // If source will be transposed, then target will also be transposed.
@@ -564,15 +564,15 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
-            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            match firstSrcDfltCh() |> Tensor.tryReshapeView (trgtDfltChShape()) with
             | Some reshapedSrc -> dfltChTrgt reshapedSrc (firstSrcDfltChShared()) 
             | None -> dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
-            dfltChTrgt (ArrayND.broadcastToShape (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (Tensor.broadcastToShape (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (PermuteAxes perm) ->
-            dfltChTrgt (ArrayND.permuteAxes perm (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (Tensor.permuteAxes perm (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (ReverseAxis ax) ->
-            dfltChTrgt (ArrayND.reverseAxis ax (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (Tensor.reverseAxis ax (firstSrcDfltCh())) (firstSrcDfltChShared())
 
         // variable access
         | UUnaryOp (StoreToVar _) -> 
@@ -617,7 +617,7 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDefChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) -> 
+            | Some req when not (Tensor.isBroadcasted req) -> 
                 let anySrcShared = srcsDfltChShared() |> List.exists id
                 dfltChTrgt req anySrcShared
             | _ -> newDfltChTrgt ()            
@@ -655,7 +655,7 @@ module CudaExecUnit =
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) ->
-            if not (firstSrcDfltChShared()) && not (ArrayND.isBroadcasted (firstSrcDfltCh())) then 
+            if not (firstSrcDfltChShared()) && not (Tensor.isBroadcasted (firstSrcDfltCh())) then 
                 dfltChTrgt (firstSrcDfltCh()) false
             else dfltChOutplaceTrgt ()
 
@@ -721,24 +721,24 @@ module CudaExecUnit =
             (List.map (fun v -> (ArrayNDArgTmpl v) :> ICudaArgTmpl) srcViews)
 
         let nSrc = List.length srcViews
-        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
+        let hetero = srcViews |> List.exists (fun sv -> (Tensor.shape trgt) <> (Tensor.shape sv))
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
-        let dimsStr = if hetero then "Heterogenous" else sprintf "%dD" (ArrayND.nDims trgt)
+        let dimsStr = if hetero then "Heterogenous" else sprintf "%dD" (Tensor.nDims trgt)
         let funcName = sprintf "elemwise%dAry%s%s" nSrc dimsStr indexedStr 
         funcName, args
 
     /// execution items for an element-wise operation
     let execItemsForElemwise trgt cOp srcViews =
-        if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
+        if srcViews |> List.exists (fun sv -> Tensor.nElems trgt <> Tensor.nElems sv) then
             failwithf "a source of an elemwise op has different number of elements than target"
 
         let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
-        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
+        let hetero = srcViews |> List.exists (fun sv -> (Tensor.shape trgt) <> (Tensor.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
     /// execution items for a gather operation
     let execItemsForGather trgt src idxViews =
-        let funcName = sprintf "gather%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let funcName = sprintf "gather%dDTo%dD" (Tensor.nDims src) (Tensor.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
@@ -749,7 +749,7 @@ module CudaExecUnit =
 
     /// execution items for a scatter operation
     let execItemsForScatter trgt src idxViews =
-        let funcName = sprintf "scatter%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let funcName = sprintf "scatter%dDTo%dD" (Tensor.nDims src) (Tensor.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
@@ -765,12 +765,12 @@ module CudaExecUnit =
                     ArrayNDArgTmpl trgt :> ICudaArgTmpl
                     ArrayNDArgTmpl src :> ICudaArgTmpl]
         let idxStr = if indexed then "Idx" else ""
-        let funcName = sprintf "reduce%sTo%dD" idxStr (ArrayND.nDims trgt)
+        let funcName = sprintf "reduce%sTo%dD" idxStr (Tensor.nDims trgt)
         funcName, args
 
     /// execution items for a reduction operation
     let execItemsForReduction trgt indexed cOp cInitialOp src =
-        match ArrayND.shape trgt, ArrayND.shape src with
+        match Tensor.shape trgt, Tensor.shape src with
         | _, [] -> failwith "cannot reduce a scalar array"
         | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
             failwithf "cannot reduce from %d dimensions to %d dimensions" srcShp.Length trgtShp.Length
@@ -791,14 +791,14 @@ module CudaExecUnit =
             args @
             (workSize |> List.map (fun ws -> sprintf "%dLL" ws |> CPPTemplateValue :> ICudaArgTmpl))
         let nSrc = List.length srcViews
-        let dimsStr = sprintf "%dD" (ArrayND.nDims trgt)
+        let dimsStr = sprintf "%dD" (Tensor.nDims trgt)
         let funcName = sprintf "elements%dAry%s" nSrc dimsStr 
         funcName, tmpls, args
 
     /// execution items for an element-wise operation
     let execItemsForElements compileEnv trgt elemFunc srcViews =
         let posOrder = 
-            if Debug.DisableElementsWorkOrdering then Permutation.identity (ArrayND.nDims trgt)
+            if Debug.DisableElementsWorkOrdering then Permutation.identity (Tensor.nDims trgt)
             else CudaElemExpr.bestPosOrder trgt srcViews elemFunc
         let inst = {UElemFunc=elemFunc; PosOrder=posOrder}
         let opName = 
@@ -859,7 +859,7 @@ module CudaExecUnit =
         //                                   const TBaseSrc &baseSrc, const Array<idx_t, nDims> &srcIdx)
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
-        let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
+        let nDimsStr = sprintf "%d" (Tensor.nDims trgt)
 
         execItemsForKernel 
             "copyFromDynamicSubtensor" 
@@ -875,7 +875,7 @@ module CudaExecUnit =
         //                                 const TSrc &src)
           
         let trgtTmpl, trgtDynTmpl, trgtIdxPntrsTmpl = dynamicSubtensorTmplAndIdx trgt rngs rngManikins
-        let nDimsStr = sprintf "%d" (ArrayND.nDims src)  
+        let nDimsStr = sprintf "%d" (Tensor.nDims src)  
 
         execItemsForKernel 
             "copyToDynamicSubtensor" 
@@ -905,9 +905,9 @@ module CudaExecUnit =
 
     /// generates ExecItems to copy srcView to trgtView 
     let copyExecItems trgt src =
-        if ArrayND.nElems trgt <> ArrayND.nElems src then
+        if Tensor.nElems trgt <> Tensor.nElems src then
             failwithf "cannot copy array with %d elements to array with %d elements"
-                (ArrayND.nElems trgt) (ArrayND.nElems src)
+                (Tensor.nElems trgt) (Tensor.nElems src)
         execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
     /// Generates ExecItems to copy srcView into newly allocated memory in C-order.
@@ -928,7 +928,7 @@ module CudaExecUnit =
         let srcView = src.[srcRngs] :?> ArrayNDManikinT
         let tmpView = ArrayNDManikin.newC memAllocator src.TypeName tmpShp
         let copyOps = copyExecItems tmpView srcView
-        let dstView = tmpView |> ArrayND.broadcastToShape src.Shape
+        let dstView = tmpView |> Tensor.broadcastToShape src.Shape
         dstView, copyOps                             
 
     /// If all batch dimensions (all dimensions but the last two) of the array are of
@@ -940,7 +940,7 @@ module CudaExecUnit =
             let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1L)
             if isUnitary then
                 let mutable m = manikin
-                for i=0 to nd-3 do m <- ArrayND.cutLeft m
+                for i=0 to nd-3 do m <- Tensor.cutLeft m
                 m
             else manikin
         else manikin           
@@ -949,11 +949,11 @@ module CudaExecUnit =
     /// Can return copy items if deemed necessary.
     let blasArg memAllocator (manikin: ArrayNDManikinT) shared willOverwrite =
         let manikin = trimUnitaryBatchedBlasDims manikin
-        if ArrayND.nDims manikin < 2 then
+        if Tensor.nDims manikin < 2 then
             failwith "need at least 2-dimensional array for BLAS argument"
         match blasArgOperation manikin shared willOverwrite with
         | BlasArgId        -> manikin, BlasTranspose, [], shared
-        | BlasArgTranspose -> ArrayND.transpose manikin, BlasId, [], shared
+        | BlasArgTranspose -> Tensor.transpose manikin, BlasId, [], shared
         | BlasArgCopy -> 
             let bcAllowed = (List.replicate (manikin.NDims - 2) true) @ [false; false]
             let tmpView, copyOps = copyKeepingBroadcasted memAllocator bcAllowed manikin
@@ -964,8 +964,8 @@ module CudaExecUnit =
         let manikin = trimUnitaryBatchedBlasDims manikin
         if not (ArrayNDManikin.canBeBlasTarget manikin) then
             failwithf "cannot use specified view with shape %A and stride %A as BLAS target" 
-                manikin.Shape (ArrayND.stride manikin)
-        ArrayND.transpose manikin
+                manikin.Shape (Tensor.stride manikin)
+        Tensor.transpose manikin
 
     /// exection items to reduce src over the last axis into trgt
     let rec batchReduceLastAxis (memAllocator: MemAllocatorT) reduceFn (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) 
@@ -983,12 +983,12 @@ module CudaExecUnit =
 
             // create array manikin for source with split last dimension
             let batchSrcShp = 
-                (ArrayND.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
-            let reduceStride = (ArrayND.stride src).[src.NDims-1]
+                (Tensor.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
+            let reduceStride = (Tensor.stride src).[src.NDims-1]
             let batchSrcStride = 
-                (ArrayND.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
+                (Tensor.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
             let batchSrc = 
-                src |> ArrayND.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
+                src |> Tensor.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
 
             // create temporary target
             let tmpShp = 
@@ -1016,29 +1016,29 @@ module CudaExecUnit =
     /// reduce one axis by appling an operation such as sum, max, min, ...
     let execItemsForReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the reduction is performed over comes last
-        let nd = ArrayND.nDims src
+        let nd = Tensor.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.permuteAxes axOrder src
+        let srcAdj = Tensor.permuteAxes axOrder src
         (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
             execItemsForReduction tmpTrgt false (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) tmpSrc)
 
     /// reduce one axis by appling an operation on indices such as argMax, argMin, ...
     let execItemsForIdxReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the reduction is performed over comes last
-        let nd = ArrayND.nDims src
+        let nd = Tensor.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.permuteAxes axOrder src
+        let srcAdj = Tensor.permuteAxes axOrder src
         execItemsForReduction trgt true (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) srcAdj
 
     /// exection items to reduce all elements of src into the scalar trgt
     let rec execItemsForReduce memAllocator eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
-        if ArrayND.nDims trgt <> 0 then failwith "reduce target must be scalar"
+        if Tensor.nDims trgt <> 0 then failwith "reduce target must be scalar"
         match src.Shape with
         | [_] -> execItemsForReduceAxis memAllocator 0 eOpName initial trgt src
         | [] -> copyExecItems trgt src
         | srcShp ->
             // create temporary target
-            let nDims = ArrayND.nDims src
+            let nDims = Tensor.nDims src
             let tmpShp = srcShp.[0 .. nDims-2]
             let tmp = ArrayNDManikin.newC memAllocator src.TypeName tmpShp            
 
@@ -1150,7 +1150,7 @@ module CudaExecUnit =
         // tensor ops
         | UUnaryOp (Diag _) -> []
         | UUnaryOp (DiagMat (ax1, ax2)) ->
-            let trgtDiag = ArrayND.diagAxis ax1 ax2 (dfltChTrgt())
+            let trgtDiag = Tensor.diagAxis ax1 ax2 (dfltChTrgt())
             let zeroItems = execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
             let copyItems = copyExecItems trgtDiag (firstSrcDfltCh())
             zeroItems @ copyItems
@@ -1162,7 +1162,7 @@ module CudaExecUnit =
                 // as well to preserve orientation. The blasTarget function always transposes.
                 match blasArgOperation (firstSrcDfltCh()) (firstSrcDfltChShared()) true with
                 | BlasArgTranspose -> blasTarget (dfltChTrgt())
-                | _ -> blasTarget (ArrayND.transpose (dfltChTrgt()))
+                | _ -> blasTarget (Tensor.transpose (dfltChTrgt()))
 
             // allocate variables and initialize pointer arrays
             let aArg = BlasTransposedMatrixBatchTmpl (aView, memAllocator)
@@ -1184,7 +1184,7 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->
-            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            match firstSrcDfltCh() |> Tensor.tryReshapeView (trgtDfltChShape()) with
             | Some reshapedSrc when reshapedSrc = dfltChTrgt() -> []
             | _ ->
                 //printfn "Reshape: copying from\n%A\nto\n%A." (firstSrcDfltCh()) (dfltChTrgt())
@@ -1208,7 +1208,7 @@ module CudaExecUnit =
                 copyExecItems dv (firstSrcDfltCh())
             | LocHost ->            
                 let copyItems, memcpySrc = 
-                    if ArrayND.isC (firstSrcDfltCh()) then 
+                    if Tensor.isC (firstSrcDfltCh()) then 
                         // Source has C-strides. Can directly copy to host.
                         [], firstSrcDfltCh()
                     else

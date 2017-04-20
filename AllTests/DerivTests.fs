@@ -154,9 +154,9 @@ let ``Gather`` () =
 
     let expr = a |> Expr.gather [Some i0; Some i1]
 
-    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let varEnv = VarEnv.ofSeq [a, av :> ITensor; i0, i0v :> ITensor; i1, i1v :> ITensor]
 
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
@@ -170,9 +170,9 @@ let ``Scatter`` () =
 
     let expr = a |> Expr.scatter [Some i0; Some i1] trgtShp
 
-    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> Tensor.padLeft
     let varEnv = VarEnv.ofSeq [a, av :> ITensor; i0, i0v :> ITensor; i1, i1v :> ITensor]
 
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr

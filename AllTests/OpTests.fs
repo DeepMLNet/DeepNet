@@ -316,7 +316,7 @@ let ``Interpolate1D: simple test`` device =
     printfn "inp=\n%A" inpVal
     printfn "res=\n%A" resVal
 
-    ArrayND.almostEqualWithTol 0.005f 1e-5f resVal expVal |> ArrayND.value |> should equal true
+    Tensor.almostEqualWithTol 0.005f 1e-5f resVal expVal |> Tensor.value |> should equal true
 
 let ``Interpolate2D: simple test`` device =
     let tbl = [[1.0f; 2.0f; 3.0f]
@@ -344,7 +344,7 @@ let ``Interpolate2D: simple test`` device =
     printfn "inp2=\n%A" inpVal2
     printfn "res=\n%A" resVal
 
-    ArrayND.almostEqualWithTol 0.005f 1e-5f resVal expVal |> ArrayND.value |> should equal true
+    Tensor.almostEqualWithTol 0.005f 1e-5f resVal expVal |> Tensor.value |> should equal true
 
 [<Fact>]
 let ``Interpolate1D: simple test on host`` () =    
@@ -385,7 +385,7 @@ let ``Interpolate1D: derivative test`` device =
     let inpVal = [-0.5f; 0.9f; 1.0f; 1.5f; 2.3f; 5.9f; 6.0f; 6.5f; 200.0f]
                     |> ArrayNDHost.ofList |> post device
     let expVal = [ 0.0f; 0.0f; 1.0f; 1.0f; 2.0f; 5.0f; 0.0f; 0.0f; 0.0f]
-                    |> ArrayNDHost.ofList |> ArrayND.diagMat |> post device
+                    |> ArrayNDHost.ofList |> Tensor.diagMat |> post device
     let resVal = fn inpVal
 
     printfn "derivative:"
@@ -393,7 +393,7 @@ let ``Interpolate1D: derivative test`` device =
     printfn "inp=\n%A" inpVal
     printfn "res=\n%A" resVal
 
-    ArrayND.almostEqualWithTol 0.005f 1e-5f resVal expVal |> ArrayND.value |> should equal true
+    Tensor.almostEqualWithTol 0.005f 1e-5f resVal expVal |> Tensor.value |> should equal true
 
 
 [<Fact>]
@@ -414,7 +414,7 @@ let checkFiniteOpTest diagVal offDiagVal =
     let av = ArrayNDCuda.ones<single> [3L; 3L]
     let dv = diagVal * ArrayNDCuda.ones<single> [3L]
     let bv = offDiagVal * ArrayNDCuda.ones<single> [3L; 3L]
-    (ArrayND.diag bv).[*] <- dv
+    (Tensor.diag bv).[*] <- dv
     printfn "a=\n%A" av
     printfn "b=\n%A" bv
     let iav = fn av bv
@@ -440,7 +440,7 @@ let ``ReverseAxis on host`` () =
     let expr1 = Expr.reverseAxis 1 a
     let fn = Func.make2<int, int> DevHost.DefaultFactory expr0 expr1 |> arg1 a
 
-    let av = [0 .. 5] |> ArrayNDHost.ofList |> ArrayND.reshape [3L; 2L]
+    let av = [0 .. 5] |> ArrayNDHost.ofList |> Tensor.reshape [3L; 2L]
     printfn "av=\n%A" av
 
     let rav0, rav1 = fn av
@@ -458,9 +458,9 @@ let ``Trace compare: Gather 1`` () =
         let expr = a |> Expr.gather [Some i0; Some i1]
         let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
 
-        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.single
-        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-        let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.single
+        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+        let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> Tensor.padLeft
 
         let sv = exprFn av i0v i1v
         printfn "a=\n%A" av
@@ -479,8 +479,8 @@ let ``Trace compare: Gather 2`` () =
         let expr = a |> Expr.gather [Some i0; None]
         let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
 
-        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.single
-        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.single
+        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
 
         let sv = exprFn av i0v 
         printfn "a=\n%A" av
@@ -500,8 +500,8 @@ let ``Trace compare: Scatter 1`` () =
         let expr = a |> Expr.scatter [Some i0; None] shp
         let exprFn = Func.make<single> device.DefaultFactory expr |> arg2 a i0 
 
-        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.single
-        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.single
+        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
 
         let sv = exprFn av i0v 
         printfn "a=\n%A" av
@@ -521,9 +521,9 @@ let ``Trace compare: Scatter 2`` () =
         let expr = a |> Expr.scatter [Some i0; Some i1] shp
         let exprFn = Func.make<single> device.DefaultFactory expr |> arg3 a i0 i1
 
-        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.single
-        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-        let i1v = [0L; 0L; 0L] |> ArrayNDHost.ofList |> ArrayND.padLeft
+        let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> Tensor.single
+        let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> Tensor.padLeft
+        let i1v = [0L; 0L; 0L] |> ArrayNDHost.ofList |> Tensor.padLeft
 
         let sv = exprFn av i0v i1v
         printfn "a=\n%A" av
