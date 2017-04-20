@@ -58,7 +58,7 @@ module ArrayNDManikinTypes =
     [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
                           storage:          MemManikinT) = 
-        inherit ArrayNDT<int> (layout)  // generic type does not matter since we do not store data
+        inherit Tensor<int> (layout)  // generic type does not matter since we do not store data
 
         /// storage manikin
         member this.Storage = storage
@@ -78,11 +78,11 @@ module ArrayNDManikinTypes =
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
             failwith "ArrayNDManikin cannot allocate memory on its own"
 
-        override this.NewOfType<'N> (layout: ArrayNDLayoutT) : ArrayNDT<'N> = 
+        override this.NewOfType<'N> (layout: ArrayNDLayoutT) : Tensor<'N> = 
             failwith "ArrayNDManikin cannot allocate memory on its own"
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDManikinT(layout, storage) :> ArrayNDT<int>
+            ArrayNDManikinT(layout, storage) :> Tensor<int>
 
         override this.DataType =
             TypeName.getType this.TypeName

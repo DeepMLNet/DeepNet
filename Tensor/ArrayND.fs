@@ -70,7 +70,7 @@ module ArrayND =
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
     [<StructuredFormatDisplay("{Pretty}")>]
-    type ArrayNDT<'T> (layout: ArrayNDLayoutT) =
+    type Tensor<'T> (layout: ArrayNDLayoutT) =
         do ArrayNDLayout.check layout
 
         /// layout
@@ -86,13 +86,13 @@ module ArrayND =
         abstract Item : int64 list -> 'T with get, set
 
         /// a new ArrayND of same type and new storage allocation for given layout
-        abstract NewOfSameType : ArrayNDLayoutT -> ArrayNDT<'T>
+        abstract NewOfSameType : ArrayNDLayoutT -> Tensor<'T>
 
         /// a new ArrayND of given type and new storage allocation for given layout
-        abstract NewOfType<'N> : ArrayNDLayoutT -> ArrayNDT<'N>
+        abstract NewOfType<'N> : ArrayNDLayoutT -> Tensor<'N>
 
         /// a new ArrayND of same type with same storage allocation but new layout
-        abstract NewView : ArrayNDLayoutT -> ArrayNDT<'T>
+        abstract NewView : ArrayNDLayoutT -> Tensor<'T>
 
         /// C++ type name
         member this.CPPType = 
@@ -119,28 +119,28 @@ module ArrayND =
         /// unchecked cast to NDArrayT<'A>
         member this.Cast<'A> () =
             let thisBoxed = box this
-            let thisCasted = unbox<ArrayNDT<'A>> thisBoxed
+            let thisCasted = unbox<Tensor<'A>> thisBoxed
             thisCasted
 
         /// unchecked cast of v to NDArrayT<'T> (this type)
-        member this.CastToMe (v: ArrayNDT<'A>) = v.Cast<'T> ()
+        member this.CastToMe (v: Tensor<'A>) = v.Cast<'T> ()
 
         /// checks that two ArrayNDs have the same shape
-        static member inline CheckSameShape (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        static member inline CheckSameShape (a: Tensor<'T>) (b: Tensor<'T>) =
             if (ArrayNDLayout.shape a.Layout) <> (ArrayNDLayout.shape b.Layout) then
                 failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
                     (ArrayNDLayout.shape a.Layout) (ArrayNDLayout.shape b.Layout)
 
         /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
         /// Both ArrayNDTs must be of same shape.
-        abstract CopyTo : ArrayNDT<'T> -> unit
-        default this.CopyTo (dest: ArrayNDT<'T>) =
+        abstract CopyTo : Tensor<'T> -> unit
+        default this.CopyTo (dest: Tensor<'T>) =
             // slow element-wise fallback copy
             if not SlowCopyWarningShown then
                 printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
                          (this message is only shown once)"
                 SlowCopyWarningShown <- true
-            ArrayNDT<'T>.CheckSameShape this dest
+            Tensor<'T>.CheckSameShape this dest
             for idx in ArrayNDLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
 
@@ -158,12 +158,12 @@ module ArrayND =
         member this.NElems = ArrayNDLayout.nElems this.Layout
 
         /// broadcasts this and other to the same shape if possible
-        member this.BroadcastToSame (other: ArrayNDT<_>) =
+        member this.BroadcastToSame (other: Tensor<_>) =
             let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
             this.NewView lThis, other.NewView lOther
 
         /// broadcasts this and other1 and other2 to the same shape if possible
-        member this.BroadcastToSame3 (other1: ArrayNDT<_>) (other2: ArrayNDT<_>) =
+        member this.BroadcastToSame3 (other1: Tensor<_>) (other2: Tensor<_>) =
             let layouts = ArrayNDLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
             match layouts with
             | [lThis; lOther1; lOther2] ->
@@ -171,7 +171,7 @@ module ArrayND =
             | _ -> failwith "impossible"
 
         /// broadcast the list of arrays to the same shape if possible
-        static member BroadcastToSameMany (arys: 'A list when 'A :> ArrayNDT<'T>) =
+        static member BroadcastToSameMany (arys: 'A list when 'A :> Tensor<'T>) =
             let layouts = ArrayNDLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
             List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
 
@@ -181,7 +181,7 @@ module ArrayND =
             this.NewView l
 
         /// implements a storage specific version of map
-        abstract MapImpl: ('T -> 'R) -> ArrayNDT<'R> -> unit
+        abstract MapImpl: ('T -> 'R) -> Tensor<'R> -> unit
         default this.MapImpl f result =
             // slow fallback mapping
             for idx in ArrayNDLayout.allIdx this.Layout do
@@ -203,13 +203,13 @@ module ArrayND =
         member this.MapInplace (f: 'T -> 'T) =
             this.MapInplaceImpl f
 
-        abstract Map2Impl: ('T -> 'T -> 'R) -> ArrayNDT<'T> -> ArrayNDT<'R> -> unit
+        abstract Map2Impl: ('T -> 'T -> 'R) -> Tensor<'T> -> Tensor<'R> -> unit
         default this.Map2Impl f other result =
             for idx in ArrayNDLayout.allIdx this.Layout do
                 result.[idx] <- f this.[idx] other.[idx]
 
         /// maps all elements of this and other using the specified function into a new ArrayNDT
-        member this.Map2 (f: 'T -> 'T -> 'R) (other: #ArrayNDT<'T>) =
+        member this.Map2 (f: 'T -> 'T -> 'R) (other: #Tensor<'T>) =
             if other.GetType() <> this.GetType() then
                 failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (other.GetType())
@@ -218,14 +218,14 @@ module ArrayND =
             this.Map2Impl f other res
             res
 
-        abstract IfThenElseImpl: ArrayNDT<bool> -> ArrayNDT<'T> -> ArrayNDT<'T> -> unit
+        abstract IfThenElseImpl: Tensor<bool> -> Tensor<'T> -> Tensor<'T> -> unit
         default this.IfThenElseImpl cond elseVal result =
             for idx in ArrayNDLayout.allIdx this.Layout do
                 result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
 
         /// elementwise uses elements from this if cond is true, 
         /// otherwise elements from elseVal
-        member this.IfThenElse (cond: #ArrayNDT<bool>) (elseVal: #ArrayNDT<'T>) =
+        member this.IfThenElse (cond: #Tensor<bool>) (elseVal: #Tensor<'T>) =
             if elseVal.GetType() <> this.GetType() then
                 failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (elseVal.GetType())
@@ -237,7 +237,7 @@ module ArrayND =
             ifVal.IfThenElseImpl cond elseVal res
             res
 
-        abstract GatherImpl: #ArrayNDT<int64> option list -> ArrayNDT<'T> -> unit
+        abstract GatherImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
         default trgt.GatherImpl indices src =
             for trgtIdx in ArrayNDLayout.allIdx trgt.Layout do
                 let srcIdx = 
@@ -251,7 +251,7 @@ module ArrayND =
                        
         /// Sets the values of this array by selecting from the sources array according to the specified
         /// indices. If an index array is set to None then the target index is used as the source index.
-        member trgt.Gather (indices: #ArrayNDT<int64> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Gather (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSet on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -268,7 +268,7 @@ module ArrayND =
             let indices = indices |> List.map (Option.map (fun idx -> idx.BroadcastToShape trgt.Shape))
             trgt.GatherImpl indices src
 
-        abstract ScatterImpl: #ArrayNDT<int64> option list -> ArrayNDT<'T> -> unit
+        abstract ScatterImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
         default trgt.ScatterImpl indices src = 
             let addInt a b = (a |> box |> unbox<int>) + (b |> box |> unbox<int>) |> box |> unbox<'T>
             let addInt64 a b = (a |> box |> unbox<int64>) + (b |> box |> unbox<int64>) |> box |> unbox<'T>
@@ -295,7 +295,7 @@ module ArrayND =
         /// Sets the values of this array by summing elements from the sources array into the elements
         /// of this array specified by the indices.
         /// If an index array is set to None then the target index is used as the source index.
-        member trgt.Scatter (indices: #ArrayNDT<int64> option list) (src: #ArrayNDT<'T>) =
+        member trgt.Scatter (indices: #Tensor<int64> option list) (src: #Tensor<'T>) =
             if src.GetType() <> trgt.GetType() then
                 failwithf "cannot use IndexedSum on ArrayNDTs of different types: %A and %A"
                     (trgt.GetType()) (src.GetType())
@@ -316,12 +316,12 @@ module ArrayND =
             trgt.ScatterImpl indices src
 
         /// invert the matrix
-        abstract Invert : unit -> ArrayNDT<'T>
+        abstract Invert : unit -> Tensor<'T>
 
         /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
         /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
         /// corresponding eigenvalue in 'vals'.
-        abstract SymmetricEigenDecomposition: unit -> ArrayNDT<'T> * ArrayNDT<'T>
+        abstract SymmetricEigenDecomposition: unit -> Tensor<'T> * Tensor<'T>
 
         // enumerator interfaces
         interface IEnumerable<'T> with
@@ -362,7 +362,7 @@ module ArrayND =
             let trgt = this.View (this.ToRng rngArgs) 
             let valueObj = Array.last allArgs
             match valueObj with
-            | :? ArrayNDT<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
+            | :? Tensor<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
             | :? IArrayNDT as ov -> 
                 failwithf "cannot assign data type %A to array of data type %A" 
                           ov.DataType this.DataType
@@ -372,25 +372,25 @@ module ArrayND =
         // item setter does not accept <ParamArray>, thus we have to write it out
         member this.Item
             with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+            and set (arg0: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
         interface IArrayNDT with
@@ -414,7 +414,7 @@ module ArrayND =
                 trgt :> IArrayNDT
             member this.CopyTo dest = 
                 match dest with
-                | :? ArrayNDT<'T> as dest -> this.CopyTo dest
+                | :? Tensor<'T> as dest -> this.CopyTo dest
                 | _ -> failwith "destination must be of same type as source"
             member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
                 this.GetSlice (allArgs) :> IArrayNDT
@@ -449,10 +449,10 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////   
     
     /// get element value
-    let inline get (idx: int64 list) (a: ArrayNDT<_>) = a.[idx]
+    let inline get (idx: int64 list) (a: Tensor<_>) = a.[idx]
     
     /// set element value
-    let inline set (idx: int64 list) value (a: ArrayNDT<_>) = a.[idx] <- value
+    let inline set (idx: int64 list) value (a: Tensor<_>) = a.[idx] <- value
 
     /// if true, then setting NaN or Inf causes and exception to be thrown.
     let CheckFinite = false
@@ -518,7 +518,7 @@ module ArrayND =
         a.NewOfSameType (ArrayNDLayout.newC shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
-    let inline newCOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+    let inline newCOfType shp (a: 'A when 'A :> Tensor<_>) =
         a.NewOfType (ArrayNDLayout.newC shp) 
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
@@ -526,7 +526,7 @@ module ArrayND =
         a.NewOfSameType (ArrayNDLayout.newF shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
-    let inline newFOfType shp (a: 'A when 'A :> ArrayNDT<_>) =
+    let inline newFOfType shp (a: 'A when 'A :> Tensor<_>) =
         a.NewOfType (ArrayNDLayout.newF shp) 
 
     /// creates a new ArrayND with existing data but new layout
@@ -534,12 +534,12 @@ module ArrayND =
         a.NewView newLayout :?> 'A
 
     /// checks that two ArrayNDs have the same shape
-    let inline checkSameShape (a: ArrayNDT<'T>) b =
-        ArrayNDT<'T>.CheckSameShape a b
+    let inline checkSameShape (a: Tensor<'T>) b =
+        Tensor<'T>.CheckSameShape a b
 
     /// Copies all elements from source to destination.
     /// Both ArrayNDs must have the same shape.
-    let inline copyTo (source: #ArrayNDT<'T>) (dest: #ArrayNDT<'T>) =
+    let inline copyTo (source: #Tensor<'T>) (dest: #Tensor<'T>) =
         source.CopyTo dest
 
     /// Returns a contiguous copy of the given ArrayND.
@@ -606,7 +606,7 @@ module ArrayND =
 
     /// broadcasts all arrays to have the same shape
     let inline broadcastToSameMany arys =
-        ArrayNDT<_>.BroadcastToSameMany arys
+        Tensor<_>.BroadcastToSameMany arys
 
     /// broadcasts to have the same size in the given dimensions
     let inline broadcastToSameInDims dims a b =
@@ -707,7 +707,7 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// creates a scalar ArrayND of given value and type
-    let scalarOfSameType (a: 'B when 'B :> ArrayNDT<'T>) (value: 'T) : 'B =
+    let scalarOfSameType (a: 'B when 'B :> Tensor<'T>) (value: 'T) : 'B =
         let ary = newCOfSameType [] a
         set [] value ary
         ary
@@ -719,9 +719,9 @@ module ArrayND =
         ary
 
     /// fills the specified ArrayND with zeros
-    let inline fillWithZeros (a: #ArrayNDT<'T>) =
+    let inline fillWithZeros (a: #Tensor<'T>) =
         for idx in allIdx a do
-            set idx (ArrayNDT<'T>.Zero) a
+            set idx (Tensor<'T>.Zero) a
    
     /// ArrayND of specified shape and same type as a filled with zeros.
     let inline zerosOfSameType shp a =
@@ -737,8 +737,8 @@ module ArrayND =
             a |> set idx value
 
     /// fills the specified ArrayND with ones
-    let fillWithOnes (a: #ArrayNDT<'T>) =
-        a |> fillConst ArrayNDT<'T>.One
+    let fillWithOnes (a: #Tensor<'T>) =
+        a |> fillConst Tensor<'T>.One
 
     /// ArrayND of specified shape and same type as a filled with ones.
     let inline onesOfSameType shp a =
@@ -751,11 +751,11 @@ module ArrayND =
         onesOfSameType (shape a) a
 
     /// fills the diagonal of a quadratic matrix with ones
-    let inline fillDiagonalWithOnes (a: #ArrayNDT<'T>) =
+    let inline fillDiagonalWithOnes (a: #Tensor<'T>) =
         match shape a with
         | [n; m] when n = m ->
             for i in 0L .. n-1L do
-                set [i; i] ArrayNDT<'T>.One a
+                set [i; i] Tensor<'T>.One a
         | _ -> invalidArg "a" "need a quadratic matrix"
 
     /// Creates a new ArrayNDT by selecting elements from `src` according to the specified `indices`.
@@ -763,7 +763,7 @@ module ArrayND =
     /// If None is specified instead of an array in an dimension, the source index will match the 
     /// target index in that dimension.
     /// The result will have the shape of the (broadcasted) index arrays.
-    let gather indices (src: #ArrayNDT<'T>) =
+    let gather indices (src: #Tensor<'T>) =
         let someIndices = indices |> List.choose id
         if List.isEmpty someIndices then
             failwith "need to specify at least one index array"
@@ -788,7 +788,7 @@ module ArrayND =
     /// (or broadcastable to) as `src`.
     /// If None is specified instead of an array in an dimension, the source index will match the 
     /// target index in that dimension.
-    let scatter indices trgtShp (src: #ArrayNDT<'T>) =
+    let scatter indices trgtShp (src: #Tensor<'T>) =
         let bcIndices = indices |> List.map (Option.map (broadcastToShape src.Shape))
         let trgt = newCOfSameType trgtShp src
         trgt.Scatter bcIndices src
@@ -801,36 +801,36 @@ module ArrayND =
    
     /// Applies the given function element-wise to the given ArrayND and 
     /// stores the result in a new ArrayND.
-    let inline map (f: 'T -> 'T) (a: 'A when 'A :> ArrayNDT<'T>) =
+    let inline map (f: 'T -> 'T) (a: 'A when 'A :> Tensor<'T>) =
         a.Map f :?> 'A
 
     /// Applies the given function element-wise to the given ArrayND and 
     /// stores the result in a new ArrayND.
-    let inline mapTC (f: 'T -> 'R) (a: #ArrayNDT<'T>) =
+    let inline mapTC (f: 'T -> 'R) (a: #Tensor<'T>) =
         a.Map f
 
     /// Applies the given function element-wise to the given ArrayND inplace.
-    let inline mapInplace f (a: #ArrayNDT<'T>) =
+    let inline mapInplace f (a: #Tensor<'T>) =
         a.MapInplace f
 
     /// Fills the array with the values returned by the function.
-    let inline fill (f: unit -> 'T) (a: #ArrayNDT<'T>) =
+    let inline fill (f: unit -> 'T) (a: #Tensor<'T>) =
         mapInplace (fun _ -> f ()) a
 
     /// Fills the array with the values returned by the given sequence.
-    let fillWithSeq (data: 'T seq) (a: #ArrayNDT<'T>) =
+    let fillWithSeq (data: 'T seq) (a: #Tensor<'T>) =
         use enumerator = data.GetEnumerator()
         a |> fill (fun () -> 
             if enumerator.MoveNext() then enumerator.Current
             else failwith "sequence ended before ArrayNDT was filled")
 
     /// Fills the array with the values returned by the function.
-    let inline fillIndexed (f: int64 list -> 'T) (a: #ArrayNDT<'T>) =
+    let inline fillIndexed (f: int64 list -> 'T) (a: #Tensor<'T>) =
         for idx in allIdx a do
             a.[idx] <- f idx
             
     /// Fills the vector with linearly spaced values from start to (including) stop.
-    let inline fillLinSpaced (start: 'T) (stop: 'T) (a: #ArrayNDT<'T>) =
+    let inline fillLinSpaced (start: 'T) (stop: 'T) (a: #Tensor<'T>) =
         if a.NDims <> 1 then invalidArg "a" "tensor must be one dimensional"
         if a.NElems < 2L then invalidArg "a" "tensor must have at least two elements"
         let step = (stop - start) / conv<'T> (a.NElems - 1L)
@@ -838,17 +838,17 @@ module ArrayND =
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
-    let inline map2 f (a: 'A when 'A :> ArrayNDT<'T>) (b: 'A) =
+    let inline map2 f (a: 'A when 'A :> Tensor<'T>) (b: 'A) =
         a.Map2 f b :?> 'A
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in a new ArrayND.
-    let inline map2TC (f: 'T -> 'T -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline map2TC (f: 'T -> 'T -> 'R) (a: #Tensor<'T>) (b: #Tensor<'T>) =
         a.Map2 f b 
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
-    let inline map2Inplace f (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline map2Inplace f (a: #Tensor<'T>) (b: #Tensor<'T>) =
         let a, b = broadcastToSame a b
         for idx in allIdx a do
             let cv = f (get idx a) (get idx b)
@@ -859,49 +859,49 @@ module ArrayND =
         failwithf "operation unsupported for type %A" typeof<'T>
 
    
-    let inline uncheckedApply (f: ArrayNDT<'A> -> ArrayNDT<'A>) (a: 'B when 'B :> ArrayNDT<'T>) : 'B =
+    let inline uncheckedApply (f: Tensor<'A> -> Tensor<'A>) (a: 'B when 'B :> Tensor<'T>) : 'B =
         let aCast = a.Cast<'A> ()
         let mCast = f aCast
         let m = a.CastToMe mCast
         m :?> 'B
 
-    let inline uncheckedApplyTypeChange (f: ArrayNDT<'A> -> ArrayNDT<'R>) 
-            (a: 'B when 'B :> ArrayNDT<'T>) : ArrayNDT<'R> =
+    let inline uncheckedApplyTypeChange (f: Tensor<'A> -> Tensor<'R>) 
+            (a: 'B when 'B :> Tensor<'T>) : Tensor<'R> =
         let aCast = a.Cast<'A> ()
         let mCast = f aCast 
         mCast
 
-    let inline uncheckedApply2 (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'A>) 
-            (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : 'B =
+    let inline uncheckedApply2 (f: Tensor<'A> -> Tensor<'A> -> Tensor<'A>) 
+            (a: 'B when 'B :> Tensor<'T>) (b: 'B) : 'B =
         let aCast = a.Cast<'A> ()
         let bCast = b.Cast<'A> ()
         let mCast = f aCast bCast
         let m = a.CastToMe mCast
         m :?> 'B
 
-    let inline uncheckedApply2TypeChange (f: ArrayNDT<'A> -> ArrayNDT<'A> -> ArrayNDT<'R>) 
-            (a: 'B when 'B :> ArrayNDT<'T>) (b: 'B) : ArrayNDT<'R> =
+    let inline uncheckedApply2TypeChange (f: Tensor<'A> -> Tensor<'A> -> Tensor<'R>) 
+            (a: 'B when 'B :> Tensor<'T>) (b: 'B) : Tensor<'R> =
         let aCast = a.Cast<'A> ()
         let bCast = b.Cast<'A> ()
         let mCast = f aCast bCast
         mCast
 
-    let inline uncheckedMap (f: 'A -> 'A) (a: #ArrayNDT<'T>) =
+    let inline uncheckedMap (f: 'A -> 'A) (a: #Tensor<'T>) =
         uncheckedApply (map f) a
 
-    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: #Tensor<'T>) (b: #Tensor<'T>) =
         uncheckedApply2 (map2 f) a b
 
-    let inline uncheckedMap2TypeChange (f: 'A -> 'A -> 'R) (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline uncheckedMap2TypeChange (f: 'A -> 'A -> 'R) (a: #Tensor<'T>) (b: #Tensor<'T>) =
         uncheckedApply2TypeChange (map2TC f) a b
 
-    let inline typedApply   (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>) 
-                            (fDouble: ArrayNDT<double> -> ArrayNDT<double>) 
-                            (fSingle: ArrayNDT<single> -> ArrayNDT<single>)
-                            (fInt:    ArrayNDT<int>    -> ArrayNDT<int>)
-                            (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>)
-                            (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>)
-                            (a: #ArrayNDT<'T>) =
+    let inline typedApply   (fBool:   Tensor<bool>   -> Tensor<bool>) 
+                            (fDouble: Tensor<double> -> Tensor<double>) 
+                            (fSingle: Tensor<single> -> Tensor<single>)
+                            (fInt:    Tensor<int>    -> Tensor<int>)
+                            (fInt64:  Tensor<int64>  -> Tensor<int64>)
+                            (fByte:   Tensor<byte>   -> Tensor<byte>)
+                            (a: #Tensor<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply fBool a 
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
@@ -910,13 +910,13 @@ module ArrayND =
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
 
-    let inline typedApplyTypeChange  (fBool:   ArrayNDT<bool>   -> ArrayNDT<'R>) 
-                                     (fDouble: ArrayNDT<double> -> ArrayNDT<'R>) 
-                                     (fSingle: ArrayNDT<single> -> ArrayNDT<'R>)
-                                     (fInt:    ArrayNDT<int>    -> ArrayNDT<'R>)
-                                     (fInt64:  ArrayNDT<int64>  -> ArrayNDT<'R>)
-                                     (fByte:   ArrayNDT<byte>   -> ArrayNDT<'R>)
-                                     (a: #ArrayNDT<'T>) =
+    let inline typedApplyTypeChange  (fBool:   Tensor<bool>   -> Tensor<'R>) 
+                                     (fDouble: Tensor<double> -> Tensor<'R>) 
+                                     (fSingle: Tensor<single> -> Tensor<'R>)
+                                     (fInt:    Tensor<int>    -> Tensor<'R>)
+                                     (fInt64:  Tensor<int64>  -> Tensor<'R>)
+                                     (fByte:   Tensor<byte>   -> Tensor<'R>)
+                                     (a: #Tensor<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApplyTypeChange fBool a 
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApplyTypeChange fDouble a 
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApplyTypeChange fSingle a 
@@ -925,13 +925,13 @@ module ArrayND =
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApplyTypeChange fByte   a 
         else failwith "unknown type"
 
-    let inline typedApply2  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<bool>) 
-                            (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<double>) 
-                            (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<single>)
-                            (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<int>)
-                            (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>  -> ArrayNDT<int64>)
-                            (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<byte>)
-                            (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline typedApply2  (fBool:   Tensor<bool>   -> Tensor<bool>   -> Tensor<bool>) 
+                            (fDouble: Tensor<double> -> Tensor<double> -> Tensor<double>) 
+                            (fSingle: Tensor<single> -> Tensor<single> -> Tensor<single>)
+                            (fInt:    Tensor<int>    -> Tensor<int>    -> Tensor<int>)
+                            (fInt64:  Tensor<int64>  -> Tensor<int64>  -> Tensor<int64>)
+                            (fByte:   Tensor<byte>   -> Tensor<byte>   -> Tensor<byte>)
+                            (a: #Tensor<'T>) (b: #Tensor<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2 fBool   a b        
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
@@ -940,13 +940,13 @@ module ArrayND =
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
         else failwith "unknown type"
 
-    let inline typedApply2TypeChange  (fBool:   ArrayNDT<bool>   -> ArrayNDT<bool>   -> ArrayNDT<'R>) 
-                                      (fDouble: ArrayNDT<double> -> ArrayNDT<double> -> ArrayNDT<'R>) 
-                                      (fSingle: ArrayNDT<single> -> ArrayNDT<single> -> ArrayNDT<'R>)
-                                      (fInt:    ArrayNDT<int>    -> ArrayNDT<int>    -> ArrayNDT<'R>)
-                                      (fInt64:  ArrayNDT<int64>  -> ArrayNDT<int64>  -> ArrayNDT<'R>)
-                                      (fByte:   ArrayNDT<byte>   -> ArrayNDT<byte>   -> ArrayNDT<'R>)
-                                      (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline typedApply2TypeChange  (fBool:   Tensor<bool>   -> Tensor<bool>   -> Tensor<'R>) 
+                                      (fDouble: Tensor<double> -> Tensor<double> -> Tensor<'R>) 
+                                      (fSingle: Tensor<single> -> Tensor<single> -> Tensor<'R>)
+                                      (fInt:    Tensor<int>    -> Tensor<int>    -> Tensor<'R>)
+                                      (fInt64:  Tensor<int64>  -> Tensor<int64>  -> Tensor<'R>)
+                                      (fByte:   Tensor<byte>   -> Tensor<byte>   -> Tensor<'R>)
+                                      (a: #Tensor<'T>) (b: #Tensor<'T>) =
         if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2TypeChange fBool   a b
         elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2TypeChange fDouble a b
         elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2TypeChange fSingle a b
@@ -961,7 +961,7 @@ module ArrayND =
                         (fInt:    int    -> int)
                         (fInt64:  int64  -> int64)
                         (fByte:   byte   -> byte)
-                        (a: #ArrayNDT<'T>) =
+                        (a: #Tensor<'T>) =
         typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fInt64) (map fByte) a
 
     let inline typedMapTypeChange (fBool:   bool   -> 'R)
@@ -970,7 +970,7 @@ module ArrayND =
                                   (fInt:    int    -> 'R)
                                   (fInt64:  int64  -> 'R)
                                   (fByte:   byte   -> 'R)
-                                  (a: #ArrayNDT<'T>) =
+                                  (a: #Tensor<'T>) =
         typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fInt64) (mapTC fByte) a
 
     let inline typedMap2 (fBool:   bool   -> bool   -> bool)
@@ -979,7 +979,7 @@ module ArrayND =
                          (fInt:    int    -> int    -> int)
                          (fInt64:  int64  -> int64  -> int64)
                          (fByte:   byte   -> byte   -> byte)
-                         (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+                         (a: #Tensor<'T>) (b: #Tensor<'T>) =
         typedApply2 (map2 fBool) (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fInt64) (map2 fByte) a b
 
     let inline typedMap2TypeChange (fBool:   bool   -> bool   -> 'R)
@@ -988,143 +988,143 @@ module ArrayND =
                                    (fInt:    int    -> int    -> 'R)
                                    (fInt64:  int64  -> int64  -> 'R)
                                    (fByte:   byte   -> byte   -> 'R)
-                                   (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+                                   (a: #Tensor<'T>) (b: #Tensor<'T>) =
         typedApply2TypeChange (map2TC fBool) (map2TC fDouble) (map2TC fSingle) (map2TC fInt) (map2TC fInt64) (map2TC fByte) a b
 
     let inline signImpl (x: 'T) =
         conv<'T> (sign x)
 
-    type ArrayNDT<'T> with    
+    type Tensor<'T> with    
 
         // element-wise unary
-        static member (~+)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
-        static member (~-)      (a: #ArrayNDT<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
-        static member Abs       (a: #ArrayNDT<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
-        static member SignT     (a: #ArrayNDT<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
-        static member Log       (a: #ArrayNDT<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
-        static member Log10     (a: #ArrayNDT<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
-        static member Exp       (a: #ArrayNDT<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
-        static member Sin       (a: #ArrayNDT<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
-        static member Cos       (a: #ArrayNDT<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
-        static member Tan       (a: #ArrayNDT<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
-        static member Asin      (a: #ArrayNDT<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
-        static member Acos      (a: #ArrayNDT<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
-        static member Atan      (a: #ArrayNDT<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
-        static member Sinh      (a: #ArrayNDT<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
-        static member Cosh      (a: #ArrayNDT<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
-        static member Tanh      (a: #ArrayNDT<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
-        static member Sqrt      (a: #ArrayNDT<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
-        static member Ceiling   (a: #ArrayNDT<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
-        static member Floor     (a: #ArrayNDT<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
-        static member Round     (a: #ArrayNDT<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
-        static member Truncate  (a: #ArrayNDT<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
+        static member (~+)      (a: #Tensor<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
+        static member (~-)      (a: #Tensor<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
+        static member Abs       (a: #Tensor<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
+        static member SignT     (a: #Tensor<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
+        static member Log       (a: #Tensor<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
+        static member Log10     (a: #Tensor<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
+        static member Exp       (a: #Tensor<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
+        static member Sin       (a: #Tensor<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
+        static member Cos       (a: #Tensor<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
+        static member Tan       (a: #Tensor<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
+        static member Asin      (a: #Tensor<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
+        static member Acos      (a: #Tensor<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
+        static member Atan      (a: #Tensor<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
+        static member Sinh      (a: #Tensor<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
+        static member Cosh      (a: #Tensor<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
+        static member Tanh      (a: #Tensor<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
+        static member Sqrt      (a: #Tensor<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
+        static member Ceiling   (a: #Tensor<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
+        static member Floor     (a: #Tensor<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
+        static member Round     (a: #Tensor<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
+        static member Truncate  (a: #Tensor<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
 
         // element-wise unary logic
-        static member (~~~~)    (a: #ArrayNDT<bool>) = map not a
+        static member (~~~~)    (a: #Tensor<bool>) = map not a
 
         // element-wise binary
-        static member (+) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
-        static member (-) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
-        static member (*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
-        static member (/) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
-        static member (%) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
-        static member Pow (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
+        static member (+) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
+        static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
+        static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
+        static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
+        static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
+        static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
 
         // element-wise binary logic
-        static member (&&&&) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (&&) a b
-        static member (||||) (a: #ArrayNDT<bool>, b: #ArrayNDT<bool>) = map2 (||) a b
+        static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
+        static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
 
         // element-wise binary comparison
-        static member (====) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
-        static member (<<<<) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
-        static member (<<==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
-        static member (>>>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
-        static member (>>==) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
-        static member (<<>>) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
+        static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
+        static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
+        static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
+        static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
+        static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
+        static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
 
         // element-wise binary with scalars
-        static member inline (+) (a: #ArrayNDT<'T>, b: 'T) = a + (scalarOfSameType a b)
-        static member inline (-) (a: #ArrayNDT<'T>, b: 'T) = a - (scalarOfSameType a b)
-        static member inline (*) (a: #ArrayNDT<'T>, b: 'T) = a * (scalarOfSameType a b)
-        static member inline (/) (a: #ArrayNDT<'T>, b: 'T) = a / (scalarOfSameType a b)
-        static member inline (%) (a: #ArrayNDT<'T>, b: 'T) = a % (scalarOfSameType a b)
-        static member inline Pow (a: #ArrayNDT<'T>, b: 'T) = a ** (scalarOfSameType a b)        
-        static member inline (&&&&) (a: #ArrayNDT<bool>, b: bool) = a &&&& (scalarOfSameType a b)
-        static member inline (||||) (a: #ArrayNDT<bool>, b: bool) = a |||| (scalarOfSameType a b)
-        static member (====) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
-        static member (<<<<) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
-        static member (<<==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
-        static member (>>>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
-        static member (>>==) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
-        static member (<<>>) (a: #ArrayNDT<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
+        static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
+        static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
+        static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
+        static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
+        static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
+        static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
+        static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
+        static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
+        static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
+        static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
+        static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
+        static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
+        static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
+        static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
 
-        static member inline (+) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) + b
-        static member inline (-) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) - b
-        static member inline (*) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) * b
-        static member inline (/) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) / b
-        static member inline (%) (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) % b
-        static member inline Pow (a: 'T, b: #ArrayNDT<'T>) = (scalarOfSameType b a) ** b
-        static member inline (&&&&) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) &&&& b
-        static member inline (||||) (a: bool, b: #ArrayNDT<bool>) = (scalarOfSameType b a) |||| b
-        static member (====) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
-        static member (<<<<) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
-        static member (<<==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
-        static member (>>>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
-        static member (>>==) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
-        static member (<<>>) (a: 'T, b: #ArrayNDT<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
+        static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
+        static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
+        static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
+        static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
+        static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
+        static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
+        static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
+        static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
+        static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
+        static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
+        static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
+        static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
+        static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
+        static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
 
         // transposition
         member this.T = transpose this
 
     /// sign keeping type
-    let inline signt (a: #ArrayNDT<'T>) =
-        ArrayNDT<'T>.SignT a 
+    let inline signt (a: #Tensor<'T>) =
+        Tensor<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
     /// Check for exact equality when type is int or bool.
-    let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: Tensor<'T>) (b: Tensor<'T>) =
         match typeof<'T> with
-        | t when t = typeof<bool> -> (box a :?> ArrayNDT<bool>) ==== (box b :?> ArrayNDT<bool>) 
-        | t when t = typeof<int>  -> (box a :?> ArrayNDT<int>)  ==== (box b :?> ArrayNDT<int>) 
+        | t when t = typeof<bool> -> (box a :?> Tensor<bool>) ==== (box b :?> Tensor<bool>) 
+        | t when t = typeof<int>  -> (box a :?> Tensor<int>)  ==== (box b :?> Tensor<int>) 
         | _ ->  abs (a - b) <<== aTol + rTol * abs b
 
     /// Elementwise check if two arrays have same (within machine precision) values.
-    let inline isClose (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline isClose (a: Tensor<'T>) (b: Tensor<'T>) =
         isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     /// Elementwise check if a value is finite (not NaN and not infinite).
-    let inline isFinite (a: ArrayNDT<'T>) =
+    let inline isFinite (a: Tensor<'T>) =
         let isFiniteSingle v = not (System.Single.IsInfinity v || System.Single.IsNaN v)
         let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
         typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) (unsp) a
 
     /// Elementwise picks the maximum of a or b.
-    let inline maxElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline maxElemwise (a: #Tensor<'T>) (b: #Tensor<'T>) =
         typedMap2 (max) (max) (max) (max) (max) (max) a b
 
     /// Elementwise picks the minimum of a or b.
-    let inline minElemwise (a: #ArrayNDT<'T>) (b: #ArrayNDT<'T>) =
+    let inline minElemwise (a: #Tensor<'T>) (b: #Tensor<'T>) =
         typedMap2 (min) (min) (min) (min) (min) (min) a b
 
     /// Elementwise uses elements from ifTrue if cond is true, 
     /// otherwise elements from ifFalse.
-    let inline ifThenElse (cond: #ArrayNDT<bool>) (ifTrue: 'B when 'B :> ArrayNDT<'T>) (ifFalse: 'B) : 'B =
+    let inline ifThenElse (cond: #Tensor<bool>) (ifTrue: 'B when 'B :> Tensor<'T>) (ifFalse: 'B) : 'B =
         ifTrue.IfThenElse cond ifFalse :?> 'B
 
     /// converts the Array from one data type to another
-    let convert (a: #ArrayNDT<'T>) : ArrayNDT<'C> =
+    let convert (a: #Tensor<'T>) : Tensor<'C> =
         a |> mapTC (fun v -> conv<'C> v)
 
     /// converts to int
-    let int (a: #ArrayNDT<'T>) : ArrayNDT<int> =
+    let int (a: #Tensor<'T>) : Tensor<int> =
         convert a
 
     /// converts to float
-    let float (a: #ArrayNDT<'T>) : ArrayNDT<float> =
+    let float (a: #Tensor<'T>) : Tensor<float> =
         convert a
 
     /// converts to single
-    let single (a: #ArrayNDT<'T>) : ArrayNDT<single> =
+    let single (a: #Tensor<'T>) : Tensor<single> =
         convert a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1138,7 +1138,7 @@ module ArrayND =
         | _ -> failwithf "array of shape %A is not a scalar" (shape a)
       
     /// applies the given reduction function over the given dimension
-    let inline axisReduceTypeChange (f: ArrayNDT<'T> -> ArrayNDT<'R>) dim (a: ArrayNDT<'T>) : ArrayNDT<'R> =
+    let inline axisReduceTypeChange (f: Tensor<'T> -> Tensor<'R>) dim (a: Tensor<'T>) : Tensor<'R> =
         checkAxis dim a
         let c = newCOfType (shape a |> List.without dim) a
         for srcRng, dstIdx in ArrayNDLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
@@ -1146,16 +1146,16 @@ module ArrayND =
         c
 
     /// applies the given reduction function over the given dimension
-    let inline axisReduce (f: ArrayNDT<'T> -> ArrayNDT<'T>) dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let inline axisReduce (f: Tensor<'T> -> Tensor<'T>) dim (a: 'A when 'A :> Tensor<'T>) : 'A =
         axisReduceTypeChange f dim a :?> 'A
 
-    let inline private sumImpl (a: ArrayNDT<'T>) =
+    let inline private sumImpl (a: Tensor<'T>) =
         allElems a 
-        |> Seq.fold (+) ArrayNDT<'T>.Zero         
+        |> Seq.fold (+) Tensor<'T>.Zero         
         |> scalarOfSameType a 
 
     /// element-wise sum
-    let sum (a: #ArrayNDT<'T>) =
+    let sum (a: #Tensor<'T>) =
         typedApply (unsp) sumImpl sumImpl sumImpl sumImpl sumImpl a 
 
     /// element-wise sum over given axis
@@ -1163,8 +1163,8 @@ module ArrayND =
         axisReduce sum dim a
 
     /// mean 
-    let mean (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
-        let a = a :> ArrayNDT<'T>
+    let mean (a: 'A when 'A :> Tensor<'T>) : 'A =
+        let a = a :> Tensor<'T>
         sum a / scalarOfSameType a (conv<'T> (nElems a)) :?> 'A
 
     /// mean over given axis
@@ -1172,47 +1172,47 @@ module ArrayND =
         axisReduce mean dim a
 
     /// standard deviation (maximum likelihood estimate for normally distributed variables)
-    let std (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
-        let a = a :> ArrayNDT<'T>
+    let std (a: 'A when 'A :> Tensor<'T>) : 'A =
+        let a = a :> Tensor<'T>
         let v = a - mean a
         v * v |> mean |> sqrt :?> 'A
 
     /// standard deviation (maximum likelihood estimate for normally distributed variables) over given axis
-    let stdAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
-        let a = a :> ArrayNDT<'T>
+    let stdAxis dim (a: 'A when 'A :> Tensor<'T>) : 'A =
+        let a = a :> Tensor<'T>
         let means = a |> meanAxis dim |> insertAxis dim
         let v = a - means 
         v * v |> meanAxis dim |> sqrt :?> 'A
     
     /// tensor, matrix or vector norm of given order
-    let ordNorm (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let ordNorm (ord: 'T) (a: 'A when 'A :> Tensor<'T>) : 'A =
         let ord = scalarOfType a ord
-        let a = a :> ArrayNDT<'T>
+        let a = a :> Tensor<'T>
         let s = a ** ord |> sum
         s ** (onesLike ord / ord) :?> 'A
 
     /// tensor, matrix or vector norm of given order over given axis
-    let ordNormAxis dim (ord: 'T) (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let ordNormAxis dim (ord: 'T) (a: 'A when 'A :> Tensor<'T>) : 'A =
         let ord = scalarOfType a ord
-        let a = a :> ArrayNDT<'T>
+        let a = a :> Tensor<'T>
         let s = a ** ord |> sumAxis dim
         s ** (onesLike ord / ord) :?> 'A
 
     /// L2-norm of tensor, matrix or vector
-    let norm (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let norm (a: 'A when 'A :> Tensor<'T>) : 'A =
         ordNorm (conv<'T> 2) a
 
     /// L2-norm of tensor, matrix or vector over given axis
-    let normAxis dim (a: 'A when 'A :> ArrayNDT<'T>) : 'A =
+    let normAxis dim (a: 'A when 'A :> Tensor<'T>) : 'A =
         ordNormAxis dim (conv<'T> 2) a
 
-    let inline private productImpl (a: ArrayNDT<'T>) =
+    let inline private productImpl (a: Tensor<'T>) =
         allElems a 
-        |> Seq.fold (*) ArrayNDT<'T>.One
+        |> Seq.fold (*) Tensor<'T>.One
         |> scalarOfSameType a 
 
     /// element-wise product
-    let product (a: #ArrayNDT<'T>) =
+    let product (a: #Tensor<'T>) =
         typedApply (unsp) productImpl productImpl productImpl productImpl productImpl a 
 
     /// element-wise product over given axis
@@ -1238,14 +1238,14 @@ module ArrayND =
     let maxAxis dim a = 
         axisReduce max dim a
 
-    let inline private argMaxAxisReduc (a: ArrayNDT<'T>) =
+    let inline private argMaxAxisReduc (a: Tensor<'T>) =
         allIdx a
         |> Seq.maxBy (fun idx -> a |> get idx)
         |> fun idx -> idx.[0]
         |> scalarOfType a
 
     /// positions of maximum values along given axis
-    let argMaxAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int64> =
+    let argMaxAxis dim (a: Tensor<'T>) : Tensor<int64> =
         let f a = axisReduceTypeChange argMaxAxisReduc dim a
         typedApplyTypeChange f f f f f f a
 
@@ -1268,14 +1268,14 @@ module ArrayND =
     let minAxis dim a = 
         axisReduce min dim a
 
-    let inline private argMinAxisReduc (a: ArrayNDT<'T>) =
+    let inline private argMinAxisReduc (a: Tensor<'T>) =
         allIdx a
         |> Seq.minBy (fun idx -> a |> get idx)
         |> fun idx -> idx.[0]
         |> scalarOfType a
 
     /// positions of maximum values along given axis
-    let argMinAxis dim (a: ArrayNDT<'T>) : ArrayNDT<int64> =
+    let argMinAxis dim (a: Tensor<'T>) : Tensor<int64> =
         let f a = axisReduceTypeChange argMinAxisReduc dim a
         typedApplyTypeChange f f f f f f a
 
@@ -1303,7 +1303,7 @@ module ArrayND =
 
     /// Returns true if two arrays have same (within specified precision) values in all elements.
     /// If arrays have different shape, then false is returned.
-    let inline almostEqualWithTol (aTol: 'T) (rTol: 'T) (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline almostEqualWithTol (aTol: 'T) (rTol: 'T) (a: Tensor<'T>) (b: Tensor<'T>) =
         if a.Shape = b.Shape then
             isCloseWithTol aTol rTol a b |> all
         else 
@@ -1313,15 +1313,15 @@ module ArrayND =
 
     /// Returns true if two arrays have same (within machine precision) values in all elements.
     /// If arrays have different shape, then false is returned.
-    let inline almostEqual (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline almostEqual (a: Tensor<'T>) (b: Tensor<'T>) =
         almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
 
     /// Returns true if all values in the tensor are finite (not NaN and not infinite).
-    let inline allFinite (a: ArrayNDT<'T>) =
+    let inline allFinite (a: Tensor<'T>) =
         a |> isFinite |> all
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
-    let inline dotImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+    let inline dotImpl (a: Tensor<'T>) (b: Tensor<'T>) =
         let inline matrixDot a b =
             let nI = (shape a).[0]
             let nJ = (shape a).[1]
@@ -1336,7 +1336,7 @@ module ArrayND =
                     set [i; k] v c
             c
 
-        let inline batchedMatrixDot (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) =
+        let inline batchedMatrixDot (a: Tensor<'T>) (b: Tensor<'T>) =
             let a, b = broadcastToSameInDims [0..nDims a - 3] a b
             let aRows, aCols = (shape a).[nDims a - 2], (shape a).[nDims a - 1]
             let bRows, bCols = (shape b).[nDims b - 2], (shape b).[nDims b - 1]
@@ -1369,9 +1369,9 @@ module ArrayND =
                 failwithf "cannot compute dot product between arrays of shapes %A and %A" 
                     (shape a) (shape b)
 
-    type ArrayNDT<'T> with   
+    type Tensor<'T> with   
         /// dot product
-        static member (.*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
+        static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
 
     /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dot a b =
@@ -1380,7 +1380,7 @@ module ArrayND =
     /// block array specification
     type BlockSpec<'T> =
         | Blocks of BlockSpec<'T> list
-        | Array of ArrayNDT<'T>
+        | Array of Tensor<'T>
 
     /// array constructed of other arrays
     let inline blockArray bs =
@@ -1440,7 +1440,7 @@ module ArrayND =
         joined
     
     /// tensor product
-    let inline tensorProductImpl (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> =
+    let inline tensorProductImpl (a: Tensor<'T>) (b: Tensor<'T>) : Tensor<'T> =
         let a, b = padToSame a b
         let aShp = shape a
 
@@ -1455,22 +1455,22 @@ module ArrayND =
 
         generate [] |> blockArray
    
-    type ArrayNDT<'T> with
+    type Tensor<'T> with
         /// tensor product
-        static member (%*) (a: #ArrayNDT<'T>, b: #ArrayNDT<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
     /// tensor product
-    let inline tensorProduct (a: ArrayNDT<'T>) (b: ArrayNDT<'T>) : ArrayNDT<'T> = a %* b
+    let inline tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) : Tensor<'T> = a %* b
 
     /// Returns a view of the diagonal along the given axes.
     /// The diagonal replaces the first axis and the second axis is removed.
-    let diagAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+    let diagAxis ax1 ax2 (a: #Tensor<'T>) =
         relayout (ArrayNDLayout.diagAxis ax1 ax2 a.Layout) a
 
     /// Returns a view of the diagonal of a matrix as a vector.
     /// If the specified tensor has more than two dimensions, the diagonals
     /// along the last two dimensions are returned.
-    let diag (a: #ArrayNDT<'T>) =
+    let diag (a: #Tensor<'T>) =
         if a.NDims < 2 then
             failwithf "need at least a two dimensional array for diagonal but got shape %A" a.Shape
         diagAxis (a.NDims-2) (a.NDims-1) a
@@ -1478,7 +1478,7 @@ module ArrayND =
     /// Creates a new array of same shape but with ax2 inserted.
     /// The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
     /// The other elements are set to zero.
-    let diagMatAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+    let diagMatAxis ax1 ax2 (a: #Tensor<'T>) =
         if ax1 = ax2 then failwithf "axes to use for diagonal must be different"
         let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
         checkAxis ax1 a
@@ -1494,20 +1494,20 @@ module ArrayND =
     /// All other elements are zero.
     /// If the specified array has more than one dimension, the operation is
     /// performed batch-wise on the last dimension.
-    let diagMat (a: #ArrayNDT<'T>) =
+    let diagMat (a: #Tensor<'T>) =
         if a.NDims < 1 then
             failwithf "need at leat a one-dimensional array to create a diagonal matrix"
         diagMatAxis (a.NDims-1) a.NDims a
 
     /// Computes the traces along the given axes.
-    let traceAxis ax1 ax2 (a: #ArrayNDT<'T>) =
+    let traceAxis ax1 ax2 (a: #Tensor<'T>) =
         let tax = if ax1 < ax2 then ax1 else ax1 - 1
         a |> diagAxis ax1 ax2 |> sumAxis tax
 
     /// Computes the trace of a matrix.
     /// If the specified tensor has more than two dimensions, the traces
     /// along the last two dimensions are returned.
-    let trace (a: #ArrayNDT<'T>) =
+    let trace (a: #Tensor<'T>) =
         if a.NDims < 2 then
             failwithf "need at least a two dimensional array for trace but got shape %A" a.Shape
         traceAxis (a.NDims-2) (a.NDims-1) a
@@ -1515,18 +1515,18 @@ module ArrayND =
     /// Returns the inverse of the given matrix.
     /// If the specified tensor has more than two dimensions, the matrices
     /// consisting of the last two dimensions are inverted.
-    let invert (a: 'A when 'A :> ArrayNDT<_>) : 'A  =
+    let invert (a: 'A when 'A :> Tensor<_>) : 'A  =
         a.Invert () :?> 'A
 
     /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
     /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
     /// corresponding eigenvalue in 'vals'.
-    let symmetricEigenDecomposition (a: 'A when 'A :> ArrayNDT<_>) : 'A * 'A =
+    let symmetricEigenDecomposition (a: 'A when 'A :> Tensor<_>) : 'A * 'A =
         let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
         eigVals :?> 'A, eigVecs :?> 'A
 
     /// calculates the pairwise differences along the given axis
-    let diffAxis ax (a: #ArrayNDT<'T>) =
+    let diffAxis ax (a: #Tensor<'T>) =
         checkAxis ax a
         let shftRng = 
             [for d=0 to a.NDims-1 do
@@ -1539,7 +1539,7 @@ module ArrayND =
         a.[shftRng] - a.[cutRng]
 
     /// calculates the pairwise differences along the last axis
-    let diff (a: #ArrayNDT<'T>) =
+    let diff (a: #Tensor<'T>) =
         diffAxis (a.NDims-1) a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1547,7 +1547,7 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////         
 
     /// Concatenates the list of tensors in the given axis.
-    let concat dim (arys: #ArrayNDT<'T> seq) =
+    let concat dim (arys: #Tensor<'T> seq) =
         let arys = List.ofSeq arys
         if List.isEmpty arys then
             invalidArg "arys" "cannot concatenate empty list of tensors"
@@ -1581,7 +1581,7 @@ module ArrayND =
         cc
 
     /// Replicates the tensor the given number of repetitions along the given axis.
-    let replicate dim reps (ary: #ArrayNDT<'T>) =
+    let replicate dim reps (ary: #Tensor<'T>) =
         ary |> checkAxis dim
         if reps < 0L then
             invalidArg "reps" "number of repetitions cannot be negative"
@@ -1601,7 +1601,7 @@ module ArrayND =
     
     /// Pretty string containing maxElems elements per dimension.
     /// If maxElems is zero, then the elements per dimension are unlimited.
-    let pretty maxElems (a: ArrayNDT<'T>) =
+    let pretty maxElems (a: Tensor<'T>) =
         let maxElems =
             if maxElems > 0L then maxElems
             else Microsoft.FSharp.Core.int64.MaxValue
@@ -1647,7 +1647,7 @@ module ArrayND =
 
         prettyDim " " a                       
 
-    type ArrayNDT<'T> with
+    type Tensor<'T> with
         /// pretty contents string
         member this.Pretty = pretty 10L this
 
@@ -1657,6 +1657,6 @@ module ArrayND =
 
 [<AutoOpen>]
 module ArrayNDTypes2 =
-    type ArrayNDT<'T> = ArrayND.ArrayNDT<'T>
+    type ArrayNDT<'T> = ArrayND.Tensor<'T>
 
 

@@ -74,7 +74,7 @@ module HostEval =
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
                     | Arange (ss, tn) -> 
                         ArrayNDHost.arange (sizeEval ss) 
-                        |> ArrayND.convert :> ArrayNDT<'T> :?> ArrayNDHostT<'T>
+                        |> ArrayND.convert :> Tensor<'T> :?> ArrayNDHostT<'T>
                     | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
@@ -199,7 +199,7 @@ module HostEval =
                             trgt.[aryRng] <- subEval e |> toR
                         trgt |> box
                     | Elements (resShape, elemExpr) -> 
-                        let esv = es |> List.map subEval |> List.map (fun v -> v :> ArrayNDT<'T>)
+                        let esv = es |> List.map subEval |> List.map (fun v -> v :> Tensor<'T>)
                         let nResShape = shapeEval resShape
                         ElemExprHostEval.eval elemExpr esv nResShape |> box
                     | Interpolate ip ->  

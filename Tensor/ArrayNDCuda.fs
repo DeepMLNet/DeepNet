@@ -77,7 +77,7 @@ module ArrayNDCudaTypes =
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                     (layout:    ArrayNDLayoutT, 
                                      storage:   CudaStorageT<'T>) = 
-        inherit ArrayNDT<'T>(layout)
+        inherit Tensor<'T>(layout)
        
         let getElement (index: int64) =
             if typeof<'T> = typeof<bool> then
@@ -113,47 +113,47 @@ module ArrayNDCudaTypes =
                 setElement (ArrayNDLayout.addr pos layout) value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
-            ArrayNDCudaT<'T> (layout) :> ArrayNDT<'T>
+            ArrayNDCudaT<'T> (layout) :> Tensor<'T>
 
         override this.NewOfType<'N> (layout: ArrayNDLayoutT) = 
             // drop constraint on 'N
             let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typeof<'N>|]
-            Activator.CreateInstance (aryType, [|box layout|]) :?> ArrayNDT<'N>
+            Activator.CreateInstance (aryType, [|box layout|]) :?> Tensor<'N>
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDCudaT<'T> (layout, storage) :> ArrayNDT<'T>
+            ArrayNDCudaT<'T> (layout, storage) :> Tensor<'T>
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
             ArrayND.view (this.ToRng allArgs) this
         member this.Item
             with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+            and set (arg0: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
-        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDCudaT<bool>
-        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDCudaT<bool>
-        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<== b :?> ArrayNDCudaT<bool>
-        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDCudaT<bool>
-        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>== b :?> ArrayNDCudaT<bool>            
-        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDCudaT<bool>
+        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) ==== b :?> ArrayNDCudaT<bool>
+        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<<< b :?> ArrayNDCudaT<bool>
+        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<== b :?> ArrayNDCudaT<bool>
+        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>>> b :?> ArrayNDCudaT<bool>
+        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>== b :?> ArrayNDCudaT<bool>            
+        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<>> b :?> ArrayNDCudaT<bool>
 
         /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
         static member NewC shp =
@@ -222,8 +222,8 @@ module ArrayNDCudaTypes =
             dstMemHnd.Dispose ()
             
 
-        override this.CopyTo (dest: ArrayNDT<'T>) =
-            ArrayNDT<'T>.CheckSameShape this dest
+        override this.CopyTo (dest: Tensor<'T>) =
+            Tensor<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDCudaT<'T> as dest ->
                 if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&

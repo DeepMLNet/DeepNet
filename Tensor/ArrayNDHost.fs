@@ -59,7 +59,7 @@ module ArrayNDHostTypes =
     /// an N-dimensional array with reshape and subview abilities stored in host memory
     and ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
                           data:        'T []) = 
-        inherit ArrayNDT<'T>(layout)
+        inherit Tensor<'T>(layout)
         
         let fastLayout = FastLayout.ofLayout layout
 
@@ -102,16 +102,16 @@ module ArrayNDHostTypes =
                 data.[int32 (ArrayNDLayout.addr pos layout)] <- value 
 
         override this.NewOfSameType (layout: ArrayNDLayoutT) = 
-            ArrayNDHostT<'T>(layout) :> ArrayNDT<'T>
+            ArrayNDHostT<'T>(layout) :> Tensor<'T>
 
         override this.NewOfType<'N> (layout: ArrayNDLayoutT) =            
-            ArrayNDHostT<'N>(layout) :> ArrayNDT<'N>
+            ArrayNDHostT<'N>(layout) :> Tensor<'N>
 
         override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDHostT<'T>(layout, data) :> ArrayNDT<'T>
+            ArrayNDHostT<'T>(layout, data) :> Tensor<'T>
 
-        override this.CopyTo (dest: ArrayNDT<'T>) =
-            ArrayNDT<'T>.CheckSameShape this dest
+        override this.CopyTo (dest: Tensor<'T>) =
+            Tensor<'T>.CheckSameShape this dest
             match dest with
             | :? ArrayNDHostT<'T> as dest ->
                 if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
@@ -129,7 +129,7 @@ module ArrayNDHostTypes =
 
             | _ -> base.CopyTo dest
 
-        override this.MapImpl (f: 'T -> 'R) (dest: ArrayNDT<'R>) =
+        override this.MapImpl (f: 'T -> 'R) (dest: Tensor<'R>) =
             let dest = dest :?> ArrayNDHostT<'R>
             let destData = dest.Data
             let destAddrs = FastLayout.allAddr dest.FastLayout
@@ -142,7 +142,7 @@ module ArrayNDHostTypes =
             for thisAddr in thisAddrs do
                 data.[int32 thisAddr] <- f data.[int32 thisAddr]
 
-        override this.Map2Impl (f: 'T -> 'T -> 'R) (other: ArrayNDT<'T>) (dest: ArrayNDT<'R>) =
+        override this.Map2Impl (f: 'T -> 'T -> 'R) (other: Tensor<'T>) (dest: Tensor<'R>) =
             let dest = dest :?> ArrayNDHostT<'R>
             let other = other :?> ArrayNDHostT<'T>
             let destData = dest.Data
@@ -153,7 +153,7 @@ module ArrayNDHostTypes =
             for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
                 destData.[int32 destAddr] <- f data.[int32 thisAddr] otherData.[int32 otherAddr]
 
-        override this.IfThenElseImpl (cond: ArrayNDT<bool>) (elseVal: ArrayNDT<'T>) (dest: ArrayNDT<'T>) =
+        override this.IfThenElseImpl (cond: Tensor<bool>) (elseVal: Tensor<'T>) (dest: Tensor<'T>) =
             let cond = cond :?> ArrayNDHostT<bool>
             let elseVal = elseVal :?> ArrayNDHostT<'T>
             let dest = dest :?> ArrayNDHostT<'T>                
@@ -182,33 +182,33 @@ module ArrayNDHostTypes =
             ArrayND.view (this.ToRng allArgs) this
         member this.Item
             with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: ArrayNDT<'T>) = 
+            and set (arg0: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
         member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ArrayNDT<'T>) = 
+            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
-        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) ==== b :?> ArrayNDHostT<bool>
-        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<<< b :?> ArrayNDHostT<bool>
-        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<== b :?> ArrayNDHostT<bool>
-        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>>> b :?> ArrayNDHostT<bool>
-        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) >>== b :?> ArrayNDHostT<bool>
-        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> ArrayNDT<'T>) <<>> b :?> ArrayNDHostT<bool>
+        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) ==== b :?> ArrayNDHostT<bool>
+        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<<< b :?> ArrayNDHostT<bool>
+        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<== b :?> ArrayNDHostT<bool>
+        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>>> b :?> ArrayNDHostT<bool>
+        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>== b :?> ArrayNDHostT<bool>
+        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<>> b :?> ArrayNDHostT<bool>
 
         /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS
         /// (in column-major order).
@@ -260,7 +260,7 @@ module ArrayNDHostTypes =
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
-            inv :> ArrayNDT<'T>
+            inv :> Tensor<'T>
 
         override this.SymmetricEigenDecomposition () =
             let nd = this.NDims
@@ -280,7 +280,7 @@ module ArrayNDHostTypes =
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
 
-            eigVals.[0L, *] :> ArrayNDT<'T>, eigVecs.T 
+            eigVals.[0L, *] :> Tensor<'T>, eigVecs.T 
 
 
 module ArrayNDHost = 
@@ -355,7 +355,7 @@ module ArrayNDHost =
 
     /// If the specified tensor is on a device, copies it to the host and returns the copy.
     /// If the tensor is already on the host, this does nothing.
-    let fetch (a: #ArrayNDT<'T>) : ArrayNDHostT<'T> =
+    let fetch (a: #Tensor<'T>) : ArrayNDHostT<'T> =
         match box a with
         | :? ArrayNDHostT<'T> as a -> a
         | :? IToArrayNDHostT<'T> as a -> a.ToHost ()
@@ -363,7 +363,7 @@ module ArrayNDHost =
 
     /// converts the from one data type to another
     let convert (a: ArrayNDHostT<'T>) : ArrayNDHostT<'C> =
-        a |> ArrayND.convert :> ArrayNDT<'C> :?> ArrayNDHostT<'C>
+        a |> ArrayND.convert :> Tensor<'C> :?> ArrayNDHostT<'C>
 
     /// Creates a one-dimensional ArrayNDT using the specified data.
     /// The data is referenced, not copied.
