@@ -1656,7 +1656,7 @@ module Tensor =
 
 
 [<AutoOpen>]
-module ArrayNDTypes2 =
+module TensorTypes2 =
     type ArrayNDT<'T> = Tensor.Tensor<'T>
 
 
