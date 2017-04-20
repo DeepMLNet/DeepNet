@@ -15,7 +15,7 @@ type private VarRecordHelpers () =
         | Some stride -> mi.SetStride expr stride
         | None -> ()
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
-        ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
+        ArrayNDHost.scalar value |> dev.ToDev :> ITensor
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
         Expr.extractVar expr
     static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
@@ -103,10 +103,10 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                     | Scalar baseType ->
                         let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
                         let m = mi.MakeGenericMethod baseType
-                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> IArrayNDT
+                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> ITensor
                         varEnv |> VarEnv.addVarSpec fi.VarSpec valueAry
                     | Array _ ->
-                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> IArrayNDT)
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> ITensor)
                 )
             varEnvCache <- Some (value, varEnv)
             varEnv      
@@ -124,7 +124,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 fi.VarSpec.Shape 
                 |> SymSizeEnv.substShape model.CompileEnv.SymSizes
                 |> ShapeSpec.tryEval
-            let stride = Option.map ArrayNDLayout.cStride shp
+            let stride = Option.map TensorLayout.cStride shp
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
                 let mi = typeof<VarRecordHelpers>.GetMethod("PublishLocStride", allBindingFlags)

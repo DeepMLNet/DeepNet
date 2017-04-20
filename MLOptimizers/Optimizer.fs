@@ -20,7 +20,7 @@ module OptimizerTypes =
         abstract member CfgWithLearningRate: learningRate:float -> cfg:'OptCfg -> 'OptCfg
 
         /// Initial optimizer state.
-        abstract member InitialState: cfg:'OptCfg -> parameterValues:IArrayNDT -> 'OptState
+        abstract member InitialState: cfg:'OptCfg -> parameterValues:ITensor -> 'OptState
 
         /// Loads the optimizer state from a HDF5 file with given prefix.
         abstract member LoadState: hdf:HDF5 -> prefix:string -> 'OptState

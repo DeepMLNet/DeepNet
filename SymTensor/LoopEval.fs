@@ -12,12 +12,12 @@ module LoopEval =
     type LoopChannelInfoT = {
         Shape:      NShapeSpecT
         SliceDim:   int
-        Target:     IArrayNDT
+        Target:     ITensor
     }
 
 
     /// build strides information for loop sources and targets
-    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: IArrayNDT list) 
+    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: ITensor list) 
                      (channels: Map<ChannelT, LoopChannelInfoT>) 
                      : VarStridesT * ChannelStridesT * int list option list =
 
@@ -44,7 +44,7 @@ module LoopEval =
                         let strideOrder = 
                             [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
                         let ivCopyStride = 
-                            ArrayNDLayout.orderedStride args.[ivIdx].Shape strideOrder
+                            TensorLayout.orderedStride args.[ivIdx].Shape strideOrder
                             |> List.without sliceDim
                         if chStride <> ivCopyStride then 
                             printfn "Loop stride problem:"
@@ -69,10 +69,10 @@ module LoopEval =
         varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
-    let buildInOut (nIters: int64) (iter: int64) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
+    let buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
                    (vars: Map<VarSpecT, LoopInputT>)
-                   (args: IArrayNDT list) (channels: Map<ChannelT, LoopChannelInfoT>)
-                   : VarEnvT * Map<ChannelT, IArrayNDT> =
+                   (args: ITensor list) (channels: Map<ChannelT, LoopChannelInfoT>)
+                   : VarEnvT * Map<ChannelT, ITensor> =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 

@@ -499,7 +499,7 @@ module CudaExecUnit =
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (ArrayNDLayout.isC hvLayout) then
+                if not (TensorLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // We will transfer variable from host to device during execution.
@@ -705,7 +705,7 @@ module CudaExecUnit =
             (workSize.[d-1], workSize.[d-2], rest)
 
     /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
-    let workDimForElemwise (trgt: IArrayNDT) hetero =
+    let workDimForElemwise (trgt: ITensor) hetero =
         workDimForWorkSize trgt.Shape hetero
 
     /// returns the C++ template instantiation code for the given template and argument list
@@ -1219,7 +1219,7 @@ module CudaExecUnit =
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (ArrayNDLayout.isC hvLayout) then
+                if not (TensorLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // copy
@@ -1329,11 +1329,11 @@ module CudaExecUnit =
                     {
                         LoopEval.Shape       = UExpr.dfltChShape lv.UExpr
                         LoopEval.SliceDim    = lv.SliceDim
-                        LoopEval.Target      = trgtChs.[ch] :> IArrayNDT
+                        LoopEval.Target      = trgtChs.[ch] :> ITensor
                     })
 
             // obtain stride information
-            let srcs = srcsDfltCh() |> List.map (fun s -> s :> IArrayNDT)
+            let srcs = srcsDfltCh() |> List.map (fun s -> s :> ITensor)
             let argStrides, chStrides, srcReqStrideOrder = 
                 LoopEval.buildStrides loopSpec.Vars srcs channelInfos 
 

@@ -19,8 +19,8 @@ module HostEval =
     /// evaluation functions
     type private EvalT =       
 
-        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: ExprT) : IArrayNDT =
-             callGeneric<EvalT, IArrayNDT> "Eval" [expr.Type] (evalEnv, expr)
+        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: ExprT) : ITensor =
+             callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
 
         static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
@@ -57,7 +57,7 @@ module HostEval =
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
             let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
-            let subEvalTypeNeutral (subExpr: ExprT) : IArrayNDT = 
+            let subEvalTypeNeutral (subExpr: ExprT) : ITensor = 
                 EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
@@ -135,7 +135,7 @@ module HostEval =
                         | StoreToVar vs -> 
                             // TODO: stage variable write to avoid overwrite of used variables
                             ArrayND.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
-                            ArrayND.relayout ArrayNDLayout.emptyVector av
+                            ArrayND.relayout TensorLayout.emptyVector av
                         | NullifyJacobian -> av
                         | AssumeJacobian _ -> av
                         | Print msg ->
@@ -215,12 +215,12 @@ module HostEval =
                     |> unbox
 
             if Trace.isActive () then
-                Trace.exprEvaled (expr |> UExpr.toUExpr) (lazy (res :> IArrayNDT))
+                Trace.exprEvaled (expr |> UExpr.toUExpr) (lazy (res :> ITensor))
             res
 
         /// evaluates all channels of a loop
-        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpecT, args: IArrayNDT list) 
-                               : Map<ChannelT, IArrayNDT> =
+        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpecT, args: ITensor list) 
+                               : Map<ChannelT, ITensor> =
 
             // iteration index variables
             let nIters = SizeSpec.eval spec.Length
@@ -262,7 +262,7 @@ module HostEval =
     /// This is done by evaluating the generating expression.
     let evalUExpr (evalEnv: EvalEnvT) uExpr =
         let expr = UExpr.toExpr uExpr
-        callGeneric<EvalT, IArrayNDT> "Eval" [expr.Type] (evalEnv, expr)
+        callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
     /// Evaluates the specified unified expressions.
     /// This is done by evaluating the generating expressions.

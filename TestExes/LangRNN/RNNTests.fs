@@ -84,9 +84,9 @@ module RNNTests =
         let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
         let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
-                                   initial, vInitial :> IArrayNDT 
-                                   target, vTarget :> IArrayNDT] 
+        let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
+                                   initial, vInitial :> ITensor 
+                                   target, vTarget :> ITensor] 
 
         DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
         printfn "Done."
@@ -124,9 +124,9 @@ module RNNTests =
         let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
         let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
-                                   initial, vInitial :> IArrayNDT 
-                                   target, vTarget :> IArrayNDT] 
+        let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
+                                   initial, vInitial :> ITensor 
+                                   target, vTarget :> ITensor] 
 
         let dloss = Deriv.compute loss
         let dinitial = dloss |> Deriv.ofVar initial

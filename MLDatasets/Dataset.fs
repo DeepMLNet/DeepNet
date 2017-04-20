@@ -16,7 +16,7 @@ open Util
 /// To construct a Dataset<_> from a sequence of samples use the
 /// Dataset<_>.FromSamples method.
 [<StructuredFormatDisplay("{Pretty}")>]
-type Dataset<'S> (fieldStorages: IArrayNDT list,
+type Dataset<'S> (fieldStorages: ITensor list,
                   isSeq:         bool) =
 
     do if not (FSharpType.IsRecord typeof<'S>) then
@@ -55,7 +55,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
             failwithf "step index %d is out of range (have %d steps)" step (nSteps())
 
     /// Creates a non-sequence dataset using the specified field storages.
-    new (fieldStorages: IArrayNDT list) = Dataset<'S> (fieldStorages, false)
+    new (fieldStorages: ITensor list) = Dataset<'S> (fieldStorages, false)
 
     /// Constructs a dataset from samples.
     static member New (samples: 'S seq, isSeq: bool) =          
@@ -70,10 +70,10 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
         for smpl, value in Seq.indexed samples do
             ary.[smpl, *] <-
                 FSharpValue.GetRecordFields value
-                |> Array.map (fun v -> v :?> IArrayNDT)
+                |> Array.map (fun v -> v :?> ITensor)
 
         // find largest shape of each field over all samples
-        let maxShape (fieldSmpls: IArrayNDT seq) =
+        let maxShape (fieldSmpls: ITensor seq) =
             let mutable maxShape = Seq.head fieldSmpls |> ArrayND.shape
             for smpl in fieldSmpls do
                 let smplShape = ArrayND.shape smpl
@@ -83,7 +83,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
             maxShape
 
         // build data storage
-        let fieldStorage (fieldSmpls: IArrayNDT seq) =
+        let fieldStorage (fieldSmpls: ITensor seq) =
             let maxSmplShp = maxShape fieldSmpls
             let storShp = (int64 nSamples) :: maxSmplShp
             let fieldTyp = (Seq.head fieldSmpls).DataType
@@ -94,7 +94,7 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
                 else
                     failwithf "the sample with index %d has shape %A but shape %A was expected"
                               smpl smplVal.Shape stor.[smpl, Fill].Shape
-            stor :> IArrayNDT            
+            stor :> ITensor            
         let fieldStorages = 
             [for fld=0 to nFields-1 do yield fieldStorage ary.[*, fld]]
 
@@ -285,10 +285,10 @@ type Dataset<'S> (fieldStorages: IArrayNDT list,
             failwith "Dataset sample type must be a record containing ArrayNDHostTs"
         FSharpType.GetRecordFields typeof<'S>
         |> Seq.map (fun fldInfo ->
-            if not (typeof<IArrayNDT>.IsAssignableFrom fldInfo.PropertyType) then 
+            if not (typeof<ITensor>.IsAssignableFrom fldInfo.PropertyType) then 
                 failwith "Dataset sample type must be a record containing ArrayNDHostTs"
             let dataType = fldInfo.PropertyType.GenericTypeArguments.[0]
-            ArrayNDHDF.readUntyped hdf (prefixPath + "/" + fldInfo.Name) dataType :> IArrayNDT)
+            ArrayNDHDF.readUntyped hdf (prefixPath + "/" + fldInfo.Name) dataType :> ITensor)
         |> Seq.toList
         |> Dataset<'S>
 
@@ -376,9 +376,9 @@ module Dataset =
         else ds
 
     /// maps the field storages using the given function creating a new dataset
-    let map (f: IArrayNDT -> #IArrayNDT) (ds: Dataset<'S>) : Dataset<'S> =
+    let map (f: ITensor -> #ITensor) (ds: Dataset<'S>) : Dataset<'S> =
         ds.FieldStorages
-        |> List.map (f >> (fun fs -> fs :> IArrayNDT))
+        |> List.map (f >> (fun fs -> fs :> ITensor))
         |> fun fs -> Dataset<'S> (fs, ds.IsSeq)
 
     /// copies this dataset to a CUDA GPU

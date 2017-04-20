@@ -664,7 +664,7 @@ module CudaExprWorkspaceTypes =
                         let args = 
                             info.Args 
                             |> List.map (fun manikin -> 
-                                manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> IArrayNDT)
+                                manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> ITensor)
                         let srcVarEnv, resTrgts =
                             LoopEval.buildInOut info.Length iter iterAry iterRemAry info.Vars args lcis
 
@@ -746,7 +746,7 @@ module CudaExprWorkspaceTypes =
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = lazy (resDev.ToHost() :> IArrayNDT)
+                    let resHost = lazy (resDev.ToHost() :> ITensor)
                     let msg = 
                         match previousCall with
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"

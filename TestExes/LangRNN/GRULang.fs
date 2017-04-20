@@ -206,7 +206,7 @@ type GRUInst (VocSize:       int64,
                 | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1L, *]
                 | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
             if smpl.Words.Shape.[1] < 2L then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
-            VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
+            VarEnv.ofSeq [words, smpl.Words :> ITensor; initial, state :> ITensor]
 
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg

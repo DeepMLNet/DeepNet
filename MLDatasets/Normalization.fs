@@ -96,20 +96,20 @@ module Normalization =
         | ZCAWhitened info ->
             Decomposition.ZCA.Reverse (nData, info)
 
-    let private performFieldUntyped n (fs: IArrayNDT) =
+    let private performFieldUntyped n (fs: ITensor) =
         match fs with
         | :? ArrayNDHostT<single> as fs -> 
-            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
+            let info, res = performField n fs in info :> INormalization, res :> ITensor
         | :? ArrayNDHostT<double> as fs -> 
-            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
+            let info, res = performField n fs in info :> INormalization, res :> ITensor
         | _ -> failwithf "normalization requires a dataset stored in CPU memory"
 
-    let private reverseFieldUntyped (n: INormalization) (fs: IArrayNDT) =
+    let private reverseFieldUntyped (n: INormalization) (fs: ITensor) =
         match fs with
         | :? ArrayNDHostT<single> as fs -> 
-            reverseField (n :?> Normalization<single>) fs :> IArrayNDT
+            reverseField (n :?> Normalization<single>) fs :> ITensor
         | :? ArrayNDHostT<double> as fs -> 
-            reverseField (n :?> Normalization<double>) fs :> IArrayNDT
+            reverseField (n :?> Normalization<double>) fs :> ITensor
         | _ -> failwithf "normalization requires a dataset stored in CPU memory"
 
     /// Normalizes each field of the specified Dataset using the specified normalizier.

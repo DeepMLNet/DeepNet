@@ -12,12 +12,12 @@ module FastLayoutTypes =
         val Shape   : int64 []
         val Stride  : int64 []
 
-        new (layout: ArrayNDLayoutT) = {
-            NDims   = ArrayNDLayout.nDims layout
-            NElems  = ArrayNDLayout.nElems layout
-            Offset  = ArrayNDLayout.offset layout
-            Shape   = ArrayNDLayout.shape layout |> List.toArray
-            Stride  = ArrayNDLayout.stride layout |> List.toArray
+        new (layout: TensorLayout) = {
+            NDims   = TensorLayout.nDims layout
+            NElems  = TensorLayout.nElems layout
+            Offset  = TensorLayout.offset layout
+            Shape   = TensorLayout.shape layout |> List.toArray
+            Stride  = TensorLayout.stride layout |> List.toArray
         }
 
 

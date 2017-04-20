@@ -4,9 +4,9 @@ open Basics
 
 
 [<AutoOpen>]
-module ArrayNDLayoutTypes =
+module TensorLayoutTypes =
     // layout (shape, offset, stride) of an ArrayND
-    type ArrayNDLayoutT = {
+    type TensorLayout = {
         /// shape
         Shape:  int64 list
         /// offset in elements
@@ -17,7 +17,7 @@ module ArrayNDLayoutTypes =
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]
-    type RangeT = 
+    type TensorRng = 
         /// single element
         | RngElem of int64
         /// range from / to (including)
@@ -42,7 +42,7 @@ module ArrayNDLayoutTypes =
     let RngAll = Rng (None, None)
 
 
-module ArrayNDLayout =
+module TensorLayout =
 
     /// checks that the layout is valid
     let inline check a =

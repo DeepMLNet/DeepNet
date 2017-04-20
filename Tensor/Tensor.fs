@@ -7,7 +7,7 @@ open Basics
 
 
 [<AutoOpen>]
-module ArrayNDTypes =
+module TensorTypes =
 
     /// Array storage location
     [<StructuredFormatDisplay("{Pretty}")>]
@@ -32,29 +32,29 @@ module ArrayNDTypes =
     exception SingularMatrixError of string
 
     /// ArrayND of any type
-    type IArrayNDT =
-        abstract Layout:            ArrayNDLayoutT
+    type ITensor =
+        abstract Layout:            TensorLayout
         abstract Shape:             int64 list
         abstract NDims:             int
         abstract NElems:            int64
         abstract CPPType:           string
-        abstract NewView:           ArrayNDLayoutT -> IArrayNDT
-        abstract NewOfSameType:     ArrayNDLayoutT -> IArrayNDT
-        abstract NewOfType:         ArrayNDLayoutT -> System.Type -> IArrayNDT
+        abstract NewView:           TensorLayout -> ITensor
+        abstract NewOfSameType:     TensorLayout -> ITensor
+        abstract NewOfType:         TensorLayout -> System.Type -> ITensor
         abstract DataType:          System.Type
         abstract Location:          ArrayLocT
-        abstract Copy:              unit -> IArrayNDT
-        abstract CopyTo:            IArrayNDT -> unit
-        abstract GetSlice:          [<System.ParamArray>] args: obj [] -> IArrayNDT
+        abstract Copy:              unit -> ITensor
+        abstract CopyTo:            ITensor -> unit
+        abstract GetSlice:          [<System.ParamArray>] args: obj [] -> ITensor
         abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
-        abstract Item:              [<System.ParamArray>] allArgs: obj [] -> IArrayNDT with get
-        abstract Item:              obj -> IArrayNDT with set
-        abstract Item:              obj * obj -> IArrayNDT with set
-        abstract Item:              obj * obj * obj -> IArrayNDT with set
-        abstract Item:              obj * obj * obj * obj -> IArrayNDT with set
-        abstract Item:              obj * obj * obj * obj * obj -> IArrayNDT with set
-        abstract Item:              obj * obj * obj * obj * obj * obj -> IArrayNDT with set
-        abstract Item:              obj * obj * obj * obj * obj * obj * obj -> IArrayNDT with set
+        abstract Item:              [<System.ParamArray>] allArgs: obj [] -> ITensor with get
+        abstract Item:              obj -> ITensor with set
+        abstract Item:              obj * obj -> ITensor with set
+        abstract Item:              obj * obj * obj -> ITensor with set
+        abstract Item:              obj * obj * obj * obj -> ITensor with set
+        abstract Item:              obj * obj * obj * obj * obj -> ITensor with set
+        abstract Item:              obj * obj * obj * obj * obj * obj -> ITensor with set
+        abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
 
 
     type SpecialAxisT =
@@ -70,8 +70,8 @@ module ArrayND =
     /// an N-dimensional array with reshape and subview abilities
     [<AbstractClass>]
     [<StructuredFormatDisplay("{Pretty}")>]
-    type Tensor<'T> (layout: ArrayNDLayoutT) =
-        do ArrayNDLayout.check layout
+    type Tensor<'T> (layout: TensorLayout) =
+        do TensorLayout.check layout
 
         /// layout
         member this.Layout = layout
@@ -86,20 +86,20 @@ module ArrayND =
         abstract Item : int64 list -> 'T with get, set
 
         /// a new ArrayND of same type and new storage allocation for given layout
-        abstract NewOfSameType : ArrayNDLayoutT -> Tensor<'T>
+        abstract NewOfSameType : TensorLayout -> Tensor<'T>
 
         /// a new ArrayND of given type and new storage allocation for given layout
-        abstract NewOfType<'N> : ArrayNDLayoutT -> Tensor<'N>
+        abstract NewOfType<'N> : TensorLayout -> Tensor<'N>
 
         /// a new ArrayND of same type with same storage allocation but new layout
-        abstract NewView : ArrayNDLayoutT -> Tensor<'T>
+        abstract NewView : TensorLayout -> Tensor<'T>
 
         /// C++ type name
         member this.CPPType = 
-            let dims = ArrayNDLayout.nDims layout
-            let shp = ArrayNDLayout.shape layout
-            let str = ArrayNDLayout.stride layout
-            let ofst = ArrayNDLayout.offset layout
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
+            let str = TensorLayout.stride layout
+            let ofst = TensorLayout.offset layout
             let cppDataType = Util.cppType this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
@@ -127,9 +127,9 @@ module ArrayND =
 
         /// checks that two ArrayNDs have the same shape
         static member inline CheckSameShape (a: Tensor<'T>) (b: Tensor<'T>) =
-            if (ArrayNDLayout.shape a.Layout) <> (ArrayNDLayout.shape b.Layout) then
+            if (TensorLayout.shape a.Layout) <> (TensorLayout.shape b.Layout) then
                 failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
-                    (ArrayNDLayout.shape a.Layout) (ArrayNDLayout.shape b.Layout)
+                    (TensorLayout.shape a.Layout) (TensorLayout.shape b.Layout)
 
         /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
         /// Both ArrayNDTs must be of same shape.
@@ -141,30 +141,30 @@ module ArrayND =
                          (this message is only shown once)"
                 SlowCopyWarningShown <- true
             Tensor<'T>.CheckSameShape this dest
-            for idx in ArrayNDLayout.allIdx this.Layout do
+            for idx in TensorLayout.allIdx this.Layout do
                 dest.[idx] <- this.[idx]
 
         /// a view of this ArrayNDT over the given range 
         member this.View rng =
-            this.NewView (ArrayNDLayout.view rng this.Layout)
+            this.NewView (TensorLayout.view rng this.Layout)
 
         /// shape
-        member this.Shape = ArrayNDLayout.shape this.Layout
+        member this.Shape = TensorLayout.shape this.Layout
 
         /// number of dimensions
-        member this.NDims = ArrayNDLayout.nDims this.Layout
+        member this.NDims = TensorLayout.nDims this.Layout
 
         /// number of elements
-        member this.NElems = ArrayNDLayout.nElems this.Layout
+        member this.NElems = TensorLayout.nElems this.Layout
 
         /// broadcasts this and other to the same shape if possible
         member this.BroadcastToSame (other: Tensor<_>) =
-            let lThis, lOther = ArrayNDLayout.broadcastToSame this.Layout other.Layout
+            let lThis, lOther = TensorLayout.broadcastToSame this.Layout other.Layout
             this.NewView lThis, other.NewView lOther
 
         /// broadcasts this and other1 and other2 to the same shape if possible
         member this.BroadcastToSame3 (other1: Tensor<_>) (other2: Tensor<_>) =
-            let layouts = ArrayNDLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
+            let layouts = TensorLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
             match layouts with
             | [lThis; lOther1; lOther2] ->
                 this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
@@ -172,31 +172,31 @@ module ArrayND =
 
         /// broadcast the list of arrays to the same shape if possible
         static member BroadcastToSameMany (arys: 'A list when 'A :> Tensor<'T>) =
-            let layouts = ArrayNDLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
+            let layouts = TensorLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
             List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
 
         /// broadcasts this array to the given shape if possible
         member this.BroadcastToShape shp = 
-            let l = ArrayNDLayout.broadcastToShape shp this.Layout
+            let l = TensorLayout.broadcastToShape shp this.Layout
             this.NewView l
 
         /// implements a storage specific version of map
         abstract MapImpl: ('T -> 'R) -> Tensor<'R> -> unit
         default this.MapImpl f result =
             // slow fallback mapping
-            for idx in ArrayNDLayout.allIdx this.Layout do
+            for idx in TensorLayout.allIdx this.Layout do
                 result.[idx] <- f this.[idx]
 
         /// maps all elements using the specified function into a new ArrayNDT
         member this.Map (f: 'T -> 'R) =
-            let res = this.NewOfType<'R> (ArrayNDLayout.newC this.Shape)
+            let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
             this.MapImpl f res
             res
 
         abstract MapInplaceImpl: ('T -> 'T) -> unit
         default this.MapInplaceImpl f = 
             // slow fallback mapping
-            for idx in ArrayNDLayout.allIdx this.Layout do
+            for idx in TensorLayout.allIdx this.Layout do
                 this.[idx] <- f this.[idx]
 
         /// maps all elements using the specified function in-place
@@ -205,7 +205,7 @@ module ArrayND =
 
         abstract Map2Impl: ('T -> 'T -> 'R) -> Tensor<'T> -> Tensor<'R> -> unit
         default this.Map2Impl f other result =
-            for idx in ArrayNDLayout.allIdx this.Layout do
+            for idx in TensorLayout.allIdx this.Layout do
                 result.[idx] <- f this.[idx] other.[idx]
 
         /// maps all elements of this and other using the specified function into a new ArrayNDT
@@ -214,13 +214,13 @@ module ArrayND =
                 failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (other.GetType())
             let this, other = this.BroadcastToSame other
-            let res = this.NewOfType<'R> (ArrayNDLayout.newC this.Shape)
+            let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
             this.Map2Impl f other res
             res
 
         abstract IfThenElseImpl: Tensor<bool> -> Tensor<'T> -> Tensor<'T> -> unit
         default this.IfThenElseImpl cond elseVal result =
-            for idx in ArrayNDLayout.allIdx this.Layout do
+            for idx in TensorLayout.allIdx this.Layout do
                 result.[idx] <- if cond.[idx] then this.[idx] else elseVal.[idx]
 
         /// elementwise uses elements from this if cond is true, 
@@ -233,13 +233,13 @@ module ArrayND =
                 failwithf "cannot use IfThenElse on ArrayNDTs of different types: %A and %A"
                     (this.GetType()) (cond.GetType())
             let ifVal, elseVal, cond = this.BroadcastToSame3 elseVal cond
-            let res = this.NewOfSameType (ArrayNDLayout.newC ifVal.Shape)
+            let res = this.NewOfSameType (TensorLayout.newC ifVal.Shape)
             ifVal.IfThenElseImpl cond elseVal res
             res
 
         abstract GatherImpl: #Tensor<int64> option list -> Tensor<'T> -> unit
         default trgt.GatherImpl indices src =
-            for trgtIdx in ArrayNDLayout.allIdx trgt.Layout do
+            for trgtIdx in TensorLayout.allIdx trgt.Layout do
                 let srcIdx = 
                     indices 
                     |> List.mapi (fun dim idx ->
@@ -283,7 +283,7 @@ module ArrayND =
                 | t when t=typeof<double> -> addDouble
                 | t when t=typeof<bool> -> addBool
                 | t -> failwithf "unsupported type: %A" t
-            for srcIdx in ArrayNDLayout.allIdx src.Layout do
+            for srcIdx in TensorLayout.allIdx src.Layout do
                 let trgtIdx =
                     indices
                     |> List.mapi (fun dim idx ->
@@ -326,7 +326,7 @@ module ArrayND =
         // enumerator interfaces
         interface IEnumerable<'T> with
             member this.GetEnumerator() =
-                ArrayNDLayout.allIdx this.Layout
+                TensorLayout.allIdx this.Layout
                 |> Seq.map (fun idx -> this.[idx])
                 |> fun s -> s.GetEnumerator()
             member this.GetEnumerator() =
@@ -337,7 +337,7 @@ module ArrayND =
             let rec toRng (args: obj list) =
                 match args with
                 // direct range specification
-                | [:? (RangeT list) as rngs] -> rngs
+                | [:? (TensorRng list) as rngs] -> rngs
                 // slices
                 | (:? (int64 option) as so) :: (:? (int64 option) as fo)  :: rest ->
                     Rng (so, fo) :: toRng rest
@@ -363,7 +363,7 @@ module ArrayND =
             let valueObj = Array.last allArgs
             match valueObj with
             | :? Tensor<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
-            | :? IArrayNDT as ov -> 
+            | :? ITensor as ov -> 
                 failwithf "cannot assign data type %A to array of data type %A" 
                           ov.DataType this.DataType
             | _ -> failwithf "need array of same type to assign, but got type %A" 
@@ -393,54 +393,54 @@ module ArrayND =
             with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
-        interface IArrayNDT with
+        interface ITensor with
             member this.Layout = this.Layout
             member this.CPPType = this.CPPType   
             member this.Shape = this.Shape
             member this.NDims = this.NDims
             member this.NElems = this.NElems      
-            member this.NewView layout = this.NewView layout :> IArrayNDT    
-            member this.NewOfSameType layout = this.NewOfSameType layout :> IArrayNDT
+            member this.NewView layout = this.NewView layout :> ITensor    
+            member this.NewOfSameType layout = this.NewOfSameType layout :> ITensor
             member this.NewOfType layout typ = 
                 let gm = this.GetType().GetMethod("NewOfType")
                 let m = gm.MakeGenericMethod [|typ|]
-                m.Invoke(this, [|box layout|]) :?> IArrayNDT
+                m.Invoke(this, [|box layout|]) :?> ITensor
             member this.DataType = this.DataType
             member this.Location = this.Location
             member this.Copy () = 
-                let shp = ArrayNDLayout.shape this.Layout
-                let trgt = this.NewOfSameType (ArrayNDLayout.newC shp)
+                let shp = TensorLayout.shape this.Layout
+                let trgt = this.NewOfSameType (TensorLayout.newC shp)
                 this.CopyTo trgt
-                trgt :> IArrayNDT
+                trgt :> ITensor
             member this.CopyTo dest = 
                 match dest with
                 | :? Tensor<'T> as dest -> this.CopyTo dest
                 | _ -> failwith "destination must be of same type as source"
             member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-                this.GetSlice (allArgs) :> IArrayNDT
+                this.GetSlice (allArgs) :> ITensor
             member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
                 this.SetSlice (allArgs)
             member this.Item
-                with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> IArrayNDT
-                and set (arg0: obj) (value: IArrayNDT) = 
+                with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> ITensor
+                and set (arg0: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj, arg2: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
             member this.Item
-                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: IArrayNDT) = 
+                with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ITensor) = 
                     this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
 
@@ -472,65 +472,65 @@ module ArrayND =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// location
-    let inline location (a: #IArrayNDT) = a.Location
+    let inline location (a: #ITensor) = a.Location
 
     /// layout
-    let inline layout (a: #IArrayNDT) = a.Layout
+    let inline layout (a: #ITensor) = a.Layout
 
     /// number of dimensions
-    let inline nDims a = layout a |> ArrayNDLayout.nDims
+    let inline nDims a = layout a |> TensorLayout.nDims
 
     /// number of elements 
-    let inline nElems a = layout a |> ArrayNDLayout.nElems
+    let inline nElems a = layout a |> TensorLayout.nElems
     
     /// shape in elements
-    let inline shape a = layout a |> ArrayNDLayout.shape
+    let inline shape a = layout a |> TensorLayout.shape
 
     /// stride in elements
-    let inline stride a = layout a |> ArrayNDLayout.stride
+    let inline stride a = layout a |> TensorLayout.stride
 
     /// offset in elements
-    let inline offset a = layout a |> ArrayNDLayout.offset
+    let inline offset a = layout a |> TensorLayout.offset
 
     /// checks that the given axis is valid
-    let inline checkAxis ax a = layout a |> ArrayNDLayout.checkAxis ax
+    let inline checkAxis ax a = layout a |> TensorLayout.checkAxis ax
 
     /// sequence of all indices 
-    let inline allIdx a = layout a |> ArrayNDLayout.allIdx
+    let inline allIdx a = layout a |> TensorLayout.allIdx
 
     /// all indices of the given dimension
-    let inline allIdxOfDim dim a = layout a |> ArrayNDLayout.allIdxOfDim dim 
+    let inline allIdxOfDim dim a = layout a |> TensorLayout.allIdxOfDim dim 
             
     /// sequence of all elements of a ArrayND
     let inline allElems a = allIdx a |> Seq.map (fun i -> get i a)
 
     /// true if the ArrayND is contiguous
-    let inline isC a = layout a |> ArrayNDLayout.isC
+    let inline isC a = layout a |> TensorLayout.isC
 
     /// true if the ArrayND is in Fortran order
-    let inline isF a = layout a |> ArrayNDLayout.isF
+    let inline isF a = layout a |> TensorLayout.isF
 
     /// true if the memory of the ArrayND is a contiguous block
-    let inline hasContiguousMemory a = layout a |> ArrayNDLayout.hasContiguousMemory
+    let inline hasContiguousMemory a = layout a |> TensorLayout.hasContiguousMemory
 
     /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newCOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
-        a.NewOfSameType (ArrayNDLayout.newC shp) :?> 'A
+    let inline newCOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
+        a.NewOfSameType (TensorLayout.newC shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
     let inline newCOfType shp (a: 'A when 'A :> Tensor<_>) =
-        a.NewOfType (ArrayNDLayout.newC shp) 
+        a.NewOfType (TensorLayout.newC shp) 
 
     /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newFOfSameType shp (a: 'A when 'A :> IArrayNDT) : 'A =
-        a.NewOfSameType (ArrayNDLayout.newF shp) :?> 'A
+    let inline newFOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
+        a.NewOfSameType (TensorLayout.newF shp) :?> 'A
 
     /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
     let inline newFOfType shp (a: 'A when 'A :> Tensor<_>) =
-        a.NewOfType (ArrayNDLayout.newF shp) 
+        a.NewOfType (TensorLayout.newF shp) 
 
     /// creates a new ArrayND with existing data but new layout
-    let inline relayout newLayout (a: 'A when 'A :> IArrayNDT)  =
+    let inline relayout newLayout (a: 'A when 'A :> ITensor)  =
         a.NewView newLayout :?> 'A
 
     /// checks that two ArrayNDs have the same shape
@@ -549,7 +549,7 @@ module ArrayND =
         dest
 
     /// Returns a contiguous copy of the given IArrayNDT.
-    let inline copyUntyped (source: 'T when 'T :> IArrayNDT) =
+    let inline copyUntyped (source: 'T when 'T :> ITensor) =
         source.Copy() :?> 'T
 
     /// If the ArrayND is not contiguous, returns a contiguous copy; otherwise
@@ -572,36 +572,36 @@ module ArrayND =
 
     /// inserts a broadcastable dimension of size one as first dimension
     let inline padLeft a =
-        relayout (ArrayNDLayout.padLeft (layout a)) a
+        relayout (TensorLayout.padLeft (layout a)) a
 
     /// appends a broadcastable dimension of size one as last dimension
     let inline padRight a =
-        relayout (ArrayNDLayout.padRight (layout a)) a
+        relayout (TensorLayout.padRight (layout a)) a
 
     /// Inserts an axis of size 1 before the specified position.
     let inline insertAxis ax a =
-        relayout (ArrayNDLayout.insertAxis ax (layout a)) a
+        relayout (TensorLayout.insertAxis ax (layout a)) a
 
     /// cuts one dimension from the left
     let inline cutLeft a =
-        relayout (ArrayNDLayout.cutLeft (layout a)) a
+        relayout (TensorLayout.cutLeft (layout a)) a
       
     /// cuts one dimension from the right
     let inline cutRight a =
-        relayout (ArrayNDLayout.cutRight (layout a)) a        
+        relayout (TensorLayout.cutRight (layout a)) a        
 
     /// broadcast the given dimension to the given size
     let inline broadcastDim dim size a =
-        relayout (ArrayNDLayout.broadcastDim dim size (layout a)) a        
+        relayout (TensorLayout.broadcastDim dim size (layout a)) a        
 
     /// pads shapes from the left until they have same rank
     let inline padToSame a b =
-        let la, lb = ArrayNDLayout.padToSame (layout a) (layout b)
+        let la, lb = TensorLayout.padToSame (layout a) (layout b)
         relayout la a, relayout lb b
 
     /// broadcasts to have the same size
     let inline broadcastToSame a b =
-        let la, lb = ArrayNDLayout.broadcastToSame (layout a) (layout b)
+        let la, lb = TensorLayout.broadcastToSame (layout a) (layout b)
         relayout la a, relayout lb b
 
     /// broadcasts all arrays to have the same shape
@@ -610,22 +610,22 @@ module ArrayND =
 
     /// broadcasts to have the same size in the given dimensions
     let inline broadcastToSameInDims dims a b =
-        let la, lb = ArrayNDLayout.broadcastToSameInDims dims (layout a) (layout b)
+        let la, lb = TensorLayout.broadcastToSameInDims dims (layout a) (layout b)
         relayout la a, relayout lb b
 
     /// broadcasts a ArrayND to the given shape
     let inline broadcastToShape shp a =
-        relayout (ArrayNDLayout.broadcastToShape shp (layout a)) a
+        relayout (TensorLayout.broadcastToShape shp (layout a)) a
 
     /// returns true if at least one dimension is broadcasted
     let inline isBroadcasted a =
-        ArrayNDLayout.isBroadcasted (layout a)
+        TensorLayout.isBroadcasted (layout a)
 
     /// Tries to reshape array assuming a contiguous (row-major) memory layout without copying.
     /// If this is not possible, None is returned.
     /// The number of elements must not change.
     let inline tryReshapeView shp a =
-        match ArrayNDLayout.tryReshape shp (layout a) with
+        match TensorLayout.tryReshape shp (layout a) with
         | Some newLayout -> a |> relayout newLayout |> Some
         | None -> None
 
@@ -633,7 +633,7 @@ module ArrayND =
     /// If this is not possible, an error is raised. 
     /// The number of elements must not change.
     let inline reshapeView shp a =
-        a |> relayout (ArrayNDLayout.reshape shp (layout a))
+        a |> relayout (TensorLayout.reshape shp (layout a))
 
     /// Returns true if the array can be reshaped without copying.
     let inline canReshapeView shp a =
@@ -657,26 +657,26 @@ module ArrayND =
 
     /// swaps the given dimensions
     let inline swapDim ax1 ax2 a =
-        relayout (ArrayNDLayout.swapDim ax1 ax2 (layout a)) a
+        relayout (TensorLayout.swapDim ax1 ax2 (layout a)) a
 
     /// Transposes the given matrix.
     /// If the array has more then two dimensions, the last two axes are swapped.
     let inline transpose a =
-        relayout (ArrayNDLayout.transpose (layout a)) a
+        relayout (TensorLayout.transpose (layout a)) a
 
     /// Permutes the axes as specified.
     /// Each entry in the specified permutation specifies the *new* position of 
     /// the corresponding axis, i.e. to which position the axis should move.
     let inline permuteAxes (permut: int list) a =
-        a |> relayout (layout a |> ArrayNDLayout.permuteAxes permut)
+        a |> relayout (layout a |> TensorLayout.permuteAxes permut)
 
     /// Reverses the elements in the specified dimension.
     let reverseAxis ax a =
-        a |> relayout (layout a |> ArrayNDLayout.reverseAxis ax)        
+        a |> relayout (layout a |> TensorLayout.reverseAxis ax)        
 
     /// creates a view of an ArrayND
     let inline view ranges a =
-        relayout (ArrayNDLayout.view ranges (layout a)) a        
+        relayout (TensorLayout.view ranges (layout a)) a        
     
     /// Ensures that the tensor has at least one dimension.
     let atLeast1D a =
@@ -1141,7 +1141,7 @@ module ArrayND =
     let inline axisReduceTypeChange (f: Tensor<'T> -> Tensor<'R>) dim (a: Tensor<'T>) : Tensor<'R> =
         checkAxis dim a
         let c = newCOfType (shape a |> List.without dim) a
-        for srcRng, dstIdx in ArrayNDLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
+        for srcRng, dstIdx in TensorLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
             set dstIdx (f (view srcRng a) |> get []) c
         c
 
@@ -1465,7 +1465,7 @@ module ArrayND =
     /// Returns a view of the diagonal along the given axes.
     /// The diagonal replaces the first axis and the second axis is removed.
     let diagAxis ax1 ax2 (a: #Tensor<'T>) =
-        relayout (ArrayNDLayout.diagAxis ax1 ax2 a.Layout) a
+        relayout (TensorLayout.diagAxis ax1 ax2 a.Layout) a
 
     /// Returns a view of the diagonal of a matrix as a vector.
     /// If the specified tensor has more than two dimensions, the diagonals

@@ -136,7 +136,7 @@ module ElemExprHostEval =
     /// evaluates all elements of an element expression
     let eval (expr: ElemExprT) (args: ArrayNDT<'T> list) (resShape: NShapeSpecT) =
         let res = ArrayNDHost.zeros<'T> resShape
-        for idx in ArrayNDLayout.allIdxOfShape resShape do
+        for idx in TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix
             let ev = evalElement expr args symIdx 
             ArrayND.set idx ev res

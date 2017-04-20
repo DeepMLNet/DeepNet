@@ -69,13 +69,13 @@ module ArrayNDCudaTypes =
 
     /// type-neutral interface to an ArrayNDCudaT
     type IArrayNDCudaT =
-        inherit IArrayNDT
+        inherit ITensor
         abstract Storage: ICudaStorage
         abstract ToHost: unit -> IArrayNDHostT
 
     /// an N-dimensional array with reshape and subview abilities stored in GPU device memory
     type ArrayNDCudaT<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                                    (layout:    ArrayNDLayoutT, 
+                                    (layout:    TensorLayout, 
                                      storage:   CudaStorageT<'T>) = 
         inherit Tensor<'T>(layout)
        
@@ -97,8 +97,8 @@ module ArrayNDCudaTypes =
                 storage.Data.CopyToDevice(value, SizeT (index * sizeof64<'T>))
 
         /// a new ArrayND stored on the GPU using newly allocated device memory
-        new (layout: ArrayNDLayoutT) =
-            let elems = ArrayNDLayout.nElems layout
+        new (layout: TensorLayout) =
+            let elems = TensorLayout.nElems layout
             ArrayNDCudaT<'T> (layout, new CudaStorageT<'T> (elems))
 
         /// storage
@@ -107,20 +107,20 @@ module ArrayNDCudaTypes =
         override this.Location = LocDev
 
         override this.Item
-            with get pos = getElement (ArrayNDLayout.addr pos layout)
+            with get pos = getElement (TensorLayout.addr pos layout)
             and set pos value = 
                 ArrayND.doCheckFinite value            
-                setElement (ArrayNDLayout.addr pos layout) value 
+                setElement (TensorLayout.addr pos layout) value 
 
-        override this.NewOfSameType (layout: ArrayNDLayoutT) = 
+        override this.NewOfSameType (layout: TensorLayout) = 
             ArrayNDCudaT<'T> (layout) :> Tensor<'T>
 
-        override this.NewOfType<'N> (layout: ArrayNDLayoutT) = 
+        override this.NewOfType<'N> (layout: TensorLayout) = 
             // drop constraint on 'N
             let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typeof<'N>|]
             Activator.CreateInstance (aryType, [|box layout|]) :?> Tensor<'N>
 
-        override this.NewView (layout: ArrayNDLayoutT) = 
+        override this.NewView (layout: TensorLayout) = 
             ArrayNDCudaT<'T> (layout, storage) :> Tensor<'T>
 
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
@@ -157,11 +157,11 @@ module ArrayNDCudaTypes =
 
         /// creates a new contiguous (row-major) ArrayNDCudaT in device memory of the given shape 
         static member NewC shp =
-            ArrayNDCudaT<_> (ArrayNDLayout.newC shp)    
+            ArrayNDCudaT<_> (TensorLayout.newC shp)    
 
         /// creates a new Fortran (column-major) ArrayNDCudaT in device memory of the given shape
         static member NewF shp =
-            ArrayNDCudaT<_>(ArrayNDLayout.newF shp)
+            ArrayNDCudaT<_>(TensorLayout.newF shp)
 
         /// Copies a ArrayNDHostT into the specified ArrayNDCudaT.
         /// Both must of same shape. dst must also be contiguous and with offset zero.
@@ -320,12 +320,12 @@ module ArrayNDCuda =
     let toHostUntyped (src: IArrayNDCudaT) = src.ToHost()
 
     /// Creates a new IArrayNDT of given type and layout in device memory.
-    let newOfType typ (layout: ArrayNDLayoutT) = 
+    let newOfType typ (layout: TensorLayout) = 
         let aryType = typedefof<ArrayNDCudaT<_>>.MakeGenericType [|typ|]
         Activator.CreateInstance (aryType, [|box layout|]) :?> IArrayNDCudaT
 
     /// Creates a IArrayNDT for the given pointer, allocation size in bytes, type and layout.
-    let fromPtrAndType (ptr: CUdeviceptr) (sizeInBytes: SizeT) typ (layout: ArrayNDLayoutT) = 
+    let fromPtrAndType (ptr: CUdeviceptr) (sizeInBytes: SizeT) typ (layout: TensorLayout) = 
         let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
         let devVar = Activator.CreateInstance (devVarType, [|box ptr; box sizeInBytes|])
 

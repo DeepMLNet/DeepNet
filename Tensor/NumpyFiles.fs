@@ -101,9 +101,9 @@ module NPYFile =
 
         // create layout
         let layout =
-            if fortranOrder then ArrayNDLayout.newF shp
-            else ArrayNDLayout.newC shp
-        let nElems = ArrayNDLayout.nElems layout
+            if fortranOrder then TensorLayout.newF shp
+            else TensorLayout.newC shp
+        let nElems = TensorLayout.nElems layout
 
         // read data
         let sizeInBytes = nElems * sizeof64<'T>

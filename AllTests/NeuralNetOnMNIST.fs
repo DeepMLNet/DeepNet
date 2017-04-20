@@ -42,8 +42,8 @@ let build device batch =
     mc.SetSize nTarget 10L
 
     // set strides
-    mc.SetStride input (ArrayNDLayout.cStride [batch; 784L])
-    mc.SetStride target (ArrayNDLayout.cStride [batch; 10L])
+    mc.SetStride input (TensorLayout.cStride [batch; 784L])
+    mc.SetStride target (TensorLayout.cStride [batch; 10L])
 
     // instantiate model
     let mi = mc.Instantiate (device, canDelay=false)

@@ -52,7 +52,7 @@ module InterpolatorTypes =
 module Interpolator =
 
     /// interpolator tables
-    let private tables = new Dictionary<InterpolatorT, IArrayNDT>()
+    let private tables = new Dictionary<InterpolatorT, ITensor>()
 
     /// numerically calculated derivatives
     let private numDerivatives = new Dictionary<InterpolatorT, InterpolatorT list>()

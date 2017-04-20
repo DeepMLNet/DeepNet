@@ -61,7 +61,7 @@ module Types =
         /// variables storing the results of the expressions
         ChannelVars:                Map<ChannelT, VarSpecT option>
         /// function to allocate new storage for the result
-        ChannelAllocators:          Map<ChannelT, unit -> IArrayNDT>
+        ChannelAllocators:          Map<ChannelT, unit -> ITensor>
         /// storage location of variables
         VarStorLoc:                 Map<VarSpecT, ArrayLocT>
         /// optional stride specification for variables
@@ -508,7 +508,7 @@ module ArgTemplates =
 
         member this.GetPointerArrayValues env = 
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
-            [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
+            [| for idx in TensorLayout.allIdxOfShape batchShp do
                 let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0L; 0L]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
 

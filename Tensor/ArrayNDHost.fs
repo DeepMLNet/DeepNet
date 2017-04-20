@@ -47,7 +47,7 @@ module ArrayNDHostTypes =
 
     /// type-neutral interface to ArrayNDHostT<'T>
     type IArrayNDHostT =
-        inherit IArrayNDT
+        inherit ITensor
         abstract Pin: unit -> PinnedMemoryT
         abstract DataObj: obj
         abstract DataSizeInBytes: int64
@@ -57,15 +57,15 @@ module ArrayNDHostTypes =
         abstract ToHost: unit -> ArrayNDHostT<'T>
 
     /// an N-dimensional array with reshape and subview abilities stored in host memory
-    and ArrayNDHostT<'T> (layout:      ArrayNDLayoutT, 
+    and ArrayNDHostT<'T> (layout:      TensorLayout, 
                           data:        'T []) = 
         inherit Tensor<'T>(layout)
         
         let fastLayout = FastLayout.ofLayout layout
 
         /// a new ArrayND in host memory using a managed array as storage
-        new (layout: ArrayNDLayoutT) =
-            let nElems = ArrayNDLayout.nElems layout
+        new (layout: TensorLayout) =
+            let nElems = TensorLayout.nElems layout
             if nElems > int64 Microsoft.FSharp.Core.int32.MaxValue then
                 failwithf "The current ArrayNDHostT implementation is limited to %d elements."
                           Microsoft.FSharp.Core.int32.MaxValue
@@ -96,18 +96,18 @@ module ArrayNDHostTypes =
         override this.Location = LocHost
 
         override this.Item
-            with get pos = data.[int32 (ArrayNDLayout.addr pos layout)]
+            with get pos = data.[int32 (TensorLayout.addr pos layout)]
             and set pos value = 
                 ArrayND.doCheckFinite value
-                data.[int32 (ArrayNDLayout.addr pos layout)] <- value 
+                data.[int32 (TensorLayout.addr pos layout)] <- value 
 
-        override this.NewOfSameType (layout: ArrayNDLayoutT) = 
+        override this.NewOfSameType (layout: TensorLayout) = 
             ArrayNDHostT<'T>(layout) :> Tensor<'T>
 
-        override this.NewOfType<'N> (layout: ArrayNDLayoutT) =            
+        override this.NewOfType<'N> (layout: TensorLayout) =            
             ArrayNDHostT<'N>(layout) :> Tensor<'N>
 
-        override this.NewView (layout: ArrayNDLayoutT) = 
+        override this.NewView (layout: TensorLayout) = 
             ArrayNDHostT<'T>(layout, data) :> Tensor<'T>
 
         override this.CopyTo (dest: Tensor<'T>) =
@@ -117,7 +117,7 @@ module ArrayNDHostTypes =
                 if ArrayND.hasContiguousMemory this && ArrayND.hasContiguousMemory dest &&
                         ArrayND.stride this = ArrayND.stride dest then
                     // use array block copy
-                    let nElems = ArrayNDLayout.nElems this.Layout
+                    let nElems = TensorLayout.nElems this.Layout
                     Array.Copy (this.Data, this.Layout.Offset, dest.Data, dest.Layout.Offset, nElems)
                 else
                     // copy element by element
@@ -237,7 +237,7 @@ module ArrayNDHostTypes =
             let inv = ArrayND.copy this
 
             // iterate over all batch dimensions
-            for batchIdx in ArrayNDLayout.allIdxOfShape batchShp do
+            for batchIdx in TensorLayout.allIdxOfShape batchShp do
                 let batchRng = batchIdx |> List.map RngElem
                 let rng = batchRng @ [RngAll; RngAll]                  
                 let aAry = inv.[rng]
@@ -269,7 +269,7 @@ module ArrayNDHostTypes =
             let size = this.Shape.[0]
 
             let eigVecs = ArrayND.copy this
-            let eigVals = this.NewOfSameType (ArrayNDLayout.newC [1L; size]) :?> ArrayNDHostT<'T>
+            let eigVals = this.NewOfSameType (TensorLayout.newC [1L; size]) :?> ArrayNDHostT<'T>
 
             use a = eigVecs.GetTransposedBlas false
             use w = eigVals.GetTransposedBlas false
@@ -286,26 +286,26 @@ module ArrayNDHostTypes =
 module ArrayNDHost = 
 
     /// Creates a ArrayNDT of given type and layout in host memory.
-    let newOfType typ (layout: ArrayNDLayoutT) = 
+    let newOfType typ (layout: TensorLayout) = 
         let gt = typedefof<ArrayNDHostT<_>>
         let t = gt.MakeGenericType [|typ|]
         Activator.CreateInstance (t, [|box layout|]) :?> IArrayNDHostT
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given shape 
     let newC<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newC shp) 
+        ArrayNDHostT<'T>(TensorLayout.newC shp) 
 
     /// creates a new contiguous (row-major) ArrayNDHostT in host memory of the given type and shape 
     let newCOfType typ shp =
-        newOfType typ (ArrayNDLayout.newC shp)
+        newOfType typ (TensorLayout.newC shp)
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given shape
     let newF<'T> shp =
-        ArrayNDHostT<'T>(ArrayNDLayout.newF shp) 
+        ArrayNDHostT<'T>(TensorLayout.newF shp) 
 
     /// creates a new Fortran (column-major) ArrayNDHostT in host memory of the given type and shape
     let newFOfType typ shp =
-        newOfType typ (ArrayNDLayout.newF shp)
+        newOfType typ (TensorLayout.newF shp)
 
     /// ArrayNDHostT with zero dimensions (scalar) and given value
     let scalar value =
@@ -370,7 +370,7 @@ module ArrayNDHost =
     let ofArray (data: 'T []) =
         let shp = [Array.length data]
         let shp = shp |> List.map int64
-        let layout = ArrayNDLayout.newC shp
+        let layout = TensorLayout.newC shp
         ArrayNDHostT<'T> (layout, data) 
 
     /// Creates a two-dimensional ArrayNDT using the specified data. 

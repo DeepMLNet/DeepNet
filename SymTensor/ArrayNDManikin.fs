@@ -56,7 +56,7 @@ module ArrayNDManikinTypes =
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     [<StructuredFormatDisplay("{Pretty}")>]
-    type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
+    type ArrayNDManikinT (layout:           TensorLayout, 
                           storage:          MemManikinT) = 
         inherit Tensor<int> (layout)  // generic type does not matter since we do not store data
 
@@ -75,13 +75,13 @@ module ArrayNDManikinTypes =
             with get pos = failwith "ArrayNDManikin does not store data"
             and set pos value = failwith "ArrayNDManikin does not store data"
 
-        override this.NewOfSameType (layout: ArrayNDLayoutT) = 
+        override this.NewOfSameType (layout: TensorLayout) = 
             failwith "ArrayNDManikin cannot allocate memory on its own"
 
-        override this.NewOfType<'N> (layout: ArrayNDLayoutT) : Tensor<'N> = 
+        override this.NewOfType<'N> (layout: TensorLayout) : Tensor<'N> = 
             failwith "ArrayNDManikin cannot allocate memory on its own"
 
-        override this.NewView (layout: ArrayNDLayoutT) = 
+        override this.NewView (layout: TensorLayout) = 
             ArrayNDManikinT(layout, storage) :> Tensor<int>
 
         override this.DataType =
@@ -91,8 +91,8 @@ module ArrayNDManikinTypes =
 
         /// C++ type name for ArrayND with static shape and dynamic offset/strides
         member this.DynamicCPPType =
-            let dims = ArrayNDLayout.nDims layout
-            let shp = ArrayNDLayout.shape layout
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
             let cppDataType = Util.cppType this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
@@ -125,23 +125,23 @@ module ArrayNDManikin =
 
     /// creates a new ArrayNDManikinT using no storage
     let newZero typ shape =
-        let layout = ArrayNDLayout.newC shape
+        let layout = TensorLayout.newC shape
         ArrayNDManikinT (layout, MemZero typ)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with C-order
     let newC memAllocator typ shape = 
-        let layout = ArrayNDLayout.newC shape
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newC shape
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran-order
     let newF memAllocator typ shape = 
-        let layout = ArrayNDLayout.newF shape
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newF shape
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with specifed stride order
     let newOrdered memAllocator typ shape strideOrder =
-        let layout = ArrayNDLayout.newOrdered shape strideOrder
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newOrdered shape strideOrder
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// create a new MemoryManikinT and a new ArrayNDManikinT with layout suitable for being a BLAS target
     let newBlasTarget memAllocator typ shape = 
@@ -160,11 +160,11 @@ module ArrayNDManikin =
         let stride = smplStride smplShp @ [1L; matRows]
         
         let layout = {Shape=shape; Stride=stride; Offset=0L}
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
     let externalC storage shape =
-        let layout = ArrayNDLayout.newC shape
+        let layout = TensorLayout.newC shape
         ArrayNDManikinT (layout, storage) 
 
     /// creates a new ArrayNDManikinT with specified strides and using the specified storage
@@ -194,7 +194,7 @@ module ArrayNDManikin =
 
     /// address of given element in bytes (relative to start of array)
     let addrInBytes idx ary =
-        typeSize64 ary * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
+        typeSize64 ary * (ary |> ArrayND.layout |> TensorLayout.addr idx)
 
     /// size in bytes 
     let sizeInBytes ary =

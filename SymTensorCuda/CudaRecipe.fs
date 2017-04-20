@@ -54,7 +54,7 @@ module CudaRecipeTypes =
     /// CUDA execution recipe
     type CudaRecipeT = {
         ChannelVars:        Map<ChannelT, VarSpecT option>
-        ChannelAllocators:  Map<ChannelT, unit -> IArrayNDT>
+        ChannelAllocators:  Map<ChannelT, unit -> ITensor>
         VarStrides:         VarStridesT
         VarStorLoc:         VarLocsT
         KernelCode:         string
@@ -338,7 +338,7 @@ module CudaRecipe =
         TransferUExpr:  UExprT
         Var:            VarSpecT option
         Stride:         int64 list option
-        Allocator:      unit -> IArrayNDT
+        Allocator:      unit -> ITensor
     }
 
     /// builds a CUDA recipe for the given unified expression
@@ -434,13 +434,13 @@ module CudaRecipe =
             uexprs
             |> Map.map (fun channel (UExpr (_, _, {ChannelType=ct; ChannelShape=cs}) as uexpr) ->
                 let tn, nshp = ct.[dfltChId], cs.[dfltChId]
-                let layout = ArrayNDLayout.newC nshp
+                let layout = TensorLayout.newC nshp
 
                 // create result storage allocator
                 let resAllocator = fun () ->
                     match compileEnv.ResultLoc with
-                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> IArrayNDT
-                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> IArrayNDT  
+                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> ITensor
+                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> ITensor  
                     | l -> failwithf "CUDA cannot work with result location %A" l      
 
                 if List.fold (*) 1L nshp > 0L then
@@ -484,7 +484,7 @@ module CudaRecipe =
                     let stride = 
                         match resInfo.Stride with
                         | Some stride -> stride
-                        | None -> ArrayNDLayout.cStride vs.NShape
+                        | None -> TensorLayout.cStride vs.NShape
                     let locs = locs |> Map.add vs compileEnv.ResultLoc                    
                     let strides = strides |> Map.add vs stride
                     locs, strides                                

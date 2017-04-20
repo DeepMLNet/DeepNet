@@ -22,7 +22,7 @@ module Trace =
     type LoopStack = LoopIter list
     
     type EvalEvent = 
-        | ExprEvaled of UExprT * LoopStack * IArrayNDT * string
+        | ExprEvaled of UExprT * LoopStack * ITensor * string
         | EnteringLoop of UExprT
         | LeavingLoop of UExprT
         | LoopIteration of LoopIter
@@ -170,9 +170,9 @@ module Trace =
     let loopStack () : LoopStack =
         activeLoopStack.Value.ToArray() |> List.ofArray |> List.rev
 
-    let private empty = ArrayNDHost.zeros<int> [0L] :> IArrayNDT
+    let private empty = ArrayNDHost.zeros<int> [0L] :> ITensor
 
-    let exprEvaledWithMsg uexpr (res: Lazy<IArrayNDT>) msg =
+    let exprEvaledWithMsg uexpr (res: Lazy<ITensor>) msg =
         if isActive () then
             let ee, es = getActiveExpr (), getActiveTraceSession ()
             let id = ee.Trace.Count
@@ -186,7 +186,7 @@ module Trace =
     let exprEvaled uexpr res =
         exprEvaledWithMsg uexpr res ""
 
-    let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
+    let maxSimilar (a: ITensor) (b: ITensor) =
         match a.DataType, b.DataType with
         | ta, tb when ta <> tb -> false
         | t, _ when t = typeof<float> ->

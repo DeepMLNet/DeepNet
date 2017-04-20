@@ -11,7 +11,7 @@ open UExprTypes
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable value collection
-    type VarEnvT = Map<VarSpecT, IArrayNDT>
+    type VarEnvT = Map<VarSpecT, ITensor>
 
     /// specification of variable storage locations
     type VarLocsT = Map<VarSpecT, ArrayLocT>
@@ -27,21 +27,21 @@ module VarEnvTypes =
 module VarEnv = 
 
     /// add variable value to environment
-    let addVarSpec (vs: VarSpecT) (value: #IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
-        Map.add vs (value :> IArrayNDT) varEnv
+    let addVarSpec (vs: VarSpecT) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
+        Map.add vs (value :> ITensor) varEnv
 
     /// remove variable value from environment
     let removeVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : VarEnvT =
         Map.remove vs varEnv
 
     /// get variable value from environment
-    let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #IArrayNDT =
+    let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #ITensor =
         match varEnv |> Map.tryFind vs with
         | Some v -> v |> box |> unbox
         | None -> failwithf "variable %A is not present in the specified VarEnv" vs
 
     /// add variable value to environment
-    let add (var: Expr.ExprT) (value: #IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
+    let add (var: Expr.ExprT) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
         addVarSpec (Expr.extractVar var) value varEnv
 
     /// remove variable value from environment
@@ -49,7 +49,7 @@ module VarEnv =
         removeVarSpec (Expr.extractVar var) varEnv
 
     /// get variable value from environment
-    let get (var: Expr.ExprT) (varEnv: VarEnvT) : #IArrayNDT =
+    let get (var: Expr.ExprT) (varEnv: VarEnvT) : #ITensor =
         getVarSpec (Expr.extractVar var) varEnv
 
     /// empty variable environment
@@ -123,7 +123,7 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (ExprT * #IArrayNDT) seq) =
+    let ofSeq (entries: (ExprT * #ITensor) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
@@ -150,7 +150,7 @@ module EnvTypes =
     }
 
     /// an evaluation function
-    type EvalFn = EvalEnvT -> IArrayNDT list
+    type EvalFn = EvalEnvT -> ITensor list
 
     /// The result of the compilation of an expression.
     type CompiledUExprsT = {
@@ -247,7 +247,7 @@ module Func =
         vars, Expr.canEvalAllSymSizes expr
 
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) 
-            : (VarEnvT -> IArrayNDT list) =     
+            : (VarEnvT -> ITensor list) =     
              
         let compiler, baseCompileEnv = compileSpec
 

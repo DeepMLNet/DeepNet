@@ -18,7 +18,7 @@ module ArrayNDHDFTypes =
         /// Reads the ArrayNDHostT with the given name from an HDF5 file.
         static member read<'T> (hdf5: HDF5) name =
             let (data: 'T array), shape = hdf5.Read (name)       
-            ArrayNDHostT (ArrayNDLayout.newC shape, data) 
+            ArrayNDHostT (TensorLayout.newC shape, data) 
 
         /// Writes the given IArrayNDHostT into the HDF5 file under the given name.
         static member writeUntyped (hdf5: HDF5) (name: string) (hostAry: IArrayNDHostT) =
