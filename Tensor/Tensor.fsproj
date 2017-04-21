@@ -138,6 +138,6 @@
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
-    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix &quot;$(VERSUFFIX)&quot;" />
+    <!-- <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix &quot;$(VERSUFFIX)&quot;" /> -->
   </Target>
 </Project>

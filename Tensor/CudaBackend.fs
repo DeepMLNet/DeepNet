@@ -69,7 +69,8 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
     interface ITensorStorage<'T> with
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
-
+        member this.Factory =
+            TensorCudaStorageFactory.Instance :> ITensorStorageFactory
 
 
 
@@ -89,10 +90,27 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             ()
             
 
-type TensorCudaStorageFactory () =
+and TensorCudaStorageFactory () =
+    static member Instance = TensorCudaStorageFactory ()
+
     interface ITensorStorageFactory with
         member this.Create nElems : ITensorStorage<'T> = 
             // we use reflection to drop the constraints on 'T 
-            let tcs = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
-            Activator.CreateInstance(tcs, nElems) :?> ITensorStorage<'T>
+            let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
+            Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
             
+
+
+[<AutoOpen>]            
+module CudaTensorTypes =
+    let DevCuda = TensorCudaStorageFactory.Instance
+
+
+type CudaTensor () =
+
+    static member zeros<'T> (shape: int64 list) : Tensor<'T> =
+        Tensor<'T>.zeros (shape, DevCuda)
+
+
+
+

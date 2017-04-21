@@ -25,6 +25,9 @@ type TensorHostStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
     interface ITensorStorage<'T> with
         member this.Backend layout =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
+        member this.Factory = 
+            TensorHostStorageFactory.Instance :> ITensorStorageFactory
+            
 
 
 and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
@@ -34,11 +37,11 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     let fastLayout = FastLayout32 layout
 
-    member private this.FastLayout = fastLayout
+    member internal this.FastLayout = fastLayout
     member this.Storage = storage
     member this.Data = this.Storage.Data
 
-    member this.BinaryOp 
+    member inline internal this.BinaryOp 
             (vecOp: Vector<'T> -> Vector<'T> -> Vector<'T>) 
             (src1: TensorHostBackend<'T>) (src2: TensorHostBackend<'T>) =        
 
@@ -160,18 +163,30 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
         member this.Plus src1 src2 =
-            let inline op a b = Vector.Add<'T> (a, b)
+            let inline op (a: Vector<'T>) (b: Vector<'T>) = a + b
             this.BinaryOp op (toMe src1) (toMe src2)
 
 
 
-type TensorHostStorageFactory () =
+and TensorHostStorageFactory () =
+    static member Instance = TensorHostStorageFactory () 
+
     interface ITensorStorageFactory with
         member this.Create nElems = 
             // we use reflection to drop the constraints on 'T 
             let ts = typedefof<TensorHostStorage<_>>.MakeGenericType (typeof<'T>)
             Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
             
+
+[<AutoOpen>]            
+module HostTensorTypes =
+    let DevHost = TensorHostStorageFactory.Instance
+
+
+type HostTensor () =
+
+    static member zeros<'T> (shape: int64 list) : Tensor<'T> =
+        Tensor<'T>.zeros (shape, DevHost)
 
 
 

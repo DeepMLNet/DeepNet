@@ -63,12 +63,14 @@ type ITensor =
 
 type ITensorStorage<'T> =
     abstract Backend:       TensorLayout -> ITensorBackend<'T>
+    abstract Factory:       ITensorStorageFactory
+    //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 and ITensorBackend<'T> =
     abstract Item:          int64 list -> 'T with get, set
     abstract Plus:          src1:ITensorBackend<'T> -> src2:ITensorBackend<'T> -> unit
 
-type ITensorStorageFactory =
+and ITensorStorageFactory =
     abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 
@@ -78,9 +80,6 @@ type ITensorStorageFactory =
 type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     do TensorLayout.check layout
     let backend = storage.Backend layout
-
-    /// true if warning about fallback copy was shown
-    static let mutable SlowCopyWarningShown = false
 
     /// value zero of type 'T
     static member Zero = conv<'T> 0
@@ -93,6 +92,18 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
 
     /// storage of this tensor
     member this.Storage = storage
+
+    /// backend
+    member private this.Backend = backend
+
+    /// shape
+    member this.Shape = this.Layout.Shape
+
+    /// number of dimensions
+    member this.NDims = this.Layout.NDims
+
+    /// number of elements
+    member this.NElems = this.Layout.NElems
 
     /// address of specified index
     member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
@@ -111,7 +122,26 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     /// a new ArrayND of same type with same storage allocation but new layout
     //abstract NewView : TensorLayout -> Tensor<'T>
 
+    new (shape: int64 list, dev: ITensorStorageFactory) =
+        let layout = TensorLayout.newC shape
+        let storage = dev.Create layout.NElems
+        Tensor<'T> (layout, storage)
+
+    static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) =
+        let x = Tensor<'T> (shape, dev)
+        // TODO: fill x with zeros
+        x
+       
+    static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let t = Tensor<'T> (a.Shape, a.Storage.Factory)
+        t.Backend.Plus a.Backend b.Backend
+        t
+        
+
 #if false
+    /// true if warning about fallback copy was shown
+    static let mutable SlowCopyWarningShown = false
+
     /// C++ type name
     member this.CPPType = 
         let dims = TensorLayout.nDims layout
@@ -166,14 +196,6 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     member this.View rng =
         this.NewView (TensorLayout.view rng this.Layout)
 
-    /// shape
-    member this.Shape = TensorLayout.shape this.Layout
-
-    /// number of dimensions
-    member this.NDims = TensorLayout.nDims this.Layout
-
-    /// number of elements
-    member this.NElems = TensorLayout.nElems this.Layout
 
     /// broadcasts this and other to the same shape if possible
     member this.BroadcastToSame (other: Tensor<_>) =
