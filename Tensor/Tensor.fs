@@ -31,6 +31,9 @@ module TensorTypes =
 /// singular matrix encountered
 exception SingularMatrixError of string
 
+/// operation requires same storage, but specified tensors had different storages
+exception StorageMismatch of string
+
 type SpecialAxisT =
     | NewAxis
     | Fill
@@ -38,6 +41,7 @@ type SpecialAxisT =
 /// Type-neutral interface to Tensor<'T> of any type
 type ITensor =
     abstract Layout:            TensorLayout
+    abstract Storage:           ITensorStorage
     abstract Shape:             int64 list
     abstract NDims:             int
     abstract NElems:            int64
@@ -60,24 +64,27 @@ type ITensor =
     abstract Item:              obj * obj * obj * obj * obj * obj -> ITensor with set
     abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
 
+and ITensorStorage =
+    abstract Id:            string
 
-type ITensorStorage<'T> =
+and ITensorStorage<'T> =
+    inherit ITensorStorage
     abstract Backend:       TensorLayout -> ITensorBackend<'T>
     abstract Factory:       ITensorStorageFactory
     //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 and ITensorBackend<'T> =
     abstract Item:          int64 list -> 'T with get, set
-    abstract Plus:          src1:ITensorBackend<'T> -> src2:ITensorBackend<'T> -> unit
+    abstract Plus:          trgt:Tensor<'T> -> src1:Tensor<'T> -> src2:Tensor<'T> -> unit
 
 and ITensorStorageFactory =
     abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 
-
 /// An N-dimensional array with elements of type 'T.
-[<StructuredFormatDisplay("{Pretty}")>]
-type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
+and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T> 
+        (layout: TensorLayout, storage: ITensorStorage<'T>) =
+
     do TensorLayout.check layout
     let backend = storage.Backend layout
 
@@ -88,25 +95,43 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     static member One = conv<'T> 1
 
     /// layout of this tensor (shape, offset and strides)
-    member this.Layout = layout
+    member val Layout = layout
+
+    /// layout
+    static member inline layout (a: #ITensor) = a.Layout
 
     /// storage of this tensor
-    member this.Storage = storage
+    member val Storage = storage
 
     /// backend
-    member private this.Backend = backend
+    member internal this.Backend = backend
 
     /// shape
-    member this.Shape = this.Layout.Shape
+    member inline this.Shape = this.Layout.Shape
+
+    /// shape in elements
+    static member inline shape (a: #ITensor) = a.Shape
 
     /// number of dimensions
-    member this.NDims = this.Layout.NDims
+    member inline this.NDims = this.Layout.NDims
+
+    /// number of dimensions
+    static member inline nDims (a: #ITensor) = a.NDims
 
     /// number of elements
-    member this.NElems = this.Layout.NElems
+    member inline this.NElems = this.Layout.NElems
+
+    /// number of elements 
+    static member inline nElems (a: #ITensor) = a.NElems
+
+    /// type of data stored in this tensor
+    member inline this.DataType = typeof<'T>
+
+    /// type of data stored in the specified tensor
+    static member inline dataType (a: #ITensor) = a.DataType
 
     /// address of specified index
-    member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
+    //member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
 
     /// access to a single item
     member this.Item
@@ -119,23 +144,337 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     /// a new ArrayND of given type and new storage allocation for given layout
     //abstract NewOfType<'N> : TensorLayout -> Tensor<'N>
 
-    /// a new ArrayND of same type with same storage allocation but new layout
-    //abstract NewView : TensorLayout -> Tensor<'T>
+    /// a tensor with the same storage but new layout
+    member internal this.Relayout (newLayout: TensorLayout) =
+        Tensor<'T> (newLayout, storage)
+   
+    /// checks that the given axis is valid
+    member inline this.CheckAxis ax = this.Layout |> TensorLayout.checkAxis ax
+
+    /// sequence of all indices 
+    static member allIdx (a: #ITensor) = a.Layout |> TensorLayout.allIdx
+
+    /// all indices of the given dimension
+    static member allIdxOfDim dim (a: #ITensor) = a.Layout |> TensorLayout.allIdxOfDim dim 
+            
+    /// sequence of all elements stored in the tensor
+    static member allElems (a: Tensor<'T>) = a |> Tensor<_>.allIdx |> Seq.map (fun idx -> a.[idx])
+
+    ///// true if the ArrayND is contiguous
+    //let inline isC a = layout a |> TensorLayout.isC
+
+    ///// true if the ArrayND is in Fortran order
+    //let inline isF a = layout a |> TensorLayout.isF
+
+    ///// true if the memory of the ArrayND is a contiguous block
+    //let inline hasContiguousMemory a = layout a |> TensorLayout.hasContiguousMemory
+
+    ///// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
+    //let inline newCOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
+    //    a.NewOfSameType (TensorLayout.newC shp) :?> 'A
+
+    ///// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
+    //let inline newCOfType shp (a: 'A when 'A :> Tensor<_>) =
+    //    a.NewOfType (TensorLayout.newC shp) 
+
+    ///// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
+    //let inline newFOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
+    //    a.NewOfSameType (TensorLayout.newF shp) :?> 'A
+
+    ///// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
+    //let inline newFOfType shp (a: 'A when 'A :> Tensor<_>) =
+    //    a.NewOfType (TensorLayout.newF shp) 
+
+    ///// creates a new ArrayND with existing data but new layout
+    //let inline relayout newLayout (a: 'A when 'A :> ITensor)  =
+    //    a.NewView newLayout :?> 'A
+
+    ///// checks that two ArrayNDs have the same shape
+    //let inline checkSameShape (a: Tensor<'T>) b =
+    //    Tensor<'T>.CheckSameShape a b
+
+
+#if false
+
+
+    /// Copies all elements from source to destination.
+    /// Both ArrayNDs must have the same shape.
+    let inline copyTo (source: #Tensor<'T>) (dest: #Tensor<'T>) =
+        source.CopyTo dest
+
+    /// Returns a contiguous copy of the given ArrayND.
+    let inline copy source =
+        let dest = newCOfSameType (shape source) source
+        copyTo source dest
+        dest
+
+    /// Returns a contiguous copy of the given IArrayNDT.
+    let inline copyUntyped (source: 'T when 'T :> ITensor) =
+        source.Copy() :?> 'T
+
+    /// If the ArrayND is not contiguous, returns a contiguous copy; otherwise
+    /// the given ArrayND is returned unchanged.
+    let inline ensureC a =
+        if isC a then a else copy a
+
+    /// makes a contiguous copy of the given tensor if it is not contiguous and with zero offset
+    let inline ensureCAndOffsetFree a = 
+        if isC a && offset a = 0L then a else copy a 
+
+    /// If the ArrayND is not in Fortran order, returns a copy in Fortran order; 
+    /// otherwise it is returned unchanged.
+    let inline ensureF a =
+        if isF a then a 
+        else 
+            let cpy = newFOfSameType (shape a) a
+            copyTo a cpy
+            cpy
+
+    /// inserts a broadcastable dimension of size one as first dimension
+    let inline padLeft a =
+        relayout (TensorLayout.padLeft (layout a)) a
+
+    /// appends a broadcastable dimension of size one as last dimension
+    let inline padRight a =
+        relayout (TensorLayout.padRight (layout a)) a
+
+    /// Inserts an axis of size 1 before the specified position.
+    let inline insertAxis ax a =
+        relayout (TensorLayout.insertAxis ax (layout a)) a
+
+    /// cuts one dimension from the left
+    let inline cutLeft a =
+        relayout (TensorLayout.cutLeft (layout a)) a
+      
+    /// cuts one dimension from the right
+    let inline cutRight a =
+        relayout (TensorLayout.cutRight (layout a)) a        
+
+    /// broadcast the given dimension to the given size
+    let inline broadcastDim dim size a =
+        relayout (TensorLayout.broadcastDim dim size (layout a)) a        
+
+    /// pads shapes from the left until they have same rank
+    let inline padToSame a b =
+        let la, lb = TensorLayout.padToSame (layout a) (layout b)
+        relayout la a, relayout lb b
+
+    /// broadcasts to have the same size
+    let inline broadcastToSame a b =
+        let la, lb = TensorLayout.broadcastToSame (layout a) (layout b)
+        relayout la a, relayout lb b
+
+    /// broadcasts all arrays to have the same shape
+    let inline broadcastToSameMany arys =
+        Tensor<_>.BroadcastToSameMany arys
+
+    /// broadcasts to have the same size in the given dimensions
+    let inline broadcastToSameInDims dims a b =
+        let la, lb = TensorLayout.broadcastToSameInDims dims (layout a) (layout b)
+        relayout la a, relayout lb b
+
+    /// broadcasts a ArrayND to the given shape
+    let inline broadcastToShape shp a =
+        relayout (TensorLayout.broadcastToShape shp (layout a)) a
+
+    /// returns true if at least one dimension is broadcasted
+    let inline isBroadcasted a =
+        TensorLayout.isBroadcasted (layout a)
+
+    /// Tries to reshape array assuming a contiguous (row-major) memory layout without copying.
+    /// If this is not possible, None is returned.
+    /// The number of elements must not change.
+    let inline tryReshapeView shp a =
+        match TensorLayout.tryReshape shp (layout a) with
+        | Some newLayout -> a |> relayout newLayout |> Some
+        | None -> None
+
+    /// Reshape array assuming a contiguous (row-major) memory layout without copying.
+    /// If this is not possible, an error is raised. 
+    /// The number of elements must not change.
+    let inline reshapeView shp a =
+        a |> relayout (TensorLayout.reshape shp (layout a))
+
+    /// Returns true if the array can be reshaped without copying.
+    let inline canReshapeView shp a =
+        match tryReshapeView shp a with
+        | Some _ -> true
+        | None -> false
+
+    /// Reshape array assuming a contiguous (row-major) memory layout.
+    /// The current memory layout (as given by the strides) has no influence 
+    /// on the reshape operation.
+    /// If the array is not contiguous, a reshaped copy is returned.
+    /// The number of elements must not change.
+    /// One element can be -1, in which case the size of that element is
+    /// inferred automatically.
+    let inline reshape shp a =
+        reshapeView shp (ensureC a)
+
+    /// Flattens the array into a vector assuming a contiguous (row-major) memory layout.
+    let inline flatten a =
+        reshape [-1L] a
+
+    /// swaps the given dimensions
+    let inline swapDim ax1 ax2 a =
+        relayout (TensorLayout.swapDim ax1 ax2 (layout a)) a
+
+    /// Transposes the given matrix.
+    /// If the array has more then two dimensions, the last two axes are swapped.
+    let inline transpose a =
+        relayout (TensorLayout.transpose (layout a)) a
+
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let inline permuteAxes (permut: int list) a =
+        a |> relayout (layout a |> TensorLayout.permuteAxes permut)
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        a |> relayout (layout a |> TensorLayout.reverseAxis ax)        
+
+    /// creates a view of an ArrayND
+    let inline view ranges a =
+        relayout (TensorLayout.view ranges (layout a)) a        
+    
+    /// Ensures that the tensor has at least one dimension.
+    let atLeast1D a =
+        if nDims a >= 1 then a
+        else a |> reshape [nElems a]
+
+    /// Ensures that the tensor has at least two dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast2D a =
+        if nDims a >= 2 then a
+        else a |> reshape [1L; nElems a]
+
+    /// Ensures that the tensor has at least three dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast3D a =
+        if nDims a >= 3 then a
+        else a |> reshape [1L; 1L; nElems a]
+
+    /// Ensures that the tensor has at least four dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    let atLeast4D a =
+        if nDims a >= 4 then a
+        else a |> reshape [1L; 1L; 1L; nElems a]
+
+    #endif
 
     new (shape: int64 list, dev: ITensorStorageFactory) =
         let layout = TensorLayout.newC shape
         let storage = dev.Create layout.NElems
         Tensor<'T> (layout, storage)
 
+    /// broadcasts both tensors to the same shape if possible
+    static member internal BroadcastToSame (a: Tensor<'TA>, b: Tensor<'TB>) =
+        let al, bl = TensorLayout.broadcastToSame a.Layout b.Layout
+        a.Relayout al, b.Relayout bl
+
+    /// broadcasts all three tensors to the same shape if possible
+    static member internal BroadcastToSame (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
+        let layouts = TensorLayout.broadcastToSameMany [a.Layout; b.Layout; c.Layout]
+        match layouts with
+        | [al; bl; cl] -> a.Relayout al, b.Relayout bl, c.Relayout cl
+        | _ -> failwith "unexpected TensorLayout.broadcastToSameMany result"
+
+    /// broadcast the list of tensors to the same shape if possible
+    static member internal BroadcastToSame (xs: Tensor<_> list) =
+        let layouts = TensorLayout.broadcastToSameMany (xs |> List.map (fun a -> a.Layout))
+        (xs, layouts) ||> List.map2 (fun a l -> a.Relayout l)
+
+    /// checks that all tensors have the same storage
+    static member internal CheckSameStorage (xs: ITensor list) =
+        match xs with
+        | x::rs when rs |> List.exists (fun r -> x.Storage.Id <> r.Storage.Id) ->
+            let storages = xs |> List.map (fun x -> x.Storage.Id)
+            raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
+                                             but they are %A." storages))
+        | _ -> ()            
+
+    /// prepares an elementwise operation by allocating a target of same size and storage
+    static member internal PrepareElemwise (a: Tensor<'TA>) =
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+        trgt, a
+
+    /// prepares an elementwise operation by broadcasting both tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>) =
+        Tensor<_>.CheckSameStorage [a; b]
+        let a, b = Tensor<_>.BroadcastToSame (a, b)
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+        trgt, a, b
+
+    /// prepares an elementwise operation by broadcasting all three tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
+        Tensor<_>.CheckSameStorage [a; b; c]
+        let a, b, c = Tensor<_>.BroadcastToSame (a, b, c)
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+        trgt, a, b, c
+
+
+
+    interface ITensor with
+        member this.Layout = this.Layout
+        member this.DataType = this.DataType
+        member this.Shape = this.Shape
+        member this.NDims = this.NDims
+        member this.NElems = this.NElems
+        member this.Storage = this.Storage :> ITensorStorage
+        member this.CPPType = raise (System.NotImplementedException())
+        member this.Copy() = raise (System.NotImplementedException())
+        member this.CopyTo(arg1) = raise (System.NotImplementedException())
+        member this.GetSlice(args) = raise (System.NotImplementedException())
+        member this.Item
+            with get (allArgs: obj []): ITensor = 
+                raise (System.NotImplementedException())
+            and set (arg1: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj, arg3: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Item
+            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj) (v: ITensor): unit = 
+                raise (System.NotImplementedException())
+        member this.Location = raise (System.NotImplementedException())
+        member this.NewOfSameType(arg1) = raise (System.NotImplementedException())
+        member this.NewOfType arg1 arg2 = raise (System.NotImplementedException())
+        member this.NewView(arg1) = raise (System.NotImplementedException())
+        member this.SetSlice(args) = raise (System.NotImplementedException())
+
+
     static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) =
         let x = Tensor<'T> (shape, dev)
         // TODO: fill x with zeros
         x
+
+    static member internal ApplyElemwise (fn, a: Tensor<'TA>) : Tensor<'R> =
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        fn trgt a
+        trgt       
+
+    static member internal ApplyElemwise (fn, a: Tensor<'TA>, b: Tensor<'TB>) : Tensor<'R> =
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        fn trgt a b
+        trgt
        
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let t = Tensor<'T> (a.Shape, a.Storage.Factory)
-        t.Backend.Plus a.Backend b.Backend
-        t
+        Tensor<_>.ApplyElemwise((fun trgt a b -> trgt.Backend.Plus trgt a b), a, b)
         
 
 #if false
@@ -156,10 +495,6 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
             "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
         sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
             dims cppDataType dims shapeStr dims strideStr            
-
-    /// type of data in this ArrayND
-    abstract DataType: System.Type
-    default this.DataType = typeof<'T>
 
     /// storage location of the ArrayND
     abstract Location: ArrayLocT
@@ -195,25 +530,6 @@ type Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
     /// a view of this ArrayNDT over the given range 
     member this.View rng =
         this.NewView (TensorLayout.view rng this.Layout)
-
-
-    /// broadcasts this and other to the same shape if possible
-    member this.BroadcastToSame (other: Tensor<_>) =
-        let lThis, lOther = TensorLayout.broadcastToSame this.Layout other.Layout
-        this.NewView lThis, other.NewView lOther
-
-    /// broadcasts this and other1 and other2 to the same shape if possible
-    member this.BroadcastToSame3 (other1: Tensor<_>) (other2: Tensor<_>) =
-        let layouts = TensorLayout.broadcastToSameMany [this.Layout; other1.Layout; other2.Layout]
-        match layouts with
-        | [lThis; lOther1; lOther2] ->
-            this.NewView lThis, other1.NewView lOther1, other2.NewView lOther2
-        | _ -> failwith "impossible"
-
-    /// broadcast the list of arrays to the same shape if possible
-    static member BroadcastToSameMany (arys: 'A list when 'A :> Tensor<'T>) =
-        let layouts = TensorLayout.broadcastToSameMany (arys |> List.map (fun a -> a.Layout))
-        List.zip arys layouts |> List.map (fun (a, l) -> a.NewView l :?> 'A)
 
     /// broadcasts this array to the given shape if possible
     member this.BroadcastToShape shp = 
@@ -611,239 +927,6 @@ module Tensor =
                 | _ -> false
             if isNonFinite then raise (System.ArithmeticException("non-finite value encountered"))
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // shape functions
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
-    /// location
-    let inline location (a: #ITensor) = a.Location
-
-    /// layout
-    let inline layout (a: #ITensor) = a.Layout
-
-    /// number of dimensions
-    let inline nDims a = layout a |> TensorLayout.nDims
-
-    /// number of elements 
-    let inline nElems a = layout a |> TensorLayout.nElems
-    
-    /// shape in elements
-    let inline shape a = layout a |> TensorLayout.shape
-
-    /// stride in elements
-    let inline stride a = layout a |> TensorLayout.stride
-
-    /// offset in elements
-    let inline offset a = layout a |> TensorLayout.offset
-
-    /// checks that the given axis is valid
-    let inline checkAxis ax a = layout a |> TensorLayout.checkAxis ax
-
-    /// sequence of all indices 
-    let inline allIdx a = layout a |> TensorLayout.allIdx
-
-    /// all indices of the given dimension
-    let inline allIdxOfDim dim a = layout a |> TensorLayout.allIdxOfDim dim 
-            
-    /// sequence of all elements of a ArrayND
-    let inline allElems a = allIdx a |> Seq.map (fun i -> get i a)
-
-    /// true if the ArrayND is contiguous
-    let inline isC a = layout a |> TensorLayout.isC
-
-    /// true if the ArrayND is in Fortran order
-    let inline isF a = layout a |> TensorLayout.isF
-
-    /// true if the memory of the ArrayND is a contiguous block
-    let inline hasContiguousMemory a = layout a |> TensorLayout.hasContiguousMemory
-
-    /// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    let inline newCOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
-        a.NewOfSameType (TensorLayout.newC shp) :?> 'A
-
-    /// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
-    let inline newCOfType shp (a: 'A when 'A :> Tensor<_>) =
-        a.NewOfType (TensorLayout.newC shp) 
-
-    /// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    let inline newFOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
-        a.NewOfSameType (TensorLayout.newF shp) :?> 'A
-
-    /// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
-    let inline newFOfType shp (a: 'A when 'A :> Tensor<_>) =
-        a.NewOfType (TensorLayout.newF shp) 
-
-    /// creates a new ArrayND with existing data but new layout
-    let inline relayout newLayout (a: 'A when 'A :> ITensor)  =
-        a.NewView newLayout :?> 'A
-
-    /// checks that two ArrayNDs have the same shape
-    let inline checkSameShape (a: Tensor<'T>) b =
-        Tensor<'T>.CheckSameShape a b
-
-    /// Copies all elements from source to destination.
-    /// Both ArrayNDs must have the same shape.
-    let inline copyTo (source: #Tensor<'T>) (dest: #Tensor<'T>) =
-        source.CopyTo dest
-
-    /// Returns a contiguous copy of the given ArrayND.
-    let inline copy source =
-        let dest = newCOfSameType (shape source) source
-        copyTo source dest
-        dest
-
-    /// Returns a contiguous copy of the given IArrayNDT.
-    let inline copyUntyped (source: 'T when 'T :> ITensor) =
-        source.Copy() :?> 'T
-
-    /// If the ArrayND is not contiguous, returns a contiguous copy; otherwise
-    /// the given ArrayND is returned unchanged.
-    let inline ensureC a =
-        if isC a then a else copy a
-
-    /// makes a contiguous copy of the given tensor if it is not contiguous and with zero offset
-    let inline ensureCAndOffsetFree a = 
-        if isC a && offset a = 0L then a else copy a 
-
-    /// If the ArrayND is not in Fortran order, returns a copy in Fortran order; 
-    /// otherwise it is returned unchanged.
-    let inline ensureF a =
-        if isF a then a 
-        else 
-            let cpy = newFOfSameType (shape a) a
-            copyTo a cpy
-            cpy
-
-    /// inserts a broadcastable dimension of size one as first dimension
-    let inline padLeft a =
-        relayout (TensorLayout.padLeft (layout a)) a
-
-    /// appends a broadcastable dimension of size one as last dimension
-    let inline padRight a =
-        relayout (TensorLayout.padRight (layout a)) a
-
-    /// Inserts an axis of size 1 before the specified position.
-    let inline insertAxis ax a =
-        relayout (TensorLayout.insertAxis ax (layout a)) a
-
-    /// cuts one dimension from the left
-    let inline cutLeft a =
-        relayout (TensorLayout.cutLeft (layout a)) a
-      
-    /// cuts one dimension from the right
-    let inline cutRight a =
-        relayout (TensorLayout.cutRight (layout a)) a        
-
-    /// broadcast the given dimension to the given size
-    let inline broadcastDim dim size a =
-        relayout (TensorLayout.broadcastDim dim size (layout a)) a        
-
-    /// pads shapes from the left until they have same rank
-    let inline padToSame a b =
-        let la, lb = TensorLayout.padToSame (layout a) (layout b)
-        relayout la a, relayout lb b
-
-    /// broadcasts to have the same size
-    let inline broadcastToSame a b =
-        let la, lb = TensorLayout.broadcastToSame (layout a) (layout b)
-        relayout la a, relayout lb b
-
-    /// broadcasts all arrays to have the same shape
-    let inline broadcastToSameMany arys =
-        Tensor<_>.BroadcastToSameMany arys
-
-    /// broadcasts to have the same size in the given dimensions
-    let inline broadcastToSameInDims dims a b =
-        let la, lb = TensorLayout.broadcastToSameInDims dims (layout a) (layout b)
-        relayout la a, relayout lb b
-
-    /// broadcasts a ArrayND to the given shape
-    let inline broadcastToShape shp a =
-        relayout (TensorLayout.broadcastToShape shp (layout a)) a
-
-    /// returns true if at least one dimension is broadcasted
-    let inline isBroadcasted a =
-        TensorLayout.isBroadcasted (layout a)
-
-    /// Tries to reshape array assuming a contiguous (row-major) memory layout without copying.
-    /// If this is not possible, None is returned.
-    /// The number of elements must not change.
-    let inline tryReshapeView shp a =
-        match TensorLayout.tryReshape shp (layout a) with
-        | Some newLayout -> a |> relayout newLayout |> Some
-        | None -> None
-
-    /// Reshape array assuming a contiguous (row-major) memory layout without copying.
-    /// If this is not possible, an error is raised. 
-    /// The number of elements must not change.
-    let inline reshapeView shp a =
-        a |> relayout (TensorLayout.reshape shp (layout a))
-
-    /// Returns true if the array can be reshaped without copying.
-    let inline canReshapeView shp a =
-        match tryReshapeView shp a with
-        | Some _ -> true
-        | None -> false
-
-    /// Reshape array assuming a contiguous (row-major) memory layout.
-    /// The current memory layout (as given by the strides) has no influence 
-    /// on the reshape operation.
-    /// If the array is not contiguous, a reshaped copy is returned.
-    /// The number of elements must not change.
-    /// One element can be -1, in which case the size of that element is
-    /// inferred automatically.
-    let inline reshape shp a =
-        reshapeView shp (ensureC a)
-
-    /// Flattens the array into a vector assuming a contiguous (row-major) memory layout.
-    let inline flatten a =
-        reshape [-1L] a
-
-    /// swaps the given dimensions
-    let inline swapDim ax1 ax2 a =
-        relayout (TensorLayout.swapDim ax1 ax2 (layout a)) a
-
-    /// Transposes the given matrix.
-    /// If the array has more then two dimensions, the last two axes are swapped.
-    let inline transpose a =
-        relayout (TensorLayout.transpose (layout a)) a
-
-    /// Permutes the axes as specified.
-    /// Each entry in the specified permutation specifies the *new* position of 
-    /// the corresponding axis, i.e. to which position the axis should move.
-    let inline permuteAxes (permut: int list) a =
-        a |> relayout (layout a |> TensorLayout.permuteAxes permut)
-
-    /// Reverses the elements in the specified dimension.
-    let reverseAxis ax a =
-        a |> relayout (layout a |> TensorLayout.reverseAxis ax)        
-
-    /// creates a view of an ArrayND
-    let inline view ranges a =
-        relayout (TensorLayout.view ranges (layout a)) a        
-    
-    /// Ensures that the tensor has at least one dimension.
-    let atLeast1D a =
-        if nDims a >= 1 then a
-        else a |> reshape [nElems a]
-
-    /// Ensures that the tensor has at least two dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast2D a =
-        if nDims a >= 2 then a
-        else a |> reshape [1L; nElems a]
-
-    /// Ensures that the tensor has at least three dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast3D a =
-        if nDims a >= 3 then a
-        else a |> reshape [1L; 1L; nElems a]
-
-    /// Ensures that the tensor has at least four dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast4D a =
-        if nDims a >= 4 then a
-        else a |> reshape [1L; 1L; 1L; nElems a]
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

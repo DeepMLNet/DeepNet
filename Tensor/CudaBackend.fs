@@ -67,6 +67,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
                 this.Data.CopyToDevice(value, SizeT (addr * sizeof64<'T>))
 
     interface ITensorStorage<'T> with
+        member this.Id = "Cuda"
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Factory =
@@ -84,10 +85,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             with get idx = storage.[layout |> TensorLayout.addr idx]
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
-        member this.Plus src1 src2 =
-            let src1, src2 = src1 |> toMe, src2 |> toMe
-            // call CUDA plus kernel
-            ()
+        member this.Plus trgt a b = failwith "notimpl"
             
 
 and TensorCudaStorageFactory () =

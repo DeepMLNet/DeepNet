@@ -26,6 +26,7 @@ type TensorHostStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         and set (addr: int64) (value: 'T) = data.SetValue(value, addr)
 
     interface ITensorStorage<'T> with
+        member this.Id = "Host"
         member this.Backend layout =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Factory = 
@@ -36,6 +37,7 @@ type TensorHostStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
 and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
             (layout: TensorLayout, storage: TensorHostStorage<'T>) =
 
+    let scalarOps = ScalarOps.ForType<'T> ()
     let toMe (x: obj) = x :?> TensorHostBackend<'T>
 
     member val FastLayout = FastLayout32 layout
@@ -88,7 +90,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                         genericInnerLoop trgtPosIter.Addr 
                 trgtPosIter.MoveNext()
                     
-        if nd > 1 && TensorHostSettings.UseThreads && trgt.FastLayout.Stride.[nd-1] <> 1 then
+        if TensorHostSettings.UseThreads && nd > 1 && trgt.FastLayout.Stride.[nd-1] <> 1 then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
@@ -175,7 +177,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     member inline internal trgt.ApplyBinaryOp 
             (scalarOp: 'T -> 'T -> 'T)
-            (vectorOp: Vector<'T> -> Vector<'T> -> Vector<'T>) 
+            (vectorOp: Vector<'T> * Vector<'T> -> Vector<'T>) 
             (hasVectorOp: bool)
             (src1: TensorHostBackend<'T>) (src2: TensorHostBackend<'T>) =        
 
@@ -191,7 +193,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             for vecIter in 0 .. vecIters-1 do
                 let src1Vec = Vector (src1.Data, src1Addr)
                 let src2Vec = Vector (src2.Data, src2Addr)
-                let trgtVec = vectorOp src1Vec src2Vec
+                let trgtVec = vectorOp (src1Vec, src2Vec)
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count
@@ -209,7 +211,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             let src2Vec = Vector (src2.Data.[src2Addr])
             for vecIter in 0 .. vecIters-1 do
                 let src1Vec = Vector (src1.Data, src1Addr)
-                let trgtVec = vectorOp src1Vec src2Vec
+                let trgtVec = vectorOp (src1Vec, src2Vec)
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count 
@@ -226,7 +228,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             let src1Vec = Vector (src1.Data.[src1Addr])
             for vecIter in 0 .. vecIters-1 do
                 let src2Vec = Vector (src2.Data, src2Addr)
-                let trgtVec = vectorOp src1Vec src2Vec
+                let trgtVec = vectorOp (src1Vec, src2Vec)
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src2Addr <- src2Addr + Vector<'T>.Count 
@@ -242,7 +244,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             let src1Vec = Vector (src1.Data.[src1Addr])
             let src2Vec = Vector (src2.Data.[src2Addr])
-            let trgtVec = vectorOp src1Vec src2Vec
+            let trgtVec = vectorOp (src1Vec, src2Vec)
             for vecIter in 0 .. vecIters-1 do
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
                 trgtAddr <- trgtAddr + Vector<'T>.Count
@@ -356,17 +358,30 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             outerLoops false 0
             
 
+    static member ElemwiseBackends (t: Tensor<'T>, a: Tensor<'TA>) =
+        ()
+
+    static member ElemwiseBackends (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
+        // try to find stride 1 dimension and move it to the back
+        // but for that we need swapdim, which is not implemented yet
+        t.Backend :?> TensorHostBackend<'T>, 
+        a.Backend :?> TensorHostBackend<'TA>, 
+        b.Backend :?> TensorHostBackend<'TB>
+
+    static member inline ApplyElemwise (scalarOp, vectorOp, 
+                                        trgt: Tensor<'T>, a: Tensor<'T>, b: Tensor<'T>) =
+        let trgt, a, b = TensorHostBackend<_>.ElemwiseBackends (trgt, a, b)
+        trgt.ApplyBinaryOp scalarOp vectorOp true a b        
+
+
     interface ITensorBackend<'T> with
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr idx]
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
-        member this.Plus src1 src2 =
-            let s = ScalarOps.ForType<'T> ()
-            let inline scalarOp a b = s.Plus a b
-            let inline vectorOp a b = Vector.Add(a, b)
-            this.ApplyBinaryOp scalarOp vectorOp true (toMe src1) (toMe src2)
-
+        member this.Plus trgt a b =
+            let inline scalarOp (a: 'T) (b: 'T) = scalarOps.Plus a b
+            TensorHostBackend<_>.ApplyElemwise (scalarOp, Vector.Add, trgt, a, b) 
 
 
 

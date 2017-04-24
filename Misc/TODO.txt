@@ -61,3 +61,9 @@ What to do with Tensor module?
 
   - reenable the reshape operations
   - reenable automatic broadcasting
+
+  - we need a function that performs axis swapping and reshaping beforehand
+  - and broadcastig
+
+  - need to 
+
