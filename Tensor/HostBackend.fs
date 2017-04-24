@@ -42,6 +42,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     member this.Data = this.Storage.Data
 
     member inline internal this.BinaryOp 
+            (scalarOp: 'T -> 'T -> 'T)
             (vecOp: Vector<'T> -> Vector<'T> -> Vector<'T>) 
             (src1: TensorHostBackend<'T>) (src2: TensorHostBackend<'T>) =        
 
@@ -49,6 +50,8 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         let trgtData, src1Data, src2Data = this.Data, src1.Data, src2.Data
         let nd = trgtFl.NDims
         let shape = trgtFl.Shape
+        let hasStride1InLastDim = 
+            trgtFl.Stride.[nd-1] = 1 && src1Fl.Stride.[nd-1] = 1 && src2Fl.Stride.[nd-1] = 1
 
         let inline stride1InnerLoop 
                 (trgtAddr: int) (src1Addr: int) (src2Addr: int)
@@ -89,32 +92,18 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 trgtAddr, src1Addr, src2Addr
             let mutable bufWritePos = 0
             let mutable srcPos = 0
+
             for pos in 0 .. shape.[nd-1] - 1 do
-                src1Buf.[bufWritePos] <- src1Data.[src1Addr]
-                src2Buf.[bufWritePos] <- src2Data.[src2Addr]
+                trgtData.[trgtAddr] <- scalarOp src1Data.[src1Addr] src2Data.[src2Addr]
+                trgtAddr <- trgtAddr + trgtFl.Stride.[nd-1]
                 src1Addr <- src1Addr + src1Fl.Stride.[nd-1]
                 src2Addr <- src2Addr + src2Fl.Stride.[nd-1]
-                bufWritePos <- bufWritePos + 1
-
-                if bufWritePos = Vector<'T>.Count || pos = shape.[nd-1] - 1 then
-                    let src1Vec = Vector src1Buf
-                    let src2Vec = Vector src2Buf
-                    let trgtVec = vecOp src1Vec src2Vec
-                    for bufReadPos in 0 .. bufWritePos - 1 do
-                        trgtData.[trgtAddr] <- trgtVec.[bufReadPos]
-                        trgtAddr <- trgtAddr + trgtFl.Stride.[nd-1]
-                    bufWritePos <- 0
-          
+         
         let inline scalarInnerLoop
                 (trgtAddr: int) (src1Addr: int) (src2Addr: int)
                 (trgtBuf: 'T[]) (src1Buf: 'T[]) (src2Buf: 'T[]) =    
 
-            src1Buf.[0] <- src1Data.[src1Addr]
-            src2Buf.[0] <- src2Data.[src2Addr]
-            let src1Vec = Vector src1Buf
-            let src2Vec = Vector src2Buf
-            let trgtVec = vecOp src1Vec src2Vec
-            trgtBuf.[trgtAddr] <- trgtVec.[0]
+            trgtBuf.[trgtAddr] <- scalarOp src1Data.[src1Addr] src2Data.[src2Addr]
 
         let inline outerLoops (dim0Fixed: bool) (dim0Pos: int) =
             let trgtBuf : 'T[] = Array.zeroCreate Vector<'T>.Count
@@ -137,8 +126,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     scalarInnerLoop
                         trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
                         trgtBuf src1Buf src2Buf
-                elif trgtFl.Stride.[nd-1] = 1 && 
-                     src1Fl.Stride.[nd-1] = 1 && src2Fl.Stride.[nd-1] = 1 then
+                elif hasStride1InLastDim then
                     stride1InnerLoop 
                         trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
                         trgtBuf src1Buf src2Buf
@@ -151,11 +139,10 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 src2PosIter.MoveNext()
                     
         let useThreads = true
-        if nd > 1 && useThreads then
+        if nd > 1 && useThreads && not hasStride1InLastDim then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
-
 
     interface ITensorBackend<'T> with
         member this.Item 
@@ -163,8 +150,10 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
         member this.Plus src1 src2 =
-            let inline op (a: Vector<'T>) (b: Vector<'T>) = a + b
-            this.BinaryOp op (toMe src1) (toMe src2)
+            let s = ScalarOps.Get()
+            let inline scalarOp (a: 'T) (b: 'T) = s.Plus a b
+            let inline vecOp (a: Vector<'T>) (b: Vector<'T>) = a + b            
+            this.BinaryOp scalarOp vecOp (toMe src1) (toMe src2)
 
 
 
