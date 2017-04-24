@@ -47,17 +47,14 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
         let nd = trgt.FastLayout.NDims
         let shape = trgt.FastLayout.Shape
-        let hasStride1InLastDim = trgt.FastLayout.Stride.[nd-1] = 1 
 
         let inline vectorInnerLoop (trgtAddr: int) =                   
-            let mutable trgtAddr = trgtAddr
-                
+            let mutable trgtAddr = trgtAddr               
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
                 let trgtVec = vectorOp ()
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
-                trgtAddr <- trgtAddr + Vector<'T>.Count
- 
+                trgtAddr <- trgtAddr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
                 trgt.Data.[trgtAddr] <- scalarOp ()
@@ -83,13 +80,15 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             while trgtPosIter.Active do
                 if nd = 0 then
                     scalarInnerLoop trgtPosIter.Addr 
-                elif hasStride1InLastDim && hasVectorOp then
-                    vectorInnerLoop trgtPosIter.Addr 
                 else
-                    genericInnerLoop trgtPosIter.Addr 
+                    match trgt.FastLayout.Stride.[nd-1] with
+                    | 1 when hasVectorOp ->
+                        vectorInnerLoop trgtPosIter.Addr 
+                    | _ ->
+                        genericInnerLoop trgtPosIter.Addr 
                 trgtPosIter.MoveNext()
                     
-        if nd > 1 && TensorHostSettings.UseThreads && not hasStride1InLastDim then
+        if nd > 1 && TensorHostSettings.UseThreads && trgt.FastLayout.Stride.[nd-1] <> 1 then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
@@ -104,22 +103,34 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         let hasStride1InLastDim = 
             trgt.FastLayout.Stride.[nd-1] = 1 && src1.FastLayout.Stride.[nd-1] = 1 
 
-        let inline vectorInnerLoop (trgtAddr: int) (src1Addr: int) =                   
-            let mutable trgtAddr, src1Addr = trgtAddr, src1Addr
-                
+        let inline stride11InnerLoop (trgtAddr: int) (src1Addr: int) =                   
+            let mutable trgtAddr, src1Addr = trgtAddr, src1Addr                
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
                 let src1Vec = Vector (src1.Data, src1Addr)
                 let trgtVec = vectorOp src1Vec 
                 trgtVec.CopyTo (trgt.Data, trgtAddr)
                 trgtAddr <- trgtAddr + Vector<'T>.Count
-                src1Addr <- src1Addr + Vector<'T>.Count
- 
+                src1Addr <- src1Addr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
                 trgt.Data.[trgtAddr] <- scalarOp src1.Data.[src1Addr] 
                 trgtAddr <- trgtAddr + 1
                 src1Addr <- src1Addr + 1
+
+        let inline stride10InnerLoop (trgtAddr: int) (src1Addr: int) =                   
+            let mutable trgtAddr = trgtAddr                
+            let vecIters = shape.[nd-1] / Vector<'T>.Count
+            let src1Vec = Vector (src1.Data.[src1Addr])
+            let trgtVec = vectorOp src1Vec
+            for vecIter in 0 .. vecIters-1 do
+                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtAddr <- trgtAddr + Vector<'T>.Count 
+            let restElems = shape.[nd-1] % Vector<'T>.Count
+            let trgtVal = scalarOp src1.Data.[src1Addr] 
+            for restPos in 0 .. restElems - 1 do
+                trgt.Data.[trgtAddr] <- trgtVal
+                trgtAddr <- trgtAddr + 1
                        
         let inline genericInnerLoop (trgtAddr: int) (src1Addr: int) =
             let mutable trgtAddr, src1Addr = trgtAddr, src1Addr
@@ -144,14 +155,19 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             while trgtPosIter.Active do
                 if nd = 0 then
                     scalarInnerLoop trgtPosIter.Addr src1PosIter.Addr 
-                elif hasStride1InLastDim && hasVectorOp then
-                    vectorInnerLoop trgtPosIter.Addr src1PosIter.Addr 
                 else
-                    genericInnerLoop trgtPosIter.Addr src1PosIter.Addr 
+                    match trgt.FastLayout.Stride.[nd-1], src1.FastLayout.Stride.[nd-1] with
+                    | 1, 1 when hasVectorOp ->
+                        stride11InnerLoop trgtPosIter.Addr src1PosIter.Addr 
+                    | 1, 0 when hasVectorOp ->
+                        stride10InnerLoop trgtPosIter.Addr src1PosIter.Addr 
+                    | _ ->
+                        genericInnerLoop trgtPosIter.Addr src1PosIter.Addr 
                 trgtPosIter.MoveNext()
                 src1PosIter.MoveNext()
                     
-        if nd > 1 && TensorHostSettings.UseThreads && not hasStride1InLastDim then
+        if TensorHostSettings.UseThreads && nd > 1 && 
+           (trgt.FastLayout.Stride.[nd-1] <> 1 || src1.FastLayout.Stride.[nd-1] > 1) then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
@@ -169,10 +185,8 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             trgt.FastLayout.Stride.[nd-1] = 1 && 
             src1.FastLayout.Stride.[nd-1] = 1 && src2.FastLayout.Stride.[nd-1] = 1
 
-        let inline vectorInnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
-            let mutable trgtAddr, src1Addr, src2Addr = 
-                trgtAddr, src1Addr, src2Addr
-                
+        let inline stride111InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+            let mutable trgtAddr, src1Addr, src2Addr = trgtAddr, src1Addr, src2Addr                
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
                 let src1Vec = Vector (src1.Data, src1Addr)
@@ -182,13 +196,61 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count
                 src2Addr <- src2Addr + Vector<'T>.Count
- 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
                 trgt.Data.[trgtAddr] <- scalarOp src1.Data.[src1Addr] src2.Data.[src2Addr]
                 trgtAddr <- trgtAddr + 1
                 src1Addr <- src1Addr + 1
                 src2Addr <- src2Addr + 1
+
+        let inline stride110InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+            let mutable trgtAddr, src1Addr = trgtAddr, src1Addr               
+            let vecIters = shape.[nd-1] / Vector<'T>.Count
+            let src2Vec = Vector (src2.Data.[src2Addr])
+            for vecIter in 0 .. vecIters-1 do
+                let src1Vec = Vector (src1.Data, src1Addr)
+                let trgtVec = vectorOp src1Vec src2Vec
+                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtAddr <- trgtAddr + Vector<'T>.Count
+                src1Addr <- src1Addr + Vector<'T>.Count 
+            let restElems = shape.[nd-1] % Vector<'T>.Count
+            let src2Val = src2.Data.[src2Addr]
+            for restPos in 0 .. restElems - 1 do
+                trgt.Data.[trgtAddr] <- scalarOp src1.Data.[src1Addr] src2Val
+                trgtAddr <- trgtAddr + 1
+                src1Addr <- src1Addr + 1
+                       
+        let inline stride101InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+            let mutable trgtAddr, src2Addr = trgtAddr, src2Addr               
+            let vecIters = shape.[nd-1] / Vector<'T>.Count
+            let src1Vec = Vector (src1.Data.[src1Addr])
+            for vecIter in 0 .. vecIters-1 do
+                let src2Vec = Vector (src2.Data, src2Addr)
+                let trgtVec = vectorOp src1Vec src2Vec
+                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtAddr <- trgtAddr + Vector<'T>.Count
+                src2Addr <- src2Addr + Vector<'T>.Count 
+            let restElems = shape.[nd-1] % Vector<'T>.Count
+            let src1Val = src1.Data.[src1Addr]
+            for restPos in 0 .. restElems - 1 do
+                trgt.Data.[trgtAddr] <- scalarOp src1Val src2.Data.[src2Addr] 
+                trgtAddr <- trgtAddr + 1
+                src2Addr <- src2Addr + 1
+
+        let inline stride100InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+            let mutable trgtAddr = trgtAddr
+            let vecIters = shape.[nd-1] / Vector<'T>.Count
+            let src1Vec = Vector (src1.Data.[src1Addr])
+            let src2Vec = Vector (src2.Data.[src2Addr])
+            let trgtVec = vectorOp src1Vec src2Vec
+            for vecIter in 0 .. vecIters-1 do
+                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtAddr <- trgtAddr + Vector<'T>.Count
+            let restElems = shape.[nd-1] % Vector<'T>.Count
+            let trgtVal = scalarOp src1.Data.[src1Addr] src2.Data.[src2Addr]
+            for restPos in 0 .. restElems - 1 do
+                trgt.Data.[trgtAddr] <- trgtVal
+                trgtAddr <- trgtAddr + 1
                        
         let inline genericInnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =
             let mutable trgtAddr, src1Addr, src2Addr = 
@@ -217,15 +279,27 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             while trgtPosIter.Active do
                 if nd = 0 then
                     scalarInnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
-                elif hasStride1InLastDim && hasVectorOp then
-                    vectorInnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
                 else
-                    genericInnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
+                    match trgt.FastLayout.Stride.[nd-1], 
+                          src1.FastLayout.Stride.[nd-1], 
+                          src2.FastLayout.Stride.[nd-1] with
+                    | 1, 1, 1 when hasVectorOp -> 
+                        stride111InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
+                    | 1, 1, 0 when hasVectorOp ->
+                        stride110InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
+                    | 1, 0, 1 when hasVectorOp ->
+                        stride101InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
+                    | 1, 0, 0 when hasVectorOp ->
+                        stride100InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
+                    | _ ->
+                        genericInnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
                 trgtPosIter.MoveNext()
                 src1PosIter.MoveNext()
                 src2PosIter.MoveNext()
                     
-        if nd > 1 && TensorHostSettings.UseThreads && not hasStride1InLastDim then
+        if TensorHostSettings.UseThreads && nd > 1 && 
+           (trgt.FastLayout.Stride.[nd-1] <> 1 || 
+            src1.FastLayout.Stride.[nd-1] > 1 || src2.FastLayout.Stride.[nd-1] > 1) then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
@@ -276,7 +350,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 for s in 0 .. nSrcs-1 do
                     srcsPosIter.[s].MoveNext()
                     
-        if nd > 1 && TensorHostSettings.UseThreads then
+        if TensorHostSettings.UseThreads && nd > 1 then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0

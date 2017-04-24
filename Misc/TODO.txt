@@ -59,3 +59,5 @@ What to do with Tensor module?
   - how to perform tensor creation?
   - 
 
+  - reenable the reshape operations
+  - reenable automatic broadcasting
