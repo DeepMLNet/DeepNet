@@ -6,7 +6,7 @@ open System.Collections.Generic
 
 open Basics
 
-type ScalarOps<'T>() =
+type internal ScalarOps<'T> private () =
 
     static let instances = Dictionary<Type, obj>()
 
@@ -20,7 +20,7 @@ type ScalarOps<'T>() =
 
 
 
-    static member Get<'T> () =
+    static member ForType<'T> () =
         match instances.TryFind typeof<'T> with
         | Some inst -> inst :?> ScalarOps<'T>
         | None ->

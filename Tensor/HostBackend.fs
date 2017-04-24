@@ -139,6 +139,7 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 src2PosIter.MoveNext()
                     
         let useThreads = true
+        //let hasStride1InLastDim = false
         if nd > 1 && useThreads && not hasStride1InLastDim then
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
@@ -150,10 +151,10 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
         member this.Plus src1 src2 =
-            let s = ScalarOps.Get()
-            let inline scalarOp (a: 'T) (b: 'T) = s.Plus a b
-            let inline vecOp (a: Vector<'T>) (b: Vector<'T>) = a + b            
-            this.BinaryOp scalarOp vecOp (toMe src1) (toMe src2)
+            let s = ScalarOps.ForType<'T> ()
+            let inline scalarOp a b = s.Plus a b
+            let inline vectorOp a b = Vector.Add(a, b)
+            this.BinaryOp scalarOp vectorOp (toMe src1) (toMe src2)
 
 
 

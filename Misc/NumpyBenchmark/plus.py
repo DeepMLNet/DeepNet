@@ -1,16 +1,16 @@
 import numpy as np
 import time
 
-np.__config__.show()
+#np.__config__.show()
 
-shape = (10000, 1000)
+shape = (10000, 10000)
 
 a = np.zeros(shape, dtype=np.float32)
 b = np.zeros(shape, dtype=np.float32)
 a[0, 0] = 1.0
 b[0, 0] = 1.0
 
-iters = 1000
+iters = 100
 
 start_time = time.time()
 for i in range(iters):
