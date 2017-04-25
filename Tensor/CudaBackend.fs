@@ -81,11 +81,16 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
+        member this.Copy(trgt: Tensor<'T>) (src: Tensor<'T>): unit = 
+            raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr idx]
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
+        member this.Convert (trgt: Tensor<'T>) (a: Tensor<'TA>) = failwith "not impl"
         member this.Plus trgt a b = failwith "notimpl"
+        member this.Map fn trgt a = failwith "not impl"
+        member this.Map2 fn trgt a b = failwith "not impl"
             
 
 and TensorCudaStorageFactory () =

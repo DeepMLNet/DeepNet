@@ -6,37 +6,24 @@ open System.Collections.Generic
 open Basics
 
 
-[<AutoOpen>]
-module TensorTypes =
-
-    /// Array storage location
-    [<StructuredFormatDisplay("{Pretty}")>]
-    type ArrayLocT = 
-        | ArrayLoc of string
-        with 
-            member this.Pretty = 
-                let (ArrayLoc loc) = this
-                loc
-
-    /// variable stored on host
-    let LocHost = ArrayLoc "Host"
-
-    let (|LocHost|_|) arg =
-        if arg = ArrayLoc "Host" then Some () else None
-
-    /// raises an error about an unsupported location
-    let unsupLoc loc =
-        failwithf "location %A is unsupported for this operation" loc
-
 /// singular matrix encountered
 exception SingularMatrixError of string
 
-/// operation requires same storage, but specified tensors had different storages
+/// operation requires tensors of same storage, but specified tensors had different storages
 exception StorageMismatch of string
 
-type SpecialAxisT =
-    | NewAxis
-    | Fill
+/// operation requires tensors of same shape, but specified tensor had different shapes
+exception ShapeMismatch of string
+
+/// a row-major layout was required for this operation, but the tensor has a different layout
+exception RowMajorLayoutRequired of string
+
+/// memory ordering of tensor
+type TensorOrder =
+    /// row-major (C) order
+    | RowMajor
+    /// column-major (Fortran) order
+    | ColumnMajor
 
 /// Type-neutral interface to Tensor<'T> of any type
 type ITensor =
@@ -46,12 +33,11 @@ type ITensor =
     abstract NDims:             int
     abstract NElems:            int64
     abstract CPPType:           string
-    abstract NewView:           TensorLayout -> ITensor
+    abstract Relayout:          TensorLayout -> ITensor
     abstract NewOfSameType:     TensorLayout -> ITensor
     abstract NewOfType:         TensorLayout -> System.Type -> ITensor
     abstract DataType:          System.Type
-    abstract Location:          ArrayLocT
-    abstract Copy:              unit -> ITensor
+    abstract Copy:              ?order:TensorOrder -> ITensor
     abstract CopyTo:            ITensor -> unit
     abstract GetSlice:          [<System.ParamArray>] args: obj [] -> ITensor
     abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
@@ -75,6 +61,11 @@ and ITensorStorage<'T> =
 
 and ITensorBackend<'T> =
     abstract Item:          int64 list -> 'T with get, set
+    abstract Copy:          trgt:Tensor<'T> -> src:Tensor<'T> -> unit
+    abstract Convert:       trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
+    abstract Map:           fn:('T1 -> 'T) -> trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
+    abstract Map2:          fn:('T1 -> 'T2 -> 'T) -> trgt:Tensor<'T> -> 
+                            src1:Tensor<'T1> -> src2:Tensor<'T2> -> unit
     abstract Plus:          trgt:Tensor<'T> -> src1:Tensor<'T> -> src2:Tensor<'T> -> unit
 
 and ITensorStorageFactory =
@@ -133,11 +124,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// address of specified index
     //member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
 
-    /// access to a single item
-    member this.Item
-        with get (idx: int64 list) : 'T = backend.[idx]
-        and set (idx: int64 list) (value: 'T) = backend.[idx] <- value
-
     /// a new ArrayND of same type and new storage allocation for given layout
     //abstract NewOfSameType : TensorLayout -> Tensor<'T>
 
@@ -147,6 +133,18 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// a tensor with the same storage but new layout
     member internal this.Relayout (newLayout: TensorLayout) =
         Tensor<'T> (newLayout, storage)
+
+    /// a tensor with the same storage but new layout
+    static member relayout newLayout (a: 'A when 'A :> ITensor) : 'A =
+        a.Relayout newLayout :?> 'A
+
+    /// a view of this tensor over the given range 
+    member internal this.RangeView (rng: TensorRng list) =
+        this.Relayout (this.Layout |> TensorLayout.view rng)
+
+    /// a view of the specified tensor over the given range 
+    static member range (rng: TensorRng list) (a: 'A when 'A :> ITensor) : 'A =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.view rng)
    
     /// checks that the given axis is valid
     member inline this.CheckAxis ax = this.Layout |> TensorLayout.checkAxis ax
@@ -169,221 +167,201 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     ///// true if the memory of the ArrayND is a contiguous block
     //let inline hasContiguousMemory a = layout a |> TensorLayout.hasContiguousMemory
 
-    ///// creates a new ArrayND with the same type as passed and contiguous (row-major) layout for specified shape
-    //let inline newCOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
-    //    a.NewOfSameType (TensorLayout.newC shp) :?> 'A
-
-    ///// creates a new ArrayND with the specified type and contiguous (row-major) layout for specified shape
-    //let inline newCOfType shp (a: 'A when 'A :> Tensor<_>) =
-    //    a.NewOfType (TensorLayout.newC shp) 
-
-    ///// creates a new ArrayND with the same type as passed and Fortran (column-major) layout for specified shape
-    //let inline newFOfSameType shp (a: 'A when 'A :> ITensor) : 'A =
-    //    a.NewOfSameType (TensorLayout.newF shp) :?> 'A
-
-    ///// creates a new ArrayND with the specified type and contiguous (column-major) layout for specified shape
-    //let inline newFOfType shp (a: 'A when 'A :> Tensor<_>) =
-    //    a.NewOfType (TensorLayout.newF shp) 
-
-    ///// creates a new ArrayND with existing data but new layout
-    //let inline relayout newLayout (a: 'A when 'A :> ITensor)  =
-    //    a.NewView newLayout :?> 'A
-
-    ///// checks that two ArrayNDs have the same shape
-    //let inline checkSameShape (a: Tensor<'T>) b =
-    //    Tensor<'T>.CheckSameShape a b
-
-
-#if false
-
-
-    /// Copies all elements from source to destination.
-    /// Both ArrayNDs must have the same shape.
-    let inline copyTo (source: #Tensor<'T>) (dest: #Tensor<'T>) =
-        source.CopyTo dest
-
-    /// Returns a contiguous copy of the given ArrayND.
-    let inline copy source =
-        let dest = newCOfSameType (shape source) source
-        copyTo source dest
-        dest
-
-    /// Returns a contiguous copy of the given IArrayNDT.
-    let inline copyUntyped (source: 'T when 'T :> ITensor) =
-        source.Copy() :?> 'T
-
-    /// If the ArrayND is not contiguous, returns a contiguous copy; otherwise
-    /// the given ArrayND is returned unchanged.
-    let inline ensureC a =
-        if isC a then a else copy a
-
-    /// makes a contiguous copy of the given tensor if it is not contiguous and with zero offset
-    let inline ensureCAndOffsetFree a = 
-        if isC a && offset a = 0L then a else copy a 
-
-    /// If the ArrayND is not in Fortran order, returns a copy in Fortran order; 
-    /// otherwise it is returned unchanged.
-    let inline ensureF a =
-        if isF a then a 
-        else 
-            let cpy = newFOfSameType (shape a) a
-            copyTo a cpy
-            cpy
-
+    /// checks that two ArrayNDs have the same shape
+    static member inline internal CheckSameShape (a: #ITensor) (b: #ITensor) =
+        if a.Shape <> b.Shape then
+            raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
+                                           to have same shape" a.Shape b.Shape))
+      
     /// inserts a broadcastable dimension of size one as first dimension
-    let inline padLeft a =
-        relayout (TensorLayout.padLeft (layout a)) a
+    static member padLeft a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padLeft)
 
     /// appends a broadcastable dimension of size one as last dimension
-    let inline padRight a =
-        relayout (TensorLayout.padRight (layout a)) a
+    static member padRight a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padRight)
 
     /// Inserts an axis of size 1 before the specified position.
-    let inline insertAxis ax a =
-        relayout (TensorLayout.insertAxis ax (layout a)) a
+    static member insertAxis ax a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.insertAxis ax)
 
-    /// cuts one dimension from the left
-    let inline cutLeft a =
-        relayout (TensorLayout.cutLeft (layout a)) a
+    /// removes the first dimension from the tensor
+    static member cutLeft a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutLeft)
       
-    /// cuts one dimension from the right
-    let inline cutRight a =
-        relayout (TensorLayout.cutRight (layout a)) a        
+    /// removes the last dimension from the tensor
+    static member cutRight a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutRight)
 
     /// broadcast the given dimension to the given size
-    let inline broadcastDim dim size a =
-        relayout (TensorLayout.broadcastDim dim size (layout a)) a        
+    static member broadcastDim dim size a =
+        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.broadcastDim dim size)       
 
-    /// pads shapes from the left until they have same rank
-    let inline padToSame a b =
-        let la, lb = TensorLayout.padToSame (layout a) (layout b)
-        relayout la a, relayout lb b
+    /// Creates a new tensor of specifed shape with newly allocated storage using 
+    /// the specified storage device.
+    new (shape: int64 list, dev: ITensorStorageFactory, ?order: TensorOrder) =
+        let order = defaultArg order RowMajor
+        let layout = 
+            match order with
+            | RowMajor -> TensorLayout.newC shape
+            | ColumnMajor -> TensorLayout.newF shape
+        let storage = dev.Create layout.NElems
+        Tensor<'T> (layout, storage)
 
-    /// broadcasts to have the same size
-    let inline broadcastToSame a b =
-        let la, lb = TensorLayout.broadcastToSame (layout a) (layout b)
-        relayout la a, relayout lb b
+    static member inline internal ApplyLayoutFn (fn, a, b) =
+        let layouts = [Tensor<_>.layout a; Tensor<_>.layout b]
+        let newLayouts = fn layouts
+        match newLayouts with
+        | [al; bl] -> 
+            Tensor<_>.relayout al a, Tensor<_>.relayout bl b
+        | _ -> failwith "unexpected layout function result"
 
-    /// broadcasts all arrays to have the same shape
-    let inline broadcastToSameMany arys =
-        Tensor<_>.BroadcastToSameMany arys
+    static member inline internal ApplyLayoutFn (fn, a, b, c) =
+        let layouts = [Tensor<_>.layout a; Tensor<_>.layout b; Tensor<_>.layout c]
+        let newLayouts = fn layouts
+        match newLayouts with
+        | [al; bl; cl] -> 
+            Tensor<_>.relayout al a, Tensor<_>.relayout bl b, Tensor<_>.relayout cl c
+        | _ -> failwith "unexpected layout function result"
 
-    /// broadcasts to have the same size in the given dimensions
-    let inline broadcastToSameInDims dims a b =
-        let la, lb = TensorLayout.broadcastToSameInDims dims (layout a) (layout b)
-        relayout la a, relayout lb b
+    static member inline internal ApplyLayoutFn (fn, xs) =
+        let layouts = fn (xs |> List.map Tensor<_>.layout)
+        (layouts, xs) ||> List.map2 Tensor<_>.relayout
 
-    /// broadcasts a ArrayND to the given shape
-    let inline broadcastToShape shp a =
-        relayout (TensorLayout.broadcastToShape shp (layout a)) a
+    /// pads the shapes of all tensors from the left until they have same rank
+    static member padToSame (a, b) = 
+        Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, a, b)
+
+    /// pads the shapes of all tensors from the left until they have same rank
+    static member padToSame (a, b, c) = 
+        Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, a, b, c)
+
+    /// pads the shapes of all tensors from the left until they have same rank
+    static member padToSame (xs) = 
+        Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, xs)
+
+    /// broadcasts all tensors to the same shape 
+    static member broadcastToSame (a, b) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, a, b)
+
+    /// broadcasts all tensors to the same shape if possible
+    static member broadcastToSame (a, b, c) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, a, b, c)
+
+    /// broadcasts all tensors to the same shape if possible
+    static member broadcastToSame (xs) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, xs)
+
+    /// broadcasts all tensors to the same sizes in the given dimensions
+    static member broadcastToSameInDims (dims, a, b) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, a, b)
+
+    /// broadcasts all tensors to the same sizes in the given dimensions
+    static member broadcastToSameInDims (dims, a, b, c) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, a, b, c)
+
+    /// broadcasts all tensors to the same sizes in the given dimensions
+    static member broadcastToSameInDims (dims, xs) =
+        Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, xs)
+
+    /// broadcasts the tensor to the given shape
+    static member broadcastTo shp a =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.broadcastToShape shp)
 
     /// returns true if at least one dimension is broadcasted
-    let inline isBroadcasted a =
-        TensorLayout.isBroadcasted (layout a)
+    static member isBroadcasted a =
+        a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
 
-    /// Tries to reshape array assuming a contiguous (row-major) memory layout without copying.
-    /// If this is not possible, None is returned.
-    /// The number of elements must not change.
-    let inline tryReshapeView shp a =
-        match TensorLayout.tryReshape shp (layout a) with
-        | Some newLayout -> a |> relayout newLayout |> Some
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, None is returned.
+    static member tryReshapedView shp a =
+        match a |> Tensor<_>.layout |> TensorLayout.tryReshape shp with
+        | Some newLayout -> a |> Tensor<_>.relayout newLayout |> Some
         | None -> None
 
-    /// Reshape array assuming a contiguous (row-major) memory layout without copying.
-    /// If this is not possible, an error is raised. 
-    /// The number of elements must not change.
-    let inline reshapeView shp a =
-        a |> relayout (TensorLayout.reshape shp (layout a))
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, an error is raised.
+    static member reshapedView shp a =
+        match Tensor<_>.tryReshapedView shp a with
+        | Some res -> res
+        | None -> 
+            let msg =
+                sprintf "cannot reshape tensor of shape %A and strides %A without copying"
+                    (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
+            raise (RowMajorLayoutRequired msg)
 
-    /// Returns true if the array can be reshaped without copying.
-    let inline canReshapeView shp a =
-        match tryReshapeView shp a with
+    /// Returns true if the tensor can be reshaped without copying.
+    static member canReshapeWithoutCopy shp a =
+        match Tensor<_>.tryReshapedView shp a with
         | Some _ -> true
         | None -> false
 
-    /// Reshape array assuming a contiguous (row-major) memory layout.
-    /// The current memory layout (as given by the strides) has no influence 
-    /// on the reshape operation.
-    /// If the array is not contiguous, a reshaped copy is returned.
+    /// Reshape array assuming a row-major order.
+    /// If the array is currently not in row-major order, a reshaped copy is returned.
+    /// Otherwise, a reshaped view of the same tensor is returned.
     /// The number of elements must not change.
     /// One element can be -1, in which case the size of that element is
     /// inferred automatically.
-    let inline reshape shp a =
-        reshapeView shp (ensureC a)
+    static member reshape shp a =
+        match a |> Tensor<_>.tryReshapedView shp with
+        | Some res -> res
+        | None ->
+            a |> Tensor<_>.copy |> Tensor<_>.reshapedView shp
 
-    /// Flattens the array into a vector assuming a contiguous (row-major) memory layout.
-    let inline flatten a =
-        reshape [-1L] a
+    /// Flattens the tensor into a vector assuming a row-major order.
+    static member flatten a =
+        Tensor<_>.reshape [-1L] a
 
     /// swaps the given dimensions
-    let inline swapDim ax1 ax2 a =
-        relayout (TensorLayout.swapDim ax1 ax2 (layout a)) a
+    static member swapDim ax1 ax2 a =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.swapDim ax1 ax2)
 
     /// Transposes the given matrix.
-    /// If the array has more then two dimensions, the last two axes are swapped.
-    let inline transpose a =
-        relayout (TensorLayout.transpose (layout a)) a
+    /// If the tensor has more then two dimensions, the last two axes are swapped.
+    static member transpose a =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.transpose)
 
     /// Permutes the axes as specified.
-    /// Each entry in the specified permutation specifies the *new* position of 
+    /// Each entry in the specified permutation specifies the new position of 
     /// the corresponding axis, i.e. to which position the axis should move.
-    let inline permuteAxes (permut: int list) a =
-        a |> relayout (layout a |> TensorLayout.permuteAxes permut)
+    static member permuteAxes (permut: int list) a =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.permuteAxes permut)
 
     /// Reverses the elements in the specified dimension.
-    let reverseAxis ax a =
-        a |> relayout (layout a |> TensorLayout.reverseAxis ax)        
+    static member reverseAxis ax a =
+        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.reverseAxis ax)        
+
+    /// Ensures that the tensor has at least minDims dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    static member atLeastND minDims a =
+        let nd = Tensor<_>.nDims a
+        if nd >= minDims then a
+        else
+            let newShp = List.init (minDims - nd) (fun _ -> 1L)
+            a |> Tensor<_>.reshape newShp
+
+    /// Ensures that the tensor has at least one dimension.
+    static member atLeast1D a = a |> Tensor<_>.atLeastND 1
+
+    /// Ensures that the tensor has at least two dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    static member atLeast2D a = a |> Tensor<_>.atLeastND 2
+
+    /// Ensures that the tensor has at least three dimensions.
+    /// If not, it is padded with size one dimensions from the left.
+    static member atLeast3D a = a |> Tensor<_>.atLeastND 3
+
+
+
+#if false
 
     /// creates a view of an ArrayND
     let inline view ranges a =
         relayout (TensorLayout.view ranges (layout a)) a        
     
-    /// Ensures that the tensor has at least one dimension.
-    let atLeast1D a =
-        if nDims a >= 1 then a
-        else a |> reshape [nElems a]
-
-    /// Ensures that the tensor has at least two dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast2D a =
-        if nDims a >= 2 then a
-        else a |> reshape [1L; nElems a]
-
-    /// Ensures that the tensor has at least three dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast3D a =
-        if nDims a >= 3 then a
-        else a |> reshape [1L; 1L; nElems a]
-
-    /// Ensures that the tensor has at least four dimensions.
-    /// If not, it is padded with size one dimensions from the left.
-    let atLeast4D a =
-        if nDims a >= 4 then a
-        else a |> reshape [1L; 1L; 1L; nElems a]
-
-    #endif
-
-    new (shape: int64 list, dev: ITensorStorageFactory) =
-        let layout = TensorLayout.newC shape
-        let storage = dev.Create layout.NElems
-        Tensor<'T> (layout, storage)
-
-    /// broadcasts both tensors to the same shape if possible
-    static member internal BroadcastToSame (a: Tensor<'TA>, b: Tensor<'TB>) =
-        let al, bl = TensorLayout.broadcastToSame a.Layout b.Layout
-        a.Relayout al, b.Relayout bl
-
-    /// broadcasts all three tensors to the same shape if possible
-    static member internal BroadcastToSame (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
-        let layouts = TensorLayout.broadcastToSameMany [a.Layout; b.Layout; c.Layout]
-        match layouts with
-        | [al; bl; cl] -> a.Relayout al, b.Relayout bl, c.Relayout cl
-        | _ -> failwith "unexpected TensorLayout.broadcastToSameMany result"
-
-    /// broadcast the list of tensors to the same shape if possible
-    static member internal BroadcastToSame (xs: Tensor<_> list) =
-        let layouts = TensorLayout.broadcastToSameMany (xs |> List.map (fun a -> a.Layout))
-        (xs, layouts) ||> List.map2 (fun a l -> a.Relayout l)
+#endif
 
     /// checks that all tensors have the same storage
     static member internal CheckSameStorage (xs: ITensor list) =
@@ -395,24 +373,24 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         | _ -> ()            
 
     /// prepares an elementwise operation by allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>) =
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+    static member internal PrepareElemwise (a: Tensor<'TA>, ?order) =
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
         trgt, a
 
     /// prepares an elementwise operation by broadcasting both tensors to the same size
     /// and allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>) =
+    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, ?order) =
         Tensor<_>.CheckSameStorage [a; b]
-        let a, b = Tensor<_>.BroadcastToSame (a, b)
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+        let a, b = Tensor<_>.broadcastToSame (a, b)
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
         trgt, a, b
 
     /// prepares an elementwise operation by broadcasting all three tensors to the same size
     /// and allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
+    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>, ?order) =
         Tensor<_>.CheckSameStorage [a; b; c]
-        let a, b, c = Tensor<_>.BroadcastToSame (a, b, c)
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory)
+        let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
+        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
         trgt, a, b, c
 
 
@@ -425,7 +403,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.NElems = this.NElems
         member this.Storage = this.Storage :> ITensorStorage
         member this.CPPType = raise (System.NotImplementedException())
-        member this.Copy() = raise (System.NotImplementedException())
+        member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.CopyTo(arg1) = raise (System.NotImplementedException())
         member this.GetSlice(args) = raise (System.NotImplementedException())
         member this.Item
@@ -451,10 +429,9 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.Item
             with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj) (v: ITensor): unit = 
                 raise (System.NotImplementedException())
-        member this.Location = raise (System.NotImplementedException())
         member this.NewOfSameType(arg1) = raise (System.NotImplementedException())
         member this.NewOfType arg1 arg2 = raise (System.NotImplementedException())
-        member this.NewView(arg1) = raise (System.NotImplementedException())
+        member this.Relayout layout = this.Relayout layout :> ITensor
         member this.SetSlice(args) = raise (System.NotImplementedException())
 
 
@@ -463,23 +440,171 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         // TODO: fill x with zeros
         x
 
-    static member internal ApplyElemwise (fn, a: Tensor<'TA>) : Tensor<'R> =
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+    static member internal ApplyElemwise (fn, a: Tensor<'TA>, ?order) : Tensor<'R> =
+        let trgt, a = Tensor<_>.PrepareElemwise (a, ?order=order)
         fn trgt a
         trgt       
 
-    static member internal ApplyElemwise (fn, a: Tensor<'TA>, b: Tensor<'TB>) : Tensor<'R> =
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+    static member internal ApplyElemwise (fn, a: Tensor<'TA>, b: Tensor<'TB>, ?order) : Tensor<'R> =
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b, ?order=order)
         fn trgt a b
         trgt
        
+    /// element-wise addition of two tensor
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
         Tensor<_>.ApplyElemwise((fun trgt a b -> trgt.Backend.Plus trgt a b), a, b)
+
+    /// returns a copy of the tensor
+    member this.Copy (?order) =
+        Tensor<_>.ApplyElemwise((fun trgt a -> trgt.Backend.Copy trgt a), this, ?order=order)
+        
+    /// returns a copy of the tensor
+    static member copy (a: 'A when 'A :> ITensor, ?order) =
+        a.Copy (?order=order) :?> 'A
+
+    /// Copies the specifed tensor into this tensor.
+    /// Both tensors must have same shape and storage.
+    member internal this.CopyFrom (src: Tensor<'T>) =
+        Tensor<_>.CheckSameShape this src
+        Tensor<_>.CheckSameStorage [this; src]
+        this.Backend.Copy this src
+
+    /// maps all elements using the specified function into a new tensor
+    static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
+        Tensor<_>.ApplyElemwise ((fun trgt a -> trgt.Backend.Map fn trgt a), a)
+
+    /// maps all elements using the specified function into a new tensor
+    static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        Tensor<_>.ApplyElemwise ((fun trgt a b -> trgt.Backend.Map2 fn trgt a b), a, b)
+
+    /// converts all elements to the specified type
+    static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
+        Tensor<_>.ApplyElemwise ((fun trgt a -> trgt.Backend.Convert trgt a), a)
+
+    /// a view of this tensor with the given .NET range
+    member inline internal this.GetRng (rngArgs: obj[]) =
+        this.RangeView (TensorRng.ofItemOrSliceArgs rngArgs) 
+    member inline internal this.GetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
+        Array.concat [rngArgs; restArgs] |> this.GetRng
+
+    /// write into the view of this tensor with the given .NET range
+    member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
+        Tensor<_>.CheckSameStorage [this; value]
+        let trgt = this.RangeView (TensorRng.ofItemOrSliceArgs rngArgs) 
+        value |> Tensor<_>.broadcastTo trgt.Shape |> trgt.CopyFrom
+    member inline internal this.SetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
+        let allArgs = Array.concat [rngArgs; restArgs]
+        let value = Array.last allArgs :?> Tensor<'T>
+        let args = allArgs.[0 .. allArgs.Length-2]
+        this.SetRng args value
+
+    /// access to a single item using a list of indices
+    member this.Item
+        with get (idx: int64 list) : 'T = backend.[idx]
+        and set (idx: int64 list) (value: 'T) = backend.[idx] <- value
+
+    /// n-dimensional slicing using a list of TensorRngs
+    member this.Item
+        with get (rng: TensorRng list) = this.GetRng [|rng|]
+        and set (rng: TensorRng list) (value: Tensor<'T>) = this.SetRng [|rng|] value
+
+    /// one-dimensional slicing using indices and special axes
+    member this.Item
+        with get (i0: int64) = this.GetRng [|i0|]
+        and set (i0: int64) (value: Tensor<'T>) = this.SetRng [|i0|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option) = this.GetRng [|i0s; i0f|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f|] value
+
+    /// two-dimensional slicing using indices and special axes
+    member this.Item
+        with get (i0: int64, i1: int64) = this.GetRng [|i0; i1|]
+        and set (i0: int64, i1: int64) (value: Tensor<'T>) = this.SetRng [|i0; i1|] value
+    member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option) = this.GetRng [|i0; i1s; i1f|]
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, value: Tensor<'T>) = this.SetRng [|i0; i1s; i1f|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64) = this.GetRng [|i0s; i0f; i1|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option) = this.GetRng [|i0s; i0f; i1s; i1f|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f|] value
+
+    /// three-dimensional slicing using indices and special axes
+    member this.Item
+        with get (i0: int64, i1: int64, i2: int64) = this.GetRng [|i0; i1; i2|]
+        and set (i0: int64, i1: int64, i2: int64) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2|] value
+    member this.GetSlice (i0: int64, i1: int64, i2: int64) = this.GetRng [|i0; i1; i2|]
+    member this.SetSlice (i0: int64, i1: int64, i2: int64, value: Tensor<'T>) = this.SetRng [|i0; i1; i2|] value
+    member this.GetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option) = this.GetRng [|i0; i1; i2s; i2f|]
+    member this.SetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, value: Tensor<'T>) = this.SetRng [|i0; i1; i2s; i2f|] value
+    member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64) = this.GetRng [|i0; i1s; i1f; i2|]
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, value: Tensor<'T>) = this.SetRng [|i0; i1s; i1f; i2|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64) = this.GetRng [|i0s; i0f; i1; i2|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1; i2|] value
+    member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option) = this.GetRng [|i0; i1s; i1f; i2s; i2f|]
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, value: Tensor<'T>) = this.SetRng [|i0; i1s; i1f; i2s; i2f|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option) = this.GetRng [|i0s; i0f; i1; i2s; i2f|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1; i2s; i2f|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64) = this.GetRng [|i0s; i0f; i1s; i1f; i2|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f; i2|] value
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option) = this.GetRng [|i0s; i0f; i1s; i1f; i2s; i2f|]
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f; i2s; i2f|] value
+
+
+    member this.GetSlice (i0: int64, i1: int64, i2: int64, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0; i1; i2|] r
+    member this.SetSlice (i0: int64, i1: int64, i2: int64, o3: obj, value: Tensor<'T>) = this.SetRng [|i0; i1; i2; o3|] value
+    member this.SetSlice (i0: int64, i1: int64, i2: int64, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0; i1; i2; o3; o4|] r
+    member this.GetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0; i1; i2s; i2f|] r
+    member this.SetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, value: Tensor<'T>) = this.SetRng [|i0; i1; i2s; i2f; o3|] value
+    member this.SetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0; i1; i2s; i2f; o3|] r
+    member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0; i1s; i1f; i2|] r
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, value: Tensor<'T>) = this.SetRng [|i0; i1s; i1f; i2; o3|] value
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0; i1s; i1f; i2; o3|] r
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1; i2|] r
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, o3: obj, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1; i2; o3|] value
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1; i2; o3|] r
+    member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0; i1s; i1f; i2s; i2f|] r
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, value: Tensor<'T>) = this.SetRng [|i0; i1s; i1f; i2s; i2f; o3|] value
+    member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0; i1s; i1f; i2s; i2f; o3|] r
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1; i2s; i2f|] r
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1; i2s; i2f; o3|] value
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1; i2s; i2f; o3|] r
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1s; i1f; i2|] r
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f; i2; o3|] value
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1s; i1f; i2; o3|] r
+    member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f|] r
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] value
+    member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
+
+    /// four- and more-dimensional slicing using indices and special axes passed as object
+    member this.Item
+        with get (i0: obj, i1: obj, i2: obj, i3: obj) = this.GetRng [|i0; i1; i2; i3|]
+        and set (i0: obj, i1: obj, i2: obj, i3: obj) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2; i3|] value
+    member this.Item
+        with get (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj) = this.GetRng [|i0; i1; i2; i3; i4|]
+        and set (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2; i3; i4|] value
+    member this.Item
+        with get (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj, i5: obj) = this.GetRng [|i0; i1; i2; i3; i4; i5|]
+        and set (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj, i5: obj) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2; i3; i4; i5|] value
+    member this.Item
+        with get (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj, i5: obj, i6: obj) = this.GetRng [|i0; i1; i2; i3; i4; i5; i6|]
+        and set (i0: obj, i1: obj, i2: obj, i3: obj, i4: obj, i5: obj, i6: obj) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2; i3; i4; i5; i6|] value
+
+
+
         
 
+
+
+
+
+        
+
+
+
+
+    //member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+        //this.RangeView (TensorRng.ofItemOrSliceArgs allArgs) 
+
+
 #if false
-    /// true if warning about fallback copy was shown
-    static let mutable SlowCopyWarningShown = false
 
     /// C++ type name
     member this.CPPType = 
@@ -496,83 +621,8 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
             dims cppDataType dims shapeStr dims strideStr            
 
-    /// storage location of the ArrayND
-    abstract Location: ArrayLocT
 
-    /// unchecked cast to NDArrayT<'A>
-    member this.Cast<'A> () =
-        let thisBoxed = box this
-        let thisCasted = unbox<Tensor<'A>> thisBoxed
-        thisCasted
 
-    /// unchecked cast of v to NDArrayT<'T> (this type)
-    member this.CastToMe (v: Tensor<'A>) = v.Cast<'T> ()
-
-    /// checks that two ArrayNDs have the same shape
-    static member inline CheckSameShape (a: Tensor<'T>) (b: Tensor<'T>) =
-        if (TensorLayout.shape a.Layout) <> (TensorLayout.shape b.Layout) then
-            failwithf "ArrayNDs of shapes %A and %A were expected to have same shape" 
-                (TensorLayout.shape a.Layout) (TensorLayout.shape b.Layout)
-
-    /// Copy the elements of this ArrayNDT to the specified destination ArrayNDT.
-    /// Both ArrayNDTs must be of same shape.
-    abstract CopyTo : Tensor<'T> -> unit
-    default this.CopyTo (dest: Tensor<'T>) =
-        // slow element-wise fallback copy
-        if not SlowCopyWarningShown then
-            printfn "WARNING: fallback slow ArrayNDT.CopyTo is being used \
-                        (this message is only shown once)"
-            SlowCopyWarningShown <- true
-        Tensor<'T>.CheckSameShape this dest
-        for idx in TensorLayout.allIdx this.Layout do
-            dest.[idx] <- this.[idx]
-
-    /// a view of this ArrayNDT over the given range 
-    member this.View rng =
-        this.NewView (TensorLayout.view rng this.Layout)
-
-    /// broadcasts this array to the given shape if possible
-    member this.BroadcastToShape shp = 
-        let l = TensorLayout.broadcastToShape shp this.Layout
-        this.NewView l
-
-    /// implements a storage specific version of map
-    abstract MapImpl: ('T -> 'R) -> Tensor<'R> -> unit
-    default this.MapImpl f result =
-        // slow fallback mapping
-        for idx in TensorLayout.allIdx this.Layout do
-            result.[idx] <- f this.[idx]
-
-    /// maps all elements using the specified function into a new ArrayNDT
-    member this.Map (f: 'T -> 'R) =
-        let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
-        this.MapImpl f res
-        res
-
-    abstract MapInplaceImpl: ('T -> 'T) -> unit
-    default this.MapInplaceImpl f = 
-        // slow fallback mapping
-        for idx in TensorLayout.allIdx this.Layout do
-            this.[idx] <- f this.[idx]
-
-    /// maps all elements using the specified function in-place
-    member this.MapInplace (f: 'T -> 'T) =
-        this.MapInplaceImpl f
-
-    abstract Map2Impl: ('T -> 'T -> 'R) -> Tensor<'T> -> Tensor<'R> -> unit
-    default this.Map2Impl f other result =
-        for idx in TensorLayout.allIdx this.Layout do
-            result.[idx] <- f this.[idx] other.[idx]
-
-    /// maps all elements of this and other using the specified function into a new ArrayNDT
-    member this.Map2 (f: 'T -> 'T -> 'R) (other: #Tensor<'T>) =
-        if other.GetType() <> this.GetType() then
-            failwithf "cannot use Map2 on ArrayNDTs of different types: %A and %A"
-                (this.GetType()) (other.GetType())
-        let this, other = this.BroadcastToSame other
-        let res = this.NewOfType<'R> (TensorLayout.newC this.Shape)
-        this.Map2Impl f other res
-        res
 
     abstract IfThenElseImpl: Tensor<bool> -> Tensor<'T> -> Tensor<'T> -> unit
     default this.IfThenElseImpl cond elseVal result =
@@ -686,67 +736,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             |> fun s -> s.GetEnumerator()
         member this.GetEnumerator() =
             (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
-
-    /// converts .Net item/ranges to RangeT list
-    member internal this.ToRng (allArgs: obj []) =
-        let rec toRng (args: obj list) =
-            match args with
-            // direct range specification
-            | [:? (TensorRng list) as rngs] -> rngs
-            // slices
-            | (:? (int64 option) as so) :: (:? (int64 option) as fo)  :: rest ->
-                Rng (so, fo) :: toRng rest
-            // items
-            | (:? int64 as i)           :: rest ->
-                RngElem i :: toRng rest
-            | (:? SpecialAxisT as sa) :: rest ->
-                match sa with
-                | NewAxis -> RngNewAxis :: toRng rest
-                | Fill    -> RngAllFill :: toRng rest
-            // special cases
-            | [] -> []
-            | _  -> failwithf "invalid item/slice specification: %A" allArgs 
-
-        allArgs |> Array.toList |> toRng
-
-    member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-        this.View (this.ToRng allArgs) 
-
-    member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
-        let rngArgs = allArgs.[0 .. allArgs.Length - 2] 
-        let trgt = this.View (this.ToRng rngArgs) 
-        let valueObj = Array.last allArgs
-        match valueObj with
-        | :? Tensor<'T> as value -> (value.BroadcastToShape trgt.Shape).CopyTo trgt
-        | :? ITensor as ov -> 
-            failwithf "cannot assign data type %A to array of data type %A" 
-                        ov.DataType this.DataType
-        | _ -> failwithf "need array of same type to assign, but got type %A" 
-                    (valueObj.GetType())
-                
-    // item setter does not accept <ParamArray>, thus we have to write it out
-    member this.Item
-        with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-        and set (arg0: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
-    member this.Item
-        with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
-            this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 
 #endif
 

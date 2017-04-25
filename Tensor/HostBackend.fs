@@ -97,9 +97,10 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
 
     member inline internal trgt.ApplyUnaryOp 
-            (scalarOp: 'T -> 'T) (vectorOp: Vector<'T> -> Vector<'T>) (hasVectorOp: bool)
-            (src1: TensorHostBackend<'T>) =        
+            (scalarOp: 'T1 -> 'T) (vectorOp: Vector<'T1> -> Vector<'T>) (hasVectorOp: bool)
+            (src1: TensorHostBackend<'T1>) =        
 
+        assert (Vector<'T>.Count = Vector<'T1>.Count)
         let nd = trgt.FastLayout.NDims
         let shape = trgt.FastLayout.Shape
         let hasStride1InLastDim = 
@@ -359,7 +360,8 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             
 
     static member ElemwiseBackends (t: Tensor<'T>, a: Tensor<'TA>) =
-        ()
+        t.Backend :?> TensorHostBackend<'T>, 
+        a.Backend :?> TensorHostBackend<'TA>
 
     static member ElemwiseBackends (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
         // try to find stride 1 dimension and move it to the back
@@ -368,20 +370,76 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         a.Backend :?> TensorHostBackend<'TA>, 
         b.Backend :?> TensorHostBackend<'TB>
 
+    static member inline ApplyElemwise (scalarOp,  
+                                        trgt: Tensor<'T>, a: Tensor<'TA>) =
+        let trgt, a = TensorHostBackend<_>.ElemwiseBackends (trgt, a)
+        trgt.ApplyUnaryOp scalarOp (fun _ -> failwith "not used") false a 
+
+    static member inline ApplyElemwise (scalarOp, vectorOp, 
+                                        trgt: Tensor<'T>, a: Tensor<'TA>) =
+        let trgt, a = TensorHostBackend<_>.ElemwiseBackends (trgt, a)
+        trgt.ApplyUnaryOp scalarOp vectorOp true a 
+
     static member inline ApplyElemwise (scalarOp, vectorOp, 
                                         trgt: Tensor<'T>, a: Tensor<'T>, b: Tensor<'T>) =
         let trgt, a, b = TensorHostBackend<_>.ElemwiseBackends (trgt, a, b)
         trgt.ApplyBinaryOp scalarOp vectorOp true a b        
 
+    static member inline private ConvertImpl (fn: 'ISrc -> 'ITrgt) 
+                                             (trgt: Tensor<'TTrgt>) (src: Tensor<'TSrc>) =
+        let trgt, src = box trgt :?> Tensor<'ITrgt>, box src :?> Tensor<'ISrc>
+        TensorHostBackend<'ITrgt>.ApplyElemwise (fn, trgt, src)         
 
     interface ITensorBackend<'T> with
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr idx]
             and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
 
+        member this.Copy trgt a =
+            let inline scalarOp (a: 'T) = a
+            let inline vectorOp (a: Vector<'T>) = a
+            TensorHostBackend<_>.ApplyElemwise (scalarOp, vectorOp, trgt, a) 
+
+        member this.Convert (trgt: Tensor<'T>) (a: Tensor<'TA>) =
+            let t, ta = typeof<'T>, typeof<'TA>
+            if t = ta then
+                let a = box a :?> Tensor<'T>
+                (this :> ITensorBackend<'T>).Copy trgt a
+            //elif t = typeof<single> && ta = typeof<double> then
+            //    this.ConvertImpl (fun (a: double) -> single a) trgt a
+            //elif t = typeof<single> && ta = typeof<int> then
+            //    this.ConvertImpl (fun (a: int) -> single a) trgt a
+            //elif t = typeof<double> && ta = typeof<single> then
+            //    TensorHostBackend<_>.ConvertImpl (fun (a: single) -> double a) trgt a
+            //elif t = typeof<double> && ta = typeof<int> then
+            //    TensorHostBackend<_>.ConvertImpl (fun (a: int) -> double a) trgt a
+            //elif t = typeof<int> && ta = typeof<single> then
+            //    TensorHostBackend<_>.ConvertImpl (fun (a: single) -> int a) trgt a
+            //elif t = typeof<int> && ta = typeof<double> then
+            //    TensorHostBackend<_>.ConvertImpl (fun (a: double) -> int a) trgt a
+            else
+                let scalarOp a = a
+                    //Convert.ChangeType(box a, typeof<'T>) :?> 'T
+                //TensorHostBackend<_>.ApplyElemwise (scalarOp, trgt, a)                       
+                ()
+
+
+            //if typeof<'T> = typeof<single> && typeof<'TA> = typeof<double> then
+            //    let trgt, a = box trgt :?> Tensor<single>, box a :?> Tensor<double>
+            //    let inline scalarOp (a: double) = single a
+            //    TensorHostBackend<single>.ApplyElemwise (scalarOp, trgt, a) 
+            //elif typeof<'T> = typeof<double> && typeof<'TA> = typeof<single> then
+            //    let trgt, a = box trgt :?> Tensor<single>, box a :?> Tensor<double>
+            //    let inline scalarOp (a: double) = single a
+            //    TensorHostBackend<single>.ApplyElemwise (scalarOp, trgt, a) 
+
+
         member this.Plus trgt a b =
             let inline scalarOp (a: 'T) (b: 'T) = scalarOps.Plus a b
             TensorHostBackend<_>.ApplyElemwise (scalarOp, Vector.Add, trgt, a, b) 
+
+        member this.Map fn trgt a = failwith "not impl"
+        member this.Map2 fn trgt a b = failwith "not impl"
 
 
 

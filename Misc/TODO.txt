@@ -65,5 +65,8 @@ What to do with Tensor module?
   - we need a function that performs axis swapping and reshaping beforehand
   - and broadcastig
 
-  - need to 
+  - what to do about map and map2?
+  - as long as backend is host, these functions make sense
+  - if backend is GPU, then they are problematic currently without then ElemExpr compiler
+
 

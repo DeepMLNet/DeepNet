@@ -1,6 +1,7 @@
 ﻿namespace ArrayNDNS
 
 open Basics
+open System
 
 
 [<AutoOpen>]
@@ -18,6 +19,12 @@ module TensorLayoutTypes =
         member this.NDims = List.length this.Shape
         /// number of elements
         member this.NElems = List.fold (*) 1L this.Shape
+
+    /// creates a new axis of size one
+    let NewAxis = Int64.MinValue + 1L
+
+    /// fills all remaining axes with size one
+    let Fill = Int64.MinValue + 2L
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]
@@ -44,6 +51,36 @@ module TensorLayoutTypes =
 
     /// all elements
     let RngAll = Rng (None, None)
+
+
+/// invalid tensor range specification
+exception InvalidTensorRng of string
+
+/// Range specification functions.
+module TensorRng =
+
+    /// converts arguments to a .NET Item property or GetSlice, SetSlice method to a TensorRng list
+    let ofItemOrSliceArgs (allArgs: obj[]) =
+        let invalid () =
+            raise (InvalidTensorRng (sprintf "specified items/slices are invalid: %A" allArgs))
+        let rec toRng (args: obj list) =
+            match args with            
+            | [:? (TensorRng list) as rngs] ->             // direct range specification
+                rngs
+            | (:? (int64 option) as so) :: (:? (int64 option) as fo) :: rest -> // slice
+                if so |> Option.contains NewAxis || so |> Option.contains Fill ||
+                   fo |> Option.contains NewAxis || fo |> Option.contains Fill then
+                    invalid ()
+                Rng (so, fo) :: toRng rest
+            | (:? int64 as i) :: rest when i = NewAxis ->  // new axis
+                RngNewAxis :: toRng rest
+            | (:? int64 as i) :: rest when i = Fill ->     // fill
+                RngAllFill :: toRng rest
+            | (:? int64 as i) :: rest ->                   // single item
+                RngElem i  :: toRng rest
+            | [] -> []
+            | _  -> invalid ()
+        allArgs |> Array.toList |> toRng
 
 
 module TensorLayout =
