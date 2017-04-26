@@ -21,9 +21,9 @@ type TensorHostStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
 
     member this.Data = data
 
-    member this.Item 
-        with get (addr: int64) = data.GetValue(addr) :?> 'T
-        and set (addr: int64) (value: 'T) = data.SetValue(value, addr)
+    //member this.Item 
+    //    with get (addr: int64) = data.GetValue(addr) :?> 'T
+    //    and set (addr: int64) (value: 'T) = data.SetValue(value, addr)
 
     interface ITensorStorage<'T> with
         member this.Id = "Host"
@@ -392,8 +392,8 @@ and TensorHostBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     interface ITensorBackend<'T> with
         member this.Item 
-            with get idx = storage.[layout |> TensorLayout.addr idx]
-            and set idx value = storage.[layout |> TensorLayout.addr idx] <- value
+            with get idx = this.Data.[this.FastLayout.Addr idx]
+            and set idx value = this.Data.[this.FastLayout.Addr idx] <- value
 
         member this.Copy trgt a =
             let inline scalarOp (a: 'T) = a

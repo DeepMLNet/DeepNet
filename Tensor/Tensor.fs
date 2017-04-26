@@ -18,6 +18,9 @@ exception ShapeMismatch of string
 /// a row-major layout was required for this operation, but the tensor has a different layout
 exception RowMajorLayoutRequired of string
 
+/// specified tensor index is out of range
+exception PositionOutOfRange of string
+
 /// memory ordering of tensor
 type TensorOrder =
     /// row-major (C) order
@@ -60,7 +63,7 @@ and ITensorStorage<'T> =
     //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 and ITensorBackend<'T> =
-    abstract Item:          int64 list -> 'T with get, set
+    abstract Item:          int64[] -> 'T with get, set
     abstract Copy:          trgt:Tensor<'T> -> src:Tensor<'T> -> unit
     abstract Convert:       trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
     abstract Map:           fn:('T1 -> 'T) -> trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
@@ -498,10 +501,15 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let args = allArgs.[0 .. allArgs.Length-2]
         this.SetRng args value
 
+    /// access to a single item using an array of indices
+    member this.Item
+        with get (idx: int64[]) : 'T = backend.[idx]
+        and set (idx: int64[]) (value: 'T) = backend.[idx] <- value
+
     /// access to a single item using a list of indices
     member this.Item
-        with get (idx: int64 list) : 'T = backend.[idx]
-        and set (idx: int64 list) (value: 'T) = backend.[idx] <- value
+        with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
+        and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
 
     /// n-dimensional slicing using a list of TensorRngs
     member this.Item
