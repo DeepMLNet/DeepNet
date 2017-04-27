@@ -37,7 +37,7 @@ type internal ScalarPrimitives<'T, 'TC> internal () =
 module internal ScalarPrimitives = 
     let private instances = Dictionary<Type * Type, obj>()
     let For<'T, 'TC> () =
-        let types = typeof<'T>, typeof<'TB>
+        let types = typeof<'T>, typeof<'TC>
         match instances.TryFind types with
         | Some inst -> inst :?> ScalarPrimitives<'T, 'TC>
         | None ->
