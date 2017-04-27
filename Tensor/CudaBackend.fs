@@ -81,8 +81,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
-        member this.Copy(trgt: Tensor<'T>) (src: Tensor<'T>): unit = 
-            raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
@@ -91,6 +89,11 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Plus trgt a b = failwith "notimpl"
         member this.Map fn trgt a = failwith "not impl"
         member this.Map2 fn trgt a b = failwith "not impl"
+
+        member this.MapIndexed fn trgt src1 = raise (System.NotImplementedException())
+        member this.MapIndexed2 fn trgt src1 src2 = raise (System.NotImplementedException())
+        member this.Copy(trgt: Tensor<'T>) (src: Tensor<'T>): unit = 
+            raise (System.NotImplementedException())
             
 
 and TensorCudaStorageFactory () =

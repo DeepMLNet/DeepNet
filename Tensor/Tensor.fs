@@ -4,6 +4,7 @@ open System.Collections
 open System.Collections.Generic
 
 open Basics
+open System
 
 
 /// singular matrix encountered
@@ -67,7 +68,10 @@ and ITensorBackend<'T> =
     abstract Copy:          trgt:Tensor<'T> -> src:Tensor<'T> -> unit
     abstract Convert:       trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
     abstract Map:           fn:('T1 -> 'T) -> trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
+    abstract MapIndexed:    fn:(int64[] -> 'T1 -> 'T) -> trgt:Tensor<'T> -> src1:Tensor<'T1> -> unit
     abstract Map2:          fn:('T1 -> 'T2 -> 'T) -> trgt:Tensor<'T> -> 
+                            src1:Tensor<'T1> -> src2:Tensor<'T2> -> unit
+    abstract MapIndexed2:   fn:(int64[] -> 'T1 -> 'T2 -> 'T) -> trgt:Tensor<'T> -> 
                             src1:Tensor<'T1> -> src2:Tensor<'T2> -> unit
     abstract Plus:          trgt:Tensor<'T> -> src1:Tensor<'T> -> src2:Tensor<'T> -> unit
 
@@ -142,7 +146,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Relayout newLayout :?> 'A
 
     /// a view of this tensor over the given range 
-    member internal this.RangeView (rng: TensorRng list) =
+    member internal this.Range (rng: TensorRng list) =
         this.Relayout (this.Layout |> TensorLayout.view rng)
 
     /// a view of the specified tensor over the given range 
@@ -357,15 +361,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
 
 
-
-#if false
-
-    /// creates a view of an ArrayND
-    let inline view ranges a =
-        relayout (TensorLayout.view ranges (layout a)) a        
-    
-#endif
-
     /// checks that all tensors have the same storage
     static member internal CheckSameStorage (xs: ITensor list) =
         match xs with
@@ -476,9 +471,17 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
         Tensor<_>.ApplyElemwise ((fun trgt a -> trgt.Backend.Map fn trgt a), a)
 
+    /// maps all elements using the specified indexed function into a new tensor
+    static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
+        Tensor<_>.ApplyElemwise ((fun trgt a -> trgt.Backend.MapIndexed fn trgt a), a)
+
     /// maps all elements using the specified function into a new tensor
     static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         Tensor<_>.ApplyElemwise ((fun trgt a b -> trgt.Backend.Map2 fn trgt a b), a, b)
+
+    /// maps all elements using the specified indexed function into a new tensor
+    static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        Tensor<_>.ApplyElemwise ((fun trgt a b -> trgt.Backend.MapIndexed2 fn trgt a b), a, b)
 
     /// converts all elements to the specified type
     static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
@@ -486,14 +489,14 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// a view of this tensor with the given .NET range
     member inline internal this.GetRng (rngArgs: obj[]) =
-        this.RangeView (TensorRng.ofItemOrSliceArgs rngArgs) 
+        this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
     member inline internal this.GetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         Array.concat [rngArgs; restArgs] |> this.GetRng
 
     /// write into the view of this tensor with the given .NET range
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
         Tensor<_>.CheckSameStorage [this; value]
-        let trgt = this.RangeView (TensorRng.ofItemOrSliceArgs rngArgs) 
+        let trgt = this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
         value |> Tensor<_>.broadcastTo trgt.Shape |> trgt.CopyFrom
     member inline internal this.SetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         let allArgs = Array.concat [rngArgs; restArgs]
@@ -582,7 +585,71 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
     member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
+    /// get element value
+    static member inline get (a: Tensor<_>) (pos: int64 list) = 
+        a.[pos]
+    
+    /// set element value
+    static member inline set (a: Tensor<_>) (pos: int64 list) value = 
+        a.[pos] <- value
 
+    /// value of scalar array
+    member this.Value 
+        with inline get () = this.[[||]]
+        and inline set value = this.[[||]] <- value
+
+    /// value of scalar array
+    static member inline value (a: Tensor<_>) =
+        a.Value
+
+    /// Pretty string containing maxElems elements per dimension.
+    member this.ToString (maxElems) =
+        let rec prettyDim lineSpace (a: Tensor<'T>) =
+            let ls () = a.Shape.[0]
+            let subPrint idxes = 
+                idxes
+                |> Seq.map (fun i -> 
+                    prettyDim (lineSpace + " ") (a.[i, Fill])) 
+                |> Seq.toList                   
+            let subStrs () = 
+                if ls() <= maxElems then
+                    subPrint (seq {0L .. ls() - 1L})
+                else
+                    let leftTo = maxElems / 2L - 1L
+                    let remaining = maxElems - 1L - leftTo - 1L
+                    let rightFrom = ls() - remaining
+                    let leftIdx = seq {0L .. leftTo}
+                    let rightIdx = seq {rightFrom .. (ls()-1L)}
+                    let elipsis =
+                        match typeof<'T> with
+                        | t when t=typeof<single> -> "      ..."
+                        | t when t=typeof<double> -> "      ..."
+                        | t when t=typeof<int>    -> " ..."
+                        | t when t=typeof<byte>   -> "..."
+                        | t when t=typeof<bool>   -> " ... "
+                        | _ -> "..."
+                    (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
+            match a.NDims with
+            | 0 -> 
+                let v = a.Value
+                if   typeof<'T>.Equals(typeof<single>) then sprintf "%9.4f" (v |> box :?> single)
+                elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
+                elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
+                elif typeof<'T>.Equals(typeof<int64>)  then sprintf "%4d"  (v |> box :?> int64)
+                elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
+                elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
+                else sprintf "%A;" v
+            | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
+            | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
+        prettyDim " " this                       
+
+    /// pretty contents string
+    member this.Pretty = this.ToString (maxElems=10L)
+    override this.ToString() = this.Pretty
+
+    /// full contents string
+    member this.Full = this.ToString (maxElems=Int64.MaxValue)
+   
 
 #if false
 
@@ -720,12 +787,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 #endif
 
 #if false
-    /// pretty contents string
-    member this.Pretty = pretty 10L this
-
-    /// full contents string
-    member this.Full = pretty 0L this
-
 
     // element-wise unary
     static member (~+)      (a: #Tensor<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
@@ -868,35 +929,9 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
                 this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
 #endif            
 
-
 #if false
 
 module Tensor = 
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // element access
-    ////////////////////////////////////////////////////////////////////////////////////////////////   
-    
-    /// get element value
-    let inline get (idx: int64 list) (a: Tensor<_>) = a.[idx]
-    
-    /// set element value
-    let inline set (idx: int64 list) value (a: Tensor<_>) = a.[idx] <- value
-
-    /// if true, then setting NaN or Inf causes and exception to be thrown.
-    let CheckFinite = false
-
-    /// checks if value is finite if CheckFinite is true and raises an exception if not
-    let inline doCheckFinite value =
-        if CheckFinite then
-            let isNonFinite =
-                match box value with
-                | :? double as dv -> System.Double.IsInfinity(dv) || System.Double.IsNaN(dv) 
-                | :? single as sv -> System.Single.IsInfinity(sv) || System.Single.IsNaN(sv) 
-                | _ -> false
-            if isNonFinite then raise (System.ArithmeticException("non-finite value encountered"))
-
-
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // array creation functions
@@ -995,20 +1030,6 @@ module Tensor =
     // element-wise operations
     ////////////////////////////////////////////////////////////////////////////////////////////////   
    
-    /// Applies the given function element-wise to the given ArrayND and 
-    /// stores the result in a new ArrayND.
-    let inline map (f: 'T -> 'T) (a: 'A when 'A :> Tensor<'T>) =
-        a.Map f :?> 'A
-
-    /// Applies the given function element-wise to the given ArrayND and 
-    /// stores the result in a new ArrayND.
-    let inline mapTC (f: 'T -> 'R) (a: #Tensor<'T>) =
-        a.Map f
-
-    /// Applies the given function element-wise to the given ArrayND inplace.
-    let inline mapInplace f (a: #Tensor<'T>) =
-        a.MapInplace f
-
     /// Fills the array with the values returned by the function.
     let inline fill (f: unit -> 'T) (a: #Tensor<'T>) =
         mapInplace (fun _ -> f ()) a
@@ -1031,16 +1052,6 @@ module Tensor =
         if a.NElems < 2L then invalidArg "a" "tensor must have at least two elements"
         let step = (stop - start) / conv<'T> (a.NElems - 1L)
         a |> fillIndexed (fun idx -> start + conv<'T> idx.[0] * step)       
-
-    /// Applies the given binary function element-wise to the two given ArrayNDs 
-    /// and stores the result in a new ArrayND.
-    let inline map2 f (a: 'A when 'A :> Tensor<'T>) (b: 'A) =
-        a.Map2 f b :?> 'A
-
-    /// Applies the given binary function element-wise to the two given ArrayNDs 
-    /// and stores the result in a new ArrayND.
-    let inline map2TC (f: 'T -> 'T -> 'R) (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        a.Map2 f b 
 
     /// Applies the given binary function element-wise to the two given ArrayNDs 
     /// and stores the result in the first ArrayND.
@@ -1246,13 +1257,7 @@ module Tensor =
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
-
-    /// value of scalar array
-    let inline value a =
-        match nDims a with
-        | 0 -> get [] a
-        | _ -> failwithf "array of shape %A is not a scalar" (shape a)
-      
+     
     /// applies the given reduction function over the given dimension
     let inline axisReduceTypeChange (f: Tensor<'T> -> Tensor<'R>) dim (a: Tensor<'T>) : Tensor<'R> =
         checkAxis dim a
@@ -1701,59 +1706,6 @@ module Tensor =
         |> reshape (ary.Shape |> List.insert dim 1L)
         |> broadcastDim dim reps
         |> reshape (ary.Shape |> List.set dim (reps * ary.Shape.[dim]))
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // pretty printing
-    ////////////////////////////////////////////////////////////////////////////////////////////////         
-    
-    /// Pretty string containing maxElems elements per dimension.
-    /// If maxElems is zero, then the elements per dimension are unlimited.
-    let pretty maxElems (a: Tensor<'T>) =
-        let maxElems =
-            if maxElems > 0L then maxElems
-            else Microsoft.FSharp.Core.int64.MaxValue
-
-        let rec prettyDim lineSpace a =
-            let ls () = (shape a).[0]
-            let subPrint idxes = 
-                idxes
-                |> Seq.map (fun i -> 
-                    prettyDim (lineSpace + " ") (view [RngElem i; RngAllFill] a)) 
-                |> Seq.toList                   
-            let subStrs () = 
-                if ls() <= maxElems then
-                    subPrint (seq {0L .. ls() - 1L})
-                else
-                    let leftTo = maxElems / 2L - 1L
-                    let remaining = maxElems - 1L - leftTo - 1L
-                    let rightFrom = ls() - remaining
-                    let leftIdx = seq {0L .. leftTo}
-                    let rightIdx = seq {rightFrom .. (ls()-1L)}
-                    let elipsis =
-                        match typeof<'T> with
-                        | t when t=typeof<single> -> "      ..."
-                        | t when t=typeof<double> -> "      ..."
-                        | t when t=typeof<int>    -> " ..."
-                        | t when t=typeof<byte>   -> "..."
-                        | t when t=typeof<bool>   -> " ... "
-                        | _ -> "..."
-                    (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
-
-            match nDims a with
-            | 0 -> 
-                let v = value a
-                if   typeof<'T>.Equals(typeof<single>) then sprintf "%9.4f" (v |> box :?> single)
-                elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
-                elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
-                elif typeof<'T>.Equals(typeof<int64>)  then sprintf "%4d"  (v |> box :?> int64)
-                elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
-                elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
-                else sprintf "%A;" v
-            | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
-            | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
-
-        prettyDim " " a                       
 
 
 
