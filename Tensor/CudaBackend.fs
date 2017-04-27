@@ -81,19 +81,20 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
+        member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
+        member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
+        member this.Convert(trgt, src) = raise (System.NotImplementedException())
+        member this.FillConst (value, trgt) = failwith "notimpl"
+        member this.Copy(trgt, src) = raise (System.NotImplementedException())
+        member this.Map(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
+        member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
+        member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
+        member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
+        member this.Plus(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
 
-        member this.Convert (trgt: Tensor<'T>) (a: Tensor<'TA>) = failwith "not impl"
-        member this.Plus trgt a b = failwith "notimpl"
-        member this.Map fn trgt a = failwith "not impl"
-        member this.Map2 fn trgt a b = failwith "not impl"
-
-        member this.MapIndexed fn trgt src1 = raise (System.NotImplementedException())
-        member this.MapIndexed2 fn trgt src1 src2 = raise (System.NotImplementedException())
-        member this.Copy(trgt: Tensor<'T>) (src: Tensor<'T>): unit = 
-            raise (System.NotImplementedException())
             
 
 and TensorCudaStorageFactory () =
@@ -104,7 +105,7 @@ and TensorCudaStorageFactory () =
             // we use reflection to drop the constraints on 'T 
             let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
             Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
-            
+        member this.Zeroed = false
 
 
 [<AutoOpen>]            

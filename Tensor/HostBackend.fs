@@ -13,6 +13,8 @@ open System.Reflection
 module TensorHostSettings =
     let mutable UseThreads = true
 
+open TensorHostSettings
+
 
 type internal DataAndLayout<'T> = {
     Data:       'T[]
@@ -238,6 +240,10 @@ type internal ScalarOps =
             Parallel.For (0, shape.[0], fun dim0Pos -> outerLoops true dim0Pos) |> ignore
         else
             outerLoops false 0
+
+    static member Fill (value: 'T, trgt: DataAndLayout<'T>) =
+        let inline op pos = value
+        ScalarOps.ApplyNoaryOp (op, trgt, isIndexed=false, useThreads=true)
 
     static member Copy (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let inline op pos a = a
@@ -493,7 +499,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     let toMe (x: obj) = x :?> TensorHostBackend<'T>
 
-    member val FastLayout = FastLayout32 layout
+    member val internal FastLayout = FastLayout32 layout
     member this.Storage = storage
     member val Data = storage.Data
     member inline internal this.DataAndLayout = 
@@ -513,115 +519,58 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
         (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout 
 
-    //static member inline ApplyElemwise (scalarOp: unit -> 'T,  
-    //                                    trgt: Tensor<'T>, 
-    //                                    useThreads: bool) =                     
-    //    let trgt = TensorHostBackend<_>.ElemwiseBackends (trgt)
-    //    trgt.ApplyNoaryOp (scalarOp=(fun _ -> scalarOp ()), 
-    //                       vectorOp=(fun _ -> failwith "not used"),
-    //                       hasVectorOp=false, isIndexed=false, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: int64[] -> 'T,  
-    //                                    trgt: Tensor<'T>, 
-    //                                    useThreads: bool) =                     
-    //    let trgt = TensorHostBackend<_>.ElemwiseBackends (trgt)
-    //    trgt.ApplyNoaryOp (scalarOp=scalarOp, 
-    //                       vectorOp=(fun _ -> failwith "not used"),
-    //                       hasVectorOp=false, isIndexed=true, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: unit -> 'T,  
-    //                                    vectorOp: unit -> Vector<'T>,
-    //                                    trgt: Tensor<'T>, 
-    //                                    useThreads: bool) =                     
-    //    let trgt = TensorHostBackend<_>.ElemwiseBackends (trgt)
-    //    trgt.ApplyNoaryOp (scalarOp=(fun _ -> scalarOp ()), 
-    //                       vectorOp=vectorOp,
-    //                       hasVectorOp=true, isIndexed=false, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: 'TA -> 'T,  
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>,
-    //                                    useThreads: bool) =                     
-    //    let trgt, src1 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1)
-    //    trgt.ApplyUnaryOp (scalarOp=(fun _ a -> scalarOp a), 
-    //                       vectorOp=(fun _ -> failwith "not used"),
-    //                       src1=src1,
-    //                       hasVectorOp=false, isIndexed=false, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: int64[] -> 'TA -> 'T,  
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>,
-    //                                    useThreads: bool) =                     
-    //    let trgt, src1 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1)
-    //    trgt.ApplyUnaryOp (scalarOp=scalarOp, 
-    //                       vectorOp=(fun _ -> failwith "not used"),
-    //                       src1=src1,
-    //                       hasVectorOp=false, isIndexed=true, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: 'TA -> 'T, 
-    //                                    vectorOp: Vector<'TA> -> Vector<'T>,
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>,
-    //                                    useThreads: bool) =
-    //    let trgt, src1 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1)
-    //    trgt.ApplyUnaryOp (scalarOp=(fun _ a -> scalarOp a), 
-    //                       vectorOp=vectorOp,
-    //                       src1=src1,
-    //                       hasVectorOp=true, isIndexed=false, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: 'TA -> 'TB -> 'T, 
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>, src2: Tensor<'TB>,
-    //                                    useThreads: bool) =
-    //    let trgt, src1, src2 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1, src2)
-    //    trgt.ApplyBinaryOp (scalarOp=(fun _ a -> scalarOp a), 
-    //                        vectorOp=(fun _ -> failwith "not used"),
-    //                        src1=src1, src2=src2,
-    //                        hasVectorOp=false, isIndexed=false, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: int64[] -> 'TA -> 'TB -> 'T, 
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>, src2: Tensor<'TB>,
-    //                                    useThreads: bool) =
-    //    let trgt, src1, src2 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1, src2)
-    //    trgt.ApplyBinaryOp (scalarOp=scalarOp,
-    //                        vectorOp=(fun _ -> failwith "not used"),
-    //                        src1=src1, src2=src2,
-    //                        hasVectorOp=false, isIndexed=true, useThreads=useThreads) 
-
-    //static member inline ApplyElemwise (scalarOp: 'TA -> 'TB -> 'T, 
-    //                                    vectorOp: (Vector<'TA> * Vector<'TB>) -> Vector<'T>,
-    //                                    trgt: Tensor<'T>, src1: Tensor<'TA>, src2: Tensor<'TB>,
-    //                                    useThreads: bool) =
-    //    let trgt, src1, src2 = TensorHostBackend<_>.ElemwiseBackends (trgt, src1, src2)
-    //    trgt.ApplyBinaryOp (scalarOp=(fun _ a -> scalarOp a), 
-    //                        vectorOp=vectorOp,
-    //                        src1=src1, src2=src2,
-    //                        hasVectorOp=true, isIndexed=false, useThreads=useThreads) 
-
     interface ITensorBackend<'T> with
         member this.Item 
             with get idx = this.Data.[this.FastLayout.Addr idx]
             and set idx value = this.Data.[this.FastLayout.Addr idx] <- value
 
-        member this.Copy trgt a =
+        member this.FillConst (value, trgt) =
+            let trgt= TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
+            else ScalarOps.Fill (value, trgt)
+
+        member this.Copy (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             if VectorOps.CanUse (trgt, a) then VectorOps.Copy (trgt, a)
             else ScalarOps.Copy (trgt, a)
 
-        member this.Convert (trgt: Tensor<'T>) (a: Tensor<'TA>) =
+        member this.Convert (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Convert (trgt, a)
 
-        member this.Plus trgt a b =
+        member this.Plus (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             if VectorOps.CanUse (trgt, a, b) then VectorOps.Plus (trgt, a, b)
             else ScalarOps.Plus (trgt, a, b)
 
-        member this.Map (fn: 'TA -> 'T) (trgt: Tensor<'T>) (a: Tensor<'TA>) = 
-            failwith "not impl"
-            //TensorHostBackend<_>.ApplyElemwise (scalarOp=fn, 
-            //                                    trgt=trgt, src1=a, useThreads=false) 
+        member this.Fill (fn, trgt, useThreads) = 
+            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            let inline scalarOp idx = fn ()
+            ScalarOps.ApplyNoaryOp (scalarOp, trgt, isIndexed=false, useThreads=useThreads)
 
-        member this.Map2 fn trgt a b = failwith "not impl"
+        member this.FillIndexed (fn, trgt, useThreads) = 
+            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            ScalarOps.ApplyNoaryOp (fn, trgt, isIndexed=true, useThreads=useThreads)
 
-        member this.MapIndexed fn trgt src1 = raise (System.NotImplementedException())
-        member this.MapIndexed2 fn trgt src1 src2 = raise (System.NotImplementedException())
+        member this.Map (fn, trgt, a, useThreads) = 
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            let inline scalarOp idx av = fn av
+            ScalarOps.ApplyUnaryOp (scalarOp, trgt, a, isIndexed=false, useThreads=useThreads)
+
+        member this.MapIndexed (fn, trgt, a, useThreads) = 
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.ApplyUnaryOp (fn, trgt, a, isIndexed=true, useThreads=useThreads)
+
+        member this.Map2 (fn, trgt, a, b, useThreads) = 
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            let inline scalarOp idx av bv = fn av bv
+            ScalarOps.ApplyBinaryOp (scalarOp, trgt, a, b, isIndexed=false, useThreads=useThreads)
+
+        member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.ApplyBinaryOp (fn, trgt, a, b, isIndexed=true, useThreads=useThreads)
+
+        
 
 
 
@@ -630,9 +579,8 @@ and TensorHostStorageFactory () =
 
     interface ITensorStorageFactory with
         member this.Create nElems = 
-            // we use reflection to drop the constraints on 'T 
-            let ts = typedefof<TensorHostStorage<_>>.MakeGenericType (typeof<'T>)
-            Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
+            TensorHostStorage<_> nElems :> ITensorStorage<_>
+        member this.Zeroed = true
             
 
 [<AutoOpen>]            
@@ -644,6 +592,9 @@ type HostTensor () =
 
     static member zeros<'T> (shape: int64 list) : Tensor<'T> =
         Tensor.zeros<'T> (shape, DevHost)
+
+    static member ones<'T> (shape: int64 list) : Tensor<'T> =
+        Tensor.ones<'T> (shape, DevHost)
 
 
 
