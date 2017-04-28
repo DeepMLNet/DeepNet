@@ -104,6 +104,7 @@
       <Link>LIBIOMP5MD.DLL</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Compile Include="Sgn.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

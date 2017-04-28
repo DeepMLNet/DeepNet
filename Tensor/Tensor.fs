@@ -84,6 +84,30 @@ and ITensorBackend<'T> =
     abstract MapIndexed2:   fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
                             trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
                             useThreads:bool -> unit
+
+    abstract UnaryPlus:     trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract UnaryMinus:    trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Abs:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sgn:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Log:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Log10:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Exp:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sin:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Cos:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Tan:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Asin:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Acos:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Atan:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sinh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Cosh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Tanh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sqrt:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Ceiling:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Floor:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Round:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Truncate:      trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+
+
     abstract Plus:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
 and ITensorStorageFactory =
@@ -139,15 +163,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// type of data stored in the specified tensor
     static member inline dataType (a: #ITensor) = a.DataType
-
-    /// address of specified index
-    //member this.Addr (idx: int64 list) = layout |> TensorLayout.addr idx
-
-    /// a new ArrayND of same type and new storage allocation for given layout
-    //abstract NewOfSameType : TensorLayout -> Tensor<'T>
-
-    /// a new ArrayND of given type and new storage allocation for given layout
-    //abstract NewOfType<'N> : TensorLayout -> Tensor<'N>
 
     /// a tensor with the same storage but new layout
     member internal this.Relayout (newLayout: TensorLayout) =
@@ -227,6 +242,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let storage = dev.Create layout.NElems
         Tensor<'T> (layout, storage)
 
+    /// Applies the given function to the tensors' layouts.
     static member inline internal ApplyLayoutFn (fn, a, b) =
         let layouts = [Tensor<_>.layout a; Tensor<_>.layout b]
         let newLayouts = fn layouts
@@ -235,6 +251,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             Tensor<_>.relayout al a, Tensor<_>.relayout bl b
         | _ -> failwith "unexpected layout function result"
 
+    /// Applies the given function to the tensors' layouts.
     static member inline internal ApplyLayoutFn (fn, a, b, c) =
         let layouts = [Tensor<_>.layout a; Tensor<_>.layout b; Tensor<_>.layout c]
         let newLayouts = fn layouts
@@ -243,6 +260,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             Tensor<_>.relayout al a, Tensor<_>.relayout bl b, Tensor<_>.relayout cl c
         | _ -> failwith "unexpected layout function result"
 
+    /// Applies the given function to the tensors' layouts.
     static member inline internal ApplyLayoutFn (fn, xs) =
         let layouts = fn (xs |> List.map Tensor<_>.layout)
         (layouts, xs) ||> List.map2 Tensor<_>.relayout
@@ -331,7 +349,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// Flattens the tensor into a vector assuming a row-major order.
     static member flatten a =
-        Tensor<_>.reshape [-1L] a
+        Tensor<_>.reshape [Remainder] a
 
     /// swaps the given dimensions
     static member swapDim ax1 ax2 a =
@@ -455,11 +473,201 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         fn trgt a b
         trgt
        
+    /// element-wise unary (prefix) plus
+    static member (~+) (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.UnaryPlus (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise unary (prefix) minus
+    static member (~-) (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.UnaryMinus (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise absolute value
+    static member Abs (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Abs (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise sign (keeping type)
+    static member Sgn (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Sgn (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise logarithm to base e
+    static member Log (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Log (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise logarithm to base 10
+    static member Log10 (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Log10 (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise exponential function
+    static member Exp (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Exp (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise sinus function
+    static member Sin (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Sin (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise cosinus function
+    static member Cos (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Cos (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise tangens function
+    static member Tan (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Tan (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise arcus sinus function
+    static member Asin (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Asin (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise arcus cosinus function
+    static member Acos (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Acos (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise arcus tangens function
+    static member Atan (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Atan (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise sinus hyperbolicus function
+    static member Sinh (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Sinh (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise cosinus hyperbolicus function
+    static member Cosh (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Cosh (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise tangens hyperbolicus function
+    static member Tanh (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Tanh (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise square root 
+    static member Sqrt (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Sqrt (trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise ceiling
+    static member Ceiling (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Ceiling(trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise ceiling
+    static member Floor (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Floor(trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise rounding
+    static member Round (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Round(trgt=trgt, src1=a)
+        trgt
+
+    /// element-wise truncate
+    static member Truncate (a: Tensor<'T>) = 
+        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        trgt.Backend.Truncate(trgt=trgt, src1=a)
+        trgt
+
+    // element-wise unary logic
+    //static member (~~~~)    (a: #Tensor<bool>) = map not a
+
+    // element-wise binary
     /// element-wise addition of two tensor
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Plus (trgt=trgt, src1=a, src2=b)
         trgt
+    
+    //static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
+    //static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
+    //static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
+    //static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
+    //static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
+
+    //// element-wise binary logic
+    //static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
+    //static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
+
+    //// element-wise binary comparison
+    //static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
+    //static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
+    //static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
+    //static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
+    //static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
+    //static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
+
+    //// element-wise binary with scalars
+    //static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
+    //static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
+    //static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
+    //static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
+    //static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
+    //static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
+    //static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
+    //static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
+    //static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
+    //static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
+    //static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
+    //static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
+    //static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
+    //static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
+
+    //static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
+    //static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
+    //static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
+    //static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
+    //static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
+    //static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
+    //static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
+    //static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
+    //static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
+    //static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
+    //static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
+    //static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
+    //static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
+    //static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
+
+    ///// dot product
+    //static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
+
+    ///// tensor product
+    //static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+        
+
+    //// transposition
+    //member this.T = transpose this
+
 
     /// returns a copy of the tensor
     member this.Copy (?order) =
@@ -862,97 +1070,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 #endif
 
 #if false
-
-    // element-wise unary
-    static member (~+)      (a: #Tensor<'T>) = typedMap (unsp) (~+) (~+) (~+) (~+) (unsp) a
-    static member (~-)      (a: #Tensor<'T>) = typedMap (unsp) (~-) (~-) (~-) (~-) (unsp) a
-    static member Abs       (a: #Tensor<'T>) = typedMap (unsp) abs abs abs abs (unsp) a
-    static member SignT     (a: #Tensor<'T>) = typedMap (unsp) signImpl signImpl sign signImpl (unsp) a
-    static member Log       (a: #Tensor<'T>) = typedMap (unsp) log log (unsp) (unsp) (unsp) a
-    static member Log10     (a: #Tensor<'T>) = typedMap (unsp) log10 log10 (unsp) (unsp) (unsp) a
-    static member Exp       (a: #Tensor<'T>) = typedMap (unsp) exp exp (unsp) (unsp) (unsp) a
-    static member Sin       (a: #Tensor<'T>) = typedMap (unsp) sin sin (unsp) (unsp) (unsp) a
-    static member Cos       (a: #Tensor<'T>) = typedMap (unsp) cos cos (unsp) (unsp) (unsp) a
-    static member Tan       (a: #Tensor<'T>) = typedMap (unsp) tan tan (unsp) (unsp) (unsp) a
-    static member Asin      (a: #Tensor<'T>) = typedMap (unsp) asin asin (unsp) (unsp) (unsp) a
-    static member Acos      (a: #Tensor<'T>) = typedMap (unsp) acos acos (unsp) (unsp) (unsp) a
-    static member Atan      (a: #Tensor<'T>) = typedMap (unsp) atan atan (unsp) (unsp) (unsp) a
-    static member Sinh      (a: #Tensor<'T>) = typedMap (unsp) sinh sinh (unsp) (unsp) (unsp) a
-    static member Cosh      (a: #Tensor<'T>) = typedMap (unsp) cosh cosh (unsp) (unsp) (unsp) a
-    static member Tanh      (a: #Tensor<'T>) = typedMap (unsp) tanh tanh (unsp) (unsp) (unsp) a
-    static member Sqrt      (a: #Tensor<'T>) = typedMap (unsp) sqrt sqrt (unsp) (unsp) (unsp) a
-    static member Ceiling   (a: #Tensor<'T>) = typedMap (unsp) ceil ceil (unsp) (unsp) (unsp) a
-    static member Floor     (a: #Tensor<'T>) = typedMap (unsp) floor floor (unsp) (unsp) (unsp) a
-    static member Round     (a: #Tensor<'T>) = typedMap (unsp) round round (unsp) (unsp) (unsp) a
-    static member Truncate  (a: #Tensor<'T>) = typedMap (unsp) truncate truncate (unsp) (unsp) (unsp) a
-
-    // element-wise unary logic
-    static member (~~~~)    (a: #Tensor<bool>) = map not a
-
-    // element-wise binary
-    static member (+) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (+) (+) (+) (+) (+) a b
-    static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
-    static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
-    static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
-    static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
-    static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
-
-    // element-wise binary logic
-    static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
-    static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
-
-    // element-wise binary comparison
-    static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
-    static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
-    static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
-    static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
-    static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
-    static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
-
-    // element-wise binary with scalars
-    static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
-    static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
-    static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
-    static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
-    static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
-    static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
-    static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
-    static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
-    static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
-    static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
-    static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
-    static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
-    static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
-    static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
-
-    static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
-    static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
-    static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
-    static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
-    static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
-    static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
-    static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
-    static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
-    static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
-    static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
-    static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
-    static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
-    static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
-    static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
-
-    /// dot product
-    static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
-
-    /// tensor product
-    static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
-        
-
-    // transposition
-    member this.T = transpose this
-
-#endif
-
-#if false
     interface ITensor with
         member this.Layout = this.Layout
         member this.CPPType = this.CPPType   
@@ -1074,157 +1191,8 @@ module Tensor =
     // element-wise operations
     ////////////////////////////////////////////////////////////////////////////////////////////////   
    
-
-
-    /// Applies the given binary function element-wise to the two given ArrayNDs 
-    /// and stores the result in the first ArrayND.
-    let inline map2Inplace f (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        let a, b = broadcastToSame a b
-        for idx in allIdx a do
-            let cv = f (get idx a) (get idx b)
-            set idx cv a
-
-    /// unsupported operation for this type
-    let inline unsp (a: 'T) : 'R = 
-        failwithf "operation unsupported for type %A" typeof<'T>
-
-   
-    let inline uncheckedApply (f: Tensor<'A> -> Tensor<'A>) (a: 'B when 'B :> Tensor<'T>) : 'B =
-        let aCast = a.Cast<'A> ()
-        let mCast = f aCast
-        let m = a.CastToMe mCast
-        m :?> 'B
-
-    let inline uncheckedApplyTypeChange (f: Tensor<'A> -> Tensor<'R>) 
-            (a: 'B when 'B :> Tensor<'T>) : Tensor<'R> =
-        let aCast = a.Cast<'A> ()
-        let mCast = f aCast 
-        mCast
-
-    let inline uncheckedApply2 (f: Tensor<'A> -> Tensor<'A> -> Tensor<'A>) 
-            (a: 'B when 'B :> Tensor<'T>) (b: 'B) : 'B =
-        let aCast = a.Cast<'A> ()
-        let bCast = b.Cast<'A> ()
-        let mCast = f aCast bCast
-        let m = a.CastToMe mCast
-        m :?> 'B
-
-    let inline uncheckedApply2TypeChange (f: Tensor<'A> -> Tensor<'A> -> Tensor<'R>) 
-            (a: 'B when 'B :> Tensor<'T>) (b: 'B) : Tensor<'R> =
-        let aCast = a.Cast<'A> ()
-        let bCast = b.Cast<'A> ()
-        let mCast = f aCast bCast
-        mCast
-
-    let inline uncheckedMap (f: 'A -> 'A) (a: #Tensor<'T>) =
-        uncheckedApply (map f) a
-
-    let inline uncheckedMap2 (f: 'A -> 'A -> 'A) (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        uncheckedApply2 (map2 f) a b
-
-    let inline uncheckedMap2TypeChange (f: 'A -> 'A -> 'R) (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        uncheckedApply2TypeChange (map2TC f) a b
-
-    let inline typedApply   (fBool:   Tensor<bool>   -> Tensor<bool>) 
-                            (fDouble: Tensor<double> -> Tensor<double>) 
-                            (fSingle: Tensor<single> -> Tensor<single>)
-                            (fInt:    Tensor<int>    -> Tensor<int>)
-                            (fInt64:  Tensor<int64>  -> Tensor<int64>)
-                            (fByte:   Tensor<byte>   -> Tensor<byte>)
-                            (a: #Tensor<'T>) =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply fBool a 
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply fDouble a 
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply fSingle a 
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
-        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply fInt64  a 
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
-        else failwith "unknown type"
-
-    let inline typedApplyTypeChange  (fBool:   Tensor<bool>   -> Tensor<'R>) 
-                                     (fDouble: Tensor<double> -> Tensor<'R>) 
-                                     (fSingle: Tensor<single> -> Tensor<'R>)
-                                     (fInt:    Tensor<int>    -> Tensor<'R>)
-                                     (fInt64:  Tensor<int64>  -> Tensor<'R>)
-                                     (fByte:   Tensor<byte>   -> Tensor<'R>)
-                                     (a: #Tensor<'T>) =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApplyTypeChange fBool a 
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApplyTypeChange fDouble a 
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApplyTypeChange fSingle a 
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApplyTypeChange fInt    a 
-        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApplyTypeChange fInt64  a 
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApplyTypeChange fByte   a 
-        else failwith "unknown type"
-
-    let inline typedApply2  (fBool:   Tensor<bool>   -> Tensor<bool>   -> Tensor<bool>) 
-                            (fDouble: Tensor<double> -> Tensor<double> -> Tensor<double>) 
-                            (fSingle: Tensor<single> -> Tensor<single> -> Tensor<single>)
-                            (fInt:    Tensor<int>    -> Tensor<int>    -> Tensor<int>)
-                            (fInt64:  Tensor<int64>  -> Tensor<int64>  -> Tensor<int64>)
-                            (fByte:   Tensor<byte>   -> Tensor<byte>   -> Tensor<byte>)
-                            (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2 fBool   a b        
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2 fDouble a b
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2 fSingle a b
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2 fInt    a b
-        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply2 fInt64  a b
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2 fByte   a b
-        else failwith "unknown type"
-
-    let inline typedApply2TypeChange  (fBool:   Tensor<bool>   -> Tensor<bool>   -> Tensor<'R>) 
-                                      (fDouble: Tensor<double> -> Tensor<double> -> Tensor<'R>) 
-                                      (fSingle: Tensor<single> -> Tensor<single> -> Tensor<'R>)
-                                      (fInt:    Tensor<int>    -> Tensor<int>    -> Tensor<'R>)
-                                      (fInt64:  Tensor<int64>  -> Tensor<int64>  -> Tensor<'R>)
-                                      (fByte:   Tensor<byte>   -> Tensor<byte>   -> Tensor<'R>)
-                                      (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        if   typeof<'T>.Equals(typeof<bool>)   then uncheckedApply2TypeChange fBool   a b
-        elif typeof<'T>.Equals(typeof<double>) then uncheckedApply2TypeChange fDouble a b
-        elif typeof<'T>.Equals(typeof<single>) then uncheckedApply2TypeChange fSingle a b
-        elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply2TypeChange fInt    a b
-        elif typeof<'T>.Equals(typeof<int64>)  then uncheckedApply2TypeChange fInt64  a b
-        elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply2TypeChange fByte   a b
-        else failwith "unknown type"
-
-    let inline typedMap (fBool:   bool   -> bool)
-                        (fDouble: double -> double) 
-                        (fSingle: single -> single)
-                        (fInt:    int    -> int)
-                        (fInt64:  int64  -> int64)
-                        (fByte:   byte   -> byte)
-                        (a: #Tensor<'T>) =
-        typedApply (map fBool) (map fDouble) (map fSingle) (map fInt) (map fInt64) (map fByte) a
-
-    let inline typedMapTypeChange (fBool:   bool   -> 'R)
-                                  (fDouble: double -> 'R) 
-                                  (fSingle: single -> 'R)
-                                  (fInt:    int    -> 'R)
-                                  (fInt64:  int64  -> 'R)
-                                  (fByte:   byte   -> 'R)
-                                  (a: #Tensor<'T>) =
-        typedApplyTypeChange (mapTC fBool) (mapTC fDouble) (mapTC fSingle) (mapTC fInt) (mapTC fInt64) (mapTC fByte) a
-
-    let inline typedMap2 (fBool:   bool   -> bool   -> bool)
-                         (fDouble: double -> double -> double) 
-                         (fSingle: single -> single -> single)
-                         (fInt:    int    -> int    -> int)
-                         (fInt64:  int64  -> int64  -> int64)
-                         (fByte:   byte   -> byte   -> byte)
-                         (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        typedApply2 (map2 fBool) (map2 fDouble) (map2 fSingle) (map2 fInt) (map2 fInt64) (map2 fByte) a b
-
-    let inline typedMap2TypeChange (fBool:   bool   -> bool   -> 'R)
-                                   (fDouble: double -> double -> 'R)
-                                   (fSingle: single -> single -> 'R)
-                                   (fInt:    int    -> int    -> 'R)
-                                   (fInt64:  int64  -> int64  -> 'R)
-                                   (fByte:   byte   -> byte   -> 'R)
-                                   (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        typedApply2TypeChange (map2TC fBool) (map2TC fDouble) (map2TC fSingle) (map2TC fInt) (map2TC fInt64) (map2TC fByte) a b
-
     let inline signImpl (x: 'T) =
         conv<'T> (sign x)
-
-    type Tensor<'T> with    
 
     /// sign keeping type
     let inline signt (a: #Tensor<'T>) =

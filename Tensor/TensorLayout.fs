@@ -20,11 +20,14 @@ module TensorLayoutTypes =
         /// number of elements
         member this.NElems = List.fold (*) 1L this.Shape
 
-    /// creates a new axis of size one
+    /// For slicing: inserts a new axis of size one.
     let NewAxis = Int64.MinValue + 1L
 
-    /// fills all remaining axes with size one
+    /// For slicing: fills all remaining axes with size one.
     let Fill = Int64.MinValue + 2L
+
+    /// For reshape: remainder, so that number of elements stays constant.
+    let Remainder = Int64.MinValue + 3L
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]
@@ -341,16 +344,19 @@ module TensorLayout =
     /// Returns Some newLayout when reshape is possible without copy
     /// Returns None when a copy is required.
     let tryReshape shp a =
-        // replace on occurence of -1 in new shape with required size to keep number of
+        // replace on occurence of "Remainder" in new shape with required size to keep number of
         // elements constant
         let shp =
-            match List.filter ((=) -1L) shp |> List.length with
+            match shp |> List.filter ((=) Remainder) |> List.length with
             | 0 -> shp
             | 1 ->
-                let elemsSoFar = List.fold (*) -1L shp
+                let elemsSoFar = 
+                    shp 
+                    |> List.filter ((<>) Remainder)
+                    |> List.fold (*) 1L 
                 let elemsNeeded = nElems a
                 if elemsNeeded % elemsSoFar = 0L then
-                    List.map (fun s -> if s = -1L then elemsNeeded / elemsSoFar else s) shp
+                    shp |> List.map (fun s -> if s = Remainder then elemsNeeded / elemsSoFar else s) 
                 else
                     failwithf "cannot reshape from %A to %A because %d / %d is not an integer" 
                               (shape a) shp elemsNeeded elemsSoFar

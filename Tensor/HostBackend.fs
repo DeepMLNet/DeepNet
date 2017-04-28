@@ -23,17 +23,125 @@ type internal DataAndLayout<'T> = {
 
 
 type internal ScalarPrimitives<'T, 'TC> internal () =
+    static let fscAsm = Assembly.GetAssembly(typeof<unit>)
+    static let myAsm = Assembly.GetExecutingAssembly()
+    static let fso = fscAsm.GetType("Microsoft.FSharp.Core.Operators", true)
+    static let tso = myAsm.GetType("ArrayNDNS.Operators", true)
+
     let a = Expression.Parameter(typeof<'T>, "a")
     let b = Expression.Parameter(typeof<'T>, "b")
     let c = Expression.Parameter(typeof<'TC>, "c")
 
     member val ConvertFunc = 
-        Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>)).Compile()
-    member inline this.Convert c = this.ConvertFunc.Invoke(c)
+        Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
+    member inline this.Convert cv = this.ConvertFunc.Invoke(cv)
+
+    member val UnaryPlusFunc = 
+        Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a).Compile()
+    member inline this.UnaryPlus av = this.UnaryPlusFunc.Invoke(av)
+
+    member val UnaryMinusFunc = 
+        Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a).Compile()
+    member inline this.UnaryMinus av = this.UnaryMinusFunc.Invoke(av)
+
+    member val AbsFunc = 
+        let m = fso.GetMethod("Abs").MakeGenericMethod (typeof<'T>)   
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()   
+    member inline this.Abs av = this.AbsFunc.Invoke(av)
+
+    member val SgnFunc = 
+        let m = tso.GetMethod("Sgn").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Sgn av = this.SgnFunc.Invoke(av)
+
+    member val LogFunc = 
+        let m = fso.GetMethod("Log").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Log av = this.LogFunc.Invoke(av)
+
+    member val Log10Func = 
+        let m = fso.GetMethod("Log10").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Log10 av = this.Log10Func.Invoke(av)
+
+    member val ExpFunc = 
+        let m = fso.GetMethod("Exp").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Exp av = this.ExpFunc.Invoke(av)
+
+    member val SinFunc = 
+        let m = fso.GetMethod("Sin").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Sin av = this.SinFunc.Invoke(av)
+
+    member val CosFunc = 
+        let m = fso.GetMethod("Cos").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Cos av = this.CosFunc.Invoke(av)
+
+    member val TanFunc = 
+        let m = fso.GetMethod("Tan").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Tan av = this.TanFunc.Invoke(av)
+
+    member val AsinFunc = 
+        let m = fso.GetMethod("Asin").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Asin av = this.AsinFunc.Invoke(av)
+
+    member val AcosFunc = 
+        let m = fso.GetMethod("Acos").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Acos av = this.AcosFunc.Invoke(av)
+
+    member val AtanFunc = 
+        let m = fso.GetMethod("Atan").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Atan av = this.AtanFunc.Invoke(av)
+
+    member val SinhFunc = 
+        let m = fso.GetMethod("Sinh").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Sinh av = this.SinhFunc.Invoke(av)
+
+    member val CoshFunc = 
+        let m = fso.GetMethod("Cosh").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Cosh av = this.CoshFunc.Invoke(av)
+
+    member val TanhFunc = 
+        let m = fso.GetMethod("Tanh").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Tanh av = this.TanhFunc.Invoke(av)
+
+    member val SqrtFunc = 
+        let m = fso.GetMethod("Sqrt").MakeGenericMethod (typeof<'T>, typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Sqrt av = this.SqrtFunc.Invoke(av)
+
+    member val CeilingFunc = 
+        let m = fso.GetMethod("Ceiling").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Ceiling av = this.CeilingFunc.Invoke(av)
+
+    member val FloorFunc = 
+        let m = fso.GetMethod("Floor").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Floor av = this.FloorFunc.Invoke(av)
+
+    member val RoundFunc = 
+        let m = fso.GetMethod("Round").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Round av = this.RoundFunc.Invoke(av)
+
+    member val TruncateFunc = 
+        let m = fso.GetMethod("Truncate").MakeGenericMethod (typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
+    member inline this.Truncate av = this.TruncateFunc.Invoke(av)
 
     member val PlusFunc = 
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b).Compile()
-    member inline this.Plus a b = this.PlusFunc.Invoke(a, b)
+    member inline this.Plus av bv = this.PlusFunc.Invoke(av, bv)
         
 
 module internal ScalarPrimitives = 
@@ -254,15 +362,121 @@ type internal ScalarOps =
         let inline op pos (a: 'T1) = p.Convert a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
 
+    static member UnaryPlus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.UnaryPlus a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member UnaryMinus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.UnaryMinus a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Abs (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Abs a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Sgn (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Sgn a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Log (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Log a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Log10 (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Log10 a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Exp (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Exp a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Sin (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Sin a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Cos (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Cos a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Tan (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Tan a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Asin (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Asin a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Acos (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Acos a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Atan (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Atan a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Sinh (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Sinh a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Cosh (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Cosh a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Tanh (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Tanh a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Sqrt (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Sqrt a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Ceiling (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Ceiling a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Floor (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Floor a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Round (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Round a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
+    static member Truncate (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.Truncate a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
     static member Plus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op pos a b = p.Plus a b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
     
 
-type internal FillDelegate<'T> = delegate of 'T * DataAndLayout<'T> -> unit
-type internal PlusDelegate<'T> = delegate of DataAndLayout<'T> * DataAndLayout<'T> * DataAndLayout<'T> -> unit
-type internal CopyDelegate<'T> = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
+type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
+type internal UnaryDelegate<'T>  = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
+type internal BinaryDelegate<'T> = delegate of DataAndLayout<'T> * DataAndLayout<'T> * DataAndLayout<'T> -> unit
+type internal CopyDelegate<'T>   = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
 
 type internal VectorOps() =
     static let MethodDelegates = Dictionary<string * Type list, Delegate> ()
@@ -438,6 +652,18 @@ type internal VectorOps() =
                       (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         VectorOps.ApplyUnary (id, trgt, src1)
 
+    static member private UnaryMinusImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.ApplyUnary (Vector.Negate, trgt, src1)
+
+    static member private AbsImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.ApplyUnary (Vector.Abs, trgt, src1)
+
+    static member private SqrtImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.ApplyUnary (Vector.SquareRoot, trgt, src1)
+
     static member private PlusImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                       (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         VectorOps.ApplyBinary (Vector.Add, trgt, src1, src2)
@@ -460,8 +686,17 @@ type internal VectorOps() =
     static member Copy (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         VectorOps.Method<CopyDelegate<'T>>("CopyImpl").Invoke (trgt, src1) 
 
+    static member UnaryMinus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.Method<UnaryDelegate<'T>>("UnaryMinusImpl").Invoke (trgt, src1) 
+
+    static member Abs (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.Method<UnaryDelegate<'T>>("AbsImpl").Invoke (trgt, src1) 
+
+    static member Sqrt (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
+        VectorOps.Method<UnaryDelegate<'T>>("SqrtImpl").Invoke (trgt, src1) 
+
     static member Plus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
-        VectorOps.Method<PlusDelegate<'T>>("PlusImpl").Invoke (trgt, src1, src2) 
+        VectorOps.Method<BinaryDelegate<'T>>("PlusImpl").Invoke (trgt, src1, src2) 
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
         let nd = trgt.FastLayout.NDims
@@ -538,11 +773,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Convert (trgt, a)
 
-        member this.Plus (trgt, a, b) =
-            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Plus (trgt, a, b)
-            else ScalarOps.Plus (trgt, a, b)
-
         member this.Fill (fn, trgt, useThreads) = 
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
             let inline scalarOp idx = fn ()
@@ -569,8 +799,99 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             ScalarOps.ApplyBinaryOp (fn, trgt, a, b, isIndexed=true, useThreads=useThreads)
+       
+        member this.UnaryPlus (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.UnaryPlus (trgt, a)
 
-        
+        member this.UnaryMinus (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.UnaryMinus (trgt, a)
+            else ScalarOps.UnaryMinus (trgt, a)
+
+        member this.Abs (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.Abs (trgt, a)
+            else ScalarOps.Abs (trgt, a)
+
+        member this.Sgn (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Sgn (trgt, a)
+
+        member this.Log (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Log (trgt, a)
+
+        member this.Log10 (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Log10 (trgt, a)
+
+        member this.Exp (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Exp (trgt, a)
+
+        member this.Sin (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Sin (trgt, a)
+
+        member this.Cos (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Cos (trgt, a)
+
+        member this.Tan (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Tan (trgt, a)
+
+        member this.Asin (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Asin (trgt, a)
+
+        member this.Acos (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Acos (trgt, a)
+
+        member this.Atan (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Atan (trgt, a)
+
+        member this.Sinh (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Sinh (trgt, a)
+
+        member this.Cosh (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Cosh (trgt, a)
+
+        member this.Tanh (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Tanh (trgt, a)
+
+        member this.Sqrt (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.Sqrt (trgt, a)
+            else ScalarOps.Sqrt (trgt, a)
+
+        member this.Ceiling (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Ceiling (trgt, a)
+
+        member this.Floor (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Floor (trgt, a)
+
+        member this.Round (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Round (trgt, a)
+
+        member this.Truncate (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Truncate (trgt, a)
+
+        member this.Plus (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Plus (trgt, a, b)
+            else ScalarOps.Plus (trgt, a, b)
+
 
 
 
