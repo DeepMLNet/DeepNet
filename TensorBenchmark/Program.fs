@@ -40,11 +40,17 @@ let main argv =
 
     let startTime = Stopwatch.StartNew()
     for i in 1 .. iters do
+        c <- exp a
+    let duration = startTime.ElapsedMilliseconds
+    let timePerIter = float duration / float iters
+    printfn "Exp time per iteration: %.3f ms" timePerIter
+
+    let startTime = Stopwatch.StartNew()
+    for i in 1 .. iters do
         c <- sqrt a
     let duration = startTime.ElapsedMilliseconds
     let timePerIter = float duration / float iters
     printfn "Sqrt time per iteration: %.3f ms" timePerIter
-
 
     let startTime = Stopwatch.StartNew()
     for i in 1 .. iters do
@@ -52,6 +58,27 @@ let main argv =
     let duration = startTime.ElapsedMilliseconds
     let timePerIter = float duration / float iters
     printfn "Sgn time per iteration: %.3f ms" timePerIter
+
+    let startTime = Stopwatch.StartNew()
+    for i in 1 .. iters do
+        c <- a / b
+    let duration = startTime.ElapsedMilliseconds
+    let timePerIter = float duration / float iters
+    printfn "Divide time per iteration: %.3f ms" timePerIter
+
+    let startTime = Stopwatch.StartNew()
+    for i in 1 .. iters do
+        c <- a % b
+    let duration = startTime.ElapsedMilliseconds
+    let timePerIter = float duration / float iters
+    printfn "Modulo time per iteration: %.3f ms" timePerIter
+
+    let startTime = Stopwatch.StartNew()
+    for i in 1 .. iters do
+        c <- a ** b
+    let duration = startTime.ElapsedMilliseconds
+    let timePerIter = float duration / float iters
+    printfn "Power time per iteration: %.3f ms" timePerIter
 
     printfn "a:\n%A" a
     printfn "b:\n%A" b

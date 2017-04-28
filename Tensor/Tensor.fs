@@ -107,8 +107,13 @@ and ITensorBackend<'T> =
     abstract Round:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract Truncate:      trgt:Tensor<'T> * src1:Tensor<'T> -> unit
 
+    abstract Add:           trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Subtract:      trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Multiply:      trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Divide:        trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Modulo:        trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Power:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
-    abstract Plus:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
 and ITensorStorageFactory =
     abstract Create:        nElems:int64 -> ITensorStorage<'T>
@@ -602,18 +607,42 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     // element-wise unary logic
     //static member (~~~~)    (a: #Tensor<bool>) = map not a
 
-    // element-wise binary
-    /// element-wise addition of two tensor
+    /// element-wise addition of two tensors
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
-        trgt.Backend.Plus (trgt=trgt, src1=a, src2=b)
+        trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
         trgt
-    
-    //static member (-) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (-) (-) (-) (-) (-) a b
-    //static member (*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (*) (*) (*) (*) (*) a b
-    //static member (/) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (/) (/) (/) (/) (/) a b
-    //static member (%) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) (%) (%) (%) (%) (%) a b
-    //static member Pow (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (unsp) a b
+
+    /// element-wise subtraction of two tensors
+    static member (-) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
+        trgt
+
+    /// element-wise multiplication of two tensor
+    static member (*) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
+        trgt
+
+    /// element-wise division of two tensors
+    static member (/) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
+        trgt
+
+    /// element-wise modulo of two tensors
+    static member (%) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
+        trgt
+
+    /// element-wise power of two tensor
+    static member Pow (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
+        trgt
+
 
     //// element-wise binary logic
     //static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b

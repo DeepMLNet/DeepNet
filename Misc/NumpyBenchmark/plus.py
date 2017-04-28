@@ -49,3 +49,10 @@ for i in range(iters):
 duration = time.time() - start_time
 time_per_iter = duration * 1000.0 / float(iters)
 print ("Sign time per iteration: %.3f ms" % time_per_iter)
+
+start_time = time.time()
+for i in range(iters):
+    c = a ** b
+duration = time.time() - start_time
+time_per_iter = duration * 1000.0 / float(iters)
+print ("Power time per iteration: %.3f ms" % time_per_iter)

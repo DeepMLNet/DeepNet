@@ -139,10 +139,32 @@ type internal ScalarPrimitives<'T, 'TC> internal () =
         Expression.Lambda<Func<'T, 'T>>(Expression.Call(m, a), a).Compile()
     member inline this.Truncate av = this.TruncateFunc.Invoke(av)
 
-    member val PlusFunc = 
+    member val AddFunc = 
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b).Compile()
-    member inline this.Plus av bv = this.PlusFunc.Invoke(av, bv)
+    member inline this.Add av bv = this.AddFunc.Invoke(av, bv)
         
+    member val SubtractFunc = 
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b).Compile()
+    member inline this.Subtract av bv = this.SubtractFunc.Invoke(av, bv)
+
+    member val MultiplyFunc = 
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b).Compile()
+    member inline this.Multiply av bv = this.MultiplyFunc.Invoke(av, bv)
+
+    member val DivideFunc = 
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b).Compile()
+    member inline this.Divide av bv = this.DivideFunc.Invoke(av, bv)
+
+    member val ModuloFunc = 
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b).Compile()
+    member inline this.Modulo av bv = this.ModuloFunc.Invoke(av, bv)
+
+    member val PowerFunc = 
+        // note: power is currently significantly slower than other operations
+        let m = fso.GetMethod("op_Exponentiation").MakeGenericMethod (typeof<'T>, typeof<'T>)        
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Call(m, a, b), a, b).Compile()
+    member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
+
 
 module internal ScalarPrimitives = 
     let private instances = Dictionary<Type * Type, obj>()
@@ -467,11 +489,39 @@ type internal ScalarOps =
         let inline op pos a = p.Truncate a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
 
-    static member Plus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+    static member Add (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op pos a b = p.Plus a b
+        let inline op pos a b = p.Add a b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Subtract (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Subtract a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Multiply (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Multiply a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Divide (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Divide a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Modulo (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Modulo a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Power (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Power a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+
     
+
 
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
 type internal UnaryDelegate<'T>  = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
@@ -664,9 +714,22 @@ type internal VectorOps() =
                       (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         VectorOps.ApplyUnary (Vector.SquareRoot, trgt, src1)
 
-    static member private PlusImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+    static member private AddImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                       (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         VectorOps.ApplyBinary (Vector.Add, trgt, src1, src2)
+
+    static member private SubtractImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.ApplyBinary (Vector.Subtract, trgt, src1, src2)
+
+    static member private MultiplyImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let inline vecOp (a: Vector<'T>, b: Vector<'T>) = Vector.Multiply (a, b)
+        VectorOps.ApplyBinary (vecOp, trgt, src1, src2)
+
+    static member private DivideImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.ApplyBinary (Vector.Divide, trgt, src1, src2)
 
     static member inline private Method<'D when 'D :> Delegate> (name: string) : 'D = 
         let dt = typeof<'D>.GenericTypeArguments
@@ -695,8 +758,17 @@ type internal VectorOps() =
     static member Sqrt (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         VectorOps.Method<UnaryDelegate<'T>>("SqrtImpl").Invoke (trgt, src1) 
 
-    static member Plus (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
-        VectorOps.Method<BinaryDelegate<'T>>("PlusImpl").Invoke (trgt, src1, src2) 
+    static member Add (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("AddImpl").Invoke (trgt, src1, src2) 
+
+    static member Subtract (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("SubtractImpl").Invoke (trgt, src1, src2) 
+
+    static member Multiply (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("MultiplyImpl").Invoke (trgt, src1, src2) 
+
+    static member Divide (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("DivideImpl").Invoke (trgt, src1, src2) 
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
         let nd = trgt.FastLayout.NDims
@@ -887,10 +959,33 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Truncate (trgt, a)
 
-        member this.Plus (trgt, a, b) =
+        member this.Add (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Plus (trgt, a, b)
-            else ScalarOps.Plus (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
+            else ScalarOps.Add (trgt, a, b)
+
+        member this.Subtract (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Subtract (trgt, a, b)
+            else ScalarOps.Subtract (trgt, a, b)
+
+        member this.Multiply (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Multiply (trgt, a, b)
+            else ScalarOps.Multiply (trgt, a, b)
+
+        member this.Divide (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Divide (trgt, a, b)
+            else ScalarOps.Divide (trgt, a, b)
+
+        member this.Modulo (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Modulo (trgt, a, b)
+
+        member this.Power (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Power (trgt, a, b)
 
 
 

@@ -111,7 +111,12 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.Plus(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Add(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Subtract(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Multiply(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Divide(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Modulo(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.Power(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
