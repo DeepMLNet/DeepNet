@@ -165,6 +165,32 @@ type internal ScalarPrimitives<'T, 'TC> internal () =
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Call(m, a, b), a, b).Compile()
     member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
 
+    member val EqualFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b).Compile()
+    member inline this.Equal av bv = this.EqualFunc.Invoke(av, bv)
+
+    member val NotEqualFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b).Compile()
+    member inline this.NotEqual av bv = this.NotEqualFunc.Invoke(av, bv)
+
+    member val LessThanFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b).Compile()
+    member inline this.LessThan av bv = this.LessThanFunc.Invoke(av, bv)
+
+    member val LessThanOrEqualFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b).Compile()
+    member inline this.LessThanOrEqual av bv = this.LessThanOrEqualFunc.Invoke(av, bv)
+
+    member val GreaterThanFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b).Compile()
+    member inline this.GreaterThan av bv = this.GreaterThanFunc.Invoke(av, bv)
+
+    member val GreaterThanOrEqualFunc = 
+        Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b).Compile()
+    member inline this.GreaterThanOrEqual av bv = this.GreaterThanOrEqualFunc.Invoke(av, bv)
+
+
+
 
 module internal ScalarPrimitives = 
     let private instances = Dictionary<Type * Type, obj>()

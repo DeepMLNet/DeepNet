@@ -37,6 +37,7 @@ type TensorOrder =
 type ITensor =
     abstract Layout:            TensorLayout
     abstract Storage:           ITensorStorage
+    abstract Factory:           ITensorStorageFactory
     abstract Shape:             int64 list
     abstract NDims:             int
     abstract NElems:            int64
@@ -59,12 +60,12 @@ type ITensor =
     abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
 
 and ITensorStorage =
-    abstract Id:            string
+    abstract Id:                string
+    abstract Factory:           ITensorStorageFactory
 
 and ITensorStorage<'T> =
     inherit ITensorStorage
     abstract Backend:       TensorLayout -> ITensorBackend<'T>
-    abstract Factory:       ITensorStorageFactory
     //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 and ITensorBackend<'T> =
@@ -141,6 +142,9 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// storage of this tensor
     member val Storage = storage
+
+    /// storage factory
+    member inline this.Factory = this.Storage.Factory
 
     /// backend
     member internal this.Backend = backend
@@ -361,7 +365,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.swapDim ax1 ax2)
 
     /// Transposes the given matrix.
-    /// If the tensor has more then two dimensions, the last two axes are swapped.
+    /// If the given tensor has more then two dimensions, the last two axes are swapped.
     static member transpose a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.transpose)
 
@@ -435,6 +439,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.NDims = this.NDims
         member this.NElems = this.NElems
         member this.Storage = this.Storage :> ITensorStorage
+        member this.Factory = this.Factory
         member this.CPPType = raise (System.NotImplementedException())
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.CopyTo(arg1) = raise (System.NotImplementedException())
@@ -467,17 +472,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.Relayout layout = this.Relayout layout :> ITensor
         member this.SetSlice(args) = raise (System.NotImplementedException())
 
-
-    static member internal ApplyElemwise (fn, a: Tensor<'TA>, ?order) : Tensor<'R> =
-        let trgt, a = Tensor<_>.PrepareElemwise (a, ?order=order)
-        fn trgt a
-        trgt       
-
-    static member internal ApplyElemwise (fn, a: Tensor<'TA>, b: Tensor<'TB>, ?order) : Tensor<'R> =
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b, ?order=order)
-        fn trgt a b
-        trgt
-       
     /// element-wise unary (prefix) plus
     static member (~+) (a: Tensor<'T>) = 
         let trgt, a = Tensor<_>.PrepareElemwise (a)
@@ -612,37 +606,48 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
         trgt
+    static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor<_>.ScalarLike(b, a)
+    static member (+) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) + b
 
     /// element-wise subtraction of two tensors
     static member (-) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
         trgt
+    static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor<_>.ScalarLike(b, a)
+    static member (-) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) - b
 
     /// element-wise multiplication of two tensor
     static member (*) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
         trgt
+    static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor<_>.ScalarLike(b, a)
+    static member (*) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) * b
 
     /// element-wise division of two tensors
     static member (/) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
         trgt
+    static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor<_>.ScalarLike(b, a)
+    static member (/) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) / b
 
     /// element-wise modulo of two tensors
     static member (%) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
         trgt
+    static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor<_>.ScalarLike(b, a)
+    static member (%) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) % b
 
     /// element-wise power of two tensor
     static member Pow (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
         trgt
-
+    static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor<_>.ScalarLike(b, a)
+    static member Pow (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) ** b
 
     //// element-wise binary logic
     //static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
@@ -656,13 +661,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     //static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
     //static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
 
-    //// element-wise binary with scalars
-    //static member inline (+) (a: #Tensor<'T>, b: 'T) = a + (scalarOfSameType a b)
-    //static member inline (-) (a: #Tensor<'T>, b: 'T) = a - (scalarOfSameType a b)
-    //static member inline (*) (a: #Tensor<'T>, b: 'T) = a * (scalarOfSameType a b)
-    //static member inline (/) (a: #Tensor<'T>, b: 'T) = a / (scalarOfSameType a b)
-    //static member inline (%) (a: #Tensor<'T>, b: 'T) = a % (scalarOfSameType a b)
-    //static member inline Pow (a: #Tensor<'T>, b: 'T) = a ** (scalarOfSameType a b)        
+    //// element-wise binary with scalars  
     //static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
     //static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
     //static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
@@ -672,12 +671,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     //static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
     //static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
 
-    //static member inline (+) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) + b
-    //static member inline (-) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) - b
-    //static member inline (*) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) * b
-    //static member inline (/) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) / b
-    //static member inline (%) (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) % b
-    //static member inline Pow (a: 'T, b: #Tensor<'T>) = (scalarOfSameType b a) ** b
     //static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
     //static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
     //static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
@@ -693,10 +686,10 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     ///// tensor product
     //static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
-
-    //// transposition
-    //member this.T = transpose this
-
+    /// Transposes the given matrix.
+    /// If the given tensor has more then two dimensions, the last two axes are swapped.
+    member inline this.T = 
+        Tensor<_>.transpose this
 
     /// returns a copy of the tensor
     member this.Copy (?order) =
@@ -767,7 +760,8 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         with get (idx: int64[]) : 'T = backend.[idx]
         and set (idx: int64[]) (value: 'T) = backend.[idx] <- value
 
-    /// access to a single item using a list of indices
+    /// access to a single item using a list of indices 
+    /// (use array of indices for faster access)
     member this.Item
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
@@ -851,12 +845,23 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member inline set (a: Tensor<_>) (pos: int64 list) value = 
         a.[pos] <- value
 
-    /// value of scalar array
-    member this.Value 
-        with inline get () = this.[[||]]
-        and inline set value = this.[[||]] <- value
+    /// checks that this Tensor is a scalar tensor
+    member inline internal this.CheckScalar () =
+        if this.NDims <> 0 then 
+            let msg = sprintf "this operation requires a scalar (0-dimensional) tensor, 
+                               but its shape is %A" this.Shape
+            raise (PositionOutOfRange msg)
 
-    /// value of scalar array
+    /// value of scalar (0-dimensional) tensor
+    member this.Value 
+        with inline get () = 
+            this.CheckScalar()
+            this.[[||]]
+        and inline set value = 
+            this.CheckScalar()
+            this.[[||]] <- value
+
+    /// value of scalar (0-dimensional) tensor
     static member inline value (a: Tensor<_>) =
         a.Value
 
@@ -959,8 +964,17 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member onesLike (tmpl: Tensor<'T>) =
         Tensor<_>.ones<'T> (tmpl.Shape, tmpl.Storage.Factory)
 
+    /// Creates a new tensor of scalar shape with the given value and storage.
+    static member scalar<'T> (value: 'T, dev: ITensorStorageFactory) =
+        let x = Tensor<'T> ([], dev)
+        x.Value <- value
+        x
 
-           
+    /// Creates a new tensor of scalar shape with the given value and 
+    /// same storage as the specified tensor.
+    static member internal ScalarLike<'T> (value: 'T, tmpl: ITensor) =
+        Tensor<_>.scalar<'T> (value, tmpl.Storage.Factory)
+                   
 
 
 #if false
@@ -1158,18 +1172,6 @@ module Tensor =
     // array creation functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// creates a scalar ArrayND of given value and type
-    let scalarOfSameType (a: 'B when 'B :> Tensor<'T>) (value: 'T) : 'B =
-        let ary = newCOfSameType [] a
-        set [] value ary
-        ary
-
-    /// creates a scalar ArrayND of given value 
-    let scalarOfType a (value: 'T) =
-        let ary = newCOfType [] a
-        set [] value ary
-        ary
-
 
     /// fills the diagonal of a quadratic matrix with ones
     let inline fillDiagonalWithOnes (a: #Tensor<'T>) =
@@ -1219,13 +1221,6 @@ module Tensor =
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // element-wise operations
     ////////////////////////////////////////////////////////////////////////////////////////////////   
-   
-    let inline signImpl (x: 'T) =
-        conv<'T> (sign x)
-
-    /// sign keeping type
-    let inline signt (a: #Tensor<'T>) =
-        Tensor<'T>.SignT a 
 
     /// Elementwise check if two arrays have same (within machine precision) values.
     /// Check for exact equality when type is int or bool.
