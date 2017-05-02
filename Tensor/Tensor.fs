@@ -1339,14 +1339,6 @@ module Tensor =
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    /// fills the diagonal of a quadratic matrix with ones
-    let inline fillDiagonalWithOnes (a: #Tensor<'T>) =
-        match shape a with
-        | [n; m] when n = m ->
-            for i in 0L .. n-1L do
-                set [i; i] Tensor<'T>.One a
-        | _ -> invalidArg "a" "need a quadratic matrix"
-
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
