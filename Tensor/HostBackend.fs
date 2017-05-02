@@ -31,6 +31,7 @@ type internal ScalarPrimitives<'T, 'TC> () =
     static let a = Expression.Parameter(typeof<'T>, "a")
     static let b = Expression.Parameter(typeof<'T>, "b")
     static let c = Expression.Parameter(typeof<'TC>, "c")
+    static let cond = Expression.Parameter(typeof<bool>, "cond")
 
     member val ConvertFunc = 
         Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
@@ -189,7 +190,9 @@ type internal ScalarPrimitives<'T, 'TC> () =
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b).Compile()
     member inline this.GreaterOrEqual av bv = this.GreaterOrEqualFunc.Invoke(av, bv)
 
-
+    member val IfThenElseFunc =
+        Expression.Lambda<Func<bool, 'T, 'T, 'T>>(Expression.Condition(cond, a, b), cond, a, b).Compile()
+    member inline this.IfThenElse condv ifTrue ifFalse = this.IfThenElseFunc.Invoke(condv, ifTrue, ifFalse)
 
 
 module internal ScalarPrimitives = 
@@ -283,6 +286,42 @@ type internal ScalarOps =
         else
             loops false 0
 
+    static member inline ApplyUnaryMethod (scalarOp: int64[] -> 'T1 -> unit, 
+                                           src1: DataAndLayout<'T1>, 
+                                           isIndexed: bool, useThreads: bool) =        
+        let nd = src1.FastLayout.NDims
+        let shape = src1.FastLayout.Shape
+                      
+        let inline loops (dim0Fixed: bool) (dim0Pos: int) =
+            let fromDim = if dim0Fixed then 1 else 0
+            let startPos = Array.zeroCreate nd
+            if dim0Fixed then startPos.[0] <- dim0Pos
+
+            let mutable src1PosIter = 
+                PosIter32 (src1.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+            let pos64 = Array.zeroCreate src1PosIter.Pos.Length
+            while src1PosIter.Active do
+                let mutable src1Addr = src1PosIter.Addr
+                if nd = 0 then
+                    scalarOp [||] src1.Data.[src1PosIter.Addr] 
+                elif isIndexed then
+                    for d in 0 .. nd - 1 do
+                        pos64.[d] <- int64 src1PosIter.Pos.[d]
+                    for i in 0 .. shape.[nd-1] - 1 do
+                        scalarOp pos64 src1.Data.[src1Addr] 
+                        src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
+                        pos64.[nd-1] <- pos64.[nd-1] + 1L
+                else
+                    for i in 0 .. shape.[nd-1] - 1 do
+                        scalarOp [||] src1.Data.[src1Addr] 
+                        src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
+                src1PosIter.MoveNext()
+                    
+        if useThreads && nd > 1 then
+            Parallel.For (0, shape.[0], fun dim0Pos -> loops true dim0Pos) |> ignore
+        else
+            loops false 0
+
     static member inline ApplyBinaryOp (scalarOp: int64[] -> 'T1 -> 'T2 -> 'T, 
                                         trgt: DataAndLayout<'T>,
                                         src1: DataAndLayout<'T1>, src2: DataAndLayout<'T2>,
@@ -326,6 +365,60 @@ type internal ScalarOps =
                 trgtPosIter.MoveNext()
                 src1PosIter.MoveNext()
                 src2PosIter.MoveNext()
+                    
+        if useThreads && nd > 1 then
+            Parallel.For (0, shape.[0], fun dim0Pos -> loops true dim0Pos) |> ignore
+        else
+            loops false 0
+
+    static member inline ApplyTernaryOp (scalarOp: int64[] -> 'T1 -> 'T2 -> 'T3 -> 'T, 
+                                         trgt: DataAndLayout<'T>,
+                                         src1: DataAndLayout<'T1>, src2: DataAndLayout<'T2>, src3: DataAndLayout<'T3>,
+                                         isIndexed: bool, useThreads: bool) =        
+        let nd = trgt.FastLayout.NDims
+        let shape = trgt.FastLayout.Shape
+                              
+        let inline loops (dim0Fixed: bool) (dim0Pos: int) =
+            let fromDim = if dim0Fixed then 1 else 0
+            let startPos = Array.zeroCreate nd
+            if dim0Fixed then startPos.[0] <- dim0Pos
+
+            let mutable trgtPosIter = 
+                PosIter32 (trgt.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+            let mutable src1PosIter = 
+                PosIter32 (src1.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+            let mutable src2PosIter = 
+                PosIter32 (src2.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+            let mutable src3PosIter = 
+                PosIter32 (src3.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+            let pos64 = Array.zeroCreate trgtPosIter.Pos.Length
+            while trgtPosIter.Active do
+                let mutable trgtAddr, src1Addr, src2Addr, src3Addr = 
+                    trgtPosIter.Addr, src1PosIter.Addr, src2PosIter.Addr, src3PosIter.Addr
+                if nd = 0 then
+                    trgt.Data.[trgtPosIter.Addr] <- 
+                        scalarOp [||] src1.Data.[src1PosIter.Addr] src2.Data.[src2PosIter.Addr] src3.Data.[src3PosIter.Addr]
+                elif isIndexed then
+                    for d in 0 .. nd - 1 do
+                        pos64.[d] <- int64 trgtPosIter.Pos.[d]
+                    for i in 0 .. shape.[nd-1] - 1 do
+                        trgt.Data.[trgtAddr] <- scalarOp pos64 src1.Data.[src1Addr] src2.Data.[src2Addr] src3.Data.[src3Addr]
+                        trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
+                        src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
+                        src2Addr <- src2Addr + src2.FastLayout.Stride.[nd-1]
+                        src3Addr <- src3Addr + src2.FastLayout.Stride.[nd-1]
+                        pos64.[nd-1] <- pos64.[nd-1] + 1L
+                else
+                    for i in 0 .. shape.[nd-1] - 1 do
+                        trgt.Data.[trgtAddr] <- scalarOp [||] src1.Data.[src1Addr] src2.Data.[src2Addr] src3.Data.[src3Addr]
+                        trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
+                        src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
+                        src2Addr <- src2Addr + src2.FastLayout.Stride.[nd-1]
+                        src3Addr <- src3Addr + src2.FastLayout.Stride.[nd-1]
+                trgtPosIter.MoveNext()
+                src1PosIter.MoveNext()
+                src2PosIter.MoveNext()
+                src3PosIter.MoveNext()
                     
         if useThreads && nd > 1 then
             Parallel.For (0, shape.[0], fun dim0Pos -> loops true dim0Pos) |> ignore
@@ -591,6 +684,34 @@ type internal ScalarOps =
         let inline op pos a b = a <> b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)    
 
+    static member IfThenElse (trgt: DataAndLayout<'T>, cond: DataAndLayout<bool>, 
+                              ifTrue: DataAndLayout<'T>, ifFalse: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos c t f = p.IfThenElse c t f
+        ScalarOps.ApplyTernaryOp (op, trgt, cond, ifTrue, ifFalse, isIndexed=false, useThreads=true)    
+
+    static member Gather (trgt: DataAndLayout<'T>, srcIndices: DataAndLayout<int64> option [],
+                          src: DataAndLayout<'T>) =
+        let inline op (trgtIdx: int64[]) = 
+            let srcIdx = Array.init src.FastLayout.NDims (fun dim ->
+                match srcIndices.[dim] with
+                | Some i -> i.Data.[i.FastLayout.Addr trgtIdx]
+                | None -> trgtIdx.[dim])
+            src.Data.[src.FastLayout.Addr srcIdx]                                      
+        ScalarOps.ApplyNoaryOp (op, trgt, isIndexed=true, useThreads=true)         
+
+    static member Scatter (trgt: DataAndLayout<'T>, trgtIndices: DataAndLayout<int64> option [],
+                           src: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op (srcIdx: int64[]) (srcVal: 'T) = 
+            let trgtIdx = Array.init trgt.FastLayout.NDims (fun dim ->
+                match trgtIndices.[dim] with
+                | Some i -> i.Data.[i.FastLayout.Addr srcIdx]
+                | None -> srcIdx.[dim])
+            let prvVal = trgt.Data.[trgt.FastLayout.Addr trgtIdx]
+            trgt.Data.[trgt.FastLayout.Addr trgtIdx] <- p.Add prvVal srcVal
+        // currently cannot use threads, because we have no interlocked addition
+        ScalarOps.ApplyUnaryMethod (op, src, isIndexed=true, useThreads=false)     
 
 
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
@@ -888,19 +1009,44 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     member inline internal this.DataAndLayout = 
         {Data=this.Data; FastLayout=this.FastLayout}
             
+
+    ///// C++ type name
+    //member this.CPPType = 
+    //    let dims = TensorLayout.nDims layout
+    //    let shp = TensorLayout.shape layout
+    //    let str = TensorLayout.stride layout
+    //    let ofst = TensorLayout.offset layout
+    //    let cppDataType = Util.cppType this.DataType
+    //    let shapeStr = 
+    //        if dims = 0 then "" 
+    //        else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+    //    let strideStr = 
+    //        "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+    //    sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+    //        dims cppDataType dims shapeStr dims strideStr            
+
+
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>) =
+        // try to find stride 1 dimension and move it to the back
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout        
 
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
+        // try to find stride 1 dimension and move it to the back
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
 
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
         // try to find stride 1 dimension and move it to the back
-        // but for that we need swapdim, which is not implemented yet
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
         (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout 
+
+    static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
+        // try to find stride 1 dimension and move it to the back
+        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
+        (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
+        (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout,
+        (c.Backend :?> TensorHostBackend<'TC>).DataAndLayout 
 
     interface ITensorBackend<'T> with
         member this.Item 
@@ -1102,6 +1248,31 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.Xor (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             ScalarOps.Xor (trgt, a, b)
+
+        member this.IfThenElse (trgt, cond, ifTrue, ifFalse) =
+            let trgt, cond, ifTrue, ifFalse = 
+                TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, cond, ifTrue, ifFalse)
+            ScalarOps.IfThenElse (trgt, cond, ifTrue, ifFalse)
+
+        member this.Gather (trgt, srcIndices, src) =
+            let nd = src.NDims
+            let trgt = (trgt.Backend :?> TensorHostBackend<'T>).DataAndLayout
+            let src = (src.Backend :?> TensorHostBackend<'T>).DataAndLayout
+            let srcIndices = 
+                srcIndices 
+                |> List.map (Option.map (fun i -> (i.Backend :?> TensorHostBackend<int64>).DataAndLayout))
+                |> Array.ofList
+            ScalarOps.Gather (trgt, srcIndices, src)
+
+        member this.Scatter (trgt: Tensor<'T>, trgtIndices, src) =
+            let trgt = (trgt.Backend :?> TensorHostBackend<'T>).DataAndLayout
+            let src = (src.Backend :?> TensorHostBackend<'T>).DataAndLayout
+            let trgtIndices = 
+                trgtIndices 
+                |> List.map (Option.map (fun i -> (i.Backend :?> TensorHostBackend<int64>).DataAndLayout))
+                |> Array.ofList
+            ScalarOps.Scatter (trgt, trgtIndices, src)
+    
 
 
 and TensorHostStorageFactory () =

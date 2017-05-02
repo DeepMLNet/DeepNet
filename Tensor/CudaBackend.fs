@@ -81,6 +81,9 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
+        member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
+        member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
+        member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
         member this.Abs(trgt, src1) = raise (System.NotImplementedException())
         member this.Acos(trgt, src1) = raise (System.NotImplementedException())
         member this.Asin(trgt, src1) = raise (System.NotImplementedException())
