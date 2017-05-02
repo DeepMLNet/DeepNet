@@ -468,6 +468,28 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// If not, it is padded with size one dimensions from the left.
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
 
+    /// Transposes the given matrix.
+    /// If the given tensor has more then two dimensions, the last two axes are swapped.
+    member inline this.T = 
+        Tensor<_>.transpose this
+
+    /// returns a copy of the tensor
+    member this.Copy (?order) =
+        let trgt, src = Tensor.PrepareElemwise (this)
+        trgt.Backend.Copy (trgt=trgt, src=src)
+        trgt      
+        
+    /// returns a copy of the tensor
+    static member copy (a: 'A when 'A :> ITensor, ?order) =
+        a.Copy (?order=order) :?> 'A
+
+    /// Copies the specifed tensor into this tensor.
+    /// Both tensors must have same shape and storage.
+    member internal this.CopyFrom (src: Tensor<'T>) =
+        Tensor.CheckSameShape this src
+        Tensor.CheckSameStorage [this; src]
+        this.Backend.Copy (trgt=this, src=src)
+
     /// this tensor as Tensor<bool>
     member internal this.AsBool : Tensor<bool> =
         if this.DataType = typeof<bool> then
@@ -477,6 +499,90 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
                 sprintf "the operation requires a Tensor<bool> but the data type of
                          the specified tensor is %s" this.DataType.Name
             raise (DataTypeMismatch msg)
+
+    /// Fills the tensor with the values returned by the function.
+    member trgt.Fill (fn: unit -> 'T)  =
+        trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=false)
+
+    /// Fills the tensor with the values returned by the function.
+    member trgt.FillIndexed (fn: int64[] -> 'T) =
+        trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=false)
+
+    /// Copy source tensor into this tensor.
+    /// The source tensor is broadcasted to the size of this tensor, if possible.
+    member trgt.FillFrom (src: Tensor<'T>) = 
+        let src = Tensor.PrepareSources (trgt, src)
+        trgt.CopyFrom src
+
+    /// Fills the tensor with the specified constant.
+    member trgt.FillConst (value: 'T) =
+        trgt.Backend.FillConst (value=value, trgt=trgt)
+
+    /// Fills the tensor with the values returned by the given sequence.
+    member trgt.FillSeq (data: 'T seq) =
+        use enumerator = data.GetEnumerator()
+        trgt.Fill (fun () -> 
+            if enumerator.MoveNext() then enumerator.Current
+            else 
+                let msg = 
+                    sprintf "sequence ended before tensor of shape %A was filled"
+                            trgt.Shape
+                raise (SeqTooShort msg))
+
+    /// maps all elements using the specified function into this tensor
+    member trgt.FillMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
+        let a = Tensor.PrepareSources (trgt, a)
+        trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
+
+    /// maps all elements using the specified function into a new tensor
+    static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillMap fn a
+        trgt       
+
+    /// maps all elements using the specified indexed function into this tensor
+    member trgt.FillMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
+        let a = Tensor.PrepareSources (trgt, a)
+        trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
+
+    /// maps all elements using the specified indexed function into a new tensor
+    static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillMapIndexed fn a
+        trgt     
+
+    /// maps all elements using the specified function into this tensor
+    member trgt.FillMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
+
+    /// maps all elements using the specified function into a new tensor
+    static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMap2 fn a b
+        trgt       
+
+    /// maps all elements using the specified indexed function into this tensor
+    member trgt.FillMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
+
+    /// maps all elements using the specified indexed function into a new tensor
+    static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMapIndexed2 fn a b
+        trgt       
+
+    /// copies all elements into this tensor and converts their data type appropriately
+    member trgt.FillConvert (a: Tensor<'TA>) = 
+        let a = Tensor.PrepareSources (trgt, a)
+        trgt.Backend.Convert (trgt=trgt, src=a)
+
+    /// converts all elements to the specified type
+    static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillConvert (a)
+        trgt
 
     /// element-wise unary (prefix) plus using this tensor as target
     member trgt.FillUnaryPlus (a: Tensor<'T>) = 
@@ -1009,57 +1115,6 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     ///// tensor product
     //static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
         
-    /// Transposes the given matrix.
-    /// If the given tensor has more then two dimensions, the last two axes are swapped.
-    member inline this.T = 
-        Tensor<_>.transpose this
-
-    /// returns a copy of the tensor
-    member this.Copy (?order) =
-        let trgt, src = Tensor.PrepareElemwise (this)
-        trgt.Backend.Copy (trgt=trgt, src=src)
-        trgt      
-        
-    /// returns a copy of the tensor
-    static member copy (a: 'A when 'A :> ITensor, ?order) =
-        a.Copy (?order=order) :?> 'A
-
-    /// Copies the specifed tensor into this tensor.
-    /// Both tensors must have same shape and storage.
-    member internal this.CopyFrom (src: Tensor<'T>) =
-        Tensor.CheckSameShape this src
-        Tensor.CheckSameStorage [this; src]
-        this.Backend.Copy (trgt=this, src=src)
-
-    /// maps all elements using the specified function into a new tensor
-    static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
-        trgt       
-
-    /// maps all elements using the specified indexed function into a new tensor
-    static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
-        trgt     
-
-    /// maps all elements using the specified function into a new tensor
-    static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
-        trgt       
-
-    /// maps all elements using the specified indexed function into a new tensor
-    static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
-        trgt       
-
-    /// converts all elements to the specified type
-    static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.Backend.Convert (trgt=trgt, src=a)
-        trgt    
 
     /// a view of this tensor with the given .NET range
     member inline internal this.GetRng (rngArgs: obj[]) =
@@ -1253,38 +1308,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// full contents string
     member this.Full = this.ToString (maxElems=Int64.MaxValue)
    
-    /// Fills the tensor with the specified constant.
-    static member fillConst (value: 'T) (trgt: Tensor<'T>) =
-        trgt.Backend.FillConst (value=value, trgt=trgt)
-
-    /// Fills the tensor with the values returned by the function.
-    static member fill (fn: unit -> 'T) (trgt: Tensor<'T>) =
-        trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=false)
-
-    /// Fills the tensor with the values returned by the function.
-    static member fillIndexed (fn: int64[] -> 'T) (trgt: Tensor<'T>) =
-        trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=false)
-
-    /// Fills the vector with linearly spaced values from start to (including) stop.
-    static member inline fillLinSpaced (start: 'V) (stop: 'V) (a: Tensor<'V>) =
-        if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
-        if a.NElems < 2L then raise (ShapeMismatch "tensor must have at least two elements")
-        let step = (stop - start) / conv<'V> (a.NElems - 1L)
-        a |> Tensor<_>.fillIndexed (fun idx -> start + conv<'V> idx.[0] * step)       
-
-    /// Fills the tensor with the values returned by the given sequence.
-    static member fillWithSeq (data: 'T seq) (trgt: Tensor<'T>) =
-        use enumerator = data.GetEnumerator()
-        trgt |> Tensor<_>.fill (fun () -> 
-            if enumerator.MoveNext() then enumerator.Current
-            else 
-                let msg = 
-                    sprintf "sequence ended before tensor of shape %A was filled"
-                            trgt.Shape
-                raise (SeqTooShort msg))
-
-
-                   
+                 
 
 
 #if false
@@ -1977,7 +2001,7 @@ type Tensor =
     static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
-            x |> Tensor<_>.fillConst Tensor<'T>.Zero
+            x.FillConst Tensor<'T>.Zero
         x
    
     /// Tensor of same shape as specifed tensor and filled with zeros.
@@ -1987,7 +2011,7 @@ type Tensor =
     /// Creates a new tensor of given shape filled with ones.
     static member ones<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
-        x |> Tensor<_>.fillConst Tensor<'T>.One
+        x.FillConst Tensor<'T>.One
         x
         
     /// Tensor of same shape as specifed tensor and filled with ones.
@@ -1997,13 +2021,13 @@ type Tensor =
     /// Creates a new boolean tensor of given shape filled with false.
     static member falses (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
-        x |> Tensor<_>.fillConst false
+        x.FillConst false
         x
 
     /// Creates a new boolean tensor of given shape filled with true.
     static member trues (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
-        x |> Tensor<_>.fillConst true
+        x.FillConst true
         x   
 
     /// Creates a new tensor of scalar shape with the given value and storage.
@@ -2016,6 +2040,19 @@ type Tensor =
     /// same storage as the specified tensor.
     static member internal ScalarLike<'T> (value: 'T, tmpl: ITensor) : Tensor<'T> =
         Tensor.scalar<'T> (value, tmpl.Storage.Factory)
+
+    /// Creates a tensor with the values returned by the function.
+    static member init<'T> (shape: int64 list, fn: (int64[] -> 'T), dev: ITensorStorageFactory) : Tensor<'T> =
+        let x = Tensor<'T> (shape, dev)
+        x.FillIndexed fn
+        x           
+
+    /// Fills the vector with linearly spaced values from start to (including) stop.
+    static member inline fillLinSpaced (start: 'V) (stop: 'V) (a: Tensor<'V>) =
+        if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
+        if a.NElems < 2L then raise (ShapeMismatch "tensor must have at least two elements")
+        let step = (stop - start) / conv<'V> (a.NElems - 1L)
+        a.FillIndexed (fun idx -> start + conv<'V> idx.[0] * step)     
 
 
 module Tensor =
