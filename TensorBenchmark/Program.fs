@@ -95,6 +95,7 @@ let main argv =
 
     printfn "sgn -1.0f: %f   sgn 0.0f: %f" (sgn -1.0f) (sgn 0.0f)
 
+    printfn "ndims a: %d" (Tensor.nDims a)
 
     let m : Tensor<bool> = HostTensor.falses shape
     let n : Tensor<bool> = HostTensor.trues shape

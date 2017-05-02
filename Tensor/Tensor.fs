@@ -16,6 +16,9 @@ exception StorageMismatch of string
 /// operation requires tensors of same shape, but specified tensor had different shapes
 exception ShapeMismatch of string
 
+/// operation requires tensors of same data types, but specified tensor had different data types
+exception DataTypeMismatch of string
+
 /// a row-major layout was required for this operation, but the tensor has a different layout
 exception RowMajorLayoutRequired of string
 
@@ -35,29 +38,93 @@ type TensorOrder =
 
 /// Type-neutral interface to Tensor<'T> of any type
 type ITensor =
+    /// layout of this tensor (shape, offset and strides)
     abstract Layout:            TensorLayout
+    /// storage of this tensor
     abstract Storage:           ITensorStorage
+    /// storage factory
     abstract Factory:           ITensorStorageFactory
+    /// shape
     abstract Shape:             int64 list
+    /// number of dimensions
     abstract NDims:             int
-    abstract NElems:            int64
-    abstract CPPType:           string
-    abstract Relayout:          TensorLayout -> ITensor
-    abstract NewOfSameType:     TensorLayout -> ITensor
-    abstract NewOfType:         TensorLayout -> System.Type -> ITensor
+    /// number of elements
+    abstract NElems:            int64    
+    /// type of data stored in this tensor
     abstract DataType:          System.Type
+    /// pretty contents string
+    abstract Pretty:            string
+    /// full contents string
+    abstract Full:              string
+
+    /// a tensor with the same storage but new layout
+    abstract Relayout:          TensorLayout -> ITensor
+    /// returns a copy of the tensor
     abstract Copy:              ?order:TensorOrder -> ITensor
-    abstract CopyTo:            ITensor -> unit
-    abstract GetSlice:          [<System.ParamArray>] args: obj [] -> ITensor
-    abstract SetSlice:          [<System.ParamArray>] args: obj [] -> unit
-    abstract Item:              [<System.ParamArray>] allArgs: obj [] -> ITensor with get
-    abstract Item:              obj -> ITensor with set
-    abstract Item:              obj * obj -> ITensor with set
-    abstract Item:              obj * obj * obj -> ITensor with set
-    abstract Item:              obj * obj * obj * obj -> ITensor with set
-    abstract Item:              obj * obj * obj * obj * obj -> ITensor with set
-    abstract Item:              obj * obj * obj * obj * obj * obj -> ITensor with set
-    abstract Item:              obj * obj * obj * obj * obj * obj * obj -> ITensor with set
+
+    /// n-dimensional slicing using a list of TensorRngs
+    abstract Item : rng:TensorRng list -> ITensor with get
+    /// n-dimensional slicing using a list of TensorRngs
+    abstract Item : rng:TensorRng list -> ITensor with set
+
+    // slicing and item access
+    abstract Item : i0:int64 -> ITensor with get
+    abstract Item : i0:int64 * i1:int64 -> ITensor with get
+    abstract Item : i0:int64 * i1:int64 * i2:int64 -> ITensor with get
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor with get
+
+    abstract Item : i0:int64 -> ITensor with set
+    abstract Item : i0:int64 * i1:int64 -> ITensor with set
+    abstract Item : i0:int64 * i1:int64 * i2:int64 -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj * o5:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj * o5:obj * o6:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj * o5:obj * o6:obj * o7:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj * o5:obj * o6:obj * o7:obj * o8:obj -> ITensor with set
+    abstract Item : o0:obj * o1:obj * o2:obj * o3:obj * o4:obj * o5:obj * o6:obj * o7:obj * o8:obj * o9:obj -> ITensor with set
+
+    abstract GetSlice : i0s:int64 option * i0f:int64 option -> ITensor
+    abstract GetSlice : i0:int64 * i1s:int64 option * i1f:int64 option -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1:int64 -> ITensor
+    abstract GetSlice : i0:int64 * i1:int64 * i2:int64 -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option -> ITensor
+    abstract GetSlice : i0:int64 * i1:int64 * i2s:int64 option * i2f:int64 option -> ITensor
+    abstract GetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2:int64 -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2:int64 -> ITensor
+    abstract GetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2s:int64 option * i2f:int64 option -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 -> ITensor
+    abstract GetSlice : i0:int64 * i1:int64 * i2:int64 * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option -> ITensor
+    abstract GetSlice : i0:int64 * i1:int64 * i2s:int64 option * i2f:int64 option * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2:int64 * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2s:int64 option * i2f:int64 option * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+    abstract GetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * [<System.ParamArray>] r:obj [] -> ITensor
+
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1:int64 * i2:int64 * value:ITensor -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1:int64 * i2s:int64 option * i2f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2:int64 * value:ITensor -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2:int64 * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2s:int64 option * i2f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1:int64 * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * value:ITensor -> unit
+    abstract SetSlice : i0:int64 * i1:int64 * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0:int64 * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1:int64 * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
+    abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
 and ITensorStorage =
     abstract Id:                string
@@ -164,7 +231,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// shape
     member inline this.Shape = this.Layout.Shape
 
-    /// shape in elements
+    /// shape 
     static member inline shape (a: #ITensor) = a.Shape
 
     /// number of dimensions
@@ -221,13 +288,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     ///// true if the memory of the ArrayND is a contiguous block
     //let inline hasContiguousMemory a = layout a |> TensorLayout.hasContiguousMemory
-
-    /// checks that two ArrayNDs have the same shape
-    static member inline internal CheckSameShape (a: #ITensor) (b: #ITensor) =
-        if a.Shape <> b.Shape then
-            raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
-                                           to have same shape" a.Shape b.Shape))
-      
+     
     /// inserts a broadcastable dimension of size one as first dimension
     static member padLeft a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padLeft)
@@ -410,47 +471,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Ensures that the tensor has at least three dimensions.
     /// If not, it is padded with size one dimensions from the left.
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
-
-
-    interface ITensor with
-        member this.Layout = this.Layout
-        member this.DataType = this.DataType
-        member this.Shape = this.Shape
-        member this.NDims = this.NDims
-        member this.NElems = this.NElems
-        member this.Storage = this.Storage :> ITensorStorage
-        member this.Factory = this.Factory
-        member this.CPPType = raise (System.NotImplementedException())
-        member this.Copy (?order) = this.Copy (?order=order) :> ITensor
-        member this.CopyTo(arg1) = raise (System.NotImplementedException())
-        member this.GetSlice(args) = raise (System.NotImplementedException())
-        member this.Item
-            with get (allArgs: obj []): ITensor = 
-                raise (System.NotImplementedException())
-            and set (arg1: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj, arg3: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.Item
-            with set (arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj) (v: ITensor): unit = 
-                raise (System.NotImplementedException())
-        member this.NewOfSameType(arg1) = raise (System.NotImplementedException())
-        member this.NewOfType arg1 arg2 = raise (System.NotImplementedException())
-        member this.Relayout layout = this.Relayout layout :> ITensor
-        member this.SetSlice(args) = raise (System.NotImplementedException())
 
     /// element-wise unary (prefix) plus
     static member (~+) (a: Tensor<'T>) = 
@@ -728,7 +748,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Copies the specifed tensor into this tensor.
     /// Both tensors must have same shape and storage.
     member internal this.CopyFrom (src: Tensor<'T>) =
-        Tensor<_>.CheckSameShape this src
+        Tensor.CheckSameShape this src
         Tensor.CheckSameStorage [this; src]
         this.Backend.Copy (trgt=this, src=src)
 
@@ -765,19 +785,36 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// a view of this tensor with the given .NET range
     member inline internal this.GetRng (rngArgs: obj[]) =
         this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
+    member inline internal this.IGetRng (rngArgs: obj[]) =
+        this.GetRng rngArgs :> ITensor
     member inline internal this.GetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         Array.concat [rngArgs; restArgs] |> this.GetRng
+    member inline internal this.IGetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
+        Array.concat [rngArgs; restArgs] |> this.IGetRng
 
     /// write into the view of this tensor with the given .NET range
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
         Tensor.CheckSameStorage [this; value]
         let trgt = this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
         value |> Tensor<_>.broadcastTo trgt.Shape |> trgt.CopyFrom
+    member inline internal this.ISetRng (rngArgs: obj[]) (value: ITensor) =
+        match value with
+        | :? Tensor<'T> as value -> this.SetRng rngArgs value
+        | _ ->
+            let msg = 
+                sprintf "cannot assign data type %s to tensor of data type %s"
+                        value.DataType.Name this.DataType.Name
+            raise (DataTypeMismatch msg)
     member inline internal this.SetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         let allArgs = Array.concat [rngArgs; restArgs]
         let value = Array.last allArgs :?> Tensor<'T>
         let args = allArgs.[0 .. allArgs.Length-2]
         this.SetRng args value
+    member inline internal this.ISetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
+        let allArgs = Array.concat [rngArgs; restArgs]
+        let value = Array.last allArgs :?> ITensor
+        let args = allArgs.[0 .. allArgs.Length-2]
+        this.ISetRng args value
 
     /// access to a single item using an array of indices
     member this.Item
@@ -1104,61 +1141,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.GetEnumerator() =
             (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
 
-#endif
-
-#if false
-    interface ITensor with
-        member this.Layout = this.Layout
-        member this.CPPType = this.CPPType   
-        member this.Shape = this.Shape
-        member this.NDims = this.NDims
-        member this.NElems = this.NElems      
-        member this.NewView layout = this.NewView layout :> ITensor    
-        member this.NewOfSameType layout = this.NewOfSameType layout :> ITensor
-        member this.NewOfType layout typ = 
-            let gm = this.GetType().GetMethod("NewOfType")
-            let m = gm.MakeGenericMethod [|typ|]
-            m.Invoke(this, [|box layout|]) :?> ITensor
-        member this.DataType = this.DataType
-        member this.Location = this.Location
-        member this.Copy () = 
-            let shp = TensorLayout.shape this.Layout
-            let trgt = this.NewOfSameType (TensorLayout.newC shp)
-            this.CopyTo trgt
-            trgt :> ITensor
-        member this.CopyTo dest = 
-            match dest with
-            | :? Tensor<'T> as dest -> this.CopyTo dest
-            | _ -> failwith "destination must be of same type as source"
-        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            this.GetSlice (allArgs) :> ITensor
-        member this.SetSlice ([<System.ParamArray>] allArgs: obj []) =
-            this.SetSlice (allArgs)
-        member this.Item
-            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs) :> ITensor
-            and set (arg0: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: ITensor) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
-#endif            
-
-#if false
 
 module Tensor = 
 
@@ -1721,8 +1703,88 @@ module Tensor =
 #endif
 
 
-type Tensor = 
+    interface ITensor with
+        member this.Layout = this.Layout
+        member this.Relayout layout = this.Relayout layout :> ITensor
+        member this.Shape = this.Shape
+        member this.NDims = this.NDims
+        member this.NElems = this.NElems
+        member this.DataType = this.DataType
+        member this.Storage = this.Storage :> ITensorStorage
+        member this.Factory = this.Factory
+        member this.Copy (?order) = this.Copy (?order=order) :> ITensor
+        member this.Pretty = this.Pretty
+        member this.Full = this.Full
 
+        member this.Item
+            with get (rng: TensorRng list) = this.IGetRng [|rng|]
+            and set (rng: TensorRng list) (value: ITensor) = this.ISetRng [|rng|] value
+
+        member this.Item
+            with get (i0: int64) = this.IGetRng [|i0|]
+            and set (i0: int64) (value: ITensor) = this.ISetRng [|i0|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option) = this.IGetRng [|i0s; i0f|] 
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, value: ITensor) = this.ISetRng [|i0s; i0f|] value
+
+        member this.Item
+            with get (i0: int64, i1: int64) = this.IGetRng [|i0; i1|]
+            and set (i0: int64, i1: int64) (value: ITensor) = this.ISetRng [|i0; i1|] value
+        member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option) = this.IGetRng [|i0; i1s; i1f|]
+        member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, value: ITensor) = this.ISetRng [|i0; i1s; i1f|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64) = this.IGetRng [|i0s; i0f; i1|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, value: ITensor) = this.ISetRng [|i0s; i0f; i1|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option) = this.IGetRng [|i0s; i0f; i1s; i1f|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, value: ITensor) = this.ISetRng [|i0s; i0f; i1s; i1f|] value
+
+        member this.Item
+            with get (i0: int64, i1: int64, i2: int64) = this.IGetRng [|i0; i1; i2|]
+            and set (i0: int64, i1: int64, i2: int64) (value: ITensor) = this.ISetRng [|i0; i1; i2|] value
+        member this.GetSlice (i0: int64, i1: int64, i2: int64) = this.IGetRng [|i0; i1; i2|]
+        member this.SetSlice (i0: int64, i1: int64, i2: int64, value: ITensor) = this.ISetRng [|i0; i1; i2|] value
+        member this.GetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option) = this.IGetRng [|i0; i1; i2s; i2f|]
+        member this.SetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, value: ITensor) = this.ISetRng [|i0; i1; i2s; i2f|] value
+        member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64) = this.IGetRng [|i0; i1s; i1f; i2|]
+        member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, value: ITensor) = this.ISetRng [|i0; i1s; i1f; i2|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64) = this.IGetRng [|i0s; i0f; i1; i2|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, value: ITensor) = this.ISetRng [|i0s; i0f; i1; i2|] value
+        member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option) = this.IGetRng [|i0; i1s; i1f; i2s; i2f|]
+        member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, value: ITensor) = this.ISetRng [|i0; i1s; i1f; i2s; i2f|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option) = this.IGetRng [|i0s; i0f; i1; i2s; i2f|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, value: ITensor) = this.ISetRng [|i0s; i0f; i1; i2s; i2f|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64) = this.IGetRng [|i0s; i0f; i1s; i1f; i2|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, value: ITensor) = this.ISetRng [|i0s; i0f; i1s; i1f; i2|] value
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option) = this.IGetRng [|i0s; i0f; i1s; i1f; i2s; i2f|]
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, value: ITensor) = this.ISetRng [|i0s; i0f; i1s; i1f; i2s; i2f|] value
+
+        member this.Item
+            with get (o0: obj, o1: obj, o2: obj, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|o0; o1; o2; o3|] r
+            and set (o0: obj, o1: obj, o2: obj, o3: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj, o5: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4; o5|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj, o5: obj, o6: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4; o5; o6|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj, o5: obj, o6: obj, o7: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4; o5; o6; o7|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj, o5: obj, o6: obj, o7: obj, o8: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4; o5; o6; o7; o8|] value
+        member this.Item with set (o0: obj, o1: obj, o2: obj, o3: obj, o4: obj, o5: obj, o6: obj, o7: obj, o8: obj, o9: obj) (value: ITensor) = this.ISetRng [|o0; o1; o2; o3; o4; o5; o6; o7; o8; o9|] value
+        member this.GetSlice (i0: int64, i1: int64, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0; i1; i2; o3|] r
+        member this.SetSlice (i0: int64, i1: int64, i2: int64, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0; i1; i2; o3; o4|] r
+        member this.GetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0; i1; i2s; i2f; o3|] r
+        member this.SetSlice (i0: int64, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0; i1; i2s; i2f; o3; o4|] r
+        member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0; i1s; i1f; i2; o3|] r
+        member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0; i1s; i1f; i2; o3; o4|] r
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1; i2; o3|] r
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2: int64, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1; i2; o3; o4|] r
+        member this.GetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0; i1s; i1f; i2s; i2f; o3|] r
+        member this.SetSlice (i0: int64, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0; i1s; i1f; i2s; i2f; o3; o4|] r
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1; i2s; i2f; o3|] r
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1: int64, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1; i2s; i2f; o3; o4|] r
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2; o3|] r
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2: int64, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2; o3; o4|] r
+        member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
+        member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
+
+
+
+type Tensor = 
 
     /// checks that all tensors have the same storage
     static member internal CheckSameStorage (xs: ITensor list) =
@@ -1732,6 +1794,12 @@ type Tensor =
             raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
                                              but they are %A." storages))
         | _ -> ()            
+
+    /// checks that two ArrayNDs have the same shape
+    static member internal CheckSameShape (a: ITensor) (b: ITensor) =
+        if a.Shape <> b.Shape then
+            raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
+                                           to have same shape" a.Shape b.Shape))
 
     /// prepares an elementwise operation by allocating a target of same size and storage
     static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =

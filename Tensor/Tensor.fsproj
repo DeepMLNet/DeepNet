@@ -39,6 +39,7 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Tensor.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
+    <OtherFlags>--sig:$(OutputPath)\Tensor.fsi</OtherFlags>
   </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
