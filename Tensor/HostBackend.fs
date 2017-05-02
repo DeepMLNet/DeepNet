@@ -22,15 +22,15 @@ type internal DataAndLayout<'T> = {
 }
 
 
-type internal ScalarPrimitives<'T, 'TC> internal () =
+type internal ScalarPrimitives<'T, 'TC> () =
     static let fscAsm = Assembly.GetAssembly(typeof<unit>)
     static let myAsm = Assembly.GetExecutingAssembly()
     static let fso = fscAsm.GetType("Microsoft.FSharp.Core.Operators", true)
     static let tso = myAsm.GetType("ArrayNDNS.Operators", true)
 
-    let a = Expression.Parameter(typeof<'T>, "a")
-    let b = Expression.Parameter(typeof<'T>, "b")
-    let c = Expression.Parameter(typeof<'TC>, "c")
+    static let a = Expression.Parameter(typeof<'T>, "a")
+    static let b = Expression.Parameter(typeof<'T>, "b")
+    static let c = Expression.Parameter(typeof<'TC>, "c")
 
     member val ConvertFunc = 
         Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
@@ -173,21 +173,21 @@ type internal ScalarPrimitives<'T, 'TC> internal () =
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b).Compile()
     member inline this.NotEqual av bv = this.NotEqualFunc.Invoke(av, bv)
 
-    member val LessThanFunc = 
+    member val LessFunc = 
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b).Compile()
-    member inline this.LessThan av bv = this.LessThanFunc.Invoke(av, bv)
+    member inline this.Less av bv = this.LessFunc.Invoke(av, bv)
 
-    member val LessThanOrEqualFunc = 
+    member val LessOrEqualFunc = 
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b).Compile()
-    member inline this.LessThanOrEqual av bv = this.LessThanOrEqualFunc.Invoke(av, bv)
+    member inline this.LessOrEqual av bv = this.LessOrEqualFunc.Invoke(av, bv)
 
-    member val GreaterThanFunc = 
+    member val GreaterFunc = 
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b).Compile()
-    member inline this.GreaterThan av bv = this.GreaterThanFunc.Invoke(av, bv)
+    member inline this.Greater av bv = this.GreaterFunc.Invoke(av, bv)
 
-    member val GreaterThanOrEqualFunc = 
+    member val GreaterOrEqualFunc = 
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b).Compile()
-    member inline this.GreaterThanOrEqual av bv = this.GreaterThanOrEqualFunc.Invoke(av, bv)
+    member inline this.GreaterOrEqual av bv = this.GreaterOrEqualFunc.Invoke(av, bv)
 
 
 
@@ -515,6 +515,10 @@ type internal ScalarOps =
         let inline op pos a = p.Truncate a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
 
+    static member Negate (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =
+        let inline op pos a = not a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
     static member Add (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op pos a b = p.Add a b
@@ -545,8 +549,48 @@ type internal ScalarOps =
         let inline op pos a b = p.Power a b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
+    static member Equal (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Equal a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
-    
+    static member NotEqual (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.NotEqual a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Less (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Less a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member LessOrEqual (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.LessOrEqual a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Greater (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Greater a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member GreaterOrEqual (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.GreaterOrEqual a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member And (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>, src2: DataAndLayout<bool>) =
+        let inline op pos a b = a && b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member Or (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>, src2: DataAndLayout<bool>) =
+        let inline op pos a b = a || b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)    
+
+    static member Xor (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>, src2: DataAndLayout<bool>) =
+        let inline op pos a b = a <> b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)    
+
 
 
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
@@ -556,6 +600,10 @@ type internal CopyDelegate<'T>   = delegate of DataAndLayout<'T> * DataAndLayout
 
 type internal VectorOps() =
     static let MethodDelegates = Dictionary<string * Type list, Delegate> ()
+
+    static let vecTypes = [|typeof<byte>; typeof<sbyte>; typeof<int16>; typeof<uint16>;
+                            typeof<int32>; typeof<uint32>; typeof<int64>; typeof<uint64>;
+                            typeof<nativeint>; typeof<single>; typeof<double>|]
 
     static member private FillImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                                   (value: 'T, trgt: DataAndLayout<'T>) = 
@@ -798,6 +846,8 @@ type internal VectorOps() =
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
         let nd = trgt.FastLayout.NDims
+        let canUseType =
+            vecTypes |> Array.contains typeof<'T>
         let canUseTrgt = 
             trgt.FastLayout.Stride.[nd-1] = 1
         let canUseSrc src = 
@@ -806,7 +856,7 @@ type internal VectorOps() =
                 let str = src.FastLayout.Stride 
                 str.[nd-1] = 1 || str.[nd-1] = 0
             | None -> true
-        canUseTrgt && canUseSrc src1 && canUseSrc src2
+        canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
 
 
 type TensorHostStorage<'T> (data: 'T []) =
@@ -985,6 +1035,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Truncate (trgt, a)
 
+        member this.Negate (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.Negate (trgt, a)
+
         member this.Add (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
@@ -1013,7 +1067,41 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             ScalarOps.Power (trgt, a, b)
 
+        member this.Equal (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Equal (trgt, a, b)
 
+        member this.NotEqual (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.NotEqual (trgt, a, b)
+
+        member this.Less (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Less (trgt, a, b)
+
+        member this.LessOrEqual (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.LessOrEqual (trgt, a, b)
+
+        member this.Greater (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Greater (trgt, a, b)
+
+        member this.GreaterOrEqual (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.GreaterOrEqual (trgt, a, b)
+
+        member this.And (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.And (trgt, a, b)
+
+        member this.Or (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Or (trgt, a, b)
+
+        member this.Xor (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            ScalarOps.Xor (trgt, a, b)
 
 
 and TensorHostStorageFactory () =
@@ -1030,13 +1118,19 @@ module HostTensorTypes =
     let DevHost = TensorHostStorageFactory.Instance
 
 
-type HostTensor () =
+type HostTensor =
 
     static member zeros<'T> (shape: int64 list) : Tensor<'T> =
         Tensor.zeros<'T> (shape, DevHost)
 
     static member ones<'T> (shape: int64 list) : Tensor<'T> =
         Tensor.ones<'T> (shape, DevHost)
+
+    static member falses (shape: int64 list) =
+        Tensor.falses (shape, DevHost)
+
+    static member trues (shape: int64 list) =
+        Tensor.trues (shape, DevHost)
 
 
 

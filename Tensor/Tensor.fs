@@ -1,4 +1,4 @@
-namespace ArrayNDNS
+namespace rec ArrayNDNS
 
 open System.Collections
 open System.Collections.Generic
@@ -69,51 +69,63 @@ and ITensorStorage<'T> =
     //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 and ITensorBackend<'T> =
-    abstract Item:          int64[] -> 'T with get, set
-    abstract FillConst:     value:'T * trgt:Tensor<'T> -> unit
-    abstract Copy:          trgt:Tensor<'T> * src:Tensor<'T> -> unit
-    abstract Convert:       trgt:Tensor<'T> * src:Tensor<'T1> -> unit
-    abstract Fill:          fn:(unit -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
-    abstract FillIndexed:   fn:(int64[] -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
-    abstract Map:           fn:('T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
-                            useThreads:bool -> unit
-    abstract MapIndexed:    fn:(int64[] -> 'T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
-                            useThreads:bool -> unit
-    abstract Map2:          fn:('T1 -> 'T2 -> 'T) * 
-                            trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> * 
-                            useThreads:bool -> unit
-    abstract MapIndexed2:   fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
-                            trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
-                            useThreads:bool -> unit
+    abstract Item:              int64[] -> 'T with get, set
+    abstract FillConst:         value:'T * trgt:Tensor<'T> -> unit
+    abstract Copy:              trgt:Tensor<'T> * src:Tensor<'T> -> unit
+    abstract Convert:           trgt:Tensor<'T> * src:Tensor<'T1> -> unit
+    abstract Fill:              fn:(unit -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
+    abstract FillIndexed:       fn:(int64[] -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
+    abstract Map:               fn:('T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
+                                useThreads:bool -> unit
+    abstract MapIndexed:        fn:(int64[] -> 'T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
+                                useThreads:bool -> unit
+    abstract Map2:              fn:('T1 -> 'T2 -> 'T) * 
+                                trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> * 
+                                useThreads:bool -> unit
+    abstract MapIndexed2:       fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
+                                trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
+                                useThreads:bool -> unit
 
-    abstract UnaryPlus:     trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract UnaryMinus:    trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Abs:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sgn:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Log:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Log10:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Exp:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sin:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Cos:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Tan:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Asin:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Acos:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Atan:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sinh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Cosh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Tanh:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sqrt:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Ceiling:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Floor:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Round:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Truncate:      trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract UnaryPlus:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract UnaryMinus:        trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Abs:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sgn:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Log:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Log10:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Exp:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sin:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Cos:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Tan:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Asin:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Acos:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Atan:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sinh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Cosh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Tanh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Sqrt:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Ceiling:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Floor:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Round:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract Truncate:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
 
-    abstract Add:           trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Subtract:      trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Multiply:      trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Divide:        trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Modulo:        trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Power:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Add:               trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Subtract:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Multiply:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Divide:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Modulo:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Power:             trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+
+    abstract Equal:             trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract NotEqual:          trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Less:              trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract LessOrEqual:       trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract Greater:           trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract GreaterOrEqual:    trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+
+    abstract Negate:            trgt:Tensor<bool> * src1:Tensor<bool> -> unit
+    abstract And:               trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
+    abstract Or:                trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
+    abstract Xor:               trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
 
 
 and ITensorStorageFactory =
@@ -400,38 +412,6 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
 
 
-    /// checks that all tensors have the same storage
-    static member internal CheckSameStorage (xs: ITensor list) =
-        match xs with
-        | x::rs when rs |> List.exists (fun r -> x.Storage.Id <> r.Storage.Id) ->
-            let storages = xs |> List.map (fun x -> x.Storage.Id)
-            raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
-                                             but they are %A." storages))
-        | _ -> ()            
-
-    /// prepares an elementwise operation by allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>, ?order) =
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
-        trgt, a
-
-    /// prepares an elementwise operation by broadcasting both tensors to the same size
-    /// and allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, ?order) =
-        Tensor<_>.CheckSameStorage [a; b]
-        let a, b = Tensor<_>.broadcastToSame (a, b)
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
-        trgt, a, b
-
-    /// prepares an elementwise operation by broadcasting all three tensors to the same size
-    /// and allocating a target of same size and storage
-    static member internal PrepareElemwise (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>, ?order) =
-        Tensor<_>.CheckSameStorage [a; b; c]
-        let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
-        let trgt = Tensor<_> (a.Shape, a.Storage.Factory, ?order=order)
-        trgt, a, b, c
-
-
-
     interface ITensor with
         member this.Layout = this.Layout
         member this.DataType = this.DataType
@@ -474,211 +454,255 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise unary (prefix) plus
     static member (~+) (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.UnaryPlus (trgt=trgt, src1=a)
         trgt
 
     /// element-wise unary (prefix) minus
     static member (~-) (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.UnaryMinus (trgt=trgt, src1=a)
         trgt
 
     /// element-wise absolute value
     static member Abs (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Abs (trgt=trgt, src1=a)
         trgt
 
     /// element-wise sign (keeping type)
     static member Sgn (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Sgn (trgt=trgt, src1=a)
         trgt
 
     /// element-wise logarithm to base e
     static member Log (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Log (trgt=trgt, src1=a)
         trgt
 
     /// element-wise logarithm to base 10
     static member Log10 (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Log10 (trgt=trgt, src1=a)
         trgt
 
     /// element-wise exponential function
     static member Exp (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Exp (trgt=trgt, src1=a)
         trgt
 
     /// element-wise sinus function
     static member Sin (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Sin (trgt=trgt, src1=a)
         trgt
 
     /// element-wise cosinus function
     static member Cos (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Cos (trgt=trgt, src1=a)
         trgt
 
     /// element-wise tangens function
     static member Tan (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Tan (trgt=trgt, src1=a)
         trgt
 
     /// element-wise arcus sinus function
     static member Asin (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Asin (trgt=trgt, src1=a)
         trgt
 
     /// element-wise arcus cosinus function
     static member Acos (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Acos (trgt=trgt, src1=a)
         trgt
 
     /// element-wise arcus tangens function
     static member Atan (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Atan (trgt=trgt, src1=a)
         trgt
 
     /// element-wise sinus hyperbolicus function
     static member Sinh (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Sinh (trgt=trgt, src1=a)
         trgt
 
     /// element-wise cosinus hyperbolicus function
     static member Cosh (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Cosh (trgt=trgt, src1=a)
         trgt
 
     /// element-wise tangens hyperbolicus function
     static member Tanh (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Tanh (trgt=trgt, src1=a)
         trgt
 
     /// element-wise square root 
     static member Sqrt (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Sqrt (trgt=trgt, src1=a)
         trgt
 
     /// element-wise ceiling
     static member Ceiling (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Ceiling(trgt=trgt, src1=a)
         trgt
 
     /// element-wise ceiling
     static member Floor (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Floor(trgt=trgt, src1=a)
         trgt
 
     /// element-wise rounding
     static member Round (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Round(trgt=trgt, src1=a)
         trgt
 
     /// element-wise truncate
     static member Truncate (a: Tensor<'T>) = 
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Truncate(trgt=trgt, src1=a)
         trgt
 
-    // element-wise unary logic
-    //static member (~~~~)    (a: #Tensor<bool>) = map not a
-
+    /// element-wise logical negation
+    static member (~~~~) (a: Tensor<bool>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.Backend.Negate(trgt=trgt, src1=a)
+        trgt
+   
     /// element-wise addition of two tensors
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
         trgt
-    static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor<_>.ScalarLike(b, a)
-    static member (+) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) + b
+    static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor.ScalarLike(b, a)
+    static member (+) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) + b
 
     /// element-wise subtraction of two tensors
     static member (-) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
         trgt
-    static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor<_>.ScalarLike(b, a)
-    static member (-) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) - b
+    static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor.ScalarLike(b, a)
+    static member (-) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) - b
 
     /// element-wise multiplication of two tensor
     static member (*) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
         trgt
-    static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor<_>.ScalarLike(b, a)
-    static member (*) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) * b
+    static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor.ScalarLike(b, a)
+    static member (*) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) * b
 
     /// element-wise division of two tensors
     static member (/) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
         trgt
-    static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor<_>.ScalarLike(b, a)
-    static member (/) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) / b
+    static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor.ScalarLike(b, a)
+    static member (/) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) / b
 
     /// element-wise modulo of two tensors
     static member (%) (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
         trgt
-    static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor<_>.ScalarLike(b, a)
-    static member (%) (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) % b
+    static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor.ScalarLike(b, a)
+    static member (%) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) % b
 
-    /// element-wise power of two tensor
+    /// element-wise power of two tensors
     static member Pow (a: Tensor<'T>, b: Tensor<'T>) = 
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
         trgt
-    static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor<_>.ScalarLike(b, a)
-    static member Pow (a: 'T, b: Tensor<'T>) = Tensor<_>.ScalarLike(a, b) ** b
+    static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor.ScalarLike(b, a)
+    static member Pow (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) ** b
 
-    //// element-wise binary logic
-    //static member (&&&&) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (&&) a b
-    //static member (||||) (a: #Tensor<bool>, b: #Tensor<bool>) = map2 (||) a b
+    /// element-wise logical "and"
+    static member (&&&&) (a: Tensor<bool>, b: Tensor<bool>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.Backend.And (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (&&&&) (a: Tensor<bool>, b: bool) = a &&&& Tensor.ScalarLike(b, a)
+    static member (&&&&) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) &&&& b
+    
+    /// element-wise logical "or"
+    static member (||||) (a: Tensor<bool>, b: Tensor<bool>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.Backend.Or (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (||||) (a: Tensor<bool>, b: bool) = a |||| Tensor.ScalarLike(b, a)
+    static member (||||) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) |||| b
 
-    //// element-wise binary comparison
-    //static member (====) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a b
-    //static member (<<<<) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a b
-    //static member (<<==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) a b
-    //static member (>>>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a b
-    //static member (>>==) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a b
-    //static member (<<>>) (a: #Tensor<'T>, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a b
+    /// element-wise logical "xor"
+    static member (^^^^) (a: Tensor<bool>, b: Tensor<bool>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.Backend.Xor (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (^^^^) (a: Tensor<bool>, b: bool) = a ^^^^ Tensor.ScalarLike(b, a)
+    static member (^^^^) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) ^^^^ b
 
-    //// element-wise binary with scalars  
-    //static member inline (&&&&) (a: #Tensor<bool>, b: bool) = a &&&& (scalarOfSameType a b)
-    //static member inline (||||) (a: #Tensor<bool>, b: bool) = a |||| (scalarOfSameType a b)
-    //static member (====) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) a (scalarOfSameType a b)   
-    //static member (<<<<) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) a (scalarOfSameType a b)   
-    //static member (<<==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=)  a (scalarOfSameType a b)    
-    //static member (>>>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) a (scalarOfSameType a b)   
-    //static member (>>==) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) a (scalarOfSameType a b)   
-    //static member (<<>>) (a: #Tensor<'T>, b: 'T) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) a (scalarOfSameType a b)   
+    /// element-wise equal
+    static member (====) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.Equal (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (====) (a: Tensor<'T>, b: 'T) = a ==== Tensor.ScalarLike(b, a)
+    static member (====) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) ==== b
 
-    //static member inline (&&&&) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) &&&& b
-    //static member inline (||||) (a: bool, b: #Tensor<bool>) = (scalarOfSameType b a) |||| b
-    //static member (====) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (=) (=) (=) (=) (=) (=) (scalarOfSameType b a) b
-    //static member (<<<<) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<) (<) (<) (<) (<) (<) (scalarOfSameType b a) b
-    //static member (<<==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<=) (<=) (<=) (<=) (<=) (<=) (scalarOfSameType b a) b
-    //static member (>>>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>) (>) (>) (>) (>) (>) (scalarOfSameType b a) b
-    //static member (>>==) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (>=) (>=) (>=) (>=) (>=) (>=) (scalarOfSameType b a) b
-    //static member (<<>>) (a: 'T, b: #Tensor<'T>) = typedMap2TypeChange (<>) (<>) (<>) (<>) (<>) (<>) (scalarOfSameType b a) b
+    /// element-wise not equal
+    static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.NotEqual (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (<<>>) (a: Tensor<'T>, b: 'T) = a <<>> Tensor.ScalarLike(b, a)
+    static member (<<>>) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<>> b
+
+    /// element-wise less than
+    static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.Less (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (<<<<) (a: Tensor<'T>, b: 'T) = a <<<< Tensor.ScalarLike(b, a)
+    static member (<<<<) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<<< b
+
+    /// element-wise less than or equal to
+    static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.LessOrEqual (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (<<==) (a: Tensor<'T>, b: 'T) = a <<== Tensor.ScalarLike(b, a)
+    static member (<<==) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<== b
+
+    /// element-wise greater than
+    static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.Greater (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (>>>>) (a: Tensor<'T>, b: 'T) = a >>>> Tensor.ScalarLike(b, a)
+    static member (>>>>) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) >>>> b
+
+    /// element-wise greater than or equal to
+    static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        a.Backend.GreaterOrEqual (trgt=trgt, src1=a, src2=b)
+        trgt
+    static member (>>==) (a: Tensor<'T>, b: 'T) = a >>== Tensor.ScalarLike(b, a)
+    static member (>>==) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) >>== b
 
     ///// dot product
     //static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
@@ -693,7 +717,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// returns a copy of the tensor
     member this.Copy (?order) =
-        let trgt, src = Tensor<_>.PrepareElemwise (this)
+        let trgt, src = Tensor.PrepareElemwise (this)
         trgt.Backend.Copy (trgt=trgt, src=src)
         trgt      
         
@@ -705,36 +729,36 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Both tensors must have same shape and storage.
     member internal this.CopyFrom (src: Tensor<'T>) =
         Tensor<_>.CheckSameShape this src
-        Tensor<_>.CheckSameStorage [this; src]
+        Tensor.CheckSameStorage [this; src]
         this.Backend.Copy (trgt=this, src=src)
 
     /// maps all elements using the specified function into a new tensor
     static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
         trgt       
 
     /// maps all elements using the specified indexed function into a new tensor
     static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
         trgt     
 
     /// maps all elements using the specified function into a new tensor
     static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
         trgt       
 
     /// maps all elements using the specified indexed function into a new tensor
     static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
         trgt       
 
     /// converts all elements to the specified type
     static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
-        let trgt, a = Tensor<_>.PrepareElemwise (a)
+        let trgt, a = Tensor.PrepareElemwise (a)
         trgt.Backend.Convert (trgt=trgt, src=a)
         trgt    
 
@@ -746,7 +770,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// write into the view of this tensor with the given .NET range
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
-        Tensor<_>.CheckSameStorage [this; value]
+        Tensor.CheckSameStorage [this; value]
         let trgt = this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
         value |> Tensor<_>.broadcastTo trgt.Shape |> trgt.CopyFrom
     member inline internal this.SetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
@@ -943,37 +967,7 @@ and [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
                             trgt.Shape
                 raise (SeqTooShort msg))
 
-    /// Creates a new tensor of given shape filled with zeros.
-    static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) =
-        let x = Tensor<'T> (shape, dev)
-        if not dev.Zeroed then 
-            x |> Tensor<_>.fillConst Tensor<'T>.Zero
-        x
-   
-    /// Tensor of same shape as specifed tensor and filled with zeros.
-    static member zerosLike (tmpl: Tensor<'T>) =
-        Tensor<_>.zeros<'T> (tmpl.Shape, tmpl.Storage.Factory)
 
-    /// Creates a new tensor of given shape filled with ones.
-    static member ones<'T> (shape: int64 list, dev: ITensorStorageFactory) =
-        let x = Tensor<'T> (shape, dev)
-        x |> Tensor<_>.fillConst Tensor<'T>.One
-        x
-        
-    /// Tensor of same shape as specifed tensor and filled with ones.
-    static member onesLike (tmpl: Tensor<'T>) =
-        Tensor<_>.ones<'T> (tmpl.Shape, tmpl.Storage.Factory)
-
-    /// Creates a new tensor of scalar shape with the given value and storage.
-    static member scalar<'T> (value: 'T, dev: ITensorStorageFactory) =
-        let x = Tensor<'T> ([], dev)
-        x.Value <- value
-        x
-
-    /// Creates a new tensor of scalar shape with the given value and 
-    /// same storage as the specified tensor.
-    static member internal ScalarLike<'T> (value: 'T, tmpl: ITensor) =
-        Tensor<_>.scalar<'T> (value, tmpl.Storage.Factory)
                    
 
 
@@ -1727,7 +1721,87 @@ module Tensor =
 #endif
 
 
+type Tensor = 
+
+
+    /// checks that all tensors have the same storage
+    static member internal CheckSameStorage (xs: ITensor list) =
+        match xs with
+        | x::rs when rs |> List.exists (fun r -> x.Storage.Id <> r.Storage.Id) ->
+            let storages = xs |> List.map (fun x -> x.Storage.Id)
+            raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
+                                             but they are %A." storages))
+        | _ -> ()            
+
+    /// prepares an elementwise operation by allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        trgt, a
+
+    /// prepares an elementwise operation by broadcasting both tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA, 'TB> (a: Tensor<'TA>, b: Tensor<'TB>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB>) =
+        Tensor.CheckSameStorage [a; b]
+        let a, b = Tensor<_>.broadcastToSame (a, b)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        trgt, a, b
+
+    /// prepares an elementwise operation by broadcasting all three tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA, 'TB, 'TC> (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
+        Tensor.CheckSameStorage [a; b; c]
+        let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        trgt, a, b, c
+
+    /// Creates a new tensor of given shape filled with zeros.
+    static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
+        let x = Tensor<'T> (shape, dev)
+        if not dev.Zeroed then 
+            x |> Tensor<_>.fillConst Tensor<'T>.Zero
+        x
+   
+    /// Tensor of same shape as specifed tensor and filled with zeros.
+    static member zerosLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
+        Tensor.zeros<'T> (tmpl.Shape, tmpl.Storage.Factory)
+
+    /// Creates a new tensor of given shape filled with ones.
+    static member ones<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
+        let x = Tensor<'T> (shape, dev)
+        x |> Tensor<_>.fillConst Tensor<'T>.One
+        x
+        
+    /// Tensor of same shape as specifed tensor and filled with ones.
+    static member onesLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
+        Tensor.ones<'T> (tmpl.Shape, tmpl.Storage.Factory)
+
+    /// Creates a new boolean tensor of given shape filled with false.
+    static member falses (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
+        let x = Tensor<bool> (shape, dev)
+        x |> Tensor<_>.fillConst false
+        x
+
+    /// Creates a new boolean tensor of given shape filled with true.
+    static member trues (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
+        let x = Tensor<bool> (shape, dev)
+        x |> Tensor<_>.fillConst true
+        x   
+
+    /// Creates a new tensor of scalar shape with the given value and storage.
+    static member scalar<'T> (value: 'T, dev: ITensorStorageFactory) : Tensor<'T> =
+        let x = Tensor<'T> ([], dev)
+        x.Value <- value
+        x
+
+    /// Creates a new tensor of scalar shape with the given value and 
+    /// same storage as the specified tensor.
+    static member internal ScalarLike<'T> (value: 'T, tmpl: ITensor) : Tensor<'T> =
+        Tensor.scalar<'T> (value, tmpl.Storage.Factory)
+
+
 module Tensor =
+
+    /// multi-threaded tensor operations
     module Parallel = 
 
         /// Fills the tensor with the values returned by the function.
@@ -1740,24 +1814,24 @@ module Tensor =
 
         /// maps all elements using the specified function into a new tensor
         let map (fn: 'T -> 'R) (a: Tensor<'T>) =
-            let trgt, a = Tensor<_>.PrepareElemwise (a)
+            let trgt, a = Tensor.PrepareElemwise (a)
             trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=true)
             trgt       
 
         /// maps all elements using the specified indexed function into a new tensor
         let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
-            let trgt, a = Tensor<_>.PrepareElemwise (a)
+            let trgt, a = Tensor.PrepareElemwise (a)
             trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=true)
             trgt     
 
         /// maps all elements using the specified function into a new tensor
         let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-            let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+            let trgt, a, b = Tensor.PrepareElemwise (a, b)
             trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
             trgt       
 
         /// maps all elements using the specified indexed function into a new tensor
         let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-            let trgt, a, b = Tensor<_>.PrepareElemwise (a, b)
+            let trgt, a, b = Tensor.PrepareElemwise (a, b)
             trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
             trgt       
