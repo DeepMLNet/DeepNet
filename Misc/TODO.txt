@@ -56,17 +56,11 @@ What to do with Tensor module?
   - perhaps generalize the seq thingy
 
 
-  - how to perform tensor creation?
-  - 
+  - what about reduction operations?
+  - what would be the host implementation for them?
+  - axisFold and fold would be useful
+  - we could parallelize, but using a parallel loop
+  - but this could be problematic when the op is non-comutative
 
-  - reenable the reshape operations
-  - reenable automatic broadcasting
-
-  - we need a function that performs axis swapping and reshaping beforehand
-  - and broadcastig
-
-  - what to do about map and map2?
-  - as long as backend is host, these functions make sense
-  - if backend is GPU, then they are problematic currently without then ElemExpr compiler
-
+  
 

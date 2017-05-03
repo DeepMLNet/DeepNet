@@ -154,6 +154,10 @@ type ITensorBackend<'T> =
     abstract MapIndexed2:       fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
                                 trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
                                 useThreads:bool -> unit
+    abstract FoldLastAxis:      fn:('T -> 'T1 -> 'T) * initial:'T *
+                                trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
+    abstract FoldLastAxisIndexed: fn:(int64[] -> 'T -> 'T1 -> 'T) * initial:'T *
+                                trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
 
     abstract UnaryPlus:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract UnaryMinus:        trgt:Tensor<'T> * src1:Tensor<'T> -> unit
@@ -203,6 +207,16 @@ type ITensorBackend<'T> =
     
     abstract Gather:            trgt:Tensor<'T> * srcIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
     abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
+
+    abstract SumLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract ProductLastAxis:   trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract MinLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract MaxLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract AllLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
+    abstract AnyLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
+
+    abstract ArgMinLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
+    abstract ArgMaxLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
 
 
 type ITensorStorageFactory =
@@ -430,7 +444,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         | None ->
             a |> Tensor<_>.copy |> Tensor<_>.reshapedView shp
 
-    /// Flattens the tensor into a vector assuming a row-major order.
+    /// Flattens the tensor into a (one-dimensional) vector.
     static member flatten a =
         Tensor<_>.reshape [Remainder] a
 
@@ -505,13 +519,31 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
                          the specified tensor is %s" this.DataType.Name
             raise (DataTypeMismatch msg)
 
+    /// this tensor as Tensor<int64>
+    member internal this.AsInt64 : Tensor<int64> =
+        if this.DataType = typeof<int64> then
+            this |> box :?> Tensor<int64>
+        else
+            let msg =
+                sprintf "the operation requires a Tensor<int64> but the data type of
+                         the specified tensor is %s" this.DataType.Name
+            raise (DataTypeMismatch msg)
+
     /// Fills the tensor with the values returned by the function.
     member trgt.Fill (fn: unit -> 'T)  =
         trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=false)
 
+    /// Fills the tensor with the values returned by the function using multiple threads.
+    member trgt.FillParallel (fn: unit -> 'T)  =
+        trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=true)
+
     /// Fills the tensor with the values returned by the function.
     member trgt.FillIndexed (fn: int64[] -> 'T) =
         trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=false)
+
+    /// Fills the tensor with the values returned by the function using multiple threads.
+    member trgt.FillParallelIndexed (fn: int64[] -> 'T) =
+        trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=true)
 
     /// Copy source tensor into this tensor.
     /// The source tensor is broadcasted to the size of this tensor, if possible.
@@ -539,6 +571,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let a = Tensor.PrepareSources (trgt, a)
         trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
 
+    /// maps all elements using the specified function into this tensor using multiple threads
+    member trgt.FillParallelMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
+        let a = Tensor.PrepareSources (trgt, a)
+        trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
+
     /// maps all elements using the specified function into a new tensor
     static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
         let trgt, a = Tensor.PrepareElemwise (a)
@@ -549,6 +586,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     member trgt.FillMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareSources (trgt, a)
         trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
+
+    /// maps all elements using the specified indexed function into this tensor using multiple threads
+    member trgt.FillParallelMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
+        let a = Tensor.PrepareSources (trgt, a)
+        trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=true)
 
     /// maps all elements using the specified indexed function into a new tensor
     static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
@@ -561,6 +603,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let a, b = Tensor.PrepareSources (trgt, a, b)
         trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
 
+    /// maps all elements using the specified function into this tensor using multiple threads
+    member trgt.FillParallelMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
+
     /// maps all elements using the specified function into a new tensor
     static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
@@ -571,6 +618,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     member trgt.FillMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
         let a, b = Tensor.PrepareSources (trgt, a, b)
         trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
+
+    /// maps all elements using the specified indexed function into this tensor using multiple threads
+    member trgt.FillParallelMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
 
     /// maps all elements using the specified indexed function into a new tensor
     static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
@@ -821,13 +873,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt
 
     /// element-wise check if elements are finite (not -Inf, Inf or NaN) using this tensor as target
-    member trgt.FillIsFinite (a: Tensor<'T>) = 
+    member trgt.FillIsFinite (a: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a = Tensor.PrepareSources (trgt, a)
         a.Backend.IsFinite (trgt=trgt, src1=a)
 
     /// element-wise check if elements are finite (not -Inf, Inf or NaN)
-    static member isFinite (a: Tensor<'T>) = 
+    static member isFinite (a: Tensor<'T>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillIsFinite (a)
         trgt
@@ -1148,6 +1200,138 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillScatter indices src
         trgt
 
+    /// folds the function over the given axis, using this tensor as target
+    member trgt.FillFoldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+        let a = Tensor.PrepareAxisReduceSources (trgt, axis, a)
+        trgt.Backend.FoldLastAxis (fn=fn, initial=initial, trgt=trgt, src=a, useThreads=false)        
+
+    /// folds the function over the given axis, using this tensor as target and multiple threads
+    member trgt.FillParallelFoldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+        let a = Tensor.PrepareAxisReduceSources (trgt, axis, a)
+        trgt.Backend.FoldLastAxis (fn=fn, initial=initial, trgt=trgt, src=a, useThreads=true) 
+
+    /// folds the function over the given axis
+    static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+        let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
+        trgt.FillFoldAxis fn initial axis a
+        trgt
+
+    /// sum over given axis using this tensor as target
+    member trgt.FillSumAxis (ax: int) (src: Tensor<'T>) =
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.SumLastAxis (trgt=trgt, src1=src)
+
+    /// sum over given axis
+    static member sumAxis (ax: int) (src: Tensor<'T>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillSumAxis ax src
+        trgt
+
+    /// sum of all elements
+    static member sum (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.sumAxis 0
+
+    /// product over given axis using this tensor as target
+    member trgt.FillProductAxis (ax: int) (src: Tensor<'T>) =
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.ProductLastAxis (trgt=trgt, src1=src)
+
+    /// product over given axis
+    static member productAxis (ax: int) (src: Tensor<'T>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillProductAxis ax src
+        trgt
+
+    /// product of all elements
+    static member product (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.productAxis 0
+
+    /// minimum value over given axis using this tensor as target
+    member trgt.FillMinAxis (ax: int) (src: Tensor<'T>) =
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.MinLastAxis (trgt=trgt, src1=src)
+
+    /// minimum value over given axis
+    static member minAxis (ax: int) (src: Tensor<'T>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillMinAxis ax src
+        trgt
+
+    /// minimum of all elements
+    static member min (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.minAxis 0
+
+    /// maximum value over given axis using this tensor as target
+    member trgt.FillMaxAxis (ax: int) (src: Tensor<'T>) =
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.MaxLastAxis (trgt=trgt, src1=src)
+
+    /// maximum value over given axis
+    static member maxAxis (ax: int) (src: Tensor<'T>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillMaxAxis ax src
+        trgt
+
+    /// maximum of all elements
+    static member max (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
+
+    /// positions of minimum values along given axis using this tensor as target
+    member trgt.FillArgMinAxis (ax: int) (src: Tensor<'R>) =
+        let trgt = trgt.AsInt64
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        src.Backend.ArgMinLastAxis (trgt=trgt, src1=src)
+
+    /// positions of minimum values along given axis 
+    static member argMinAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillArgMinAxis ax src
+        trgt
+
+    /// positions of maximum values along given axis using this tensor as target
+    member trgt.FillArgMaxAxis (ax: int) (src: Tensor<'R>) =
+        let trgt = trgt.AsInt64
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        src.Backend.ArgMaxLastAxis (trgt=trgt, src1=src)
+
+    /// positions of maximum values along given axis 
+    static member argMaxAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillArgMaxAxis ax src
+        trgt
+
+    /// false if there is at least one false element in given axis, using this tensor as target
+    member trgt.FillAllAxis (ax: int) (src: Tensor<bool>) =
+        let trgt = trgt.AsBool
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.AllLastAxis (trgt=trgt, src1=src)
+
+    /// false if there is at least one false element in given axis, otherwise true
+    static member allAxis (ax: int) (src: Tensor<bool>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillMaxAxis ax src
+        trgt
+
+    /// false if there is at least one false element in the tensor, otherwise true
+    static member all (src: Tensor<bool>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.allAxis 0
+
+    /// true if there is at least one true element in given axis, using this tensor as target
+    member trgt.FillAnyAxis (ax: int) (src: Tensor<bool>) =
+        let trgt = trgt.AsBool
+        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        trgt.Backend.AnyLastAxis (trgt=trgt, src1=src)
+
+    /// true if there is at least one true element in given axis, otherwise false
+    static member anyAxis (ax: int) (src: Tensor<bool>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillAnyAxis ax src
+        trgt
+
+    /// true if there is at least one true element in the tensor, otherwise false
+    static member any (src: Tensor<bool>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0
+
     ///// dot product
     //static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
 
@@ -1369,108 +1553,12 @@ module Tensor =
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
-    ////////////////////////////////////////////////////////////////////////////////////////////////         
-     
-    /// applies the given reduction function over the given dimension
-    let inline axisReduceTypeChange (f: Tensor<'T> -> Tensor<'R>) dim (a: Tensor<'T>) : Tensor<'R> =
-        checkAxis dim a
-        let c = newCOfType (shape a |> List.without dim) a
-        for srcRng, dstIdx in TensorLayout.allSrcRngsAndTrgtIdxsForAxisReduce dim (layout a) do
-            set dstIdx (f (view srcRng a) |> get []) c
-        c
+    ////////////////////////////////////////////////////////////////////////////////////////////////             
 
-    /// applies the given reduction function over the given dimension
-    let inline axisReduce (f: Tensor<'T> -> Tensor<'T>) dim (a: 'A when 'A :> Tensor<'T>) : 'A =
-        axisReduceTypeChange f dim a :?> 'A
-
-    let inline private sumImpl (a: Tensor<'T>) =
-        allElems a 
-        |> Seq.fold (+) Tensor<'T>.Zero         
-        |> scalarOfSameType a 
-
-    /// element-wise sum
-    let sum (a: #Tensor<'T>) =
-        typedApply (unsp) sumImpl sumImpl sumImpl sumImpl sumImpl a 
-
-    /// element-wise sum over given axis
-    let sumAxis dim a = 
-        axisReduce sum dim a
-
-    /// mean 
-    let mean (a: 'A when 'A :> Tensor<'T>) : 'A =
-        let a = a :> Tensor<'T>
-        sum a / scalarOfSameType a (conv<'T> (nElems a)) :?> 'A
-
-    /// mean over given axis
-    let meanAxis dim a = 
-        axisReduce mean dim a
-
-    /// standard deviation (maximum likelihood estimate for normally distributed variables)
-    let std (a: 'A when 'A :> Tensor<'T>) : 'A =
-        let a = a :> Tensor<'T>
-        let v = a - mean a
-        v * v |> mean |> sqrt :?> 'A
-
-    /// standard deviation (maximum likelihood estimate for normally distributed variables) over given axis
-    let stdAxis dim (a: 'A when 'A :> Tensor<'T>) : 'A =
-        let a = a :> Tensor<'T>
-        let means = a |> meanAxis dim |> insertAxis dim
-        let v = a - means 
-        v * v |> meanAxis dim |> sqrt :?> 'A
-    
-    /// tensor, matrix or vector norm of given order
-    let ordNorm (ord: 'T) (a: 'A when 'A :> Tensor<'T>) : 'A =
-        let ord = scalarOfType a ord
-        let a = a :> Tensor<'T>
-        let s = a ** ord |> sum
-        s ** (onesLike ord / ord) :?> 'A
-
-    /// tensor, matrix or vector norm of given order over given axis
-    let ordNormAxis dim (ord: 'T) (a: 'A when 'A :> Tensor<'T>) : 'A =
-        let ord = scalarOfType a ord
-        let a = a :> Tensor<'T>
-        let s = a ** ord |> sumAxis dim
-        s ** (onesLike ord / ord) :?> 'A
-
-    /// L2-norm of tensor, matrix or vector
-    let norm (a: 'A when 'A :> Tensor<'T>) : 'A =
-        ordNorm (conv<'T> 2) a
-
-    /// L2-norm of tensor, matrix or vector over given axis
-    let normAxis dim (a: 'A when 'A :> Tensor<'T>) : 'A =
-        ordNormAxis dim (conv<'T> 2) a
-
-    let inline private productImpl (a: Tensor<'T>) =
-        allElems a 
-        |> Seq.fold (*) Tensor<'T>.One
-        |> scalarOfSameType a 
-
-    /// element-wise product
-    let product (a: #Tensor<'T>) =
-        typedApply (unsp) productImpl productImpl productImpl productImpl productImpl a 
-
-    /// element-wise product over given axis
-    let productAxis dim a = 
-        axisReduce product dim a
-
-    let inline private maxImpl a =
-        allElems a 
-        |> Seq.reduce max
-        |> scalarOfSameType a 
-
-    /// maximum value
-    let max a =
-        if nElems a = 0L then invalidArg "a" "cannot compute max of empty ArrayNDT"
-        typedApply (unsp) maxImpl maxImpl maxImpl maxImpl maxImpl a
-    
     /// position of maximum value
     let argMax a =
         allIdx a
         |> Seq.maxBy (fun idx -> a |> get idx)
-
-    /// maximum value over given axis
-    let maxAxis dim a = 
-        axisReduce max dim a
 
     let inline private argMaxAxisReduc (a: Tensor<'T>) =
         allIdx a
@@ -1483,24 +1571,10 @@ module Tensor =
         let f a = axisReduceTypeChange argMaxAxisReduc dim a
         typedApplyTypeChange f f f f f f a
 
-    let inline private minImpl a =
-        allElems a 
-        |> Seq.reduce min
-        |> scalarOfSameType a 
-
-    /// minimum value
-    let min a =
-        if nElems a = 0L then invalidArg "a" "cannot compute min of empty ArrayNDT"
-        typedApply (unsp) minImpl minImpl minImpl minImpl minImpl a
-
     /// position of maximum value
     let argMin a =
         allIdx a
         |> Seq.minBy (fun idx -> a |> get idx)
-
-    /// minimum value over given axis
-    let minAxis dim a = 
-        axisReduce min dim a
 
     let inline private argMinAxisReduc (a: Tensor<'T>) =
         allIdx a
@@ -1513,46 +1587,11 @@ module Tensor =
         let f a = axisReduceTypeChange argMinAxisReduc dim a
         typedApplyTypeChange f f f f f f a
 
-    /// true if all elements of the array are true
-    let all a =
-        let value = allElems a |> Seq.fold (&&) true
-        scalarOfSameType a value
 
-    /// true if all elements over given axis are true
-    let allAxis dim a =
-        axisReduce all dim a
-
-    /// true if any element of the array is true
-    let any a =
-        let value = allElems a |> Seq.fold (||) false
-        scalarOfSameType a value
-
-    /// true if any element over given axis are true
-    let anyAxis dim a =
-        axisReduce any dim a
      
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // tensor operations
     ////////////////////////////////////////////////////////////////////////////////////////////////         
-
-    /// Returns true if two arrays have same (within specified precision) values in all elements.
-    /// If arrays have different shape, then false is returned.
-    let inline almostEqualWithTol (aTol: 'T) (rTol: 'T) (a: Tensor<'T>) (b: Tensor<'T>) =
-        if a.Shape = b.Shape then
-            isCloseWithTol aTol rTol a b |> all
-        else 
-            let res = newCOfType [] a
-            set [] false res
-            res
-
-    /// Returns true if two arrays have same (within machine precision) values in all elements.
-    /// If arrays have different shape, then false is returned.
-    let inline almostEqual (a: Tensor<'T>) (b: Tensor<'T>) =
-        almostEqualWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
-
-    /// Returns true if all values in the tensor are finite (not NaN and not infinite).
-    let inline allFinite (a: Tensor<'T>) =
-        a |> isFinite |> all
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: Tensor<'T>) (b: Tensor<'T>) =
@@ -1950,6 +1989,31 @@ type Tensor =
         let c = c |> Tensor<_>.broadcastTo trgt.Shape
         a, b, c
 
+    /// Prepares the sources of an axis reduce operation (e.g. sum over axis),
+    /// by moving the reduction axis to be the last axis in the source.
+    static member internal PrepareAxisReduceSources<'TR, 'TA> (trgt: Tensor<'TR>, axis: int, a: Tensor<'TA>) : Tensor<'TA> =
+        Tensor.CheckSameStorage [trgt; a]
+        a.CheckAxis axis
+        let redShp = a.Shape |> List.without axis
+        if trgt.Shape <> redShp then
+            raise (ShapeMismatch (sprintf "Reduction of tensor %A along axis %d gives shape %A but
+                                           target has shape %A" a.Shape axis redShp trgt.Shape))
+        let axisToLast = [
+            for d in 0 .. axis-1 do yield d
+            yield a.NDims-1
+            for d in axis+1 .. a.NDims-1 do yield d-1
+        ]
+        let a = a |> Tensor<_>.permuteAxes axisToLast
+        assert (trgt.Shape = a.Shape.[0 .. a.NDims-2])
+        a
+
+    /// prepares an axis reduce operation by allocating a target of appropriate size and storage
+    static member internal PrepareAxisReduceTarget<'TR, 'TA> (axis: int, a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
+        a.CheckAxis axis
+        let redShp = a.Shape |> List.without axis        
+        let trgt = Tensor<'TR> (redShp, a.Storage.Factory, ?order=order)
+        trgt, a
+
     /// prepares an elementwise operation by allocating a target of same size and storage
     static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
         let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
@@ -2096,40 +2160,100 @@ type Tensor =
     /// Checks for exact equality for non-floating-point types.
     static member isClose a b = Tensor.isCloseWithTol (a, b)
 
+    /// Returns true if two tensors have same (within specified precision) values in all elements.
+    /// If tensors have different shape, then false is returned.
+    static member allCloseWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
+        if a.Shape = b.Shape then
+            Tensor.isCloseWithTol (a, b, ?absTol=absTol, ?relTol=relTol) |> Tensor.all
+        else 
+            Tensor.scalarLike a false
+
+    /// Returns true if two tensors have same (within machine precision) values in all elements.
+    /// If tensors have different shape, then false is returned.
+    static member allClose (a: Tensor<'T>) (b: Tensor<'T>) =
+        Tensor.allCloseWithTol (a, b)
+
+    /// Returns true if all values in the tensor are finite (not NaN and not infinite).
+    static member allFinite (a: Tensor<'T>) =
+        a |> Tensor.isFinite |> Tensor.all
+
+    /// mean over given axis
+    static member meanAxis axis (a: Tensor<'T>) = 
+        Tensor.sumAxis axis a / Tensor.scalarLike a (conv<'T> a.Shape.[axis])
+
+    /// mean 
+    static member mean a =
+        a |> Tensor.flatten |> Tensor.meanAxis 0
+
+    /// variance over given axis
+    static member varAxis (axis, a: Tensor<'T>, ?ddof) =
+        let ddof = defaultArg ddof 0L
+        let v = a - Tensor.mean a
+        let n = a.Shape.[axis] - ddof
+        Tensor.sum (v * v) / Tensor.scalarLike a (conv<'T> n)
+
+    /// variances
+    static member var (a, ?ddof) =
+        Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof)
+
+    /// standard deviation over given axis
+    static member stdAxis (ax, a, ?ddof) =
+        Tensor.varAxis (ax, a, ?ddof=ddof) |> sqrt
+
+    /// standard deviation 
+    static member std (a, ?ddof) =
+        Tensor.var (a, ?ddof=ddof) |> sqrt
+
+    /// tensor, matrix or vector norm of given order over given axis
+    static member normAxis (axis, a: Tensor<'T>, ?ord: 'T) =
+        let ord = defaultArg ord (conv<'T> 2)
+        let tOrd = Tensor.scalarLike a ord
+        let tOrdRep = Tensor.scalarLike a (conv<'T> 1) / tOrd
+        let s = a ** tOrd |> Tensor.sumAxis axis
+        s ** tOrdRep 
+
+    /// tensor, matrix or vector norm of given order
+    static member norm (a: Tensor<'T>, ?ord: 'T) =
+        Tensor.normAxis (0, Tensor.flatten a, ?ord=ord)
+
 
 module Tensor =
 
     /// multi-threaded tensor operations
     module Parallel = 
 
-        /// Fills the tensor with the values returned by the function.
-        let fill (fn: unit -> 'T) (trgt: Tensor<'T>) =
-            trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=true)
-
-        /// Fills the array with the values returned by the function.
-        let fillIndexed (fn: int64[] -> 'T) (trgt: Tensor<'T>) =
-            trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=true)
+        /// creates a new tensor with the values returned by the function.
+        let init<'T> (dev: ITensorStorageFactory) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+            let x = Tensor<'T> (shape, dev)
+            x.FillParallelIndexed fn
+            x          
 
         /// maps all elements using the specified function into a new tensor
         let map (fn: 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
-            trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=true)
+            trgt.FillParallelMap fn a
             trgt       
 
         /// maps all elements using the specified indexed function into a new tensor
         let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
-            trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=true)
-            trgt     
+            trgt.FillParallelMapIndexed fn a
+            trgt      
 
         /// maps all elements using the specified function into a new tensor
         let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
-            trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
-            trgt       
+            trgt.FillParallelMap2 fn a b
+            trgt           
 
         /// maps all elements using the specified indexed function into a new tensor
         let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
-            trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
-            trgt       
+            trgt.FillParallelMapIndexed2 fn a b
+            trgt            
+
+        /// folds the function over the given axis
+        let foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+            let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
+            trgt.FillParallelFoldAxis fn initial axis a
+            trgt

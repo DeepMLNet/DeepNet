@@ -81,10 +81,18 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
-        member this.GetEnumerator(): Collections.Generic.IEnumerator<'T> = 
-            raise (System.NotImplementedException())
-        member this.GetEnumerator(): Collections.IEnumerator = 
-            raise (System.NotImplementedException())
+        member this.ArgMaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.ArgMinLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
+        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
+        member this.AllLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.AnyLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.GetEnumerator() : System.Collections.IEnumerator = raise (System.NotImplementedException())
+        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = raise (System.NotImplementedException())
+        member this.MaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.MinLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.ProductLastAxis(trgt, src1) = raise (System.NotImplementedException())
+        member this.SumLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
         member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
