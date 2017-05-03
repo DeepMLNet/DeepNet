@@ -166,6 +166,25 @@ type internal ScalarPrimitives<'T, 'TC> () =
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Call(m, a, b), a, b).Compile()
     member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
 
+    member val MaxFunc = 
+        let cond = Expression.GreaterThan(a, b)
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(cond, a, b), a, b).Compile()
+    member inline this.Max av bv = this.MaxFunc.Invoke(av, bv)
+
+    member val MinFunc = 
+        let cond = Expression.LessThan(a, b)
+        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(cond, a, b), a, b).Compile()
+    member inline this.Min av bv = this.MinFunc.Invoke(av, bv)
+
+    member val IsFiniteFunc : ('T -> bool) =
+        match typeof<'T> with
+        | t when t=typeof<single> -> 
+            unbox (fun (v: single) -> not (System.Single.IsInfinity v || System.Single.IsNaN v))
+        | t when t=typeof<double> -> 
+            unbox (fun (v: double) -> not (System.Double.IsInfinity v || System.Double.IsNaN v))
+        | _ -> (fun _ -> true)
+    member inline this.IsFinite av = this.IsFiniteFunc av
+
     member val EqualFunc = 
         Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b).Compile()
     member inline this.Equal av bv = this.EqualFunc.Invoke(av, bv)
@@ -608,6 +627,11 @@ type internal ScalarOps =
         let inline op pos a = p.Truncate a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
 
+    static member IsFinite (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a = p.IsFinite a
+        ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
+
     static member Negate (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =
         let inline op pos a = not a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
@@ -640,6 +664,16 @@ type internal ScalarOps =
     static member Power (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op pos a b = p.Power a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member MaxElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Max a b
+        ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
+
+    static member MinElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op pos a b = p.Min a b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
     static member Equal (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
@@ -926,6 +960,14 @@ type internal VectorOps() =
                       (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         VectorOps.ApplyBinary (Vector.Divide, trgt, src1, src2)
 
+    static member private MaxElemwiseImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.ApplyBinary (Vector.Max, trgt, src1, src2)
+
+    static member private MinElemwiseImpl<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+                      (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.ApplyBinary (Vector.Min, trgt, src1, src2)
+
     static member inline private Method<'D when 'D :> Delegate> (name: string) : 'D = 
         let dt = typeof<'D>.GenericTypeArguments
         let dtl = dt |> List.ofArray
@@ -964,6 +1006,12 @@ type internal VectorOps() =
 
     static member Divide (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         VectorOps.Method<BinaryDelegate<'T>>("DivideImpl").Invoke (trgt, src1, src2) 
+
+    static member MaxElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("MaxElemwise").Invoke (trgt, src1, src2) 
+
+    static member MinElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
+        VectorOps.Method<BinaryDelegate<'T>>("MinElemwise").Invoke (trgt, src1, src2) 
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
         let nd = trgt.FastLayout.NDims
@@ -1181,6 +1229,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Truncate (trgt, a)
 
+        member this.IsFinite (trgt, a) =
+            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            ScalarOps.IsFinite (trgt, a)
+
         member this.Negate (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Negate (trgt, a)
@@ -1212,6 +1264,16 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.Power (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             ScalarOps.Power (trgt, a, b)
+
+        member this.MaxElemwise (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.MaxElemwise (trgt, a, b)
+            else ScalarOps.MaxElemwise (trgt, a, b)
+
+        member this.MinElemwise (trgt, a, b) =
+            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.MinElemwise (trgt, a, b)
+            else ScalarOps.MinElemwise (trgt, a, b)
 
         member this.Equal (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
@@ -1272,7 +1334,19 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 |> List.map (Option.map (fun i -> (i.Backend :?> TensorHostBackend<int64>).DataAndLayout))
                 |> Array.ofList
             ScalarOps.Scatter (trgt, trgtIndices, src)
-    
+
+        member this.GetEnumerator() : IEnumerator<'T> = 
+            let s = seq {
+                let mutable pos = PosIter32 this.FastLayout
+                while pos.Active do
+                    yield this.Data.[pos.Addr]
+                    pos.MoveNext()
+            }
+            s.GetEnumerator()
+
+        member this.GetEnumerator() : System.Collections.IEnumerator =
+            (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
+
 
 
 and TensorHostStorageFactory () =
@@ -1289,19 +1363,21 @@ module HostTensorTypes =
     let DevHost = TensorHostStorageFactory.Instance
 
 
-type HostTensor =
+module HostTensor =
 
-    static member zeros<'T> (shape: int64 list) : Tensor<'T> =
-        Tensor.zeros<'T> (shape, DevHost)
+    let zeros<'T> = Tensor.zeros<'T> DevHost 
 
-    static member ones<'T> (shape: int64 list) : Tensor<'T> =
-        Tensor.ones<'T> (shape, DevHost)
+    let ones<'T> = Tensor.ones<'T> DevHost
 
-    static member falses (shape: int64 list) =
-        Tensor.falses (shape, DevHost)
+    let falses = Tensor.falses DevHost
 
-    static member trues (shape: int64 list) =
-        Tensor.trues (shape, DevHost)
+    let trues = Tensor.trues DevHost
+
+    let scalar<'T> = Tensor.scalar<'T> DevHost
+
+    let init<'T> = Tensor.init<'T> DevHost
+
+
 
 
 

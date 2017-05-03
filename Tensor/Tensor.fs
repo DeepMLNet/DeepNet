@@ -136,6 +136,8 @@ type ITensorStorage<'T> =
     //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 type ITensorBackend<'T> =
+    inherit IEnumerable<'T>
+
     abstract Item:              int64[] -> 'T with get, set
     abstract FillConst:         value:'T * trgt:Tensor<'T> -> unit
     abstract Copy:              trgt:Tensor<'T> * src:Tensor<'T> -> unit
@@ -174,6 +176,7 @@ type ITensorBackend<'T> =
     abstract Floor:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract Round:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract Truncate:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract IsFinite:          trgt:Tensor<bool> * src1:Tensor<'T> -> unit
 
     abstract Add:               trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract Subtract:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
@@ -181,6 +184,8 @@ type ITensorBackend<'T> =
     abstract Divide:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract Modulo:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract Power:             trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract MaxElemwise:       trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract MinElemwise:       trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
     abstract Equal:             trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract NotEqual:          trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
@@ -815,6 +820,18 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillTruncate (a)
         trgt
 
+    /// element-wise check if elements are finite (not -Inf, Inf or NaN) using this tensor as target
+    member trgt.FillIsFinite (a: Tensor<'T>) = 
+        let trgt = trgt.AsBool
+        let a = Tensor.PrepareSources (trgt, a)
+        a.Backend.IsFinite (trgt=trgt, src1=a)
+
+    /// element-wise check if elements are finite (not -Inf, Inf or NaN)
+    static member isFinite (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillIsFinite (a)
+        trgt
+
     /// element-wise logical negation using this tensor as target
     member trgt.FillNegate (a: Tensor<bool>) = 
         let trgt = trgt.AsBool
@@ -837,8 +854,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillAdd a b
         trgt
-    static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor.ScalarLike(b, a)
-    static member (+) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) + b
+    static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor.scalarLike a b
+    static member (+) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a + b
 
     /// element-wise subtraction of two tensors using this tensor as target
     member trgt.FillSubtract (a: Tensor<'T>) (b: Tensor<'T>) = 
@@ -850,8 +867,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillSubtract a b
         trgt
-    static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor.ScalarLike(b, a)
-    static member (-) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) - b
+    static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor.scalarLike a b
+    static member (-) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a - b
 
     /// element-wise multiplication of two tensors using this tensor as target
     member trgt.FillMultiply (a: Tensor<'T>) (b: Tensor<'T>) = 
@@ -863,8 +880,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillMultiply a b
         trgt
-    static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor.ScalarLike(b, a)
-    static member (*) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) * b
+    static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor.scalarLike a b
+    static member (*) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a * b
 
     /// element-wise division of two tensors using this tensor as target
     member trgt.FillDivide (a: Tensor<'T>) (b: Tensor<'T>) = 
@@ -876,8 +893,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillDivide a b
         trgt
-    static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor.ScalarLike(b, a)
-    static member (/) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) / b
+    static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor.scalarLike a b
+    static member (/) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a / b
 
     /// element-wise modulo of two tensors using this tensor as target
     member trgt.FillModulo (a: Tensor<'T>) (b: Tensor<'T>) = 
@@ -889,8 +906,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillModulo a b
         trgt
-    static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor.ScalarLike(b, a)
-    static member (%) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) % b
+    static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor.scalarLike a b
+    static member (%) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a % b
 
     /// element-wise power of two tensors using this tensor as target
     member trgt.FillPower (a: Tensor<'T>) (b: Tensor<'T>) = 
@@ -902,8 +919,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillPower a b
         trgt
-    static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor.ScalarLike(b, a)
-    static member Pow (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) ** b
+    static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor.scalarLike a b
+    static member Pow (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a ** b
 
     /// element-wise logical "and" of two tensors using this tensor as target
     member trgt.FillAnd (a: Tensor<bool>) (b: Tensor<bool>) = 
@@ -916,8 +933,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillAnd a b
         trgt
-    static member (&&&&) (a: Tensor<bool>, b: bool) = a &&&& Tensor.ScalarLike(b, a)
-    static member (&&&&) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) &&&& b
+    static member (&&&&) (a: Tensor<bool>, b: bool) = a &&&& Tensor.scalarLike a b
+    static member (&&&&) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a &&&& b
     
     /// element-wise logical "or" of two tensors using this tensor as target
     member trgt.FillOr (a: Tensor<bool>) (b: Tensor<bool>) = 
@@ -930,8 +947,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillOr a b
         trgt
-    static member (||||) (a: Tensor<bool>, b: bool) = a |||| Tensor.ScalarLike(b, a)
-    static member (||||) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) |||| b
+    static member (||||) (a: Tensor<bool>, b: bool) = a |||| Tensor.scalarLike a b
+    static member (||||) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a |||| b
 
     /// element-wise logical "xor" of two tensors using this tensor as target
     member trgt.FillXor (a: Tensor<bool>) (b: Tensor<bool>) = 
@@ -944,8 +961,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillXor a b
         trgt
-    static member (^^^^) (a: Tensor<bool>, b: bool) = a ^^^^ Tensor.ScalarLike(b, a)
-    static member (^^^^) (a: bool, b: Tensor<bool>) = Tensor.ScalarLike(a, b) ^^^^ b
+    static member (^^^^) (a: Tensor<bool>, b: bool) = a ^^^^ Tensor.scalarLike a b
+    static member (^^^^) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a ^^^^ b
 
     /// element-wise equal of two tensors using this tensor as target
     member trgt.FillEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -958,8 +975,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillEqual a b
         trgt
-    static member (====) (a: Tensor<'T>, b: 'T) = a ==== Tensor.ScalarLike(b, a)
-    static member (====) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) ==== b
+    static member (====) (a: Tensor<'T>, b: 'T) = a ==== Tensor.scalarLike a b
+    static member (====) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a ==== b
 
     /// element-wise not equal of two tensors using this tensor as target
     member trgt.FillNotEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -972,8 +989,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillNotEqual a b
         trgt
-    static member (<<>>) (a: Tensor<'T>, b: 'T) = a <<>> Tensor.ScalarLike(b, a)
-    static member (<<>>) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<>> b
+    static member (<<>>) (a: Tensor<'T>, b: 'T) = a <<>> Tensor.scalarLike a b
+    static member (<<>>) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<>> b
 
     /// element-wise less than of two tensors using this tensor as target
     member trgt.FillLess (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -986,8 +1003,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLess a b
         trgt
-    static member (<<<<) (a: Tensor<'T>, b: 'T) = a <<<< Tensor.ScalarLike(b, a)
-    static member (<<<<) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<<< b
+    static member (<<<<) (a: Tensor<'T>, b: 'T) = a <<<< Tensor.scalarLike a b
+    static member (<<<<) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<<< b
 
     /// element-wise less than of two tensors using this tensor as target
     member trgt.FillLessOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -1000,8 +1017,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLessOrEqual a b
         trgt
-    static member (<<==) (a: Tensor<'T>, b: 'T) = a <<== Tensor.ScalarLike(b, a)
-    static member (<<==) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) <<== b
+    static member (<<==) (a: Tensor<'T>, b: 'T) = a <<== Tensor.scalarLike a b
+    static member (<<==) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<== b
 
     /// element-wise greater than of two tensors using this tensor as target
     member trgt.FillGreater (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -1014,8 +1031,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreater a b
         trgt
-    static member (>>>>) (a: Tensor<'T>, b: 'T) = a >>>> Tensor.ScalarLike(b, a)
-    static member (>>>>) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) >>>> b
+    static member (>>>>) (a: Tensor<'T>, b: 'T) = a >>>> Tensor.scalarLike a b
+    static member (>>>>) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a >>>> b
 
     /// element-wise greater than or equal to of two tensors using this tensor as target
     member trgt.FillGreaterOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
@@ -1028,8 +1045,30 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreaterOrEqual a b
         trgt
-    static member (>>==) (a: Tensor<'T>, b: 'T) = a >>== Tensor.ScalarLike(b, a)
-    static member (>>==) (a: 'T, b: Tensor<'T>) = Tensor.ScalarLike(a, b) >>== b
+    static member (>>==) (a: Tensor<'T>, b: 'T) = a >>== Tensor.scalarLike a b
+    static member (>>==) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a >>== b
+
+    /// element-wise picks the maximum of a or b using this tensor as target
+    member trgt.FillMaxElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.MaxElemwise (trgt=trgt, src1=a, src2=b)
+
+    /// element-wise picks the maximum of a or b
+    static member maxElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMaxElemwise a b
+        trgt
+
+    /// element-wise picks the minimum of a or b using this tensor as target
+    member trgt.FillMinElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
+        let a, b = Tensor.PrepareSources (trgt, a, b)
+        trgt.Backend.MinElemwise (trgt=trgt, src1=a, src2=b)
+
+    /// element-wise picks the minimum of a or b
+    static member minElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMinElemwise a b
+        trgt
 
     /// Elementwise writes elements from ifTrue if cond is true in this tensor, 
     /// otherwise elements from ifFalse.
@@ -1322,70 +1361,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// corresponding eigenvalue in 'vals'.
     abstract SymmetricEigenDecomposition: unit -> Tensor<'T> * Tensor<'T>
 
-    // enumerator interfaces
-    interface IEnumerable<'T> with
-        member this.GetEnumerator() =
-            TensorLayout.allIdx this.Layout
-            |> Seq.map (fun idx -> this.[idx])
-            |> fun s -> s.GetEnumerator()
-        member this.GetEnumerator() =
-            (this :> IEnumerable<'T>).GetEnumerator() :> IEnumerator
+
 
 
 module Tensor = 
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // array creation functions
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // element-wise operations
-    ////////////////////////////////////////////////////////////////////////////////////////////////   
-
-    /// Elementwise check if two arrays have same (within machine precision) values.
-    /// Check for exact equality when type is int or bool.
-    let inline isCloseWithTol (aTol: 'T) (rTol: 'T) (a: Tensor<'T>) (b: Tensor<'T>) =
-        match typeof<'T> with
-        | t when t = typeof<bool> -> (box a :?> Tensor<bool>) ==== (box b :?> Tensor<bool>) 
-        | t when t = typeof<int>  -> (box a :?> Tensor<int>)  ==== (box b :?> Tensor<int>) 
-        | _ ->  abs (a - b) <<== aTol + rTol * abs b
-
-    /// Elementwise check if two arrays have same (within machine precision) values.
-    let inline isClose (a: Tensor<'T>) (b: Tensor<'T>) =
-        isCloseWithTol (conv<'T> 1e-8) (conv<'T> 1e-5) a b
-
-    /// Elementwise check if a value is finite (not NaN and not infinite).
-    let inline isFinite (a: Tensor<'T>) =
-        let isFiniteSingle v = not (System.Single.IsInfinity v || System.Single.IsNaN v)
-        let isFiniteDouble v = not (System.Double.IsInfinity v || System.Double.IsNaN v)
-        typedMapTypeChange (unsp) isFiniteDouble isFiniteSingle (unsp) (unsp) (unsp) a
-
-    /// Elementwise picks the maximum of a or b.
-    let inline maxElemwise (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        typedMap2 (max) (max) (max) (max) (max) (max) a b
-
-    /// Elementwise picks the minimum of a or b.
-    let inline minElemwise (a: #Tensor<'T>) (b: #Tensor<'T>) =
-        typedMap2 (min) (min) (min) (min) (min) (min) a b
-
-    /// converts the Array from one data type to another
-    let convert (a: #Tensor<'T>) : Tensor<'C> =
-        a |> mapTC (fun v -> conv<'C> v)
-
-    /// converts to int
-    let int (a: #Tensor<'T>) : Tensor<int> =
-        convert a
-
-    /// converts to float
-    let float (a: #Tensor<'T>) : Tensor<float> =
-        convert a
-
-    /// converts to single
-    let single (a: #Tensor<'T>) : Tensor<single> =
-        convert a
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // reduction operations
@@ -1924,6 +1904,10 @@ module Tensor =
         member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
         member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
+    // enumerator interfaces
+    interface IEnumerable<'T> with
+        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = this.Backend.GetEnumerator()
+        member this.GetEnumerator() : System.Collections.IEnumerator = (this.Backend :> IEnumerable).GetEnumerator()
 
 
 type Tensor = 
@@ -1990,7 +1974,7 @@ type Tensor =
         trgt, a, b, c
 
     /// Creates a new tensor of given shape filled with zeros.
-    static member zeros<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
+    static member zeros<'T> (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
             x.FillConst Tensor<'T>.Zero
@@ -1998,53 +1982,119 @@ type Tensor =
    
     /// Tensor of same shape as specifed tensor and filled with zeros.
     static member zerosLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.zeros<'T> (tmpl.Shape, tmpl.Storage.Factory)
+        Tensor.zeros<'T> tmpl.Storage.Factory tmpl.Shape
 
     /// Creates a new tensor of given shape filled with ones.
-    static member ones<'T> (shape: int64 list, dev: ITensorStorageFactory) : Tensor<'T> =
+    static member ones<'T> (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst Tensor<'T>.One
         x
         
     /// Tensor of same shape as specifed tensor and filled with ones.
     static member onesLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.ones<'T> (tmpl.Shape, tmpl.Storage.Factory)
+        Tensor.ones<'T> tmpl.Storage.Factory tmpl.Shape 
 
     /// Creates a new boolean tensor of given shape filled with false.
-    static member falses (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
+    static member falses (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst false
         x
 
     /// Creates a new boolean tensor of given shape filled with true.
-    static member trues (shape: int64 list, dev: ITensorStorageFactory) : Tensor<bool> =
+    static member trues (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst true
         x   
 
     /// Creates a new tensor of scalar shape with the given value and storage.
-    static member scalar<'T> (value: 'T, dev: ITensorStorageFactory) : Tensor<'T> =
+    static member scalar<'T> (dev: ITensorStorageFactory) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> ([], dev)
         x.Value <- value
         x
 
     /// Creates a new tensor of scalar shape with the given value and 
     /// same storage as the specified tensor.
-    static member internal ScalarLike<'T> (value: 'T, tmpl: ITensor) : Tensor<'T> =
-        Tensor.scalar<'T> (value, tmpl.Storage.Factory)
+    static member scalarLike<'T> (tmpl: ITensor) (value: 'T) : Tensor<'T> =
+        Tensor.scalar<'T> tmpl.Storage.Factory value 
 
     /// Creates a tensor with the values returned by the function.
-    static member init<'T> (shape: int64 list, fn: (int64[] -> 'T), dev: ITensorStorageFactory) : Tensor<'T> =
+    static member init<'T> (dev: ITensorStorageFactory) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillIndexed fn
         x           
 
     /// Fills the vector with linearly spaced values from start to (including) stop.
-    static member inline fillLinSpaced (start: 'V) (stop: 'V) (a: Tensor<'V>) =
+    static member inline fillLinspace (start: 'V) (stop: 'V) (a: Tensor<'V>) =
         if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
         if a.NElems < 2L then raise (ShapeMismatch "tensor must have at least two elements")
         let step = (stop - start) / conv<'V> (a.NElems - 1L)
         a.FillIndexed (fun idx -> start + conv<'V> idx.[0] * step)     
+
+    /// Creates a one-dimensional tensor filled with linearly spaced values from start 
+    /// to (including) stop.
+    static member inline linspace (dev: ITensorStorageFactory) (start: 'V) (stop: 'V) (nElems: int64) =
+        let x = Tensor<'V> ([nElems], dev)
+        x |> Tensor.fillLinspace start stop
+        x
+
+    /// convert tensor data type to bool
+    static member bool a : Tensor<bool> = Tensor<_>.convert a
+
+    /// convert tensor data type to byte
+    static member byte a : Tensor<byte> = Tensor<_>.convert a
+
+    /// convert tensor data type to sbyte
+    static member sbyte a : Tensor<sbyte> = Tensor<_>.convert a
+
+    /// convert tensor data type to int16
+    static member int16 a : Tensor<int16> = Tensor<_>.convert a
+
+    /// convert tensor data type to uint16
+    static member uint16 a : Tensor<uint16> = Tensor<_>.convert a
+
+    /// convert tensor data type to int32
+    static member int32 a : Tensor<int32> = Tensor<_>.convert a
+
+    /// convert tensor data type to uint32
+    static member uint32 a : Tensor<uint32> = Tensor<_>.convert a
+
+    /// convert tensor data type to int64
+    static member int64 a : Tensor<int64> = Tensor<_>.convert a
+
+    /// convert tensor data type to uint64
+    static member uint64 a : Tensor<uint64> = Tensor<_>.convert a
+
+    /// convert tensor data type to int
+    static member int a : Tensor<int> = Tensor<_>.convert a
+
+    /// convert tensor data type to nativeint
+    static member nativeint a : Tensor<nativeint> = Tensor<_>.convert a
+
+    /// convert tensor data type to single
+    static member single a : Tensor<single> = Tensor<_>.convert a
+
+    /// convert tensor data type to double
+    static member double a : Tensor<double> = Tensor<_>.convert a
+
+    /// convert tensor data type to float
+    static member float a : Tensor<float> = Tensor<_>.convert a
+
+    /// convert tensor data type to float32
+    static member float32 a : Tensor<float32> = Tensor<_>.convert a
+
+    /// Element-wise check if two tensors have same (within machine precision) values.
+    /// Checks for exact equality for non-floating-point types.
+    static member isCloseWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
+        match typeof<'T> with
+        | t when t=typeof<single> || t=typeof<double> ->
+            let absTol = defaultArg absTol (conv<'T> 1e-8) |> Tensor.scalarLike a
+            let relTol = defaultArg relTol (conv<'T> 1e-5) |> Tensor.scalarLike a
+            abs (a - b) <<== absTol + relTol * abs b
+        | _ -> a ==== b
+
+    /// Element-wise check if two tensors have same (within machine precision) values.
+    /// Checks for exact equality for non-floating-point types.
+    static member isClose a b = Tensor.isCloseWithTol (a, b)
 
 
 module Tensor =

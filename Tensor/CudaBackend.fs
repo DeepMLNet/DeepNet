@@ -81,6 +81,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let toMe (x: obj) = x :?> TensorCudaBackend<'T>
 
     interface ITensorBackend<'T> with
+        member this.GetEnumerator(): Collections.Generic.IEnumerator<'T> = 
+            raise (System.NotImplementedException())
+        member this.GetEnumerator(): Collections.IEnumerator = 
+            raise (System.NotImplementedException())
         member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
         member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
@@ -103,6 +107,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Tan(trgt, src1) = raise (System.NotImplementedException())
         member this.Tanh(trgt, src1) = raise (System.NotImplementedException())
         member this.Truncate(trgt, src1) = raise (System.NotImplementedException())
+        member this.IsFinite(trgt, src1) = raise (System.NotImplementedException())
         member this.UnaryMinus(trgt, src1) = raise (System.NotImplementedException())
         member this.UnaryPlus(trgt, src1) = raise (System.NotImplementedException())
         member this.Negate(trgt, src1) = raise (System.NotImplementedException())
@@ -130,6 +135,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.And(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Or(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Xor(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.MaxElemwise(trgt, src1, src2) = raise (System.NotImplementedException())
+        member this.MinElemwise(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
@@ -152,10 +159,10 @@ module CudaTensorTypes =
     let DevCuda = TensorCudaStorageFactory.Instance
 
 
-type CudaTensor =
+module CudaTensor =
 
-    static member zeros<'T> (shape: int64 list) : Tensor<'T> =
-        Tensor.zeros (shape, DevCuda)
+    let zeros<'T> = Tensor.zeros<'T> DevCuda
+
 
 
 
