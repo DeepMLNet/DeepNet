@@ -1,27 +1,129 @@
 ﻿namespace ArrayNDNS
 
 open System
+open System.Reflection
 open System.Numerics
 open System.Threading.Tasks
 open System.Linq.Expressions
 open System.Collections.Generic
-
-
 open Basics
-open System.Reflection
 
-module TensorHostSettings =
-    let mutable UseThreads = true
+module private FastLayoutTools =
+    let inline checkedInt layout (x: int64) =
+        if int64 FSharp.Core.int.MinValue <= x && x <= int64 FSharp.Core.int.MaxValue then
+            int x
+        else failwithf "cannot convert tensor layout %A to 32-bit integer" layout
 
-open TensorHostSettings
+open FastLayoutTools
 
+/// Fast layout operations.
+[<Struct>]
+type internal FastLayout32 = 
+    val NDims   : int
+    val NElems  : int
+    val Offset  : int
+    val Shape   : int []
+    val Stride  : int []
 
+    new (layout: TensorLayout) = {
+        NDims   = TensorLayout.nDims layout
+        NElems  = TensorLayout.nElems layout |> checkedInt layout
+        Offset  = TensorLayout.offset layout |> checkedInt layout
+        Shape   = TensorLayout.shape layout |> List.toArray |> Array.map (checkedInt layout)
+        Stride  = TensorLayout.stride layout |> List.toArray |> Array.map (checkedInt layout)
+    }
+
+    member inline this.IsPosValid (pos: int[]) =
+        if pos.Length = this.NDims then
+            Array.forall2 (fun i size -> 0 <= i && i < size) pos this.Shape
+        else false
+
+    member inline this.UncheckedAddr (pos: int[]) =
+        let mutable addr = this.Offset
+        for d=0 to this.NDims-1 do
+            assert (0 <= pos.[d] && pos.[d] < this.Shape.[d])
+            addr <- addr + pos.[d] * this.Stride.[d]
+        addr
+
+    member inline this.Addr (pos: int64[]) =
+        if pos.Length <> this.NDims then
+            let msg = 
+                sprintf "position %A has wrong dimensionality for tensor of shape %A"
+                        pos this.Shape
+            raise (IndexOutOfRange msg)                
+        let mutable addr = this.Offset           
+        for d=0 to this.NDims-1 do
+            let p = int pos.[d]
+            if (0 <= p && p < this.Shape.[d]) then
+                addr <- addr + p * this.Stride.[d]
+            else
+                let msg = 
+                    sprintf "position %A is out of range for tensor of shape %A"
+                            pos this.Shape
+                raise (IndexOutOfRange msg)
+        addr
+
+/// Fast index operations.
+[<Struct>]
+type internal PosIter32 = 
+    val Pos             : int []
+    val mutable Addr    : int
+    val mutable Active  : bool
+    val Shape           : int []
+    val Stride          : int []               
+    val FromDim         : int
+    val ToDim           : int
+
+    new (fl: FastLayout32, ?startPos, ?fromDim, ?toDim) = 
+        let startPos = defaultArg startPos (Array.zeroCreate fl.NDims)
+        let fromDim = defaultArg fromDim 0
+        let toDim = defaultArg toDim (fl.NDims - 1)
+        assert (fl.IsPosValid startPos)
+        assert (0 <= fromDim && fromDim < fl.NDims)
+        assert (0 <= toDim && toDim < fl.NDims)
+        let active = 
+            fl.Shape 
+            |> Array.indexed 
+            |> Array.forall (fun (d, s) -> 
+                if fromDim <= d && d <= toDim then fl.Shape.[d] > 0
+                else true)
+        {
+            Pos     = Array.copy startPos
+            Addr    = fl.UncheckedAddr startPos
+            Active  = active
+            Shape   = fl.Shape
+            Stride  = fl.Stride
+            FromDim = fromDim
+            ToDim   = toDim
+        }
+
+    member inline this.MoveNext () =
+        assert (this.Active)
+
+        // try incrementing starting from last axis
+        let mutable increment = true
+        let mutable d = this.ToDim
+        while increment && d >= this.FromDim do
+            if this.Pos.[d] = this.Shape.[d] - 1 then
+                // was last element of that axis
+                this.Addr <- this.Addr - this.Pos.[d] * this.Stride.[d]
+                this.Pos.[d] <- 0
+                d <- d - 1
+            else
+                // can increment this axis
+                this.Addr <- this.Addr + this.Stride.[d]
+                this.Pos.[d] <- this.Pos.[d] + 1
+                increment <- false  
+        // if we tried to increment past first axis, then iteration finished                            
+        if d < this.FromDim then this.Active <- false                  
+
+/// Data and fast layout of a host tensor.
 type internal DataAndLayout<'T> = {
     Data:       'T[]
     FastLayout: FastLayout32
 }
 
-
+/// Generic scalar operation primitives.
 type internal ScalarPrimitives<'T, 'TC> () =
     static let fscAsm = Assembly.GetAssembly(typeof<unit>)
     static let myAsm = Assembly.GetExecutingAssembly()
@@ -214,6 +316,7 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.IfThenElse condv ifTrue ifFalse = this.IfThenElseFunc.Invoke(condv, ifTrue, ifFalse)
 
 
+/// Generic scalar operation primitives.
 module internal ScalarPrimitives = 
     let private instances = Dictionary<Type * Type, obj>()
     let For<'T, 'TC> () =
@@ -226,6 +329,7 @@ module internal ScalarPrimitives =
             inst
         
 
+/// Scalar operations on host tensors.
 type internal ScalarOps =
 
     static member inline ApplyNoaryOp (scalarOp: int64[] -> 'T, 
@@ -847,6 +951,7 @@ type internal UnaryDelegate<'T>  = delegate of DataAndLayout<'T> * DataAndLayout
 type internal BinaryDelegate<'T> = delegate of DataAndLayout<'T> * DataAndLayout<'T> * DataAndLayout<'T> -> unit
 type internal CopyDelegate<'T>   = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
 
+/// Vectorized (SIMD) operations on host tensors.
 type internal VectorOps() =
     static let MethodDelegates = Dictionary<string * Type list, Delegate> ()
 
@@ -1122,6 +1227,7 @@ type internal VectorOps() =
         canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
 
 
+/// Storage (using a .NET array) for host tensors.
 type TensorHostStorage<'T> (data: 'T []) =
 
     new (nElems: int64) =
@@ -1140,7 +1246,7 @@ type TensorHostStorage<'T> (data: 'T []) =
             TensorHostStorageFactory.Instance :> ITensorStorageFactory
             
 
-
+/// Backend for host tensors.
 and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>) =
 
     let toMe (x: obj) = x :?> TensorHostBackend<'T>
@@ -1484,7 +1590,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
 
 
-
+/// Factory for host tensors.
 and TensorHostStorageFactory () =
     static member Instance = TensorHostStorageFactory () 
 
@@ -1496,9 +1602,11 @@ and TensorHostStorageFactory () =
 
 [<AutoOpen>]            
 module HostTensorTypes =
+    /// Tensor located on host using a .NET array as storage.
     let DevHost = TensorHostStorageFactory.Instance
 
 
+/// Host tensor functions.
 module HostTensor =
 
     let zeros<'T> = Tensor.zeros<'T> DevHost 

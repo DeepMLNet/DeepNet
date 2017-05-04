@@ -66,7 +66,6 @@
     <Compile Include="MKL.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
-    <Compile Include="FastLayout.fs" />
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
     <None Include="ArrayNDHost.fs" />
