@@ -1421,16 +1421,20 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     /// Returns a BlasInfo that exposes the transpose of the specfied matrix to BLAS
     /// (in column-major order).
     static member private GetTransposedBlas (mat: Tensor<'T>, allowCopy: bool) =
-        if mat.NDims <> 2 then failwithf "require a matrix but got shape %A" mat.Shape
+        if mat.NDims <> 2 then failwithf "BLAS call requires a matrix but got shape %A" mat.Shape
         if not (mat.Shape.[0] > 0L && mat.Shape.[1] > 0L) then 
-            failwithf "require a non-empty matrix but got shape %A" mat.Shape
+            failwithf "BLAS call requires a non-empty matrix but got shape %A" mat.Shape
         let str = mat.Layout.Stride
         if str.[0] >= 1L && str.[0] >= mat.Shape.[1] && str.[1] = 1L then
             let storage = mat.Storage :?> TensorHostStorage<'T>
             new BlasInfo (storage.Pin(), nativeint (mat.Layout.Offset * sizeof64<'T>),
                           mat.Shape.[1], mat.Shape.[0], str.[0])
         elif allowCopy then TensorHostBackend<_>.GetTransposedBlas (Tensor.copy mat, false)
-        else failwith "Tensor incompatible with BLAS but copying not allowed"
+        else 
+            let msg =
+                sprintf "matrix with shape %A and strides %A is incompatible with BLAS/LAPACK"
+                        mat.Shape mat.Layout.Stride
+            raise (StrideMismatch msg)
 
     interface ITensorBackend<'T> with
         member this.Item 
@@ -1730,13 +1734,12 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ()
 
         member this.Invert (trgt, src) =
-            let batchShp = trgt.Shape.[0 .. trgt.NDims-3]
-
             // inversion is done in place, so we have to copy first if trgt and src are different
             if not (trgt = src) then
                 (this :> ITensorBackend<_>).Copy (trgt, src)
 
             // iterate over all batch dimensions
+            let batchShp = trgt.Shape.[0 .. trgt.NDims-3]
             for batchIdx in TensorLayout.allIdxOfShape batchShp do
                 let batchRng = batchIdx |> List.map RngElem
                 let rng = batchRng @ [RngAll; RngAll]                  
@@ -1765,7 +1768,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             (this :> ITensorBackend<_>).Copy (eigVecs, src)
             let eigVals = eigVals |> Tensor.reshape [1L; size]
 
-            use a = TensorHostBackend.GetTransposedBlas (eigVecs, allowCopy=false)
+            use a = TensorHostBackend.GetTransposedBlas (eigVecs.T, allowCopy=false)
             use w = TensorHostBackend.GetTransposedBlas (eigVals, allowCopy=false)
             let info = 
                 BLAS.invoke<'T, BLAS.lapack_int> 
@@ -1773,8 +1776,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                      doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr)))
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
-
-            // TODO: eigVals.[0L, *] :> Tensor<'T>, eigVecs.T 
 
         member this.GetEnumerator() : IEnumerator<'T> = 
             let s = seq {

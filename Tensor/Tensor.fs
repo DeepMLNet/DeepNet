@@ -19,6 +19,9 @@ exception ShapeMismatch of string
 /// operation requires tensors of same data types, but specified tensor had different data types
 exception DataTypeMismatch of string
 
+/// operation requires tensor with a specific stride configuration, which is not fulfilled
+exception StrideMismatch of string
+
 /// sequence too short to fill tensor
 exception SeqTooShort of string
 
@@ -1459,7 +1462,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         if a.NDims <> 2 then
             invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
         let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Factory)
-        let trgtEigVecs = Tensor<'T> (a.Shape, a.Factory)
+        let trgtEigVecs = Tensor<'T> (a.Shape, a.Factory, order=ColumnMajor)
         Tensor.FillSymmetricEigenDecomposition trgtEigVals trgtEigVecs a
         trgtEigVals, trgtEigVecs
         
