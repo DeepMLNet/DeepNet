@@ -19,12 +19,6 @@ exception ShapeMismatch of string
 /// operation requires tensors of same data types, but specified tensor had different data types
 exception DataTypeMismatch of string
 
-/// a row-major layout was required for this operation, but the tensor has a different layout
-exception RowMajorLayoutRequired of string
-
-/// specified tensor index is out of range
-exception PositionOutOfRange of string
-
 /// sequence too short to fill tensor
 exception SeqTooShort of string
 
@@ -409,7 +403,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Tries to reshape the tensor without copying.
     /// For this to succeed, the tensor must have row-major layout.
     /// If this a reshape without copying is impossible, None is returned.
-    static member tryReshapedView shp a =
+    static member tryReshapeView shp a =
         match a |> Tensor<_>.layout |> TensorLayout.tryReshape shp with
         | Some newLayout -> a |> Tensor<_>.relayout newLayout |> Some
         | None -> None
@@ -417,18 +411,18 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Tries to reshape the tensor without copying.
     /// For this to succeed, the tensor must have row-major layout.
     /// If this a reshape without copying is impossible, an error is raised.
-    static member reshapedView shp a =
-        match Tensor<_>.tryReshapedView shp a with
+    static member reshapeView shp a =
+        match Tensor<_>.tryReshapeView shp a with
         | Some res -> res
         | None -> 
             let msg =
                 sprintf "cannot reshape tensor of shape %A and strides %A without copying"
                     (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
-            raise (RowMajorLayoutRequired msg)
+            raise (ImpossibleWithoutCopy msg)
 
     /// Returns true if the tensor can be reshaped without copying.
-    static member canReshapeWithoutCopy shp a =
-        match Tensor<_>.tryReshapedView shp a with
+    static member canReshapeView shp a =
+        match Tensor<_>.tryReshapeView shp a with
         | Some _ -> true
         | None -> false
 
@@ -439,10 +433,10 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// One element can be -1, in which case the size of that element is
     /// inferred automatically.
     static member reshape shp a =
-        match a |> Tensor<_>.tryReshapedView shp with
+        match a |> Tensor<_>.tryReshapeView shp with
         | Some res -> res
         | None ->
-            a |> Tensor<_>.copy |> Tensor<_>.reshapedView shp
+            a |> Tensor<_>.copy |> Tensor<_>.reshapeView shp
 
     /// Flattens the tensor into a (one-dimensional) vector.
     static member flatten a =
@@ -1300,6 +1294,22 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillArgMaxAxis ax src
         trgt
 
+    /// position of minimum value
+    static member argMin (a: Tensor<'T>) =
+        a 
+        |> Tensor<_>.flatten 
+        |> Tensor<_>.argMinAxis 0 
+        |> Tensor.value 
+        |> TensorLayout.linearToIdx a.Layout
+
+    /// position of maximum value
+    static member argMax (a: Tensor<'T>) =
+        a 
+        |> Tensor<_>.flatten 
+        |> Tensor<_>.argMaxAxis 0 
+        |> Tensor.value 
+        |> TensorLayout.linearToIdx a.Layout
+
     /// false if there is at least one false element in given axis, using this tensor as target
     member trgt.FillAllAxis (ax: int) (src: Tensor<bool>) =
         let trgt = trgt.AsBool
@@ -1314,7 +1324,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// false if there is at least one false element in the tensor, otherwise true
     static member all (src: Tensor<bool>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.allAxis 0
+        src |> Tensor<_>.flatten |> Tensor<_>.allAxis 0 |> Tensor<_>.value
 
     /// true if there is at least one true element in given axis, using this tensor as target
     member trgt.FillAnyAxis (ax: int) (src: Tensor<bool>) =
@@ -1330,7 +1340,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// true if there is at least one true element in the tensor, otherwise false
     static member any (src: Tensor<bool>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0
+        src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0 |> Tensor<_>.value
 
     ///// dot product
     //static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
@@ -1468,19 +1478,19 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         if this.NDims <> 0 then 
             let msg = sprintf "this operation requires a scalar (0-dimensional) tensor, 
                                but its shape is %A" this.Shape
-            raise (PositionOutOfRange msg)
+            raise (IndexOutOfRange msg)
 
     /// value of scalar (0-dimensional) tensor
     member this.Value 
-        with inline get () = 
+        with get () = 
             this.CheckScalar()
             this.[[||]]
-        and inline set value = 
+        and set value = 
             this.CheckScalar()
             this.[[||]] <- value
 
     /// value of scalar (0-dimensional) tensor
-    static member inline value (a: Tensor<_>) =
+    static member value (a: Tensor<'T>) : 'T =
         a.Value
 
     /// Pretty string containing maxElems elements per dimension.
@@ -1551,41 +1561,6 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 module Tensor = 
 
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // reduction operations
-    ////////////////////////////////////////////////////////////////////////////////////////////////             
-
-    /// position of maximum value
-    let argMax a =
-        allIdx a
-        |> Seq.maxBy (fun idx -> a |> get idx)
-
-    let inline private argMaxAxisReduc (a: Tensor<'T>) =
-        allIdx a
-        |> Seq.maxBy (fun idx -> a |> get idx)
-        |> fun idx -> idx.[0]
-        |> scalarOfType a
-
-    /// positions of maximum values along given axis
-    let argMaxAxis dim (a: Tensor<'T>) : Tensor<int64> =
-        let f a = axisReduceTypeChange argMaxAxisReduc dim a
-        typedApplyTypeChange f f f f f f a
-
-    /// position of maximum value
-    let argMin a =
-        allIdx a
-        |> Seq.minBy (fun idx -> a |> get idx)
-
-    let inline private argMinAxisReduc (a: Tensor<'T>) =
-        allIdx a
-        |> Seq.minBy (fun idx -> a |> get idx)
-        |> fun idx -> idx.[0]
-        |> scalarOfType a
-
-    /// positions of maximum values along given axis
-    let argMinAxis dim (a: Tensor<'T>) : Tensor<int64> =
-        let f a = axisReduceTypeChange argMinAxisReduc dim a
-        typedApplyTypeChange f f f f f f a
 
 
      
@@ -2165,8 +2140,7 @@ type Tensor =
     static member allCloseWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
         if a.Shape = b.Shape then
             Tensor.isCloseWithTol (a, b, ?absTol=absTol, ?relTol=relTol) |> Tensor.all
-        else 
-            Tensor.scalarLike a false
+        else false
 
     /// Returns true if two tensors have same (within machine precision) values in all elements.
     /// If tensors have different shape, then false is returned.

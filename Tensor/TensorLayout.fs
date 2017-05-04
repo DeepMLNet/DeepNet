@@ -3,10 +3,25 @@
 open Basics
 open System
 
+/// cannot broadcast to same shape
+exception CannotBroadcast of string
+
+/// invalid tensor range specification
+exception InvalidTensorRng of string
+
+/// invalid tensor layout specification
+exception InvalidTensorLayout of string
+
+/// specified tensor index is out of range
+exception IndexOutOfRange of string
+
+/// the layout of this tensor makes this operation impossible without copying it
+exception ImpossibleWithoutCopy of string
+
 
 [<AutoOpen>]
 module TensorLayoutTypes =
-    // layout (shape, offset, stride) of an ArrayND
+    // layout (shape, offset, stride) of a Tensor
     type TensorLayout = {
         /// shape
         Shape:  int64 list
@@ -56,8 +71,6 @@ module TensorLayoutTypes =
     let RngAll = Rng (None, None)
 
 
-/// invalid tensor range specification
-exception InvalidTensorRng of string
 
 /// Range specification functions.
 module TensorRng =
@@ -91,16 +104,25 @@ module TensorLayout =
     /// checks that the layout is valid
     let inline check a =
         if a.Shape.Length <> a.Stride.Length then
-            failwithf "shape and stride must have same number of entries: %A" a
+            let msg = 
+                sprintf "shape %A and stride %A must have same number of entries"
+                        a.Shape a.Stride
+            raise (InvalidTensorLayout msg)
         for s in a.Shape do
-            if s < 0L then failwithf "shape cannot have negative entries: %A" a
+            if s < 0L then 
+                let msg = sprintf "shape %A cannot have negative entires" a.Shape
+                raise (InvalidTensorLayout msg)
 
     /// checks that the given index is valid for the given shape
     let inline checkIndex shp idx =
         if List.length shp <> List.length idx then
-            failwithf "index %A has other dimensionality than shape %A" idx shp
+            let msg =
+                sprintf "index %A has other dimensionality than tensor of shape %A" idx shp
+            raise (IndexOutOfRangeException msg)
         if not (List.forall2 (fun s i -> 0L <= i && i < s) shp idx) then 
-            failwithf "index %A out of range for shape %A" idx shp
+            let msg =
+                sprintf "index %A out of range for tensor of shape %A" idx shp
+            raise (IndexOutOfRangeException msg)
 
     /// address of element
     let inline addr idx a =
@@ -125,8 +147,10 @@ module TensorLayout =
     /// checks that the given axis is valid 
     let inline checkAxis ax a =
         if not (0 <= ax && ax < nDims a) then
-            failwithf "axis %d out of range for array with shape %A" ax a.Shape
-
+            let msg =
+                sprintf "axis %d out of range for tensor with shape %A" ax a.Shape
+            raise (IndexOutOfRangeException msg)
+   
     /// a sequence of indicies enumerating all elements of the array with the given shape
     let rec allIdxOfShape shp = seq {
         match shp with
@@ -153,9 +177,9 @@ module TensorLayout =
     /// A Fortran-order stride corresponds to the ordering: [0; 1; 2; ...; n-1; n].
     let orderedStride (shape: int64 list) (order: int list) =
         if not (Permutation.is order) then
-            failwithf "the stride order %A is not a permutation" order
+            invalidArg "order" (sprintf "the stride order %A is not a permutation" order)
         if order.Length <> shape.Length then
-            failwithf "the stride order %A is incompatible with the shape %A" order shape
+            invalidArg "order" (sprintf "the stride order %A is incompatible with the shape %A" order shape)
         let rec build cumElems order =
             match order with
             | o :: os -> cumElems :: build (cumElems * shape.[o]) os
@@ -215,18 +239,20 @@ module TensorLayout =
     /// Inserts an axis of size 1 before the specified position.
     let insertAxis ax a =
         if not (0 <= ax && ax <= nDims a) then
-            failwithf "axis %d out of range for array with shape %A" ax a.Shape
+            let msg =
+                sprintf "axis %d out of range for tensor with shape %A" ax a.Shape
+            raise (IndexOutOfRangeException msg)
         {a with Shape = a.Shape |> List.insert ax 1L
                 Stride = a.Stride |> List.insert ax 0L}        
 
     /// cuts one dimension from the left
     let cutLeft a =
-        if nDims a = 0 then failwith "cannot remove dimensions from scalar"
+        if nDims a = 0 then invalidArg "a" "cannot remove dimensions from scalar"
         {a with Shape=a.Shape.[1..]; Stride=a.Stride.[1..]}
 
     /// cuts one dimension from the right
     let cutRight a =
-        if nDims a = 0 then failwith "cannot remove dimensions from scalar"
+        if nDims a = 0 then invalidArg "a" "cannot remove dimensions from scalar"
         let nd = nDims a
         {a with Shape=a.Shape.[.. nd-2]; Stride=a.Stride.[.. nd-2]}       
 
@@ -235,7 +261,10 @@ module TensorLayout =
         if size < 0L then invalidArg "size" "size must be positive"
         match (shape a).[dim] with
         | 1L -> {a with Shape=List.set dim size a.Shape; Stride=List.set dim 0L a.Stride}
-        | _ -> failwithf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
+        | _ -> 
+            let msg = 
+                sprintf "dimension %d of shape %A must be of size 1 to broadcast" dim (shape a)
+            raise (CannotBroadcast msg)
 
     /// pads shapes from the left until they have same rank
     let rec padToSame a b =
@@ -253,23 +282,24 @@ module TensorLayout =
                 sa <- padLeft sa
             sa)
 
-    /// cannot broadcast to same shape
-    exception CannotBroadcast of string
-
     /// broadcasts to have the same size in the given dimensions
     let broadcastToSameInDims dims ain bin =
         let mutable a, b = ain, bin
         for d in dims do
             if not (d < nDims a && d < nDims b) then
-                sprintf "cannot broadcast shapes %A and %A in non-existant dimension %d" 
-                    (shape ain) (shape bin) d |> CannotBroadcast |> raise                    
+                let msg = 
+                    sprintf "cannot broadcast shapes %A and %A in non-existant dimension %d" 
+                        (shape ain) (shape bin) d 
+                raise (CannotBroadcast msg)
             match (shape a).[d], (shape b).[d] with
             | al, bl when al = bl -> ()
             | al, bl when al = 1L -> a <- broadcastDim d bl a
             | al, bl when bl = 1L -> b <- broadcastDim d al b
             | _ -> 
-                sprintf "cannot broadcast shapes %A and %A to same size in dimensions %A" 
-                    (shape ain) (shape bin) dims |> CannotBroadcast |> raise
+                let msg = 
+                    sprintf "cannot broadcast shapes %A and %A to same size in dimensions %A" 
+                        (shape ain) (shape bin) dims
+                raise (CannotBroadcast msg)
         a, b       
 
     /// broadcasts to have the same size in the given dimensions    
@@ -277,8 +307,9 @@ module TensorLayout =
         let mutable sas = sas
         for d in dims do
             if not (sas |> List.forall (fun sa -> d < nDims sa)) then
-                sprintf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
-                |> CannotBroadcast |> raise 
+                let msg =
+                    sprintf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
+                raise (CannotBroadcast msg)
             let ls = sas |> List.map (fun sa -> sa.Shape.[d])
             if ls |> List.exists ((=) 1L) then
                 let nonBc = ls |> List.filter (fun l -> l <> 1L)
@@ -290,11 +321,14 @@ module TensorLayout =
                         if sa.Shape.[d] <> target then sa |> broadcastDim d target
                         else sa)
                 | _ ->
-                    sprintf "cannot broadcast shapes %A to same size in dimension %d because \
-                             they don't agree in the target size" sas d  
-                             |> CannotBroadcast |> raise              
+                    let msg =
+                        sprintf "cannot broadcast shapes %A to same size in dimension %d because \
+                                 they don't agree in the target size" sas d  
+                    raise (CannotBroadcast msg)
             elif Set ls |> Set.count > 1 then
-                failwithf "non-broadcast dimension %d of shapes %A does not agree" d sas
+                let msg =
+                    sprintf "non-broadcast dimension %d of shapes %A does not agree" d sas
+                raise (CannotBroadcast msg)
         sas
 
     /// broadcasts to have the same size
@@ -303,8 +337,9 @@ module TensorLayout =
         try
             broadcastToSameInDims [0..nDims a - 1] a b
         with CannotBroadcast _ ->
-            sprintf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
-            |> CannotBroadcast |> raise
+            let msg =
+                sprintf "cannot broadcast shapes %A and %A to same size" (shape ain) (shape bin)
+            raise (CannotBroadcast msg)
 
     /// broadcasts to have the same size
     let broadcastToSameMany sas =
@@ -315,14 +350,17 @@ module TensorLayout =
             try
                 broadcastToSameInDimsMany [0 .. (nDims sas.Head - 1)] sas
             with CannotBroadcast _ ->
-                sprintf "cannot broadcast shapes %A to same size" (sas |> List.map shape)
-                |> CannotBroadcast |> raise
+                let msg =
+                    sprintf "cannot broadcast shapes %A to same size" (sas |> List.map shape)
+                raise (CannotBroadcast msg)
 
-    /// broadcasts a ArrayND to the given shape
+    /// broadcasts a tensor to the given shape
     let broadcastToShape bs ain =
         let bsDim = List.length bs
         if bsDim < nDims ain then
-            failwithf "cannot broadcast to shape %A from shape %A of higher rank" bs (shape ain)        
+            let msg = 
+                sprintf "cannot broadcast to shape %A from shape %A of higher rank" bs (shape ain)        
+            raise (CannotBroadcast msg)
 
         let mutable a = ain
         while nDims a < bsDim do
@@ -331,7 +369,10 @@ module TensorLayout =
             match (shape a).[d], bs.[d] with
             | al, bl when al = bl -> ()
             | al, bl when al = 1L -> a <- broadcastDim d bl a
-            | _ -> failwithf "cannot broadcast shape %A to shape %A" (shape ain) bs
+            | _ -> 
+                let msg =
+                    sprintf "cannot broadcast shape %A to shape %A" (shape ain) bs
+                raise (CannotBroadcast msg)
         a
 
     /// returns true if at least one dimension is broadcasted
@@ -358,15 +399,19 @@ module TensorLayout =
                 if elemsNeeded % elemsSoFar = 0L then
                     shp |> List.map (fun s -> if s = Remainder then elemsNeeded / elemsSoFar else s) 
                 else
-                    failwithf "cannot reshape from %A to %A because %d / %d is not an integer" 
-                              (shape a) shp elemsNeeded elemsSoFar
-            | _ -> failwithf "only the size of one dimension can be determined automatically, but shape was %A" shp
+                    invalidArg "shp"
+                        (sprintf "cannot reshape from %A to %A because %d / %d is not an integer" 
+                                 (shape a) shp elemsNeeded elemsSoFar)
+            | _ -> 
+                invalidArg "shp"
+                    (sprintf "only the size of one dimension can be determined automatically, but shape was %A" shp)
           
         // check that number of elements does not change
         let shpElems = List.fold (*) 1L shp
         if shpElems <> nElems a then
-            failwithf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
-                      (shape a) (nElems a) shp shpElems
+            invalidArg "shp"
+                (sprintf "cannot reshape from shape %A (with %d elements) to shape %A (with %d elements)" 
+                         (shape a) (nElems a) shp shpElems)
 
         // try to transform stride using singleton insertions and removals
         let rec tfStride newStr newShp aStr aShp =
@@ -400,12 +445,16 @@ module TensorLayout =
     let reshape shp a =
         match tryReshape shp a with
         | Some layout -> layout
-        | None -> failwithf "cannot reshape layout %A into shape %A without copying" a shp
+        | None -> 
+            let msg =
+                sprintf "cannot reshape layout %A into shape %A without copying" a shp
+            raise (ImpossibleWithoutCopy msg)
 
     /// swaps the given dimensions
     let swapDim ax1 ax2 a =
         if not (0 <= ax1 && ax1 < nDims a && 0 <= ax2 && ax2 < nDims a) then
-            failwithf "cannot swap dimension %d with %d of for shape %A" ax1 ax2 (shape a)
+            invalidArg "ax1" 
+                (sprintf "cannot swap dimension %d with %d of for shape %A" ax1 ax2 (shape a))
         let shp, str = shape a, stride a
         {a with Shape=shp |> List.set ax1 shp.[ax2] |> List.set ax2 shp.[ax1]; 
                 Stride=str |> List.set ax1 str.[ax2] |> List.set ax2 str.[ax1];}
@@ -422,7 +471,8 @@ module TensorLayout =
     /// the corresponding axis, i.e. to which position the axis should move.
     let permuteAxes (permut: int list) a =
         if nDims a <> List.length permut then
-            failwithf "permutation %A must have same rank as shape %A" permut (shape a)
+            invalidArg "permut"
+                (sprintf "permutation %A must have same rank as shape %A" permut (shape a))
         {a with Shape = List.permute (fun i -> permut.[i]) a.Shape
                 Stride = List.permute (fun i -> permut.[i]) a.Stride}
 
@@ -437,9 +487,13 @@ module TensorLayout =
         let checkElementRange isEnd nElems i =
             let nElems = if isEnd then nElems + 1L else nElems
             if not (0L <= i && i < nElems) then
-                failwithf "index %d out of range in slice %A for shape %A" i ranges (shape a)
+                let msg =
+                    sprintf "index %d out of range in slice %A for shape %A" i ranges (shape a)
+                raise (IndexOutOfRange msg)
         let failIncompatible () =
-            failwithf "slice %A is incompatible with shape %A" ranges (shape a)
+            let msg =
+                sprintf "slice %A is incompatible with shape %A" ranges (shape a)
+            raise (IndexOutOfRange msg)
 
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
@@ -482,7 +536,8 @@ module TensorLayout =
 
     let allSrcRngsAndTrgtIdxsForAxisReduce dim a =
         if not (0 <= dim && dim < nDims a) then
-            failwithf "reduction dimension %d out of range for shape %A" dim (shape a)
+            invalidArg "dim" 
+                (sprintf "reduction dimension %d out of range for shape %A" dim (shape a))
 
         let rec generate shape dim = seq {
             match shape with
@@ -505,10 +560,12 @@ module TensorLayout =
     let diagAxis ax1 ax2 a =
         checkAxis ax1 a
         checkAxis ax2 a
-        if ax1 = ax2 then failwithf "axes to use for diagonal must be different"
+        if ax1 = ax2 then 
+            invalidArg "ax1" "axes to use for diagonal must be different"
         if a.Shape.[ax1] <> a.Shape.[ax2] then
-            failwithf "array must have same dimensions along axis %d and %d to extract diagonal \
-                       but it has shape %A" ax1 ax2 a.Shape
+            invalidArg "a" 
+                (sprintf "array must have same dimensions along axis %d and %d to extract diagonal 
+                          but it has shape %A" ax1 ax2 a.Shape)
               
         let newShape, newStride = 
             [for ax, (sh, st) in List.indexed (List.zip a.Shape a.Stride) do
@@ -519,3 +576,21 @@ module TensorLayout =
             ] |> List.unzip                
         {a with Shape=newShape; Stride=newStride}
 
+    /// Computes the linear index of a given index.
+    /// Linear indexing is performed in row-major order.
+    let idxToLinear a idx =
+        checkIndex a.Shape idx
+        List.map2 (*) idx (cStride a.Shape) |> List.sum
+
+    /// Computes the index of a given linear index.
+    let linearToIdx a linear = 
+        let idx =
+            (linear, cStride a.Shape) 
+            |> List.unfold (fun (l, str) ->
+                match str with
+                | s::rs -> Some (l / s, (l % s, rs))
+                | _ -> None)
+        checkIndex a.Shape idx
+        idx
+
+            
