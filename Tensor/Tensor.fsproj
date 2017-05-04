@@ -63,7 +63,6 @@
     <Compile Include="Util.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="CudaSup.fs" />
-    <Compile Include="MKL.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="HostBackend.fs" />

@@ -6,15 +6,80 @@ open System.Numerics
 open System.Threading.Tasks
 open System.Linq.Expressions
 open System.Collections.Generic
+open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 open Basics
 
-module private FastLayoutTools =
+
+/// BLAS / LAPACK library imports
+module private BLAS =
+    type lapack_int = int64
+    let LAPACK_ROW_MAJOR = 101
+    let LAPACK_COL_MAJOR = 102
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_sgetrf (int matrix_layout, lapack_int m, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      [<Out>] lapack_int[] ipiv)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_dgetrf (int matrix_layout, lapack_int m, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      [<Out>] lapack_int[] ipiv)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_sgetri (int matrix_layout, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      [<In>] lapack_int[] ipiv)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_dgetri (int matrix_layout, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      [<In>] lapack_int[] ipiv)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_sgeev (int matrix_layout, char jobvl, char jobvr, lapack_int n,
+                                     nativeint a, lapack_int lda,
+                                     nativeint wr, nativeint wi,
+                                     nativeint vl, lapack_int ldvl,
+                                     nativeint vr, lapack_int ldvr)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_dgeev (int matrix_layout, char jobvl, char jobvr, lapack_int n,
+                                     nativeint a, lapack_int lda,
+                                     nativeint wr, nativeint wi,
+                                     nativeint vl, lapack_int ldvl,
+                                     nativeint vr, lapack_int ldvr)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_ssyevd (int matrix_layout, char jobz, char uplo, lapack_int n,
+                                      nativeint a, lapack_int lda,
+                                      nativeint w)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_dsyevd (int matrix_layout, char jobz, char uplo, lapack_int n,
+                                      nativeint a, lapack_int lda,
+                                      nativeint w)
+
+type private BLAS =
+    /// Call BLAS/LAPACK function depending on data type.
+    static member invoke<'T, 'R> (?singleFn: unit -> 'R, 
+                                  ?doubleFn: unit -> 'R,
+                                  ?int32Fn: unit -> 'R,
+                                  ?int64Fn: unit -> 'R) : 'R =
+        match typeof<'T> with
+        | t when t=typeof<single> && singleFn.IsSome -> singleFn.Value () 
+        | t when t=typeof<double> && doubleFn.IsSome -> doubleFn.Value () 
+        | t when t=typeof<int32> && int32Fn.IsSome -> int32Fn.Value () 
+        | t when t=typeof<int64> && int64Fn.IsSome -> int64Fn.Value () 
+        | t -> failwithf "unsupported data type for BLAS operation: %A" t
+
+
+module private Tools =
     let inline checkedInt layout (x: int64) =
         if int64 FSharp.Core.int.MinValue <= x && x <= int64 FSharp.Core.int.MaxValue then
             int x
         else failwithf "cannot convert tensor layout %A to 32-bit integer" layout
-
-open FastLayoutTools
 
 /// Fast layout operations.
 [<Struct>]
@@ -27,10 +92,10 @@ type internal FastLayout32 =
 
     new (layout: TensorLayout) = {
         NDims   = TensorLayout.nDims layout
-        NElems  = TensorLayout.nElems layout |> checkedInt layout
-        Offset  = TensorLayout.offset layout |> checkedInt layout
-        Shape   = TensorLayout.shape layout |> List.toArray |> Array.map (checkedInt layout)
-        Stride  = TensorLayout.stride layout |> List.toArray |> Array.map (checkedInt layout)
+        NElems  = TensorLayout.nElems layout |> Tools.checkedInt layout
+        Offset  = TensorLayout.offset layout |> Tools.checkedInt layout
+        Shape   = TensorLayout.shape layout |> List.toArray |> Array.map (Tools.checkedInt layout)
+        Stride  = TensorLayout.stride layout |> List.toArray |> Array.map (Tools.checkedInt layout)
     }
 
     member inline this.IsPosValid (pos: int[]) =
@@ -1227,16 +1292,58 @@ type internal VectorOps() =
         canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
 
 
+/// pinned .NET managed memory (wraps a GCHandle)
+type PinnedMemory (gcHnd: GCHandle, size: int64) =       
+
+    /// pointer to storage array 
+    member this.Ptr = gcHnd.AddrOfPinnedObject()
+
+    /// size of storage array in bytes
+    member this.Size = size
+
+    interface IDisposable with
+        member this.Dispose() = gcHnd.Free()
+
+
+/// Information for calling BLAS/LAPACK routines.
+type private BlasInfo (memory: PinnedMemory,
+                       offset: nativeint,
+                       rows:   int64,
+                       cols:   int64,
+                       ld:     int64) =
+
+    member this.Ptr  : nativeint       = memory.Ptr + offset
+    member this.Rows : BLAS.lapack_int = rows
+    member this.Cols : BLAS.lapack_int = cols
+    member this.Ld   : BLAS.lapack_int = ld
+
+    interface IDisposable with
+        member this.Dispose() = (memory :> IDisposable).Dispose()
+
+
 /// Storage (using a .NET array) for host tensors.
 type TensorHostStorage<'T> (data: 'T []) =
 
+    /// allocates a new data array with the given number of elements
     new (nElems: int64) =
         if nElems > int64 FSharp.Core.int32.MaxValue then
             failwithf "Cannot create host tensor storage for %d elements, the current
                        limit is %d elements." nElems FSharp.Core.int32.MaxValue
         TensorHostStorage<'T> (Array.zeroCreate (int32 nElems))        
 
+    /// the underlying data array
     member this.Data = data
+
+    /// pins the underlying data array and returns the corresponding pinned memory
+    member this.Pin () =
+        let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
+        new PinnedMemory (gcHnd, data.LongLength * sizeof64<'T>) 
+
+    /// size of underlying data array in elements
+    member this.DataSize = data.LongLength
+
+    /// size of underlying data array in bytes
+    member this.DataSizeInBytes = data.LongLength * sizeof64<'T>
 
     interface ITensorStorage<'T> with
         member this.Id = "Host"
@@ -1244,20 +1351,32 @@ type TensorHostStorage<'T> (data: 'T []) =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Factory = 
             TensorHostStorageFactory.Instance :> ITensorStorageFactory
-            
+
+    override this.Equals other =
+        match other with
+        | :? TensorHostStorage<'T> as os ->
+            LanguagePrimitives.PhysicalEquality this.Data os.Data
+        | _ -> false            
+
+    override this.GetHashCode () =
+        RuntimeHelpers.GetHashCode data
 
 /// Backend for host tensors.
 and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>) =
 
-    let toMe (x: obj) = x :?> TensorHostBackend<'T>
-
+    /// fast layout
     member val internal FastLayout = FastLayout32 layout
+
+    /// underlying TensorHostStorate<'T>
     member this.Storage = storage
+
+    /// underlying data array
     member val Data = storage.Data
+
+    /// data array and fast layout
     member inline internal this.DataAndLayout = 
         {Data=this.Data; FastLayout=this.FastLayout}
             
-
     ///// C++ type name
     //member this.CPPType = 
     //    let dims = TensorLayout.nDims layout
@@ -1272,7 +1391,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     //        "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
     //    sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
     //        dims cppDataType dims shapeStr dims strideStr            
-
 
     static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
@@ -1300,6 +1418,20 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout,
         (c.Backend :?> TensorHostBackend<'TC>).DataAndLayout 
 
+    /// Returns a BlasInfo that exposes the transpose of the specfied matrix to BLAS
+    /// (in column-major order).
+    static member private GetTransposedBlas (mat: Tensor<'T>, allowCopy: bool) =
+        if mat.NDims <> 2 then failwithf "require a matrix but got shape %A" mat.Shape
+        if not (mat.Shape.[0] > 0L && mat.Shape.[1] > 0L) then 
+            failwithf "require a non-empty matrix but got shape %A" mat.Shape
+        let str = mat.Layout.Stride
+        if str.[0] >= 1L && str.[0] >= mat.Shape.[1] && str.[1] = 1L then
+            let storage = mat.Storage :?> TensorHostStorage<'T>
+            new BlasInfo (storage.Pin(), nativeint (mat.Layout.Offset * sizeof64<'T>),
+                          mat.Shape.[1], mat.Shape.[0], str.[0])
+        elif allowCopy then TensorHostBackend<_>.GetTransposedBlas (Tensor.copy mat, false)
+        else failwith "Tensor incompatible with BLAS but copying not allowed"
+
     interface ITensorBackend<'T> with
         member this.Item 
             with get idx = this.Data.[this.FastLayout.Addr idx]
@@ -1310,10 +1442,18 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
             else ScalarOps.Fill (value, trgt)
 
-        member this.Copy (trgt, a) =
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            if VectorOps.CanUse (trgt, a) then VectorOps.Copy (trgt, a)
-            else ScalarOps.Copy (trgt, a)
+        member this.Copy (trgt, src) =
+            if TensorLayout.hasContiguousMemory trgt.Layout &&
+               TensorLayout.hasContiguousMemory src.Layout &&
+               trgt.Layout.Stride = src.Layout.Stride then
+                // use array block copy for contiguous memory block
+                let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
+                Array.Copy (src.Data, src.FastLayout.Offset, 
+                            trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
+            else 
+                let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
+                if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
+                else ScalarOps.Copy (trgt, src)
 
         member this.Convert (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -1576,6 +1716,65 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.ArgMaxLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
             ScalarOps.ArgMaxLastAxis (trgt, src)
+
+        member this.VecVecDot (trgt, a, b) =
+            ()
+
+        member this.MatVecDot (trgt, a, b) =
+            ()
+
+        member this.MatMatDot (trgt, a, b) =
+            ()
+
+        member this.BatchedMatMatDot (trgt, a, b) =
+            ()
+
+        member this.Invert (trgt, src) =
+            let batchShp = trgt.Shape.[0 .. trgt.NDims-3]
+
+            // inversion is done in place, so we have to copy first if trgt and src are different
+            if not (trgt = src) then
+                (this :> ITensorBackend<_>).Copy (trgt, src)
+
+            // iterate over all batch dimensions
+            for batchIdx in TensorLayout.allIdxOfShape batchShp do
+                let batchRng = batchIdx |> List.map RngElem
+                let rng = batchRng @ [RngAll; RngAll]                  
+                let aAry = trgt.[rng]
+
+                // compute LU factorization
+                use a = TensorHostBackend<_>.GetTransposedBlas (aAry, allowCopy=false)
+                let ipiv : BLAS.lapack_int[] = Array.zeroCreate (int32 aAry.Shape.[0])
+                let info =
+                    BLAS.invoke<'T, BLAS.lapack_int> 
+                        (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv)))
+                if info < 0L then failwithf "LAPACK argument error %d" info
+                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
+
+                // compute matrix inverse
+                let info =
+                    BLAS.invoke<'T, BLAS.lapack_int> 
+                        (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv)))
+                if info < 0L then failwithf "LAPACK argument error %d" info
+                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
+
+        member this.SymmetricEigenDecomposition (eigVals, eigVecs, src) =
+            let size = src.Shape.[0]
+            (this :> ITensorBackend<_>).Copy (eigVecs, src)
+            let eigVals = eigVals |> Tensor.reshape [1L; size]
+
+            use a = TensorHostBackend.GetTransposedBlas (eigVecs, allowCopy=false)
+            use w = TensorHostBackend.GetTransposedBlas (eigVals, allowCopy=false)
+            let info = 
+                BLAS.invoke<'T, BLAS.lapack_int> 
+                    (singleFn=(fun () -> BLAS.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr)),
+                     doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr)))
+            if info < 0L then failwithf "LAPACK argument error %d" info
+            if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
+
+            // TODO: eigVals.[0L, *] :> Tensor<'T>, eigVecs.T 
 
         member this.GetEnumerator() : IEnumerator<'T> = 
             let s = seq {

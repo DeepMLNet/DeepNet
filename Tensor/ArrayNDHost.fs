@@ -12,38 +12,9 @@ open MKL
 [<AutoOpen>]
 module ArrayNDHostTypes = 
 
-    /// pinned .NET managed memory
-    type PinnedMemoryT (gcHnd: GCHandle, size: int64) =       
-        /// pointer to storage array 
-        member this.Ptr = gcHnd.AddrOfPinnedObject()
 
-        /// size of storage array in bytes
-        member this.Size = size
 
-        interface IDisposable with
-            member this.Dispose() = gcHnd.Free()
 
-    /// Information for calling BLAS/LAPACK routines.
-    type private BlasInfo (memory: PinnedMemoryT,
-                           offset: nativeint,
-                           rows:   int64,
-                           cols:   int64,
-                           ld:     int64) =
-
-        member this.Ptr  : nativeint  = memory.Ptr + offset
-        member this.Rows : lapack_int = rows
-        member this.Cols : lapack_int = cols
-        member this.Ld   : lapack_int = ld
-
-        interface IDisposable with
-            member this.Dispose() = (memory :> IDisposable).Dispose()
-
-    /// Call BLAS/LAPACK function depending on data type.
-    let private blasTypeChoose<'T, 'R> (singleFn: unit -> 'R) (doubleFn: unit -> 'R) : 'R =
-        match typeof<'T> with
-        | t when t = typeof<single> -> singleFn () 
-        | t when t = typeof<double> -> doubleFn () 
-        | t -> failwithf "unsupported data type for BLAS operation: %A" t
 
     /// type-neutral interface to ArrayNDHostT<'T>
     type IArrayNDHostT =
@@ -61,29 +32,7 @@ module ArrayNDHostTypes =
                           data:        'T []) = 
         inherit Tensor<'T>(layout)
         
-        let fastLayout = FastLayout.ofLayout layout
 
-        /// a new ArrayND in host memory using a managed array as storage
-        new (layout: TensorLayout) =
-            let nElems = TensorLayout.nElems layout
-            if nElems > int64 Microsoft.FSharp.Core.int32.MaxValue then
-                failwithf "The current ArrayNDHostT implementation is limited to %d elements."
-                          Microsoft.FSharp.Core.int32.MaxValue
-            ArrayNDHostT<'T>(layout, Array.zeroCreate (int32 nElems))
-
-        /// underlying data array
-        member this.Data = data
-
-        /// optimized layout operations
-        member this.FastLayout = fastLayout
-
-        /// pins the underlying data array and returns the corresponding GCHandle
-        member this.Pin () =
-            let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-            new PinnedMemoryT (gcHnd, data.LongLength * sizeof64<'T>) 
-
-        /// size of underlying data array in bytes
-        member this.DataSizeInBytes = int64 data.Length * sizeof64<'T>
 
         interface IArrayNDHostT with
             member this.Pin () = this.Pin ()
@@ -93,194 +42,11 @@ module ArrayNDHostTypes =
         interface IToArrayNDHostT<'T> with
             member this.ToHost () = this
 
-        override this.Location = LocHost
 
-        override this.Item
-            with get pos = data.[int32 (TensorLayout.addr pos layout)]
-            and set pos value = 
-                Tensor.doCheckFinite value
-                data.[int32 (TensorLayout.addr pos layout)] <- value 
-
-        override this.NewOfSameType (layout: TensorLayout) = 
-            ArrayNDHostT<'T>(layout) :> Tensor<'T>
-
-        override this.NewOfType<'N> (layout: TensorLayout) =            
-            ArrayNDHostT<'N>(layout) :> Tensor<'N>
-
-        override this.NewView (layout: TensorLayout) = 
-            ArrayNDHostT<'T>(layout, data) :> Tensor<'T>
-
-        override this.CopyTo (dest: Tensor<'T>) =
-            Tensor<'T>.CheckSameShape this dest
-            match dest with
-            | :? ArrayNDHostT<'T> as dest ->
-                if Tensor.hasContiguousMemory this && Tensor.hasContiguousMemory dest &&
-                        Tensor.stride this = Tensor.stride dest then
-                    // use array block copy
-                    let nElems = TensorLayout.nElems this.Layout
-                    Array.Copy (this.Data, this.Layout.Offset, dest.Data, dest.Layout.Offset, nElems)
-                else
-                    // copy element by element
-                    let destData = dest.Data
-                    let destAddrs = FastLayout.allAddr dest.FastLayout
-                    let thisAddrs = FastLayout.allAddr this.FastLayout
-                    for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
-                        destData.[int32 destAddr] <- data.[int32 thisAddr]
-
-            | _ -> base.CopyTo dest
-
-        override this.MapImpl (f: 'T -> 'R) (dest: Tensor<'R>) =
-            let dest = dest :?> ArrayNDHostT<'R>
-            let destData = dest.Data
-            let destAddrs = FastLayout.allAddr dest.FastLayout
-            let thisAddrs = FastLayout.allAddr this.FastLayout
-            for destAddr, thisAddr in Seq.zip destAddrs thisAddrs do
-                destData.[int32 destAddr] <- f data.[int32 thisAddr]
-
-        override this.MapInplaceImpl (f: 'T -> 'T) = 
-            let thisAddrs = FastLayout.allAddr this.FastLayout
-            for thisAddr in thisAddrs do
-                data.[int32 thisAddr] <- f data.[int32 thisAddr]
-
-        override this.Map2Impl (f: 'T -> 'T -> 'R) (other: Tensor<'T>) (dest: Tensor<'R>) =
-            let dest = dest :?> ArrayNDHostT<'R>
-            let other = other :?> ArrayNDHostT<'T>
-            let destData = dest.Data
-            let otherData = other.Data
-            let destAddrs = FastLayout.allAddr dest.FastLayout
-            let thisAddrs = FastLayout.allAddr this.FastLayout
-            let otherAddrs = FastLayout.allAddr other.FastLayout
-            for destAddr, thisAddr, otherAddr in Seq.zip3 destAddrs thisAddrs otherAddrs do
-                destData.[int32 destAddr] <- f data.[int32 thisAddr] otherData.[int32 otherAddr]
-
-        override this.IfThenElseImpl (cond: Tensor<bool>) (elseVal: Tensor<'T>) (dest: Tensor<'T>) =
-            let cond = cond :?> ArrayNDHostT<bool>
-            let elseVal = elseVal :?> ArrayNDHostT<'T>
-            let dest = dest :?> ArrayNDHostT<'T>                
-            let condData = cond.Data
-            let ifValData = this.Data
-            let elseValData = elseVal.Data
-            let destData = dest.Data
-            let condAddrs = FastLayout.allAddr cond.FastLayout
-            let ifValAddrs = FastLayout.allAddr this.FastLayout
-            let elseValAddrs = FastLayout.allAddr elseVal.FastLayout
-            let destAddrs = FastLayout.allAddr dest.FastLayout
-            for destAddr, condAddr, (ifValAddr, elseValAddr) in 
-                    Seq.zip3 destAddrs condAddrs (Seq.zip ifValAddrs elseValAddrs) do
-                destData.[int32 destAddr] <- 
-                    if condData.[int32 condAddr] then ifValData.[int32 ifValAddr] else elseValData.[int32 elseValAddr]
-
-        interface IEnumerable<'T> with
-            member this.GetEnumerator() =
-                FastLayout.allAddr this.FastLayout
-                |> Seq.map (fun addr -> this.Data.[int32 addr])
-                |> fun s -> s.GetEnumerator()
-            member this.GetEnumerator() =
-                (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
-                              
-        member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
-            Tensor.view (this.ToRng allArgs) this
-        member this.Item
-            with get ([<System.ParamArray>] allArgs: obj []) = this.GetSlice (allArgs)
-            and set (arg0: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; value :> obj|])
-        member this.Item
-            with set (arg0: obj, arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj) (value: Tensor<'T>) = 
-                this.SetSlice ([|arg0; arg1; arg2; arg3; arg4; arg5; arg6; value :> obj|])
-
-        static member (====) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) ==== b :?> ArrayNDHostT<bool>
-        static member (<<<<) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<<< b :?> ArrayNDHostT<bool>
-        static member (<<==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<== b :?> ArrayNDHostT<bool>
-        static member (>>>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>>> b :?> ArrayNDHostT<bool>
-        static member (>>==) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) >>== b :?> ArrayNDHostT<bool>
-        static member (<<>>) (a: ArrayNDHostT<'T>, b: ArrayNDHostT<'T>) = (a :> Tensor<'T>) <<>> b :?> ArrayNDHostT<bool>
-
-        /// Returns a BlasInfo that exposes the transpose of this matrix to BLAS
-        /// (in column-major order).
-        member private this.GetTransposedBlas copyAllowed =
-            if this.NDims <> 2 then failwithf "require a matrix but got shape %A" this.Shape
-            if not (this.Shape.[0] > 0L && this.Shape.[1] > 0L) then 
-                failwithf "require a non-empty matrix but got shape %A" this.Shape
-            let str = stride this
-            if str.[0] >= 1L && str.[0] >= this.Shape.[1] && str.[1] = 1L then
-                new BlasInfo (this.Pin(), nativeint (this.Layout.Offset * sizeof64<'T>),
-                              this.Shape.[1], this.Shape.[0], str.[0])
-            else
-                if copyAllowed then (Tensor.copy this).GetTransposedBlas copyAllowed
-                else failwith "ArrayNDHost incompatible with BLAS but copying not allowed"
-               
-        /// Computes the matrix inverse.    
-        override this.Invert () =
-            let nd = this.NDims
-            if nd < 2 then 
-                failwithf "require at least a two-dimensional tensor \
-                           for matrix inversion but got %A" this.Shape
-            if this.Shape.[nd-2] <> this.Shape.[nd-1] then
-                failwithf "cannot invert non-square matrix of shape %A" this.Shape
-            let batchShp = this.Shape.[0 .. nd-3]
-
-            let inv = Tensor.copy this
-
-            // iterate over all batch dimensions
-            for batchIdx in TensorLayout.allIdxOfShape batchShp do
-                let batchRng = batchIdx |> List.map RngElem
-                let rng = batchRng @ [RngAll; RngAll]                  
-                let aAry = inv.[rng]
-
-                // compute LU factorization
-                use a = aAry.GetTransposedBlas false
-                let ipiv : lapack_int[] = Array.zeroCreate (int32 aAry.Shape.[0])
-                let info =
-                    blasTypeChoose<'T, lapack_int> 
-                        (fun () -> LAPACKE_sgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
-                        (fun () -> LAPACKE_dgetrf (LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv))
-                if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
-
-                // compute matrix inverse
-                let info =
-                    blasTypeChoose<'T, lapack_int>
-                        (fun () -> LAPACKE_sgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
-                        (fun () -> LAPACKE_dgetri (LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv))
-                if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
-
-            inv :> Tensor<'T>
+             
 
         override this.SymmetricEigenDecomposition () =
-            let nd = this.NDims
-            if nd <> 2 || this.Shape.[0] <> this.Shape.[1] then 
-                failwithf "require a square matrix for symmetric eigen decomposition but got %A" this.Shape
-            let size = this.Shape.[0]
 
-            let eigVecs = Tensor.copy this
-            let eigVals = this.NewOfSameType (TensorLayout.newC [1L; size]) :?> ArrayNDHostT<'T>
-
-            use a = eigVecs.GetTransposedBlas false
-            use w = eigVals.GetTransposedBlas false
-            let info = 
-                blasTypeChoose<'T, lapack_int>
-                    (fun () -> LAPACKE_ssyevd (LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr))
-                    (fun () -> LAPACKE_dsyevd (LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr))
-            if info < 0L then failwithf "LAPACK argument error %d" info
-            if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
-
-            eigVals.[0L, *] :> Tensor<'T>, eigVecs.T 
 
 
 module ArrayNDHost = 
@@ -311,16 +77,6 @@ module ArrayNDHost =
     let scalar value =
         let a = newC [] 
         Tensor.set [] value a
-        a
-
-    /// ArrayNDHostT of given shape filled with zeros.
-    let zeros<'T> shape : ArrayNDHostT<'T> =
-        newC shape
-
-    /// ArrayNDHostT of given shape filled with ones.
-    let ones<'T> shape : ArrayNDHostT<'T> =
-        let a = newC shape
-        Tensor.fillWithOnes a
         a
 
     /// ArrayNDHostT of given shape filled with the given value.

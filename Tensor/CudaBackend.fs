@@ -148,6 +148,23 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
+        member this.VecVecDot (trgt, a, b) =
+            ()
+
+        member this.MatVecDot (trgt, a, b) =
+            ()
+
+        member this.MatMatDot (trgt, a, b) =
+            ()
+
+        member this.BatchedMatMatDot (trgt, a, b) =
+            ()
+
+        member this.Invert (trgt, src) =
+            ()
+
+        member this.SymmetricEigenDecomposition (trgtEigVals, trgtEigVec, src) =
+            ()
 
             
 

@@ -127,7 +127,6 @@ type ITensorStorage =
 type ITensorStorage<'T> =
     inherit ITensorStorage
     abstract Backend:       TensorLayout -> ITensorBackend<'T>
-    //abstract Create:        nElems:int64 -> ITensorStorage<'T>
 
 type ITensorBackend<'T> =
     inherit IEnumerable<'T>
@@ -211,6 +210,15 @@ type ITensorBackend<'T> =
 
     abstract ArgMinLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
     abstract ArgMaxLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
+
+    abstract VecVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract MatVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract MatMatDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+    abstract BatchedMatMatDot:  trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
+
+    abstract Invert:            trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract SymmetricEigenDecomposition: trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * src:Tensor<'T> -> unit
+
 
 
 type ITensorStorageFactory =
@@ -542,7 +550,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Copy source tensor into this tensor.
     /// The source tensor is broadcasted to the size of this tensor, if possible.
     member trgt.FillFrom (src: Tensor<'T>) = 
-        let src = Tensor.PrepareSources (trgt, src)
+        let src = Tensor.PrepareElemwiseSources (trgt, src)
         trgt.CopyFrom src
 
     /// Fills the tensor with the specified constant.
@@ -562,12 +570,12 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// maps all elements using the specified function into this tensor
     member trgt.FillMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
 
     /// maps all elements using the specified function into this tensor using multiple threads
     member trgt.FillParallelMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
 
     /// maps all elements using the specified function into a new tensor
@@ -578,12 +586,12 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// maps all elements using the specified indexed function into this tensor
     member trgt.FillMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
 
     /// maps all elements using the specified indexed function into this tensor using multiple threads
     member trgt.FillParallelMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=true)
 
     /// maps all elements using the specified indexed function into a new tensor
@@ -594,12 +602,12 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// maps all elements using the specified function into this tensor
     member trgt.FillMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
 
     /// maps all elements using the specified function into this tensor using multiple threads
     member trgt.FillParallelMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
 
     /// maps all elements using the specified function into a new tensor
@@ -610,12 +618,12 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// maps all elements using the specified indexed function into this tensor
     member trgt.FillMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
 
     /// maps all elements using the specified indexed function into this tensor using multiple threads
     member trgt.FillParallelMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
 
     /// maps all elements using the specified indexed function into a new tensor
@@ -626,7 +634,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// copies all elements into this tensor and converts their data type appropriately
     member trgt.FillConvert (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Convert (trgt=trgt, src=a)
 
     /// converts all elements to the specified type
@@ -637,7 +645,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise unary (prefix) plus using this tensor as target
     member trgt.FillUnaryPlus (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.UnaryPlus (trgt=trgt, src1=a)
 
     /// element-wise unary (prefix) plus
@@ -648,7 +656,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise unary (prefix) minus using this tensor as target
     member trgt.FillUnaryMinus (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.UnaryMinus (trgt=trgt, src1=a)
 
     /// element-wise unary (prefix) minus
@@ -659,7 +667,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise absolute value  using this tensor as target
     member trgt.FillAbs (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Abs (trgt=trgt, src1=a)
 
     /// element-wise absolute value
@@ -670,7 +678,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise sign (keeping type) using this tensor as target
     member trgt.FillSgn (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sgn (trgt=trgt, src1=a)
 
     /// element-wise sign (keeping type)
@@ -681,7 +689,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise logarithm to base e using this tensor as target
     member trgt.FillLog (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log (trgt=trgt, src1=a)
 
     /// element-wise logarithm to base e
@@ -692,7 +700,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise logarithm to base 10 using this tensor as target
     member trgt.FillLog10 (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log10 (trgt=trgt, src1=a)
 
     /// element-wise logarithm to base 10
@@ -703,7 +711,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise exponential function using this tensor as target
     member trgt.FillExp (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Exp (trgt=trgt, src1=a)
 
     /// element-wise exponential function
@@ -714,7 +722,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise sinus function using this tensor as target
     member trgt.FillSin (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sin (trgt=trgt, src1=a)
 
     /// element-wise sinus function
@@ -725,7 +733,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise cosinus function using this tensor as target
     member trgt.FillCos (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cos (trgt=trgt, src1=a)
 
     /// element-wise cosinus function
@@ -736,7 +744,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise tangens function using this tensor as target
     member trgt.FillTan (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tan (trgt=trgt, src1=a)
 
     /// element-wise tangens function
@@ -747,7 +755,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise arcus sinus function using this tensor as target
     member trgt.FillAsin (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Asin (trgt=trgt, src1=a)
 
     /// element-wise arcus sinus function
@@ -758,7 +766,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise arcus cosinus function using this tensor as target
     member trgt.FillAcos (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Acos (trgt=trgt, src1=a)
 
     /// element-wise arcus cosinus function
@@ -769,7 +777,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise arcus tangens function using this tensor as target
     member trgt.FillAtan (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Atan (trgt=trgt, src1=a)
 
     /// element-wise arcus tangens function
@@ -780,7 +788,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise sinus hyperbolicus function using this tensor as target
     member trgt.FillSinh (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sinh (trgt=trgt, src1=a)
 
     /// element-wise sinus hyperbolicus function
@@ -791,7 +799,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise cosinus hyperbolicus function using this tensor as target
     member trgt.FillCosh (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cosh (trgt=trgt, src1=a)
 
     /// element-wise cosinus hyperbolicus function
@@ -802,7 +810,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise tangens hyperbolicus function using this tensor as target
     member trgt.FillTanh (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tanh (trgt=trgt, src1=a)
 
     /// element-wise tangens hyperbolicus function
@@ -813,7 +821,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise square root using this tensor as target
     member trgt.FillSqrt (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sqrt (trgt=trgt, src1=a)
 
     /// element-wise square root 
@@ -824,7 +832,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise ceiling using this tensor as target
     member trgt.FillCeiling (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Ceiling (trgt=trgt, src1=a)
 
     /// element-wise ceiling
@@ -835,7 +843,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise floor using this tensor as target
     member trgt.FillFloor (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Floor (trgt=trgt, src1=a)
 
     /// element-wise floor
@@ -846,7 +854,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise rounding using this tensor as target
     member trgt.FillRound (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Round (trgt=trgt, src1=a)
 
     /// element-wise rounding
@@ -857,7 +865,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise truncation using this tensor as target
     member trgt.FillTruncate (a: Tensor<'T>) = 
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Truncate (trgt=trgt, src1=a)
 
     /// element-wise truncation
@@ -869,7 +877,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise check if elements are finite (not -Inf, Inf or NaN) using this tensor as target
     member trgt.FillIsFinite (a: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         a.Backend.IsFinite (trgt=trgt, src1=a)
 
     /// element-wise check if elements are finite (not -Inf, Inf or NaN)
@@ -881,7 +889,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise logical negation using this tensor as target
     member trgt.FillNegate (a: Tensor<bool>) = 
         let trgt = trgt.AsBool
-        let a = Tensor.PrepareSources (trgt, a)
+        let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Negate (trgt=trgt, src1=a)
 
     /// element-wise logical negation
@@ -892,7 +900,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise addition of two tensors using this tensor as target
     member trgt.FillAdd (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
    
     /// element-wise addition of two tensors
@@ -905,7 +913,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise subtraction of two tensors using this tensor as target
     member trgt.FillSubtract (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
 
     /// element-wise subtraction of two tensors
@@ -918,7 +926,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise multiplication of two tensors using this tensor as target
     member trgt.FillMultiply (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
 
     /// element-wise multiplication of two tensor
@@ -931,7 +939,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise division of two tensors using this tensor as target
     member trgt.FillDivide (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
 
     /// element-wise division of two tensors
@@ -944,7 +952,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise modulo of two tensors using this tensor as target
     member trgt.FillModulo (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
 
     /// element-wise modulo of two tensors
@@ -957,7 +965,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise power of two tensors using this tensor as target
     member trgt.FillPower (a: Tensor<'T>) (b: Tensor<'T>) = 
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
 
     /// element-wise power of two tensors
@@ -971,7 +979,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise logical "and" of two tensors using this tensor as target
     member trgt.FillAnd (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.And (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "and"
@@ -985,7 +993,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise logical "or" of two tensors using this tensor as target
     member trgt.FillOr (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.Or (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "or"
@@ -999,7 +1007,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise logical "xor" of two tensors using this tensor as target
     member trgt.FillXor (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.Xor (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "xor"
@@ -1013,7 +1021,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise equal of two tensors using this tensor as target
     member trgt.FillEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Equal (trgt=trgt, src1=a, src2=b)
 
     /// element-wise equal
@@ -1027,7 +1035,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise not equal of two tensors using this tensor as target
     member trgt.FillNotEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.NotEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise not equal
@@ -1041,7 +1049,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise less than of two tensors using this tensor as target
     member trgt.FillLess (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Less (trgt=trgt, src1=a, src2=b)
 
     /// element-wise less than
@@ -1055,7 +1063,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise less than of two tensors using this tensor as target
     member trgt.FillLessOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.LessOrEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise less than or equal to
@@ -1069,7 +1077,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise greater than of two tensors using this tensor as target
     member trgt.FillGreater (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Greater (trgt=trgt, src1=a, src2=b)
 
     /// element-wise greater than
@@ -1083,7 +1091,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// element-wise greater than or equal to of two tensors using this tensor as target
     member trgt.FillGreaterOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
-        let a, b = Tensor.PrepareSources (trgt, a, b)           
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.GreaterOrEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise greater than or equal to
@@ -1096,7 +1104,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise picks the maximum of a or b using this tensor as target
     member trgt.FillMaxElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MaxElemwise (trgt=trgt, src1=a, src2=b)
 
     /// element-wise picks the maximum of a or b
@@ -1107,7 +1115,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// element-wise picks the minimum of a or b using this tensor as target
     member trgt.FillMinElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
-        let a, b = Tensor.PrepareSources (trgt, a, b)
+        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MinElemwise (trgt=trgt, src1=a, src2=b)
 
     /// element-wise picks the minimum of a or b
@@ -1119,7 +1127,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Elementwise writes elements from ifTrue if cond is true in this tensor, 
     /// otherwise elements from ifFalse.
     member trgt.FillIfThenElse (cond: Tensor<bool>) (ifTrue: Tensor<'T>) (ifFalse: Tensor<'T>) = 
-        let cond, ifTrue, ifFalse = Tensor.PrepareSources (trgt, cond, ifTrue, ifFalse)
+        let cond, ifTrue, ifFalse = Tensor.PrepareElemwiseSources (trgt, cond, ifTrue, ifFalse)
         trgt.Backend.IfThenElse (trgt=trgt, cond=cond, ifTrue=ifTrue, ifFalse=ifFalse)
 
     /// Elementwise takes elements from ifTrue if cond is true, 
@@ -1342,13 +1350,119 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member any (src: Tensor<bool>) =
         src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0 |> Tensor<_>.value
 
-    ///// dot product
-    //static member (.*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) dotImpl dotImpl dotImpl dotImpl dotImpl a b
+    /// Dot product of two tensors using this tensor as target:
+    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat).
+    member trgt.FillDot (a: Tensor<'T>) (b: Tensor<'T>) = 
+        Tensor.CheckSameStorage [trgt; a; b]
+        match trgt.NDims, a.NDims, b.NDims with
+        | 0, 1, 1 when a.Shape = b.Shape -> 
+            trgt.Backend.VecVecDot (trgt, a, b)
+        | 1, 2, 1 when trgt.Shape.[0] = a.Shape.[0] && a.Shape.[1] = b.Shape.[0] -> 
+            trgt.Backend.MatVecDot (trgt, a, b)
+        | 2, 2, 2 when trgt.Shape.[0] = a.Shape.[0] && trgt.Shape.[1] = b.Shape.[1] &&
+                       a.Shape.[1] = b.Shape.[0] ->
+            trgt.Backend.MatMatDot (trgt, a, b)
+        | nt, na, nb when na > 2 && nt = na && na = nb && a.Shape.[na-1] = b.Shape.[na-2] ->
+            let a = a |> Tensor.broadcastTo (trgt.Shape.[0 .. na-3] @ a.Shape.[na-2 ..])
+            let b = b |> Tensor.broadcastTo (trgt.Shape.[0 .. na-3] @ b.Shape.[na-2 ..])
+            trgt.Backend.BatchedMatMatDot (trgt, a, b)
+        | _ -> 
+            let msg =
+                sprintf "cannot compute dot product between tensors of shapes %A and %A 
+                            into tensor of shape %A" a.Shape b.Shape trgt.Shape
+            raise (ShapeMismatch msg)
 
-    ///// tensor product
-    //static member (%*) (a: #Tensor<'T>, b: #Tensor<'T>) = typedApply2 (unsp) tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl tensorProductImpl a b
+    /// Dot product of two tensors:
+    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
+    /// (batched mat)*(batched vec)=>(batched vec).
+    /// Broadcasting is applied over batch dimensions.
+    static member (.*) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<'T> = 
+        Tensor.CheckSameStorage [a; b]
+        match a.NDims, b.NDims with
+        | 1, 1 when a.Shape = b.Shape -> 
+            let trgt = Tensor<'T> ([], a.Factory)
+            trgt.FillDot a b
+            trgt
+        | 2, 1 when a.Shape.[1] = b.Shape.[0] -> 
+            let trgt = Tensor<'T> ([a.Shape.[0]], a.Factory)
+            trgt.FillDot a b
+            trgt
+        | 2, 2 when a.Shape.[1] = b.Shape.[0] -> 
+            let trgt = Tensor<'T> ([a.Shape.[0]; b.Shape.[1]], a.Factory)
+            trgt.FillDot a b
+            trgt
+        | na, nb when na > 2 && na = nb && a.Shape.[na-1] = b.Shape.[na-2] ->
+            let a, b = Tensor.broadcastToSameInDims ([0 .. na-3], a, b)
+            let trgt = Tensor<'T> (a.Shape.[0 .. na-3] @ [a.Shape.[na-2]; b.Shape.[na-1]], a.Factory)
+            trgt.FillDot a b
+            trgt
+        | na, nb when na > 2 && na = nb+1 && a.Shape.[na-1] = b.Shape.[nb-1] ->
+            let bPad = b.[Fill, NewAxis]
+            let resPad = a .* bPad
+            resPad.[Fill, 0L]
+        | _ -> 
+            let msg =
+                sprintf "cannot compute dot product between tensors of shapes %A and %A" 
+                        a.Shape b.Shape 
+            raise (ShapeMismatch msg)
+
+    /// Dot product of two tensors:
+    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
+    /// (batched mat)*(batched vec)=>(batched vec).
+    /// Broadcasting is applied over batch dimensions.
+    static member dot (a: Tensor<'T>) (b: Tensor<'T>) =
+        a .* b        
+
+    /// Matrix inversion using this tensor as target.
+    /// If the specified tensor has more than two dimensions, the matrices
+    /// consisting of the last two dimensions are inverted.
+    member trgt.FillInvert (a: Tensor<'T>)  = 
+        Tensor.CheckSameStorage [trgt; a]
+        if a.NDims < 2 then
+            invalidArg "a" 
+                (sprintf "need at least a matrix to invert but got shape %A" a.Shape)
+        let a = a |> Tensor.broadcastTo trgt.Shape
+        trgt.Backend.Invert (trgt, a)
+
+    /// Matrix inversion.
+    /// If the specified tensor has more than two dimensions, the matrices
+    /// consisting of the last two dimensions are inverted.
+    static member invert (a: Tensor<'T>) = 
+        let trgt = Tensor<'T> (a.Shape, a.Factory)
+        trgt.FillInvert a
+        trgt
+
+    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+    /// corresponding eigenvalue in 'vals'.
+    static member FillSymmetricEigenDecomposition 
+            (trgtEigVals: Tensor<'T>) (trgtEigVecs: Tensor<'T>) (a: Tensor<'T>) =
+        Tensor.CheckSameStorage [trgtEigVals; trgtEigVecs; a]
+        if a.NDims <> 2 || a.Shape.[0] <> a.Shape.[1] then 
+            invalidArg "a"
+                (sprintf "require a square matrix for symmetric eigen-decomposition 
+                          but got %A" a.Shape)
+        if trgtEigVecs.Shape <> a.Shape then
+            invalidArg "trgtEigVecs"
+                (sprintf "trgtEigVecs and src must have the same shapes but got
+                          %A and %A" trgtEigVecs.Shape a.Shape)
+        if trgtEigVals.NDims <> 1 || trgtEigVals.Shape.[0] <> a.Shape.[0] then
+            invalidArg "trgtEigVals"
+                (sprintf "trgtEigVals must be a vector of length %d but it has shape %A"
+                         a.Shape.[0] trgtEigVals.Shape)                        
+        trgtEigVals.Backend.SymmetricEigenDecomposition (trgtEigVals, trgtEigVecs, a)
+
+    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
+    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
+    /// corresponding eigenvalue in 'vals'.
+    static member symmetricEigenDecomposition (a: Tensor<'T>) =
+        if a.NDims <> 2 then
+            invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
+        let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Factory)
+        let trgtEigVecs = Tensor<'T> (a.Shape, a.Factory)
+        Tensor.FillSymmetricEigenDecomposition trgtEigVals trgtEigVecs a
+        trgtEigVals, trgtEigVecs
         
-
     /// a view of this tensor with the given .NET range
     member inline internal this.GetRng (rngArgs: obj[]) =
         this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
@@ -1547,26 +1661,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 #if false
                        
  
-    /// invert the matrix
-    abstract Invert : unit -> Tensor<'T>
 
-    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
-    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
-    /// corresponding eigenvalue in 'vals'.
-    abstract SymmetricEigenDecomposition: unit -> Tensor<'T> * Tensor<'T>
-
-
-
-
-module Tensor = 
-
-
-
-
-     
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // tensor operations
-    ////////////////////////////////////////////////////////////////////////////////////////////////         
 
     /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dotImpl (a: Tensor<'T>) (b: Tensor<'T>) =
@@ -1600,39 +1695,9 @@ module Tensor =
                 c.[smpl, *, *] <- matrixDot a.[smpl, *, *] b.[smpl, *, *]
             c |> reshape (smplShape @ [aRows; bCols])         
 
-        match nDims a, nDims b with
-            | 1, 1 when shape a = shape b -> 
-                map2 (*) a b |> sum
-            | 2, 1 when (shape a).[1] = (shape b).[0] -> 
-                matrixDot a (padRight b) |> view [RngAll; RngElem 0L] 
-            | 2, 2 when (shape a).[1] = (shape b).[0] ->
-                matrixDot a b
-            | na, nb when na > 2 && na = nb+1 && (shape a).[na-1] = (shape b).[nb-1] ->
-                // batched mat*vec
-                (batchedMatrixDot a (padRight b)).[Fill, 0L]
-            | na, nb when na > 2 && na = nb && (shape a).[na-1] = (shape b).[nb-2] ->
-                // batched mat*mat
-                batchedMatrixDot a b
-            | _ -> 
-                failwithf "cannot compute dot product between arrays of shapes %A and %A" 
-                    (shape a) (shape b)
 
-    /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
-    let inline dot a b =
-        a .* b   
 
-    /// Returns the inverse of the given matrix.
-    /// If the specified tensor has more than two dimensions, the matrices
-    /// consisting of the last two dimensions are inverted.
-    let invert (a: 'A when 'A :> Tensor<_>) : 'A  =
-        a.Invert () :?> 'A
 
-    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
-    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
-    /// corresponding eigenvalue in 'vals'.
-    let symmetricEigenDecomposition (a: 'A when 'A :> Tensor<_>) : 'A * 'A =
-        let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
-        eigVals :?> 'A, eigVecs :?> 'A
 
  
 
@@ -1724,6 +1789,17 @@ module Tensor =
         member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = this.Backend.GetEnumerator()
         member this.GetEnumerator() : System.Collections.IEnumerator = (this.Backend :> IEnumerable).GetEnumerator()
 
+    /// two tensors are equal if they have the same underlying memory and layout
+    override this.Equals other =
+        match other with
+        | :? Tensor<'T> as ot ->
+            this.Storage = ot.Storage && this.Layout = ot.Layout 
+        | _ -> false
+
+    override this.GetHashCode () =
+        hash (this.Storage, this.Layout)
+
+
 
 /// block tensor specification
 type BlockTensor<'T> =
@@ -1745,20 +1821,20 @@ type Tensor =
                                              but they are %A." storages))
         | _ -> ()            
 
-    /// checks that two ArrayNDs have the same shape
+    /// checks that two tensors have the same shape
     static member internal CheckSameShape (a: ITensor) (b: ITensor) =
         if a.Shape <> b.Shape then
             raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
                                            to have same shape" a.Shape b.Shape))
 
     /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
+    static member internal PrepareElemwiseSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
         Tensor.CheckSameStorage [trgt; a]
         let a = a |> Tensor<_>.broadcastTo trgt.Shape
         a
 
     /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareSources<'TR, 'TA, 'TB> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>) 
+    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>) 
             : (Tensor<'TA> * Tensor<'TB>) =
         Tensor.CheckSameStorage [trgt; a; b]
         let a = a |> Tensor<_>.broadcastTo trgt.Shape
@@ -1766,7 +1842,7 @@ type Tensor =
         a, b
 
     /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareSources<'TR, 'TA, 'TB, 'TC> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
+    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB, 'TC> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
             : (Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
         Tensor.CheckSameStorage [trgt; a; b; c]
         let a = a |> Tensor<_>.broadcastTo trgt.Shape
@@ -2102,8 +2178,8 @@ type Tensor =
         let startPos = List.replicate (List.length joinedShape) 0L
 
         for pos, ary in blockPosAndContents 0 startPos bs do
-            let slice = List.map2 (fun p s -> Rng(Some p, Some (p + s))) pos ary.Shape
-            joined.[slice].FillFrom ary
+            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng (Some p, Some (p + s))) 
+            joined.[slice] <- ary
         joined
 
     /// tensor product
@@ -2119,11 +2195,11 @@ type Tensor =
                 |> Seq.toList |> SubBlocks
         generate [] |> Tensor.ofBlocks
 
-    /// Concatenates the sequence of tensors in the given axis.
+    /// Concatenates the sequence of tensors along the given axis.
     static member concat (ax: int) (ts: Tensor<'T> seq) =
         let ts = List.ofSeq ts
         if List.isEmpty ts then
-            invalidArg "ts" "cannot concatenate empty list of tensors"
+            invalidArg "ts" "cannot concatenate empty sequence of tensors"
 
         // check for compatibility
         let shp = ts.Head.Shape
@@ -2186,7 +2262,7 @@ type Tensor =
     /// calculates the pairwise differences along the last axis
     static member diff (a: Tensor<'T>) =
         if a.NDims < 1 then
-            invalidArg "a" "need at least vector to calculate diff"
+            invalidArg "a" "need at least a vector to calculate diff"
         Tensor.diffAxis (a.NDims-1) a
         
 
