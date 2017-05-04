@@ -1619,138 +1619,7 @@ module Tensor =
 
     /// dot product between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
     let inline dot a b =
-        a .* b
-
-    /// block array specification
-    type BlockSpec<'T> =
-        | Blocks of BlockSpec<'T> list
-        | Array of Tensor<'T>
-
-    /// array constructed of other arrays
-    let inline blockArray bs =
-
-        let rec commonShape joinDim shps =               
-            match shps with
-            | [shp] ->
-                List.set joinDim -1L shp
-            | shp::rShps ->
-                let commonShp = commonShape joinDim [shp]
-                if commonShp <> commonShape joinDim rShps then
-                    failwithf "block array blocks must have same rank and be identical in all but the join dimension"
-                commonShp
-            | [] -> []
-
-        let joinSize joinDim (shps: int64 list list) =
-            shps |> List.map (fun shp -> shp.[joinDim]) |> List.sum
-
-        let joinShape joinDim shps =
-            commonShape joinDim shps 
-                |> List.set joinDim (joinSize joinDim shps)
-
-        let rec joinedBlocksShape joinDim bs =
-            match bs with
-            | Blocks blcks ->
-                blcks |> List.map (joinedBlocksShape (joinDim + 1)) |> joinShape joinDim
-            | Array ary ->
-                ary |> shape
-
-        let rec blockPosAndContents (joinDim: int) startPos bs = seq {
-            match bs with
-            | Blocks blcks ->
-                let mutable pos = startPos
-                for blck in blcks do
-                    yield! blockPosAndContents (joinDim + 1) pos blck 
-                    let blckShape = joinedBlocksShape joinDim blck
-                    pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
-            | Array ary ->
-                yield startPos, ary
-        }
-
-        let rec anyArray bs =
-            match bs with
-            | Blocks b -> List.tryPick anyArray b
-            | Array a -> Some a
-                  
-        let tmplArray = Option.get (anyArray bs)
-        let joinedShape = joinedBlocksShape 0 bs
-        let joined = newCOfSameType joinedShape tmplArray
-        let startPos = List.replicate (List.length joinedShape) 0L
-
-        for pos, ary in blockPosAndContents 0 startPos bs do
-            let slice = List.map2 (fun p s -> Rng(Some p, Some (p + s))) pos (shape ary)
-            let joinedSlice = joined |> view slice 
-            copyTo ary joinedSlice
-
-        joined
-    
-    /// tensor product
-    let inline tensorProductImpl (a: Tensor<'T>) (b: Tensor<'T>) : Tensor<'T> =
-        let a, b = padToSame a b
-        let aShp = shape a
-
-        let rec generate pos = 
-            match List.length pos with
-            | dim when dim = nDims a ->
-                let aElem = get pos a
-                Array (aElem * b)
-            | dim ->
-                seq {for p in 0L .. aShp.[dim] - 1L -> generate (pos @ [p])}
-                    |> Seq.toList |> Blocks
-
-        generate [] |> blockArray
-
-    /// tensor product
-    let inline tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) : Tensor<'T> = a %* b
-
-    /// Returns a view of the diagonal along the given axes.
-    /// The diagonal replaces the first axis and the second axis is removed.
-    let diagAxis ax1 ax2 (a: #Tensor<'T>) =
-        relayout (TensorLayout.diagAxis ax1 ax2 a.Layout) a
-
-    /// Returns a view of the diagonal of a matrix as a vector.
-    /// If the specified tensor has more than two dimensions, the diagonals
-    /// along the last two dimensions are returned.
-    let diag (a: #Tensor<'T>) =
-        if a.NDims < 2 then
-            failwithf "need at least a two dimensional array for diagonal but got shape %A" a.Shape
-        diagAxis (a.NDims-2) (a.NDims-1) a
-
-    /// Creates a new array of same shape but with ax2 inserted.
-    /// The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
-    /// The other elements are set to zero.
-    let diagMatAxis ax1 ax2 (a: #Tensor<'T>) =
-        if ax1 = ax2 then failwithf "axes to use for diagonal must be different"
-        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
-        checkAxis ax1 a
-        if not (0 <= ax2 && ax2 <= a.NDims) then
-            failwithf "cannot insert axis at position %d into array of shape %A" ax2 a.Shape
-        let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
-        let d = newCOfSameType dShp a
-        let dDiag = diagAxis ax1 ax2 d
-        dDiag.[Fill] <- a
-        d
-
-    /// Creates a new matrix that has the specified diagonal.
-    /// All other elements are zero.
-    /// If the specified array has more than one dimension, the operation is
-    /// performed batch-wise on the last dimension.
-    let diagMat (a: #Tensor<'T>) =
-        if a.NDims < 1 then
-            failwithf "need at leat a one-dimensional array to create a diagonal matrix"
-        diagMatAxis (a.NDims-1) a.NDims a
-
-    /// Computes the traces along the given axes.
-    let traceAxis ax1 ax2 (a: #Tensor<'T>) =
-        let tax = if ax1 < ax2 then ax1 else ax1 - 1
-        a |> diagAxis ax1 ax2 |> sumAxis tax
-
-    /// Computes the trace of a matrix.
-    /// If the specified tensor has more than two dimensions, the traces
-    /// along the last two dimensions are returned.
-    let trace (a: #Tensor<'T>) =
-        if a.NDims < 2 then
-            failwithf "need at least a two dimensional array for trace but got shape %A" a.Shape
-        traceAxis (a.NDims-2) (a.NDims-1) a
+        a .* b   
 
     /// Returns the inverse of the given matrix.
     /// If the specified tensor has more than two dimensions, the matrices
@@ -1765,75 +1634,7 @@ module Tensor =
         let eigVals, eigVecs = a.SymmetricEigenDecomposition () 
         eigVals :?> 'A, eigVecs :?> 'A
 
-    /// calculates the pairwise differences along the given axis
-    let diffAxis ax (a: #Tensor<'T>) =
-        checkAxis ax a
-        let shftRng = 
-            [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (Some 1L, None)
-                else yield RngAll]
-        let cutRng = 
-            [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2L))
-                else yield RngAll]
-        a.[shftRng] - a.[cutRng]
-
-    /// calculates the pairwise differences along the last axis
-    let diff (a: #Tensor<'T>) =
-        diffAxis (a.NDims-1) a
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // concatenation and replication
-    ////////////////////////////////////////////////////////////////////////////////////////////////         
-
-    /// Concatenates the list of tensors in the given axis.
-    let concat dim (arys: #Tensor<'T> seq) =
-        let arys = List.ofSeq arys
-        if List.isEmpty arys then
-            invalidArg "arys" "cannot concatenate empty list of tensors"
-
-        // check for compatibility
-        let shp = List.head arys |> shape
-        if not (0 <= dim && dim < shp.Length) then
-            failwithf "concatenation axis %d is out of range for shape %A" dim shp
-        for aryIdx, ary in List.indexed arys do
-            if List.without dim ary.Shape <> List.without dim shp then
-                failwithf "concatentation element with index %d with shape %A must \
-                    be equal to shape %A of the first element, except in the concatenation axis %d" 
-                    aryIdx ary.Shape shp dim
-
-        // calculate shape of concatenated tensors
-        let totalSize = arys |> List.sumBy (fun ary -> ary.Shape.[dim])
-        let concatShape = shp |> List.set dim totalSize
-
-        // copy tensors into concatenated tensor
-        let cc = List.head arys |> newCOfSameType concatShape
-        let mutable pos = 0L
-        for ary in arys do
-            let aryLen = ary.Shape.[dim]
-            if aryLen > 0L then
-                let ccRng = 
-                    List.init shp.Length (fun idx ->
-                        if idx = dim then Rng (Some pos, Some (pos + aryLen - 1L))
-                        else RngAll)
-                cc.[ccRng] <- ary
-                pos <- pos + aryLen
-        cc
-
-    /// Replicates the tensor the given number of repetitions along the given axis.
-    let replicate dim reps (ary: #Tensor<'T>) =
-        ary |> checkAxis dim
-        if reps < 0L then
-            invalidArg "reps" "number of repetitions cannot be negative"
-
-        // 1. insert axis of size one left to repetition axis
-        // 2. broadcast along the new axis to number of repetitions
-        // 3. reshape to result shape
-        ary 
-        |> reshape (ary.Shape |> List.insert dim 1L)
-        |> broadcastDim dim reps
-        |> reshape (ary.Shape |> List.set dim (reps * ary.Shape.[dim]))
-
+ 
 
 
 #endif
@@ -1924,6 +1725,15 @@ module Tensor =
         member this.GetEnumerator() : System.Collections.IEnumerator = (this.Backend :> IEnumerable).GetEnumerator()
 
 
+/// block tensor specification
+type BlockTensor<'T> =
+    /// a block consisting of multiple sub-blocks
+    | SubBlocks of BlockTensor<'T> list
+    /// a block consisting of a tensor
+    | Block of Tensor<'T>
+
+
+/// An N-dimensional array with elements of type 'T.
 type Tensor = 
 
     /// checks that all tensors have the same storage
@@ -2189,6 +1999,196 @@ type Tensor =
     /// tensor, matrix or vector norm of given order
     static member norm (a: Tensor<'T>, ?ord: 'T) =
         Tensor.normAxis (0, Tensor.flatten a, ?ord=ord)
+
+    /// Returns a view of the diagonal along the given axes.
+    /// The diagonal replaces the first axis and the second axis is removed.
+    static member diagAxis ax1 ax2 (a: Tensor<'T>) =
+        a |> Tensor.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
+
+    /// Returns a view of the diagonal of a matrix as a vector.
+    /// If the specified tensor has more than two dimensions, the diagonals
+    /// along the last two dimensions are returned.
+    static member diag (a: Tensor<'T>) =
+        if a.NDims < 2 then
+            invalidArg "a"
+                (sprintf "need at least a two dimensional array for diagonal but got shape %A" a.Shape)
+        Tensor.diagAxis (a.NDims-2) (a.NDims-1) a
+
+    /// Creates a new tensor of same shape but with ax2 inserted.
+    /// The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
+    /// The other elements are set to zero.
+    static member diagMatAxis ax1 ax2 (a: Tensor<'T>) =
+        if ax1 = ax2 then 
+            invalidArg "ax1" "axes to use for diagonal must be different"
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        a.CheckAxis ax1
+        if not (0 <= ax2 && ax2 <= a.NDims) then
+            invalidArg "ax2"
+                (sprintf "cannot insert axis at position %d into array of shape %A" ax2 a.Shape)
+        let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
+        let d = Tensor.zeros a.Factory dShp
+        let dDiag = Tensor.diagAxis ax1 ax2 d
+        dDiag.FillFrom a
+        d
+
+    /// Creates a new matrix that has the specified diagonal.
+    /// All other elements are zero.
+    /// If the specified array has more than one dimension, the operation is
+    /// performed batch-wise on the last dimension.
+    static member diagMat (a: Tensor<'T>) =
+        if a.NDims < 1 then
+            invalidArg "a" "need at leat a one-dimensional array to create a diagonal matrix"
+        Tensor.diagMatAxis (a.NDims-1) a.NDims a
+
+    /// Computes the traces along the given axes.
+    static member traceAxis ax1 ax2 (a: Tensor<'T>) =
+        let tax = if ax1 < ax2 then ax1 else ax1 - 1
+        a |> Tensor.diagAxis ax1 ax2 |> Tensor.sumAxis tax
+
+    /// Computes the trace of a matrix.
+    /// If the specified tensor has more than two dimensions, the traces
+    /// along the last two dimensions are returned.
+    static member trace (a: Tensor<'T>) =
+        if a.NDims < 2 then
+            invalidArg "a" 
+                (sprintf "need at least a two dimensional array for trace but got shape %A" a.Shape)
+        Tensor.traceAxis (a.NDims-2) (a.NDims-1) a
+
+    /// tensor constructed of subtensors using a BlockTensor specification
+    static member ofBlocks (bs: BlockTensor<'T>) =
+        let rec commonShape joinDim shps =               
+            match shps with
+            | [shp] -> List.set joinDim -1L shp
+            | shp::rShps ->
+                let commonShp = commonShape joinDim [shp]
+                if commonShp <> commonShape joinDim rShps then
+                    invalidArg "bs" "block tensor blocks must have same rank and be 
+                                     identical in all but the join dimension"
+                commonShp
+            | [] -> []
+
+        let joinSize joinDim (shps: int64 list list) =
+            shps |> List.map (fun shp -> shp.[joinDim]) |> List.sum
+
+        let joinShape joinDim shps =
+            commonShape joinDim shps 
+            |> List.set joinDim (joinSize joinDim shps)
+
+        let rec joinedBlocksShape joinDim bs =
+            match bs with
+            | SubBlocks blcks ->
+                blcks |> List.map (joinedBlocksShape (joinDim + 1)) |> joinShape joinDim
+            | Block ary -> ary.Shape
+
+        let rec blockPosAndContents (joinDim: int) startPos bs = seq {
+            match bs with
+            | SubBlocks blcks ->
+                let mutable pos = startPos
+                for blck in blcks do
+                    yield! blockPosAndContents (joinDim + 1) pos blck 
+                    let blckShape = joinedBlocksShape joinDim blck
+                    pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
+            | Block ary -> yield startPos, ary
+        }
+
+        let rec anyArray bs =
+            match bs with
+            | SubBlocks b -> List.tryPick anyArray b
+            | Block a -> Some a
+                  
+        let tmplArray = Option.get (anyArray bs)
+        let joinedShape = joinedBlocksShape 0 bs
+        let joined = Tensor<_> (joinedShape, tmplArray.Factory)
+        let startPos = List.replicate (List.length joinedShape) 0L
+
+        for pos, ary in blockPosAndContents 0 startPos bs do
+            let slice = List.map2 (fun p s -> Rng(Some p, Some (p + s))) pos ary.Shape
+            joined.[slice].FillFrom ary
+        joined
+
+    /// tensor product
+    static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
+        let a, b = Tensor.padToSame (a, b)
+        let rec generate (pos: int64 list) = 
+            match List.length pos with
+            | dim when dim = a.NDims ->
+                let slice = pos |> List.map RngElem
+                Block (a.[slice] * b)
+            | dim ->
+                seq {for p in 0L .. a.Shape.[dim] - 1L -> generate (pos @ [p])}
+                |> Seq.toList |> SubBlocks
+        generate [] |> Tensor.ofBlocks
+
+    /// Concatenates the sequence of tensors in the given axis.
+    static member concat (ax: int) (ts: Tensor<'T> seq) =
+        let ts = List.ofSeq ts
+        if List.isEmpty ts then
+            invalidArg "ts" "cannot concatenate empty list of tensors"
+
+        // check for compatibility
+        let shp = ts.Head.Shape
+        if not (0 <= ax && ax < shp.Length) then
+            invalidArg "ax" 
+                (sprintf "concatenation axis %d is out of range for shape %A" ax shp)
+        for aryIdx, ary in List.indexed ts do
+            if List.without ax ary.Shape <> List.without ax shp then
+                let msg =
+                    sprintf "concatentation element with index %d with shape %A must \
+                             be equal to shape %A of the first element, except in the concatenation axis %d" 
+                             aryIdx ary.Shape shp ax
+                raise (ShapeMismatch msg)
+
+        // calculate shape of concatenated tensors
+        let totalSize = ts |> List.sumBy (fun ary -> ary.Shape.[ax])
+        let concatShape = shp |> List.set ax totalSize
+
+        // copy tensors into concatenated tensor
+        let cc = Tensor(concatShape, ts.Head.Factory)
+        let mutable pos = 0L
+        for ary in ts do
+            let aryLen = ary.Shape.[ax]
+            if aryLen > 0L then
+                let ccRng = 
+                    List.init shp.Length (fun idx ->
+                        if idx = ax then Rng (Some pos, Some (pos + aryLen - 1L))
+                        else RngAll)
+                cc.[ccRng] <- ary
+                pos <- pos + aryLen
+        cc
+
+    /// Replicates the tensor the given number of repetitions along the given axis.
+    static member replicate (ax: int) (reps: int64) (a: Tensor<'T>) =
+        a.CheckAxis ax
+        if reps < 0L then
+            invalidArg "reps" "number of repetitions cannot be negative"
+
+        // 1. insert axis of size one left to repetition axis
+        // 2. broadcast along the new axis to number of repetitions
+        // 3. reshape to result shape
+        a 
+        |> Tensor.reshape (a.Shape |> List.insert ax 1L)
+        |> Tensor.broadcastDim ax reps
+        |> Tensor.reshape (a.Shape |> List.set ax (reps * a.Shape.[ax]))
+
+    /// calculates the pairwise differences along the given axis
+    static member diffAxis (ax: int) (a: Tensor<'T>) =
+        a.CheckAxis ax 
+        let shftRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (Some 1L, None)
+                else yield RngAll]
+        let cutRng = 
+            [for d=0 to a.NDims-1 do
+                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2L))
+                else yield RngAll]
+        a.[shftRng] - a.[cutRng]
+
+    /// calculates the pairwise differences along the last axis
+    static member diff (a: Tensor<'T>) =
+        if a.NDims < 1 then
+            invalidArg "a" "need at least vector to calculate diff"
+        Tensor.diffAxis (a.NDims-1) a
+        
 
 
 module Tensor =

@@ -1591,7 +1591,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
 
 /// Factory for host tensors.
-and TensorHostStorageFactory () =
+and TensorHostStorageFactory private () =
     static member Instance = TensorHostStorageFactory () 
 
     interface ITensorStorageFactory with
