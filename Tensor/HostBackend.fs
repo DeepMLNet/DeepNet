@@ -11,11 +11,87 @@ open System.Runtime.InteropServices
 open Basics
 
 
+/// pinned .NET managed memory (wraps a GCHandle)
+type PinnedMemory (gcHnd: GCHandle, size: int64) =       
+    let mutable disposed = false
+
+    /// pointer to storage array 
+    member this.Ptr = gcHnd.AddrOfPinnedObject()
+
+    /// size of storage array in bytes
+    member this.Size = size
+
+    interface IDisposable with
+        member this.Dispose() = 
+            if not disposed then
+                gcHnd.Free()
+                disposed <- true
+
+    override this.Finalize() = (this :> IDisposable).Dispose()
+
+
 /// BLAS / LAPACK library imports
 module private BLAS =
     type lapack_int = int64
+    type MKL_INT = int64
+
+    type CBLAS_LAYOUT =
+        | CblasRowMajor = 101
+        | CblasColMajor = 102
+    type CBLAS_TRANSPOSE =
+        | CblasNoTrans = 111
+        | CblasTrans = 112
+        | CblasConjTrans = 113
+    type CBLAS_UPLO = 
+        | CblasUpper = 121
+        | CblasLower = 122
+    
     let LAPACK_ROW_MAJOR = 101
     let LAPACK_COL_MAJOR = 102
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern single cblas_sdot (MKL_INT n, nativeint x, MKL_INT incx, nativeint y, MKL_INT incy)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern double cblas_ddot (MKL_INT n, nativeint x, MKL_INT incx, nativeint y, MKL_INT incy)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_sgemv (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE TransA,
+                             MKL_INT M, MKL_INT N, single alpha,
+                             nativeint A, MKL_INT lda, nativeint X, MKL_INT incx,
+                             single beta, nativeint Y, MKL_INT incy)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_dgemv (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE TransA,
+                             MKL_INT M, MKL_INT N, double alpha,
+                             nativeint A, MKL_INT lda, nativeint X, MKL_INT incx,
+                             double beta, nativeint Y, MKL_INT incy)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_sgemm (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE TransA, CBLAS_TRANSPOSE TransB,
+                             MKL_INT M, MKL_INT N, MKL_INT K, single alpha,
+                             nativeint A, MKL_INT lda, nativeint B, MKL_INT ldb,
+                             single beta, nativeint C, MKL_INT ldc)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_dgemm (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE TransA, CBLAS_TRANSPOSE TransB,
+                             MKL_INT M, MKL_INT N, MKL_INT K, double alpha,
+                             nativeint A, MKL_INT lda, nativeint B, MKL_INT ldb,
+                             double beta, nativeint C, MKL_INT ldc)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_sgemm_batch (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE[] TransA, CBLAS_TRANSPOSE[] TransB,
+                                   MKL_INT[] M, MKL_INT[] N, MKL_INT[] K, single[] alpha,
+                                   nativeint[] A, MKL_INT[] lda, nativeint[] B, MKL_INT[] ldb,
+                                   single[] beta, nativeint[] C, MKL_INT[] ldc,
+                                   MKL_INT group_count, MKL_INT[] group_size)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern void cblas_dgemm_batch (CBLAS_LAYOUT Layout, CBLAS_TRANSPOSE[] TransA, CBLAS_TRANSPOSE[] TransB,
+                                   MKL_INT[] M, MKL_INT[] N, MKL_INT[] K, double[] alpha,
+                                   nativeint[] A, MKL_INT[] lda, nativeint[] B, MKL_INT[] ldb,
+                                   double[] beta, nativeint[] C, MKL_INT[] ldc,
+                                   MKL_INT group_count, MKL_INT[] group_size)
 
     [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
     extern lapack_int LAPACKE_sgetrf (int matrix_layout, lapack_int m, lapack_int n, 
@@ -73,6 +149,63 @@ type private BLAS =
         | t when t=typeof<int32> && int32Fn.IsSome -> int32Fn.Value () 
         | t when t=typeof<int64> && int64Fn.IsSome -> int64Fn.Value () 
         | t -> failwithf "unsupported data type for BLAS operation: %A" t
+
+
+/// Information for passing a matrix to BLAS/LAPACK routines.
+/// The BlasInfo takes ownership of the PinnedMemory and disposes it when disposed.
+type private BlasMatrixInfo (memory:    PinnedMemory,
+                             offsets:   nativeint[],
+                             rows:      int64,
+                             cols:      int64,
+                             ld:        int64,
+                             trans:     BLAS.CBLAS_TRANSPOSE,
+                             disposeFn: (unit -> unit)) =
+
+    member this.Ptr : nativeint = 
+        if offsets.Length = 1 then memory.Ptr + offsets.[0]
+        else failwith "this BlasInfo is representing a batch of matrices"
+    member this.Ptrs : nativeint [] =
+        offsets |> Array.map (fun o -> memory.Ptr + o)
+    member this.Rows      : BLAS.MKL_INT         = rows
+    member this.Cols      : BLAS.MKL_INT         = cols
+    member this.Ld        : BLAS.MKL_INT         = ld
+    member this.Trans     : BLAS.CBLAS_TRANSPOSE = trans
+    member this.OpRows    : BLAS.MKL_INT         = 
+        match this.Trans with 
+        | BLAS.CBLAS_TRANSPOSE.CblasNoTrans   -> this.Rows
+        | BLAS.CBLAS_TRANSPOSE.CblasTrans   
+        | BLAS.CBLAS_TRANSPOSE.CblasConjTrans -> this.Cols
+        | _ -> failwith "invalid transposition mode"                                              
+    member this.OpCols    : BLAS.MKL_INT         = 
+        match this.Trans with 
+        | BLAS.CBLAS_TRANSPOSE.CblasNoTrans   -> this.Cols
+        | BLAS.CBLAS_TRANSPOSE.CblasTrans   
+        | BLAS.CBLAS_TRANSPOSE.CblasConjTrans -> this.Rows
+        | _ -> failwith "invalid transposition mode"
+    member this.BatchSize  : BLAS.MKL_INT         = int64 offsets.Length 
+
+    interface IDisposable with
+        member this.Dispose() = 
+            disposeFn ()
+            (memory :> IDisposable).Dispose()
+
+
+/// Information for passing a vector to BLAS/LAPACK routines.
+/// The BlasInfo takes ownership of the PinnedMemory and disposes it when disposed.
+type private BlasVectorInfo (memory:    PinnedMemory,
+                             offset:    nativeint,
+                             size:      int64,
+                             inc:       int64,
+                             disposeFn: (unit -> unit)) =
+
+    member this.Ptr       : nativeint            = memory.Ptr + offset
+    member this.Size      : BLAS.MKL_INT         = size
+    member this.Inc       : BLAS.MKL_INT         = inc
+
+    interface IDisposable with
+        member this.Dispose() = 
+            disposeFn ()
+            (memory :> IDisposable).Dispose()
 
 
 module private Tools =
@@ -1292,35 +1425,6 @@ type internal VectorOps() =
         canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
 
 
-/// pinned .NET managed memory (wraps a GCHandle)
-type PinnedMemory (gcHnd: GCHandle, size: int64) =       
-
-    /// pointer to storage array 
-    member this.Ptr = gcHnd.AddrOfPinnedObject()
-
-    /// size of storage array in bytes
-    member this.Size = size
-
-    interface IDisposable with
-        member this.Dispose() = gcHnd.Free()
-
-
-/// Information for calling BLAS/LAPACK routines.
-type private BlasInfo (memory: PinnedMemory,
-                       offset: nativeint,
-                       rows:   int64,
-                       cols:   int64,
-                       ld:     int64) =
-
-    member this.Ptr  : nativeint       = memory.Ptr + offset
-    member this.Rows : BLAS.lapack_int = rows
-    member this.Cols : BLAS.lapack_int = cols
-    member this.Ld   : BLAS.lapack_int = ld
-
-    interface IDisposable with
-        member this.Dispose() = (memory :> IDisposable).Dispose()
-
-
 /// Storage (using a .NET array) for host tensors.
 type TensorHostStorage<'T> (data: 'T []) =
 
@@ -1418,23 +1522,82 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout,
         (c.Backend :?> TensorHostBackend<'TC>).DataAndLayout 
 
-    /// Returns a BlasInfo that exposes the transpose of the specfied matrix to BLAS
-    /// (in column-major order).
-    static member private GetTransposedBlas (mat: Tensor<'T>, allowCopy: bool) =
-        if mat.NDims <> 2 then failwithf "BLAS call requires a matrix but got shape %A" mat.Shape
-        if not (mat.Shape.[0] > 0L && mat.Shape.[1] > 0L) then 
-            failwithf "BLAS call requires a non-empty matrix but got shape %A" mat.Shape
-        let str = mat.Layout.Stride
-        if str.[0] >= 1L && str.[0] >= mat.Shape.[1] && str.[1] = 1L then
-            let storage = mat.Storage :?> TensorHostStorage<'T>
-            new BlasInfo (storage.Pin(), nativeint (mat.Layout.Offset * sizeof64<'T>),
-                          mat.Shape.[1], mat.Shape.[0], str.[0])
-        elif allowCopy then TensorHostBackend<_>.GetTransposedBlas (Tensor.copy mat, false)
-        else 
-            let msg =
-                sprintf "matrix with shape %A and strides %A is incompatible with BLAS/LAPACK"
-                        mat.Shape mat.Layout.Stride
-            raise (StrideMismatch msg)
+    /// Internal function for GetBlasVector.
+    static member private GetBlasVectorInfo (vec: Tensor<'T>, ?disposeFn) =
+        let disposeFn = defaultArg disposeFn id
+        if vec.NDims <> 1 then 
+            failwithf "BLAS operation requires a vector but got tensor of shape %A" vec.Shape
+        let storage = vec.Storage :?> TensorHostStorage<'T>
+        match vec.Layout.Stride, vec.Layout.Shape with
+        | [m], [ms] when m <> 0L ->   // increment <> 0
+            new BlasVectorInfo (storage.Pin(), nativeint (sizeof64<'T> * vec.Layout.Offset), 
+                                ms, m, disposeFn) |> Some
+        | _  -> None                  // not acceptable BLAS layout
+
+    /// Returns a BlasVectorInfo that exposes the specfied vector to BLAS
+    /// as a source and/or target. 
+    /// When allowCopy is true, then:
+    /// - the source might be copied into a temporary tensor,
+    /// - the result might be copied from a temporary tensor into the target, when
+    ///   the returned BlasMatrixInfo is disposed.
+    static member private GetBlasVector (vec: Tensor<'T>, isSource: bool, isTarget: bool,
+                                         ?allowCopy: bool) =
+        let allowCopy = defaultArg allowCopy true                        
+        match TensorHostBackend<_>.GetBlasVectorInfo (vec) with
+        | Some bi -> bi
+        | None when allowCopy ->
+            let tmp = Tensor<'T>(vec.Shape, vec.Factory, order=ColumnMajor)
+            if isSource then tmp.CopyFrom vec
+            let disposeFn () = if isTarget then vec.CopyFrom tmp
+            TensorHostBackend<_>.GetBlasVectorInfo (tmp, disposeFn=disposeFn) 
+            |> Option.get
+        | None ->
+            failwithf "tensor with shape %A and strides %A is not a valid BLAS vector"
+                      vec.Shape vec.Layout.Stride
+
+    /// Internal function for GetBlasMatrix.
+    static member private GetBlasMatrixInfo (mat: Tensor<'T>, canTranspose, ?disposeFn) =
+        let disposeFn = defaultArg disposeFn id
+        if mat.NDims < 2 then 
+            failwithf "BLAS operation requires a matrix but got tensor of shape %A" mat.Shape
+        let storage = mat.Storage :?> TensorHostStorage<'T>
+        let offsets = 
+            TensorLayout.allIdxOfShape mat.Shape.[0 .. mat.NDims-3]
+            |> Seq.map (fun batchIdx -> 
+                let idx = batchIdx @ [0L; 0L]
+                sizeof64<'T> * TensorLayout.addr idx mat.Layout |> nativeint)
+            |> Array.ofSeq
+        match mat.Layout.Stride.[mat.NDims-2 ..], mat.Layout.Shape.[mat.NDims-2 ..] with
+        | [m;  1L], [ms; ns] when m >= max 1L ns && canTranspose ->   // row-major
+            new BlasMatrixInfo (storage.Pin(), offsets, ns, ms, m, 
+                                BLAS.CBLAS_TRANSPOSE.CblasTrans, disposeFn) |> Some
+        | [1L; n],  [ms; ns] when n >= max 1L ms ->                   // column-major
+            new BlasMatrixInfo (storage.Pin(), offsets, ms, ns, n, 
+                                BLAS.CBLAS_TRANSPOSE.CblasNoTrans, disposeFn) |> Some            
+        | _  -> None                                                  // not acceptable BLAS layout
+
+    /// Returns a BlasMatrixInfo that exposes the specfied matrix to BLAS
+    /// as a source and/or target. 
+    /// If canTranpose is true, then the BLAS call must accept a tranpose parameter.
+    /// When allowCopy is true, then:
+    /// - the source might be copied into a temporary tensor,
+    /// - the result might be copied from a temporary tensor into the target, when
+    ///   the returned BlasMatrixInfo is disposed.
+    static member private GetBlasMatrix (mat: Tensor<'T>, isSource: bool, isTarget: bool,
+                                         canTranspose: bool, ?allowCopy: bool) =
+        let allowCopy = defaultArg allowCopy true                        
+        match TensorHostBackend<_>.GetBlasMatrixInfo (mat, canTranspose=canTranspose) with
+        | Some bi -> bi
+        | None when allowCopy ->
+            let tmp = Tensor<'T>(mat.Shape, mat.Factory, order=ColumnMajor)
+            if isSource then tmp.CopyFrom mat
+            let disposeFn () = if isTarget then mat.CopyFrom tmp
+            TensorHostBackend<_>.GetBlasMatrixInfo (tmp, canTranspose=canTranspose, 
+                                                    disposeFn=disposeFn) 
+            |> Option.get
+        | None ->
+            failwithf "tensor with shape %A and strides %A is not a valid BLAS matrix"
+                      mat.Shape mat.Layout.Stride
 
     interface ITensorBackend<'T> with
         member this.Item 
@@ -1722,58 +1885,104 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.ArgMaxLastAxis (trgt, src)
 
         member this.VecVecDot (trgt, a, b) =
-            ()
+            use x = TensorHostBackend<_>.GetBlasVector (a, isSource=true, isTarget=false)
+            use y = TensorHostBackend<_>.GetBlasVector (b, isSource=true, isTarget=false)
+            BLAS.invoke<'T, unit>
+                (singleFn=(fun () -> 
+                    let trgt = trgt |> box :?> Tensor<single>
+                    trgt.Value <- BLAS.cblas_sdot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)),
+                 doubleFn=(fun () -> 
+                    let trgt = trgt |> box :?> Tensor<double>
+                    trgt.Value <- BLAS.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
 
         member this.MatVecDot (trgt, a, b) =
-            ()
+            use a = TensorHostBackend<_>.GetBlasMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+            use x = TensorHostBackend<_>.GetBlasVector (b, isSource=true, isTarget=false)
+            use y = TensorHostBackend<_>.GetBlasVector (trgt, isSource=false, isTarget=true)
+            BLAS.invoke<'T, unit>
+                (singleFn=(fun () -> BLAS.cblas_sgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                       a.Trans, a.Rows, a.Cols, 1.0f,
+                                                       a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                       0.0f, y.Ptr, y.Inc)),
+                 doubleFn=(fun () -> BLAS.cblas_dgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                       a.Trans, a.Rows, a.Cols, 1.0,
+                                                       a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                       0.0, y.Ptr, y.Inc)))  
 
         member this.MatMatDot (trgt, a, b) =
-            ()
+            use a = TensorHostBackend<_>.GetBlasMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+            use b = TensorHostBackend<_>.GetBlasMatrix (b, isSource=true, isTarget=false, canTranspose=true)
+            use c = TensorHostBackend<_>.GetBlasMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
+            BLAS.invoke<'T, unit>
+                (singleFn=(fun () -> BLAS.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                       a.Trans, b.Trans, a.OpRows, b.OpCols, a.OpCols, 
+                                                       1.0f, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                       0.0f, c.Ptr, c.Ld)),
+                 doubleFn=(fun () -> BLAS.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                       a.Trans, b.Trans, a.OpRows, b.OpCols, a.OpCols, 
+                                                       1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                       0.0, c.Ptr, c.Ld)))                                                      
 
         member this.BatchedMatMatDot (trgt, a, b) =
-            ()
+            use a = TensorHostBackend<_>.GetBlasMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+            use b = TensorHostBackend<_>.GetBlasMatrix (b, isSource=true, isTarget=false, canTranspose=true)
+            use c = TensorHostBackend<_>.GetBlasMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
+            BLAS.invoke<'T, unit>
+                (singleFn=(fun () -> BLAS.cblas_sgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             [|a.Trans|], [|b.Trans|], 
+                                                             [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0f|],
+                                                             a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                             [|0.0f|], c.Ptrs, [|c.Ld|],
+                                                             1L, [|a.BatchSize|])),
+                 doubleFn=(fun () -> BLAS.cblas_dgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             [|a.Trans|], [|b.Trans|], 
+                                                             [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0|],
+                                                             a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                             [|0.0|], c.Ptrs, [|c.Ld|],
+                                                             1L, [|a.BatchSize|])))
 
-        member this.Invert (trgt, src) =
+        member this.BatchedInvert (trgt, src) =
             // inversion is done in place, so we have to copy first if trgt and src are different
             if not (trgt = src) then
                 (this :> ITensorBackend<_>).Copy (trgt, src)
 
-            // iterate over all batch dimensions
-            let batchShp = trgt.Shape.[0 .. trgt.NDims-3]
-            for batchIdx in TensorLayout.allIdxOfShape batchShp do
-                let batchRng = batchIdx |> List.map RngElem
-                let rng = batchRng @ [RngAll; RngAll]                  
-                let aAry = trgt.[rng]
+            let size = trgt.Shape.[trgt.NDims-2]
+            use a = TensorHostBackend<_>.GetBlasMatrix (trgt, isSource=true, isTarget=true, canTranspose=true)
 
+            // loop over batch 
+            for s in 0 .. int a.BatchSize do
                 // compute LU factorization
-                use a = TensorHostBackend<_>.GetTransposedBlas (aAry, allowCopy=false)
-                let ipiv : BLAS.lapack_int[] = Array.zeroCreate (int32 aAry.Shape.[0])
+                let ipiv : BLAS.lapack_int[] = Array.zeroCreate (int32 size)
                 let info =
                     BLAS.invoke<'T, BLAS.lapack_int> 
-                        (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv)),
-                         doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptr, a.Ld, ipiv)))
+                        (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
                 // compute matrix inverse
                 let info =
                     BLAS.invoke<'T, BLAS.lapack_int> 
-                        (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv)),
-                         doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptr, a.Ld, ipiv)))
+                        (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
-        member this.SymmetricEigenDecomposition (eigVals, eigVecs, src) =
+        member this.SymmetricEigenDecomposition (part, eigVals, eigVecs, src) =
             let size = src.Shape.[0]
-            (this :> ITensorBackend<_>).Copy (eigVecs, src)
-            let eigVals = eigVals |> Tensor.reshape [1L; size]
+            let part = 
+                match part with
+                | UpperPart -> 'U'
+                | LowerPart -> 'L'
+            if not (eigVecs = src) then
+                (this :> ITensorBackend<_>).Copy (eigVecs, src)
 
-            use a = TensorHostBackend.GetTransposedBlas (eigVecs.T, allowCopy=false)
-            use w = TensorHostBackend.GetTransposedBlas (eigVals, allowCopy=false)
+            use a = TensorHostBackend<_>.GetBlasMatrix (eigVecs, isSource=true, isTarget=true, canTranspose=false)
+            use w = TensorHostBackend<_>.GetBlasVector (eigVals, isSource=false, isTarget=true)
             let info = 
                 BLAS.invoke<'T, BLAS.lapack_int> 
-                    (singleFn=(fun () -> BLAS.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr)),
-                     doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', 'L', a.Rows, a.Ptr, a.Ld, w.Ptr)))
+                    (singleFn=(fun () -> BLAS.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)),
+                     doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)))
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
 

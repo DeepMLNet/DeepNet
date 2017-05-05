@@ -160,10 +160,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.BatchedMatMatDot (trgt, a, b) =
             ()
 
-        member this.Invert (trgt, src) =
+        member this.BatchedInvert (trgt, src) =
             ()
 
-        member this.SymmetricEigenDecomposition (trgtEigVals, trgtEigVec, src) =
+        member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
             ()
 
             

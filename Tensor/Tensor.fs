@@ -33,6 +33,15 @@ type TensorOrder =
     /// column-major (Fortran) order
     | ColumnMajor
 
+
+/// part of a matrix
+type MatrixPart =
+    /// upper triangular part of the matrix
+    | UpperPart
+    /// lower triangular part of the matrix
+    | LowerPart
+
+
 /// Type-neutral interface to Tensor<'T> of any type 'T.
 type ITensor =
     /// layout of this tensor (shape, offset and strides)
@@ -219,8 +228,9 @@ type ITensorBackend<'T> =
     abstract MatMatDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract BatchedMatMatDot:  trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
-    abstract Invert:            trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract SymmetricEigenDecomposition: trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * src:Tensor<'T> -> unit
+    abstract BatchedInvert:     trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * 
+                                          src:Tensor<'T> -> unit
 
 
 
@@ -499,7 +509,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// returns a copy of the tensor
     member this.Copy (?order) =
-        let trgt, src = Tensor.PrepareElemwise (this)
+        let trgt, src = Tensor.PrepareElemwise (this, ?order=order)
         trgt.Backend.Copy (trgt=trgt, src=src)
         trgt      
         
@@ -1425,7 +1435,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             invalidArg "a" 
                 (sprintf "need at least a matrix to invert but got shape %A" a.Shape)
         let a = a |> Tensor.broadcastTo trgt.Shape
-        trgt.Backend.Invert (trgt, a)
+        trgt.Backend.BatchedInvert (trgt, a)
 
     /// Matrix inversion.
     /// If the specified tensor has more than two dimensions, the matrices
@@ -1438,7 +1448,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
     /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
     /// corresponding eigenvalue in 'vals'.
-    static member FillSymmetricEigenDecomposition 
+    static member FillSymmetricEigenDecomposition (part: MatrixPart)
             (trgtEigVals: Tensor<'T>) (trgtEigVecs: Tensor<'T>) (a: Tensor<'T>) =
         Tensor.CheckSameStorage [trgtEigVals; trgtEigVecs; a]
         if a.NDims <> 2 || a.Shape.[0] <> a.Shape.[1] then 
@@ -1453,17 +1463,17 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             invalidArg "trgtEigVals"
                 (sprintf "trgtEigVals must be a vector of length %d but it has shape %A"
                          a.Shape.[0] trgtEigVals.Shape)                        
-        trgtEigVals.Backend.SymmetricEigenDecomposition (trgtEigVals, trgtEigVecs, a)
+        trgtEigVals.Backend.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVecs, a)
 
     /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
     /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
     /// corresponding eigenvalue in 'vals'.
-    static member symmetricEigenDecomposition (a: Tensor<'T>) =
+    static member symmetricEigenDecomposition (part: MatrixPart) (a: Tensor<'T>) =
         if a.NDims <> 2 then
             invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
         let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Factory)
         let trgtEigVecs = Tensor<'T> (a.Shape, a.Factory, order=ColumnMajor)
-        Tensor.FillSymmetricEigenDecomposition trgtEigVals trgtEigVecs a
+        Tensor.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs a
         trgtEigVals, trgtEigVecs
         
     /// a view of this tensor with the given .NET range
@@ -1657,57 +1667,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// full contents string
     member this.Full = this.ToString (maxElems=Int64.MaxValue)
-   
-                 
-
-
-#if false
-                       
- 
-
-
-    /// dot product implementation between vec*vec, mat*vec, mat*mat, batched mat*vec, batched mat*mat
-    let inline dotImpl (a: Tensor<'T>) (b: Tensor<'T>) =
-        let inline matrixDot a b =
-            let nI = (shape a).[0]
-            let nJ = (shape a).[1]
-            let nK = (shape b).[1]
-            let c = newCOfSameType [nI; nK] a
-            for k in 0L .. nK-1L do
-                for i in 0L .. nI-1L do
-                    let v = 
-                        {0L .. nJ-1L}
-                        |> Seq.map (fun j -> (get [i; j] a) * (get [j; k] b))
-                        |> Seq.sum
-                    set [i; k] v c
-            c
-
-        let inline batchedMatrixDot (a: Tensor<'T>) (b: Tensor<'T>) =
-            let a, b = broadcastToSameInDims [0..nDims a - 3] a b
-            let aRows, aCols = (shape a).[nDims a - 2], (shape a).[nDims a - 1]
-            let bRows, bCols = (shape b).[nDims b - 2], (shape b).[nDims b - 1]
-            if aCols <> bRows then
-                failwithf "cannot compute batched dot product between arrays of shapes %A and %A" 
-                    (shape a) (shape b)                
-            let smplShape = (shape a).[0 .. nDims a - 3]
-            let nSmpls = List.fold (*) 1L smplShape
-            let a = reshape [nSmpls; aRows; aCols] a
-            let b = reshape [nSmpls; bRows; bCols] b
-            let c = newCOfSameType [nSmpls; aRows; bCols] a
-            for smpl in 0L .. nSmpls-1L do
-                c.[smpl, *, *] <- matrixDot a.[smpl, *, *] b.[smpl, *, *]
-            c |> reshape (smplShape @ [aRows; bCols])         
-
-
-
-
-
- 
-
-
-#endif
-
-
+                                
+    // type-neural interface
     interface ITensor with
         member this.Layout = this.Layout
         member this.Relayout layout = this.Relayout layout :> ITensor
@@ -1801,7 +1762,6 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     override this.GetHashCode () =
         hash (this.Storage, this.Layout)
-
 
 
 /// block tensor specification
@@ -2212,7 +2172,7 @@ type Tensor =
         for aryIdx, ary in List.indexed ts do
             if List.without ax ary.Shape <> List.without ax shp then
                 let msg =
-                    sprintf "concatentation element with index %d with shape %A must \
+                    sprintf "concatentation element with index %d with shape %A must 
                              be equal to shape %A of the first element, except in the concatenation axis %d" 
                              aryIdx ary.Shape shp ax
                 raise (ShapeMismatch msg)
@@ -2270,6 +2230,7 @@ type Tensor =
         
 
 
+/// An N-dimensional array with elements of type 'T.
 module Tensor =
 
     /// multi-threaded tensor operations
