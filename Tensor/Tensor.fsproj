@@ -61,14 +61,13 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Util.fs" />
+    <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="CudaSup.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
-    <None Include="HDF5.fs" />
-    <None Include="ArrayNDHDF.fs" />
     <None Include="NumpyFiles.fs" />
     <None Include="Random.fs" />
     <None Include="Decomposition.fs" />

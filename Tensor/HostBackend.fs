@@ -1461,8 +1461,11 @@ type TensorHostStorage<'T> (data: 'T []) =
     /// size of underlying data array in bytes
     member this.DataSizeInBytes = data.LongLength * sizeof64<'T>
 
+    /// storage id
+    static member Id = "Host"
+
     interface ITensorStorage<'T> with
-        member this.Id = "Host"
+        member this.Id = TensorHostStorage<'T>.Id
         member this.Backend layout =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Factory = 
@@ -2149,6 +2152,35 @@ module HostTensor =
     let toList (ary: Tensor<_>) =
         ary |> toArray |> Array.toList
 
+    let private ensureCAndOffsetFree (x: Tensor<'T>) =
+        if x.Storage.Id <> TensorHostStorage<_>.Id then
+            let msg = sprintf "require a Host tensor but got a %s tensor" x.Storage.Id
+            raise (StorageMismatch msg)
+        if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
+        else Tensor.copy (x, order=RowMajor)
+
+    /// Writes the given tensor into the HDF5 file under the given path.
+    let write (hdf5: HDF5) name (hostAry: Tensor<'T>) =
+        let hostAry = ensureCAndOffsetFree hostAry
+        let storage = hostAry.Storage :?> TensorHostStorage<'T>
+        hdf5.Write (name, storage.Data, Tensor.shape hostAry)
+
+    /// Reads the tensor with the given path from an HDF5 file.
+    let read (hdf5: HDF5) name =
+        let (data: 'T []), shape = hdf5.Read (name)       
+        data |> usingArray |> Tensor.reshape shape
+
+    ///// Writes the given IArrayNDHostT into the HDF5 file under the given name.
+    //static member writeUntyped (hdf5: HDF5) (name: string) (hostAry: IArrayNDHostT) =
+    //    let gm = typeof<ArrayNDHDF>.GetMethod ("write",  BindingFlags.Public ||| BindingFlags.Static)
+    //    let m = gm.MakeGenericMethod ([| hostAry.DataType |])
+    //    m.Invoke(null, [| box hdf5; box name; box hostAry|]) |> ignore
+        
+    ///// Reads the IArrayNDHostT with the given name and type from an HDF5 file.
+    //static member readUntyped (hdf5: HDF5) (name: string) (dataType: System.Type) =
+    //    let gm = typeof<ArrayNDHDF>.GetMethod ("read",  BindingFlags.Public ||| BindingFlags.Static)
+    //    let m = gm.MakeGenericMethod ([| dataType |])
+    //    m.Invoke(null, [| box hdf5; box name |]) :?> IArrayNDHostT
 
 
 
