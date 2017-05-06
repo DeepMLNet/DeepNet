@@ -51,16 +51,8 @@ What to do with Tensor module?
  - or do the threading differently
  - most probably it's okay like that
  
- 
-  - how to perform looping?
-  - perhaps generalize the seq thingy
+- how to implement the copying to and from GPU?
+- copyFrom could be extended to the GPU case, but what about back copying to host?
+- would also need a copyTo function?
 
-
-  - what about reduction operations?
-  - what would be the host implementation for them?
-  - axisFold and fold would be useful
-  - we could parallelize, but using a parallel loop
-  - but this could be problematic when the op is non-comutative
-
-  
 

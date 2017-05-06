@@ -67,9 +67,6 @@
     <Compile Include="Tensor.fs" />
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
-    <None Include="ArrayNDHost.fs" />
-    <None Include="ArrayNDHostReg.fs" />
-    <None Include="ArrayNDCuda.fs" />
     <None Include="HDF5.fs" />
     <None Include="ArrayNDHDF.fs" />
     <None Include="NumpyFiles.fs" />

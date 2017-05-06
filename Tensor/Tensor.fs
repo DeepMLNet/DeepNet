@@ -25,6 +25,9 @@ exception StrideMismatch of string
 /// sequence too short to fill tensor
 exception SeqTooShort of string
 
+/// transfer between used storages is not possible
+exception UnsupportedTransfer of string
+
 
 /// memory ordering of tensor
 type TensorOrder =
@@ -67,6 +70,8 @@ type ITensor =
     abstract Relayout:          TensorLayout -> ITensor
     /// returns a copy of the tensor
     abstract Copy:              ?order:TensorOrder -> ITensor
+    /// Transfers this tensor to the specifed device.
+    abstract Transfer:          dev:ITensorStorageFactory -> ITensor
 
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
@@ -144,11 +149,15 @@ type ITensorBackend<'T> =
     inherit IEnumerable<'T>
 
     abstract Item:              int64[] -> 'T with get, set
-    abstract FillConst:         value:'T * trgt:Tensor<'T> -> unit
+
     abstract Copy:              trgt:Tensor<'T> * src:Tensor<'T> -> unit
+    abstract Transfer:          trgt:Tensor<'T> * src:Tensor<'T> -> bool
     abstract Convert:           trgt:Tensor<'T> * src:Tensor<'T1> -> unit
+
     abstract Fill:              fn:(unit -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
     abstract FillIndexed:       fn:(int64[] -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
+    abstract FillConst:         value:'T * trgt:Tensor<'T> -> unit
+    
     abstract Map:               fn:('T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
                                 useThreads:bool -> unit
     abstract MapIndexed:        fn:(int64[] -> 'T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
@@ -208,8 +217,7 @@ type ITensorBackend<'T> =
     abstract Or:                trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
     abstract Xor:               trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
 
-    abstract IfThenElse:        trgt:Tensor<'T> * cond:Tensor<bool> * ifTrue:Tensor<'T> * ifFalse:Tensor<'T> -> unit
-    
+    abstract IfThenElse:        trgt:Tensor<'T> * cond:Tensor<bool> * ifTrue:Tensor<'T> * ifFalse:Tensor<'T> -> unit  
     abstract Gather:            trgt:Tensor<'T> * srcIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
     abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
 
@@ -519,10 +527,34 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// Copies the specifed tensor into this tensor.
     /// Both tensors must have same shape and storage.
-    member internal this.CopyFrom (src: Tensor<'T>) =
-        Tensor.CheckSameShape this src
-        Tensor.CheckSameStorage [this; src]
-        this.Backend.Copy (trgt=this, src=src)
+    member trgt.CopyFrom (src: Tensor<'T>) =
+        Tensor.CheckSameShape trgt src
+        Tensor.CheckSameStorage [trgt; src]
+        trgt.Backend.Copy (trgt=trgt, src=src)
+
+    /// Transfers the specified tensor located on another device into this tensor.
+    /// Both tensors must have the same shape.
+    member trgt.TransferFrom (src: Tensor<'T>) =
+        Tensor.CheckSameShape trgt src
+        if trgt.Storage.Id = src.Storage.Id then
+            trgt.CopyFrom (src)
+        else
+            if not (trgt.Backend.Transfer (trgt=trgt, src=src) ||
+                    src.Backend.Transfer (trgt=trgt, src=src)) then
+                let msg =
+                    sprintf "cannot transfer from storage %s to storage %s"
+                            src.Storage.Id trgt.Storage.Id
+                raise (UnsupportedTransfer msg)
+
+    /// Transfers this tensor to the specifed device.
+    member src.Transfer (dev: ITensorStorageFactory) =
+        let trgt = Tensor<'T> (src.Shape, dev)
+        trgt.TransferFrom src
+        trgt
+
+    /// Transfers the specified tensor to the specifed device.
+    static member transfer (dev: ITensorStorageFactory) (src: 'A when 'A :> ITensor) =
+        src.Transfer (dev) :?> 'A
 
     /// this tensor as Tensor<bool>
     member internal this.AsBool : Tensor<bool> =
@@ -1679,6 +1711,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.Storage = this.Storage :> ITensorStorage
         member this.Factory = this.Factory
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
+        member this.Transfer (dev) = this.Transfer (dev) :> ITensor
         member this.Pretty = this.Pretty
         member this.Full = this.Full
 
@@ -1910,6 +1943,23 @@ type Tensor =
         let x = Tensor<'T> (shape, dev)
         x.FillIndexed fn
         x           
+
+    /// Creates a tensor filled with the specified value.
+    static member filled<'T> (dev: ITensorStorageFactory) (shape: int64 list) (value: 'T) : Tensor<'T> =
+        let x = Tensor<'T> (shape, dev)
+        x.FillConst value
+        x           
+
+    /// Identity matrix of given size.
+    static member identity<'T> (dev: ITensorStorageFactory) (size: int64) : Tensor<'T> =
+        let x = Tensor.zeros<'T> dev [size; size]
+        let d : Tensor<'T> = Tensor.diag x
+        d.FillConst Tensor<'T>.One
+        x           
+
+    /// Int64 vector containing the numbers [0L; 1L; ...; nElems-1L].
+    static member arange (dev: ITensorStorageFactory) (nElems: int64) =
+        Tensor.init dev [nElems] (fun idx -> idx.[0])        
 
     /// Fills the vector with linearly spaced values from start to (including) stop.
     static member inline fillLinspace (start: 'V) (stop: 'V) (a: Tensor<'V>) =
