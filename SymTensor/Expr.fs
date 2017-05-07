@@ -4,15 +4,13 @@ open System.Collections.Generic
 open Microsoft.FSharp.Reflection
 
 open Basics
-open ArrayNDNS
+open Tensor
 open ShapeSpec
 open VarSpec
 
 
 /// expression module
 module Expr =
-    open ArrayND
-
     /// cache for ExprT hashes by reference
     let private exprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
 
@@ -314,7 +312,7 @@ module Expr =
         /// This evaluation should be done on the host using the simplest means possible and is used
         /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
         /// implementations. This method may be omitted when no verification will be done.
-        abstract EvalSimple: args:ArrayNDHostT<'T> list -> ArrayNDHostT<'T>
+        abstract EvalSimple: args:Tensor<'T> list -> Tensor<'T>
 
         /// Should return the set of variables that this op instance depends on.
         abstract ContainedVars: Set<VarSpecT>
@@ -1755,9 +1753,8 @@ module Expr =
 
                 // items
                 | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: parseArgs rest
-                | (:? SpecialAxisT as s)  :: rest -> match s with
-                                                     | NewAxis -> RSNewAxis :: parseArgs rest
-                                                     | Fill    -> RSAllFill :: parseArgs rest
+                | (:? int64 as s)         :: rest when s = NewAxis -> RSNewAxis :: parseArgs rest
+                | (:? int64 as s)         :: rest when s = Fill ->    RSAllFill :: parseArgs rest
                 | (:? ExprT as e)         :: rest -> if typename e <> TypeName.ofType<int> then
                                                          failwith "need int expression for element"               
                                                      RSDynElem e :: parseArgs rest

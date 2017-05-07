@@ -222,8 +222,10 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             else
                 this.Data.CopyToDevice(value, SizeT (addr * sizeof64<'T>))
 
+    static member Id = "Cuda"
+
     interface ITensorStorage<'T> with
-        member this.Id = "Cuda"
+        member this.Id = TensorCudaStorage<'T>.Id
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Factory =
@@ -416,7 +418,7 @@ and TensorCudaStorageFactory private () =
 [<AutoOpen>]            
 module CudaTensorTypes =
     /// Tensor stored on CUDA device.
-    let DevCuda = TensorCudaStorageFactory.Instance
+    let DevCuda = TensorCudaStorageFactory.Instance :> ITensorStorageFactory
 
 
 /// Tensor stored on CUDA device.

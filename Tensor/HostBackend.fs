@@ -2074,7 +2074,7 @@ and TensorHostStorageFactory private () =
 [<AutoOpen>]            
 module HostTensorTypes =
     /// Tensor located on host using a .NET array as storage.
-    let DevHost = TensorHostStorageFactory.Instance
+    let DevHost = TensorHostStorageFactory.Instance :> ITensorStorageFactory
 
 
 module internal HostTensorHelpers = 

@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 
@@ -35,7 +35,7 @@ module Dump =
                 if prefix.EndsWith "/" then prefix + name
                 else prefix + "/" + name
             if not (dumpedFullnames |> Set.contains fullname) then
-                ArrayNDHDF.writeUntyped t fullname value
+                HostTensor.write t fullname value
                 dumpedFullnames <- dumpedFullnames |> Set.add fullname
         | None -> ()
         

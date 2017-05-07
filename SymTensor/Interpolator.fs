@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 [<AutoOpen>]
@@ -117,13 +117,13 @@ module Interpolator =
                     match numDerivatives.LockedTryFind ip with
                     | Some ipds -> ipds // use cached derivate table
                     | None ->           // build derivative tables
-                        let tbl = getTable ip    
+                        let tbl : Tensor<'T> = getTable ip    
 
                         // hack to work around slow ArrayNDCuda operations
                         let tbl, wasOnDev = 
-                            match tbl with
-                            | :? ArrayNDHostT<'T> -> tbl, false
-                            | _ -> ArrayNDHost.fetch tbl :> Tensor<'T>, true
+                            match tbl.Factory with
+                            | fac when fac=DevCuda -> HostTensor.transfer tbl, true
+                            | _ -> tbl, false
 
                         let ipds = 
                             [0 .. ip.NDims-1]
@@ -131,21 +131,20 @@ module Interpolator =
                                 let diffTbl =
                                     match ip.Mode with
                                     | InterpolateLinearaly ->
-                                        let diffTbl = 
-                                            Tensor.diffAxis dd tbl / 
-                                            Tensor.scalarOfSameType tbl (conv<'T> ip.Resolution.[dd]) 
+                                        let diffFac = Tensor.scalarLike tbl (conv<'T> ip.Resolution.[dd]) 
+                                        let diffTbl = Tensor.diffAxis dd tbl / diffFac                                            
                                         let zeroShp =
                                             [for d, s in List.indexed tbl.Shape do
                                                 if d = dd then yield 1L
                                                 else yield s]
-                                        let zero = Tensor.zerosOfSameType zeroShp diffTbl
+                                        let zero = Tensor.zeros diffTbl.Factory zeroShp 
                                         Tensor.concat dd [diffTbl; zero]
                                     | InterpolateToLeft ->
                                         Tensor.zerosLike tbl
 
                                 // hack to work around slow ArrayNDCuda operations
                                 let diffTbl =
-                                    if wasOnDev then ArrayNDCuda.toDevUntyped (box diffTbl :?> IArrayNDHostT) :?> Tensor<'T>
+                                    if wasOnDev then CudaTensor.transfer diffTbl
                                     else diffTbl
 
                                 let outside =
@@ -165,7 +164,7 @@ module Interpolator =
         callGeneric<GetDerivative, InterpolatorT> "Do" [ip.TypeName.Type] (derivDim, ip)                
 
     /// Performs interpolation on host.
-    let interpolate (ip: InterpolatorT) (es: ArrayNDHostT<'T> list) : ArrayNDHostT<'T> =
+    let interpolate (ip: InterpolatorT) (es: Tensor<'T> list) : Tensor<'T> =
         let tbl : Tensor<'T> = getTable ip
 
         /// returns interpolation in dimensions to the right of leftIdxs

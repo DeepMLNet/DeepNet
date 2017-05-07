@@ -5,7 +5,7 @@ open System.Reflection
 open System.Collections.Generic
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Expr
 
 

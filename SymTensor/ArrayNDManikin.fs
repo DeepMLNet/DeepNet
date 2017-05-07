@@ -3,14 +3,13 @@
 open System.Runtime.InteropServices
 open ManagedCuda
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open UExprTypes
 
 
 [<AutoOpen>]
 module ArrayNDManikinTypes = 
-    open Tensor
 
     /// memory allocation type
     type MemAllocKindT =
@@ -58,10 +57,16 @@ module ArrayNDManikinTypes =
     [<StructuredFormatDisplay("{Pretty}")>]
     type ArrayNDManikinT (layout:           TensorLayout, 
                           storage:          MemManikinT) = 
-        inherit Tensor<int> (layout)  // generic type does not matter since we do not store data
 
         /// storage manikin
         member this.Storage = storage
+
+        member this.Layout = layout
+
+        member this.Shape = this.Layout.Shape
+
+        member this.NDims = this.Layout.NDims
+
 
         /// typename of the data stored in this array
         member this.TypeName = 
@@ -71,23 +76,11 @@ module ArrayNDManikinTypes =
             | MemConst mc -> mc.TypeName
             | MemZero t -> t
 
-        override this.Item
-            with get pos = failwith "ArrayNDManikin does not store data"
-            and set pos value = failwith "ArrayNDManikin does not store data"
+        member this.NewView (layout: TensorLayout) = 
+            ArrayNDManikinT(layout, storage) 
 
-        override this.NewOfSameType (layout: TensorLayout) = 
-            failwith "ArrayNDManikin cannot allocate memory on its own"
-
-        override this.NewOfType<'N> (layout: TensorLayout) : Tensor<'N> = 
-            failwith "ArrayNDManikin cannot allocate memory on its own"
-
-        override this.NewView (layout: TensorLayout) = 
-            ArrayNDManikinT(layout, storage) :> Tensor<int>
-
-        override this.DataType =
+        member this.DataType =
             TypeName.getType this.TypeName
-
-        override this.Location = ArrayLoc "Manikin"
 
         /// C++ type name for ArrayND with static shape and dynamic offset/strides
         member this.DynamicCPPType =
@@ -99,12 +92,6 @@ module ArrayNDManikinTypes =
                 else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
             sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
                 dims cppDataType dims shapeStr dims        
-
-        override this.Invert () = 
-            failwith "ArrayNDManikin does not store data"
-
-        override this.SymmetricEigenDecomposition () =
-            failwith "ArrayNDManikin does not store data"
 
         member this.Pretty = 
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
@@ -121,7 +108,6 @@ module ArrayNDManikinTypes =
 
 
 module ArrayNDManikin =
-    open ArrayND
 
     /// creates a new ArrayNDManikinT using no storage
     let newZero typ shape =
@@ -189,23 +175,23 @@ module ArrayNDManikin =
         ary |> typeName |> TypeName.size64
 
     /// offset in bytes
-    let offsetInBytes ary =
-        typeSize64 ary * Tensor.offset ary
+    let offsetInBytes (ary: ArrayNDManikinT) =
+        typeSize64 ary * ary.Layout.Offset
 
     /// address of given element in bytes (relative to start of array)
-    let addrInBytes idx ary =
-        typeSize64 ary * (ary |> Tensor.layout |> TensorLayout.addr idx)
+    let addrInBytes idx (ary: ArrayNDManikinT) =
+        typeSize64 ary * (ary.Layout |> TensorLayout.addr idx)
 
     /// size in bytes 
-    let sizeInBytes ary =
-        typeSize64 ary * Tensor.nElems ary
+    let sizeInBytes (ary: ArrayNDManikinT) =
+        typeSize64 ary * TensorLayout.nElems ary.Layout
 
     /// True if array can be target of BLAS operation.
-    let canBeBlasTarget ary =
-        let nd = Tensor.nDims ary
+    let canBeBlasTarget (ary: ArrayNDManikinT) =
+        let nd = ary.NDims
         if nd >= 2 then
-            let st = Tensor.stride ary
-            let shp = Tensor.shape ary
+            let st = ary.Layout.Stride
+            let shp = ary.Shape
             match st.[nd-2 ..] with
             | [1L; ld] when ld >= 1L && ld >= shp.[nd-2] -> true
             | _ -> false

@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
 open Basics
-open ArrayNDNS
+open Tensor
 open ShapeSpec
 open VarSpec
 open ElemExpr

@@ -3,7 +3,7 @@
 open System.Diagnostics
 
 open Basics
-open ArrayNDNS
+open Tensor
 open UExprTypes
 
 
