@@ -282,9 +282,9 @@ type internal PosIter32 =
         #if DEBUG
         if not (fl.IsPosValid startPos) then
             failwithf "startPos=%A invalid for shape %A" startPos fl.Shape
-        if not (0 <= fromDim && fromDim <= fl.NDims) then
+        if not (0 <= fromDim) then
             failwithf "fromDim=%d out of range for shape %A" fromDim fl.Shape
-        if not (fromDim - 1 <= toDim && toDim < fl.NDims) then
+        if not (toDim < fl.NDims) then
             failwithf "toDim=%d out of range for shape %A" toDim fl.Shape
         #endif
         let active = 
@@ -344,16 +344,34 @@ type internal ScalarPrimitives<'T, 'TC> () =
     static let c = Expression.Parameter(typeof<'TC>, "c")
     static let cond = Expression.Parameter(typeof<bool>, "cond")
 
+    static let tryUnary (fn: unit -> Expression<_>) =
+        try (fn ()).Compile()
+        with :? InvalidOperationException as ex ->
+            let thrw = Expression.Throw(Expression.Constant(ex))
+            Expression.Lambda<Func<'T, 'T>>(Expression.Block(thrw, a), a).Compile()
+
+    static let tryBinary (fn: unit -> Expression<_>) =
+        try (fn ()).Compile()
+        with :? InvalidOperationException as ex ->
+            let thrw = Expression.Throw(Expression.Constant(ex))
+            Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Block(thrw, a), a, b).Compile()
+
+    static let tryCompare (fn: unit -> Expression<_>) =
+        try (fn ()).Compile()
+        with :? InvalidOperationException as ex ->
+            let thrw = Expression.Throw(Expression.Constant(ex))
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Block(thrw, Expression.Constant(false)), a, b).Compile()
+
     member val ConvertFunc = 
         Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
     member inline this.Convert cv = this.ConvertFunc.Invoke(cv)
 
     member val UnaryPlusFunc = 
-        Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a).Compile()
+        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a))
     member inline this.UnaryPlus av = this.UnaryPlusFunc.Invoke(av)
 
     member val UnaryMinusFunc = 
-        Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a).Compile()
+        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a))
     member inline this.UnaryMinus av = this.UnaryMinusFunc.Invoke(av)
 
     member val AbsFunc = 
@@ -452,23 +470,23 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.Truncate av = this.TruncateFunc.Invoke(av)
 
     member val AddFunc = 
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b))
     member inline this.Add av bv = this.AddFunc.Invoke(av, bv)
         
     member val SubtractFunc = 
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b))
     member inline this.Subtract av bv = this.SubtractFunc.Invoke(av, bv)
 
     member val MultiplyFunc = 
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b))
     member inline this.Multiply av bv = this.MultiplyFunc.Invoke(av, bv)
 
     member val DivideFunc = 
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b))
     member inline this.Divide av bv = this.DivideFunc.Invoke(av, bv)
 
     member val ModuloFunc = 
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b))
     member inline this.Modulo av bv = this.ModuloFunc.Invoke(av, bv)
 
     member val PowerFunc = 
@@ -478,13 +496,11 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
 
     member val MaxFunc = 
-        let cond = Expression.GreaterThan(a, b)
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(cond, a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.GreaterThan(a, b), a, b), a, b))
     member inline this.Max av bv = this.MaxFunc.Invoke(av, bv)
 
     member val MinFunc = 
-        let cond = Expression.LessThan(a, b)
-        Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(cond, a, b), a, b).Compile()
+        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.LessThan(a, b), a, b), a, b))
     member inline this.Min av bv = this.MinFunc.Invoke(av, bv)
 
     member val IsFiniteFunc : ('T -> bool) =
@@ -497,27 +513,27 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.IsFinite av = this.IsFiniteFunc av
 
     member val EqualFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b))
     member inline this.Equal av bv = this.EqualFunc.Invoke(av, bv)
 
     member val NotEqualFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b))
     member inline this.NotEqual av bv = this.NotEqualFunc.Invoke(av, bv)
 
     member val LessFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b))
     member inline this.Less av bv = this.LessFunc.Invoke(av, bv)
 
     member val LessOrEqualFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b))
     member inline this.LessOrEqual av bv = this.LessOrEqualFunc.Invoke(av, bv)
 
     member val GreaterFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b))
     member inline this.Greater av bv = this.GreaterFunc.Invoke(av, bv)
 
     member val GreaterOrEqualFunc = 
-        Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b).Compile()
+        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b))
     member inline this.GreaterOrEqual av bv = this.GreaterOrEqualFunc.Invoke(av, bv)
 
     member val IfThenElseFunc =
