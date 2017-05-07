@@ -8,25 +8,25 @@ open System
 
 
 /// singular matrix encountered
-exception SingularMatrixError of string
+exception SingularMatrixError of msg:string with override __.Message = __.msg
 
 /// operation requires tensors of same storage, but specified tensors had different storages
-exception StorageMismatch of string
+exception StorageMismatch of msg:string with override __.Message = __.msg
 
 /// operation requires tensors of same shape, but specified tensor had different shapes
-exception ShapeMismatch of string
+exception ShapeMismatch of msg:string with override __.Message = __.msg
 
 /// operation requires tensors of same data types, but specified tensor had different data types
-exception DataTypeMismatch of string
+exception DataTypeMismatch of msg:string with override __.Message = __.msg
 
 /// operation requires tensor with a specific stride configuration, which is not fulfilled
-exception StrideMismatch of string
+exception StrideMismatch of msg:string with override __.Message = __.msg
 
 /// sequence too short to fill tensor
-exception SeqTooShort of string
+exception SeqTooShort of msg:string with override __.Message = __.msg
 
 /// transfer between used storages is not possible
-exception UnsupportedTransfer of string
+exception UnsupportedTransfer of msg:string with override __.Message = __.msg
 
 
 /// memory ordering of tensor
@@ -35,6 +35,8 @@ type TensorOrder =
     | RowMajor
     /// column-major (Fortran) order
     | ColumnMajor
+    /// custom ordering of strides
+    | CustomOrder of int list
 
 
 /// part of a matrix
@@ -359,6 +361,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             match order with
             | RowMajor -> TensorLayout.newC shape
             | ColumnMajor -> TensorLayout.newF shape
+            | CustomOrder perm -> TensorLayout.newOrdered shape perm
         let storage = dev.Create layout.NElems
         Tensor<'T> (layout, storage)
 
@@ -1442,7 +1445,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
             trgt.FillDot a b
             trgt
         | na, nb when na > 2 && na = nb+1 && a.Shape.[na-1] = b.Shape.[nb-1] ->
-            let bPad = b.[Fill, NewAxis]
+            let bPad = Tensor.padRight b
             let resPad = a .* bPad
             resPad.[Fill, 0L]
         | _ -> 

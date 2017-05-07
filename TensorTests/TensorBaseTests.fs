@@ -1,4 +1,4 @@
-﻿module BaseTests
+﻿module TensorBaseTests
 
 open Xunit
 open FsUnit.Xunit
@@ -180,7 +180,7 @@ let ``Invert singular matrix`` () =
 
 [<Fact>]
 let ``Invert Kk matrix`` () =
-    use hdf = HDF5.OpenRead "/TestData/MatInv.h5"
+    use hdf = HDF5.OpenRead (Util.assemblyDirectory + "/TestData/MatInv.h5")
     let Kk : Tensor<single> = HostTensor.read hdf "Kk"
 
     let Kkinv = Tensor.invert Kk   

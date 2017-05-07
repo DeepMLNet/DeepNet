@@ -545,13 +545,15 @@ type internal ScalarPrimitives<'T, 'TC> () =
 module internal ScalarPrimitives = 
     let private instances = Dictionary<Type * Type, obj>()
     let For<'T, 'TC> () =
-        let types = typeof<'T>, typeof<'TC>
-        match instances.TryFind types with
-        | Some inst -> inst :?> ScalarPrimitives<'T, 'TC>
-        | None ->
-            let inst = ScalarPrimitives<'T, 'TC> ()
-            instances.Add (types, inst)
-            inst
+        lock instances (fun () ->
+            let types = typeof<'T>, typeof<'TC>
+            match instances.TryFind types with
+            | Some inst -> inst :?> ScalarPrimitives<'T, 'TC>
+            | None ->
+                let inst = ScalarPrimitives<'T, 'TC> ()
+                instances.Add (types, inst)
+                inst
+        )
         
 
 /// Scalar operations on host tensors.
@@ -1645,7 +1647,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         match TensorHostBackend<_>.GetBlasMatrixInfo (mat, canTranspose=canTranspose) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T>(mat.Shape, mat.Factory, order=ColumnMajor)
+            let order = [mat.NDims-2; mat.NDims-1] @ [0 .. mat.NDims-3]
+            let tmp = Tensor<'T> (mat.Shape, mat.Factory, order=CustomOrder order)
             if isSource then tmp.CopyFrom mat
             let disposeFn () = if isTarget then mat.CopyFrom tmp
             TensorHostBackend<_>.GetBlasMatrixInfo (tmp, canTranspose=canTranspose, 
@@ -2009,7 +2012,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             use a = TensorHostBackend<_>.GetBlasMatrix (trgt, isSource=true, isTarget=true, canTranspose=true)
 
             // loop over batch 
-            for s in 0 .. int a.BatchSize do
+            for s in 0 .. int a.BatchSize - 1 do
                 // compute LU factorization
                 let ipiv : BLAS.lapack_int[] = Array.zeroCreate (int32 size)
                 let info =

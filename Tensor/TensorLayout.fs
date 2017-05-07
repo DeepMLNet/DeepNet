@@ -4,19 +4,19 @@ open Basics
 open System
 
 /// cannot broadcast to same shape
-exception CannotBroadcast of string
+exception CannotBroadcast of msg:string with override __.Message = __.msg
 
 /// invalid tensor range specification
-exception InvalidTensorRng of string
+exception InvalidTensorRng of msg:string with override __.Message = __.msg
 
 /// invalid tensor layout specification
-exception InvalidTensorLayout of string
+exception InvalidTensorLayout of msg:string with override __.Message = __.msg
 
 /// specified tensor index is out of range
-exception IndexOutOfRange of string
+exception IndexOutOfRange of msg:string with override __.Message = __.msg
 
 /// the layout of this tensor makes this operation impossible without copying it
-exception ImpossibleWithoutCopy of string
+exception ImpossibleWithoutCopy of msg:string with override __.Message = __.msg
 
 
 [<AutoOpen>]
@@ -498,9 +498,9 @@ module TensorLayout =
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
             | RngAllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
-                recView (RngAll :: RngAllFill :: rRanges) a
+                recView (RngAll::RngAllFill::rRanges) a
             | RngAllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
-                recView (RngAll :: rRanges) a
+                recView (RngAll::rRanges) a
             | RngAllFill::rRanges, _, _ ->
                 recView rRanges a
             | (RngElem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
