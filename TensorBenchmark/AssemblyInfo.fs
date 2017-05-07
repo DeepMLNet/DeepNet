@@ -10,9 +10,9 @@ open System.Runtime.InteropServices
 [<assembly: AssemblyTitle("TensorBenchmark")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
-[<assembly: AssemblyCompany("Technische Universität München")>]
+[<assembly: AssemblyCompany("Deep.Net developers")>]
 [<assembly: AssemblyProduct("TensorBenchmark")>]
-[<assembly: AssemblyCopyright("Copyright © Technische Universität München 2017")>]
+[<assembly: AssemblyCopyright("Copyright © Deep.Net developers")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
