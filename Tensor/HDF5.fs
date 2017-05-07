@@ -1,4 +1,4 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open System
 open System.IO
@@ -8,6 +8,7 @@ open HDF.PInvoke
 
 open Basics
  
+
 /// HDF5 support functions
 module private HDF5Support =
 

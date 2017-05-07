@@ -1,4 +1,4 @@
-﻿namespace ArrayND.AssemblyInfo
+﻿namespace Tensor.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices

@@ -4,7 +4,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 [<Fact>]

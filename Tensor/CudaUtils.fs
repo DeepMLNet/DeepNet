@@ -1,4 +1,4 @@
-﻿namespace Basics.Cuda
+﻿namespace Basics
 
 open ManagedCuda
 open ManagedCuda.BasicTypes

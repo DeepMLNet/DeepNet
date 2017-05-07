@@ -4,8 +4,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
-//open Datasets
+open Tensor
 
 
 [<Fact>]
@@ -56,8 +55,8 @@ let ``Pretty printing works`` () =
 let ``Batched matrix-matrix dot product`` () =
     let N, M = 2L, 3L
     let rng = System.Random(123)
-    let a = rng.UniformArrayND (-3., 3.) [N; M; 4L; 3L]
-    let b = rng.UniformArrayND (-1., 1.) [N; M; 3L; 2L]
+    let a = rng.UniformTensor (-3., 3.) [N; M; 4L; 3L]
+    let b = rng.UniformTensor (-1., 1.) [N; M; 3L; 2L]
     let c = a .* b
 
     let cr = HostTensor.zeros<float> [N; M; 4L; 2L]
@@ -70,8 +69,8 @@ let ``Batched matrix-matrix dot product`` () =
 let ``Batched matrix-vector dot product`` () =
     let N, M = 2L, 3L
     let rng = System.Random(123)
-    let a = rng.UniformArrayND (-3., 3.) [N; M; 4L; 3L]
-    let b = rng.UniformArrayND (-1., 1.) [N; M; 3L]
+    let a = rng.UniformTensor (-3., 3.) [N; M; 4L; 3L]
+    let b = rng.UniformTensor (-1., 1.) [N; M; 3L]
     let c = a .* b
 
     let cr = HostTensor.zeros<float> [N; M; 4L]
@@ -85,7 +84,7 @@ let ``Batched matrix-vector dot product`` () =
 let ``Build and extract diagonal`` () =
     let N = 3L
     let rng = System.Random 123
-    let v = rng.UniformArrayND (-1., 1.) [N]
+    let v = rng.UniformTensor (-1., 1.) [N]
     let dm = Tensor.diagMat v
     
     printfn "v=%A" v
@@ -100,7 +99,7 @@ let ``Batched build and extract diagonal`` () =
     let S1, S2 = 2L, 3L
     let N = 4L
     let rng = System.Random 123
-    let v = rng.UniformArrayND (-1., 1.) [S1; S2; N]
+    let v = rng.UniformTensor (-1., 1.) [S1; S2; N]
     let dm = Tensor.diagMat v
     
     printfn "v=\n%A" v
@@ -144,7 +143,7 @@ let ``Invert diagonal matrix`` () =
 let ``Invert random matrix`` () =
     let rng = System.Random 123
 
-    let dm = rng.UniformArrayND (-1.0, 1.0) [4L; 4L]
+    let dm = rng.UniformTensor (-1.0, 1.0) [4L; 4L]
     let dmInv = Tensor.invert dm
     let dmInvInv = Tensor.invert dmInv
 
@@ -158,7 +157,7 @@ let ``Invert random matrix`` () =
 let ``Batch invert random matrices`` () =
     let rng = System.Random 123
 
-    let dm = rng.UniformArrayND (-1.0, 1.0) [2L; 4L; 3L; 3L]
+    let dm = rng.UniformTensor (-1.0, 1.0) [2L; 4L; 3L; 3L]
     let dmInv = Tensor.invert dm
     let dmInvInv = Tensor.invert dmInv
 

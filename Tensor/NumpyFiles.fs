@@ -1,4 +1,4 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open System
 open System.IO

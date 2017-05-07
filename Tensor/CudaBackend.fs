@@ -1,20 +1,20 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Basics
-open Basics.Cuda
 open System
 
+
 /// cannot register host memory with CUDA, maybe because it is not properly aligned
-exception CannotCudaRegisterMemory of string
+exception CannotCudaRegisterMemory of msg:string with override __.Message = __.msg
 
 /// out of CUDA memory
-exception OutOfCudaMemory of string
+exception OutOfCudaMemory of msg:string with override __.Message = __.msg
 
 /// generic CUDA error
-exception CudaError of string
+exception CudaError of msg:string with override __.Message = __.msg
 
 
 /// CUDA helpers

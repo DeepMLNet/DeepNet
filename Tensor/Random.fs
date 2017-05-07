@@ -1,4 +1,4 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open Basics
 open System
@@ -40,13 +40,13 @@ module RandomExtensions =
 
         /// Samples each element of an ArrayND of shape shp from a discrete uniform distribution
         /// between minValue and maxValue.      
-        member this.IntArrayND (minValue, maxValue) shp =
+        member this.IntTensor (minValue, maxValue) shp =
             this.Seq (minValue, maxValue)
             |> HostTensor.ofSeqWithShape shp
 
         /// Samples each element of an ArrayND of shape shp from a uniform distribution
         /// between minValue and maxValue.
-        member this.UniformArrayND (minValue: 'T, maxValue: 'T) shp =
+        member this.UniformTensor (minValue: 'T, maxValue: 'T) shp =
             let minValue, maxValue = conv<float> minValue, conv<float> maxValue
             this.SeqDouble() 
             |> Seq.map (fun x -> x * (maxValue - minValue) + minValue |> conv<'T>)
@@ -55,7 +55,7 @@ module RandomExtensions =
         /// Samples each element of an ArrayND of shape shp from a uniform distribution
         /// between minValue and maxValue.
         // TODO: too specific method, move
-        member this.SortedUniformArrayND (minValue: 'T, maxValue: 'T) shp =
+        member this.SortedUniformTensor (minValue: 'T, maxValue: 'T) shp =
             let nElems = shp |> List.fold (*) 1L
             let minValue, maxValue = conv<float> minValue, conv<float> maxValue
             this.SeqDouble() 
@@ -67,7 +67,7 @@ module RandomExtensions =
             |> Tensor.reshape shp
         
         /// Generates an array of random elements x ~ N(mean,variance)
-        member this.NormalArrayND (mean: 'T, variance: 'T) shp  =
+        member this.NormalTensor (mean: 'T, variance: 'T) shp  =
             let mean, variance = conv<float> mean, conv<float> variance
             this.NormalDouble mean variance |> Seq.map conv<'T>
             |> HostTensor.ofSeqWithShape shp

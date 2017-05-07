@@ -7,7 +7,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>82de3bae-bcec-4df8-9c46-07b7faf4e31a</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>ArrayND</RootNamespace>
+    <RootNamespace>Tensor</RootNamespace>
     <AssemblyName>Tensor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
@@ -61,10 +61,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Util.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="CudaUtils.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
-    <Compile Include="CudaSup.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="HostBackend.fs" />
@@ -135,6 +135,6 @@
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
-    <!-- <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix &quot;$(VERSUFFIX)&quot;" /> -->
+    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix &quot;$(VERSUFFIX)&quot;" />
   </Target>
 </Project>

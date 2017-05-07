@@ -1,4 +1,4 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 
 /// Useful core operators.

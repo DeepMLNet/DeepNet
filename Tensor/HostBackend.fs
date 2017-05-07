@@ -1,4 +1,4 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open System
 open System.Reflection
@@ -337,7 +337,7 @@ type internal ScalarPrimitives<'T, 'TC> () =
     static let fscAsm = Assembly.GetAssembly(typeof<unit>)
     static let myAsm = Assembly.GetExecutingAssembly()
     static let fso = fscAsm.GetType("Microsoft.FSharp.Core.Operators", true)
-    static let tso = myAsm.GetType("ArrayNDNS.Operators", true)
+    static let tso = myAsm.GetType("Tensor.Operators", true)
 
     static let a = Expression.Parameter(typeof<'T>, "a")
     static let b = Expression.Parameter(typeof<'T>, "b")

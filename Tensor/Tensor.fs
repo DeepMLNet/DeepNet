@@ -1,4 +1,4 @@
-namespace rec ArrayNDNS
+namespace rec Tensor
 
 open System.Collections
 open System.Collections.Generic
