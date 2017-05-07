@@ -281,11 +281,11 @@ type internal PosIter32 =
         let toDim = defaultArg toDim (fl.NDims - 1)
         #if DEBUG
         if not (fl.IsPosValid startPos) then
-            invalidArg "startPos" "startPos invalid"
-        if not (0 <= fromDim && fromDim < fl.NDims) then
-            invalidArg "fromDim" "fromDim out of range"
-        if not (0 <= toDim && toDim < fl.NDims) then
-            invalidArg "toDim" "toDim out of range"
+            failwithf "startPos=%A invalid for shape %A" startPos fl.Shape
+        if not (0 <= fromDim && fromDim <= fl.NDims) then
+            failwithf "fromDim=%d out of range for shape %A" fromDim fl.Shape
+        if not (fromDim - 1 <= toDim && toDim < fl.NDims) then
+            failwithf "toDim=%d out of range for shape %A" toDim fl.Shape
         #endif
         let active = 
             fl.Shape 
@@ -558,7 +558,7 @@ type internal ScalarOps =
             while trgtPosIter.Active do
                 let mutable trgtAddr = trgtPosIter.Addr
                 if nd = 0 then
-                    trgt.Data.[trgtPosIter.Addr ] <- scalarOp [||]
+                    trgt.Data.[trgtPosIter.Addr] <- scalarOp [||]
                 elif isIndexed then
                     for d in 0 .. nd - 1 do
                         pos64.[d] <- int64 trgtPosIter.Pos.[d]
@@ -835,7 +835,8 @@ type internal ScalarOps =
         #if DEBUG
         if trgt.FastLayout.NDims <> nd-1 ||
            List.ofArray trgt.FastLayout.Shape <> List.ofArray src1.FastLayout.Shape.[0 .. nd-2] then
-            invalidArg "trgt" "target has wrong shape for ApplyAxisFold"
+            failwithf "target of shape %A is incompatible with source shape %A" 
+                      trgt.FastLayout.Shape src1.FastLayout.Shape
         #endif
                               
         let inline loops (dim0Fixed: bool) (dim0Pos: int) =
@@ -844,7 +845,7 @@ type internal ScalarOps =
             if dim0Fixed then startPos.[0] <- dim0Pos
 
             let mutable trgtPosIter = 
-                PosIter32 (trgt.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
+                PosIter32 (trgt.FastLayout, startPos.[0 .. nd-2], fromDim=fromDim, toDim=nd-2)
             let mutable src1PosIter = 
                 PosIter32 (src1.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
             let pos64 = Array.zeroCreate nd

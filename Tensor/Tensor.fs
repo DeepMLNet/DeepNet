@@ -1370,9 +1370,9 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.AllLastAxis (trgt=trgt, src1=src)
 
     /// false if there is at least one false element in given axis, otherwise true
-    static member allAxis (ax: int) (src: Tensor<bool>) =
+    static member allAxis (ax: int) (src: Tensor<bool>) : Tensor<bool> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillMaxAxis ax src
+        trgt.FillAllAxis ax src
         trgt
 
     /// false if there is at least one false element in the tensor, otherwise true
@@ -1386,7 +1386,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.AnyLastAxis (trgt=trgt, src1=src)
 
     /// true if there is at least one true element in given axis, otherwise false
-    static member anyAxis (ax: int) (src: Tensor<bool>) =
+    static member anyAxis (ax: int) (src: Tensor<bool>) : Tensor<bool> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillAnyAxis ax src
         trgt
