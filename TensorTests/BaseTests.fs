@@ -1,4 +1,4 @@
-﻿module ArrayNDTests
+﻿module BaseTests
 
 open Xunit
 open FsUnit.Xunit

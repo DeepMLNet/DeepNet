@@ -239,7 +239,10 @@ type internal FastLayout32 =
     member inline this.UncheckedAddr (pos: int[]) =
         let mutable addr = this.Offset
         for d=0 to this.NDims-1 do
-            assert (0 <= pos.[d] && pos.[d] < this.Shape.[d])
+            #if DEBUG
+            if not (0 <= pos.[d] && pos.[d] < this.Shape.[d]) then
+                invalidArg "pos" "pos is out of range"
+            #endif
             addr <- addr + pos.[d] * this.Stride.[d]
         addr
 
@@ -276,9 +279,14 @@ type internal PosIter32 =
         let startPos = defaultArg startPos (Array.zeroCreate fl.NDims)
         let fromDim = defaultArg fromDim 0
         let toDim = defaultArg toDim (fl.NDims - 1)
-        assert (fl.IsPosValid startPos)
-        assert (0 <= fromDim && fromDim < fl.NDims)
-        assert (0 <= toDim && toDim < fl.NDims)
+        #if DEBUG
+        if not (fl.IsPosValid startPos) then
+            invalidArg "startPos" "startPos invalid"
+        if not (0 <= fromDim && fromDim < fl.NDims) then
+            invalidArg "fromDim" "fromDim out of range"
+        if not (0 <= toDim && toDim < fl.NDims) then
+            invalidArg "toDim" "toDim out of range"
+        #endif
         let active = 
             fl.Shape 
             |> Array.indexed 
@@ -296,7 +304,10 @@ type internal PosIter32 =
         }
 
     member inline this.MoveNext () =
-        assert (this.Active)
+        #if DEBUG
+        if not this.Active then
+            failwith "iteration past end attempted"
+        #endif      
 
         // try incrementing starting from last axis
         let mutable increment = true
@@ -748,9 +759,11 @@ type internal ScalarOps =
 
     static member inline ApplyNAryOp (scalarOp: int64[] -> 'T[] -> 'T, 
                                       trgt: DataAndLayout<'T>, srcs: DataAndLayout<'T>[],
-                                      isIndexed: bool, useThreads: bool) =        
-        assert (srcs |> Array.forall (fun src -> 
-            List.ofArray trgt.FastLayout.Shape = List.ofArray src.FastLayout.Shape))
+                                      isIndexed: bool, useThreads: bool) =      
+        if not (srcs |> Array.forall (fun src -> 
+                List.ofArray trgt.FastLayout.Shape = List.ofArray src.FastLayout.Shape)) then
+            invalidArg "srcs" "sources must have same shape as target"
+
         let nSrcs = srcs.Length
         let nd = trgt.FastLayout.NDims
         let shape = trgt.FastLayout.Shape
@@ -818,8 +831,12 @@ type internal ScalarOps =
                                         isIndexed: bool, useThreads: bool) =        
         let nd = src1.FastLayout.NDims
         let shape = src1.FastLayout.Shape
-        assert (trgt.FastLayout.NDims = nd-1)
-        assert (List.ofArray trgt.FastLayout.Shape = List.ofArray src1.FastLayout.Shape.[0 .. nd-2])
+
+        #if DEBUG
+        if trgt.FastLayout.NDims <> nd-1 ||
+           List.ofArray trgt.FastLayout.Shape <> List.ofArray src1.FastLayout.Shape.[0 .. nd-2] then
+            invalidArg "trgt" "target has wrong shape for ApplyAxisFold"
+        #endif
                               
         let inline loops (dim0Fixed: bool) (dim0Pos: int) =
             let fromDim = if dim0Fixed then 1 else 0

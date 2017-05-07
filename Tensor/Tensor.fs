@@ -1861,7 +1861,8 @@ type Tensor =
             for d in axis+1 .. a.NDims-1 do yield d-1
         ]
         let a = a |> Tensor<_>.permuteAxes axisToLast
-        assert (trgt.Shape = a.Shape.[0 .. a.NDims-2])
+        if not (trgt.Shape = a.Shape.[0 .. a.NDims-2]) then
+            failwith "axis reduce shape computation error"
         a
 
     /// prepares an axis reduce operation by allocating a target of appropriate size and storage
