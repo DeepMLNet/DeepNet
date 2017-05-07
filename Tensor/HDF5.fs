@@ -177,6 +177,8 @@ type HDF5 (path: string, mode: HDF5Mode) =
             failwithf "HDF5 file %s is opened for reading" path
         checkShape data shape
         this.CreateParentGroups name
+        if this.Exists name then
+            failwithf "HDF5 dataset %s already exists in file %s" name path
             
         let typeHnd = H5T.copy hdfType<'T> |> check
         let shapeHnd = H5S.create_simple (List.length shape, hdfShape shape, hdfShape shape) |> check

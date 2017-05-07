@@ -9,11 +9,11 @@ module Decomposition =
     /// Information about a performed PCA or ZCA.
     type PCAInfo<'T> = {
         /// the means of the features (for centering the data)
-        Means:      ArrayNDHostT<'T>
+        Means:      Tensor<'T>
         /// the variances of the principal components in descending order
-        Variances:  ArrayNDHostT<'T>
+        Variances:  Tensor<'T>
         /// the axes corresponding to the principal components
-        Axes:       ArrayNDHostT<'T>
+        Axes:       Tensor<'T>
     }
 
     /// Principal Component Analysis (PCA)
@@ -23,7 +23,7 @@ module Decomposition =
         /// `data` must be of the form [sample, feature].
         /// `nComps` optionally specifies how many components to keep.
         /// Returns a tensor of the form [sample, component].
-        static member Perform (data: ArrayNDHostT<'T>, ?nComps) =
+        static member Perform (data: Tensor<'T>, ?nComps) =
             if data.NDims <> 2 then
                 invalidArg "data" "data must be a matrix"            
             let nFeatures = data.Shape.[1]
@@ -36,19 +36,19 @@ module Decomposition =
             let centered = data - means.[NewAxis, *] // centered[smpl, feature]
 
             // compute covariance matrix and its eigen decomposition
-            let n = ArrayNDHost.scalar (conv<'T> data.Shape.[0])
+            let n = HostTensor.scalar (conv<'T> data.Shape.[0])
             let cov = (Tensor.transpose centered .* centered) / n 
-            let variances, axes = Tensor.symmetricEigenDecomposition cov 
+            let variances, axes = Tensor.symmetricEigenDecomposition UpperPart cov 
 
             // sort axes by their variances in descending order
             let sortIdx = 
                 variances 
-                |> ArrayNDHost.toList 
+                |> HostTensor.toList 
                 |> List.indexed 
                 |> List.sortByDescending snd
                 |> List.map fst
                 |> List.map int64
-                |> ArrayNDHost.ofList
+                |> HostTensor.ofList
             let variances = variances |> Tensor.gather [Some sortIdx]
             let axesIdx = Tensor.replicate 0 axes.Shape.[0] sortIdx.[NewAxis, *]
             let axes = axes |> Tensor.gather [None; Some axesIdx]
@@ -67,7 +67,7 @@ module Decomposition =
 
         /// Reverses PCA whitening.
         /// `whitened` must be of the form [sample, component].
-        static member Reverse (whitened: ArrayNDHostT<'T>, 
+        static member Reverse (whitened: Tensor<'T>, 
                                {Means=means; Variances=variances; Axes=axes}) =
             if whitened.NDims <> 2 then
                 invalidArg "whitened" "whitened must be a matrix" 
@@ -82,11 +82,11 @@ module Decomposition =
         /// Apply ZCA whitening. 
         /// `data` must be of the form [sample, feature].
         /// Returns a tensor of the form [sample, component].
-        static member Perform (data: ArrayNDHostT<'T>) =        
+        static member Perform (data: Tensor<'T>) =        
             let whitened, info = PCA.Perform data
             whitened .* Tensor.transpose info.Axes, info
 
         /// Reverses ZCA whitening.
         /// `whitened` must be of the form [sample, component].
-        static member Reverse (zcaed: ArrayNDHostT<'T>, info: PCAInfo<'T>) =
+        static member Reverse (zcaed: Tensor<'T>, info: PCAInfo<'T>) =
             PCA.Reverse (zcaed .* info.Axes, info)
