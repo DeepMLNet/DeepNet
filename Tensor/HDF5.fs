@@ -18,23 +18,34 @@ module private HDF5Support =
     do
         H5.``open`` () |> check |> ignore
 
-    let hdfTypeInst t =        
-        if   t = typeof<bool> then H5T.NATIVE_UINT8
-        elif t = typeof<int8> then H5T.NATIVE_INT8
-        elif t = typeof<int16> then H5T.NATIVE_INT16
-        elif t = typeof<int32> then H5T.NATIVE_INT32
-        elif t = typeof<int64> then H5T.NATIVE_INT64
-        elif t = typeof<uint8> then H5T.NATIVE_UINT8
-        elif t = typeof<uint16> then H5T.NATIVE_UINT16
-        elif t = typeof<uint32> then H5T.NATIVE_UINT32
-        elif t = typeof<uint64> then H5T.NATIVE_UINT64
-        elif t = typeof<single> then H5T.NATIVE_FLOAT
-        elif t = typeof<double> then H5T.NATIVE_DOUBLE
-        elif t = typeof<string> then H5T.C_S1
-        else failwithf "unknown type for HDF5: %A" t
+    let hdfTypeTable = 
+        [ typeof<bool>,     H5T.NATIVE_UINT8
+          typeof<int8>,     H5T.NATIVE_INT8
+          typeof<int16>,    H5T.NATIVE_INT16
+          typeof<int32>,    H5T.NATIVE_INT32
+          typeof<int64>,    H5T.NATIVE_INT64
+          typeof<uint8>,    H5T.NATIVE_UINT8
+          typeof<uint16>,   H5T.NATIVE_UINT16
+          typeof<uint32>,   H5T.NATIVE_UINT32
+          typeof<uint64>,   H5T.NATIVE_UINT64
+          typeof<single>,   H5T.NATIVE_FLOAT
+          typeof<double>,   H5T.NATIVE_DOUBLE
+          typeof<string>,   H5T.C_S1 ]
+
+    let hdfTypeInst t =     
+        match hdfTypeTable |> List.tryPick (fun (nt, ht) -> 
+            if nt=t then Some ht else None) with
+        | Some ht -> ht
+        | None -> failwithf "unknown type for HDF5: %A" t
 
     let hdfType<'T> =  
         hdfTypeInst typeof<'T>
+
+    let netType t =     
+        match hdfTypeTable |> List.tryPick (fun (nt, ht) -> 
+            if ht=t then Some nt else None) with
+        | Some nt -> nt
+        | None -> failwithf "unknown HDF5 type: %A" t
 
     let hdfShape (shape: int64 list) =
         shape |> List.map uint64 |> List.toArray
@@ -209,6 +220,18 @@ type HDF5 (path: string, mode: HDF5Mode) =
         H5T.close typeHnd |> check |> ignore
 
         data, shape |> intShape
+
+    /// Returns data type of data array using specified name.
+    member this.GetDataType (name: string) =
+        checkDisposed ()
+        if not (this.Exists name) then
+            failwithf "HDF5 dataset %s does not exist in file %s" name path
+        let dataHnd = H5D.``open`` (fileHnd, name) |> check
+        let typeHnd = H5D.get_type dataHnd |> check
+        let netType = netType typeHnd
+        H5D.close dataHnd |> check |> ignore
+        H5T.close typeHnd |> check |> ignore
+        netType
 
     /// Sets the HDF5 attribute with the specified `atrName` on object specified by `name`.
     member this.SetAttribute (name: string, atrName: string, value: 'T) =

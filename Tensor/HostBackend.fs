@@ -2040,6 +2040,28 @@ module HostTensorTypes =
     let DevHost = TensorHostStorageFactory.Instance
 
 
+module internal HostTensorHelpers = 
+
+    let ensureCAndOffsetFree (x: Tensor<'T>) =
+        if x.Storage.Id <> TensorHostStorage<_>.Id then
+            let msg = sprintf "require a Host tensor but got a %s tensor" x.Storage.Id
+            raise (StorageMismatch msg)
+        if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
+        else Tensor.copy (x, order=RowMajor)
+
+type private HDFFuncs =
+
+    static member Write<'T> (hdf5: HDF5, path: string, x: Tensor<'T>) =
+        let x = HostTensorHelpers.ensureCAndOffsetFree x
+        let storage = x.Storage :?> TensorHostStorage<'T>
+        hdf5.Write (path, storage.Data, Tensor.shape x)
+
+    static member Read<'T> (hdf5: HDF5, name: string) =
+        let (data: 'T []), shape = hdf5.Read (name)
+        Tensor<'T> (TensorLayout.newC shape, TensorHostStorage<'T> data)         
+
+
+
 /// Host tensor functions.
 module HostTensor =
 
@@ -2152,35 +2174,18 @@ module HostTensor =
     let toList (ary: Tensor<_>) =
         ary |> toArray |> Array.toList
 
-    let private ensureCAndOffsetFree (x: Tensor<'T>) =
-        if x.Storage.Id <> TensorHostStorage<_>.Id then
-            let msg = sprintf "require a Host tensor but got a %s tensor" x.Storage.Id
-            raise (StorageMismatch msg)
-        if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
-        else Tensor.copy (x, order=RowMajor)
+    /// Writes the given host tensor into the HDF5 file under the given path.
+    let write (hdf5: HDF5) (path: string) (x: ITensor) =
+        callGeneric<HDFFuncs, unit> "Write" [x.DataType] (hdf5, path, x)
 
-    /// Writes the given tensor into the HDF5 file under the given path.
-    let write (hdf5: HDF5) name (hostAry: Tensor<'T>) =
-        let hostAry = ensureCAndOffsetFree hostAry
-        let storage = hostAry.Storage :?> TensorHostStorage<'T>
-        hdf5.Write (name, storage.Data, Tensor.shape hostAry)
+    /// Reads the tensor of data type 'T with the given path from an HDF5 file.
+    let read<'T> (hdf5: HDF5) (path: string) : Tensor<'T> =
+        HDFFuncs.Read (hdf5, path)
 
-    /// Reads the tensor with the given path from an HDF5 file.
-    let read (hdf5: HDF5) name =
-        let (data: 'T []), shape = hdf5.Read (name)       
-        data |> usingArray |> Tensor.reshape shape
-
-    ///// Writes the given IArrayNDHostT into the HDF5 file under the given name.
-    //static member writeUntyped (hdf5: HDF5) (name: string) (hostAry: IArrayNDHostT) =
-    //    let gm = typeof<ArrayNDHDF>.GetMethod ("write",  BindingFlags.Public ||| BindingFlags.Static)
-    //    let m = gm.MakeGenericMethod ([| hostAry.DataType |])
-    //    m.Invoke(null, [| box hdf5; box name; box hostAry|]) |> ignore
-        
-    ///// Reads the IArrayNDHostT with the given name and type from an HDF5 file.
-    //static member readUntyped (hdf5: HDF5) (name: string) (dataType: System.Type) =
-    //    let gm = typeof<ArrayNDHDF>.GetMethod ("read",  BindingFlags.Public ||| BindingFlags.Static)
-    //    let m = gm.MakeGenericMethod ([| dataType |])
-    //    m.Invoke(null, [| box hdf5; box name |]) :?> IArrayNDHostT
-
+    /// Reads the tensor with the given path from an HDF5 file and returns it
+    /// as an ITensor with the data type as stored in the HDF5 file.
+    let readUntyped (hdf5: HDF5) (path: string) = 
+        let dataType = hdf5.GetDataType path
+        callGeneric<HDFFuncs, ITensor> "Read" [dataType] (hdf5, path)
 
 
