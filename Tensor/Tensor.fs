@@ -2036,15 +2036,15 @@ type Tensor =
 
     /// Returns true if two tensors have same (within specified precision) values in all elements.
     /// If tensors have different shape, then false is returned.
-    static member allCloseWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
+    static member almostEqualWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
         if a.Shape = b.Shape then
             Tensor.isCloseWithTol (a, b, ?absTol=absTol, ?relTol=relTol) |> Tensor.all
         else false
 
     /// Returns true if two tensors have same (within machine precision) values in all elements.
     /// If tensors have different shape, then false is returned.
-    static member allClose (a: Tensor<'T>) (b: Tensor<'T>) =
-        Tensor.allCloseWithTol (a, b)
+    static member almostEqual (a: Tensor<'T>) (b: Tensor<'T>) =
+        Tensor.almostEqualWithTol (a, b)
 
     /// Returns true if all values in the tensor are finite (not NaN and not infinite).
     static member allFinite (a: Tensor<'T>) =

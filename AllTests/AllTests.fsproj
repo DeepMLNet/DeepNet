@@ -59,8 +59,6 @@
     <Compile Include="AssemblyInfo.fs" />
     <Content Include="packages.config" />
     <Compile Include="TestUtils.fs" />
-    <Compile Include="ArrayNDTests.fs" />
-    <Compile Include="NumpyFilesTest.fs" />
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
     <None Include="CompilerPipeline.fs" />
@@ -71,14 +69,6 @@
     <Compile Include="ElemExprTests.fs" />
     <Compile Include="LoopTests.fs" />
     <Content Include="App.config" />
-    <None Include="TestData\NPZ1.npz">
-      <Link>NPZ1.npz</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="TestData\MatInv.h5">
-      <Link>MatInv.h5</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="TestData\abalone.txt">
       <Link>abalone.txt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

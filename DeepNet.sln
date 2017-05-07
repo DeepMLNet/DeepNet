@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.3
+VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SymTensorCudaSup", "SymTensorCudaSup\SymTensorCudaSup.vcxproj", "{D746A1DB-9C71-4B76-B184-A38031879282}"
 EndProject
@@ -65,6 +65,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TensorCudaSup", "TensorCudaSup\TensorCudaSup.vcxproj", "{A3E00A5C-A679-416A-8D2C-4D2721C90D6D}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TensorBenchmark", "TensorBenchmark\TensorBenchmark.fsproj", "{9CA15DFC-8043-4267-AD35-04ADDD23987B}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TensorTests", "TensorTests\TensorTests.fsproj", "{73235C57-C9E3-4A03-B334-C6F566C907F4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -220,6 +222,14 @@ Global
 		{9CA15DFC-8043-4267-AD35-04ADDD23987B}.Release|x64.ActiveCfg = Release|x64
 		{9CA15DFC-8043-4267-AD35-04ADDD23987B}.Release|x64.Build.0 = Release|x64
 		{9CA15DFC-8043-4267-AD35-04ADDD23987B}.Release|x86.ActiveCfg = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|x64.ActiveCfg = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|x64.Build.0 = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|x86.ActiveCfg = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|Any CPU.ActiveCfg = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|x64.ActiveCfg = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|x64.Build.0 = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -241,5 +251,6 @@ Global
 		{44537BCD-DF37-49DF-A30A-40ADE84F5E50} = {252FFCE3-82FA-4882-811C-83A3AB583F3B}
 		{A3E00A5C-A679-416A-8D2C-4D2721C90D6D} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 		{9CA15DFC-8043-4267-AD35-04ADDD23987B} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
+		{73235C57-C9E3-4A03-B334-C6F566C907F4} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 	EndGlobalSection
 EndGlobal
