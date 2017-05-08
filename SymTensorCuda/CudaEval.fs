@@ -4,7 +4,7 @@ open System
 open System.Reflection
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open UExprTypes
 open SymTensor.Compiler
@@ -47,16 +47,15 @@ module CudaEvalTypes =
     type private HelperT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
                 (shp: NShapeSpecT) : Tensor<'T> =
-            let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newC shp 
-            ary :> Tensor<'T>
+            Tensor<'T> (shp, CudaTensor.Dev)
 
         static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: ArrayNDHostT<'T>) : Tensor<'T> =
-            ArrayNDCuda.toDev ary :> Tensor<'T>
+                (ary: Tensor<'T>) : Tensor<'T> =
+            CudaTensor.transfer ary
 
         static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: Tensor<'T>) : ArrayNDHostT<'T> =
-            ArrayNDCuda.toHost (ary :?> ArrayNDCudaT<'T>)
+                (ary: Tensor<'T>) : Tensor<'T> =
+            HostTensor.transfer ary
 
     let private invokeHelperMethod<'T> name args = 
         let gm = typeof<HelperT>.GetMethod (name, allBindingFlags)
@@ -71,7 +70,7 @@ module CudaEvalTypes =
             #if !CUDA_DUMMY
             member this.Allocator shp : Tensor<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
             member this.ToDev ary : Tensor<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
-            member this.ToHost ary : ArrayNDHostT<'T2>  = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
+            member this.ToHost ary : Tensor<'T2>      = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
 
             #else
 
@@ -83,7 +82,7 @@ module CudaEvalTypes =
             member this.Compiler = { new IUExprCompiler with 
                                         member this.Name = "Cuda"
                                         member this.Compile env exprs = CudaEval.cudaEvaluator env exprs }
-            member this.DefaultLoc = LocDev
+            member this.DefaultLoc = CudaTensor.Dev
             member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
 
     }

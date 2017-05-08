@@ -5,7 +5,7 @@ open FsUnit.Xunit
 open System.IO
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Datasets
 
 
@@ -38,10 +38,10 @@ type CurveDataset () =
         for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) |> Seq.take 3 do
             printfn "idx %d has sample biotac %A pos %A" 
                 idx (smpl.Biotac |> Tensor.shape) (smpl.Pos |> Tensor.shape)
-            smpl.Biotac ==== orig.Biotac |> Tensor.all |> Tensor.value |> should equal true
-            smpl.Pos ==== orig.Pos |> Tensor.all |> Tensor.value |> should equal true
-            smpl.Vels ==== orig.Vels |> Tensor.all |> Tensor.value |> should equal true
-            smpl.Biotac ==== orig.Biotac |> Tensor.all |> Tensor.value |> should equal true
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> should equal true
+            smpl.Pos ==== orig.Pos |> Tensor.all |> should equal true
+            smpl.Vels ==== orig.Vels |> Tensor.all |> should equal true
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> should equal true
 
     [<Fact>]
     member this.``Partitioning`` () =
@@ -101,9 +101,9 @@ let ``Loading CSV datasets`` () =
 type SeqSample = {SeqData: Tensor<int64>}
 
 type SequenceDataset () = 
-    let smpl1 = {SeqData = ArrayNDHost.arange 98L}
-    let smpl2 = {SeqData = 100L + ArrayNDHost.arange 98L}
-    let smpl3 = {SeqData = 200L + ArrayNDHost.arange 98L}
+    let smpl1 = {SeqData = HostTensor.arange 98L}
+    let smpl2 = {SeqData = 100L + HostTensor.arange 98L}
+    let smpl3 = {SeqData = 200L + HostTensor.arange 98L}
     let dataset = Dataset.ofSeqSamples [smpl1; smpl2; smpl3]
 
     [<Fact>]

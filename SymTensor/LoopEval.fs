@@ -10,15 +10,21 @@ module LoopEval =
 
     /// channel information for loop execution
     type LoopChannelInfoT = {
-        Shape:      NShapeSpecT
-        SliceDim:   int
-        Target:     ITensor
-    }
+        Shape:          NShapeSpecT
+        SliceDim:       int
+        Target:         ITensor
+    } 
 
+    /// channel layout information for building loop strides
+    type LoopChannelLayoutInfoT = {
+        Shape:          NShapeSpecT
+        SliceDim:       int
+        TargetLayout:   TensorLayout
+    } 
 
     /// build strides information for loop sources and targets
-    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: ITensor list) 
-                     (channels: Map<ChannelT, LoopChannelInfoT>) 
+    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: TensorLayout list) 
+                     (channels: Map<ChannelT, LoopChannelLayoutInfoT>) 
                      : VarStridesT * ChannelStridesT * int list option list =
 
         let mutable argRequiredStrideOrder = List.replicate args.Length None
@@ -27,15 +33,15 @@ module LoopEval =
             vars |> Map.map (fun vs li ->
                 match li with
                 | ConstArg idx -> 
-                    args.[idx].Layout.Stride
+                    args.[idx].Stride
                 | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
-                    args.[idx].Layout.Stride |> List.without dim
+                    args.[idx].Stride |> List.without dim
                 | PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
                     let sliceDim = channels.[ch].SliceDim
-                    let chStride = channels.[ch].Target.Layout.Stride |> List.without sliceDim
+                    let chStride = channels.[ch].TargetLayout.Stride |> List.without sliceDim
 
                     // check that initial value has same stride as channel target
-                    let ivStride = args.[ivIdx].Layout.Stride |> List.without sliceDim
+                    let ivStride = args.[ivIdx].Stride |> List.without sliceDim
                     if chStride <> ivStride then
                         // Stride mismatch. 
                         // Check that copying argument to temporary array would
@@ -49,7 +55,7 @@ module LoopEval =
                         if chStride <> ivCopyStride then 
                             printfn "Loop stride problem:"
                             printfn "Channel %s:\n%A" ch channels.[ch]
-                            printfn "Initial value layout:\n%A" args.[ivIdx].Layout
+                            printfn "Initial value layout:\n%A" args.[ivIdx]
                             printfn "Copy stride:    %A" ivCopyStride
                             printfn "Channel stride: %A" chStride
                             failwithf "channel %A slice strides %A are different from initial \
@@ -64,7 +70,7 @@ module LoopEval =
                 | IterationsRemaining -> [])
 
         let channelStrides =
-            channels |> Map.map (fun ch lv -> lv.Target.Layout.Stride |> List.without lv.SliceDim)
+            channels |> Map.map (fun ch lv -> lv.TargetLayout.Stride |> List.without lv.SliceDim)
 
         varStrides, channelStrides, argRequiredStrideOrder
 

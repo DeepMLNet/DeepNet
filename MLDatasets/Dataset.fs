@@ -5,7 +5,7 @@ open System.Collections.Generic
 open Microsoft.FSharp.Reflection
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Util
 
 /// A dataset of a record type 'S containing ArrayNDT<_> data variables.
@@ -24,7 +24,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
 
     // make sure that all field storages are in C-order
     do for fs in fieldStorages do
-        if not (Tensor.isC fs) then
+        if not (Tensor.isRowMajor fs) then
             failwith "all field storages in must be in C-order"
 
     /// number of samples
@@ -87,14 +87,14 @@ type Dataset<'S> (fieldStorages: ITensor list,
             let maxSmplShp = maxShape fieldSmpls
             let storShp = (int64 nSamples) :: maxSmplShp
             let fieldTyp = (Seq.head fieldSmpls).DataType
-            let stor = ArrayNDHost.newCOfType fieldTyp storShp 
+            let stor = Tensor.NewOfType (storShp, fieldTyp, HostTensor.Dev, order=RowMajor)
             for smpl, smplVal in Seq.indexed fieldSmpls do
                 if stor.[int64 smpl, Fill].Shape = smplVal.Shape then
                     stor.[int64 smpl, Fill] <- smplVal
                 else
                     failwithf "the sample with index %d has shape %A but shape %A was expected"
-                              smpl smplVal.Shape stor.[smpl, Fill].Shape
-            stor :> ITensor            
+                              smpl smplVal.Shape stor.[0L, Fill].Shape
+            stor
         let fieldStorages = 
             [for fld=0 to nFields-1 do yield fieldStorage ary.[*, fld]]
 
@@ -163,7 +163,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
     member this.SampleType = typeof<'S>
 
     /// storage location
-    member this.Location = fieldStorages.[0].Location
+    member this.Location = fieldStorages.[0].Device
 
     /// Generates a function that returns a sequence of batches with the given size of this dataset.
     /// If the number of samples in this dataset is not a multiple of the batch size,
@@ -180,7 +180,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
                 |> List.map (fun fsAll ->
                     let shpAll = Tensor.shape fsAll
                     let shpBatch = shpAll |> List.set 0 batchSize                    
-                    let fsBatch = fsAll |> Tensor.newCOfSameType shpBatch 
+                    let fsBatch = Tensor.NewOfType (shpBatch, fsAll.DataType, fsAll.Device, order=RowMajor)
                     fsBatch.[0L .. lastBatchElems-1L, Fill] <- fsAll.[lastBatchStart .. nSamples-1L, Fill]
                     fsBatch)
                 |> Some
@@ -267,9 +267,9 @@ type Dataset<'S> (fieldStorages: ITensor list,
         let prefixPath = defaultArg hdfPrefixPath ""
         let fldInfos = FSharpType.GetRecordFields this.SampleType
         for fldInfo, fs in Seq.zip fldInfos this.FieldStorages do
-            match fs with
-            | :? IArrayNDHostT as fs -> ArrayNDHDF.writeUntyped hdf (prefixPath + "/" + fldInfo.Name) fs
-            | _ -> failwith "can only save a dataset stored on the host"
+            if fs.Device <> HostTensor.Dev then 
+                failwith "can only save a dataset stored on the host"
+            HostTensor.write hdf (prefixPath + "/" + fldInfo.Name) fs
 
     /// Saves this dataset into the specified HDF5 file.
     /// The file is overwritten.
@@ -282,13 +282,13 @@ type Dataset<'S> (fieldStorages: ITensor list,
     static member Load<'S> (hdf, ?hdfPrefixPath) =
         let prefixPath = defaultArg hdfPrefixPath ""
         if not (FSharpType.IsRecord typeof<'S>) then
-            failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+            failwith "Dataset sample type must be a record containing Tensors"
         FSharpType.GetRecordFields typeof<'S>
         |> Seq.map (fun fldInfo ->
             if not (typeof<ITensor>.IsAssignableFrom fldInfo.PropertyType) then 
-                failwith "Dataset sample type must be a record containing ArrayNDHostTs"
+                failwith "Dataset sample type must be a record containing Tensors"
             let dataType = fldInfo.PropertyType.GenericTypeArguments.[0]
-            ArrayNDHDF.readUntyped hdf (prefixPath + "/" + fldInfo.Name) dataType :> ITensor)
+            HostTensor.readUntyped hdf (prefixPath + "/" + fldInfo.Name))
         |> Seq.toList
         |> Dataset<'S>
 
@@ -359,8 +359,10 @@ module Dataset =
                 let fs =
                     // pad if necessary
                     if padSteps > nSteps then
-                        let z = fs |> Tensor.zerosOfSameType ([ds.NSamples; padSteps] @ rShp)
-                        z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]; z
+                        let z = Tensor.NewOfType ([ds.NSamples; padSteps] @ rShp, fs.DataType, fs.Device)   
+                        z.FillZero()
+                        z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]
+                        z
                     else fs
                 fs |> Tensor.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
         Dataset (cutFs, true)
@@ -381,15 +383,17 @@ module Dataset =
         |> List.map (f >> (fun fs -> fs :> ITensor))
         |> fun fs -> Dataset<'S> (fs, ds.IsSeq)
 
+    /// copies this dataset to the specified device
+    let transfer dev (ds: Dataset<'S>) : Dataset<'S> =
+        ds |> map (Tensor.transfer dev)
+
     /// copies this dataset to a CUDA GPU
     let toCuda (ds: Dataset<'S>) : Dataset<'S> =
-        ds |> map (fun fs ->
-            ArrayNDCuda.toDevUntyped (fs :?> IArrayNDHostT))
+        ds |> map CudaTensor.transfer
 
     /// copies this dataset to the host
     let toHost (ds: Dataset<'S>) : Dataset<'S> =
-        ds |> map (fun fs ->
-            ArrayNDCuda.toHostUntyped (fs :?> IArrayNDCudaT))
+        ds |> map HostTensor.transfer
 
 /// A training/validation/test partitioning of a dataset.
 [<StructuredFormatDisplay("{Pretty}")>]

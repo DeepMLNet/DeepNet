@@ -5,8 +5,7 @@ open System.Diagnostics
 
 open ManagedCuda
 open Basics
-open Basics.Cuda
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
@@ -62,7 +61,7 @@ module CudaRecipeTypes =
         InitCalls:          CudaCallT list
         DisposeCalls:       CudaCallT list
         ExecCalls:          CudaCallT list
-        ConstantValues:     Map<MemConstManikinT, IArrayNDCudaT>
+        ConstantValues:     Map<MemConstManikinT, ITensor>
         SubRecipes:         Map<SubWorkspaceT, CudaRecipeT>
     } 
 
@@ -434,14 +433,13 @@ module CudaRecipe =
             uexprs
             |> Map.map (fun channel (UExpr (_, _, {ChannelType=ct; ChannelShape=cs}) as uexpr) ->
                 let tn, nshp = ct.[dfltChId], cs.[dfltChId]
-                let layout = TensorLayout.newC nshp
 
                 // create result storage allocator
                 let resAllocator = fun () ->
                     match compileEnv.ResultLoc with
-                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> ITensor
-                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> ITensor  
-                    | l -> failwithf "CUDA cannot work with result location %A" l      
+                    | dev when dev=HostTensor.Dev || dev=CudaTensor.Dev ->
+                        Tensor.NewOfType (nshp, tn.Type, dev, order=RowMajor)
+                    | dev -> failwithf "CUDA cannot work with result location %A" dev
 
                 if List.fold (*) 1L nshp > 0L then
                     // expression has data that needs to be stored       

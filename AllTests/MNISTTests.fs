@@ -4,7 +4,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Datasets
 
 let mnistPath = Util.assemblyDirectory + "../../../../Data/MNIST"
@@ -19,7 +19,8 @@ let ``Save MNIST as HDF5`` () =
     let mnist = Mnist.loadRaw mnistPath
 
     use hdf = new HDF5 (@"MNIST-TestWrite.h5", HDF5Overwrite)
-    ArrayNDHDF.write hdf "TrnImgs" (mnist.TrnImgs :?> ArrayNDHostT<single>)
-    ArrayNDHDF.write hdf "TrnLbls" (mnist.TrnLbls :?> ArrayNDHostT<single>)
-    ArrayNDHDF.write hdf "TstImgs" (mnist.TstImgs :?> ArrayNDHostT<single>)
-    ArrayNDHDF.write hdf "TstLbls" (mnist.TstLbls :?> ArrayNDHostT<single>)
+    HostTensor.write hdf "TrnImgs" mnist.TrnImgs
+    HostTensor.write hdf "TrnLbls" mnist.TrnLbls
+    HostTensor.write hdf "TstImgs" mnist.TstImgs
+    HostTensor.write hdf "TstLbls" mnist.TstLbls
+

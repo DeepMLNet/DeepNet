@@ -1534,22 +1534,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     /// data array and fast layout
     member inline internal this.DataAndLayout = 
         {Data=this.Data; FastLayout=this.FastLayout}
-            
-    ///// C++ type name
-    //member this.CPPType = 
-    //    let dims = TensorLayout.nDims layout
-    //    let shp = TensorLayout.shape layout
-    //    let str = TensorLayout.stride layout
-    //    let ofst = TensorLayout.offset layout
-    //    let cppDataType = Util.cppType this.DataType
-    //    let shapeStr = 
-    //        if dims = 0 then "" 
-    //        else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-    //    let strideStr = 
-    //        "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-    //    sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
-    //        dims cppDataType dims shapeStr dims strideStr            
-
+              
     static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
@@ -2068,16 +2053,10 @@ and TensorHostDevice private () =
     override this.Zeroed = true
 
 
-[<AutoOpen>]            
-module HostTensorTypes =
-    /// Tensor located on host using a .NET array as storage.
-    let DevHost = TensorHostDevice.Instance :> ITensorDevice
-
-
 module internal HostTensorHelpers = 
 
     let ensureCAndOffsetFree (x: Tensor<'T>) =
-        if x.Device <> DevHost then
+        if x.Device <> (TensorHostDevice.Instance :> ITensorDevice) then
             let msg = sprintf "require a Host tensor but got a %s tensor" x.Device.Id
             raise (StorageMismatch msg)
         if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
@@ -2099,28 +2078,31 @@ type private HDFFuncs =
 /// Host tensor functions.
 module HostTensor =
 
-    let transfer x = Tensor.transfer DevHost x
+    /// Tensor located on host using a .NET array as storage.
+    let Dev = TensorHostDevice.Instance :> ITensorDevice
 
-    let zeros<'T> = Tensor.zeros<'T> DevHost 
+    let transfer x = Tensor.transfer Dev x
 
-    let ones<'T> = Tensor.ones<'T> DevHost
+    let zeros<'T> = Tensor.zeros<'T> Dev 
 
-    let falses = Tensor.falses DevHost
+    let ones<'T> = Tensor.ones<'T> Dev
 
-    let trues = Tensor.trues DevHost
+    let falses = Tensor.falses Dev
 
-    let scalar<'T> = Tensor.scalar<'T> DevHost
+    let trues = Tensor.trues Dev
 
-    let init<'T> = Tensor.init<'T> DevHost
+    let scalar<'T> = Tensor.scalar<'T> Dev
 
-    let filled<'T> = Tensor.filled<'T> DevHost
+    let init<'T> = Tensor.init<'T> Dev
 
-    let identity<'T> = Tensor.identity<'T> DevHost
+    let filled<'T> = Tensor.filled<'T> Dev
 
-    let arange = Tensor.arange DevHost
+    let identity<'T> = Tensor.identity<'T> Dev
+
+    let arange = Tensor.arange Dev
 
     let inline linspace start stop nElems = 
-        Tensor.linspace DevHost start stop nElems
+        Tensor.linspace Dev start stop nElems
   
     /// Creates a one-dimensional Tensor using the specified data.
     /// The data is referenced, not copied.

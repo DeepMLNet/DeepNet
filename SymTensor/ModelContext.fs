@@ -35,7 +35,7 @@ module ModelContextTypes =
             member this.Compiler        = { new IUExprCompiler with 
                                               member this.Name = "Host"
                                               member this.Compile env exprs = onHost env exprs }
-            member this.DefaultLoc      = DevHost
+            member this.DefaultLoc      = HostTensor.Dev
             member this.DefaultFactory  = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
     }
 

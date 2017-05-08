@@ -5,7 +5,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open TestUtils
@@ -24,9 +24,9 @@ let ``Eval: simple`` () =
     let y = ElemExpr.argElem<float> 1
     let expr = 2.0 * (x [k; k]) + y [SizeSpec.zero; k]
 
-    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> Tensor.diagMat
+    let xVal = [1.0; 2.0; 3.0] |> HostTensor.ofList |> Tensor.diagMat
     let yVal = [[4.0; 5.0; 6.0]
-                [7.0; 8.0; 9.0]] |> ArrayNDHost.ofList2D
+                [7.0; 8.0; 9.0]] |> HostTensor.ofList2D
     let res = ElemExprHostEval.eval expr [xVal; yVal] [xVal.Shape.[0]]
 
     printfn "Expr:\n%A" expr
@@ -34,8 +34,8 @@ let ``Eval: simple`` () =
     printfn "y=\n%A" yVal
     printfn "result=\n%A" res
 
-    let expected = [6.0; 9.0; 12.0] |> ArrayNDHost.ofList
-    Tensor.almostEqual res expected |> Tensor.value |> should equal true
+    let expected = [6.0; 9.0; 12.0] |> HostTensor.ofList
+    Tensor.almostEqual res expected |> should equal true
 
 
 [<Fact>]
@@ -53,16 +53,16 @@ let ``Eval: sum`` () =
     let l = ElemExpr.sumIdx "l"
     let expr = 2.0 * (ElemExpr.sum l SizeSpec.zero (is-1L) (x [l; k]))
 
-    let xVal = [1.0; 2.0; 3.0] |> ArrayNDHost.ofList |> Tensor.diagMat
-    let xVal = xVal + ArrayNDHost.ones [3L; 3L]
+    let xVal = [1.0; 2.0; 3.0] |> HostTensor.ofList |> Tensor.diagMat
+    let xVal = xVal + HostTensor.ones [3L; 3L]
     let res = ElemExprHostEval.eval expr [xVal] [xVal.Shape.[0]]
 
     printfn "Expr:\n%A" expr
     printfn "x=\n%A" xVal
     printfn "result=\n%A" res
 
-    let expected = [8.0; 10.0; 12.0] |> ArrayNDHost.ofList
-    Tensor.almostEqual res expected |> Tensor.value |> should equal true
+    let expected = [8.0; 10.0; 12.0] |> HostTensor.ofList
+    Tensor.almostEqual res expected  |> should equal true
 
 [<Fact>]
 let ``Deriv: 1`` () =   
@@ -152,8 +152,8 @@ let ``Eval and deriv: KSE`` () =
     printfn "dKSE / dl:\n%A" dKse.[1]
 
 
-    let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
-    let lVal = [0.5] |> ArrayNDHost.ofList
+    let xVal = [[1.0; 1.1; 2.0]] |> HostTensor.ofList2D
+    let lVal = [0.5] |> HostTensor.ofList
     let kseVal = ElemExprHostEval.eval kse [xVal; lVal] [1L; 3L; 3L]
 
     printfn "x=\n%A" xVal
@@ -232,8 +232,8 @@ let ``Eval and deriv: KSE in Expr on Host`` () =
     let kseinvFn = Func.make<float> DevHost.DefaultFactory kseinv |> arg2 xTensor lTensor
     let dKseinvFn = Func.make2<float, float> DevHost.DefaultFactory dKseinvdX dKseinvdL |> arg2 xTensor lTensor
 
-    let xVal = [[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
-    let lVal = [0.5] |> ArrayNDHost.ofList
+    let xVal = [[1.0; 1.1; 2.0]] |> HostTensor.ofList2D
+    let lVal = [0.5] |> HostTensor.ofList
 
     let kseVal = kseFn xVal lVal
     let dKsedXVal, dKsedLVal = dKseFn xVal lVal
@@ -280,8 +280,8 @@ let ``Eval and deriv: KSE in Expr on CUDA`` () =
     let kseFn = Func.make<single> DevCuda.DefaultFactory kse |> arg2 xTensor lTensor
     let dKseFn = Func.make2<single, single> DevCuda.DefaultFactory dKsedX dKsedL |> arg2 xTensor lTensor
 
-    let xVal = [[1.0f; 1.1f; 2.0f]] |> ArrayNDHost.ofList2D |> ArrayNDCuda.toDev
-    let lVal = [0.5f] |> ArrayNDHost.ofList |> ArrayNDCuda.toDev
+    let xVal = [[1.0f; 1.1f; 2.0f]] |> HostTensor.ofList2D |> CudaTensor.transfer
+    let lVal = [0.5f] |> HostTensor.ofList |> CudaTensor.transfer
 
     let kseVal = kseFn xVal lVal
     let dKsedXVal, dKsedLVal = dKseFn xVal lVal
@@ -376,10 +376,10 @@ let ``Eval and derive: lkse`` () =
     printfn "dlk / dx=\n%A" dLkse.[2]
     printfn "dlk / dl=\n%A" dLkse.[3]
 
-    let xVal = [[1.0; 1.1; 2.0];[1.0; 1.1; 2.0]] |> ArrayNDHost.ofList2D
-    let lVal = [0.5;0.6] |> ArrayNDHost.ofList
-    let muVal = [1.0;0.5] |> ArrayNDHost.ofList
-    let sigmaVal = [[0.4;0.2];[0.2;0.8]] |> ArrayNDHost.ofList2D
+    let xVal = [[1.0; 1.1; 2.0];[1.0; 1.1; 2.0]] |> HostTensor.ofList2D
+    let lVal = [0.5;0.6] |> HostTensor.ofList
+    let muVal = [1.0;0.5] |> HostTensor.ofList
+    let sigmaVal = [[0.4;0.2];[0.2;0.8]] |> HostTensor.ofList2D
     let lkseVal = ElemExprHostEval.eval lkse [muVal;sigmaVal;xVal;lVal] [2L; 3L]
 
     printfn "mu=\n%A" muVal
@@ -427,10 +427,10 @@ let ``DerivTest: GP Predict`` () =
     let mean = k' .* (Expr.invert k) .* t
 
     // do check
-    let xv = ArrayNDHost.linSpaced -4.0 4.0 5L
-    let x'v = ArrayNDHost.linSpaced -3.0 3.0 4L
-    let varEnv = VarEnv.ofSeq [l, ArrayNDHost.scalar 1.0
-                               sigf, ArrayNDHost.scalar 1.0
+    let xv = HostTensor.linspace -4.0 4.0 5L
+    let x'v = HostTensor.linspace -3.0 3.0 4L
+    let varEnv = VarEnv.ofSeq [l, HostTensor.scalar 1.0
+                               sigf, HostTensor.scalar 1.0
                                x, xv
                                t, xv |> Tensor.map tanh
                                sign, 0.001 * Tensor.onesLike xv
@@ -473,8 +473,8 @@ let ``DerivTest: GP Predict2`` () =
     printfn "%A" dmean
 
     // do check
-    let xv = ArrayNDHost.linSpaced -4.0 4.0 15L
-    let x'v = ArrayNDHost.linSpaced -3.0 3.0 10L
+    let xv = HostTensor.linspace -4.0 4.0 15L
+    let x'v = HostTensor.linspace -3.0 3.0 10L
     let varEnv = VarEnv.ofSeq [                               
                                x, xv
                                t, xv |> Tensor.map tanh

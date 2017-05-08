@@ -210,7 +210,7 @@ module CompileEnv =
         VarLocs         = Map.empty 
         VarStrides      = Map.empty
         ChannelStrides  = Map.empty
-        ResultLoc       = DevHost
+        ResultLoc       = HostTensor.Dev
         SymSizes        = SymSizeEnv.empty
         CanDelay        = true
     }

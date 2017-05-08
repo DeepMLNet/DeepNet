@@ -1,7 +1,7 @@
 ﻿namespace Models 
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Datasets
 
 
@@ -14,13 +14,13 @@ module Accuracy =
     let correctlyClassified (trgt: Tensor<'T>) (pred: Tensor<'T>) =     
         if Tensor.nDims pred <> 2 || Tensor.nDims trgt <> 2 then
             failwith "pred and target must be two-dimensional"      
-        let pred = pred |> ArrayNDHost.fetch
-        let trgt = trgt |> ArrayNDHost.fetch
+        let pred = pred |> HostTensor.transfer
+        let trgt = trgt |> HostTensor.transfer
 
         let predClass = pred |> Tensor.argMaxAxis 1
         let trgtClass = trgt |> Tensor.argMaxAxis 1
 
-        Tensor.ifThenElse (predClass ==== trgtClass) (ArrayNDHost.scalar 1.0) (ArrayNDHost.scalar 0.0)
+        Tensor.ifThenElse (predClass ==== trgtClass) (HostTensor.scalar 1.0) (HostTensor.scalar 0.0)
         |> Tensor.sum
         |> Tensor.value 
 
@@ -42,8 +42,8 @@ module SSE =
     /// Calculates the sum squared error.
     /// Shapes: pred[smpl, ...], target[smpl, ...]
     let error (trgt: Tensor<'T>) (pred: Tensor<'T>) =
-        let pred = pred |> ArrayNDHost.fetch |> Tensor.float
-        let trgt = trgt |> ArrayNDHost.fetch |> Tensor.float
+        let pred = pred |> HostTensor.transfer |> Tensor.float
+        let trgt = trgt |> HostTensor.transfer |> Tensor.float
 
         (pred - trgt) ** 2.0
         |> Tensor.sum

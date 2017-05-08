@@ -1,7 +1,7 @@
 ﻿namespace Optimizers
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 

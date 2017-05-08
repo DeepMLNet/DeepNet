@@ -5,7 +5,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open TestUtils
@@ -41,7 +41,7 @@ let ``Simple loop`` (device: IDevice) =
 
     let resultFn = Func.make<single> device.DefaultFactory result |> arg1 initialA
     
-    let initialAv = ArrayNDHost.zeros<single> [1L; 3L; 2L]
+    let initialAv = HostTensor.zeros<single> [1L; 3L; 2L]
     printfn "initialAv=\n%A" initialAv
 
     let resultVal = resultFn initialAv
@@ -112,10 +112,10 @@ let ``Build complicated loop 1`` () =
 
     
 let ``Values for complicated loop 1`` () =
-    let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1L; 3L; 2L]
-    let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3L; 2L; 2L]
-    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [2L; 5L; 3L]
-    let constAv   = ArrayNDHost.ofList [0.001f; 0.0004f] 
+    let initialAv = Seq.countingFrom 0 |> Seq.map single |> HostTensor.ofSeqWithShape [1L; 3L; 2L]
+    let initialBv = Seq.countingFrom 100 |> Seq.map single |> HostTensor.ofSeqWithShape [3L; 2L; 2L]
+    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> HostTensor.ofSeqWithShape [2L; 5L; 3L]
+    let constAv   = HostTensor.ofList [0.001f; 0.0004f] 
     printfn "initialAv=\n%A" initialAv
     printfn "initialBv=\n%A" initialBv
     printfn "seqAv=\n%A" seqAv

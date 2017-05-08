@@ -1,7 +1,7 @@
 ﻿namespace Datasets
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Util
 
 

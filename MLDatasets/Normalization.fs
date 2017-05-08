@@ -1,7 +1,7 @@
 ﻿namespace Datasets
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Util
 
 
@@ -34,9 +34,9 @@ module NormalizationTypes =
     /// performed normalization operation
     type Normalization<'T> =
         | NotNormalized
-        | Rescaled of minVals:ArrayNDHostT<'T> * maxVals:ArrayNDHostT<'T>
-        | Standardized of means:ArrayNDHostT<'T> * stds:ArrayNDHostT<'T> * onlyZeroOne:ArrayNDHostT<bool> option
-        | ScaledToUnitLength of lengths:ArrayNDHostT<'T> 
+        | Rescaled of minVals:Tensor<'T> * maxVals:Tensor<'T>
+        | Standardized of means:Tensor<'T> * stds:Tensor<'T> * onlyZeroOne:Tensor<bool> option
+        | ScaledToUnitLength of lengths:Tensor<'T> 
         | PCAWhitened of Decomposition.PCAInfo<'T>
         | ZCAWhitened of Decomposition.PCAInfo<'T>
 
@@ -46,8 +46,8 @@ module NormalizationTypes =
 /// Dataset normalization functions.
 module Normalization =
 
-    let private performField normalizer (data: ArrayNDHostT<'T>)  =
-        let epsilon = ArrayNDHost.scalar (conv<'T> 1e-5)
+    let private performField normalizer (data: Tensor<'T>)  =
+        let epsilon = HostTensor.scalar (conv<'T> 1e-5)
         match normalizer with 
         | NoNormalizer ->
             NotNormalized, data
@@ -57,10 +57,10 @@ module Normalization =
             let maxVals = Tensor.maxElemwise maxVals (minVals + epsilon)
             Rescaled (minVals, maxVals), (data - minVals.[NewAxis, *]) / (maxVals - minVals).[NewAxis, *]
         | Standardization keepZeroOne ->
-            let zero = Tensor.scalarOfSameType data (conv<'T> 0)
-            let one = Tensor.scalarOfSameType data (conv<'T> 1)
+            let zero = HostTensor.scalar (conv<'T> 0)
+            let one = HostTensor.scalar (conv<'T> 1)
             let means = data |> Tensor.meanAxis 0
-            let stds = (data |> Tensor.stdAxis 0) + epsilon
+            let stds = Tensor.stdAxis(0, data) + epsilon
             let standardized = (data - means.[NewAxis, *]) / stds.[NewAxis, *]
             let res, onlyZeroOne = 
                 if keepZeroOne then
@@ -69,7 +69,7 @@ module Normalization =
                 else standardized, None
             Standardized (means, stds, onlyZeroOne), res
         | ScaleToUnitLength ->
-            let lengths = (data |> Tensor.normAxis 1) + epsilon
+            let lengths = Tensor.normAxis(1, data) + epsilon
             ScaledToUnitLength lengths, data / lengths.[*, NewAxis]
         | PCAWhitening nComps ->
             let whitened, info = Decomposition.PCA.Perform (data, ?nComps=nComps)
@@ -78,7 +78,7 @@ module Normalization =
             let whitened, info = Decomposition.ZCA.Perform data
             ZCAWhitened info, whitened
 
-    let private reverseField normalization (nData: ArrayNDHostT<'T>) =
+    let private reverseField normalization (nData: Tensor<'T>) =
         match normalization with
         | NotNormalized ->
             nData
@@ -98,19 +98,19 @@ module Normalization =
 
     let private performFieldUntyped n (fs: ITensor) =
         match fs with
-        | :? ArrayNDHostT<single> as fs -> 
+        | :? Tensor<single> as fs -> 
             let info, res = performField n fs in info :> INormalization, res :> ITensor
-        | :? ArrayNDHostT<double> as fs -> 
+        | :? Tensor<double> as fs -> 
             let info, res = performField n fs in info :> INormalization, res :> ITensor
-        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
+        | _ -> failwithf "normalization requires single or double data type"
 
     let private reverseFieldUntyped (n: INormalization) (fs: ITensor) =
         match fs with
-        | :? ArrayNDHostT<single> as fs -> 
+        | :? Tensor<single> as fs -> 
             reverseField (n :?> Normalization<single>) fs :> ITensor
-        | :? ArrayNDHostT<double> as fs -> 
+        | :? Tensor<double> as fs -> 
             reverseField (n :?> Normalization<double>) fs :> ITensor
-        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
+        | _ -> failwithf "unnormalization requires single or double data type"
 
     /// Normalizes each field of the specified Dataset using the specified normalizier.
     let perform (normalizers: Normalizer list) (dataset: Dataset<'S>) =

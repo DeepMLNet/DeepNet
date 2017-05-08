@@ -1,7 +1,7 @@
 ﻿namespace Optimizers
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 
@@ -56,7 +56,7 @@ type RMSprop<'T when 'T: equality and 'T: comparison>
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
         let shp = Tensor.shape parVals
         {
-            EstMomSq     = ArrayNDHost.zeros shp |> dev.ToDev
+            EstMomSq     = HostTensor.zeros shp |> dev.ToDev
         }
 
     member this.Minimize : ExprT =

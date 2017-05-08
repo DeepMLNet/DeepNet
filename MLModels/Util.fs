@@ -1,6 +1,6 @@
 ﻿namespace Models
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 

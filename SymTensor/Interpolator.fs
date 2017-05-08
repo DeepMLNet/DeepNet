@@ -122,7 +122,7 @@ module Interpolator =
                         // hack to work around slow ArrayNDCuda operations
                         let tbl, wasOnDev = 
                             match tbl.Device with
-                            | dev when dev=DevCuda -> HostTensor.transfer tbl, true
+                            | dev when dev=CudaTensor.Dev -> HostTensor.transfer tbl, true
                             | _ -> tbl, false
 
                         let ipds = 

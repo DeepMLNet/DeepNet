@@ -5,7 +5,7 @@ open Xunit
 open FsUnit.Xunit
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -14,7 +14,7 @@ open Optimizers
 
 
 let post device (x: Tensor<'T>) =
-    if device = DevCuda then ArrayNDCuda.toDev (x :?> ArrayNDHostT<'T>) :> Tensor<'T>
+    if device = DevCuda then CudaTensor.transfer x
     else x 
     
 let compareTracesLock = obj ()
@@ -67,7 +67,7 @@ let buildVarEnv<'T> (vars: ExprT list) shps (rng: System.Random) (dev: IDevice) 
     (VarEnv.empty, List.zip vars shps)
     ||> List.fold (fun varEnv (var, shp) ->
         let shp = shp |> List.map (function | -1L -> 1L | s -> s)
-        let value = rng.UniformArrayND (conv<'T> -1.0, conv<'T> 1.0) shp |> dev.ToDev
+        let value = rng.UniformTensor (conv<'T> -1.0, conv<'T> 1.0) shp |> dev.ToDev
         varEnv |> VarEnv.add var value
     )
 

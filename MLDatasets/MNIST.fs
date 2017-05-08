@@ -5,7 +5,7 @@ open System.IO
 open System.IO.Compression
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 /// Raw MNIST dataset
@@ -22,10 +22,10 @@ type MnistRawT = {
 } with 
     /// copies this dataset to the CUDA GPU
     member this.ToCuda () =
-        {TrnImgs = this.TrnImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TrnLbls = this.TrnLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstImgs = this.TstImgs :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstLbls = this.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
+        {TrnImgs = this.TrnImgs |> CudaTensor.transfer
+         TrnLbls = this.TrnLbls |> CudaTensor.transfer
+         TstImgs = this.TstImgs |> CudaTensor.transfer
+         TstLbls = this.TstLbls |> CudaTensor.transfer}
 
 
 /// Module containing functions to load the MNIST dataset.
@@ -39,7 +39,7 @@ module Mnist =
         let nSamples = List.length data |> int64
 
         let dataShape = Tensor.shape data.[0]
-        let ds = ArrayNDHost.zeros (nSamples :: dataShape)
+        let ds = HostTensor.zeros (nSamples :: dataShape)
 
         data |> List.iteri (fun smpl d -> ds.[int64 smpl, Fill] <- d)
         ds
@@ -72,12 +72,12 @@ module Mnist =
 
         for smpl in 0 .. nSamples - 1 do
             let label = labelReader.ReadByte() |> int64
-            let labelHot : ArrayNDHostT<single> = ArrayNDHost.zeros [10L];
+            let labelHot : Tensor<single> = HostTensor.zeros [10L]
             labelHot.[[label]] <- 1.0f
 
             let image = imageReader.ReadBytes (nRows * nCols)           
             let imageSingle = Array.map (fun p -> single p / 255.0f) image
-            let imageMat = ArrayNDHost.ofArray imageSingle |> Tensor.reshape [int64 nRows; int64 nCols]
+            let imageMat = HostTensor.usingArray imageSingle |> Tensor.reshape [int64 nRows; int64 nCols]
 
             yield labelHot, imageMat
     }
@@ -104,18 +104,18 @@ module Mnist =
         let hdfPath = Path.Combine (directory, sprintf "MNIST%s.h5" testStr)
         if File.Exists hdfPath then
             use hdf = new HDF5 (hdfPath, HDF5Read)
-            {TrnImgs = ArrayNDHDF.read hdf "TrnImgs"; 
-             TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
-             TstImgs = ArrayNDHDF.read hdf "TstImgs"; 
-             TstLbls = ArrayNDHDF.read hdf "TstLbls";}
+            {TrnImgs = HostTensor.read hdf "TrnImgs" 
+             TrnLbls = HostTensor.read hdf "TrnLbls"
+             TstImgs = HostTensor.read hdf "TstImgs" 
+             TstLbls = HostTensor.read hdf "TstLbls"}
         else
             printf "Converting MNIST to HDF5..."
             let mnist = doLoadRaw directory
             use hdf = new HDF5 (hdfPath, HDF5Overwrite)
-            ArrayNDHDF.write hdf "TrnImgs" (mnist.TrnImgs :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TrnLbls" (mnist.TrnLbls :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TstImgs" (mnist.TstImgs :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TstLbls" (mnist.TstLbls :?> ArrayNDHostT<single>)
+            HostTensor.write hdf "TrnImgs" mnist.TrnImgs 
+            HostTensor.write hdf "TrnLbls" mnist.TrnLbls 
+            HostTensor.write hdf "TstImgs" mnist.TstImgs 
+            HostTensor.write hdf "TstLbls" mnist.TstLbls 
             printfn "Done."
             mnist
 

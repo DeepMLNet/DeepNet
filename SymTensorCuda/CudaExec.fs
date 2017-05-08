@@ -9,11 +9,10 @@ open System.Security.Cryptography
 open ManagedCuda
 open ManagedCuda.BasicTypes
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
-open Basics.Cuda
 open DiskMap
 
 
@@ -417,17 +416,17 @@ module CudaExprWorkspaceTypes =
                     let devAry, resDsc =
                         match tex.Contents.NDims with
                         | 1 ->
-                            if (Tensor.stride tex.Contents).[0] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[0] <> 1L then
                                 failwith "texture contents must be continuous"
                             let nElems = tex.Contents.Shape.[0]
                             let devAry = new CudaArray1D
                                            (CUArrayFormat.Float, SizeT nElems, CudaArray1DNumChannels.One)
                             devAry.CopyFromDeviceToArray1D 
                                 (devVar.DevicePointer, SizeT (nElems * sizeof64<single>), 
-                                 SizeT (Tensor.offset tex.Contents * sizeof64<single>))
+                                 SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 2 ->
-                            if (Tensor.stride tex.Contents).[1] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[1] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
                             let devAry = new CudaArray2D(CUArrayFormat.Float, 
                                                          SizeT tex.Contents.Shape.[1],
@@ -435,16 +434,16 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray2DNumChannels.One)
                             use pdv = 
                                 new CudaPitchedDeviceVariable<single> 
-                                    (devVar.DevicePointer + SizeT (Tensor.offset tex.Contents * sizeof64<single>), 
+                                    (devVar.DevicePointer + SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>), 
                                      SizeT tex.Contents.Shape.[1], SizeT tex.Contents.Shape.[0], 
-                                     SizeT (((Tensor.stride tex.Contents).[0]) * sizeof64<single>)) 
+                                     SizeT (((ArrayNDManikin.stride tex.Contents).[0]) * sizeof64<single>)) 
                             devAry.CopyFromDeviceToThis (pdv)
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 3 ->
-                            if (Tensor.stride tex.Contents).[2] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[2] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
-                            if (Tensor.stride tex.Contents).[0] <> 
-                               (Tensor.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
+                            if (ArrayNDManikin.stride tex.Contents).[0] <> 
+                               (ArrayNDManikin.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
                                 failwith "texture contents must be continuous in first dimension"
                             let devAry = new CudaArray3D(CUArrayFormat.Float, 
                                                          SizeT tex.Contents.Shape.[2],
@@ -453,9 +452,9 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray3DNumChannels.One,
                                                          CUDAArray3DFlags.None)
                             devAry.CopyFromDeviceToThis 
-                                (devVar.DevicePointer + SizeT (Tensor.offset tex.Contents * sizeof64<single>),
+                                (devVar.DevicePointer + SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>),
                                  SizeT sizeof64<single>, 
-                                 SizeT (((Tensor.stride tex.Contents).[1]) * sizeof64<single>))
+                                 SizeT (((ArrayNDManikin.stride tex.Contents).[1]) * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | d -> failwithf "unsupported number of dimensions for texture: %d" d
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
@@ -654,17 +653,16 @@ module CudaExprWorkspaceTypes =
                         iterMem.MemsetAsync (uint32 iter, getStream strm)
                         iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1L), getStream strm)
 
-                        // obtain real ArrayNDCudaTs for array manikins
+                        // obtain real tensors for manikins
                         let lcis = 
                             info.Channels 
                             |> Map.map (fun ch ci -> 
-                                {ci with 
-                                  LoopEval.Target = 
-                                   CudaExecEnv.getArrayNDForManikin execEnv (ci.Target :?> ArrayNDManikinT)})
+                                { LoopEval.Shape    = ci.Shape
+                                  LoopEval.SliceDim = ci.SliceDim
+                                  LoopEval.Target   = CudaExecEnv.getArrayNDForManikin execEnv ci.TargetManikin })
                         let args = 
                             info.Args 
-                            |> List.map (fun manikin -> 
-                                manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> ITensor)
+                            |> List.map (CudaExecEnv.getArrayNDForManikin execEnv)
                         let srcVarEnv, resTrgts =
                             LoopEval.buildInOut info.Length iter iterAry iterRemAry info.Vars args lcis
 
@@ -692,14 +690,14 @@ module CudaExprWorkspaceTypes =
                 | ExecItem (PrintWithMsg (msg, res), strm) ->
                     CudaSup.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = resDev.ToHost()    
+                    let resHost = HostTensor.transfer resDev
                     printfn "%s=\n%A\n" msg resHost                
 
                 | ExecItem (DumpValue (name, res), strm) ->
                     if Dump.isActive () then
                         CudaSup.context.Synchronize ()
                         let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                        let resHost = resDev.ToHost()    
+                        let resHost = HostTensor.transfer resDev
                         Dump.dumpValue name resHost
 
                 | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
@@ -746,7 +744,7 @@ module CudaExprWorkspaceTypes =
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = lazy (resDev.ToHost() :> ITensor)
+                    let resHost = lazy (HostTensor.transfer resDev)
                     let msg = 
                         match previousCall with
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"
@@ -814,7 +812,7 @@ module CudaExprWorkspaceTypes =
             // partition variables depending on location
             let vsLoc = VarEnv.valueLocations varEnv
             let externalVar, hostVar = 
-                varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = LocDev)
+                varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = CudaTensor.Dev)
 
             // check the shapes and strides of external variables match with recipe
             for KeyValue(vs, ev) in externalVar do              
@@ -829,15 +827,15 @@ module CudaExprWorkspaceTypes =
 
             lock this (fun () ->
                 // prepare environment
-                execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
-                execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
+                execEnv.ExternalVar <- externalVar 
+                execEnv.HostVar <- hostVar 
 
                 // Register host variables with CUDA.
                 // This does nothing if a variable is already registered.
                 let hostVarRegs =
                     hostVar
                     |> Map.toList
-                    |> List.map (fun (_, hvAry) -> ArrayNDHostReg.lock (hvAry :?> IArrayNDHostT))
+                    |> List.map (fun (_, hvAry) -> CudaRegMem.register (hvAry.Storage :?> ITensorHostStorage))
 
                 // TODO: implement proper synchronization.
                 // For now we synchronize the whole context to make sure that data transfers

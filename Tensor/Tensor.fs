@@ -57,6 +57,10 @@ type ITensor =
     abstract Device:            ITensorDevice
     /// shape
     abstract Shape:             int64 list
+    /// stride
+    abstract Stride:            int64 list
+    /// stride
+    abstract Offset:            int64 
     /// number of dimensions
     abstract NDims:             int
     /// number of elements
@@ -74,6 +78,8 @@ type ITensor =
     abstract Copy:              ?order:TensorOrder -> ITensor
     /// Transfers this tensor to the specifed device.
     abstract Transfer:          dev:ITensorDevice -> ITensor
+    /// fills the tensors with zeros
+    abstract FillZero:          unit -> unit
 
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
@@ -251,6 +257,7 @@ type ITensorDevice =
 
 
 [<AbstractClass>]
+[<StructuredFormatDisplay("{Id}")>]
 type BaseTensorDevice() =   
     abstract Id: string
     abstract Create: nElems:int64 -> ITensorStorage<'T>
@@ -280,6 +287,7 @@ type BaseTensorDevice() =
         | _ -> false
     override this.GetHashCode () =
         hash (this :> ITensorDevice).Id
+    override this.ToString () = this.Id
 
 
 /// An N-dimensional array with elements of type 'T.
@@ -330,6 +338,18 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// number of elements 
     static member inline nElems (a: #ITensor) = a.NElems
+
+    /// strides
+    member inline this.Stride = this.Layout.Stride
+
+    /// strides
+    static member inline stride (a: #ITensor) = a.Stride
+
+    /// offset
+    member inline this.Offset = this.Layout.Offset
+
+    /// offset
+    static member inline offset (a: #ITensor) = a.Offset
 
     /// type of data stored in this tensor
     member inline this.DataType = typeof<'T>
@@ -467,6 +487,14 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// returns true if at least one dimension is broadcasted
     static member isBroadcasted a =
         a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
+
+    /// returns true if tensor is stored in row-major order
+    static member isRowMajor a =
+        a |> Tensor<_>.layout |> TensorLayout.isC
+
+    /// returns true if tensor is stored in column-major order
+    static member isColumnMajor a =
+        a |> Tensor<_>.layout |> TensorLayout.isF
 
     /// Tries to reshape the tensor without copying.
     /// For this to succeed, the tensor must have row-major layout.
@@ -1744,6 +1772,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.Layout = this.Layout
         member this.Relayout layout = this.Relayout layout :> ITensor
         member this.Shape = this.Shape
+        member this.Stride = this.Stride
+        member this.Offset = this.Offset
         member this.NDims = this.NDims
         member this.NElems = this.NElems
         member this.DataType = this.DataType
@@ -1751,6 +1781,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.Device = this.Device
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
+        member this.FillZero () = this.FillConst Tensor<'T>.Zero
         member this.Pretty = this.Pretty
         member this.Full = this.Full
 

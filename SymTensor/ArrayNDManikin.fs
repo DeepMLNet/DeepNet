@@ -67,6 +67,31 @@ module ArrayNDManikinTypes =
 
         member this.NDims = this.Layout.NDims
 
+        /// C++ type name
+        member this.CPPType = 
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
+            let str = TensorLayout.stride layout
+            let ofst = TensorLayout.offset layout
+            let cppDataType = Util.cppType this.DataType
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            let strideStr = 
+                "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+                dims cppDataType dims shapeStr dims strideStr     
+
+        /// C++ type name for ArrayND with static shape and dynamic offset/strides
+        member this.DynamicCPPType =
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
+            let cppDataType = Util.cppType this.DataType
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
+                dims cppDataType dims shapeStr dims   
 
         /// typename of the data stored in this array
         member this.TypeName = 
@@ -80,18 +105,10 @@ module ArrayNDManikinTypes =
             ArrayNDManikinT(layout, storage) 
 
         member this.DataType =
-            TypeName.getType this.TypeName
+            TypeName.getType this.TypeName    
 
-        /// C++ type name for ArrayND with static shape and dynamic offset/strides
-        member this.DynamicCPPType =
-            let dims = TensorLayout.nDims layout
-            let shp = TensorLayout.shape layout
-            let cppDataType = Util.cppType this.DataType
-            let shapeStr = 
-                if dims = 0 then "" 
-                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
-                dims cppDataType dims shapeStr dims        
+        member this.T = 
+            ArrayNDManikinT (TensorLayout.transpose this.Layout, this.Storage)
 
         member this.Pretty = 
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
@@ -157,6 +174,114 @@ module ArrayNDManikin =
     let external storage shape stride =
         let layout = {Shape=shape; Stride=stride; Offset=0L}
         ArrayNDManikinT (layout, storage)
+
+    let layout (ary: ArrayNDManikinT) =
+        ary.Layout
+
+    let shape (ary: ArrayNDManikinT) =
+        ary.Layout.Shape
+
+    let nDims (ary: ArrayNDManikinT) =
+        ary.Layout.NDims
+
+    let nElems (ary: ArrayNDManikinT) =
+        ary.Layout.NElems
+
+    let stride (ary: ArrayNDManikinT) =
+        ary.Layout.Stride
+
+    let offset (ary: ArrayNDManikinT) =
+        ary.Layout.Offset
+
+    let relayout newLayout (ary: ArrayNDManikinT) =
+        ArrayNDManikinT (newLayout, ary.Storage)
+
+    let isC (ary: ArrayNDManikinT) =
+        ary |> layout |> TensorLayout.isC
+
+    let isF (ary: ArrayNDManikinT) =
+        ary |> layout |> TensorLayout.isF
+        
+    /// a view of the specified tensor over the given range 
+    let range (rng: TensorRng list) a =
+        a |> relayout (a |> layout |> TensorLayout.view rng)
+
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, None is returned.
+    let tryReshapeView shp a =
+        match a |> layout |> TensorLayout.tryReshape shp with
+        | Some newLayout -> a |> relayout newLayout |> Some
+        | None -> None
+
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, an error is raised.
+    let reshapeView shp a =
+        match tryReshapeView shp a with
+        | Some res -> res
+        | None -> 
+            let msg =
+                sprintf "cannot reshape tensor of shape %A and strides %A without copying"
+                    (layout a).Shape (layout a).Stride
+            raise (ImpossibleWithoutCopy msg)
+
+    /// Returns true if the tensor can be reshaped without copying.
+    let canReshapeView shp a =
+        match tryReshapeView shp a with
+        | Some _ -> true
+        | None -> false
+
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the new position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let permuteAxes (permut: int list) a =
+        a |> relayout (a |> layout |> TensorLayout.permuteAxes permut)
+
+    /// inserts a broadcastable dimension of size one as first dimension
+    let padLeft a =
+        a |> relayout (a.Layout |> TensorLayout.padLeft)
+
+    /// appends a broadcastable dimension of size one as last dimension
+    let padRight a =
+        a |> relayout (a.Layout |> TensorLayout.padRight)
+
+    /// Inserts an axis of size 1 before the specified position.
+    let insertAxis ax a =
+        a |> relayout (a.Layout |> TensorLayout.insertAxis ax)
+
+    /// removes the first dimension from the tensor
+    let cutLeft a =
+        a |> relayout (a.Layout |> TensorLayout.cutLeft)
+      
+    /// removes the last dimension from the tensor
+    let cutRight a =
+        a |> relayout (a.Layout |> TensorLayout.cutRight)
+
+    /// transpose
+    let transpose (a: ArrayNDManikinT) =
+        a.T
+
+    /// C++ type string
+    let cppType (a: ArrayNDManikinT) = 
+        a.CPPType
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        a |> relayout (a |> layout |> TensorLayout.reverseAxis ax)      
+
+    /// Returns a view of the diagonal along the given axes.
+    /// The diagonal replaces the first axis and the second axis is removed.
+    let diagAxis ax1 ax2 a =
+        a |> relayout (a |> layout |> TensorLayout.diagAxis ax1 ax2)
+
+    /// broadcasts the tensor to the given shape
+    let broadcastTo shp a =
+        a |> relayout (a |> layout |> TensorLayout.broadcastToShape shp)
+
+    /// returns true if at least one dimension is broadcasted
+    let isBroadcasted a =
+        a |> layout |> TensorLayout.isBroadcasted 
 
     /// storage
     let storage (ary: ArrayNDManikinT) =

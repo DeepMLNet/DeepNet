@@ -1,7 +1,7 @@
 ﻿namespace Optimizers
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 
@@ -87,12 +87,12 @@ type Adam<'T when 'T: equality and 'T: comparison>
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
         let shp = Tensor.shape parVals
         {
-            Iter        = ArrayNDHost.zeros []  |> dev.ToDev
-            LastStep    = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom1     = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom2     = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom1B    = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom2B    = ArrayNDHost.zeros shp |> dev.ToDev
+            Iter        = HostTensor.zeros []  |> dev.ToDev
+            LastStep    = HostTensor.zeros shp |> dev.ToDev
+            EstMom1     = HostTensor.zeros shp |> dev.ToDev
+            EstMom2     = HostTensor.zeros shp |> dev.ToDev
+            EstMom1B    = HostTensor.zeros shp |> dev.ToDev
+            EstMom2B    = HostTensor.zeros shp |> dev.ToDev
         }
 
     member this.Minimize : ExprT =

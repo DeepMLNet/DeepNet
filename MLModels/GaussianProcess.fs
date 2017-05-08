@@ -1,6 +1,6 @@
 ﻿namespace Models
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 module GaussianProcess =
@@ -56,13 +56,13 @@ module GaussianProcess =
 
 
     ///Iitializes the lengthscale.
-    let  initLengthscale l seed (shp: int64 list)  : ArrayNDHostT<single> =
-        ArrayNDHost.scalar l
+    let  initLengthscale l seed (shp: int64 list)  : Tensor<single> =
+        HostTensor.scalar l
     
 
     /// Initializes the signal variance.
-    let  initSignalVariance s seed (shp: int64 list) : ArrayNDHostT<single> =
-        ArrayNDHost.scalar s
+    let  initSignalVariance s seed (shp: int64 list) : Tensor<single> =
+        HostTensor.scalar s
 
 
     /// Parameter Type of a Gaussian Process dependent on the used Kernel.

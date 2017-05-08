@@ -233,11 +233,11 @@ module HostEval =
                 |> Map.map (fun ch lv ->
                     let sliceShp = lv.Expr.Shape |> ShapeSpec.eval
                     let targetShp = sliceShp |> List.insert lv.SliceDim nIters
+                    let target = Tensor.NewOfType (targetShp, lv.Expr.Type, HostTensor.Dev, order=RowMajor)
                     {
-                        LoopEval.Shape    = sliceShp
-                        LoopEval.SliceDim = lv.SliceDim
-                        LoopEval.Target   = Tensor.NewOfType (targetShp, lv.Expr.Type, 
-                                                              DevHost, order=RowMajor)
+                        LoopEval.Shape      = sliceShp
+                        LoopEval.SliceDim   = lv.SliceDim
+                        LoopEval.Target     = target
                     })
 
             // perform loop
@@ -278,11 +278,12 @@ module HostEvalTypes =
     let onHost (compileEnv: CompileEnvT) (uexprs: UExprT list) = 
 
         // check requirements
-        if compileEnv.ResultLoc <> DevHost then
+        if compileEnv.ResultLoc <> HostTensor.Dev then
             failwith "host evaluator needs host result location"
         for KeyValue(vs, loc) in compileEnv.VarLocs do
-            if loc <> DevHost then
-                failwithf "host evaluator cannot evaluate expression with variable %A located in %A" vs loc
+            if loc <> HostTensor.Dev then
+                failwithf "host evaluator cannot evaluate expression with 
+                           variable %A located in %A" vs loc
 
         // evaluation function
         let evalFn = fun evalEnv -> HostEval.evalUExprs evalEnv uexprs

@@ -412,40 +412,37 @@ and TensorCudaDevice private () =
     override this.Zeroed = false
 
 
-[<AutoOpen>]            
-module CudaTensorTypes =
-    /// Tensor stored on CUDA device.
-    let DevCuda = TensorCudaDevice.Instance :> ITensorDevice
-
-
 /// Tensor stored on CUDA device.
 module CudaTensor =
 
-    let transfer x = Tensor.transfer DevCuda x
+    /// Tensor stored on CUDA device.
+    let Dev = TensorCudaDevice.Instance :> ITensorDevice
 
-    let zeros<'T> = Tensor.zeros<'T> DevCuda 
+    let transfer x = Tensor.transfer Dev x
 
-    let ones<'T> = Tensor.ones<'T> DevCuda
+    let zeros<'T> = Tensor.zeros<'T> Dev 
 
-    let falses = Tensor.falses DevCuda
+    let ones<'T> = Tensor.ones<'T> Dev
 
-    let trues = Tensor.trues DevCuda
+    let falses = Tensor.falses Dev
 
-    let scalar<'T> = Tensor.scalar<'T> DevCuda
+    let trues = Tensor.trues Dev
 
-    let init<'T> = Tensor.init<'T> DevCuda
+    let scalar<'T> = Tensor.scalar<'T> Dev
 
-    let filled<'T> = Tensor.filled<'T> DevCuda
+    let init<'T> = Tensor.init<'T> Dev
 
-    let identity<'T> = Tensor.identity<'T> DevCuda
+    let filled<'T> = Tensor.filled<'T> Dev
 
-    let arange = Tensor.arange DevCuda
+    let identity<'T> = Tensor.identity<'T> Dev
+
+    let arange = Tensor.arange Dev
 
     let inline linspace start stop nElems = 
-        Tensor.linspace DevCuda start stop nElems
+        Tensor.linspace Dev start stop nElems
 
     /// Creates a ITensor for the given pointer, allocation size in bytes, type and layout.
-    let usingPtr (ptr: CUdeviceptr) (sizeInBytes: SizeT) (typ: Type) (layout: TensorLayout) = 
+    let usingPtrAndType (ptr: CUdeviceptr) (sizeInBytes: SizeT) (typ: Type) (layout: TensorLayout) = 
         let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
         let devVar = Activator.CreateInstance (devVarType, [|box ptr; box sizeInBytes|])
 
@@ -454,8 +451,4 @@ module CudaTensor =
 
         let tensorType = typedefof<Tensor<_>>.MakeGenericType [|typ|]
         Activator.CreateInstance (tensorType, [|box layout; devStor|]) :?> ITensor
-
-
-
-
 

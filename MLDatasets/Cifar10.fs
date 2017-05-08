@@ -4,7 +4,7 @@ open System
 open System.IO
 open System.IO.Compression
 open Basics
-open ArrayNDNS
+open Tensor
 
 /// Raw MNIST dataset
 type CifarRawT = {
@@ -20,10 +20,10 @@ type CifarRawT = {
 } with 
     /// copies this dataset to the CUDA GPU
     member this.ToCuda () =
-        {TrnImgs = this.TrnData :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TrnLbls = this.TrnLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstImgs = this.TstData :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev
-         TstLbls = this.TstLbls :?> ArrayNDHostT<single> |> ArrayNDCuda.toDev}
+        {TrnImgs = this.TrnData |> CudaTensor.transfer
+         TrnLbls = this.TrnLbls |> CudaTensor.transfer
+         TstImgs = this.TstData |> CudaTensor.transfer
+         TstLbls = this.TstLbls |> CudaTensor.transfer}
 
 /// Module containing functions to load the Cifar 10 dataset from the binary version.
 /// The dataset can be found at https://www.cs.toronto.edu/~kriz/cifar.html
@@ -34,9 +34,9 @@ module Cifar10 =
         let nSamples = List.length data |> int64
 
         let dataShape = Tensor.shape data.[0]
-        let ds = ArrayNDHost.zeros (nSamples :: dataShape)
+        let ds = HostTensor.zeros (nSamples :: dataShape)
 
-        data |> List.iteri (fun smpl d -> ds.[smpl, Fill] <- d)
+        data |> List.iteri (fun smpl d -> ds.[int64 smpl, Fill] <- d)
         ds
 
     let private sampleList (directory:string) (batchName:String) =
@@ -51,7 +51,7 @@ module Cifar10 =
                          |> List.map (fun x ->
                                 let label = batchReader.ReadByte ()
                                 let image = batchReader.ReadBytes imgSize
-                                ArrayNDHost.scalar (single label), ArrayNDHost.ofArray(Array.map single image)
+                                HostTensor.scalar (single label), HostTensor.ofArray(Array.map single image)
                                 )
         sampleList
 
@@ -75,18 +75,18 @@ module Cifar10 =
         let hdfPath = Path.Combine (directory,"Cifar10")
         if File.Exists hdfPath then
             use hdf = new HDF5 (hdfPath, HDF5Read)
-            {TrnData = ArrayNDHDF.read hdf "TrnData"; 
-             TrnLbls = ArrayNDHDF.read hdf "TrnLbls";
-             TstData = ArrayNDHDF.read hdf "TstData"; 
-             TstLbls = ArrayNDHDF.read hdf "TstLbls";}
+            {TrnData = HostTensor.read hdf "TrnData"; 
+             TrnLbls = HostTensor.read hdf "TrnLbls";
+             TstData = HostTensor.read hdf "TstData"; 
+             TstLbls = HostTensor.read hdf "TstLbls";}
         else
             printf "Converting Cifar10 to HDF5..."
             let cifar10 = doLoadRaw directory
             use hdf = new HDF5 (hdfPath, HDF5Overwrite)
-            ArrayNDHDF.write hdf "TrnImgs" (cifar10.TrnData :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TrnLbls" (cifar10.TrnLbls :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TstImgs" (cifar10.TstData :?> ArrayNDHostT<single>)
-            ArrayNDHDF.write hdf "TstLbls" (cifar10.TstLbls :?> ArrayNDHostT<single>)
+            HostTensor.write hdf "TrnImgs" cifar10.TrnData 
+            HostTensor.write hdf "TrnLbls" cifar10.TrnLbls 
+            HostTensor.write hdf "TstImgs" cifar10.TstData 
+            HostTensor.write hdf "TstLbls" cifar10.TstLbls 
             printfn "Done."
             cifar10
 

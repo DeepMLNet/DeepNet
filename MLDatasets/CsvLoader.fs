@@ -5,7 +5,7 @@ open System.IO.Compression
 open System.Net
 open FSharp.Data
 open FSharp.Data.CsvExtensions
-open ArrayNDNS
+open Tensor
 
 
 module private TryParser =
@@ -147,14 +147,14 @@ module CsvLoader =
 
     let private categoryArrayND (categoryEncoding: CategoryEnconding) categorySet isTarget idx =
         match categoryEncoding with
-        | OrderedInt -> idx |> single |> ArrayNDHost.scalar
+        | OrderedInt -> idx |> single |> HostTensor.scalar
         | OneHot ->
             match Set.count categorySet with
-            | 1 -> ArrayNDHost.zeros<single> [0L]
-            | 2 when idx=0 && not isTarget -> ArrayNDHost.zeros<single> [1L]
-            | 2 when idx=1 && not isTarget -> ArrayNDHost.ones<single> [1L]
+            | 1 -> HostTensor.zeros<single> [0L]
+            | 2 when idx=0 && not isTarget -> HostTensor.zeros<single> [1L]
+            | 2 when idx=1 && not isTarget -> HostTensor.ones<single> [1L]
             | _ ->
-                let v = ArrayNDHost.zeros<single> [Set.count categorySet |> int64]
+                let v = HostTensor.zeros<single> [Set.count categorySet |> int64]
                 v.[[int64 idx]] <- 1.0f
                 v        
 
@@ -174,12 +174,12 @@ module CsvLoader =
                 let isTarget = targetCols |> List.contains colIdx
                 match col, colType with
                 | Category c, Categorical cs -> categoryArrayND categoryEncoding cs isTarget categoryTable.[c]
-                | Number n, Numerical -> n |> single |> ArrayNDHost.scalar |> Tensor.reshape [1L]
+                | Number n, Numerical -> n |> single |> HostTensor.scalar |> Tensor.reshape [1L]
                 | Missing, Categorical cs -> categoryArrayND categoryEncoding cs isTarget 0
-                | Missing, Numerical -> ArrayNDHost.zeros<single> [1L]
+                | Missing, Numerical -> HostTensor.zeros<single> [1L]
                 | _ -> failwithf "data inconsistent with column type: %A for %A" col colType))
 
-    let private toCsvSamples (targetCols: int list) (data: seq<ArrayNDHostT<single> list>) =
+    let private toCsvSamples (targetCols: int list) (data: seq<Tensor<single> list>) =
         data 
         |> Seq.map (fun smpl ->
             let targets, inputs =

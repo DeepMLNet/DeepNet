@@ -6,7 +6,7 @@ open System.IO
 open Nessos.FsPickler.Json
 
 open Basics
-open ArrayNDNS
+open Tensor
 open Datasets
 open SymTensor
 open Optimizers
