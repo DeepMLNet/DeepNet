@@ -583,7 +583,7 @@ module CudaExprWorkspaceTypes =
                     let nSamples = a.NSamples |> int32
 
                     if Debug.TraceCalls then
-                        printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, \
+                        printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, 
                                  ldA=%d, ldB=%d, ldTrgt=%d, nSamples=%d" 
                             strm m n k ldA ldB ldTrgt nSamples
 

@@ -58,6 +58,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Content Include="packages.config" />
     <Compile Include="TensorBaseTests.fs" />
+    <Compile Include="TensorCudaTests.fs" />
     <Compile Include="NumpyFilesTest.fs" />
     <Content Include="App.config" />
     <None Include="TestData\MatInv.h5">

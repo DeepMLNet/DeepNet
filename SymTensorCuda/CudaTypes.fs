@@ -227,9 +227,9 @@ module CudaExecEnv =
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemExternal vs ->
-            let hv = env.HostVar.[vs]
-            let hvStorage = hv.Storage :?> ITensorHostStorage
-            if hv.Layout.Offset = 0L && TensorLayout.isC hv.Layout then
+            let hv = env.HostVar.[vs]            
+            if hv.Offset = 0L && Tensor.isRowMajor hv then
+                let hvStorage = hv.Storage :?> ITensorHostStorage
                 CudaRegMem.getCudaRegisteredMemory hvStorage
             else
                 failwithf "host variable %A was expected to be contiguous \

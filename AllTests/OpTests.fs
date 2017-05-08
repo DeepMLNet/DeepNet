@@ -492,6 +492,7 @@ let ``Trace compare: Gather 2`` () =
 [<Fact>]
 [<Trait("Category", "Skip_CI")>]
 let ``Trace compare: Scatter 1`` () =
+    //SymTensor.Compiler.Cuda.Debug.TraceCalls <- true
     requireEqualTraces (fun device ->
         let a = Expr.var<single> "a" [SizeSpec.fix 4L; SizeSpec.fix 3L]
         let i0 = Expr.var<int64> "i0" [SizeSpec.broadcastable; SizeSpec.fix 3L]

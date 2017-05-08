@@ -504,6 +504,7 @@ module CudaExecUnit =
                 let stride = compileEnv |> CudaCompileEnv.strideForVar vs
                 dfltChTrgt (ArrayNDManikin.external (MemExternal vs) vs.NShape stride) true
             | dev when dev=HostTensor.Dev ->
+                printfn "variable %A is on host" vs
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
@@ -1116,12 +1117,12 @@ module CudaExecUnit =
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev -> []
-            | LocHost -> 
+            | dev when dev=CudaTensor.Dev -> []
+            | dev when dev=HostTensor.Dev -> 
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt()))]       
-            | loc -> unsupLoc loc
+            | dev -> unsupLoc dev
 
         // unary element-wise
         | UUnaryOp Negate -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NegateEOp_t", false)) (srcsDfltCh())

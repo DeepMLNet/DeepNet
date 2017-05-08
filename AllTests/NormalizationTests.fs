@@ -11,7 +11,7 @@ open Datasets
 type TestSample = {Data: Tensor<double>}
 
 type CurveNormalizationTests () =
-    let dataFile = NPZFile.Open (Util.assemblyDirectory + "/../../TestData/PCA.npz")
+    let dataFile = NPZFile.Open (Util.assemblyDirectory + "/TestData/PCA.npz")
     let data : Tensor<double> = dataFile.Get "data"
     let refPCAWhitenedFull : Tensor<double> = dataFile.Get "pca_whitened_full"
     let refPCAWhitened10 : Tensor<double> = dataFile.Get "pca_whitened_10"
