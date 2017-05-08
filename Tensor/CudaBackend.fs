@@ -260,10 +260,16 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             else
                 // TODO: fix
                 // use slow element by element copy over host
-                printfn "using slow CUDA element by element copy"
+                printfn "WARNING: using slow CUDA element by element copy"
                 for idx in Tensor.allIdx trgt do
                     trgtStorage.[TensorLayout.addr idx trgt.Layout] <- 
                         srcStorage.[TensorLayout.addr idx src.Layout]
+
+        member this.FillConst (value, trgt) = 
+            printfn "WARNING: using slow CUDA element by element fill"
+            let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
+            for idx in Tensor.allIdx trgt do
+                trgtStorage.[TensorLayout.addr idx trgt.Layout] <- value
 
         member this.Transfer (trgt, src) =
             let regMem (storage: TensorHostStorage<'T>) = 
@@ -356,7 +362,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.Convert(trgt, src) = raise (System.NotImplementedException())
-        member this.FillConst (value, trgt) = failwith "notimpl"
         member this.Map(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())

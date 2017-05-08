@@ -216,6 +216,7 @@ module private Tools =
 
 /// Fast layout operations.
 [<Struct>]
+[<StructuredFormatDisplay("FastLayout32 (Shape={Shape} Offset={Offset} Stride={Stride})")>]
 type internal FastLayout32 = 
     val NDims   : int
     val NElems  : int
@@ -239,10 +240,6 @@ type internal FastLayout32 =
     member inline this.UncheckedAddr (pos: int[]) =
         let mutable addr = this.Offset
         for d=0 to this.NDims-1 do
-            #if DEBUG
-            if not (0 <= pos.[d] && pos.[d] < this.Shape.[d]) then
-                invalidArg "pos" "pos is out of range"
-            #endif
             addr <- addr + pos.[d] * this.Stride.[d]
         addr
 
@@ -280,18 +277,16 @@ type internal PosIter32 =
         let fromDim = defaultArg fromDim 0
         let toDim = defaultArg toDim (fl.NDims - 1)
         #if DEBUG
-        if not (fl.IsPosValid startPos) then
-            failwithf "startPos=%A invalid for shape %A" startPos fl.Shape
         if not (0 <= fromDim) then
             failwithf "fromDim=%d out of range for shape %A" fromDim fl.Shape
         if not (toDim < fl.NDims) then
             failwithf "toDim=%d out of range for shape %A" toDim fl.Shape
         #endif
         let active = 
-            fl.Shape 
-            |> Array.indexed 
-            |> Array.forall (fun (d, s) -> 
-                if fromDim <= d && d <= toDim then fl.Shape.[d] > 0
+            [0 .. fl.NDims]
+            |> List.forall (fun d -> 
+                if fromDim <= d && d <= toDim then 
+                    0 <= startPos.[d] && startPos.[d] < fl.Shape.[d] 
                 else true)
         {
             Pos     = Array.copy startPos
@@ -873,7 +868,7 @@ type internal ScalarOps =
                 if nd = 0 then
                     trgt.Data.[trgtPosIter.Addr] <- foldOp [||] state src1.Data.[src1Addr] |> extractOp
                 elif isIndexed then
-                    for d in 0 .. nd - 1 do
+                    for d in 0 .. nd-2 do
                         pos64.[d] <- int64 trgtPosIter.Pos.[d]
                     pos64.[nd-1] <- 0L
                     for i in 0 .. shape.[nd-1] - 1 do

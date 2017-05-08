@@ -316,6 +316,8 @@ let ``Interpolate1D: simple test`` device =
     printfn "inp=\n%A" inpVal
     printfn "res=\n%A" resVal
 
+    let resVal = HostTensor.transfer resVal
+    let expVal = HostTensor.transfer expVal
     Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
 
 let ``Interpolate2D: simple test`` device =
@@ -344,6 +346,8 @@ let ``Interpolate2D: simple test`` device =
     printfn "inp2=\n%A" inpVal2
     printfn "res=\n%A" resVal
 
+    let resVal = HostTensor.transfer resVal
+    let expVal = HostTensor.transfer expVal
     Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
 
 [<Fact>]
@@ -393,6 +397,8 @@ let ``Interpolate1D: derivative test`` device =
     printfn "inp=\n%A" inpVal
     printfn "res=\n%A" resVal
 
+    let resVal = HostTensor.transfer resVal
+    let expVal = HostTensor.transfer expVal
     Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
 
 
@@ -412,8 +418,8 @@ let checkFiniteOpTest diagVal offDiagVal =
     let expr = a / b |> Expr.checkFinite "a / b"
     let fn = Func.make<single> DevCuda.DefaultFactory expr |> arg2 a b
     let av = CudaTensor.ones<single> [3L; 3L]
-    let dv = diagVal * CudaTensor.ones<single> [3L]
-    let bv = offDiagVal * CudaTensor.ones<single> [3L; 3L]
+    let dv = diagVal * HostTensor.ones<single> [3L] |> CudaTensor.transfer
+    let bv = offDiagVal * HostTensor.ones<single> [3L; 3L] |> CudaTensor.transfer
     (Tensor.diag bv).[*] <- dv
     printfn "a=\n%A" av
     printfn "b=\n%A" bv
