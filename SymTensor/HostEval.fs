@@ -72,8 +72,7 @@ module HostEval =
                     | Identity (ss, tn) -> HostTensor.identity (sizeEval ss) 
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> HostTensor.scalar
                     | Arange (ss, tn) -> 
-                        HostTensor.arange (sizeEval ss) 
-                        |> Tensor.convert :> Tensor<'T> :?> Tensor<'T>
+                        HostTensor.arange (sizeEval ss) |> Tensor.convert<'T>
                     | ScalarConst sc -> HostTensor.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
@@ -199,7 +198,7 @@ module HostEval =
                             trgt.[aryRng] <- subEval e |> toR
                         trgt |> box
                     | Elements (resShape, elemExpr) -> 
-                        let esv = es |> List.map subEval |> List.map (fun v -> v :> Tensor<'T>)
+                        let esv = es |> List.map subEval 
                         let nResShape = shapeEval resShape
                         ElemExprHostEval.eval elemExpr esv nResShape |> box
                     | Interpolate ip ->  

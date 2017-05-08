@@ -504,7 +504,6 @@ module CudaExecUnit =
                 let stride = compileEnv |> CudaCompileEnv.strideForVar vs
                 dfltChTrgt (ArrayNDManikin.external (MemExternal vs) vs.NShape stride) true
             | dev when dev=HostTensor.Dev ->
-                printfn "variable %A is on host" vs
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
