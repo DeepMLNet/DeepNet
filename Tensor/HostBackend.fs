@@ -756,7 +756,7 @@ type internal ScalarOps =
                         trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
                         src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
                         src2Addr <- src2Addr + src2.FastLayout.Stride.[nd-1]
-                        src3Addr <- src3Addr + src2.FastLayout.Stride.[nd-1]
+                        src3Addr <- src3Addr + src3.FastLayout.Stride.[nd-1]
                         pos64.[nd-1] <- pos64.[nd-1] + 1L
                 else
                     for i in 0 .. shape.[nd-1] - 1 do
@@ -764,7 +764,7 @@ type internal ScalarOps =
                         trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
                         src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
                         src2Addr <- src2Addr + src2.FastLayout.Stride.[nd-1]
-                        src3Addr <- src3Addr + src2.FastLayout.Stride.[nd-1]
+                        src3Addr <- src3Addr + src3.FastLayout.Stride.[nd-1]
                 trgtPosIter.MoveNext()
                 src1PosIter.MoveNext()
                 src2PosIter.MoveNext()
@@ -1447,18 +1447,20 @@ type internal VectorOps() =
         VectorOps.Method<BinaryDelegate<'T>>("MinElemwiseImpl").Invoke (trgt, src1, src2) 
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
-        let nd = trgt.FastLayout.NDims
-        let canUseType =
-            vecTypes |> Array.contains typeof<'T>
-        let canUseTrgt = 
-            trgt.FastLayout.Stride.[nd-1] = 1
-        let canUseSrc src = 
-            match src with
-            | Some src -> 
-                let str = src.FastLayout.Stride 
-                str.[nd-1] = 1 || str.[nd-1] = 0
-            | None -> true
-        canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
+        match trgt.FastLayout.NDims with
+        | 0 -> false
+        | nd ->
+            let canUseType =
+                vecTypes |> Array.contains typeof<'T>
+            let canUseTrgt = 
+                trgt.FastLayout.Stride.[nd-1] = 1
+            let canUseSrc src = 
+                match src with
+                | Some src -> 
+                    let str = src.FastLayout.Stride 
+                    str.[nd-1] = 1 || str.[nd-1] = 0
+                | None -> true
+            canUseType && canUseTrgt && canUseSrc src1 && canUseSrc src2
 
 
 /// type-neutral interface to TensorHostStorage<'T>

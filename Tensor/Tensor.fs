@@ -2137,9 +2137,10 @@ type Tensor =
     /// variance over given axis
     static member varAxis (axis, a: Tensor<'T>, ?ddof) =
         let ddof = defaultArg ddof 0L
-        let v = a - Tensor.mean a
+        let m = Tensor.meanAxis axis a |> Tensor.insertAxis axis
+        let v = a - m
         let n = a.Shape.[axis] - ddof
-        Tensor.sum (v * v) / Tensor.scalarLike a (conv<'T> n)
+        Tensor.sumAxis axis (v * v) / Tensor.scalarLike a (conv<'T> n)
 
     /// variances
     static member var (a, ?ddof) =
