@@ -1005,7 +1005,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.Negate (trgt=trgt, src1=a)
 
     /// element-wise logical negation
-    static member (~~~~) (a: Tensor<bool>) = 
+    static member (~~~~) (a: Tensor<bool>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillNegate (a)
         trgt
@@ -1095,7 +1095,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.And (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "and"
-    static member (&&&&) (a: Tensor<bool>, b: Tensor<bool>) = 
+    static member (&&&&) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillAnd a b
         trgt
@@ -1109,7 +1109,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.Or (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "or"
-    static member (||||) (a: Tensor<bool>, b: Tensor<bool>) = 
+    static member (||||) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillOr a b
         trgt
@@ -1123,7 +1123,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.Backend.Xor (trgt=trgt, src1=a, src2=b)
 
     /// element-wise logical "xor"
-    static member (^^^^) (a: Tensor<bool>, b: Tensor<bool>) = 
+    static member (^^^^) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillXor a b
         trgt
@@ -1151,7 +1151,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Backend.NotEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise not equal
-    static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) = 
+    static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillNotEqual a b
         trgt
@@ -1165,7 +1165,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Backend.Less (trgt=trgt, src1=a, src2=b)
 
     /// element-wise less than
-    static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) = 
+    static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLess a b
         trgt
@@ -1179,7 +1179,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Backend.LessOrEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise less than or equal to
-    static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) = 
+    static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLessOrEqual a b
         trgt
@@ -1193,7 +1193,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Backend.Greater (trgt=trgt, src1=a, src2=b)
 
     /// element-wise greater than
-    static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) = 
+    static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreater a b
         trgt
@@ -1207,7 +1207,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         a.Backend.GreaterOrEqual (trgt=trgt, src1=a, src2=b)
 
     /// element-wise greater than or equal to
-    static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) = 
+    static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreaterOrEqual a b
         trgt
