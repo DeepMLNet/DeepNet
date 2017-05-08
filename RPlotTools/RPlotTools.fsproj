@@ -10,9 +10,10 @@
     <RootNamespace>RTools</RootNamespace>
     <AssemblyName>RPlotTools</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Name>RPlotTools</Name>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -102,5 +103,4 @@
   <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
     <Exec Command="..\dist\nuget.exe pack RPlotTools.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)  -Suffix &quot;$(VERSUFFIX)&quot;" />
   </Target>
-
 </Project>

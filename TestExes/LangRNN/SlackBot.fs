@@ -8,7 +8,7 @@ open MargieBot.Responders
 open MargieBot.Models
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 type SlackBot (data:      WordData,
@@ -54,7 +54,7 @@ type SlackBot (data:      WordData,
 
                 member this.GetResponse context =
                     // set worker thread's CUDA context
-                    Cuda.CudaSup.setContext ()
+                    CudaSup.setContext ()
 
                     let msg = context.Message.Text
                     let msg = Regex.Replace(msg, @"<@.+>", "").Trim()
@@ -76,13 +76,13 @@ type SlackBot (data:      WordData,
                         let startTokens = 
                             words 
                             |> data.Tokenize 
-                            |> ArrayNDHost.ofList
+                            |> HostTensor.ofList
                             |> Tensor.reshape [1L; -1L]
-                            |> ArrayNDCuda.toDev
+                            |> CudaTensor.transfer
 
                         // generate and detokenize
                         let genTokens = model.Generate seed {Words=startTokens}
-                        let genTokens = genTokens.Words.[0L, *] |> ArrayNDHost.fetch 
+                        let genTokens = genTokens.Words.[0L, *] |> HostTensor.transfer 
                         let genWords = genTokens |> List.ofSeq |> data.Detokenize 
 
                         // format response

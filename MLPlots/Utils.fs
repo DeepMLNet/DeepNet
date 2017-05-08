@@ -1,7 +1,7 @@
 ﻿namespace MLPlots
 
 open System.IO
-open ArrayNDNS
+open Tensor
 open RProvider
 open RProvider.graphics
 open RProvider.grDevices
@@ -15,7 +15,7 @@ module Utils =
 
     /// Transforms an ArrayND<single> to a float list that can be used by RProvider.
     let toFloatList (x: Tensor<single>) : float list = 
-        x |> ArrayNDHost.fetch |> ArrayNDHost.convert |> ArrayNDHost.toList
+        x |> HostTensor.transfer |> Tensor.convert |> HostTensor.toList
     
 
     /// Saves a plot in directory dir with name name and size height x width.

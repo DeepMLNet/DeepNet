@@ -1,4 +1,4 @@
-﻿open ArrayNDNS
+﻿open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -58,8 +58,8 @@ let main argv =
         Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
     let misclassificationRate inputs targets =
-        let preds = predFn inputs |> ArrayNDHost.fetch |> Tensor.argMaxAxis 1
-        let targets = targets |> ArrayNDHost.fetch |> Tensor.argMaxAxis 1
+        let preds = predFn inputs |> HostTensor.transfer |> Tensor.argMaxAxis 1
+        let targets = targets |> HostTensor.transfer |> Tensor.argMaxAxis 1
         let isErr = Tensor.ifThenElse (preds ==== targets) (Tensor.zerosLike preds) (Tensor.onesLike preds)
         let errCnt = Tensor.sum isErr |> Tensor.value
         let errRate = float errCnt / float inputs.Shape.[0]

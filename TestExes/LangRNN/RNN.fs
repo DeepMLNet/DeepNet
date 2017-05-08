@@ -1,7 +1,7 @@
 ﻿namespace LangRNN
 
 open Basics
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 
@@ -69,16 +69,16 @@ module RecurrentLayer =
         HyperPars:         HyperPars
     }
 
-    let internal initWeights seed (shp: int64 list) : ArrayNDHostT<'T> = 
+    let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
         let fanIn = float shp.[1] 
         let r = 1.0 / sqrt fanIn       
         (System.Random seed).SeqDouble(-1.0, 1.0)
         |> Seq.map conv<'T>
-        |> ArrayNDHost.ofSeqWithShape shp
+        |> HostTensor.ofSeqWithShape shp
         
-    let internal initBias seed (shp: int64 list) : ArrayNDHostT<'T> =
+    let internal initBias seed (shp: int64 list) : Tensor<'T> =
         Seq.initInfinite (fun _ -> conv<'T> 0)
-        |> ArrayNDHost.ofSeqWithShape shp
+        |> HostTensor.ofSeqWithShape shp
 
     /// Creates the parameters.
     let pars (mb: ModelBuilder<_>) hp = {

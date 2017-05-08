@@ -4,7 +4,7 @@ open SymTensor.Compiler.Cuda
 open RProvider.graphics
 open RProvider.plotrix
 open Models
-open ArrayNDNS
+open Tensor
 open SymTensor
 open RProvider
 open RTools
@@ -69,15 +69,15 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-ArrayNDHost.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- ArrayNDHost.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
             | _ -> ()
             let mean, cov = GaussianProcess.predict pars x t sigNs inp      
             let stdev = cov |> Expr.diag |> Expr.sqrtt
         
             let meanCovStdFn = mi.Func (mean, cov, stdev) |> arg4 x t sigNs inp
         
-            let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
+            let sX = HostTensor.linspace minValue maxValue nPoints |> CudaTensor.transfer
             let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaN sX
             sX, sMean, sCov, sStd
 
@@ -91,15 +91,15 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-ArrayNDHost.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- ArrayNDHost.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
             | _ -> ()
 
             let mean, _ = GaussianProcess.predict pars x t sigNs inp  
             let dMeanDInp = Deriv.compute mean |> Deriv.ofVar inp |> Expr.diag                   
             let dMeanDInpFn = mi.Func (dMeanDInp) |> arg4 x t sigNs inp
         
-            let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
+            let sX = HostTensor.linspace minValue maxValue nPoints |> CudaTensor.transfer
             let sDMeanDInp = dMeanDInpFn trnX trnT sigmaN sX
             sX, sDMeanDInp
 

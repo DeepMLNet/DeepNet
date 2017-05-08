@@ -3,7 +3,7 @@
 open Basics
 open System.IO
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -82,7 +82,7 @@ module RNNLang =
                                                nRecurrent, NRecurrent])
 
         let smplVarEnv stateOpt (smpl: WordSeq) =
-            let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
+            let zeroInitial = CudaTensor.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
             let state =
                 match stateOpt with
                 | Some state -> state :> ITensor

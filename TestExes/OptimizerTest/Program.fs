@@ -1,4 +1,4 @@
-﻿open ArrayNDNS
+﻿open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -80,7 +80,7 @@ let main argv =
     //Debug.TerminateAfterCompilation <- true
 
     let lossFn = mi.Func loss |> arg3 input1 input2 target
-    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
+    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Input mnist.Trn.All.Target |> Tensor.value
     printfn "Initial training loss: %f" initialLoss
 
     printfn "Computing dLoss / dInput1."
