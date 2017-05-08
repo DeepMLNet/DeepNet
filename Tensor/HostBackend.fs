@@ -1441,10 +1441,10 @@ type internal VectorOps() =
         VectorOps.Method<BinaryDelegate<'T>>("DivideImpl").Invoke (trgt, src1, src2) 
 
     static member MaxElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
-        VectorOps.Method<BinaryDelegate<'T>>("MaxElemwise").Invoke (trgt, src1, src2) 
+        VectorOps.Method<BinaryDelegate<'T>>("MaxElemwiseImpl").Invoke (trgt, src1, src2) 
 
     static member MinElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
-        VectorOps.Method<BinaryDelegate<'T>>("MinElemwise").Invoke (trgt, src1, src2) 
+        VectorOps.Method<BinaryDelegate<'T>>("MinElemwiseImpl").Invoke (trgt, src1, src2) 
 
     static member CanUse (trgt: DataAndLayout<'T>, ?src1: DataAndLayout<'T1>, ?src2: DataAndLayout<'T2>) =
         let nd = trgt.FastLayout.NDims

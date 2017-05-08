@@ -1967,9 +1967,8 @@ type Tensor =
 
     /// Creates a new tensor of the given shape and data type.
     static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
-        let order = defaultArg order RowMajor
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
-        Activator.CreateInstance (gt, shape, dev) :?> ITensor
+        Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor
 
     /// Creates a new tensor of given shape filled with zeros.
     static member zeros<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =

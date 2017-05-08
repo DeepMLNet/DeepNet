@@ -73,7 +73,7 @@ let getMnist device samples =
     let mnist = Mnist.loadRaw mnistPath
     let tstImgs =  
         mnist.TstImgs
-        |> Tensor.reshape [mnist.TstImgs.Shape.[0]; -1L]
+        |> Tensor.reshape [mnist.TstImgs.Shape.[0]; Remainder]
         |> cut
         |> post device
     let tstLbls =  

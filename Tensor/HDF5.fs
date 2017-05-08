@@ -44,7 +44,7 @@ module private HDF5Support =
 
     let netType t =     
         match hdfTypeTable |> List.tryPick (fun (nt, ht) -> 
-            if ht=t then Some nt else None) with
+            if H5T.equal(ht, t) > 0 then Some nt else None) with
         | Some nt -> nt
         | None -> failwithf "unknown HDF5 type: %A" t
 
