@@ -14,7 +14,7 @@ module VarEnvTypes =
     type VarEnvT = Map<VarSpecT, ITensor>
 
     /// specification of variable storage locations
-    type VarLocsT = Map<VarSpecT, ArrayLocT>
+    type VarLocsT = Map<VarSpecT, ITensorDevice>
 
     /// specification of variable strides
     type VarStridesT = Map<VarSpecT, int64 list>
@@ -116,11 +116,11 @@ module VarEnv =
 
     /// gets the locations of the variable value arrays
     let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> Tensor.location vVal)
+        varEnv |> Map.map (fun _ vVal -> Tensor.device vVal)
 
     /// gets the strides of the variable value arrays
     let valueStrides (varEnv: VarEnvT) : VarStridesT =
-        varEnv |> Map.map (fun _ vVal -> Tensor.stride vVal)
+        varEnv |> Map.map (fun _ vVal -> vVal.Layout.Stride)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
     let ofSeq (entries: (ExprT * #ITensor) seq) =
@@ -145,7 +145,7 @@ module EnvTypes =
         VarLocs:            VarLocsT
         VarStrides:         VarStridesT
         ChannelStrides:     ChannelStridesT
-        ResultLoc:          ArrayLocT
+        ResultLoc:          ITensorDevice
         CanDelay:           bool
     }
 
@@ -210,7 +210,7 @@ module CompileEnv =
         VarLocs         = Map.empty 
         VarStrides      = Map.empty
         ChannelStrides  = Map.empty
-        ResultLoc       = LocHost
+        ResultLoc       = DevHost
         SymSizes        = SymSizeEnv.empty
         CanDelay        = true
     }

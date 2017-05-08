@@ -48,11 +48,9 @@ What to do with Tensor module?
       - and singleton dimensions are removed
   - and for multi-core parallelization a multi-threaded loop over first dimension
   
- - or do the threading differently
- - most probably it's okay like that
- 
-- how to implement the copying to and from GPU?
-- copyFrom could be extended to the GPU case, but what about back copying to host?
-- would also need a copyTo function?
+
+- how to solve this storage/id problem?
+- okay, remove ID and put it into the factory..
+
 
 

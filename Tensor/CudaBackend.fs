@@ -222,14 +222,11 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             else
                 this.Data.CopyToDevice(value, SizeT (addr * sizeof64<'T>))
 
-    static member Id = "Cuda"
-
     interface ITensorStorage<'T> with
-        member this.Id = TensorCudaStorage<'T>.Id
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Factory =
-            TensorCudaStorageFactory.Instance :> ITensorStorageFactory
+        member this.Device =
+            TensorCudaDevice.Instance :> ITensorDevice
 
     interface ITensorCudaStorage with
         member this.ByteData = this.ByteData
@@ -311,7 +308,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             else
                 // target is not in row-major order, transfer to temporary tensor
                 // and copy into target
-                let tmp = Tensor<'T> (trgt.Shape, trgt.Factory, order=RowMajor)
+                let tmp = Tensor<'T> (trgt.Shape, trgt.Device, order=RowMajor)
                 if doTransfer tmp src then
                     trgt.CopyFrom tmp
                     true
@@ -403,22 +400,22 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             ()
 
             
-
-and TensorCudaStorageFactory private () =
-    static member Instance = TensorCudaStorageFactory ()
-
-    interface ITensorStorageFactory with
-        member this.Create nElems : ITensorStorage<'T> = 
-            // we use reflection to drop the constraints on 'T 
-            let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
-            Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
-        member this.Zeroed = false
+and TensorCudaDevice private () =
+    inherit BaseTensorDevice()
+    static member Instance = TensorCudaDevice ()
+    
+    override this.Id = "Cuda"
+    override this.Create nElems = 
+        // we use reflection to drop the constraints on 'T 
+        let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
+        Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
+    override this.Zeroed = false
 
 
 [<AutoOpen>]            
 module CudaTensorTypes =
     /// Tensor stored on CUDA device.
-    let DevCuda = TensorCudaStorageFactory.Instance :> ITensorStorageFactory
+    let DevCuda = TensorCudaDevice.Instance :> ITensorDevice
 
 
 /// Tensor stored on CUDA device.

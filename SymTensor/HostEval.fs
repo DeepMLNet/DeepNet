@@ -5,8 +5,7 @@ open System.Reflection
 
 open Basics
 open UExprTypes
-open ArrayNDNS
-open ArrayNDNS.Tensor
+open Tensor
 open SymTensor.Compiler
 
 
@@ -23,7 +22,7 @@ module HostEval =
              callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
 
-        static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
+        static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : Tensor<'R> =
             let retType = expr.Type
             if retType <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
@@ -45,37 +44,37 @@ module HostEval =
                         let ts = es |> List.map (fun e -> e.TypeName) |> Set.ofList
                         if ts.Count = 1 then es.Head.Type
                         else typeof<obj>
-            callGeneric<EvalT, ArrayNDHostT<'R>> "DoEval" [argType; retType] (evalEnv, expr)
+            callGeneric<EvalT, Tensor<'R>> "DoEval" [argType; retType] (evalEnv, expr)
 
 
-        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: ExprT) : ArrayNDHostT<'R> =
+        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: ExprT) : Tensor<'R> =
             if expr.Type <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
                     expr.Type typeof<'R>
 
-            let varEval vs = evalEnv.VarEnv |> VarEnv.getVarSpec vs |> fun v -> v.Copy() |> box :?> ArrayNDHostT<'T>
+            let varEval vs = evalEnv.VarEnv |> VarEnv.getVarSpec vs |> fun v -> v.Copy() |> box :?> Tensor<'T>
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
-            let subEval subExpr : ArrayNDHostT<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
+            let subEval subExpr : Tensor<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
             let subEvalTypeNeutral (subExpr: ExprT) : ITensor = 
                 EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
                     (fun intExpr -> EvalT.Eval<int64> (evalEnv, intExpr) |> Tensor.value)
-            let toBool (v : ArrayNDHostT<'V>) : ArrayNDHostT<bool> = v |> box |> unbox
-            let toT (v: ArrayNDHostT<'V>) : ArrayNDHostT<'T> = v |> box |> unbox
-            let toR (v: ArrayNDHostT<'V>) : ArrayNDHostT<'R> = v |> box |> unbox
+            let toBool (v : Tensor<'V>) : Tensor<bool> = v |> box |> unbox
+            let toT (v: Tensor<'V>) : Tensor<'T> = v |> box |> unbox
+            let toR (v: Tensor<'V>) : Tensor<'R> = v |> box |> unbox
         
-            let res : ArrayNDHostT<'R> = 
+            let res : Tensor<'R> = 
                 match expr with
                 | Leaf(op) ->
                     match op with
-                    | Identity (ss, tn) -> ArrayNDHost.identity (sizeEval ss) 
-                    | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> ArrayNDHost.scalar
+                    | Identity (ss, tn) -> HostTensor.identity (sizeEval ss) 
+                    | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> HostTensor.scalar
                     | Arange (ss, tn) -> 
-                        ArrayNDHost.arange (sizeEval ss) 
-                        |> Tensor.convert :> Tensor<'T> :?> ArrayNDHostT<'T>
-                    | ScalarConst sc -> ArrayNDHost.scalar (sc.GetValue())
+                        HostTensor.arange (sizeEval ss) 
+                        |> Tensor.convert :> Tensor<'T> :?> Tensor<'T>
+                    | ScalarConst sc -> HostTensor.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
                 | Unary(op, a) ->
@@ -87,7 +86,7 @@ module HostEval =
                         match op with
                         | Negate -> -av
                         | Abs -> abs av
-                        | SignT -> Tensor.signt av
+                        | SignT -> sgn av
                         | Log -> log av
                         | Log10 -> log10 av
                         | Exp -> exp av
@@ -118,7 +117,7 @@ module HostEval =
                         | ArgMaxAxis _
                         | ArgMinAxis _ -> failwith "implemented above"
                         | Reshape ss -> Tensor.reshape (shapeEval ss) av
-                        | DoBroadcast ss -> Tensor.broadcastToShape (shapeEval ss) av
+                        | DoBroadcast ss -> Tensor.broadcastTo (shapeEval ss) av
                         | PermuteAxes perm -> Tensor.permuteAxes perm av
                         | ReverseAxis ax -> Tensor.reverseAxis ax av
                         | Gather indices ->
@@ -134,7 +133,8 @@ module HostEval =
                         | Subtensor sr -> av.[rngEval sr]
                         | StoreToVar vs -> 
                             // TODO: stage variable write to avoid overwrite of used variables
-                            Tensor.copyTo av (VarEnv.getVarSpec vs evalEnv.VarEnv)
+                            let tv : Tensor<'T> = VarEnv.getVarSpec vs evalEnv.VarEnv
+                            tv.CopyFrom av
                             Tensor.relayout TensorLayout.emptyVector av
                         | NullifyJacobian -> av
                         | AssumeJacobian _ -> av
@@ -145,7 +145,7 @@ module HostEval =
                             Dump.dumpValue name av
                             av
                         | CheckFinite name ->
-                            if not (Tensor.allFinite av |> Tensor.value) then
+                            if not (Tensor.allFinite av) then
                                 printfn "Infinity or NaN encountered in %s with value:\n%A" name av
                                 failwithf "Infinity or NaN encountered in %s" name
                             av
@@ -176,7 +176,7 @@ module HostEval =
                         | MaxElemwise -> Tensor.maxElemwise av bv 
                         | MinElemwise -> Tensor.minElemwise av bv 
                         | Dot -> av .* bv
-                        | TensorProduct -> av %* bv
+                        | TensorProduct -> Tensor.tensorProduct av bv
                         | And -> (toBool av) &&&& (toBool bv) |> toT
                         | Or -> (toBool av) |||| (toBool bv) |> toT
                         | IfThenElse cond ->
@@ -190,9 +190,9 @@ module HostEval =
 
                 | Nary(op, es) ->
                     match op with 
-                    | Discard -> ArrayNDHost.zeros<'R> [0L] |> box
+                    | Discard -> HostTensor.zeros<'R> [0L] |> box
                     | BuildTensor (shp, rngs) ->
-                        let trgt = ArrayNDHost.zeros<'R> (shapeEval shp)
+                        let trgt = HostTensor.zeros<'R> (shapeEval shp)
                         for rng, e in List.zip rngs es do                            
                             let aryRng = rng |> List.map (fun (first, last) -> 
                                 Rng (Some (sizeEval first), Some (sizeEval last)))
@@ -224,8 +224,8 @@ module HostEval =
 
             // iteration index variables
             let nIters = SizeSpec.eval spec.Length
-            let iterAry = ArrayNDHost.zeros<int64> []
-            let itersRemAry = ArrayNDHost.zeros<int64> []
+            let iterAry = HostTensor.zeros<int64> []
+            let itersRemAry = HostTensor.zeros<int64> []
 
             // create channel information
             let channelInfos =
@@ -236,7 +236,8 @@ module HostEval =
                     {
                         LoopEval.Shape    = sliceShp
                         LoopEval.SliceDim = lv.SliceDim
-                        LoopEval.Target   = ArrayNDHost.newCOfType lv.Expr.Type targetShp
+                        LoopEval.Target   = Tensor.NewOfType (targetShp, lv.Expr.Type, 
+                                                              DevHost, order=RowMajor)
                     })
 
             // perform loop
@@ -277,10 +278,10 @@ module HostEvalTypes =
     let onHost (compileEnv: CompileEnvT) (uexprs: UExprT list) = 
 
         // check requirements
-        if compileEnv.ResultLoc <> LocHost then
+        if compileEnv.ResultLoc <> DevHost then
             failwith "host evaluator needs host result location"
         for KeyValue(vs, loc) in compileEnv.VarLocs do
-            if loc <> LocHost then
+            if loc <> DevHost then
                 failwithf "host evaluator cannot evaluate expression with variable %A located in %A" vs loc
 
         // evaluation function

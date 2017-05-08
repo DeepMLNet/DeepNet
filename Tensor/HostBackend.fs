@@ -1497,15 +1497,11 @@ type TensorHostStorage<'T> (data: 'T []) =
     /// size of underlying data array in bytes
     member this.DataSizeInBytes = data.LongLength * sizeof64<'T>
 
-    /// storage id
-    static member Id = "Host"
-
     interface ITensorStorage<'T> with
-        member this.Id = TensorHostStorage<'T>.Id
         member this.Backend layout =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Factory = 
-            TensorHostStorageFactory.Instance :> ITensorStorageFactory
+        member this.Device = 
+            TensorHostDevice.Instance :> ITensorDevice
 
     interface ITensorHostStorage with
         member this.Data = this.Data :> Array
@@ -1604,7 +1600,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         match TensorHostBackend<_>.GetBlasVectorInfo (vec) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T>(vec.Shape, vec.Factory, order=ColumnMajor)
+            let tmp = Tensor<'T>(vec.Shape, vec.Device, order=ColumnMajor)
             if isSource then tmp.CopyFrom vec
             let disposeFn () = if isTarget then vec.CopyFrom tmp
             TensorHostBackend<_>.GetBlasVectorInfo (tmp, disposeFn=disposeFn) 
@@ -1648,7 +1644,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         | Some bi -> bi
         | None when allowCopy ->
             let order = [mat.NDims-2; mat.NDims-1] @ [0 .. mat.NDims-3]
-            let tmp = Tensor<'T> (mat.Shape, mat.Factory, order=CustomOrder order)
+            let tmp = Tensor<'T> (mat.Shape, mat.Device, order=CustomOrder order)
             if isSource then tmp.CopyFrom mat
             let disposeFn () = if isTarget then mat.CopyFrom tmp
             TensorHostBackend<_>.GetBlasMatrixInfo (tmp, canTranspose=canTranspose, 
@@ -2062,26 +2058,27 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
 
 /// Factory for host tensors.
-and TensorHostStorageFactory private () =
-    static member Instance = TensorHostStorageFactory () 
+and TensorHostDevice private () =
+    inherit BaseTensorDevice()
+    static member Instance = TensorHostDevice () 
 
-    interface ITensorStorageFactory with
-        member this.Create nElems = 
-            TensorHostStorage<_> nElems :> ITensorStorage<_>
-        member this.Zeroed = true
-            
+    override this.Id = "Host"
+    override this.Create nElems =
+        TensorHostStorage<_> nElems :> ITensorStorage<_>
+    override this.Zeroed = true
+
 
 [<AutoOpen>]            
 module HostTensorTypes =
     /// Tensor located on host using a .NET array as storage.
-    let DevHost = TensorHostStorageFactory.Instance :> ITensorStorageFactory
+    let DevHost = TensorHostDevice.Instance :> ITensorDevice
 
 
 module internal HostTensorHelpers = 
 
     let ensureCAndOffsetFree (x: Tensor<'T>) =
-        if x.Storage.Id <> TensorHostStorage<_>.Id then
-            let msg = sprintf "require a Host tensor but got a %s tensor" x.Storage.Id
+        if x.Device <> DevHost then
+            let msg = sprintf "require a Host tensor but got a %s tensor" x.Device.Id
             raise (StorageMismatch msg)
         if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
         else Tensor.copy (x, order=RowMajor)

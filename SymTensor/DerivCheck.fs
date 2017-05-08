@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
 open Basics
-open ArrayNDNS
+open Tensor
 open System
 
 
@@ -14,7 +14,7 @@ module DerivCheck =
         let xElems, yElems = Tensor.nElems x, Tensor.nElems y
         let xShp = Tensor.shape x
 
-        let jac = Tensor.zerosOfSameType [yElems; xElems] x
+        let jac = Tensor.zeros x.Device [yElems; xElems] 
         let xd = x |> Tensor.reshape [xElems] |> Tensor.copy
         for xi in 0L .. xElems-1L do
             let xiVal = xd.[[xi]]
@@ -28,7 +28,7 @@ module DerivCheck =
             let ydb = xd |> Tensor.reshape xShp |> f |> Tensor.reshape [yElems]
 
             // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
-            jac.[*, xi] <- (ydf - ydb) / (Tensor.scalarOfSameType ydf (epsilon + epsilon))
+            jac.[*, xi] <- (ydf - ydb) / (Tensor.scalar ydf.Device (epsilon + epsilon))
             xd.[[xi]] <- xiVal
         jac 
 

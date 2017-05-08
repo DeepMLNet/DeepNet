@@ -54,7 +54,7 @@ type ITensor =
     /// storage of this tensor
     abstract Storage:           ITensorStorage
     /// storage factory
-    abstract Factory:           ITensorStorageFactory
+    abstract Device:            ITensorDevice
     /// shape
     abstract Shape:             int64 list
     /// number of dimensions
@@ -73,7 +73,7 @@ type ITensor =
     /// returns a copy of the tensor
     abstract Copy:              ?order:TensorOrder -> ITensor
     /// Transfers this tensor to the specifed device.
-    abstract Transfer:          dev:ITensorStorageFactory -> ITensor
+    abstract Transfer:          dev:ITensorDevice -> ITensor
 
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
@@ -140,12 +140,11 @@ type ITensor =
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
 type ITensorStorage =
-    abstract Id:                string
-    abstract Factory:           ITensorStorageFactory
+    abstract Device:            ITensorDevice
 
 type ITensorStorage<'T> =
     inherit ITensorStorage
-    abstract Backend:       TensorLayout -> ITensorBackend<'T>
+    abstract Backend:           TensorLayout -> ITensorBackend<'T>
 
 type ITensorBackend<'T> =
     inherit IEnumerable<'T>
@@ -242,11 +241,45 @@ type ITensorBackend<'T> =
     abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * 
                                           src:Tensor<'T> -> unit
 
+type ITensorDevice =
+    inherit IComparable
+    inherit IComparable<ITensorDevice>
+    inherit IEquatable<ITensorDevice>
+    abstract Id:                string
+    abstract Create:            nElems:int64 -> ITensorStorage<'T>
+    abstract Zeroed:            bool
 
 
-type ITensorStorageFactory =
-    abstract Create:        nElems:int64 -> ITensorStorage<'T>
-    abstract Zeroed:        bool
+[<AbstractClass>]
+type BaseTensorDevice() =   
+    abstract Id: string
+    abstract Create: nElems:int64 -> ITensorStorage<'T>
+    abstract Zeroed: bool
+
+    interface ITensorDevice with
+        member this.Id = this.Id
+        member this.Create nElems = this.Create nElems
+        member this.Zeroed = this.Zeroed
+
+    interface IComparable<ITensorDevice> with
+        member this.CompareTo other =
+            compare (this :> ITensorDevice).Id other.Id
+    interface IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? ITensorDevice as other -> 
+                (this :> IComparable<ITensorDevice>).CompareTo other
+            | _ -> failwithf "cannot compare to %A" (other.GetType())
+    interface IEquatable<ITensorDevice> with
+        member this.Equals other =
+            (this :> ITensorDevice).Id = other.Id
+    override this.Equals other =
+        match other with
+        | :? ITensorDevice as other ->
+            (this :> IEquatable<ITensorDevice>).Equals other
+        | _ -> false
+    override this.GetHashCode () =
+        hash (this :> ITensorDevice).Id
 
 
 /// An N-dimensional array with elements of type 'T.
@@ -271,8 +304,11 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// storage of this tensor
     member val Storage = storage
 
-    /// storage factory
-    member inline this.Factory = this.Storage.Factory
+    /// device this tensor is stored on
+    member inline this.Device = this.Storage.Device
+
+    /// device where the specified tensor is stored
+    static member inline device (a: #ITensor) = a.Device
 
     /// backend
     member internal this.Backend = backend
@@ -355,7 +391,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// Creates a new tensor of specifed shape with newly allocated storage using 
     /// the specified storage device.
-    new (shape: int64 list, dev: ITensorStorageFactory, ?order: TensorOrder) =
+    new (shape: int64 list, dev: ITensorDevice, ?order: TensorOrder) =
         let order = defaultArg order RowMajor
         let layout = 
             match order with
@@ -539,24 +575,24 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// Both tensors must have the same shape.
     member trgt.TransferFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
-        if trgt.Storage.Id = src.Storage.Id then
+        if trgt.Device = src.Device then
             trgt.CopyFrom (src)
         else
             if not (trgt.Backend.Transfer (trgt=trgt, src=src) ||
                     src.Backend.Transfer (trgt=trgt, src=src)) then
                 let msg =
                     sprintf "cannot transfer from storage %s to storage %s"
-                            src.Storage.Id trgt.Storage.Id
+                            src.Device.Id trgt.Device.Id
                 raise (UnsupportedTransfer msg)
 
     /// Transfers this tensor to the specifed device.
-    member src.Transfer (dev: ITensorStorageFactory) =
+    member src.Transfer (dev: ITensorDevice) =
         let trgt = Tensor<'T> (src.Shape, dev)
         trgt.TransferFrom src
         trgt
 
     /// Transfers the specified tensor to the specifed device.
-    static member transfer (dev: ITensorStorageFactory) (src: 'A when 'A :> ITensor) =
+    static member transfer (dev: ITensorDevice) (src: 'A when 'A :> ITensor) =
         src.Transfer (dev) :?> 'A
 
     /// this tensor as Tensor<bool>
@@ -1219,7 +1255,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         let bcIndices = rebuild indices bcSpecIndices
 
         // apply gather
-        let trgt = Tensor<'T> (bcSpecIndices.Head.Shape, src.Factory)
+        let trgt = Tensor<'T> (bcSpecIndices.Head.Shape, src.Device)
         trgt.FillGather bcIndices src
         trgt        
 
@@ -1246,7 +1282,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// If None is specified instead of a tensor in an dimension, the source index will match the 
     /// target index in that dimension.
     static member scatter (indices: Tensor<int64> option list) (trgtShp: int64 list) (src: Tensor<'T>) =
-        let trgt = Tensor<'T> (trgtShp, src.Factory)
+        let trgt = Tensor<'T> (trgtShp, src.Device)
         trgt.FillScatter indices src
         trgt
 
@@ -1428,20 +1464,20 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         Tensor.CheckSameStorage [a; b]
         match a.NDims, b.NDims with
         | 1, 1 when a.Shape = b.Shape -> 
-            let trgt = Tensor<'T> ([], a.Factory)
+            let trgt = Tensor<'T> ([], a.Device)
             trgt.FillDot a b
             trgt
         | 2, 1 when a.Shape.[1] = b.Shape.[0] -> 
-            let trgt = Tensor<'T> ([a.Shape.[0]], a.Factory)
+            let trgt = Tensor<'T> ([a.Shape.[0]], a.Device)
             trgt.FillDot a b
             trgt
         | 2, 2 when a.Shape.[1] = b.Shape.[0] -> 
-            let trgt = Tensor<'T> ([a.Shape.[0]; b.Shape.[1]], a.Factory)
+            let trgt = Tensor<'T> ([a.Shape.[0]; b.Shape.[1]], a.Device)
             trgt.FillDot a b
             trgt
         | na, nb when na > 2 && na = nb && a.Shape.[na-1] = b.Shape.[na-2] ->
             let a, b = Tensor.broadcastToSameInDims ([0 .. na-3], a, b)
-            let trgt = Tensor<'T> (a.Shape.[0 .. na-3] @ [a.Shape.[na-2]; b.Shape.[na-1]], a.Factory)
+            let trgt = Tensor<'T> (a.Shape.[0 .. na-3] @ [a.Shape.[na-2]; b.Shape.[na-1]], a.Device)
             trgt.FillDot a b
             trgt
         | na, nb when na > 2 && na = nb+1 && a.Shape.[na-1] = b.Shape.[nb-1] ->
@@ -1476,7 +1512,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// If the specified tensor has more than two dimensions, the matrices
     /// consisting of the last two dimensions are inverted.
     static member invert (a: Tensor<'T>) = 
-        let trgt = Tensor<'T> (a.Shape, a.Factory)
+        let trgt = Tensor<'T> (a.Shape, a.Device)
         trgt.FillInvert a
         trgt
 
@@ -1506,8 +1542,8 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     static member symmetricEigenDecomposition (part: MatrixPart) (a: Tensor<'T>) =
         if a.NDims <> 2 then
             invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
-        let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Factory)
-        let trgtEigVecs = Tensor<'T> (a.Shape, a.Factory, order=ColumnMajor)
+        let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Device)
+        let trgtEigVecs = Tensor<'T> (a.Shape, a.Device, order=ColumnMajor)
         Tensor.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs a
         trgtEigVals, trgtEigVecs
         
@@ -1712,7 +1748,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         member this.NElems = this.NElems
         member this.DataType = this.DataType
         member this.Storage = this.Storage :> ITensorStorage
-        member this.Factory = this.Factory
+        member this.Device = this.Device
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
         member this.Pretty = this.Pretty
@@ -1814,8 +1850,8 @@ type Tensor =
     /// checks that all tensors have the same storage
     static member internal CheckSameStorage (xs: ITensor list) =
         match xs with
-        | x::rs when rs |> List.exists (fun r -> x.Storage.Id <> r.Storage.Id) ->
-            let storages = xs |> List.map (fun x -> x.Storage.Id)
+        | x::rs when rs |> List.exists (fun r -> x.Device <> r.Device) ->
+            let storages = xs |> List.map (fun x -> x.Device.Id)
             raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
                                              but they are %A." storages))
         | _ -> ()            
@@ -1872,12 +1908,12 @@ type Tensor =
     static member internal PrepareAxisReduceTarget<'TR, 'TA> (axis: int, a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
         a.CheckAxis axis
         let redShp = a.Shape |> List.without axis        
-        let trgt = Tensor<'TR> (redShp, a.Storage.Factory, ?order=order)
+        let trgt = Tensor<'TR> (redShp, a.Storage.Device, ?order=order)
         trgt, a
 
     /// prepares an elementwise operation by allocating a target of same size and storage
     static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Device, ?order=order)
         trgt, a
 
     /// prepares an elementwise operation by broadcasting both tensors to the same size
@@ -1886,7 +1922,7 @@ type Tensor =
             : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB>) =
         Tensor.CheckSameStorage [a; b]
         let a, b = Tensor<_>.broadcastToSame (a, b)
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Device, ?order=order)
         trgt, a, b
 
     /// prepares an elementwise operation by broadcasting all three tensors to the same size
@@ -1895,11 +1931,17 @@ type Tensor =
             : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
         Tensor.CheckSameStorage [a; b; c]
         let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Factory, ?order=order)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Device, ?order=order)
         trgt, a, b, c
 
+    /// Creates a new tensor of the given shape and data type.
+    static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
+        let order = defaultArg order RowMajor
+        let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
+        Activator.CreateInstance (gt, shape, dev) :?> ITensor
+
     /// Creates a new tensor of given shape filled with zeros.
-    static member zeros<'T> (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<'T> =
+    static member zeros<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
             x.FillConst Tensor<'T>.Zero
@@ -1907,32 +1949,32 @@ type Tensor =
    
     /// Tensor of same shape as specifed tensor and filled with zeros.
     static member zerosLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.zeros<'T> tmpl.Storage.Factory tmpl.Shape
+        Tensor.zeros<'T> tmpl.Storage.Device tmpl.Shape
 
     /// Creates a new tensor of given shape filled with ones.
-    static member ones<'T> (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<'T> =
+    static member ones<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst Tensor<'T>.One
         x
         
     /// Tensor of same shape as specifed tensor and filled with ones.
     static member onesLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.ones<'T> tmpl.Storage.Factory tmpl.Shape 
+        Tensor.ones<'T> tmpl.Storage.Device tmpl.Shape 
 
     /// Creates a new boolean tensor of given shape filled with false.
-    static member falses (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<bool> =
+    static member falses (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst false
         x
 
     /// Creates a new boolean tensor of given shape filled with true.
-    static member trues (dev: ITensorStorageFactory) (shape: int64 list) : Tensor<bool> =
+    static member trues (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst true
         x   
 
     /// Creates a new tensor of scalar shape with the given value and storage.
-    static member scalar<'T> (dev: ITensorStorageFactory) (value: 'T) : Tensor<'T> =
+    static member scalar<'T> (dev: ITensorDevice) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> ([], dev)
         x.Value <- value
         x
@@ -1940,29 +1982,29 @@ type Tensor =
     /// Creates a new tensor of scalar shape with the given value and 
     /// same storage as the specified tensor.
     static member scalarLike<'T> (tmpl: ITensor) (value: 'T) : Tensor<'T> =
-        Tensor.scalar<'T> tmpl.Storage.Factory value 
+        Tensor.scalar<'T> tmpl.Storage.Device value 
 
     /// Creates a tensor with the values returned by the function.
-    static member init<'T> (dev: ITensorStorageFactory) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+    static member init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillIndexed fn
         x           
 
     /// Creates a tensor filled with the specified value.
-    static member filled<'T> (dev: ITensorStorageFactory) (shape: int64 list) (value: 'T) : Tensor<'T> =
+    static member filled<'T> (dev: ITensorDevice) (shape: int64 list) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst value
         x           
 
     /// Identity matrix of given size.
-    static member identity<'T> (dev: ITensorStorageFactory) (size: int64) : Tensor<'T> =
+    static member identity<'T> (dev: ITensorDevice) (size: int64) : Tensor<'T> =
         let x = Tensor.zeros<'T> dev [size; size]
         let d : Tensor<'T> = Tensor.diag x
         d.FillConst Tensor<'T>.One
         x           
 
     /// Int64 vector containing the numbers [0L; 1L; ...; nElems-1L].
-    static member arange (dev: ITensorStorageFactory) (nElems: int64) =
+    static member arange (dev: ITensorDevice) (nElems: int64) =
         Tensor.init dev [nElems] (fun idx -> idx.[0])        
 
     /// Fills the vector with linearly spaced values from start to (including) stop.
@@ -1974,7 +2016,7 @@ type Tensor =
 
     /// Creates a one-dimensional tensor filled with linearly spaced values from start 
     /// to (including) stop.
-    static member inline linspace (dev: ITensorStorageFactory) (start: 'V) (stop: 'V) (nElems: int64) =
+    static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
         let x = Tensor<'V> ([nElems], dev)
         x |> Tensor.fillLinspace start stop
         x
@@ -2119,7 +2161,7 @@ type Tensor =
             invalidArg "ax2"
                 (sprintf "cannot insert axis at position %d into array of shape %A" ax2 a.Shape)
         let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
-        let d = Tensor.zeros a.Factory dShp
+        let d = Tensor.zeros a.Device dShp
         let dDiag = Tensor.diagAxis ax1 ax2 d
         dDiag.FillFrom a
         d
@@ -2191,7 +2233,7 @@ type Tensor =
                   
         let tmplArray = Option.get (anyArray bs)
         let joinedShape = joinedBlocksShape 0 bs
-        let joined = Tensor<_> (joinedShape, tmplArray.Factory)
+        let joined = Tensor<_> (joinedShape, tmplArray.Device)
         let startPos = List.replicate (List.length joinedShape) 0L
 
         for pos, ary in blockPosAndContents 0 startPos bs do
@@ -2236,7 +2278,7 @@ type Tensor =
         let concatShape = shp |> List.set ax totalSize
 
         // copy tensors into concatenated tensor
-        let cc = Tensor(concatShape, ts.Head.Factory)
+        let cc = Tensor(concatShape, ts.Head.Device)
         let mutable pos = 0L
         for ary in ts do
             let aryLen = ary.Shape.[ax]
@@ -2291,7 +2333,7 @@ module Tensor =
     module Parallel = 
 
         /// creates a new tensor with the values returned by the function.
-        let init<'T> (dev: ITensorStorageFactory) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+        let init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
             let x = Tensor<'T> (shape, dev)
             x.FillParallelIndexed fn
             x          

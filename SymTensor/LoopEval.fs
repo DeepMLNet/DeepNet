@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
 open Basics
-open ArrayNDNS
+open Tensor
 
 
 /// functions for loop evaluation

@@ -5,27 +5,28 @@ open System.Reflection
 open FSharp.Reflection
 
 open Basics
-open ArrayNDNS
+open Tensor
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLocStride<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (stride: int64 list option) (mi: ModelInstance<'T>) =
+    static member PublishLocStride<'T when 'T: equality and 'T: comparison> 
+            (expr: ExprT) (loc: ITensorDevice) (stride: int64 list option) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
         match stride with
         | Some stride -> mi.SetStride expr stride
         | None -> ()
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
-        ArrayNDHost.scalar value |> dev.ToDev :> ITensor
+        HostTensor.scalar value |> dev.ToDev :> ITensor
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
         Expr.extractVar expr
     static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: Tensor<'T>) =
-        value |> dev.ToHost |> ArrayNDHDF.write hdf name
+        value |> dev.ToHost |> HostTensor.write hdf name
     static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
-        value |> ArrayNDHost.scalar |> ArrayNDHDF.write hdf name
+        value |> HostTensor.scalar |> HostTensor.write hdf name
     static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : Tensor<'T> =
-        ArrayNDHDF.read hdf name |> dev.ToDev
+        HostTensor.read hdf name |> dev.ToDev
     static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
-        ArrayNDHDF.read hdf name |> Tensor.value
+        HostTensor.read hdf name |> Tensor.value
 
 type private ValueType =
     | Scalar of Type
