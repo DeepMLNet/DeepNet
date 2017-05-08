@@ -32,8 +32,9 @@ type CurveNormalizationTests () =
         HostTensor.write hdf "reversed" reversed.All.Data 
         HostTensor.write hdf "refPCAWhitenedFull" refPCAWhitenedFull
 
+        // PCA axes are not sign unique.
         Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (normalized.All.Data, refPCAWhitenedFull, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitenedFull, absTol=1e-5, relTol=1e-4) |> should equal true
         
     [<Fact>]
     member this.``PCA Whitening 10`` () =
@@ -47,8 +48,9 @@ type CurveNormalizationTests () =
         HostTensor.write hdf "reversed" reversed.All.Data
         HostTensor.write hdf "refPCAWhitened10" refPCAWhitened10
 
+        // PCA axes are not sign unique.
         //ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
-        Tensor.almostEqualWithTol (normalized.All.Data, refPCAWhitened10, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitened10, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``ZCA Whitening`` () =
