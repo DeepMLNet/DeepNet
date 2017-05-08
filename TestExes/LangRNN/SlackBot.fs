@@ -77,7 +77,7 @@ type SlackBot (data:      WordData,
                             words 
                             |> data.Tokenize 
                             |> HostTensor.ofList
-                            |> Tensor.reshape [1L; -1L]
+                            |> Tensor.reshape [1L; Remainder]
                             |> CudaTensor.transfer
 
                         // generate and detokenize

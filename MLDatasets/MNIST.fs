@@ -127,8 +127,8 @@ module Mnist =
             invalidArg "valRatio" "valRatio must be between 0.0 and 1.0"
         
         let raw = loadRaw directory
-        let trnImgsFlat = raw.TrnImgs |> Tensor.reshape [raw.TrnImgs.Shape.[0]; -1L]
-        let tstImgsFlat = raw.TstImgs |> Tensor.reshape [raw.TstImgs.Shape.[0]; -1L]
+        let trnImgsFlat = raw.TrnImgs |> Tensor.reshape [raw.TrnImgs.Shape.[0]; Remainder]
+        let tstImgsFlat = raw.TstImgs |> Tensor.reshape [raw.TstImgs.Shape.[0]; Remainder]
         let orgTrn = Dataset<InputTargetSampleT> [trnImgsFlat; raw.TrnLbls]
 
         let trn, vali =
