@@ -27,13 +27,13 @@ module Compile =
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
-    let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
+    let krnlPtxCacheDir = Path.Combine(Util.localAppData "DeepNet", "PTXCache")
     let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
 
-    let cppModCacheDir = Path.Combine(Util.localAppData, "CPPCache")
+    let cppModCacheDir = Path.Combine(Util.localAppData "DeepNet", "CPPCache")
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
-    let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
+    let compileDirRoot = Path.Combine(Util.localAppData "DeepNet", "Compile")
 
     /// prepares a compile directory
     let prepareCompileDir code =        

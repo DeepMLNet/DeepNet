@@ -63,6 +63,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="CudaUtils.fs" />
+    <Compile Include="DiskMap.fs" />
+    <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
@@ -107,6 +109,9 @@
       <HintPath>..\packages\ManagedCuda-CUBLAS.8.0.13\lib\net46\CudaBlas.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="FsPickler">
+      <HintPath>..\packages\FsPickler.3.2.0\lib\net45\FsPickler.dll</HintPath>
+    </Reference>
     <Reference Include="HDF.PInvoke">
       <HintPath>HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>
@@ -122,6 +127,9 @@
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="NVRTC">
+      <HintPath>..\packages\ManagedCuda-NVRTC.8.0.13\lib\net46\NVRTC.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.IO.Compression" />
@@ -131,6 +139,8 @@
       <HintPath>..\packages\System.Numerics.Vectors.4.3.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <Target Name="BeforeBuild">
   </Target>

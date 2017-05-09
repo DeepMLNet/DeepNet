@@ -378,9 +378,9 @@ module Util =
         System.IO.Path.GetDirectoryName(path)
 
     /// path to application directory under AppData\Local
-    let localAppData =  
+    let localAppData progName =  
         let lad = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData)
-        System.IO.Path.Combine (lad, "DeepNet")
+        System.IO.Path.Combine (lad, progName)
     
     [<Flags>]
     type ErrorModes = 

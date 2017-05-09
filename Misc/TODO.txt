@@ -1,56 +1,17 @@
-How can we refactor Tensor so that it is still modular but easier to handle?
+- what is necessary to make CUDA copy kernel work?
+  1. Tensor structure in F#
+    - structure has dynamic size
+	- to make kernel invocation efficient we should build it
+	- DONE.
 
-- hide storage implementation in type
-- how to go about creation?
-- stateful? => usually bad
-- as before with wrapper function for locations?
-  => yes, why not...
-- how to handle arrays that don't have the same location?
-  => will probably a major user problem, but auto copy is definitely not the answer
-- that's way derived types were actually quite useful to ensure correctness
-- but in the end it should be possible to add two tensors of unknown type to write location-unaware code
-- only other way to do that would be to fall back to generics, but they suck
-- so the subclasses are useful to ensure that a function gets a specific array storage location
-- but it's better to be more transparent about the location, i.e. to support everything on each location
+  2. Generating wrapper code with extern "C"
+    - how to best implement type-safe wrappers?
+	- DONE.
 
+  3. nvrtc invocation
+	- DONE.
 
-How to write specific storage providers?
-- i.e. they will need methods to access elements, etc.
-- so they actually depend on Tensor don't they?
-- hmmm, difficult to say.
+  4. module loading
+    - DONE.
 
-
-What to do with Tensor module?
-- can merge into type
-- but how to handle access now
-- and how to implement basic ops such as + and -
-
-- now, how to implement a function such as + ???
-- for CUDA it requires the use of a kernel
-- so each storage must have a function for each operation
-- but then it must also know the layout
-- no, the function should take it...
-
-- How to perform SIMD plus?
-- need to combine two things
-  1. multicore
-  2. SIMD
-
-- vector length is 4 elements
-- so we need a loop over all elements using all cores
-- and JIT must be able to see everything
-
-- how to perform multi-core strategy??
-  - x64 has probably same cache architecture as CUDA, i.e. we should operate on lowest stride
-  - SIMD optimization is only applicable if stride is one
-  - best strategy would be a simple for loop over last dimension
-      - beforehand we swap dimensions so that last dimension is stride one
-      - and singleton dimensions are removed
-  - and for multi-core parallelization a multi-threaded loop over first dimension
-  
-
-- how to solve this storage/id problem?
-- okay, remove ID and put it into the factory..
-
-
-
+  5. kernel invocation
