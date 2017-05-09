@@ -204,7 +204,7 @@ type GRUInst (VocSize:       int64,
                 match stateOpt with
                 | Some state when state.Shape.[0] = nBatch && not dropState -> state
                 | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0L .. nBatch-1L, *]
-                | _ -> CudaTensor.zeros<single> [nBatch; EmbeddingDim] :> Tensor<_>
+                | _ -> CudaTensor.zeros<single> [nBatch; EmbeddingDim] 
             if smpl.Words.Shape.[1] < 2L then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
             VarEnv.ofSeq [words, smpl.Words :> ITensor; initial, state :> ITensor]
 
