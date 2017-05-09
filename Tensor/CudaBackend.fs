@@ -245,33 +245,49 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     member this.DevicePtr : nativeint =
         Cuda.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)        
 
+    member inline internal this.NativeTensor = {
+        DataType    = typeof<'T>
+        BasePtr     = storage.ByteData.DevicePointer |> Cuda.getIntPtr
+        Offset      = layout.Offset
+        Shape       = layout.Shape
+        Stride      = layout.Stride
+    }
+
+    /// gets NativeTensors for specified tensors
+    static member internal GetNativeTensor (t: Tensor<'T>, a: Tensor<'TA>) =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
+        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
+
+    /// gets NativeTensors for specified tensors, optimized for elment-wise operations
+    static member internal ElemwiseNativeTensor (t: Tensor<'T>) =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
+
+    /// gets NativeTensors for specified tensors, optimized for elment-wise operations
+    static member internal ElemwiseNativeTensor (t: Tensor<'T>, a: Tensor<'TA>) =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
+        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
+
     interface ITensorBackend<'T> with
 
         member this.Copy(trgt, src) = 
-            let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
-            let srcStorage = src.Storage :?> TensorCudaStorage<'T>
-
             if TensorLayout.hasContiguousMemory trgt.Layout && 
                TensorLayout.hasContiguousMemory src.Layout &&
                trgt.Layout.Stride = src.Layout.Stride then
-                // use fast CUDA memcpy
+                // use CUDA memcpy for continous block of memory
+                let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
+                let srcStorage = src.Storage :?> TensorCudaStorage<'T>
                 trgtStorage.Data.CopyToDevice (srcStorage.Data, 
                                                SizeT (sizeof64<'T> * src.Layout.Offset),
                                                SizeT (sizeof64<'T> * trgt.Layout.Offset),
                                                SizeT (sizeof64<'T> * src.NElems))
             else
-                // TODO: fix
-                // use slow element by element copy over host
-                printfn "WARNING: using slow CUDA element by element copy"
-                for idx in Tensor.allIdx trgt do
-                    trgtStorage.[TensorLayout.addr idx trgt.Layout] <- 
-                        srcStorage.[TensorLayout.addr idx src.Layout]
+                // call copy kernel
+                let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
+                kernels.Copy(CUstream.NullStream, trgt, src)
 
         member this.FillConst (value, trgt) = 
-            printfn "WARNING: using slow CUDA element by element fill"
-            let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
-            for idx in Tensor.allIdx trgt do
-                trgtStorage.[TensorLayout.addr idx trgt.Layout] <- value
+            let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
+            kernels.FillConst(CUstream.NullStream, box value, trgt)
 
         member this.Transfer (trgt, src) =
             let regMem (storage: TensorHostStorage<'T>) = 

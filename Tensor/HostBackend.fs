@@ -1665,7 +1665,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             and set idx value = this.Data.[this.FastLayout.Addr idx] <- value
 
         member this.FillConst (value, trgt) =
-            let trgt= TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
             if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
             else ScalarOps.Fill (value, trgt)
 

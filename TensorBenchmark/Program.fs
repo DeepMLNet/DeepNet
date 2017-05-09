@@ -20,6 +20,9 @@ let testCuda () =
     let cb = Tensor.copy ca
     printfn "cb=\n%A" cb
 
+    printfn "fill cuda..."
+    cb.FillConst(5.5f)
+    printfn "cb=\n%A" cb
 
 
 

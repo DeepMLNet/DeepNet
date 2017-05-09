@@ -7,7 +7,7 @@
 
 
 template<typename T, dim_t TDims>
-struct CopyWorkFn {
+struct CopyFn {
 	Tensor<T, TDims> trgt;
 	Tensor<T, TDims> src;
 	_dev_ void operator() (Idxs<TDims> &pos) {
@@ -15,12 +15,9 @@ struct CopyWorkFn {
 	}
 };
 
-
 template<typename T, dim_t TDims> _dev_
 void Copy(Tensor<T, TDims> &trgt, const Tensor<T, TDims> &src) {
-	//auto workFn = [&trgt, &src](Idxs<TDims> &pos) { trgt[pos] = src[pos]; };
-	//PerformWork(trgt.Shape(), workFn);
-	CopyWorkFn<T, TDims> workFn = { trgt, src};
+	CopyFn<T, TDims> workFn = {trgt, src};
 	PerformWork(trgt.Shape(), workFn);
 };
 
@@ -41,3 +38,18 @@ void CopyHeterogenous(Tensor<T, TTrgtDims> &trgt, const Tensor<T, TSrcDims> &src
 };
 
 
+
+template<typename T, dim_t TDims>
+struct FillConstFn {
+	T value;
+	Tensor<T, TDims> trgt;
+	_dev_ void operator() (Idxs<TDims> &pos) {
+		trgt[pos] = value;
+	}
+};
+
+template<typename T, dim_t TDims> _dev_
+void FillConst(T value, Tensor<T, TDims> &trgt) {
+	FillConstFn<T, TDims> workFn = {value, trgt};
+	PerformWork(trgt.Shape(), workFn);
+};

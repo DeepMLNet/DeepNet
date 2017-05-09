@@ -237,6 +237,7 @@ module internal KernelCompiler =
 /// Argument type of a CUDA kernel
 type internal KernelArgType = 
     | ArgTypeTensor of NativeTensorInfo
+    | ArgTypeScalar of Type
     | ArgTypeInt64
 
 /// Argument type of a CUDA kernel
@@ -244,17 +245,20 @@ module internal KernelArgType =
     let cppType at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.cppName nti
+        | ArgTypeScalar t -> Util.cppTypeInst t
         | ArgTypeInt64 -> "int64_t"
 
     let mangleName at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.mangledName nti
+        | ArgTypeScalar t -> Util.cppTypeInst t
         | ArgTypeInt64 -> "int64_t"
 
     let marshal at (av: obj) =
         match at, av with
         | ArgTypeTensor nti, (:? NativeTensor as nt) when NativeTensor.validInstance nti nt ->
             NativeTensor.marshal nt
+        | ArgTypeScalar t, av when av.GetType() = t -> av
         | ArgTypeInt64, (:? int64 as v) -> box v
         | _ -> failwithf "cannot marshal %A as %A" av at
 
@@ -340,15 +344,35 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     inherit CudaModule()
     static let headers = ["CudaTensor.cuh"]
 
-    let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
+    /// returns the CUDA work dimensions (x, y, z) for work of given size
+    let workDimForWorkSize workSize hetero : Cuda.WorkDim =
+        match List.length workSize with
+        | _ when hetero -> (List.fold (*) 1L workSize, 1L, 1L)
+        | 0 -> (1L, 1L, 1L)
+        | 1 -> (workSize.[0], 1L, 1L)
+        | 2 -> (workSize.[1], workSize.[0], 1L)
+        | 3 -> (workSize.[2], workSize.[1], workSize.[0])
+        | d ->
+            let rest = {0 .. d-3} |> Seq.map (fun i -> workSize.[i]) |> Seq.fold (*) 1L 
+            (workSize.[d-1], workSize.[d-2], rest)
 
-    let copyFunc =
-        this.GetKernel "Copy" [fullTensor; fullTensor]
+    /// returns the CUDA work dimensions (x, y, z) for an element-wise operation
+    let workDimForElemwise (trgt: NativeTensor) =
+        workDimForWorkSize trgt.Shape false
+
+    let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
+    let scalar = ArgTypeScalar dataType
+
+    let copyFunc = this.GetKernel "Copy" [fullTensor; fullTensor]
+    let fillConst = this.GetKernel "FillConst" [scalar; fullTensor]
 
     do this.Build (headers)
 
-    member this.Copy (stream, workDim, trgt: NativeTensor, src: NativeTensor) = 
-        copyFunc (stream, workDim, [|box trgt; box src|])
+    member this.Copy (stream, trgt: NativeTensor, src: NativeTensor) = 
+        copyFunc (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.FillConst (stream, value: obj, trgt: NativeTensor) = 
+        fillConst (stream, workDimForElemwise trgt, [|value; box trgt|])
 
 
 /// CUDA kernels for the CUDA tensor backend
