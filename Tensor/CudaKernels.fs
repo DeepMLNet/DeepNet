@@ -18,7 +18,7 @@ module Cfg =
 
     let mutable FastKernelMath = false
     let mutable RestrictKernels = false
-    let mutable DebugCompile = true
+    let mutable DebugCompile = false
     let mutable DisableKernelCache = false
 
 
@@ -66,9 +66,9 @@ module internal NativeTensor =
                 // define fields
                 tb.DefineField("Base", typeof<nativeint>, FieldAttributes.Public) |> ignore
                 tb.DefineField("Offset", typeof<int64>, FieldAttributes.Public) |> ignore
-                for d = 0 to nDims - 1 do
+                for d = 0 to max (nDims-1) 1 do
                     tb.DefineField(sprintf "Shape%d" d, typeof<int64>, FieldAttributes.Public) |> ignore
-                for d = 0 to nDims - 1 do
+                for d = 0 to max (nDims-1) 1 do
                     tb.DefineField(sprintf "Stride%d" d, typeof<int64>, FieldAttributes.Public) |> ignore
 
                 // create defined type and cache it
@@ -258,6 +258,7 @@ module internal KernelArgType =
         | ArgTypeInt64, (:? int64 as v) -> box v
         | _ -> failwithf "cannot marshal %A as %A" av at
 
+
 /// A CUDA module built from source containing kernel functions.
 type internal CudaModule () =
     let wrapperCodes = Dictionary<string, string> ()
@@ -334,7 +335,7 @@ type internal CudaModule () =
         | None -> ()
 
 
-
+/// CUDA kernels for the CUDA tensor backend
 type internal TensorKernels (dataType: Type, nDims: int) as this =
     inherit CudaModule()
     static let headers = ["CudaTensor.cuh"]
@@ -348,6 +349,21 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
 
     member this.Copy (stream, workDim, trgt: NativeTensor, src: NativeTensor) = 
         copyFunc (stream, workDim, [|box trgt; box src|])
+
+
+/// CUDA kernels for the CUDA tensor backend
+module internal TensorKernels =
+    let private cache = Dictionary<Type * int, TensorKernels>()
+
+    let get (dataType: Type, nDims: int) =
+        lock cache (fun () ->
+            match cache.TryFind (dataType, nDims) with
+            | Some tk -> tk
+            | None ->
+                let tk = TensorKernels (dataType, nDims)
+                cache.[(dataType, nDims)] <- tk
+                tk
+        )
 
 
 

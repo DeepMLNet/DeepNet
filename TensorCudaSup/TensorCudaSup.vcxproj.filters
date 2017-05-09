@@ -13,7 +13,4 @@
   <ItemGroup>
     <CudaCompile Include="CudaTensor.cu" />
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="dllmain.cpp" />
-  </ItemGroup>
 </Project>

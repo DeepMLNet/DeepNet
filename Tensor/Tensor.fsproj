@@ -103,6 +103,21 @@
       <Link>LIBIOMP5MD.DLL</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="..\TensorCudaSup\Common.cuh">
+      <Link>Common.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\CudaTensor.cuh">
+      <Link>CudaTensor.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Idxs.cuh">
+      <Link>Idxs.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Tensor.cuh">
+      <Link>Tensor.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Work.cuh">
+      <Link>Work.cuh</Link>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

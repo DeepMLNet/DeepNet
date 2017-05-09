@@ -4,6 +4,7 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor.Utils
+open Tensor.Cuda.Backend
 open System
 
 
@@ -238,10 +239,11 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
 and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (layout: TensorLayout, storage: TensorCudaStorage<'T>) =
 
+    let kernels = TensorKernels.get (typeof<'T>, layout.NDims)
+
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
-        Cuda.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)
-        
+        Cuda.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)        
 
     interface ITensorBackend<'T> with
 

@@ -2,8 +2,34 @@
 open System.Diagnostics
 
 
+
+let testCuda () =
+    let shape = [5L; 5L]
+
+    let a = HostTensor.ones<single> shape
+    printfn "a=\n%A" a
+
+    printfn "copy to cuda..."
+    let ca = a |> CudaTensor.transfer
+    printfn "ca=\n%A" ca
+    printfn "copy to host..."
+    let ha = ca |> HostTensor.transfer
+    printfn "ha=\n%A" ha
+
+    printfn "copy cuda to cuda..."
+    let cb = Tensor.copy ca
+    printfn "cb=\n%A" cb
+
+
+
+
 [<EntryPoint>]
 let main argv = 
+    Tensor.Utils.Util.disableCrashDialog ()
+    testCuda()
+    exit 0
+
+
     let shape = [10000L; 1000L]
     printfn "Shape: %A" shape
 

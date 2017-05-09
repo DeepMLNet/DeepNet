@@ -6,21 +6,21 @@ template<dim_t TNDims>
 struct Idxs {
 	idx_t Data[TNDims];
 
-	inline _dev_ dim_t NDims() const { 
+	_dev_ dim_t NDims() const { 
 		return TNDims; 
 	}
 
-	inline _dev_ idx_t &operator[] (dim_t dim) {
+	_dev_ idx_t &operator[] (dim_t dim) {
 		assert(0 <= dim && dim < TNDims);
 		return Data[dim]; 
 	}
 
-	inline _dev_ const idx_t &operator[] (dim_t dim) const {
+	_dev_ const idx_t &operator[] (dim_t dim) const {
 		assert(0 <= dim && dim < TNDims);
 		return Data[dim];
 	}
 
-	inline _dev_ idx_t ToLinearPos(const Idxs<TNDims> &shape) const {
+	_dev_ idx_t ToLinearPos(const Idxs<TNDims> &shape) const {
 		idx_t incr[TNDims];
 		incr[TNDims-1] = 1;
 		for (dim_t d = TNDims-2; d >= 0; d--)
@@ -33,7 +33,7 @@ struct Idxs {
 		return linearPos;
 	}
 
-	inline _dev_ static Idxs<TNDims> FromLinearPos(const Idxs<TNDims> &shape, idx_t linearPos) {
+	_dev_ static Idxs<TNDims> FromLinearPos(const Idxs<TNDims> &shape, idx_t linearPos) {
 		idx_t incr[TNDims];
 		incr[TNDims-1] = 1;
 		for (dim_t d = TNDims-2; d >= 0; d--)
@@ -47,4 +47,35 @@ struct Idxs {
 		return idxs;
 	}
 };
+
+
+template<>
+struct Idxs<(dim_t)0> {
+	idx_t Dummy;
+
+	_dev_ dim_t NDims() const { 
+		return 0; 
+	}
+
+	_dev_ idx_t &operator[] (dim_t dim) {
+		assert(false);
+		return Dummy; 
+	}
+
+	_dev_ const idx_t &operator[] (dim_t dim) const {
+		assert(false);
+		return Dummy; 
+	}
+
+	_dev_ idx_t ToLinearPos(const Idxs<(dim_t)0> &shape) const {
+		return (idx_t)0;
+	}
+
+	_dev_ static Idxs<(dim_t)0> FromLinearPos(const Idxs<(dim_t)0> &shape, idx_t linearPos) {
+		Idxs<(dim_t)0> idxs;
+		idxs.Dummy = (idx_t)0;
+		return idxs;
+	}
+};
+
 
