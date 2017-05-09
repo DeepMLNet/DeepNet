@@ -12,7 +12,7 @@ b = np.ones(shape, dtype=np.float32)
 a[0, 0] = 1.0
 b[0, 0] = 2.0
 
-iters = 50
+iters = 30
 
 start_time = time.time()
 for i in range(iters):
@@ -21,13 +21,19 @@ duration = time.time() - start_time
 time_per_iter = duration * 1000.0 / float(iters)
 print ("Plus time per iteration: %.3f ms" % time_per_iter)
 
-
 start_time = time.time()
 for i in range(iters):
     c = np.abs(a)
 duration = time.time() - start_time
 time_per_iter = duration * 1000.0 / float(iters)
 print ("Abs time per iteration: %.3f ms" % time_per_iter)
+
+start_time = time.time()
+for i in range(iters):
+    c = np.dot(a.T, b)
+duration = time.time() - start_time
+time_per_iter = duration * 1000.0 / float(iters)
+print ("Dot time per iteration: %.3f ms" % time_per_iter)
 
 start_time = time.time()
 for i in range(iters):
@@ -56,3 +62,11 @@ for i in range(iters):
 duration = time.time() - start_time
 time_per_iter = duration * 1000.0 / float(iters)
 print ("Power time per iteration: %.3f ms" % time_per_iter)
+
+start_time = time.time()
+for i in range(iters):
+    c = a < b
+duration = time.time() - start_time
+time_per_iter = duration * 1000.0 / float(iters)
+print ("Less time per iteration: %.3f ms" % time_per_iter)
+print (c)
