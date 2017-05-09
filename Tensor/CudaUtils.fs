@@ -1,4 +1,4 @@
-﻿namespace Basics
+﻿namespace Tensor.Utils
 
 open ManagedCuda
 open ManagedCuda.BasicTypes

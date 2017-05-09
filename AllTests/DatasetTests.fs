@@ -4,7 +4,7 @@ open Xunit
 open FsUnit.Xunit
 open System.IO
 
-open Basics
+open Tensor.Utils
 open Tensor
 open Datasets
 

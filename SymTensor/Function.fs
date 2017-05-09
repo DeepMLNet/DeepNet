@@ -2,7 +2,7 @@
 
 open System.Diagnostics
 
-open Basics
+open Tensor.Utils
 open Tensor
 open UExprTypes
 

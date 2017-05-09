@@ -6,7 +6,7 @@ open System.Runtime.InteropServices
 open FSharp.Reflection
 open HDF.PInvoke
 
-open Basics
+open Tensor.Utils
  
 
 /// HDF5 support functions

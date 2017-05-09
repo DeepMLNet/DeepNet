@@ -3,7 +3,7 @@
 open Xunit
 open FsUnit.Xunit
 
-open Basics
+open Tensor.Utils
 open Tensor
 
 

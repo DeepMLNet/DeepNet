@@ -1,6 +1,6 @@
 ﻿namespace Models
 
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 

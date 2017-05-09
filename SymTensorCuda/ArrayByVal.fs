@@ -1,4 +1,4 @@
-﻿namespace Basics
+﻿namespace SymTensor.Compiler.Cuda
 
 open System
 open System.Threading

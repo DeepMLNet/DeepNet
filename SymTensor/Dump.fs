@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Basics
+open Tensor.Utils
 open Tensor
 
 

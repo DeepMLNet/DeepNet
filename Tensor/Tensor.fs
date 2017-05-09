@@ -3,7 +3,7 @@ namespace rec Tensor
 open System.Collections
 open System.Collections.Generic
 
-open Basics
+open Tensor.Utils
 open System
 
 

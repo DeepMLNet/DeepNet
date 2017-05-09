@@ -1,6 +1,6 @@
 ﻿namespace Tensor
 
-open Basics
+open Tensor.Utils
 open System
 
 /// cannot broadcast to same shape

@@ -1,6 +1,6 @@
 ﻿namespace Optimizers
 
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 

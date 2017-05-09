@@ -1,4 +1,4 @@
-﻿namespace Basics
+﻿namespace Tensor.Utils
 
 open System
 open System.Reflection
@@ -46,6 +46,7 @@ module Seq =
 
     /// sequence counting from zero to infinity
     let counting = countingFrom 0
+
 
 module List =
     /// sets element with index elem to given value
@@ -122,31 +123,88 @@ module Map =
         |> Seq.map (|KeyValue|)
         |> Map.ofSeq    
 
-module String =
 
+module String =
     /// combines sequence of string with given seperator but returns empty if sequence is empty
     let concatButIfEmpty empty sep items =
         if Seq.isEmpty items then empty
         else String.concat sep items
 
+    /// object x converted to a string and capped to a maximum length
+    let truncObj x =
+        let maxLen = 80
+        let s = sprintf "%A" x
+        let s = s.Replace ("\n", " ")
+        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
+        else s
+
 
 module Array2D =
-
     /// returns a transposed copy of the matrix
     let transpose m = 
         Array2D.init (Array2D.length2 m) (Array2D.length1 m) (fun y x -> m.[x, y])
 
 
+/// Permutation utilities
+module Permutation =
+    
+    /// true if the given list is a permutation of the numbers 0 to perm.Length-1
+    let is (perm: int list) =
+        let nd = perm.Length
+        Set perm = Set [0 .. nd-1]
+
+    let private check (perm: int list) =
+        if not (is perm) then
+            failwithf "%A is not a permutation" perm
+
+    /// the length of the given permutation
+    let length (perm: int list) =
+        check perm
+        perm.Length
+
+    /// true if then given permutation is the identity permutation
+    let isIdentity (perm: int list) =
+        check perm
+        perm = [0 .. (length perm)-1]
+
+    /// identity permutation of given size
+    let identity (size: int) =
+        [0 .. size-1]
+
+    /// inverts the given permutation
+    let invert (perm: int list) =
+        check perm
+        List.indexed perm
+        |> List.sortBy (fun (i, p) -> p)
+        |> List.map (fun (i, p) -> i)
+    
+    /// returns the permutation that would result in applying perm1 after perm2    
+    let chain (perm1: int list) (perm2: int list) =
+        check perm1
+        check perm2
+        perm2 |> List.permute (fun i -> perm1.[i])
+
+    /// permutes the list using the given permutation
+    let apply (perm: int list) lst =
+        check perm
+        lst |> List.permute (fun i -> perm.[i])
+
+    /// permutation is a swap of two elements
+    let (|Swap|_|) (perm: int list) =
+        if is perm then
+            let idxPerm = List.indexed perm
+            match idxPerm |> List.tryFind (fun (pos, dest) -> pos <> dest) with
+            | Some (cand, candDest) when perm.[candDest] = cand &&
+                    idxPerm |> List.forall (fun (pos, dest) -> pos=cand || pos=candDest || pos=dest) ->
+                Some (cand, candDest)
+            | _ -> None
+        else None
+                
+
 
 
 [<AutoOpen>]
 module UtilTypes =
-
-    [<Measure>]
-    type bytes
-
-    [<Measure>]
-    type elements
 
     type System.Collections.Generic.HashSet<'T> with
         member this.LockedContains key =
@@ -252,10 +310,6 @@ module UtilTypes =
         | Some v -> v
         | None -> b
 
-    let allBindingFlags = 
-        BindingFlags.Public ||| BindingFlags.NonPublic ||| 
-        BindingFlags.Static ||| BindingFlags.Instance
-
     type private GenericMethodDescT = {
         ContainingType:     string
         MethodName:         string
@@ -277,7 +331,8 @@ module UtilTypes =
             match genericMethodCache.TryFind gmd with
             | Some m -> m
             | None ->
-                let gm = typeof<'U>.GetMethod (methodName, allBindingFlags)
+                let gm = typeof<'U>.GetMethod (methodName, BindingFlags.Public ||| BindingFlags.NonPublic ||| 
+                                                           BindingFlags.Static ||| BindingFlags.Instance)
                 if gm = null then
                     failwithf "cannot find method %s on type %A" methodName typeof<'U>
                 let m = gm.MakeGenericMethod (List.toArray genericTypeArgs)
@@ -292,22 +347,20 @@ module UtilTypes =
     let callGeneric<'U, 'R> (methodName: string) (genericTypeArgs: System.Type list) args =
         callGenericInst<'U, 'R> null methodName genericTypeArgs args
 
-    /// object x converted to a string and capped to a maximum length
-    let truncStr x =
-        let maxLen = 80
-        let s = sprintf "%A" x
-        let s = s.Replace ("\n", " ")
-        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
-        else s
+
+/// Utility functions
+module Util =
+
+    /// all BindingFlags, i.e. public and non-public, static and instance
+    let allBindingFlags = 
+        BindingFlags.Public ||| BindingFlags.NonPublic ||| 
+        BindingFlags.Static ||| BindingFlags.Instance
 
     /// Compares two objects of possibly different types.
     let compareObjs (this: 'A when 'A :> System.IComparable<'A>) (other: obj) =
         if this.GetType() = other.GetType() then
             (this :> System.IComparable<'A>).CompareTo (other :?> 'A)
         else compare (this.GetType().FullName) (other.GetType().FullName)
-
-
-module Util =
 
     /// iterates function f n times
     let rec iterate f n x =
@@ -347,18 +400,22 @@ module Util =
                      ErrorModes.SEM_NOOPENFILEERRORBOX)
         |> ignore
 
-    /// C++ data type for given type
-    let cppType (typ: System.Type) = 
+    /// C++ data type for given type instance
+    let cppTypeInst (typ: System.Type) = 
         match typ with
-        | _ when typ = typeof<double>   -> "double"
         | _ when typ = typeof<single>   -> "float"
+        | _ when typ = typeof<double>   -> "double"
+        | _ when typ = typeof<sbyte>    -> "int8_t"
+        | _ when typ = typeof<byte>     -> "uint8_t"
         | _ when typ = typeof<int32>    -> "int32_t"
         | _ when typ = typeof<uint32>   -> "uint32_t"
         | _ when typ = typeof<int64>    -> "int64_t"
         | _ when typ = typeof<uint64>   -> "uint64_t"
-        | _ when typ = typeof<byte>     -> "uint8_t"
         | _ when typ = typeof<bool>     -> "bool"
         | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// C++ data type for given type 
+    let cppType<'T> = cppTypeInst typeof<'T>
 
     /// Returns the contents of a blittable structure as a byte array.
     let structToBytes (s: 'S when 'S: struct) =
@@ -409,59 +466,3 @@ module Util =
         | _ -> None
 
 
-
-/// Permutation utilities
-module Permutation =
-    
-    /// true if the given list is a permutation of the numbers 0 to perm.Length-1
-    let is (perm: int list) =
-        let nd = perm.Length
-        Set perm = Set [0 .. nd-1]
-
-    let private check (perm: int list) =
-        if not (is perm) then
-            failwithf "%A is not a permutation" perm
-
-    /// the length of the given permutation
-    let length (perm: int list) =
-        check perm
-        perm.Length
-
-    /// true if then given permutation is the identity permutation
-    let isIdentity (perm: int list) =
-        check perm
-        perm = [0 .. (length perm)-1]
-
-    /// identity permutation of given size
-    let identity (size: int) =
-        [0 .. size-1]
-
-    /// inverts the given permutation
-    let invert (perm: int list) =
-        check perm
-        List.indexed perm
-        |> List.sortBy (fun (i, p) -> p)
-        |> List.map (fun (i, p) -> i)
-    
-    /// returns the permutation that would result in applying perm1 after perm2    
-    let chain (perm1: int list) (perm2: int list) =
-        check perm1
-        check perm2
-        perm2 |> List.permute (fun i -> perm1.[i])
-
-    /// permutes the list using the given permutation
-    let apply (perm: int list) lst =
-        check perm
-        lst |> List.permute (fun i -> perm.[i])
-
-    /// permutation is a swap of two elements
-    let (|Swap|_|) (perm: int list) =
-        if is perm then
-            let idxPerm = List.indexed perm
-            match idxPerm |> List.tryFind (fun (pos, dest) -> pos <> dest) with
-            | Some (cand, candDest) when perm.[candDest] = cand &&
-                    idxPerm |> List.forall (fun (pos, dest) -> pos=cand || pos=candDest || pos=dest) ->
-                Some (cand, candDest)
-            | _ -> None
-        else None
-                

@@ -5,7 +5,7 @@ open System.Diagnostics
 open System.IO
 open Nessos.FsPickler.Json
 
-open Basics
+open Tensor.Utils
 open Tensor
 open Datasets
 open SymTensor

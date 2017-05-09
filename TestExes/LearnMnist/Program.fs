@@ -9,6 +9,10 @@ open Optimizers
 [<EntryPoint>]
 let main argv =
 
+    //Debug.VisualizeUExpr <- true
+    Debug.DisableCombineIntoElementsOptimization <- true
+    //Debug.DisableOptimizer <- true
+
     //let device = DevHost
     let device = DevCuda
 
@@ -16,6 +20,7 @@ let main argv =
 
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
 
+    printfn "Building model..."
     let mb = ModelBuilder<single> "NeuralNetModel"
 
     // define symbolic sizes
@@ -99,6 +104,7 @@ let main argv =
     //let ts = Trace.startSession "LearnMnist"
 
     let lossFn = mi.Func loss |> arg2 input target
+    printfn "Calculating initial loss..."
     let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> Tensor.value
     printfn "Initial training loss: %f" initialLoss
     let result = Train.train trainable mnist trainCfg

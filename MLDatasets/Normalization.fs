@@ -1,6 +1,6 @@
 ﻿namespace Datasets
 
-open Basics
+open Tensor.Utils
 open Tensor
 open Util
 

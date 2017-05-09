@@ -2,7 +2,7 @@
 
 open System.Runtime.InteropServices
 open ManagedCuda
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 open UExprTypes
@@ -73,7 +73,7 @@ module ArrayNDManikinTypes =
             let shp = TensorLayout.shape layout
             let str = TensorLayout.stride layout
             let ofst = TensorLayout.offset layout
-            let cppDataType = Util.cppType this.DataType
+            let cppDataType = Util.cppTypeInst this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
@@ -86,7 +86,7 @@ module ArrayNDManikinTypes =
         member this.DynamicCPPType =
             let dims = TensorLayout.nDims layout
             let shp = TensorLayout.shape layout
-            let cppDataType = Util.cppType this.DataType
+            let cppDataType = Util.cppTypeInst this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"

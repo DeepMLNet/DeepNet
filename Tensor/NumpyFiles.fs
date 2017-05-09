@@ -5,7 +5,7 @@ open System.IO
 open System.IO.Compression
 open System.Text.RegularExpressions
 
-open Basics
+open Tensor.Utils
 
 
 /// methods for accessing Numpy .npy data files.

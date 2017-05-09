@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Basics
+open Tensor.Utils
 open Tensor
 open System
 
@@ -54,10 +54,10 @@ module DerivCheck =
                 let deviation = Tensor.sum gradDiff |> Tensor.value
                 if deviation > maxDeviation then
                     printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
-                            (truncStr expr) wrt (truncStr rDiff) symGradVal
+                            (String.truncObj expr) wrt (String.truncObj rDiff) symGradVal
                     printfn "and numeric grad has value \n%A." exprGradVal
                     failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
-                        (truncStr expr) deviation maxDeviation
+                        (String.truncObj expr) deviation maxDeviation
             else
                 printfn "DerivCheck: Skipping variable %A because it does not match type %A."
                         wrt typeof<'T>

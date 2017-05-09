@@ -8,7 +8,7 @@ open System.Security.Cryptography
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 open SymTensor.Compiler

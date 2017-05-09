@@ -7,7 +7,7 @@ open MargieBot
 open MargieBot.Responders
 open MargieBot.Models
 
-open Basics
+open Tensor.Utils
 open Tensor
 
 

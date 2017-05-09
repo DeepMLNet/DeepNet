@@ -4,7 +4,7 @@ open System.Diagnostics
 open System.Reflection
 open System.Collections.Generic
 
-open Basics
+open Tensor.Utils
 open Tensor
 open Expr
 

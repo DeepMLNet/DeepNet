@@ -8,7 +8,7 @@ open System.Linq.Expressions
 open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
-open Basics
+open Tensor.Utils
 
 
 /// pinned .NET managed memory (wraps a GCHandle)

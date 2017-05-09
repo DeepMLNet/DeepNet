@@ -3,7 +3,7 @@
 open System
 open System.Reflection
 
-open Basics
+open Tensor.Utils
 open UExprTypes
 open Tensor
 open SymTensor.Compiler

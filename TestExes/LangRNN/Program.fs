@@ -3,7 +3,7 @@
 open System.IO
 open Argu
 
-open Basics
+open Tensor.Utils
 open Tensor
 open Models
 

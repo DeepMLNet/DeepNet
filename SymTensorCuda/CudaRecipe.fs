@@ -4,7 +4,7 @@ open System.Collections.Generic
 open System.Diagnostics
 
 open ManagedCuda
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 open SymTensor.Compiler

@@ -1,6 +1,6 @@
 ﻿namespace LangRNN
 
-open Basics
+open Tensor.Utils
 open System.IO
 
 open Tensor

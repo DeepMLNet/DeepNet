@@ -6,7 +6,7 @@ open System.Collections.Generic
 open System.Threading
 
 open Tensor
-open Basics
+open Tensor.Utils
 open UExprTypes
 
 

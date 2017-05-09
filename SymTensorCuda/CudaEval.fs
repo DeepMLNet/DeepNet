@@ -3,7 +3,7 @@
 open System
 open System.Reflection
 
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 open UExprTypes
@@ -58,7 +58,7 @@ module CudaEvalTypes =
             HostTensor.transfer ary
 
     let private invokeHelperMethod<'T> name args = 
-        let gm = typeof<HelperT>.GetMethod (name, allBindingFlags)
+        let gm = typeof<HelperT>.GetMethod (name, Util.allBindingFlags)
         let m = gm.MakeGenericMethod ([|typeof<'T>|])
         m.Invoke(null, args)  
 

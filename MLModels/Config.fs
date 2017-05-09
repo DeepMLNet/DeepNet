@@ -4,7 +4,7 @@ open System
 open System.IO
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
-open Basics
+open Tensor.Utils
 
 
 /// Configuration loader.

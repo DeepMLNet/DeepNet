@@ -3,7 +3,7 @@
 open System
 open System.IO
 open System.IO.Compression
-open Basics
+open Tensor.Utils
 open Tensor
 
 /// Raw MNIST dataset

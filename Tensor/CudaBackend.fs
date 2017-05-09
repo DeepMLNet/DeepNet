@@ -3,7 +3,7 @@
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
-open Basics
+open Tensor.Utils
 open System
 
 

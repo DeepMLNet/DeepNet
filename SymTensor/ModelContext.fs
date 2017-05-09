@@ -2,7 +2,7 @@
 
 open System
 
-open Basics
+open Tensor.Utils
 open Tensor
 
 [<AutoOpen>]

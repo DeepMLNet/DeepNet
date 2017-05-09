@@ -1,7 +1,7 @@
 ﻿namespace LangRNN
 
 
-open Basics
+open Tensor.Utils
 open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
