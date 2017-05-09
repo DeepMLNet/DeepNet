@@ -1175,6 +1175,7 @@ type internal ScalarOps =
                                  isIndexed=true, useThreads=true)     
 
 
+// delegates for VectorOps
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
 type internal UnaryDelegate<'T>  = delegate of DataAndLayout<'T> * DataAndLayout<'T> -> unit
 type internal BinaryDelegate<'T> = delegate of DataAndLayout<'T> * DataAndLayout<'T> * DataAndLayout<'T> -> unit
@@ -1532,31 +1533,53 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     member inline internal this.DataAndLayout = 
         {Data=this.Data; FastLayout=this.FastLayout}
               
+    /// gets DataAndLayout for specified tensors
     static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
 
-    static member internal ElemwiseDataAndLayout (t: Tensor<'T>) =
-        // try to find stride 1 dimension and move it to the back
-        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout        
+    /// gets layouts for specified targets and sources, optimized for an element-wise operation
+    static member internal ElemwiseLayouts (trgt: TensorLayout, srcs: TensorLayout list) =
+        let dimGood = 
+            [0 .. trgt.NDims-1]
+            |> List.map (fun d ->
+                trgt.Stride.[d] = 1L &&
+                srcs |> List.forall (fun src -> src.Stride.[d]=1L || src.Stride.[d]=0L))
+        if dimGood |> List.exists id then
+            let bestLastDim =
+                [0 .. trgt.NDims-1]
+                |> List.maxBy (fun d ->
+                    if dimGood.[d] then trgt.Shape.[d] else -1L)
+            let swap = TensorLayout.swapDim bestLastDim (trgt.NDims-1)
+            swap trgt, List.map swap srcs
+        else
+            trgt, srcs
 
+    /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
+    static member internal ElemwiseDataAndLayout (t: Tensor<'T>) =        
+        let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [])
+        (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout        
+
+    /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
-        // try to find stride 1 dimension and move it to the back
-        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
-        (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
+        let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout])
+        (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
+        (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout 
 
+    /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
-        // try to find stride 1 dimension and move it to the back
-        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
-        (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
-        (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout 
+        let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout; b.Layout])
+        (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
+        (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout,
+        (b.Relayout(ls.[1]).Backend :?> TensorHostBackend<'TB>).DataAndLayout 
 
+    /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
     static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
-        // try to find stride 1 dimension and move it to the back
-        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
-        (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
-        (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout,
-        (c.Backend :?> TensorHostBackend<'TC>).DataAndLayout 
+        let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout; b.Layout; c.Layout])
+        (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
+        (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout,
+        (b.Relayout(ls.[1]).Backend :?> TensorHostBackend<'TB>).DataAndLayout,
+        (c.Relayout(ls.[2]).Backend :?> TensorHostBackend<'TC>).DataAndLayout 
 
     /// Internal function for GetBlasVector.
     static member private GetBlasVectorInfo (vec: Tensor<'T>, ?disposeFn) =
