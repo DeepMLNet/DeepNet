@@ -119,7 +119,9 @@ if exist "$(FrameworkSDKRoot)\..\..\F#\4.1\Framework\v4.0\fsi.exe" "$(FrameworkS
     </CudaCompile>
     <PreBuildEvent>
       <Command>cd "$(ProjectDir)"
-"$(FrameworkSDKRoot)\..\..\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
+if exist "$(FrameworkSDKRoot)\..\..\F#\4.0\Framework\v4.0\fsi.exe" "$(FrameworkSDKRoot)\..\..\F#\4.0\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
+if exist "$(FrameworkSDKRoot)\..\..\F#\4.1\Framework\v4.0\fsi.exe" "$(FrameworkSDKRoot)\..\..\F#\4.1\Framework\v4.0\fsi.exe" GenerateNDSupport.fsx
+
 </Command>
       <Message>Generate NDSupport.cuh</Message>
     </PreBuildEvent>

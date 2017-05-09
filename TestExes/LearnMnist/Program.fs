@@ -13,8 +13,8 @@ let main argv =
     Debug.DisableCombineIntoElementsOptimization <- true
     //Debug.DisableOptimizer <- true
 
-    //let device = DevHost
-    let device = DevCuda
+    let device = DevHost
+    //let device = DevCuda
 
     let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
 
