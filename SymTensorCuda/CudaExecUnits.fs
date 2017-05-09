@@ -45,7 +45,7 @@ module CudaExecUnitTypes =
         | MemsetSingle of single * IDevMemRngTmpl
         | MemsetUInt32 of uint32 * IDevMemRngTmpl
         // execution control
-        | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
+        | LaunchKernel of TmplInstT * Cuda.WorkDim * (ICudaArgTmpl list)
         | CallCFunc    of TmplInstT * System.Type * (ICudaArgTmpl list)
         // CUBLAS calls 
         | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  

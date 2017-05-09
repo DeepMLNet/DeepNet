@@ -305,7 +305,7 @@ module ArgTemplates =
             member this.GetArg env strm =
                 // C++ struct just contains the pointer to data memory
                 let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
-                let ptr = mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
+                let ptr = mem.DevicePointer + SizeT offset |> Cuda.getIntPtr
                 ArrayNDSSArg ptr |> box
 
     /// ArrayND argument with null data pointer template
@@ -343,7 +343,7 @@ module ArgTemplates =
                 | Some manikin ->
                     // pass pointer to (only) element
                     let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
-                    mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
+                    mem.DevicePointer + SizeT offset |> Cuda.getIntPtr
                 | None -> IntPtr.Zero
 
     type CPPArrayTmpl<'T when 'T :> ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
@@ -372,7 +372,7 @@ module ArgTemplates =
                     | MemAlloc im -> env.InternalMem.[im]
                     | MemExternal vs -> (env.ExternalVar.[vs].Storage :?> ITensorCudaStorage).ByteData
                     | MemConst mc -> (env.ConstantValues.[mc].Storage :?> ITensorCudaStorage).ByteData
-                storage.DevicePointer |> CudaSup.getIntPtr |> box
+                storage.DevicePointer |> Cuda.getIntPtr |> box
 
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with

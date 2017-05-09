@@ -38,8 +38,8 @@ module CudaRecipeTypes =
         | SubWorkspaceNew     of SubWorkspaceT
         | SubWorkspaceDispose of SubWorkspaceT
         // execution control
-        | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-        | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+        | LaunchCPPKernel   of TmplInstT * Cuda.WorkDim * int * StreamT * (ICudaArgTmpl list)
+        | LaunchCKernel     of string * Cuda.WorkDim * int * StreamT * (ICudaArgTmpl list)
         | CallCFunc         of string * System.Type * StreamT * (ICudaArgTmpl list)
         // execution item
         | ExecItem          of CudaExecItemT * StreamT

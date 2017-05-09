@@ -58,7 +58,7 @@ module Program =
         //SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
         // required for SlackBot
-        CudaSup.setContext ()
+        Cuda.setContext ()
 
         // tests
         //verifyRNNGradientOneHot DevCuda
@@ -161,7 +161,7 @@ module Program =
         | None -> ()
 
         // shutdown
-        CudaSup.shutdown ()
+        Cuda.shutdown ()
         0 
 
 

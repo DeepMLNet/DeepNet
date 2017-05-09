@@ -240,7 +240,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
-        CudaSup.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)
+        Cuda.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)
         
 
     interface ITensorBackend<'T> with

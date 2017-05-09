@@ -54,7 +54,7 @@ type SlackBot (data:      WordData,
 
                 member this.GetResponse context =
                     // set worker thread's CUDA context
-                    CudaSup.setContext ()
+                    Cuda.setContext ()
 
                     let msg = context.Message.Text
                     let msg = Regex.Replace(msg, @"<@.+>", "").Trim()

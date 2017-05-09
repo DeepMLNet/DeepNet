@@ -4,26 +4,23 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 
-[<AutoOpen>]
-module CudaSupTypes =
+/// Cuda support types functions
+module Cuda =
 
     /// dimensionality of parallel work to perform (x, y, z)
-    type WorkDimT = int64 * int64 * int64
+    type WorkDim = int64 * int64 * int64
 
     /// CUDA block dimension (x, y, z)
-    type BlockDimT = int * int * int
+    type BlockDim = int * int * int
 
     /// CUDA grid dimension (x, y, z)
-    type GridDimT = int * int * int
+    type GridDim = int * int * int
 
     /// CUDA launch dimension
-    type LaunchDimT = {
-        Block: BlockDimT
-        Grid:  GridDimT
+    type LaunchDim = {
+        Block: BlockDim
+        Grid:  GridDim
     }
-
-
-module CudaSup =
 
     /// convert block/grid dimension (x, y, z) to VectorTypes.dim3
     let toDim3 d =
@@ -42,21 +39,27 @@ module CudaSup =
 
         cudaCntxt
 
+    /// CUDA device info
     let deviceInfo =
         context.GetDeviceInfo()
 
-    let maxBlockDim =
+    /// CUDA maximum block dimension
+    let maxBlockDim : BlockDim =
         int deviceInfo.MaxBlockDim.x, int deviceInfo.MaxBlockDim.y, int deviceInfo.MaxBlockDim.z
 
-    let maxGridDim =
+    /// CUDA maximum grid dimension
+    let maxGridDim : GridDim =
         int deviceInfo.MaxGridDim.x, int deviceInfo.MaxGridDim.y, int deviceInfo.MaxGridDim.z
     
+    /// nvcc arch code
     let nvccArch =
         sprintf "compute_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
 
+    /// nvcc sm code
     let nvccCode =
         sprintf "sm_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
 
+    /// prints CUDA info
     let printInfo () =
         let di = deviceInfo
         printfn "CUDA device:                                         %s" di.DeviceName
@@ -71,6 +74,7 @@ module CudaSup =
         printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
         printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
 
+    /// prints short CUDA device information
     let printDevice () =
         let di = deviceInfo
         printfn "Using CUDA device \"%s\" with %d multiprocessors @ %.2f GHz and %d MB memory." 
@@ -117,7 +121,7 @@ module CudaSup =
     /// Computes CUDA launch dimensions from work dimensions and maximum block size.
     /// It is possible that the calculated launch dimensions will be smaller than the
     /// specified work dimensions, since the maximum block and grid sizes are limited.
-    let computeLaunchDim (workDim: WorkDimT) maxBlockSize =
+    let computeLaunchDim (workDim: WorkDim) maxBlockSize =
         let (./) a b = divCeil a b
 
         let wx, wy, wz = workDim
@@ -145,11 +149,10 @@ module CudaSup =
 
         {Block = int32 bx, int32 by, int32 bz; Grid = int32 gx, int32 gy, int32 gz;}
 
-    /// call implicit type conversation
-    let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
-
     /// gets device pointer as IntPtr
     let getIntPtr (cuPtr: CUdeviceptr) : System.IntPtr =
+        let inline (!>) (x:^a) : ^b = 
+            ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
         !> cuPtr.Pointer
 
 
