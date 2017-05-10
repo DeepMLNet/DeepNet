@@ -237,7 +237,6 @@ module internal KernelCompiler =
 type internal KernelArgType = 
     | ArgTypeTensor of NativeTensorInfo
     | ArgTypeScalar of Type
-    | ArgTypeInt64
 
 /// Argument type of a CUDA kernel
 module internal KernelArgType =
@@ -245,20 +244,20 @@ module internal KernelArgType =
         match at with
         | ArgTypeTensor nti -> NativeTensor.cppName nti
         | ArgTypeScalar t -> Util.cppTypeInst t
-        | ArgTypeInt64 -> "int64_t"
 
     let mangleName at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.mangledName nti
         | ArgTypeScalar t -> Util.cppTypeInst t
-        | ArgTypeInt64 -> "int64_t"
 
     let marshal at (av: obj) =
         match at, av with
         | ArgTypeTensor nti, (:? NativeTensor as nt) when NativeTensor.validInstance nti nt ->
             NativeTensor.marshal nt
-        | ArgTypeScalar t, av when av.GetType() = t -> av
-        | ArgTypeInt64, (:? int64 as v) -> box v
+        | ArgTypeScalar t, av when av.GetType() = t -> 
+            if t = typeof<bool> then
+                if av :?> bool then box 1uy else box 0uy
+            else av
         | _ -> failwithf "cannot marshal %A as %A" av at
 
 
