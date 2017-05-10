@@ -295,6 +295,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     interface ITensorBackend<'T> with
 
+        member this.Item 
+            with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
+            and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
+
         member this.Transfer (trgt, src) =
             let regMem (storage: TensorHostStorage<'T>) = 
                 try
@@ -388,7 +392,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Floor(trgt, src1)       = callUnary kernels.Floor trgt src1
         member this.Round(trgt, src1)       = callUnary kernels.Round trgt src1
         member this.Truncate(trgt, src1)    = callUnary kernels.Truncate trgt src1
-        member this.IsFinite(trgt, src1) = raise (System.NotImplementedException())
 
         member this.Add(trgt, src1, src2)           = callBinary kernels.Add trgt src1 src2
         member this.Subtract(trgt, src1, src2)      = callBinary kernels.Subtract trgt src1 src2
@@ -399,6 +402,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.MinElemwise(trgt, src1, src2)   = callBinary kernels.MinElemwise trgt src1 src2
         member this.MaxElemwise(trgt, src1, src2)   = callBinary kernels.MaxElemwise trgt src1 src2
 
+        member this.IsFinite(trgt, src1)                = callUnary kernels.IsFinite trgt src1
         member this.Equal(trgt, src1, src2)             = callBinary kernels.Equal trgt src1 src2
         member this.NotEqual(trgt, src1, src2)          = callBinary kernels.NotEqual trgt src1 src2
         member this.Less(trgt, src1, src2)              = callBinary kernels.Less trgt src1 src2
@@ -434,9 +438,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.Item 
-            with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
-            and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
         member this.VecVecDot (trgt, a, b) =
             ()
 

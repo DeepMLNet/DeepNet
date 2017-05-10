@@ -427,8 +427,9 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     let orFn        = getBinaryKernel "Or" boolTypes []
     let xorFn       = getBinaryKernel "Xor" boolTypes []
 
-    // binary comparison kernels
+    // comparison kernels
     let getComparisonKernel name = getKernel name [boolTensor; fullTensor; fullTensor] 
+    let isFinite        = getKernel "IsFinite" [boolTensor; fullTensor] numTypes []
     let equal           = getComparisonKernel "Equal" [] []
     let notEqual        = getComparisonKernel "NotEqual" [] []
     let less            = getComparisonKernel "Less" [] []
@@ -534,6 +535,9 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
 
     member this.MaxElemwise (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         maxElemwise (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.IsFinite (stream, trgt: NativeTensor, src1: NativeTensor) = 
+        isFinite (stream, workDimForElemwise trgt, [|box trgt; box src1|])
 
     member this.Equal (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         equal (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])

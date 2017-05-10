@@ -181,6 +181,38 @@ BINARY_OP(Xor,          xor_fn);
 
 
 // =============================================================================================
+// unary comparisions
+// =============================================================================================
+
+#define UNARY_COMPARISON(Name, op)  \
+	template<typename T, dim_t TDims> \
+	struct Name##Fn { \
+		Tensor<bool, TDims> trgt; \
+		Tensor<T, TDims> src1; \
+		_dev_ void operator() (Idxs<TDims> &pos) { \
+			trgt[pos] = op(src1[pos]); \
+		} \
+	}; \
+	template<typename T, dim_t TDims> _dev_ \
+	void Name(Tensor<bool, TDims> &trgt, const Tensor<T, TDims> &src1) { \
+		Name##Fn<T, TDims> workFn = {trgt, src1}; \
+		PerformWork(trgt.Shape(), workFn); \
+	};
+
+_dev_ bool ol_isfinite (double   x) { return isfinite(x); }
+_dev_ bool ol_isfinite (float    x) { return isfinite(x); }
+_dev_ bool ol_isfinite (int8_t   x) { return true; }
+_dev_ bool ol_isfinite (int16_t  x) { return true; }
+_dev_ bool ol_isfinite (int32_t  x) { return true; }
+_dev_ bool ol_isfinite (int64_t  x) { return true; }
+_dev_ bool ol_isfinite (uint8_t  x) { return true; }
+_dev_ bool ol_isfinite (uint16_t x) { return true; }
+_dev_ bool ol_isfinite (uint32_t x) { return true; }
+_dev_ bool ol_isfinite (uint64_t x) { return true; }
+
+UNARY_COMPARISON(IsFinite, ol_isfinite);
+
+// =============================================================================================
 // binary comparisions
 // =============================================================================================
 
@@ -215,10 +247,6 @@ BINARY_COMPARISON(LessOrEqual,		less_or_equal);
 BINARY_COMPARISON(Greater,			greater);
 BINARY_COMPARISON(GreaterOrEqual,	greater_or_equal);
 
-
-// =============================================================================================
-// logic operations
-// =============================================================================================
 
 
 
