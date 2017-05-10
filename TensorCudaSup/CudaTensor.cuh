@@ -92,6 +92,8 @@ MATH_OVERLOAD(floor);
 MATH_OVERLOAD(round);
 MATH_OVERLOAD(trunc);
 
+_dev_ bool negate (bool x) { return !x; }
+
 
 UNARY_OP(Copy,			id);
 UNARY_OP(UnaryPlus,		unaryPlus);
@@ -115,6 +117,7 @@ UNARY_OP(Ceiling,		ol_ceil);
 UNARY_OP(Floor,			ol_floor);
 UNARY_OP(Round,			ol_round);
 UNARY_OP(Truncate,		ol_trunc);
+UNARY_OP(Negate,	    negate); 
 
 
 
@@ -160,6 +163,10 @@ _dev_ uint16_t ol_fmod (uint16_t a, uint16_t b) { return a % b; }
 _dev_ uint32_t ol_fmod (uint32_t a, uint32_t b) { return a % b; }
 _dev_ uint64_t ol_fmod (uint64_t a, uint64_t b) { return a % b; }
 
+_dev_ bool and_fn (bool a, bool b) { return a && b; }
+_dev_ bool or_fn  (bool a, bool b) { return a || b; }
+_dev_ bool xor_fn (bool a, bool b) { return a != b; }
+
 BINARY_OP(Add,			add);	
 BINARY_OP(Subtract,		subtract);
 BINARY_OP(Multiply,		multiply);
@@ -168,6 +175,9 @@ BINARY_OP(Modulo,		ol_fmod);
 BINARY_OP(Power,		ol_pow);
 BINARY_OP(MinElemwise,  min);
 BINARY_OP(MaxElemwise,	max);
+BINARY_OP(And,          and_fn);
+BINARY_OP(Or,           or_fn);
+BINARY_OP(Xor,          xor_fn);
 
 
 // =============================================================================================
@@ -204,6 +214,11 @@ BINARY_COMPARISON(Less,				less);
 BINARY_COMPARISON(LessOrEqual,		less_or_equal);
 BINARY_COMPARISON(Greater,			greater);
 BINARY_COMPARISON(GreaterOrEqual,	greater_or_equal);
+
+
+// =============================================================================================
+// logic operations
+// =============================================================================================
 
 
 

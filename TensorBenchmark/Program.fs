@@ -36,6 +36,13 @@ let testCuda () =
     let cd = ca <<== cb
     printfn "cd=\n%A" cd
 
+    printfn "not cd..."
+    let ce = ~~~~cd
+    printfn "ce=\n%A" ce
+
+    printfn "cd or ce..."
+    let cf = cd |||| ce
+    printfn "cf=\n%A" cf
 
 
 [<EntryPoint>]

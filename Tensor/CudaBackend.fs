@@ -388,7 +388,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Floor(trgt, src1)       = callUnary kernels.Floor trgt src1
         member this.Round(trgt, src1)       = callUnary kernels.Round trgt src1
         member this.Truncate(trgt, src1)    = callUnary kernels.Truncate trgt src1
-
         member this.IsFinite(trgt, src1) = raise (System.NotImplementedException())
 
         member this.Add(trgt, src1, src2)           = callBinary kernels.Add trgt src1 src2
@@ -407,6 +406,11 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Greater(trgt, src1, src2)           = callBinary kernels.Greater trgt src1 src2
         member this.GreaterOrEqual(trgt, src1, src2)    = callBinary kernels.GreaterOrEqual trgt src1 src2
 
+        member this.Negate(trgt, src1)      = callUnary kernels.Negate trgt src1
+        member this.And(trgt, src1, src2)   = callBinary kernels.And trgt src1 src2
+        member this.Or(trgt, src1, src2)    = callBinary kernels.Or trgt src1 src2
+        member this.Xor(trgt, src1, src2)   = callBinary kernels.Xor trgt src1 src2
+
 
         member this.ArgMaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.ArgMinLastAxis(trgt, src1) = raise (System.NotImplementedException())
@@ -423,7 +427,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
         member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
-        member this.Negate(trgt, src1) = raise (System.NotImplementedException())
         member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.Convert(trgt, src) = raise (System.NotImplementedException())
@@ -431,9 +434,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.And(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Or(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Xor(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value

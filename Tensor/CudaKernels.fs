@@ -360,57 +360,81 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     let workDimForElemwise (trgt: NativeTensor) =
         workDimForWorkSize trgt.Shape false
 
+    /// gets kernels of specifed name and argTypes, when dataType is in supTypes (if not empty)
+    /// and not in unsupTypes
+    let getKernel name argTypes supTypes unsupTypes =
+        let supported =
+            match supTypes with
+            | [] -> not (unsupTypes |> List.contains dataType) 
+            | _ ->
+                (supTypes |> List.contains dataType) && 
+                    not (unsupTypes |> List.contains dataType) 
+        if supported then this.GetKernel name argTypes
+        else (fun _ -> 
+            sprintf "the operation %s is unsupported for tensor data type %A" name dataType
+            |> invalidOp)
+
     let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
     let boolTensor = ArgTypeTensor {DataType=typeof<bool>; NDims=nDims}
     let scalar = ArgTypeScalar dataType
 
+    let fpTypes = [typeof<single>; typeof<double>]
+    let intTypes = [typeof<int8>; typeof<int16>; typeof<int32>; typeof<int64>
+                    typeof<uint8>; typeof<uint16>; typeof<uint32>; typeof<uint64>]
+    let numTypes = fpTypes @ intTypes
+    let boolTypes = [typeof<bool>]
+
     // noary kernels
-    let fillConst = this.GetKernel "FillConst" [scalar; fullTensor]
+    let fillConst = getKernel "FillConst" [scalar; fullTensor] [] []
 
     // unary kernels
-    let getUnaryKernel name = this.GetKernel name [fullTensor; fullTensor] 
-    let copy        = getUnaryKernel "Copy"
-    let unaryPlus   = getUnaryKernel "UnaryPlus" 
-    let unaryMinus  = getUnaryKernel "UnaryMinus" 
-    let abs         = getUnaryKernel "Abs" 
-    let sgn         = getUnaryKernel "Sgn" 
-    let log         = getUnaryKernel "Log" 
-    let log10       = getUnaryKernel "Log10" 
-    let exp         = getUnaryKernel "Exp" 
-    let sin         = getUnaryKernel "Sin" 
-    let cos         = getUnaryKernel "Cos" 
-    let tan         = getUnaryKernel "Tan" 
-    let asin        = getUnaryKernel "Asin"
-    let acos        = getUnaryKernel "Acos"
-    let atan        = getUnaryKernel "Atan"
-    let sinh        = getUnaryKernel "Sinh"
-    let cosh        = getUnaryKernel "Cosh"
-    let tanh        = getUnaryKernel "Tanh"
-    let sqrt        = getUnaryKernel "Sqrt"
-    let ceiling     = getUnaryKernel "Ceiling"
-    let floor       = getUnaryKernel "Floor"
-    let round       = getUnaryKernel "Round"
-    let truncate    = getUnaryKernel "Truncate"
-
+    let getUnaryKernel name = getKernel name [fullTensor; fullTensor] 
+    let copy        = getUnaryKernel "Copy" [] []
+    let unaryPlus   = getUnaryKernel "UnaryPlus" [] []
+    let unaryMinus  = getUnaryKernel "UnaryMinus" [] []
+    let abs         = getUnaryKernel "Abs" numTypes []
+    let sgn         = getUnaryKernel "Sgn" [] []
+    let log         = getUnaryKernel "Log" fpTypes []
+    let log10       = getUnaryKernel "Log10" fpTypes [] 
+    let exp         = getUnaryKernel "Exp" fpTypes []
+    let sin         = getUnaryKernel "Sin" fpTypes [] 
+    let cos         = getUnaryKernel "Cos" fpTypes []
+    let tan         = getUnaryKernel "Tan" fpTypes []
+    let asin        = getUnaryKernel "Asin" fpTypes []
+    let acos        = getUnaryKernel "Acos" fpTypes []
+    let atan        = getUnaryKernel "Atan" fpTypes []
+    let sinh        = getUnaryKernel "Sinh" fpTypes []
+    let cosh        = getUnaryKernel "Cosh" fpTypes []
+    let tanh        = getUnaryKernel "Tanh" fpTypes []
+    let sqrt        = getUnaryKernel "Sqrt" fpTypes []
+    let ceiling     = getUnaryKernel "Ceiling" fpTypes []
+    let floor       = getUnaryKernel "Floor" fpTypes []
+    let round       = getUnaryKernel "Round" fpTypes []
+    let truncate    = getUnaryKernel "Truncate" fpTypes []
+    let negate      = getUnaryKernel "Negate" boolTypes []
+     
     // binary kernels
-    let getBinaryKernel name = this.GetKernel name [fullTensor; fullTensor; fullTensor] 
-    let add         = getBinaryKernel "Add"
-    let subtract    = getBinaryKernel "Subtract"
-    let multiply    = getBinaryKernel "Multiply"
-    let divide      = getBinaryKernel "Divide"
-    let modulo      = getBinaryKernel "Modulo"
-    let power       = getBinaryKernel "Power"
-    let minElemwise = getBinaryKernel "MinElemwise"
-    let maxElemwise = getBinaryKernel "MaxElemwise"
+    let getBinaryKernel name = getKernel name [fullTensor; fullTensor; fullTensor] 
+    let add         = getBinaryKernel "Add" [] []
+    let subtract    = getBinaryKernel "Subtract" [] []
+    let multiply    = getBinaryKernel "Multiply" [] []
+    let divide      = getBinaryKernel "Divide" [] []
+    let modulo      = getBinaryKernel "Modulo" numTypes []
+    let power       = getBinaryKernel "Power" fpTypes []
+    let minElemwise = getBinaryKernel "MinElemwise" [] []
+    let maxElemwise = getBinaryKernel "MaxElemwise" [] []
+    let andFn       = getBinaryKernel "And" boolTypes []
+    let orFn        = getBinaryKernel "Or" boolTypes []
+    let xorFn       = getBinaryKernel "Xor" boolTypes []
 
     // binary comparison kernels
-    let getComparisonKernel name = this.GetKernel name [boolTensor; fullTensor; fullTensor] 
-    let equal           = getComparisonKernel "Equal"
-    let notEqual        = getComparisonKernel "NotEqual"
-    let less            = getComparisonKernel "Less"
-    let lessOrEqual     = getComparisonKernel "LessOrEqual"
-    let greater         = getComparisonKernel "Greater"
-    let greaterOrEqual  = getComparisonKernel "GreaterOrEqual"
+    let getComparisonKernel name = getKernel name [boolTensor; fullTensor; fullTensor] 
+    let equal           = getComparisonKernel "Equal" [] []
+    let notEqual        = getComparisonKernel "NotEqual" [] []
+    let less            = getComparisonKernel "Less" [] []
+    let lessOrEqual     = getComparisonKernel "LessOrEqual" [] []
+    let greater         = getComparisonKernel "Greater" [] []
+    let greaterOrEqual  = getComparisonKernel "GreaterOrEqual" [] []
 
 
     do this.Build (headers)
@@ -484,6 +508,9 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     member this.Truncate (stream, trgt: NativeTensor, src: NativeTensor) = 
         truncate (stream, workDimForElemwise trgt, [|box trgt; box src|])
 
+    member this.Negate (stream, trgt: NativeTensor, src: NativeTensor) = 
+        negate (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
     member this.Add (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         add (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
 
@@ -525,6 +552,15 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
 
     member this.GreaterOrEqual (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         greaterOrEqual (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.And (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        andFn (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Or (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        orFn (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Xor (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        xorFn (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
 
 
 
