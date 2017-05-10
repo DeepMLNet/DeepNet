@@ -415,19 +415,20 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Or(trgt, src1, src2)    = callBinary kernels.Or trgt src1 src2
         member this.Xor(trgt, src1, src2)   = callBinary kernels.Xor trgt src1 src2
 
+        member this.MinLastAxis(trgt, src1)     = callUnary kernels.MinLastAxis trgt src1
+        member this.MaxLastAxis(trgt, src1)     = callUnary kernels.MaxLastAxis trgt src1
+        member this.SumLastAxis(trgt, src1)     = callUnary kernels.SumLastAxis trgt src1
+        member this.ProductLastAxis(trgt, src1) = callUnary kernels.ProductLastAxis trgt src1
+        member this.AllLastAxis(trgt, src1)     = callUnary kernels.AllLastAxis trgt src1
+        member this.AnyLastAxis(trgt, src1)     = callUnary kernels.AnyLastAxis trgt src1
+
 
         member this.ArgMaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.ArgMinLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.AllLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.AnyLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.GetEnumerator() : System.Collections.IEnumerator = raise (System.NotImplementedException())
         member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = raise (System.NotImplementedException())
-        member this.MaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.MinLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.ProductLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.SumLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
         member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())

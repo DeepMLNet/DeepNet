@@ -106,9 +106,6 @@
     <EmbeddedResource Include="..\TensorCudaSup\Common.cuh">
       <Link>Common.cuh</Link>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\TensorCudaSup\CudaTensor.cuh">
-      <Link>CudaTensor.cuh</Link>
-    </EmbeddedResource>
     <EmbeddedResource Include="..\TensorCudaSup\Idxs.cuh">
       <Link>Idxs.cuh</Link>
     </EmbeddedResource>
@@ -117,6 +114,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="..\TensorCudaSup\Work.cuh">
       <Link>Work.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Elemwise.cuh">
+      <Link>Elemwise.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Reduction.cuh">
+      <Link>Reduction.cuh</Link>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

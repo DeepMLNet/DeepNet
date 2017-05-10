@@ -2,15 +2,16 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="Common.cuh" />
-    <ClInclude Include="CudaTensor.cuh" />
     <ClInclude Include="Idxs.cuh" />
     <ClInclude Include="Tensor.cuh" />
     <ClInclude Include="Work.cuh" />
+    <ClInclude Include="Elemwise.cuh" />
+    <ClInclude Include="Reduction.cuh" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="OldCode.txt" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="CudaTensor.cu" />
+    <CudaCompile Include="main.cu" />
   </ItemGroup>
 </Project>

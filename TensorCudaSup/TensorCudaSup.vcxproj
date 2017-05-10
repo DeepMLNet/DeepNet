@@ -157,15 +157,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Common.cuh" />
-    <ClInclude Include="CudaTensor.cuh">
+    <ClInclude Include="Elemwise.cuh">
       <FileType>CppCode</FileType>
     </ClInclude>
     <ClInclude Include="Idxs.cuh" />
+    <ClInclude Include="Reduction.cuh" />
     <ClInclude Include="Tensor.cuh" />
     <ClInclude Include="Work.cuh" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="CudaTensor.cu">
+    <CudaCompile Include="main.cu">
       <FileType>CppCode</FileType>
     </CudaCompile>
   </ItemGroup>

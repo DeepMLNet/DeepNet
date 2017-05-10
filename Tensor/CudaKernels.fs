@@ -26,13 +26,12 @@ module Cfg =
 module internal DynamicTypes =
     let currentDomain = Thread.GetDomain()
     let dynAsmName = new AssemblyName("TensorDynamicTypes")
-    //dynAsmName.Name <- "ArrayByValDynamicTypes"
     let asmBuilder = currentDomain.DefineDynamicAssembly(dynAsmName, AssemblyBuilderAccess.Run)
     let modBuilder = asmBuilder.DefineDynamicModule("Module")
 
 
 /// C++ tensor marshaling
-type internal NativeTensor = {
+type  NativeTensor = {
     DataType:       Type
     BasePtr:        nativeint
     Offset:         int64
@@ -66,9 +65,9 @@ module internal NativeTensor =
                 // define fields
                 tb.DefineField("Base", typeof<nativeint>, FieldAttributes.Public) |> ignore
                 tb.DefineField("Offset", typeof<int64>, FieldAttributes.Public) |> ignore
-                for d = 0 to max (nDims-1) 1 do
+                for d = 0 to max (nDims-1) 0 do
                     tb.DefineField(sprintf "Shape%d" d, typeof<int64>, FieldAttributes.Public) |> ignore
-                for d = 0 to max (nDims-1) 1 do
+                for d = 0 to max (nDims-1) 0 do
                     tb.DefineField(sprintf "Stride%d" d, typeof<int64>, FieldAttributes.Public) |> ignore
 
                 // create defined type and cache it
@@ -342,7 +341,7 @@ type internal CudaModule () =
 /// CUDA kernels for the CUDA tensor backend
 type internal TensorKernels (dataType: Type, nDims: int) as this =
     inherit CudaModule()
-    static let headers = ["CudaTensor.cuh"]
+    static let headers = ["Elemwise.cuh"; "Reduction.cuh"]
 
     /// returns the CUDA work dimensions (x, y, z) for work of given size
     let workDimForWorkSize workSize hetero : Cuda.WorkDim =
@@ -375,6 +374,7 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
             |> invalidOp)
 
     let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
+    let reductionSrcTensor = ArgTypeTensor {DataType=dataType; NDims=nDims+1}        
     let boolTensor = ArgTypeTensor {DataType=typeof<bool>; NDims=nDims}
     let scalar = ArgTypeScalar dataType
 
@@ -436,6 +436,15 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     let lessOrEqual     = getComparisonKernel "LessOrEqual" [] []
     let greater         = getComparisonKernel "Greater" [] []
     let greaterOrEqual  = getComparisonKernel "GreaterOrEqual" [] []
+
+    // axis reduce kernels
+    let getAxisReduceKernel name = getKernel name [scalar; fullTensor; reductionSrcTensor] 
+    let minLastAxis     = getAxisReduceKernel "MinLastAxis" [] []
+    let maxLastAxis     = getAxisReduceKernel "MaxLastAxis" [] []
+    let sumLastAxis     = getAxisReduceKernel "SumLastAxis" [] []
+    let productLastAxis = getAxisReduceKernel "ProductLastAxis" [] []
+    let allLastAxis     = getAxisReduceKernel "AllLastAxis" boolTypes []
+    let anyLastAxis     = getAxisReduceKernel "AnyLastAxis" boolTypes []
 
 
     do this.Build (headers)
@@ -566,6 +575,29 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     member this.Xor (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         xorFn (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
 
+    member this.MinLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = maxValueOf dataType
+        minLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.MaxLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = minValueOf dataType
+        maxLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.SumLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = convTo dataType 0
+        sumLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.ProductLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = convTo dataType 1
+        productLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.AllLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = true
+        allLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.AnyLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = false
+        anyLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
 
 
 /// CUDA kernels for the CUDA tensor backend

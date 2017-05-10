@@ -11,7 +11,7 @@ let testCuda () =
 
     printfn "copy to cuda..."
     let ca = a |> CudaTensor.transfer
-    printfn "ca=\n%A" ca
+    printfn "ca=\n%A" ca.Full
     printfn "copy to host..."
     let ha = ca |> HostTensor.transfer
     printfn "ha=\n%A" ha
@@ -32,6 +32,14 @@ let testCuda () =
     let cc = ca + cb
     printfn "cc=\n%A" cc
 
+    printfn "cuda sumAxis cc..."
+    let ci = Tensor.sumAxis 0 cc
+    printfn "ci=\n%A" ci
+
+    printfn "cuda maxAxis cc..."
+    let cg = Tensor.maxAxis 0 cc
+    printfn "cg=\n%A" cg
+
     printfn "cuda ca <<== cb..."
     let cd = ca <<== cb
     printfn "cd=\n%A" cd
@@ -43,6 +51,10 @@ let testCuda () =
     printfn "cd or ce..."
     let cf = cd |||| ce
     printfn "cf=\n%A" cf
+
+    printfn "all cf..."
+    let ch = Tensor.allAxis 0 cf
+    printfn "ch=\n%A" ch
 
 
 [<EntryPoint>]

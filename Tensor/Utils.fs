@@ -270,35 +270,43 @@ module UtilTypes =
     let conv<'T> value : 'T =
         Convert.ChangeType(box value, typeof<'T>) :?> 'T
 
+    /// minimum value for the specifed numeric data type
+    let minValueOf dataType =
+        match dataType with
+        | t when t=typeof<byte>   -> box System.Byte.MinValue 
+        | t when t=typeof<sbyte>  -> box System.SByte.MinValue
+        | t when t=typeof<int16>  -> box System.Int16.MinValue
+        | t when t=typeof<uint16> -> box System.UInt16.MinValue
+        | t when t=typeof<int32>  -> box System.Int32.MinValue
+        | t when t=typeof<uint32> -> box System.UInt32.MinValue
+        | t when t=typeof<int64>  -> box System.Int64.MinValue
+        | t when t=typeof<uint64> -> box System.UInt64.MinValue
+        | t when t=typeof<single> -> box System.Single.MinValue
+        | t when t=typeof<double> -> box System.Double.MinValue
+        | _ -> failwithf "no minimum value defined for type %s" dataType.Name
+
     /// minimum value for numeric type 'T
-    let minValue<'T> : 'T =
-        match typeof<'T> with
-        | t when t=typeof<byte>   -> unbox System.Byte.MinValue 
-        | t when t=typeof<sbyte>  -> unbox System.SByte.MinValue
-        | t when t=typeof<int16>  -> unbox System.Int16.MinValue
-        | t when t=typeof<uint16> -> unbox System.UInt16.MinValue
-        | t when t=typeof<int32>  -> unbox System.Int32.MinValue
-        | t when t=typeof<uint32> -> unbox System.UInt32.MinValue
-        | t when t=typeof<int64>  -> unbox System.Int64.MinValue
-        | t when t=typeof<uint64> -> unbox System.UInt64.MinValue
-        | t when t=typeof<single> -> unbox System.Single.MinValue
-        | t when t=typeof<double> -> unbox System.Double.MinValue
-        | _ -> failwithf "no minimum value defined for type %s" typeof<'T>.Name
+    let minValue<'T> : 'T = 
+        minValueOf typeof<'T> |> unbox
+
+    /// maximum value for the specified numeric data type
+    let maxValueOf dataType =
+        match dataType with
+        | t when t=typeof<byte>   -> box System.Byte.MaxValue 
+        | t when t=typeof<sbyte>  -> box System.SByte.MaxValue
+        | t when t=typeof<int16>  -> box System.Int16.MaxValue
+        | t when t=typeof<uint16> -> box System.UInt16.MaxValue
+        | t when t=typeof<int32>  -> box System.Int32.MaxValue
+        | t when t=typeof<uint32> -> box System.UInt32.MaxValue
+        | t when t=typeof<int64>  -> box System.Int64.MaxValue
+        | t when t=typeof<uint64> -> box System.UInt64.MaxValue
+        | t when t=typeof<single> -> box System.Single.MaxValue
+        | t when t=typeof<double> -> box System.Double.MaxValue
+        | _ -> failwithf "no maximum value defined for type %s" dataType.Name
 
     /// maximum value for numeric type 'T
-    let maxValue<'T> : 'T =
-        match typeof<'T> with
-        | t when t=typeof<byte>   -> unbox System.Byte.MaxValue 
-        | t when t=typeof<sbyte>  -> unbox System.SByte.MaxValue
-        | t when t=typeof<int16>  -> unbox System.Int16.MaxValue
-        | t when t=typeof<uint16> -> unbox System.UInt16.MaxValue
-        | t when t=typeof<int32>  -> unbox System.Int32.MaxValue
-        | t when t=typeof<uint32> -> unbox System.UInt32.MaxValue
-        | t when t=typeof<int64>  -> unbox System.Int64.MaxValue
-        | t when t=typeof<uint64> -> unbox System.UInt64.MaxValue
-        | t when t=typeof<single> -> unbox System.Single.MaxValue
-        | t when t=typeof<double> -> unbox System.Double.MaxValue
-        | _ -> failwithf "no maximum value defined for type %s" typeof<'T>.Name
+    let maxValue<'T> : 'T = 
+        maxValueOf typeof<'T> |> unbox
 
     /// size of 'T as int64
     let sizeof64<'T> =

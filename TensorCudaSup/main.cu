@@ -1,4 +1,4 @@
-#include "CudaTensor.cuh"
+#include "Elemwise.cuh"
 
 
 extern "C" __global__
