@@ -241,10 +241,22 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     let kernels = TensorKernels.get (typeof<'T>, layout.NDims)
 
+    let stream () = CUstream.NullStream
+
+    let callUnary fn trgt src1 : unit =
+        let trgt, src1 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1)
+        fn (stream(), trgt, src1)
+
+    let callBinary fn trgt src1 src2 : unit =
+        let trgt, src1, src2 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2)
+        fn (stream(), trgt, src1, src2)
+
+
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
         Cuda.getIntPtr storage.Data.DevicePointer + nativeint (layout.Offset * sizeof64<'T>)        
 
+    /// tensor information for native CUDA code
     member inline internal this.NativeTensor = {
         DataType    = typeof<'T>
         BasePtr     = storage.ByteData.DevicePointer |> Cuda.getIntPtr
@@ -259,35 +271,29 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor (t: Tensor<'T>) =
+    static member internal ElemwiseNativeTensor<'T> (t: Tensor<'T>) 
+            : NativeTensor =
         (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor (t: Tensor<'T>, a: Tensor<'TA>) =
+    static member internal ElemwiseNativeTensor<'T, 'TA when 
+                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType> 
+            (t: Tensor<'T>, a: Tensor<'TA>) : NativeTensor * NativeTensor =
         (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
         (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
 
+    /// gets NativeTensors for specified tensors, optimized for elment-wise operations
+    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB when
+                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType and
+                                                 'TB: (new: unit -> 'TB) and 'TB: struct and 'TB :> System.ValueType>  
+            (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) : NativeTensor * NativeTensor * NativeTensor =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
+        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor,
+        (b.Backend :?> TensorCudaBackend<'TB>).NativeTensor
+
+
+
     interface ITensorBackend<'T> with
-
-        member this.Copy(trgt, src) = 
-            if TensorLayout.hasContiguousMemory trgt.Layout && 
-               TensorLayout.hasContiguousMemory src.Layout &&
-               trgt.Layout.Stride = src.Layout.Stride then
-                // use CUDA memcpy for continous block of memory
-                let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
-                let srcStorage = src.Storage :?> TensorCudaStorage<'T>
-                trgtStorage.Data.CopyToDevice (srcStorage.Data, 
-                                               SizeT (sizeof64<'T> * src.Layout.Offset),
-                                               SizeT (sizeof64<'T> * trgt.Layout.Offset),
-                                               SizeT (sizeof64<'T> * src.NElems))
-            else
-                // call copy kernel
-                let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
-                kernels.Copy(CUstream.NullStream, trgt, src)
-
-        member this.FillConst (value, trgt) = 
-            let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
-            kernels.FillConst(CUstream.NullStream, box value, trgt)
 
         member this.Transfer (trgt, src) =
             let regMem (storage: TensorHostStorage<'T>) = 
@@ -303,6 +309,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 // transfer from host to CUDA
                 | (:? TensorCudaStorage<'T> as trgtStorage), (:? TensorHostStorage<'T> as srcStorage) ->
                     let srcMemHnd, srcMemPtr = regMem srcStorage
+                    // TODO: make it use stream! BUG
                     trgtStorage.Data.CopyToDevice (srcMemPtr, 
                                                    SizeT (sizeof64<'T> * src.Layout.Offset), 
                                                    SizeT (sizeof64<'T> * trgt.Layout.Offset),
@@ -313,6 +320,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 // transfer from CUDA to host
                 | (:? TensorHostStorage<'T> as trgtStorage), (:? TensorCudaStorage<'T> as srcStorage) ->
                     let trgtMemHnd, trgtMemPtr = regMem trgtStorage
+                    // TODO: make it use stream! BUG
                     srcStorage.Data.CopyToHost(trgtMemPtr, 
                                                SizeT (sizeof64<'T> * src.Layout.Offset), 
                                                SizeT (sizeof64<'T> * trgt.Layout.Offset), 
@@ -338,6 +346,67 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     true
                 else false
 
+        member this.FillConst (value, trgt) = 
+            let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
+            kernels.FillConst (stream(), box value, trgt)
+
+        member this.Copy(trgt, src) = 
+            if TensorLayout.hasContiguousMemory trgt.Layout && 
+               TensorLayout.hasContiguousMemory src.Layout &&
+               trgt.Layout.Stride = src.Layout.Stride then
+                // use CUDA memcpy for continous block of memory
+                let trgtStorage = trgt.Storage :?> TensorCudaStorage<'T>
+                let srcStorage = src.Storage :?> TensorCudaStorage<'T>
+                trgtStorage.Data.AsyncCopyToDevice (srcStorage.Data, 
+                                                    SizeT (sizeof64<'T> * src.Layout.Offset),
+                                                    SizeT (sizeof64<'T> * trgt.Layout.Offset),
+                                                    SizeT (sizeof64<'T> * src.NElems),
+                                                    stream())
+            else
+                // call copy kernel
+                let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
+                kernels.Copy(stream(), trgt, src)
+
+        member this.UnaryPlus(trgt, src1)   = callUnary kernels.UnaryPlus trgt src1
+        member this.UnaryMinus(trgt, src1)  = callUnary kernels.UnaryMinus trgt src1
+        member this.Abs(trgt, src1)         = callUnary kernels.Abs trgt src1
+        member this.Sgn(trgt, src1)         = callUnary kernels.Sgn trgt src1
+        member this.Log(trgt, src1)         = callUnary kernels.Log trgt src1
+        member this.Log10(trgt, src1)       = callUnary kernels.Log10 trgt src1
+        member this.Exp(trgt, src1)         = callUnary kernels.Exp trgt src1
+        member this.Sin(trgt, src1)         = callUnary kernels.Sin trgt src1
+        member this.Cos(trgt, src1)         = callUnary kernels.Cos trgt src1
+        member this.Tan(trgt, src1)         = callUnary kernels.Tan trgt src1
+        member this.Asin(trgt, src1)        = callUnary kernels.Asin trgt src1
+        member this.Acos(trgt, src1)        = callUnary kernels.Acos trgt src1
+        member this.Atan(trgt, src1)        = callUnary kernels.Atan trgt src1
+        member this.Sinh(trgt, src1)        = callUnary kernels.Sinh trgt src1
+        member this.Cosh(trgt, src1)        = callUnary kernels.Cosh trgt src1
+        member this.Tanh(trgt, src1)        = callUnary kernels.Tanh trgt src1
+        member this.Sqrt(trgt, src1)        = callUnary kernels.Sqrt trgt src1
+        member this.Ceiling(trgt, src1)     = callUnary kernels.Ceiling trgt src1
+        member this.Floor(trgt, src1)       = callUnary kernels.Floor trgt src1
+        member this.Round(trgt, src1)       = callUnary kernels.Round trgt src1
+        member this.Truncate(trgt, src1)    = callUnary kernels.Truncate trgt src1
+
+        member this.IsFinite(trgt, src1) = raise (System.NotImplementedException())
+
+        member this.Add(trgt, src1, src2)           = callBinary kernels.Add trgt src1 src2
+        member this.Subtract(trgt, src1, src2)      = callBinary kernels.Subtract trgt src1 src2
+        member this.Multiply(trgt, src1, src2)      = callBinary kernels.Multiply trgt src1 src2
+        member this.Divide(trgt, src1, src2)        = callBinary kernels.Divide trgt src1 src2
+        member this.Modulo(trgt, src1, src2)        = callBinary kernels.Modulo trgt src1 src2
+        member this.Power(trgt, src1, src2)         = callBinary kernels.Power trgt src1 src2
+        member this.MinElemwise(trgt, src1, src2)   = callBinary kernels.MinElemwise trgt src1 src2
+        member this.MaxElemwise(trgt, src1, src2)   = callBinary kernels.MaxElemwise trgt src1 src2
+
+        member this.Equal(trgt, src1, src2)             = callBinary kernels.Equal trgt src1 src2
+        member this.NotEqual(trgt, src1, src2)          = callBinary kernels.NotEqual trgt src1 src2
+        member this.Less(trgt, src1, src2)              = callBinary kernels.Less trgt src1 src2
+        member this.LessOrEqual(trgt, src1, src2)       = callBinary kernels.LessOrEqual trgt src1 src2
+        member this.Greater(trgt, src1, src2)           = callBinary kernels.Greater trgt src1 src2
+        member this.GreaterOrEqual(trgt, src1, src2)    = callBinary kernels.GreaterOrEqual trgt src1 src2
+
 
         member this.ArgMaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
         member this.ArgMinLastAxis(trgt, src1) = raise (System.NotImplementedException())
@@ -354,28 +423,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
         member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
-        member this.Abs(trgt, src1) = raise (System.NotImplementedException())
-        member this.Acos(trgt, src1) = raise (System.NotImplementedException())
-        member this.Asin(trgt, src1) = raise (System.NotImplementedException())
-        member this.Atan(trgt, src1) = raise (System.NotImplementedException())
-        member this.Ceiling(trgt, src1) = raise (System.NotImplementedException())
-        member this.Cos(trgt, src1) = raise (System.NotImplementedException())
-        member this.Cosh(trgt, src1) = raise (System.NotImplementedException())
-        member this.Exp(trgt, src1) = raise (System.NotImplementedException())
-        member this.Floor(trgt, src1) = raise (System.NotImplementedException())
-        member this.Log(trgt, src1) = raise (System.NotImplementedException())
-        member this.Log10(trgt, src1) = raise (System.NotImplementedException())
-        member this.Round(trgt, src1) = raise (System.NotImplementedException())
-        member this.Sgn(trgt, src1) = raise (System.NotImplementedException())
-        member this.Sin(trgt, src1) = raise (System.NotImplementedException())
-        member this.Sinh(trgt, src1) = raise (System.NotImplementedException())
-        member this.Sqrt(trgt, src1) = raise (System.NotImplementedException())
-        member this.Tan(trgt, src1) = raise (System.NotImplementedException())
-        member this.Tanh(trgt, src1) = raise (System.NotImplementedException())
-        member this.Truncate(trgt, src1) = raise (System.NotImplementedException())
-        member this.IsFinite(trgt, src1) = raise (System.NotImplementedException())
-        member this.UnaryMinus(trgt, src1) = raise (System.NotImplementedException())
-        member this.UnaryPlus(trgt, src1) = raise (System.NotImplementedException())
         member this.Negate(trgt, src1) = raise (System.NotImplementedException())
         member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
@@ -384,23 +431,9 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.Add(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Subtract(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Multiply(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Divide(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Modulo(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Power(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Equal(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.NotEqual(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Less(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.LessOrEqual(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.Greater(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.GreaterOrEqual(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.And(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Or(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Xor(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.MaxElemwise(trgt, src1, src2) = raise (System.NotImplementedException())
-        member this.MinElemwise(trgt, src1, src2) = raise (System.NotImplementedException())
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value

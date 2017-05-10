@@ -3,10 +3,6 @@
 #include "Common.cuh"
 #include "Idxs.cuh"
 
-
-//template<dim_t TWorkDims>
-//using WorkFn = nvstd::function<void(const Idxs<TWorkDims> &)>;
-
 template<dim_t TWorkDims, dim_t TDim, dim_t TRestDims>
 struct FillRestPosT {
 	static _dev_ void Do(const Idxs<TWorkDims> &workSize, Idxs<TWorkDims> &pos, idx_t rest) {

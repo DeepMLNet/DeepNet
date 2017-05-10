@@ -303,16 +303,16 @@ type internal CudaModule () =
                 kernel.DynamicSharedMemory <- 0u
 
                 if argVals.Length <> argTypes.Length then
-                    failwith "incorrect number of arguments"
+                    failwithf "incorrect number of arguments for %s" funcName
                 let kernelArgs =
                     (argTypes, argVals) ||> Array.map2 KernelArgType.marshal
                 kernel.RunAsync (stream, kernelArgs)
-            | None -> failwith "KernelFunc was not built"
+            | None -> failwith "CudaModule was not built"
         )
 
     member this.Build (headers: string list) =
         match kernels with
-        | Some _ -> failwith "KernelFuncs already built"
+        | Some _ -> failwith "CudaModule already built"
         | None -> 
             let headerCode = 
                 headers 
@@ -361,18 +361,171 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
         workDimForWorkSize trgt.Shape false
 
     let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
+    let boolTensor = ArgTypeTensor {DataType=typeof<bool>; NDims=nDims}
     let scalar = ArgTypeScalar dataType
 
-    let copyFunc = this.GetKernel "Copy" [fullTensor; fullTensor]
+    // noary kernels
     let fillConst = this.GetKernel "FillConst" [scalar; fullTensor]
+
+    // unary kernels
+    let getUnaryKernel name = this.GetKernel name [fullTensor; fullTensor] 
+    let copy        = getUnaryKernel "Copy"
+    let unaryPlus   = getUnaryKernel "UnaryPlus" 
+    let unaryMinus  = getUnaryKernel "UnaryMinus" 
+    let abs         = getUnaryKernel "Abs" 
+    let sgn         = getUnaryKernel "Sgn" 
+    let log         = getUnaryKernel "Log" 
+    let log10       = getUnaryKernel "Log10" 
+    let exp         = getUnaryKernel "Exp" 
+    let sin         = getUnaryKernel "Sin" 
+    let cos         = getUnaryKernel "Cos" 
+    let tan         = getUnaryKernel "Tan" 
+    let asin        = getUnaryKernel "Asin"
+    let acos        = getUnaryKernel "Acos"
+    let atan        = getUnaryKernel "Atan"
+    let sinh        = getUnaryKernel "Sinh"
+    let cosh        = getUnaryKernel "Cosh"
+    let tanh        = getUnaryKernel "Tanh"
+    let sqrt        = getUnaryKernel "Sqrt"
+    let ceiling     = getUnaryKernel "Ceiling"
+    let floor       = getUnaryKernel "Floor"
+    let round       = getUnaryKernel "Round"
+    let truncate    = getUnaryKernel "Truncate"
+
+    // binary kernels
+    let getBinaryKernel name = this.GetKernel name [fullTensor; fullTensor; fullTensor] 
+    let add         = getBinaryKernel "Add"
+    let subtract    = getBinaryKernel "Subtract"
+    let multiply    = getBinaryKernel "Multiply"
+    let divide      = getBinaryKernel "Divide"
+    let modulo      = getBinaryKernel "Modulo"
+    let power       = getBinaryKernel "Power"
+    let minElemwise = getBinaryKernel "MinElemwise"
+    let maxElemwise = getBinaryKernel "MaxElemwise"
+
+    // binary comparison kernels
+    let getComparisonKernel name = this.GetKernel name [boolTensor; fullTensor; fullTensor] 
+    let equal           = getComparisonKernel "Equal"
+    let notEqual        = getComparisonKernel "NotEqual"
+    let less            = getComparisonKernel "Less"
+    let lessOrEqual     = getComparisonKernel "LessOrEqual"
+    let greater         = getComparisonKernel "Greater"
+    let greaterOrEqual  = getComparisonKernel "GreaterOrEqual"
+
 
     do this.Build (headers)
 
-    member this.Copy (stream, trgt: NativeTensor, src: NativeTensor) = 
-        copyFunc (stream, workDimForElemwise trgt, [|box trgt; box src|])
-
     member this.FillConst (stream, value: obj, trgt: NativeTensor) = 
         fillConst (stream, workDimForElemwise trgt, [|value; box trgt|])
+
+    member this.Copy (stream, trgt: NativeTensor, src: NativeTensor) = 
+        copy (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.UnaryPlus (stream, trgt: NativeTensor, src: NativeTensor) = 
+        unaryPlus (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.UnaryMinus (stream, trgt: NativeTensor, src: NativeTensor) = 
+        unaryMinus (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Abs (stream, trgt: NativeTensor, src: NativeTensor) = 
+        abs (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Sgn (stream, trgt: NativeTensor, src: NativeTensor) = 
+        sgn (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Log (stream, trgt: NativeTensor, src: NativeTensor) = 
+        log (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Log10 (stream, trgt: NativeTensor, src: NativeTensor) = 
+        log10 (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Exp (stream, trgt: NativeTensor, src: NativeTensor) = 
+        exp (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Sin (stream, trgt: NativeTensor, src: NativeTensor) = 
+        sin (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Cos (stream, trgt: NativeTensor, src: NativeTensor) = 
+        cos (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Tan (stream, trgt: NativeTensor, src: NativeTensor) = 
+        tan (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Asin (stream, trgt: NativeTensor, src: NativeTensor) = 
+        asin (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Acos (stream, trgt: NativeTensor, src: NativeTensor) = 
+        acos (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Atan (stream, trgt: NativeTensor, src: NativeTensor) = 
+        atan (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Sinh (stream, trgt: NativeTensor, src: NativeTensor) = 
+        sinh (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Cosh (stream, trgt: NativeTensor, src: NativeTensor) = 
+        cosh (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Tanh (stream, trgt: NativeTensor, src: NativeTensor) = 
+        tanh (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Sqrt (stream, trgt: NativeTensor, src: NativeTensor) = 
+        sqrt (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Ceiling (stream, trgt: NativeTensor, src: NativeTensor) = 
+        ceiling (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Floor (stream, trgt: NativeTensor, src: NativeTensor) = 
+        floor (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Round (stream, trgt: NativeTensor, src: NativeTensor) = 
+        round (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Truncate (stream, trgt: NativeTensor, src: NativeTensor) = 
+        truncate (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    member this.Add (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        add (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Subtract (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        subtract (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Multiply (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        multiply (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Divide (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        divide (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Modulo (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        modulo (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Power (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        power (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.MinElemwise (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        minElemwise (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.MaxElemwise (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        maxElemwise (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Equal (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        equal (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.NotEqual (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        notEqual (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Less (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        less (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.LessOrEqual (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        lessOrEqual (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.Greater (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        greater (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
+    member this.GreaterOrEqual (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
+        greaterOrEqual (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
+
 
 
 /// CUDA kernels for the CUDA tensor backend

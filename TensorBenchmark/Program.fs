@@ -21,8 +21,20 @@ let testCuda () =
     printfn "cb=\n%A" cb
 
     printfn "fill cuda..."
-    cb.FillConst(5.5f)
+    cb.FillConst(-5.5f)
     printfn "cb=\n%A" cb
+
+    printfn "cuda abs..."
+    let cb = abs cb
+    printfn "cb=\n%A" cb
+
+    printfn "cuda ca + cb..."
+    let cc = ca + cb
+    printfn "cc=\n%A" cc
+
+    printfn "cuda ca <<== cb..."
+    let cd = ca <<== cb
+    printfn "cd=\n%A" cd
 
 
 
