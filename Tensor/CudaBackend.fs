@@ -235,6 +235,9 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         member this.DataSizeInBytes = this.DataSizeInBytes
 
 
+and ITensorCudaBackend =
+    abstract NativeTensor: NativeTensor
+
 /// CUDA backend for tensors.
 and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (layout: TensorLayout, storage: TensorCudaStorage<'T>) =
@@ -242,6 +245,11 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     let kernels = TensorKernels.Get (typeof<'T>, layout.NDims)
 
     let stream () = CUstream.NullStream
+
+    let unsup op =
+        let msg = 
+            sprintf "the CUDA tensor backend currently does not support the %s operation" op
+        raise (NotSupportedException msg)
 
     let callUnary fn trgt src1 : unit =
         let trgt, src1 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1)
@@ -270,6 +278,9 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         Stride      = layout.Stride
     }
 
+    interface ITensorCudaBackend with
+        member this.NativeTensor = this.NativeTensor
+
     /// gets NativeTensors for specified tensors
     static member internal GetNativeTensor (t: Tensor<'T>) =
         (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
@@ -282,35 +293,29 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
     static member internal ElemwiseNativeTensor<'T> (t: Tensor<'T>) 
             : NativeTensor =
-        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
+        (t.Backend :?> ITensorCudaBackend).NativeTensor
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor<'T, 'TA when 
-                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType> 
+    static member internal ElemwiseNativeTensor<'T, 'TA> 
             (t: Tensor<'T>, a: Tensor<'TA>) : NativeTensor * NativeTensor =
-        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
-        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
+        (t.Backend :?> ITensorCudaBackend).NativeTensor, 
+        (a.Backend :?> ITensorCudaBackend).NativeTensor 
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB when
-                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType and
-                                                 'TB: (new: unit -> 'TB) and 'TB: struct and 'TB :> System.ValueType>  
+    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB>  
             (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) : NativeTensor * NativeTensor * NativeTensor =
-        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
-        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor,
-        (b.Backend :?> TensorCudaBackend<'TB>).NativeTensor
+        (t.Backend :?> ITensorCudaBackend).NativeTensor, 
+        (a.Backend :?> ITensorCudaBackend).NativeTensor,
+        (b.Backend :?> ITensorCudaBackend).NativeTensor
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB, 'TC when
-                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType and
-                                                 'TB: (new: unit -> 'TB) and 'TB: struct and 'TB :> System.ValueType and
-                                                 'TC: (new: unit -> 'TC) and 'TC: struct and 'TC :> System.ValueType>  
+    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB, 'TC>  
             (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
             : NativeTensor * NativeTensor * NativeTensor * NativeTensor =
-        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
-        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor,
-        (b.Backend :?> TensorCudaBackend<'TB>).NativeTensor,
-        (c.Backend :?> TensorCudaBackend<'TC>).NativeTensor
+        (t.Backend :?> ITensorCudaBackend).NativeTensor, 
+        (a.Backend :?> ITensorCudaBackend).NativeTensor,
+        (b.Backend :?> ITensorCudaBackend).NativeTensor,
+        (c.Backend :?> ITensorCudaBackend).NativeTensor
 
 
     interface ITensorBackend<'T> with
@@ -395,7 +400,9 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
                 kernels.Copy(stream(), trgt, src)
 
-        member this.Convert(trgt, src) = raise (System.NotImplementedException())
+        member this.Convert(trgt: Tensor<'T>, src: Tensor<'S>) =
+            let convKernels = TensorConvertKernels.Get (typeof<'T>, typeof<'S>, trgt.NDims)
+            callUnary convKernels.Convert trgt src
 
         member this.UnaryPlus(trgt, src1)   = callUnary kernels.UnaryPlus trgt src1
         member this.UnaryMinus(trgt, src1)  = callUnary kernels.UnaryMinus trgt src1
@@ -485,17 +492,18 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
             ()
 
-        member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
-        member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
-        member this.Map(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
+        // unsupported for now on CUDA
+        member this.Fill(fn, trgt, useThreads) = unsup "Fill"
+        member this.FillIndexed(fn, trgt, useThreads) = unsup "FillIndexed"
+        member this.Map(fn, trgt, src, useThreads) = unsup "Map"
+        member this.Map2(fn, trgt, src1, src2, useThreads) = unsup "Map2"
+        member this.MapIndexed(fn, trgt, src, useThreads) = unsup "MapIndexed"
+        member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = unsup "MapIndexed2"
+        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxis"
+        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxisIndexed"
 
 
-            
+/// Creates Tensors on a CUDA device.
 and TensorCudaDevice private () =
     inherit BaseTensorDevice()
     static member Instance = TensorCudaDevice ()

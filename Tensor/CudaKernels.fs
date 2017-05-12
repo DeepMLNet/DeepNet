@@ -780,6 +780,28 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
 
 
 
+type internal TensorConvertKernels private (trgtDataType: Type, srcDataType: Type, nDims: int) as this =
+    inherit CudaModule()
+    static let instances = InstanceCache TensorConvertKernels 
+    static let headers = ["Elemwise.cuh"]
+
+    let trgtTensor = ArgTypeTensor {DataType=trgtDataType; NDims=nDims}
+    let srcTensor = ArgTypeTensor {DataType=srcDataType; NDims=nDims}
+
+    let convert = this.GetKernel "Convert" [trgtTensor; srcTensor]
+
+    do this.Build (headers)
+
+    member this.Convert (stream, trgt: NativeTensor, src: NativeTensor) =         
+        convert (stream, workDimForElemwise trgt, [|box trgt; box src|])
+
+    static member Get (trgtDataType, srcDataType, nDims) = 
+        instances.Get (trgtDataType, srcDataType, nDims)
+
+
+
+
         
+
 
         

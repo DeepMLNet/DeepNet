@@ -47,6 +47,10 @@ let testCuda () =
     let cj = Tensor.argMinAxis 1 cc
     printfn "cj=\n%A" cj
 
+    printfn "cuda convert to int..."
+    let cgInt = Tensor.convert<int> cg
+    printfn "cgInt=\n%A" cgInt
+
     printfn "cuda ca <<== cb..."
     let cd = ca <<== cb
     printfn "cd=\n%A" cd

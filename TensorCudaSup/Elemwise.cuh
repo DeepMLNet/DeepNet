@@ -26,6 +26,25 @@ void FillConst(T value, Tensor<T, TDims> &trgt) {
 };
 
 
+// =============================================================================================
+// data type conversion
+// =============================================================================================
+
+template<typename TTrgt, typename TSrc, dim_t TDims> 
+struct ConvertFn { 
+	Tensor<TTrgt, TDims> trgt; 
+	Tensor<TSrc, TDims> src; 
+	_dev_ void operator() (Idxs<TDims> &pos) { 
+		trgt[pos] = static_cast<TTrgt>(src[pos]); 
+	} 
+}; 
+
+template<typename TTrgt, typename TSrc, dim_t TDims> _dev_ 
+void Convert(Tensor<TTrgt, TDims> &trgt, const Tensor<TSrc, TDims> &src) { 
+	ConvertFn<TTrgt, TSrc, TDims> workFn = {trgt, src}; 
+	PerformWork(trgt.Shape(), workFn); 
+};
+
 
 // =============================================================================================
 // unary operations (one input)
