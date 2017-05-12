@@ -299,6 +299,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
 
+        member this.GetEnumerator() : System.Collections.IEnumerator = raise (System.NotImplementedException())
+        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = raise (System.NotImplementedException())
+
+
         member this.Transfer (trgt, src) =
             let regMem (storage: TensorHostStorage<'T>) = 
                 try
@@ -371,6 +375,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
                 kernels.Copy(stream(), trgt, src)
 
+        member this.Convert(trgt, src) = raise (System.NotImplementedException())
+
         member this.UnaryPlus(trgt, src1)   = callUnary kernels.UnaryPlus trgt src1
         member this.UnaryMinus(trgt, src1)  = callUnary kernels.UnaryMinus trgt src1
         member this.Abs(trgt, src1)         = callUnary kernels.Abs trgt src1
@@ -415,6 +421,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Or(trgt, src1, src2)    = callBinary kernels.Or trgt src1 src2
         member this.Xor(trgt, src1, src2)   = callBinary kernels.Xor trgt src1 src2
 
+        member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
+
         member this.MinLastAxis(trgt, src1)     = callUnary kernels.MinLastAxis trgt src1
         member this.MaxLastAxis(trgt, src1)     = callUnary kernels.MaxLastAxis trgt src1
         member this.SumLastAxis(trgt, src1)     = callUnary kernels.SumLastAxis trgt src1
@@ -422,40 +430,34 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.AllLastAxis(trgt, src1)     = callUnary kernels.AllLastAxis trgt src1
         member this.AnyLastAxis(trgt, src1)     = callUnary kernels.AnyLastAxis trgt src1
 
+        member this.ArgMinLastAxis(trgt, src1)  = callUnary kernels.ArgMinLastAxis trgt src1
+        member this.ArgMaxLastAxis(trgt, src1)  = callUnary kernels.ArgMaxLastAxis trgt src1
 
-        member this.ArgMaxLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.ArgMinLastAxis(trgt, src1) = raise (System.NotImplementedException())
-        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
-        member this.GetEnumerator() : System.Collections.IEnumerator = raise (System.NotImplementedException())
-        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = raise (System.NotImplementedException())
-        member this.Gather(trgt, srcIdxs, src) = raise (System.NotImplementedException())
-        member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
+        member this.Gather(trgt, srcIdxs, src)   = raise (System.NotImplementedException())
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
+
+        member this.VecVecDot (trgt, a, b) =
+            ()
+        member this.MatVecDot (trgt, a, b) =
+            ()
+        member this.MatMatDot (trgt, a, b) =
+            ()
+        member this.BatchedMatMatDot (trgt, a, b) =
+            ()
+        member this.BatchedInvert (trgt, src) =
+            ()
+        member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
+            ()
+
         member this.Fill(fn, trgt, useThreads) = raise (System.NotImplementedException())
         member this.FillIndexed(fn, trgt, useThreads) = raise (System.NotImplementedException())
-        member this.Convert(trgt, src) = raise (System.NotImplementedException())
         member this.Map(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.Map2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed(fn, trgt, src, useThreads) = raise (System.NotImplementedException())
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = raise (System.NotImplementedException())
-        member this.VecVecDot (trgt, a, b) =
-            ()
+        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
+        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = raise (System.NotImplementedException())
 
-        member this.MatVecDot (trgt, a, b) =
-            ()
-
-        member this.MatMatDot (trgt, a, b) =
-            ()
-
-        member this.BatchedMatMatDot (trgt, a, b) =
-            ()
-
-        member this.BatchedInvert (trgt, src) =
-            ()
-
-        member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
-            ()
 
             
 and TensorCudaDevice private () =

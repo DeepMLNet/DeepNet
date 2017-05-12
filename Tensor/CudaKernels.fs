@@ -374,6 +374,7 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
 
     let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
     let reductionSrcTensor = ArgTypeTensor {DataType=dataType; NDims=nDims+1}        
+    let argReductionTrgtTensor = ArgTypeTensor {DataType=typeof<int64>; NDims=nDims-1}        
     let boolTensor = ArgTypeTensor {DataType=typeof<bool>; NDims=nDims}
     let scalar = ArgTypeScalar dataType
 
@@ -445,6 +446,14 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     let allLastAxis     = getAxisReduceKernel "AllLastAxis" boolTypes []
     let anyLastAxis     = getAxisReduceKernel "AnyLastAxis" boolTypes []
 
+    // axis reduce to index kernels
+    let getArgAxisReduceKernel name supTypes unsupTypes = 
+        if nDims > 0 then
+            getKernel name [scalar; argReductionTrgtTensor; fullTensor] supTypes unsupTypes
+        else
+            (fun _ -> failwith "ArgAxisReduceKernel requires at least a vector")
+    let argMinLastAxis  = getArgAxisReduceKernel "ArgMinLastAxis" [] []
+    let argMaxLastAxis  = getArgAxisReduceKernel "ArgMaxLastAxis" [] []
 
     do this.Build (headers)
 
@@ -597,6 +606,15 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     member this.AnyLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
         let initial = false
         anyLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.ArgMinLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = maxValueOf dataType
+        argMinLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    member this.ArgMaxLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
+        let initial = minValueOf dataType
+        argMinLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
 
 
 /// CUDA kernels for the CUDA tensor backend

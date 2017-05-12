@@ -40,6 +40,10 @@ let testCuda () =
     let cg = Tensor.maxAxis 0 cc
     printfn "cg=\n%A" cg
 
+    printfn "cuda argMinAxis cc..."
+    let cj = Tensor.argMinAxis 1 cc
+    printfn "cj=\n%A" cj
+
     printfn "cuda ca <<== cb..."
     let cd = ca <<== cb
     printfn "cd=\n%A" cd
