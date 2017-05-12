@@ -5,6 +5,7 @@
 #include <math.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <device_atomic_functions.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -28,4 +29,6 @@ typedef unsigned long long uint64_t;
 
 typedef int32_t dim_t;
 typedef int64_t idx_t;
+typedef void * ptr_t;
+
 

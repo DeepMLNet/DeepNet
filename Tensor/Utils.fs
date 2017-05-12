@@ -411,15 +411,16 @@ module Util =
     /// C++ data type for given type instance
     let cppTypeInst (typ: System.Type) = 
         match typ with
-        | _ when typ = typeof<single>   -> "float"
-        | _ when typ = typeof<double>   -> "double"
-        | _ when typ = typeof<sbyte>    -> "int8_t"
-        | _ when typ = typeof<byte>     -> "uint8_t"
-        | _ when typ = typeof<int32>    -> "int32_t"
-        | _ when typ = typeof<uint32>   -> "uint32_t"
-        | _ when typ = typeof<int64>    -> "int64_t"
-        | _ when typ = typeof<uint64>   -> "uint64_t"
-        | _ when typ = typeof<bool>     -> "bool"
+        | _ when typ = typeof<single>    -> "float"
+        | _ when typ = typeof<double>    -> "double"
+        | _ when typ = typeof<sbyte>     -> "int8_t"
+        | _ when typ = typeof<byte>      -> "uint8_t"
+        | _ when typ = typeof<int32>     -> "int32_t"
+        | _ when typ = typeof<uint32>    -> "uint32_t"
+        | _ when typ = typeof<int64>     -> "int64_t"
+        | _ when typ = typeof<uint64>    -> "uint64_t"
+        | _ when typ = typeof<bool>      -> "bool"
+        | _ when typ = typeof<nativeint> -> "ptr_t"
         | _ -> failwithf "no C++ datatype for %A" typ
 
     /// C++ data type for given type 

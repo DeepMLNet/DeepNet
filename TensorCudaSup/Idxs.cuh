@@ -79,15 +79,14 @@ struct Idxs<(dim_t)0> {
 };
 
 
-_dev_ void PrintIdxs(const Idxs<0> &pos) { printf("[]"); }
-_dev_ void PrintIdxs(const Idxs<1> &pos) { printf("[%ld]", pos[0]); }
-_dev_ void PrintIdxs(const Idxs<2> &pos) { printf("[%ld; %ld]", pos[0], pos[1]); }
-_dev_ void PrintIdxs(const Idxs<3> &pos) { printf("[%ld; %ld; %ld]", pos[0], pos[1], pos[2]); }
-_dev_ void PrintIdxs(const Idxs<4> &pos) { printf("[%ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3]); }
-_dev_ void PrintIdxs(const Idxs<5> &pos) { printf("[%ld; %ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3], pos[4]); }
-_dev_ void PrintIdxs(const Idxs<6> &pos) { printf("[%ld; %ld; %ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3], pos[4], pos[5]); }
-_dev_ void PrintIdxs(const Idxs<7> &pos) { printf("[%ld; %ld; %ld; %ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3], pos[4], pos[5], pos[6]); }
-_dev_ void PrintIdxs(const Idxs<8> &pos) { printf("[%ld; %ld; %ld; %ld; %ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3], pos[4], pos[5], pos[6], pos[7]); }
-_dev_ void PrintIdxs(const Idxs<9> &pos) { printf("[%ld; %ld; %ld; %ld; %ld; %ld; %ld; %ld; %ld]", pos[0], pos[1], pos[2], pos[3], pos[4], pos[5], pos[6], pos[7], pos[8]); }
-
+template<dim_t TNDims>
+_dev_ void PrintIdxs(const Idxs<TNDims> &pos) { 
+	printf("["); 
+	for (dim_t d = 0; d < TNDims; d++) {
+		printf("%lld", pos[d]);
+		if (d != TNDims-1)
+			printf("; ");
+	}
+	printf("]");
+};
 

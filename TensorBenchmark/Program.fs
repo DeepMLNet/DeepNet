@@ -6,6 +6,9 @@ open System.Diagnostics
 let testCuda () =
     let shape = [5L; 5L]
 
+    //Tensor.Cuda.Backend.Cfg.DebugCompile <- true
+    Tensor.Cuda.Backend.Cfg.GatherScatterStacktrace <- true
+
     let a = HostTensor.ones<single> shape
     printfn "a=\n%A" a
 
@@ -65,6 +68,10 @@ let testCuda () =
     let cgather = Tensor.gather [Some idxs0; None] cb
     printfn "cgather=\n%A" cgather
 
+    printfn "cuda scatter..."
+    let idxs1 = CudaTensor.ones<int64> shape
+    let cscatter = Tensor.scatter [Some idxs1; None] [3L; 3L] cb
+    printfn "cscatter=\n%A" cscatter
 
 
 [<EntryPoint>]

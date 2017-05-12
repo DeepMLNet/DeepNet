@@ -20,6 +20,7 @@ module Cfg =
     let mutable RestrictKernels = false
     let mutable DebugCompile = false
     let mutable DisableKernelCache = false
+    let mutable GatherScatterStacktrace = false
 
 
 /// Dynamic type helpers.
@@ -730,15 +731,38 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
     static let headers = ["GatherScatter.cuh"]
 
     let trgtTensor = ArgTypeTensor {DataType=dataType; NDims=nTrgtDims}
+    let trgtIdxs = ArgTypeIdxTensors {NDims=nSrcDims; NIdxs=nTrgtDims}
     let srcTensor = ArgTypeTensor {DataType=dataType; NDims=nSrcDims}
     let srcIdxs = ArgTypeIdxTensors {NDims=nTrgtDims; NIdxs=nSrcDims}
+    let ptrArg = ArgTypeScalar typeof<nativeint>
+    let boolArg = ArgTypeScalar typeof<bool>
 
-    let gather = this.GetKernel "Gather" [trgtTensor; srcIdxs; srcTensor]
+    let error = new CudaDeviceVariable<int32> (SizeT 1)
+    do error.Memset (0u)
+    let errorPtr = Cuda.getIntPtr error.DevicePointer
+    let trapOnError = not Cfg.GatherScatterStacktrace
+
+    let gather = this.GetKernel "Gather" [trgtTensor; srcIdxs; srcTensor; ptrArg; boolArg]
+    let scatter = this.GetKernel "Scatter" [trgtTensor; trgtIdxs; srcTensor; ptrArg; boolArg]
 
     do this.Build (headers)
 
     member this.Gather (stream, trgt: NativeTensor, srcIdxs: NativeIdxTensors, src: NativeTensor) =         
-        gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src|])
+        gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src; box errorPtr; box trapOnError|])
+        this.CheckError (stream)
+
+    member this.Scatter (stream, trgt: NativeTensor, trgtIdxs: NativeIdxTensors, src: NativeTensor) =         
+        scatter (stream, workDimForElemwise src, [|box trgt; box trgtIdxs; box src; box errorPtr; box trapOnError|])
+        this.CheckError (stream)
+
+    member this.CheckError (stream) =
+        if Cfg.GatherScatterStacktrace then
+            if stream <> CUstream.NullStream then
+                Cuda.context.Synchronize()
+            let hasError = ref 0
+            error.CopyToHost (hasError)
+            if !hasError <> 0 then
+                raise (IndexOutOfRangeException "invalid index during gather or scatter")
 
     static member Get (dataType, nTrgtDims, nSrcDims) = 
         instances.Get (dataType, nTrgtDims, nSrcDims)

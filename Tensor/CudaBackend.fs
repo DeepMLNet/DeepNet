@@ -438,15 +438,23 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.ArgMaxLastAxis(trgt, src1)  = callUnary kernels.ArgMaxLastAxis trgt src1
 
         member this.Gather(trgt, srcIdxs, src) = 
-            let kernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
+            let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
             let srcIdxs = {
                 NDims = trgt.NDims
                 Idxs  = srcIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
             }
             let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
-            kernels.Gather (stream(), trgt, srcIdxs, src)
+            gsKernels.Gather (stream(), trgt, srcIdxs, src)
 
-        member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
+        member this.Scatter(trgt, trgtIdxs, src) = 
+            let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
+            let trgtIdxs = {
+                NDims = src.NDims
+                Idxs  = trgtIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
+            }
+            let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
+            kernels.FillConst (stream(), box (conv<'T> 0), trgt)
+            gsKernels.Scatter (stream(), trgt, trgtIdxs, src)
 
         member this.VecVecDot (trgt, a, b) =
             ()
