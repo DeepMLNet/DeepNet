@@ -543,6 +543,9 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
     let greater         = getComparisonKernel "Greater" [] []
     let greaterOrEqual  = getComparisonKernel "GreaterOrEqual" [] []
 
+    // conditional if-then-else
+    let ifThenElse      = getKernel "IfThenElse" [fullTensor; boolTensor; fullTensor; fullTensor] [] []
+
     // axis reduce kernels
     let getAxisReduceKernel name = getKernel name [scalar; fullTensor; reductionSrcTensor] 
     let minLastAxis     = getAxisReduceKernel "MinLastAxis" [] []
@@ -680,6 +683,10 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
     member this.GreaterOrEqual (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         greaterOrEqual (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
 
+    member this.IfThenElse (stream, trgt: NativeTensor, cond: NativeTensor,
+                            ifTrue: NativeTensor, ifFalse: NativeTensor) = 
+        ifThenElse (stream, workDimForElemwise trgt, [|box trgt; box cond; box ifTrue; box ifFalse|])    
+
     member this.And (stream, trgt: NativeTensor, src1: NativeTensor, src2: NativeTensor) = 
         andFn (stream, workDimForElemwise trgt, [|box trgt; box src1; box src2|])
 
@@ -740,7 +747,6 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
     let error = new CudaDeviceVariable<int32> (SizeT 1)
     do error.Memset (0u)
     let errorPtr = Cuda.getIntPtr error.DevicePointer
-    let trapOnError = not Cfg.GatherScatterStacktrace
 
     let gather = this.GetKernel "Gather" [trgtTensor; srcIdxs; srcTensor; ptrArg; boolArg]
     let scatter = this.GetKernel "Scatter" [trgtTensor; trgtIdxs; srcTensor; ptrArg; boolArg]
@@ -748,11 +754,15 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
     do this.Build (headers)
 
     member this.Gather (stream, trgt: NativeTensor, srcIdxs: NativeIdxTensors, src: NativeTensor) =         
-        gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src; box errorPtr; box trapOnError|])
+        let trapOnError = not Cfg.GatherScatterStacktrace
+        gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src; 
+                                                   box errorPtr; box trapOnError|])
         this.CheckError (stream)
 
     member this.Scatter (stream, trgt: NativeTensor, trgtIdxs: NativeIdxTensors, src: NativeTensor) =         
-        scatter (stream, workDimForElemwise src, [|box trgt; box trgtIdxs; box src; box errorPtr; box trapOnError|])
+        let trapOnError = not Cfg.GatherScatterStacktrace
+        scatter (stream, workDimForElemwise src, [|box trgt; box trgtIdxs; box src; 
+                                                   box errorPtr; box trapOnError|])
         this.CheckError (stream)
 
     member this.CheckError (stream) =

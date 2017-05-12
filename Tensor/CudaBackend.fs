@@ -251,6 +251,11 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         let trgt, src1, src2 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2)
         fn (stream(), trgt, src1, src2)
 
+    let callTenary fn trgt src1 src2 src3 : unit =
+        let trgt, src1, src2, src3 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2, src3)
+        fn (stream(), trgt, src1, src2, src3)
+
+
 
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
@@ -295,6 +300,17 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor,
         (b.Backend :?> TensorCudaBackend<'TB>).NativeTensor
 
+    /// gets NativeTensors for specified tensors, optimized for elment-wise operations
+    static member internal ElemwiseNativeTensor<'T, 'TA, 'TB, 'TC when
+                                                 'TA: (new: unit -> 'TA) and 'TA: struct and 'TA :> System.ValueType and
+                                                 'TB: (new: unit -> 'TB) and 'TB: struct and 'TB :> System.ValueType and
+                                                 'TC: (new: unit -> 'TC) and 'TC: struct and 'TC :> System.ValueType>  
+            (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
+            : NativeTensor * NativeTensor * NativeTensor * NativeTensor =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
+        (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor,
+        (b.Backend :?> TensorCudaBackend<'TB>).NativeTensor,
+        (c.Backend :?> TensorCudaBackend<'TC>).NativeTensor
 
 
     interface ITensorBackend<'T> with
@@ -420,12 +436,12 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Greater(trgt, src1, src2)           = callBinary kernels.Greater trgt src1 src2
         member this.GreaterOrEqual(trgt, src1, src2)    = callBinary kernels.GreaterOrEqual trgt src1 src2
 
+        member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = callTenary kernels.IfThenElse trgt cond ifTrue ifFalse
+
         member this.Negate(trgt, src1)      = callUnary kernels.Negate trgt src1
         member this.And(trgt, src1, src2)   = callBinary kernels.And trgt src1 src2
         member this.Or(trgt, src1, src2)    = callBinary kernels.Or trgt src1 src2
         member this.Xor(trgt, src1, src2)   = callBinary kernels.Xor trgt src1 src2
-
-        member this.IfThenElse(trgt, cond, ifTrue, ifFalse) = raise (System.NotImplementedException())
 
         member this.MinLastAxis(trgt, src1)     = callUnary kernels.MinLastAxis trgt src1
         member this.MaxLastAxis(trgt, src1)     = callUnary kernels.MaxLastAxis trgt src1

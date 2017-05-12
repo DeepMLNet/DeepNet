@@ -249,20 +249,29 @@ BINARY_COMPARISON(GreaterOrEqual,	greater_or_equal);
 
 
 
+// =============================================================================================
+// conditional if-then-else
+// =============================================================================================
 
+template<typename T, dim_t TDims> 
+struct IfThenElseFn { 
+	Tensor<T, TDims> trgt; 
+	Tensor<bool, TDims> cond; 
+	Tensor<T, TDims> ifTrue; 
+	Tensor<T, TDims> ifFalse; 
+	_dev_ void operator() (Idxs<TDims> &pos) { 
+		trgt[pos] = cond[pos] ? ifTrue[pos] : ifFalse[pos];
+	} 
+}; 
 
-template<typename T, dim_t TTrgtDims, dim_t TSrcDims> _dev_
-void CopyHeterogenous(Tensor<T, TTrgtDims> &trgt, const Tensor<T, TSrcDims> &src) {
-	constexpr dim_t trgtDims = TTrgtDims;
-	constexpr dim_t srcDims = TSrcDims;
-	auto workFn = [trgtDims, srcDims, &trgt, &src](Idxs<1> &pos) { 
-		Idxs<trgtDims> trgtPos = Idxs<trgtDims>::FromLinearPos(trgt.Shape(), pos[0]);
-		Idxs<srcDims> srcPos = Idxs<srcDims>::FromLinearPos(src.Shape(), pos[0]);
-		trgt[trgtPos] = src[srcPos]; 
-	};
-
-	assert(trgt.Size() == src.Size());
-	Idxs<1> workSize {{trgt.Size()}};
-	PerformWork(workSize, workFn);
+template<typename T, dim_t TDims> _dev_ 
+void IfThenElse(Tensor<T, TDims> &trgt, const Tensor<bool, TDims> &cond, 
+	            const Tensor<T, TDims> &ifTrue, const Tensor<T, TDims> &ifFalse) { 
+	IfThenElseFn<T, TDims> workFn = {trgt, cond, ifTrue, ifFalse}; 
+	PerformWork(trgt.Shape(), workFn); 
 };
+
+
+
+
 

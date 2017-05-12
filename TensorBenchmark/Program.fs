@@ -55,6 +55,10 @@ let testCuda () =
     let ce = ~~~~cd
     printfn "ce=\n%A" ce
 
+    printfn "ifthenelse..."
+    let ck = Tensor.ifThenElse ce ca cc
+    printfn "ck=\n%A" ck
+
     printfn "cd or ce..."
     let cf = cd |||| ce
     printfn "cf=\n%A" cf
@@ -70,7 +74,7 @@ let testCuda () =
 
     printfn "cuda scatter..."
     let idxs1 = CudaTensor.ones<int64> shape
-    let cscatter = Tensor.scatter [Some idxs1; None] [3L; 3L] cb
+    let cscatter = Tensor.scatter [Some idxs1; None] [6L; 6L] cb
     printfn "cscatter=\n%A" cscatter
 
 
