@@ -239,7 +239,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
 and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (layout: TensorLayout, storage: TensorCudaStorage<'T>) =
 
-    let kernels = TensorKernels.get (typeof<'T>, layout.NDims)
+    let kernels = TensorKernels.Get (typeof<'T>, layout.NDims)
 
     let stream () = CUstream.NullStream
 
@@ -264,6 +264,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         Shape       = layout.Shape
         Stride      = layout.Stride
     }
+
+    /// gets NativeTensors for specified tensors
+    static member internal GetNativeTensor (t: Tensor<'T>) =
+        (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
 
     /// gets NativeTensors for specified tensors
     static member internal GetNativeTensor (t: Tensor<'T>, a: Tensor<'TA>) =
@@ -433,7 +437,15 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.ArgMinLastAxis(trgt, src1)  = callUnary kernels.ArgMinLastAxis trgt src1
         member this.ArgMaxLastAxis(trgt, src1)  = callUnary kernels.ArgMaxLastAxis trgt src1
 
-        member this.Gather(trgt, srcIdxs, src)   = raise (System.NotImplementedException())
+        member this.Gather(trgt, srcIdxs, src) = 
+            let kernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
+            let srcIdxs = {
+                NDims = trgt.NDims
+                Idxs  = srcIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
+            }
+            let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
+            kernels.Gather (stream(), trgt, srcIdxs, src)
+
         member this.Scatter(trgt, trgtIdxs, src) = raise (System.NotImplementedException())
 
         member this.VecVecDot (trgt, a, b) =

@@ -46,7 +46,7 @@ void FillConst(T value, Tensor<T, TDims> &trgt) {
 		PerformWork(trgt.Shape(), workFn); \
 	};
 
-#define MATH_OVERLOAD(func) \
+#define FLOAT_DOUBLE_OVERLOAD(func) \
 	_dev_ double ol_##func(double x) { return func(x); } \
 	_dev_ float  ol_##func(float  x) { return func##f(x); }
 
@@ -64,7 +64,7 @@ T _dev_ sgn(T x) {
 		return 1;
 }
 
-MATH_OVERLOAD(fabs);
+FLOAT_DOUBLE_OVERLOAD(fabs);
 _dev_ int8_t   ol_fabs(int8_t x)   { return x < 0 ? -x : x; }
 _dev_ int16_t  ol_fabs(int16_t x)  { return x < 0 ? -x : x; }
 _dev_ int32_t  ol_fabs(int32_t x)  { return x < 0 ? -x : x; }
@@ -74,23 +74,23 @@ _dev_ uint16_t ol_fabs(uint16_t x) { return x; }
 _dev_ uint32_t ol_fabs(uint32_t x) { return x; }
 _dev_ uint64_t ol_fabs(uint64_t x) { return x; }
 
-MATH_OVERLOAD(log);
-MATH_OVERLOAD(log10);
-MATH_OVERLOAD(exp);
-MATH_OVERLOAD(sin);
-MATH_OVERLOAD(cos);
-MATH_OVERLOAD(tan);
-MATH_OVERLOAD(asin);
-MATH_OVERLOAD(acos);
-MATH_OVERLOAD(atan);
-MATH_OVERLOAD(sinh);
-MATH_OVERLOAD(cosh);
-MATH_OVERLOAD(tanh);
-MATH_OVERLOAD(sqrt);
-MATH_OVERLOAD(ceil);
-MATH_OVERLOAD(floor);
-MATH_OVERLOAD(round);
-MATH_OVERLOAD(trunc);
+FLOAT_DOUBLE_OVERLOAD(log);
+FLOAT_DOUBLE_OVERLOAD(log10);
+FLOAT_DOUBLE_OVERLOAD(exp);
+FLOAT_DOUBLE_OVERLOAD(sin);
+FLOAT_DOUBLE_OVERLOAD(cos);
+FLOAT_DOUBLE_OVERLOAD(tan);
+FLOAT_DOUBLE_OVERLOAD(asin);
+FLOAT_DOUBLE_OVERLOAD(acos);
+FLOAT_DOUBLE_OVERLOAD(atan);
+FLOAT_DOUBLE_OVERLOAD(sinh);
+FLOAT_DOUBLE_OVERLOAD(cosh);
+FLOAT_DOUBLE_OVERLOAD(tanh);
+FLOAT_DOUBLE_OVERLOAD(sqrt);
+FLOAT_DOUBLE_OVERLOAD(ceil);
+FLOAT_DOUBLE_OVERLOAD(floor);
+FLOAT_DOUBLE_OVERLOAD(round);
+FLOAT_DOUBLE_OVERLOAD(trunc);
 
 _dev_ bool negate (bool x) { return !x; }
 

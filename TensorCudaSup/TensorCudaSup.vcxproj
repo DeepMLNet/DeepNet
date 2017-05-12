@@ -160,6 +160,7 @@
     <ClInclude Include="Elemwise.cuh">
       <FileType>CppCode</FileType>
     </ClInclude>
+    <ClInclude Include="GatherScatter.cuh" />
     <ClInclude Include="Idxs.cuh" />
     <ClInclude Include="Reduction.cuh" />
     <ClInclude Include="Tensor.cuh" />

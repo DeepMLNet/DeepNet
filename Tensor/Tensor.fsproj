@@ -121,6 +121,9 @@
     <EmbeddedResource Include="..\TensorCudaSup\Reduction.cuh">
       <Link>Reduction.cuh</Link>
     </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\GatherScatter.cuh">
+      <Link>GatherScatter.cuh</Link>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">

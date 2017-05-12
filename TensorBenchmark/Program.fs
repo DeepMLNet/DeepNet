@@ -60,6 +60,12 @@ let testCuda () =
     let ch = Tensor.allAxis 0 cf
     printfn "ch=\n%A" ch
 
+    printfn "cuda gather..."
+    let idxs0 = CudaTensor.zeros<int64> [3L; 3L]
+    let cgather = Tensor.gather [Some idxs0; None] cb
+    printfn "cgather=\n%A" cgather
+
+
 
 [<EntryPoint>]
 let main argv = 

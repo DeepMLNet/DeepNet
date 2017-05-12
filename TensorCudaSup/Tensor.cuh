@@ -52,6 +52,14 @@ struct Tensor {
 			size *= Shape()[d];
 		return size;
 	}
+
+	_dev_ bool PosValid (const TIdxs &pos) const {
+		for (dim_t d = 0; d < TNDims; d++) {
+			if (!(0 <= pos[d] && pos[d] < Shape()[d]))
+				return false;
+		}
+		return true;
+	}
 };
 
 

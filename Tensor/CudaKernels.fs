@@ -31,7 +31,7 @@ module internal DynamicTypes =
 
 
 /// C++ tensor marshaling
-type  NativeTensor = {
+type NativeTensor = {
     DataType:       Type
     BasePtr:        nativeint
     Offset:         int64
@@ -49,8 +49,7 @@ type internal NativeTensorInfo = {
 module internal NativeTensor =
     let private typeCache = Dictionary<string, Type> ()
 
-    /// creates a struct type containing a fixed size array of given type and size
-    let private getType (dataType: Type) (nDims: int) =
+    let getType (dataType: Type) (nDims: int) =
         let typeName = sprintf "Tensor_%s_%d" dataType.Name nDims
         match typeCache.TryFind typeName with
         | Some typ -> typ
@@ -105,6 +104,88 @@ module internal NativeTensor =
         nt.DataType = nti.DataType && 
         nt.Shape.Length = nti.NDims && 
         nt.Stride.Length = nti.NDims
+
+
+/// C++ NativeIdx 
+type NativeIdxTensors = {
+    NDims:      int                      // not present in native struct
+    Idxs:       NativeTensor option list
+} 
+   
+/// C++ NativeIdx template info
+type NativeIdxTensorsInfo = {
+    NDims:      int
+    NIdxs:      int
+}
+
+/// C++ NativeIdx marshalling
+module internal NativeIdxTensors =
+    let private typeCache = Dictionary<string, Type> ()
+
+    let private getType (nDims: int) (nIdxs: int) =
+        let typeName = sprintf "IdxTensors_%d_%d" nDims nIdxs
+        match typeCache.TryFind typeName with
+        | Some typ -> typ
+        | None ->
+            lock DynamicTypes.modBuilder (fun () ->
+                // define new value type with attribute [<Struct; StructLayout(LayoutKind.Sequential)>]
+                let mb = DynamicTypes.modBuilder
+                let tb = mb.DefineType(typeName, 
+                                       TypeAttributes.Public ||| TypeAttributes.SequentialLayout,
+                                       typeof<ValueType>)
+
+                // define fields
+                let nt = NativeTensor.getType typeof<int64> nDims
+                for d = 0 to max (nIdxs-1) 0 do
+                    tb.DefineField(sprintf "Idxs%d" d, nt, FieldAttributes.Public) |> ignore
+                for d = 0 to max (nIdxs-1) 0 do
+                    tb.DefineField(sprintf "Specified%d" d, typeof<byte>, FieldAttributes.Public) |> ignore
+
+                // create defined type and cache it
+                let typ = tb.CreateType()
+                typeCache.[typeName] <- typ
+                typ
+            )
+
+    /// C++ IdxTensors<nDims, nIdxs> struct ready for marshalling
+    let marshal (nit: NativeIdxTensors) =          
+        let nIdxs = nit.Idxs.Length
+        let nDims = nit.NDims
+        if not (nit.Idxs |> List.forall (Option.forall (fun it -> it.Shape.Length = nDims))) then
+            failwith "NDims does not match dimensionality of Idxs tensors"
+
+        // create struct 
+        let strctType = getType nDims nIdxs
+        let strct = Activator.CreateInstance(strctType)
+
+        // set data
+        let unspecIdx = {
+            DataType=typeof<int64>
+            BasePtr=nativeint 0
+            Offset=0L
+            Shape=List.replicate nDims 0L
+            Stride=List.replicate nDims 0L 
+        }
+        for d, idx in List.indexed nit.Idxs do
+            let idx, specified = 
+                match idx with
+                | Some idx -> NativeTensor.marshal idx, 1uy
+                | None -> NativeTensor.marshal unspecIdx, 0uy
+            strctType.GetField(sprintf "Idxs%d" d).SetValue(strct, idx)
+            strctType.GetField(sprintf "Specified%d" d).SetValue(strct, specified)
+        strct
+
+    /// C++ type string
+    let cppName (niti: NativeIdxTensorsInfo) =
+        sprintf "IdxTensors<%d, %d>" niti.NDims niti.NIdxs
+
+    /// C++ mangled name
+    let mangledName (niti: NativeIdxTensorsInfo) =
+        sprintf "IdxTensors_%d_%d" niti.NDims niti.NIdxs
+
+    let validInstance (niti: NativeIdxTensorsInfo) (nit: NativeIdxTensors) =
+        nit.NDims = niti.NDims &&
+        nit.Idxs.Length = niti.NIdxs
 
 
 /// CUDA module caching key.
@@ -236,6 +317,7 @@ module internal KernelCompiler =
 /// Argument type of a CUDA kernel
 type internal KernelArgType = 
     | ArgTypeTensor of NativeTensorInfo
+    | ArgTypeIdxTensors of NativeIdxTensorsInfo
     | ArgTypeScalar of Type
 
 /// Argument type of a CUDA kernel
@@ -243,17 +325,21 @@ module internal KernelArgType =
     let cppType at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.cppName nti
+        | ArgTypeIdxTensors niti -> NativeIdxTensors.cppName niti
         | ArgTypeScalar t -> Util.cppTypeInst t
 
     let mangleName at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.mangledName nti
+        | ArgTypeIdxTensors niti -> NativeIdxTensors.mangledName niti
         | ArgTypeScalar t -> Util.cppTypeInst t
 
     let marshal at (av: obj) =
         match at, av with
         | ArgTypeTensor nti, (:? NativeTensor as nt) when NativeTensor.validInstance nti nt ->
             NativeTensor.marshal nt
+        | ArgTypeIdxTensors niti, (:? NativeIdxTensors as nit) when NativeIdxTensors.validInstance niti nit ->
+            NativeIdxTensors.marshal nit
         | ArgTypeScalar t, av when av.GetType() = t -> 
             if t = typeof<bool> then
                 if av :?> bool then box 1uy else box 0uy
@@ -337,11 +423,20 @@ type internal CudaModule () =
         | None -> ()
 
 
-/// CUDA kernels for the CUDA tensor backend
-type internal TensorKernels (dataType: Type, nDims: int) as this =
-    inherit CudaModule()
-    static let headers = ["Elemwise.cuh"; "Reduction.cuh"]
+type internal InstanceCache<'T, 'K when 'K: equality> (create: 'K -> 'T) =
+    let cache = Dictionary<'K, 'T>()
+    member this.Get (key: 'K) =
+        lock cache (fun () ->
+            match cache.TryFind key with
+            | Some inst -> inst
+            | None ->
+                let inst = create key
+                cache.[key] <- inst
+                inst
+        )
 
+
+module internal KernelHelpers =
     /// returns the CUDA work dimensions (x, y, z) for work of given size
     let workDimForWorkSize workSize hetero : Cuda.WorkDim =
         match List.length workSize with
@@ -357,6 +452,22 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     /// returns the CUDA work dimensions (x, y, z) for an element-wise operation
     let workDimForElemwise (trgt: NativeTensor) =
         workDimForWorkSize trgt.Shape false
+
+    // useful type classifications
+    let fpTypes = [typeof<single>; typeof<double>]
+    let intTypes = [typeof<int8>; typeof<int16>; typeof<int32>; typeof<int64>
+                    typeof<uint8>; typeof<uint16>; typeof<uint32>; typeof<uint64>]
+    let numTypes = fpTypes @ intTypes
+    let boolTypes = [typeof<bool>]
+
+
+open KernelHelpers
+
+/// CUDA kernels for the CUDA tensor backend
+type internal TensorKernels private (dataType: Type, nDims: int) as this =
+    inherit CudaModule()
+    static let instances = InstanceCache TensorKernels   
+    static let headers = ["Elemwise.cuh"; "Reduction.cuh"]
 
     /// gets kernels of specifed name and argTypes, when dataType is in supTypes (if not empty)
     /// and not in unsupTypes
@@ -377,12 +488,6 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
     let argReductionTrgtTensor = ArgTypeTensor {DataType=typeof<int64>; NDims=nDims-1}        
     let boolTensor = ArgTypeTensor {DataType=typeof<bool>; NDims=nDims}
     let scalar = ArgTypeScalar dataType
-
-    let fpTypes = [typeof<single>; typeof<double>]
-    let intTypes = [typeof<int8>; typeof<int16>; typeof<int32>; typeof<int64>
-                    typeof<uint8>; typeof<uint16>; typeof<uint32>; typeof<uint64>]
-    let numTypes = fpTypes @ intTypes
-    let boolTypes = [typeof<bool>]
 
     // noary kernels
     let fillConst = getKernel "FillConst" [scalar; fullTensor] [] []
@@ -613,23 +718,30 @@ type internal TensorKernels (dataType: Type, nDims: int) as this =
 
     member this.ArgMaxLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
         let initial = minValueOf dataType
-        argMinLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+        argMaxLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+
+    static member Get (dataType, nDims) = instances.Get (dataType, nDims)
 
 
 
-/// CUDA kernels for the CUDA tensor backend
-module internal TensorKernels =
-    let private cache = Dictionary<Type * int, TensorKernels>()
+type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int, nSrcDims: int) as this =
+    inherit CudaModule()
+    static let instances = InstanceCache TensorGatherScatterKernels 
+    static let headers = ["GatherScatter.cuh"]
 
-    let get (dataType: Type, nDims: int) =
-        lock cache (fun () ->
-            match cache.TryFind (dataType, nDims) with
-            | Some tk -> tk
-            | None ->
-                let tk = TensorKernels (dataType, nDims)
-                cache.[(dataType, nDims)] <- tk
-                tk
-        )
+    let trgtTensor = ArgTypeTensor {DataType=dataType; NDims=nTrgtDims}
+    let srcTensor = ArgTypeTensor {DataType=dataType; NDims=nSrcDims}
+    let srcIdxs = ArgTypeIdxTensors {NDims=nTrgtDims; NIdxs=nSrcDims}
+
+    let gather = this.GetKernel "Gather" [trgtTensor; srcIdxs; srcTensor]
+
+    do this.Build (headers)
+
+    member this.Gather (stream, trgt: NativeTensor, srcIdxs: NativeIdxTensors, src: NativeTensor) =         
+        gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src|])
+
+    static member Get (dataType, nTrgtDims, nSrcDims) = 
+        instances.Get (dataType, nTrgtDims, nSrcDims)
 
 
 
