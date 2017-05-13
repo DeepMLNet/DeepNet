@@ -85,8 +85,8 @@ let testCuda () =
 [<EntryPoint>]
 let main argv = 
     Tensor.Utils.Util.disableCrashDialog ()
-    testCuda()
-    exit 0
+    //testCuda()
+    //exit 0
 
 
     let shape = [10000L; 1000L]

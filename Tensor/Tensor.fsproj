@@ -69,6 +69,7 @@
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
+    <Compile Include="BlasSupport.fs" />
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
     <Compile Include="NumpyFiles.fs" />

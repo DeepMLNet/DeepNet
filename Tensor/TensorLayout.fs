@@ -38,7 +38,8 @@ module TensorLayoutTypes =
     /// For slicing: inserts a new axis of size one.
     let NewAxis = Int64.MinValue + 1L
 
-    /// For slicing: fills all remaining axes with size one.
+    /// For slicing: fills all remaining axes with size one. 
+    /// Cannot be used together with NewAxis.
     let Fill = Int64.MinValue + 2L
 
     /// For reshape: remainder, so that number of elements stays constant.
