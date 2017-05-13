@@ -20,7 +20,27 @@ module Cfg =
     let mutable RestrictKernels = false
     let mutable DebugCompile = false
     let mutable DisableKernelCache = false
-    let mutable GatherScatterStacktrace = false
+
+
+/// CUDA backend configuration
+type Cfg () = 
+
+    static let stream = new ThreadLocal<CUstream> (fun () -> CUstream.NullStream)
+    static let gatherScatterStacktrace = new ThreadLocal<bool> (fun () -> false)
+
+    /// The CUDA stream to execute CUDA operations on.
+    /// This setting is local to the calling thread and defaults to the null stream.
+    static member Stream
+        with get() = stream.Value
+        and set(v) = stream.Value <- v
+
+    /// If set to true, gather and scatter operations produce and acurate stack trace
+    /// when an invalid index is encountered. However, this affects performance slightly.
+    /// This setting is local to the calling thread and defaults to false.
+    static member GatherScatterStacktrace
+        with get() = gatherScatterStacktrace.Value
+        and set(v) = gatherScatterStacktrace.Value <- v
+        
 
 
 /// Dynamic type helpers.

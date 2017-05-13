@@ -215,6 +215,14 @@ module internal CudaBLASExtensions =
             let ptr = this.Ptr |> SizeT |> CUdeviceptr
             new CudaDeviceVariable<'T> (ptr, false, SizeT 4)    
 
+    type CUBLAS =
+        static member Invoke<'T, 'R> (stream, ?singleFn, ?doubleFn, ?int32Fn, ?int64Fn)  =
+            lock Cuda.blas (fun () ->
+                Cuda.blas.Stream <- stream
+                BLAS.Invoke<'T,'R>
+                    (?singleFn=singleFn, ?doubleFn=doubleFn, ?int32Fn=int32Fn, ?int64Fn=int64Fn)
+            )
+
 open CudaBLASExtensions
 
 /// type neutral interface to a CudaStorageT
@@ -295,8 +303,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     let kernels = TensorKernels.Get (typeof<'T>, layout.NDims)
 
-    let stream () = CUstream.NullStream
-
     let unsup op =
         let msg = 
             sprintf "the CUDA tensor backend currently does not support the %s operation" op
@@ -304,18 +310,18 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
     let callUnary fn trgt src1 : unit =
         let trgt, src1 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1)
-        fn (stream(), trgt, src1)
-        Cuda.keepAliveMany (stream()) [trgt; src1]
+        fn (Cfg.Stream, trgt, src1)
+        Cuda.keepAliveMany Cfg.Stream [trgt; src1]
 
     let callBinary fn trgt src1 src2 : unit =
         let trgt, src1, src2 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2)
-        fn (stream(), trgt, src1, src2)
-        Cuda.keepAliveMany (stream()) [trgt; src1; src2]
+        fn (Cfg.Stream, trgt, src1, src2)
+        Cuda.keepAliveMany Cfg.Stream [trgt; src1; src2]
 
     let callTenary fn trgt src1 src2 src3 : unit =
         let trgt, src1, src2, src3 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2, src3)
-        fn (stream(), trgt, src1, src2, src3)
-        Cuda.keepAliveMany (stream()) [trgt; src1; src2; src3]
+        fn (Cfg.Stream, trgt, src1, src2, src3)
+        Cuda.keepAliveMany Cfg.Stream [trgt; src1; src2; src3]
 
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
@@ -376,10 +382,16 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.Item 
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
+           
+        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = 
+            let s =
+                TensorLayout.allIdx layout 
+                |> Seq.map (fun idx -> (this :> ITensorBackend<'T>).[List.toArray idx])
+            s.GetEnumerator()
 
-        member this.GetEnumerator() : System.Collections.IEnumerator = raise (System.NotImplementedException())
-        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = raise (System.NotImplementedException())
-
+        member this.GetEnumerator() : System.Collections.IEnumerator = 
+            (this :> System.Collections.Generic.IEnumerable<'T>).GetEnumerator() 
+            :> System.Collections.IEnumerator
 
         member this.Transfer (trgt, src) =
             /// gets CUDA registered or pinned memory
@@ -402,13 +414,13 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     let srcMemOffsetPtr = srcMemPtr + nativeint (sizeof64<'T> * src.Layout.Offset)
                     let trgtMemOffsetPtr = trgtMemPtr + nativeint (sizeof64<'T> * trgt.Layout.Offset)
                     use srcRegMem = new CudaRegisteredHostMemory<byte> (srcMemOffsetPtr, SizeT sizeInBytes)
-                    if stream() = CUstream.NullStream then
+                    if Cfg.Stream = CUstream.NullStream then
                         srcRegMem.SynchronCopyToDevice (CUdeviceptr (SizeT trgtMemOffsetPtr))
                     else
-                        srcRegMem.AsyncCopyToDevice(CUdeviceptr (SizeT trgtMemOffsetPtr), stream())
+                        srcRegMem.AsyncCopyToDevice(CUdeviceptr (SizeT trgtMemOffsetPtr), Cfg.Stream)
                    
-                    Cuda.callback (stream()) (fun () -> srcMemHnd.Dispose())
-                    Cuda.keepAliveMany (stream()) [trgtStorage; srcStorage]
+                    Cuda.callback Cfg.Stream (fun () -> srcMemHnd.Dispose())
+                    Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
                     true
 
                 // transfer from CUDA to host
@@ -420,13 +432,13 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     let srcMemOffsetPtr = srcMemPtr + nativeint (sizeof64<'T> * src.Layout.Offset)
                     let trgtMemOffsetPtr = trgtMemPtr + nativeint (sizeof64<'T> * trgt.Layout.Offset)
                     use trgtRegMem = new CudaRegisteredHostMemory<byte> (trgtMemOffsetPtr, SizeT sizeInBytes)
-                    if stream() = CUstream.NullStream then
+                    if Cfg.Stream = CUstream.NullStream then
                         trgtRegMem.SynchronCopyToHost(CUdeviceptr (SizeT srcMemOffsetPtr))
                     else
-                        trgtRegMem.AsyncCopyFromDevice(CUdeviceptr (SizeT srcMemOffsetPtr), stream())
+                        trgtRegMem.AsyncCopyFromDevice(CUdeviceptr (SizeT srcMemOffsetPtr), Cfg.Stream)
                    
-                    Cuda.callback (stream()) (fun () -> trgtMemHnd.Dispose())
-                    Cuda.keepAliveMany (stream()) [trgtStorage; srcStorage]
+                    Cuda.callback Cfg.Stream (fun () -> trgtMemHnd.Dispose())
+                    Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
                     true
                 | _ -> false
 
@@ -449,8 +461,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
         member this.FillConst (value, trgt) = 
             let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
-            kernels.FillConst (stream(), box value, trgt)
-            Cuda.keepAlive (stream()) trgt
+            kernels.FillConst (Cfg.Stream, box value, trgt)
+            Cuda.keepAlive Cfg.Stream trgt
 
         member this.Copy(trgt, src) = 
             if TensorLayout.hasContiguousMemory trgt.Layout && 
@@ -463,13 +475,13 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                                                     SizeT (sizeof64<'T> * src.Layout.Offset),
                                                     SizeT (sizeof64<'T> * trgt.Layout.Offset),
                                                     SizeT (sizeof64<'T> * src.NElems),
-                                                    stream())
-                Cuda.keepAliveMany (stream()) [trgtStorage; srcStorage]
+                                                    Cfg.Stream)
+                Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
             else
                 // call copy kernel
                 let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
-                kernels.Copy(stream(), trgt, src)
-                Cuda.keepAliveMany (stream()) [trgt; src]
+                kernels.Copy(Cfg.Stream, trgt, src)
+                Cuda.keepAliveMany Cfg.Stream [trgt; src]
 
         member this.Convert(trgt: Tensor<'T>, src: Tensor<'S>) =
             let convKernels = TensorConvertKernels.Get (typeof<'T>, typeof<'S>, trgt.NDims)
@@ -538,8 +550,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 Idxs  = srcIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
             }
             let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
-            gsKernels.Gather (stream(), trgt, srcIdxs, src)
-            Cuda.keepAliveMany (stream()) [trgt; srcIdxs; src]
+            gsKernels.Gather (Cfg.Stream, trgt, srcIdxs, src)
+            Cuda.keepAliveMany Cfg.Stream [trgt; srcIdxs; src]
 
         member this.Scatter(trgt, trgtIdxs, src) = 
             let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
@@ -548,62 +560,63 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 Idxs  = trgtIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
             }
             let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
-            kernels.FillConst (stream(), box (conv<'T> 0), trgt)
-            gsKernels.Scatter (stream(), trgt, trgtIdxs, src)
-            Cuda.keepAliveMany (stream()) [trgt; trgtIdxs; src]
+            kernels.FillConst (Cfg.Stream, box (conv<'T> 0), trgt)
+            gsKernels.Scatter (Cfg.Stream, trgt, trgtIdxs, src)
+            Cuda.keepAliveMany Cfg.Stream [trgt; trgtIdxs; src]
 
         member this.VecVecDot (trgt, a, b) =
-            Cuda.blas.Stream <- stream()
             use x = BLAS.GetVector (a, isSource=true, isTarget=false)
             use y = BLAS.GetVector (b, isSource=true, isTarget=false)
             use t = BLAS.GetScalar (trgt)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> Cuda.blas.Dot (x.CPtr<single>(a.NElems), x.CInc, 
+            CUBLAS.Invoke<'T, unit>
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.Dot (x.CPtr<single>(a.NElems), x.CInc, 
                                                     y.CPtr(a.NElems), y.CInc, t.CPtr())),
                  doubleFn=(fun () -> Cuda.blas.Dot (x.CPtr<double>(a.NElems), x.CInc, 
                                                     y.CPtr(a.NElems), y.CInc, t.CPtr())))
-            Cuda.keepAliveMany (stream()) [x; y; t]
+            Cuda.keepAliveMany Cfg.Stream [x; y; t]
 
         member this.MatVecDot (trgt, a, b) =
-            Cuda.blas.Stream <- stream()
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use x = BLAS.GetVector (b, isSource=true, isTarget=false)
             use y = BLAS.GetVector (trgt, isSource=false, isTarget=true)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> Cuda.blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0f,
+            CUBLAS.Invoke<'T, unit>
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0f,
                                                      a.CPtr(), a.CLd, x.CPtr(), x.CInc,
                                                      0.0f, y.CPtr(), y.CInc)),
                  doubleFn=(fun () -> Cuda.blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0,
                                                      a.CPtr(), a.CLd, x.CPtr(), x.CInc,
                                                      0.0, y.CPtr(), y.CInc)))  
             y.FetchResult()
-            Cuda.keepAliveMany (stream()) [a; x; y]
+            Cuda.keepAliveMany Cfg.Stream [a; x; y]
 
         member this.MatMatDot (trgt, a, b) =
-            Cuda.blas.Stream <- stream()
+            Cuda.blas.Stream <- Cfg.Stream
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> Cuda.blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
+            CUBLAS.Invoke<'T, unit>
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
                                                      1.0f, a.CPtr(), a.CLd, b.CPtr(), b.CLd,
                                                      0.0f, c.CPtr(), c.CLd)),
                  doubleFn=(fun () -> Cuda.blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
                                                      1.0, a.CPtr(), a.CLd, b.CPtr(), b.CLd,
                                                      0.0, c.CPtr(), c.CLd)))                                                      
             c.FetchResult()
-            Cuda.keepAliveMany (stream()) [a; b; c]
+            Cuda.keepAliveMany Cfg.Stream [a; b; c]
 
         member this.BatchedMatMatDot (trgt, a, b) =
-            Cuda.blas.Stream <- stream()
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            let aPtrs, aDispose = a.CPtrs (stream())
-            let bPtrs, bDispose = b.CPtrs (stream())
-            let cPtrs, cDispose = c.CPtrs (stream())
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> Cuda.blas.GemmBatched (a.CTrans, b.CTrans, 
+            let aPtrs, aDispose = a.CPtrs Cfg.Stream
+            let bPtrs, bDispose = b.CPtrs Cfg.Stream
+            let cPtrs, cDispose = c.CPtrs Cfg.Stream
+            CUBLAS.Invoke<'T, unit>
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.GemmBatched (a.CTrans, b.CTrans, 
                                                             a.COpRows, b.COpCols, a.COpCols, 1.0f,
                                                             aPtrs, a.CLd, bPtrs, b.CLd,
                                                             0.0f, cPtrs, c.CLd,
@@ -617,14 +630,12 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             bDispose()
             cDispose()
             c.FetchResult()
-            Cuda.keepAliveMany (stream()) [a; b; c]
+            Cuda.keepAliveMany Cfg.Stream [a; b; c]
 
         member this.BatchedInvert (trgt, src) =
-            Cuda.blas.Stream <- stream()
             ()
 
         member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
-            Cuda.blas.Stream <- stream()
             ()
 
         // unsupported for now on CUDA
