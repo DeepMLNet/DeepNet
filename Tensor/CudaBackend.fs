@@ -1,6 +1,9 @@
 ﻿namespace Tensor
 
 open System
+open System.Runtime
+open System.Threading
+open System.Runtime.InteropServices
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
@@ -23,6 +26,9 @@ exception CudaError of msg:string with override __.Message = __.msg
 /// CUDA helpers
 module private CudaHelpers =
 
+    /// minimum available CUDA memory before triggering GC
+    let minAvailMem = 100000000L
+
     /// the CUDA context we are using
     let mutable context = None
 
@@ -39,10 +45,25 @@ module private CudaHelpers =
     /// create a new CUDA device variable
     let newDevVar<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
             (elems: int64) = 
+
+        let sizeInBytes = elems * sizeof64<'T>        
+        let rec checkFreeMem retries = 
+            let freeMem = Cuda.context.GetFreeDeviceMemorySize() |> int64
+            if freeMem < (sizeInBytes + 10000L) || freeMem < minAvailMem then
+                GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
+                GC.Collect (2, GCCollectionMode.Forced, true, true)
+                Thread.Yield() |> ignore
+                if retries < 3 then
+                    Thread.Sleep(20)
+                if retries > 0 then
+                    checkFreeMem (retries - 1)
+        checkFreeMem 10
+
+        //printfn "freemem is %d MB" (freeMem / 1000000L)
+
         try new CudaDeviceVariable<'T> (SizeT elems)
         with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
                                      || e.CudaError = CUResult.ErrorUnknown ->
-            let sizeInBytes = elems * sizeof64<'T>
             let msg = 
                 sprintf "CUDA memory allocation of %d MB failed (%A)" 
                         (sizeInBytes / pown 2L 20) e.CudaError
@@ -174,7 +195,6 @@ module CudaRegMem =
               
 
 module internal CudaBLASExtensions = 
-    open System.Runtime.InteropServices
 
     type Tensor.Backend.BLAS.MatrixInfo with
         member this.CTrans = 
@@ -293,7 +313,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             let d = { new IDisposable with member this.Dispose() = () }
             d, Cuda.getIntPtr this.Data.DevicePointer
 
-
+/// type-neutral interface to CUDA backend for tensors
 and ITensorCudaBackend =
     abstract NativeTensor: NativeTensor
 
@@ -636,8 +656,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.BatchedInvert (trgt, src) =
             let size = trgt.Shape.[trgt.NDims-2]
 
-            let tmp = Tensor.copy (src, order=BLAS.MatrixOrder trgt.NDims)
-            use a = BLAS.GetMatrix (tmp, isSource=true, isTarget=false, canTranspose=false)
+            let lu = Tensor.copy (src, order=BLAS.MatrixOrder trgt.NDims)
+            use a = BLAS.GetMatrix (lu, isSource=true, isTarget=false, canTranspose=false)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
             let aPtrs, aDispose = a.CPtrs Cfg.Stream
             let cPtrs, cDispose = c.CPtrs Cfg.Stream
