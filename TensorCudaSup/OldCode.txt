@@ -79,3 +79,14 @@ void CopyHeterogenous(Tensor<T, TTrgtDims> &trgt, const Tensor<T, TSrcDims> &src
 };
 
 
+extern "C" __global__
+void CopyHeterogenous_Float_3_3(Tensor<float, 3> trgt, Tensor<float, 3> src) {
+	CopyHeterogenous(trgt, src);
+}
+
+
+extern "C" __global__
+void CopyHeterogenous_Float_3_4(Tensor<float, 3> trgt, Tensor<float, 4> src) {
+	CopyHeterogenous(trgt, src);
+}
+

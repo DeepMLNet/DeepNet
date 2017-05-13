@@ -164,8 +164,7 @@ type internal BLAS =
         match BLAS.GetMatrixInfo (mat, canTranspose=canTranspose) with
         | Some bi -> bi
         | None when allowCopy ->
-            let order = [mat.NDims-2; mat.NDims-1] @ [0 .. mat.NDims-3]
-            let tmp = Tensor<'T> (mat.Shape, mat.Device, order=CustomOrder order)
+            let tmp = Tensor<'T> (mat.Shape, mat.Device, order=BLAS.MatrixOrder mat.NDims)
             if isSource then tmp.CopyFrom mat
             let fetchFn () = if isTarget then mat.CopyFrom tmp
             BLAS.GetMatrixInfo (tmp, canTranspose=canTranspose, fetchFn=fetchFn) 
@@ -174,6 +173,9 @@ type internal BLAS =
             failwithf "tensor with shape %A and strides %A is not a valid BLAS matrix"
                       mat.Shape mat.Layout.Stride
 
+    /// best order for matrix
+    static member MatrixOrder (nDims: int) =
+        CustomOrder ([nDims-2; nDims-1] @ [0 .. nDims-3])
 
     /// Call BLAS/LAPACK function depending on data type.
     static member Invoke<'T, 'R> (?singleFn: unit -> 'R, 

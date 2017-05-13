@@ -302,6 +302,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     (layout: TensorLayout, storage: TensorCudaStorage<'T>) =
 
     let kernels = TensorKernels.Get (typeof<'T>, layout.NDims)
+    let blasSupportKernels = BlasSupportKernels.Get ()
 
     let unsup op =
         let msg = 
@@ -633,7 +634,36 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             Cuda.keepAliveMany Cfg.Stream [a; b; c]
 
         member this.BatchedInvert (trgt, src) =
-            ()
+            let size = trgt.Shape.[trgt.NDims-2]
+
+            let tmp = Tensor.copy (src, order=BLAS.MatrixOrder trgt.NDims)
+            use a = BLAS.GetMatrix (tmp, isSource=true, isTarget=false, canTranspose=false)
+            use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
+            let aPtrs, aDispose = a.CPtrs Cfg.Stream
+            let cPtrs, cDispose = c.CPtrs Cfg.Stream
+
+            // compute LU factorization
+            let ipiv = new CudaDeviceVariable<int> (SizeT (size * a.BatchSize))
+            let info = new CudaDeviceVariable<int> (SizeT a.BatchSize)
+            CUBLAS.Invoke<'T, unit> 
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.GetrfBatchedS (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)),
+                 doubleFn=(fun () -> Cuda.blas.GetrfBatchedD (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)))
+            if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
+                raise (SingularMatrixError "cannot invert singular matrix")
+
+            // compute matrix inverse
+            CUBLAS.Invoke<'T, unit> 
+                (Cfg.Stream,
+                 singleFn=(fun () -> Cuda.blas.GetriBatchedS (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)),
+                 doubleFn=(fun () -> Cuda.blas.GetriBatchedD (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)))
+            if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
+                raise (SingularMatrixError "cannot invert singular matrix")
+
+            aDispose()
+            cDispose()
+            c.FetchResult()
+            Cuda.keepAliveMany Cfg.Stream [a; c]
 
         member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) =
             ()

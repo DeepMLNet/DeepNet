@@ -7,7 +7,7 @@ let testCuda () =
     let shape = [5L; 5L]
 
     //Tensor.Cuda.Backend.Cfg.DebugCompile <- true
-    Tensor.Cuda.Backend.Cfg.GatherScatterStacktrace <- true
+    Tensor.Cuda.Backend.Cfg.Stacktrace <- true
 
     let a = HostTensor.ones<single> shape
     printfn "a=\n%A" a
@@ -26,6 +26,15 @@ let testCuda () =
     printfn "fill cuda..."
     cb.FillConst(-5.5f)
     printfn "cb=\n%A" cb
+
+    printfn "cuda diagonal * 3..."
+    let cdiag = 3.0f * CudaTensor.identity 3L
+    printfn "cdiag=\n%A" cdiag
+
+    printfn "cuda invert..."
+    //let cinv = Tensor.invert cb
+    let cinv = Tensor.invert cdiag
+    printfn "cinv=\n%A" cinv
 
     printfn "cuda abs..."
     let cb = abs cb

@@ -7,6 +7,8 @@
     <ClInclude Include="Work.cuh" />
     <ClInclude Include="Elemwise.cuh" />
     <ClInclude Include="Reduction.cuh" />
+    <ClInclude Include="GatherScatter.cuh" />
+    <ClInclude Include="BlasSupport.cuh" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="OldCode.txt" />

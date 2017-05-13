@@ -26,7 +26,7 @@ module Cfg =
 type Cfg () = 
 
     static let stream = new ThreadLocal<CUstream> (fun () -> CUstream.NullStream)
-    static let gatherScatterStacktrace = new ThreadLocal<bool> (fun () -> false)
+    static let stacktrace = new ThreadLocal<bool> (fun () -> false)
 
     /// The CUDA stream to execute CUDA operations on.
     /// This setting is local to the calling thread and defaults to the null stream.
@@ -34,12 +34,13 @@ type Cfg () =
         with get() = stream.Value
         and set(v) = stream.Value <- v
 
-    /// If set to true, gather and scatter operations produce and acurate stack trace
-    /// when an invalid index is encountered. However, this affects performance slightly.
+    /// If set to true, CUDA operations produce an acurate stack trace
+    /// when an error is encountered. However, this affects performance,
+    /// even if no error occurs.
     /// This setting is local to the calling thread and defaults to false.
-    static member GatherScatterStacktrace
-        with get() = gatherScatterStacktrace.Value
-        and set(v) = gatherScatterStacktrace.Value <- v
+    static member Stacktrace
+        with get() = stacktrace.Value
+        and set(v) = stacktrace.Value <- v
         
 
 
@@ -776,19 +777,19 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
     do this.Build (headers)
 
     member this.Gather (stream, trgt: NativeTensor, srcIdxs: NativeIdxTensors, src: NativeTensor) =         
-        let trapOnError = not Cfg.GatherScatterStacktrace
+        let trapOnError = not Cfg.Stacktrace
         gather (stream, workDimForElemwise trgt, [|box trgt; box srcIdxs; box src; 
                                                    box errorPtr; box trapOnError|])
         this.CheckError (stream)
 
     member this.Scatter (stream, trgt: NativeTensor, trgtIdxs: NativeIdxTensors, src: NativeTensor) =         
-        let trapOnError = not Cfg.GatherScatterStacktrace
+        let trapOnError = not Cfg.Stacktrace
         scatter (stream, workDimForElemwise src, [|box trgt; box trgtIdxs; box src; 
                                                    box errorPtr; box trapOnError|])
         this.CheckError (stream)
 
     member this.CheckError (stream) =
-        if Cfg.GatherScatterStacktrace then
+        if Cfg.Stacktrace then
             if stream <> CUstream.NullStream then
                 Cuda.context.Synchronize()
             let hasError = ref 0
@@ -823,7 +824,44 @@ type internal TensorConvertKernels private (trgtDataType: Type, srcDataType: Typ
 
 
 
-        
+type internal BlasSupportKernels private () as this =
+    inherit CudaModule()
+    static let mutable instance = None 
+    static let headers = ["BlasSupport.cuh"]
+
+    let error = new CudaDeviceVariable<int32> (SizeT 1)
+    do error.Memset (0u)
+    let errorPtr = Cuda.getIntPtr error.DevicePointer
+
+    let checkBlasInfo = 
+        this.GetKernel "CheckBlasInfo" 
+            [ArgTypeScalar typeof<nativeint>; ArgTypeScalar typeof<int>; 
+             ArgTypeScalar typeof<nativeint>; ArgTypeScalar typeof<bool>]
+
+    do this.Build (headers)
+
+    member this.CheckBlasInfo (stream, info: CudaDeviceVariable<int>) = 
+        let trapOnError = not Cfg.Stacktrace
+        let infoPtr = Cuda.getIntPtr info.DevicePointer
+        let batchSize = int info.Size
+        let workDim = (int64 batchSize, 1L, 1L)
+        checkBlasInfo (stream, workDim, [|box infoPtr; box batchSize; box errorPtr; box trapOnError|])
+
+        if Cfg.Stacktrace then
+            if stream <> CUstream.NullStream then Cuda.context.Synchronize()
+            let hasError = ref 0
+            error.CopyToHost (hasError)
+            !hasError = 0 
+        else
+            true
+
+    static member Get () = 
+        match instance with
+        | Some instance -> instance
+        | None ->
+            let inst = BlasSupportKernels()
+            instance <- Some inst
+            inst
 
 
         

@@ -156,6 +156,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BlasSupport.cuh" />
     <ClInclude Include="Common.cuh" />
     <ClInclude Include="Elemwise.cuh">
       <FileType>CppCode</FileType>
