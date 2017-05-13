@@ -109,7 +109,6 @@ let main argv =
     testCuda()
     exit 0
 
-
     let shape = [10000L; 1000L]
     printfn "Shape: %A" shape
 
