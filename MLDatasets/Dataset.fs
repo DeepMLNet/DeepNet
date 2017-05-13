@@ -163,7 +163,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
     member this.SampleType = typeof<'S>
 
     /// storage location
-    member this.Location = fieldStorages.[0].Device
+    member this.Location = fieldStorages.[0].Dev
 
     /// Generates a function that returns a sequence of batches with the given size of this dataset.
     /// If the number of samples in this dataset is not a multiple of the batch size,
@@ -180,7 +180,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
                 |> List.map (fun fsAll ->
                     let shpAll = Tensor.shape fsAll
                     let shpBatch = shpAll |> List.set 0 batchSize                    
-                    let fsBatch = Tensor.NewOfType (shpBatch, fsAll.DataType, fsAll.Device, order=RowMajor)
+                    let fsBatch = Tensor.NewOfType (shpBatch, fsAll.DataType, fsAll.Dev, order=RowMajor)
                     fsBatch.[0L .. lastBatchElems-1L, Fill] <- fsAll.[lastBatchStart .. nSamples-1L, Fill]
                     fsBatch)
                 |> Some
@@ -267,7 +267,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
         let prefixPath = defaultArg hdfPrefixPath ""
         let fldInfos = FSharpType.GetRecordFields this.SampleType
         for fldInfo, fs in Seq.zip fldInfos this.FieldStorages do
-            if fs.Device <> HostTensor.Dev then 
+            if fs.Dev <> HostTensor.Dev then 
                 failwith "can only save a dataset stored on the host"
             HostTensor.write hdf (prefixPath + "/" + fldInfo.Name) fs
 
@@ -359,7 +359,7 @@ module Dataset =
                 let fs =
                     // pad if necessary
                     if padSteps > nSteps then
-                        let z = Tensor.NewOfType ([ds.NSamples; padSteps] @ rShp, fs.DataType, fs.Device)   
+                        let z = Tensor.NewOfType ([ds.NSamples; padSteps] @ rShp, fs.DataType, fs.Dev)   
                         z.FillZero()
                         z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]
                         z

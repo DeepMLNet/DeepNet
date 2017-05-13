@@ -301,7 +301,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
     interface ITensorStorage<'T> with
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Device =
+        member this.Dev =
             TensorCudaDevice.Instance :> ITensorDevice
 
     interface ITensorCudaStorage with
@@ -475,7 +475,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             else
                 // target is not in row-major order, transfer to temporary tensor
                 // and copy into target
-                let tmp = Tensor<'T> (trgt.Shape, trgt.Device, order=RowMajor)
+                let tmp = Tensor<'T> (trgt.Shape, trgt.Dev, order=RowMajor)
                 if doTransfer tmp src then
                     trgt.CopyFrom tmp
                     true

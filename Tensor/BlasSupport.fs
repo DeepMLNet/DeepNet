@@ -123,7 +123,7 @@ type internal BLAS =
         match BLAS.GetVectorInfo (vec) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T>(vec.Shape, vec.Device, order=ColumnMajor)
+            let tmp = Tensor<'T>(vec.Shape, vec.Dev, order=ColumnMajor)
             if isSource then tmp.CopyFrom vec
             let fetchFn () = if isTarget then vec.CopyFrom tmp
             BLAS.GetVectorInfo (tmp, fetchFn=fetchFn) 
@@ -164,7 +164,7 @@ type internal BLAS =
         match BLAS.GetMatrixInfo (mat, canTranspose=canTranspose) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T> (mat.Shape, mat.Device, order=BLAS.MatrixOrder mat.NDims)
+            let tmp = Tensor<'T> (mat.Shape, mat.Dev, order=BLAS.MatrixOrder mat.NDims)
             if isSource then tmp.CopyFrom mat
             let fetchFn () = if isTarget then mat.CopyFrom tmp
             BLAS.GetMatrixInfo (tmp, canTranspose=canTranspose, fetchFn=fetchFn) 

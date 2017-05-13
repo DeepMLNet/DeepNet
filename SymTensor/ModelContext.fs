@@ -332,7 +332,7 @@ module ModelContextTypes =
             symSizeEnv <- Map.join symSizeEnv inferredSizes
 
             // infer location and strides
-            varLocs <- varLocs |> Map.add (Expr.extractVar var) (Tensor.device value)
+            varLocs <- varLocs |> Map.add (Expr.extractVar var) (Tensor.dev value)
             varStrides <- varStrides |> Map.add (Expr.extractVar var) (value.Layout.Stride)
 
         /// Inferred size symbol values
@@ -428,7 +428,7 @@ module ModelContextTypes =
             let psVal = parameterStorage.Flat
             let varLocs =
                 compileEnv.VarLocs
-                |> Map.add psVar (Tensor.device psVal)
+                |> Map.add psVar (Tensor.dev psVal)
             let varStrides =
                 compileEnv.VarStrides
                 |> Map.add psVar psVal.Layout.Stride

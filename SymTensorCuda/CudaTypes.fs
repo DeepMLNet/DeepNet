@@ -649,7 +649,7 @@ module ArgTemplates =
 
         let tbl = Interpolator.getTableAsIArrayNDT ip
         do
-            if tbl.Device <> CudaTensor.Dev then
+            if tbl.Dev <> CudaTensor.Dev then
                 failwith "interpolation table must be stored on CUDA device"
             if ip.NDims > 3 then
                 failwith "interpolation on CUDA device is currently only supported for up to 3 dimensions"

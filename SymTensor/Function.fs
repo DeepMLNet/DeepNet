@@ -116,7 +116,7 @@ module VarEnv =
 
     /// gets the locations of the variable value arrays
     let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> Tensor.device vVal)
+        varEnv |> Map.map (fun _ vVal -> Tensor.dev vVal)
 
     /// gets the strides of the variable value arrays
     let valueStrides (varEnv: VarEnvT) : VarStridesT =

@@ -121,7 +121,7 @@ module Interpolator =
 
                         // hack to work around slow ArrayNDCuda operations
                         let tbl, wasOnDev = 
-                            match tbl.Device with
+                            match tbl.Dev with
                             | dev when dev=CudaTensor.Dev -> HostTensor.transfer tbl, true
                             | _ -> tbl, false
 
@@ -137,7 +137,7 @@ module Interpolator =
                                             [for d, s in List.indexed tbl.Shape do
                                                 if d = dd then yield 1L
                                                 else yield s]
-                                        let zero = Tensor.zeros diffTbl.Device zeroShp 
+                                        let zero = Tensor.zeros diffTbl.Dev zeroShp 
                                         Tensor.concat dd [diffTbl; zero]
                                     | InterpolateToLeft ->
                                         Tensor.zerosLike tbl

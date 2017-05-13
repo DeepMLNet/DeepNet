@@ -1437,7 +1437,7 @@ type TensorHostStorage<'T> (data: 'T []) =
     interface ITensorStorage<'T> with
         member this.Backend layout =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Device = 
+        member this.Dev = 
             TensorHostDevice.Instance :> ITensorDevice
 
     interface ITensorHostStorage with
@@ -1949,8 +1949,8 @@ and TensorHostDevice private () =
 module internal HostTensorHelpers = 
 
     let ensureCAndOffsetFree (x: Tensor<'T>) =
-        if x.Device <> (TensorHostDevice.Instance :> ITensorDevice) then
-            let msg = sprintf "require a Host tensor but got a %s tensor" x.Device.Id
+        if x.Dev <> (TensorHostDevice.Instance :> ITensorDevice) then
+            let msg = sprintf "require a Host tensor but got a %s tensor" x.Dev.Id
             raise (StorageMismatch msg)
         if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
         else Tensor.copy (x, order=RowMajor)
