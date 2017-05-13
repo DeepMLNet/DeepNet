@@ -42,24 +42,25 @@ module private CudaHelpers =
                 let msg = sprintf "cannot create CUDA context: %s" e.Message
                 raise (CudaError msg)
 
+    /// tries to obtain neededMem bytes of CUDA memory by invoking the GC if necessary
+    let rec tryObtainMem neededMem retries = 
+        let freeMem = Cuda.context.GetFreeDeviceMemorySize() |> int64
+        if freeMem < (neededMem + 10000L) || freeMem < minAvailMem then
+            GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
+            GC.Collect (2, GCCollectionMode.Forced, true, true)
+            Thread.Yield() |> ignore
+            if retries < 3 then
+                Thread.Sleep(20)
+            if retries > 0 then
+                tryObtainMem neededMem (retries - 1)
+        //printfn "CUDA has %d MB available" (freeMem / 1000000L)
+
     /// create a new CUDA device variable
     let newDevVar<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
             (elems: int64) = 
 
         let sizeInBytes = elems * sizeof64<'T>        
-        let rec checkFreeMem retries = 
-            let freeMem = Cuda.context.GetFreeDeviceMemorySize() |> int64
-            if freeMem < (sizeInBytes + 10000L) || freeMem < minAvailMem then
-                GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
-                GC.Collect (2, GCCollectionMode.Forced, true, true)
-                Thread.Yield() |> ignore
-                if retries < 3 then
-                    Thread.Sleep(20)
-                if retries > 0 then
-                    checkFreeMem (retries - 1)
-        checkFreeMem 10
-
-        //printfn "freemem is %d MB" (freeMem / 1000000L)
+        tryObtainMem sizeInBytes 10
 
         try new CudaDeviceVariable<'T> (SizeT elems)
         with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
