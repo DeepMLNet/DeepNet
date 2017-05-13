@@ -1838,6 +1838,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                        a.CTrans, a.Rows, a.Cols, 1.0,
                                                        a.Ptr, a.Ld, x.Ptr, x.Inc,
                                                        0.0, y.Ptr, y.Inc)))  
+            y.FetchResult()
 
         member this.MatMatDot (trgt, a, b) =
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
@@ -1851,7 +1852,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                  doubleFn=(fun () -> BLAS.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
                                                        a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
                                                        1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
-                                                       0.0, c.Ptr, c.Ld)))                                                      
+                                                       0.0, c.Ptr, c.Ld)))              
+            c.FetchResult()
 
         member this.BatchedMatMatDot (trgt, a, b) =
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
@@ -1870,6 +1872,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                              a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
                                                              [|0.0|], c.Ptrs, [|c.Ld|],
                                                              1L, [|a.BatchSize|])))
+            c.FetchResult()
 
         member this.BatchedInvert (trgt, src) =
             // inversion is done in place, so we have to copy first if trgt and src are different
@@ -1897,6 +1900,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                          doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
+            a.FetchResult()
 
         member this.SymmetricEigenDecomposition (part, eigVals, eigVecs, src) =
             let size = src.Shape.[0]
@@ -1915,6 +1919,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                      doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)))
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
+            a.FetchResult()
+            w.FetchResult()
 
         member this.GetEnumerator() : IEnumerator<'T> = 
             let s = seq {

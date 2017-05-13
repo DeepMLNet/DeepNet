@@ -77,6 +77,10 @@ let ``Batched matrix-vector dot product`` () =
     for n in 0L .. N-1L do
         for m in 0L .. M-1L do
             cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
+
+    printfn "c=\n%A" c
+    printfn "cr=\n%A" cr
+
     Tensor.almostEqual c cr |> Assert.True
     
 
