@@ -137,7 +137,7 @@ module internal BLAS =
                                       nativeint a, lapack_int lda,
                                       nativeint w)
 
-module internal BLASExtensions = 
+module internal HostBLASExtensions = 
     type Tensor.Backend.BLAS.MatrixInfo with
         member this.CTrans = 
             match this.Trans with
@@ -145,7 +145,7 @@ module internal BLASExtensions =
             | BLAS.Trans     -> BLAS.CBLAS_TRANSPOSE.CblasTrans
             | BLAS.ConjTrans -> BLAS.CBLAS_TRANSPOSE.CblasConjTrans
 
-open BLASExtensions
+open HostBLASExtensions
 
 module private Tools =
     let inline checkedInt layout (x: int64) =

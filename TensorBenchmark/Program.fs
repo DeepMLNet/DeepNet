@@ -81,12 +81,24 @@ let testCuda () =
     let cscatter = Tensor.scatter [Some idxs1; None] [6L; 6L] cb
     printfn "cscatter=\n%A" cscatter
 
+    printfn "cuda dot..."
+    let c1 = cscatter .* cscatter
+    printfn "c1=\n%A" c1
+
+    printfn "cuda replicate..."
+    let cscatterRep = Tensor.replicate 0 2L cscatter.[NewAxis, *, *]
+    printfn "cscatterRep=\n%A" cscatterRep
+
+    printfn "cuda batched dot..."
+    let c2 = cscatterRep .* cscatterRep
+    printfn "c2=\n%A" c2
+
 
 [<EntryPoint>]
 let main argv = 
     Tensor.Utils.Util.disableCrashDialog ()
-    //testCuda()
-    //exit 0
+    testCuda()
+    exit 0
 
 
     let shape = [10000L; 1000L]

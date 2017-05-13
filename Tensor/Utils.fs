@@ -244,6 +244,12 @@ module UtilTypes =
             | Some v -> v
             | None -> dflt
 
+    type System.Collections.Concurrent.ConcurrentQueue<'T> with
+        member this.TryDequeue () =
+            let value = ref (Unchecked.defaultof<'T>)
+            if this.TryDequeue (value) then Some !value
+            else None
+
     type System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue> with
         member this.TryFindReadOnly key =
             let value = ref (Unchecked.defaultof<'TValue>)
@@ -258,6 +264,7 @@ module UtilTypes =
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
     type IReadOnlyDictionary<'TKey, 'TValue> = System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue>
     type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
+    type ConcurrentQueue<'T> = System.Collections.Concurrent.ConcurrentQueue<'T>
     type HashSet<'T> = System.Collections.Generic.HashSet<'T>
     type Queue<'T> = System.Collections.Generic.Queue<'T>
     type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>

@@ -1,11 +1,15 @@
 ﻿namespace Tensor.Utils
 
+open System.Threading
+open System.Collections.Concurrent
+
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
 
 /// Cuda support types functions
 module Cuda =
+    open System
 
     /// dimensionality of parallel work to perform (x, y, z)
     type WorkDim = int64 * int64 * int64
@@ -154,8 +158,60 @@ module Cuda =
         let inline (!>) (x:^a) : ^b = 
             ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
         !> cuPtr.Pointer
+   
+    // callback support
+    type private CallbackFn = unit -> unit
+    let private callbackQueue = ConcurrentQueue<CudaEvent * CallbackFn> ()
+    let private callbackEvent = new AutoResetEvent(false)
+    let private callbackThreadFn () =
+        setContext ()
+        while true do
+            let rec processCallbacks() =
+                match callbackQueue.TryDequeue() with
+                | Some (event, callbackFn) ->
+                    event.Synchronize ()
+                    event.Dispose()
+                    try callbackFn()
+                    with e -> 
+                        printfn "CUDA callback failed with exception:\n%s" (e.ToString())
+                        exit -100
+                    processCallbacks()
+                | None -> ()
+            processCallbacks()
+            callbackEvent.WaitOne() |> ignore
+    let private callbackThread = new Thread(callbackThreadFn, IsBackground=true)
+    do callbackThread.Start()
 
+    /// Places a callback function on a CUDA stream.
+    /// The function is executed on a global callback thread and is allowed to make CUDA calls.
+    /// The thread's CUDA context has been set to the libraries CUDA context.
+    /// The CUDA stream continues execution while the callback function is being invoked.
+    /// The callback can be blocked by waiting for other callbacks.
+    let callback (cuStream: CUstream) (fn: unit -> unit) =
+        let event = new CudaEvent (CUEventFlags.BlockingSync ||| CUEventFlags.DisableTiming)
+        event.Record(cuStream)
+        callbackQueue.Enqueue((event, fn))
+        callbackEvent.Set() |> ignore
 
+    /// Places a callback function on a CUDA stream.
+    /// The function is executed on a thread-pool thread and is allowed to make CUDA calls.
+    /// This function is less efficient than Cuda.callback.
+    let callbackWithResult (cuStream: CUstream) (fn: CUResult -> unit) =
+        let threadPoolCallback (result: obj) =
+            fn (unbox result)
+        let cudaCallback (strm: CUstream) (result: CUResult) (userData: nativeint) =
+            ThreadPool.QueueUserWorkItem (WaitCallback threadPoolCallback, box result) |> ignore
+        use stream = new CudaStream (cuStream)
+        stream.AddCallback (CUstreamCallback cudaCallback, nativeint 0, CUStreamAddCallbackFlags.None)
 
+    /// Keeps the given object alive (i.e. prevent it from being GCed) 
+    /// until all operations that were queued on the given CUDA stream 
+    /// up to now have been executed.
+    let keepAlive (cuStream: CUstream) (x: obj) =
+        callback cuStream (fun () -> GC.KeepAlive x)
 
-
+    /// Keeps the given objects alive (i.e. prevent them from being GCed) 
+    /// until all operations that were queued on the given CUDA stream 
+    /// up to now have been executed.
+    let keepAliveMany (cuStream: CUstream) (xs: obj list) =
+        xs |> List.iter (keepAlive cuStream)

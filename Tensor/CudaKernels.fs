@@ -38,6 +38,7 @@ type NativeTensor = {
     Offset:         int64
     Shape:          int64 list
     Stride:         int64 list
+    Storage:        obj
 }
    
 /// C++ tensor marshaling
@@ -161,11 +162,12 @@ module internal NativeIdxTensors =
 
         // set data
         let unspecIdx = {
-            DataType=typeof<int64>
-            BasePtr=nativeint 0
-            Offset=0L
-            Shape=List.replicate nDims 0L
-            Stride=List.replicate nDims 0L 
+            DataType    = typeof<int64>
+            BasePtr     = nativeint 0
+            Offset      = 0L
+            Shape       = List.replicate nDims 0L
+            Stride      = List.replicate nDims 0L 
+            Storage     = null
         }
         for d, idx in List.indexed nit.Idxs do
             let idx, specified = 

@@ -27,7 +27,7 @@ module internal BLAS =
                      cols:      int64,
                      ld:        int64,
                      trans:     Transposition,
-                     disposeFn: (unit -> unit)) =
+                     fetchFn:   (unit -> unit)) =
 
         let memPin, basePtr = storage.Pin()
 
@@ -49,10 +49,10 @@ module internal BLAS =
             | NoTrans           -> this.Cols
             | Trans | ConjTrans -> this.Rows
         member this.BatchSize = int64 offsets.Length 
+        member this.FetchResult () = fetchFn()
 
         interface IDisposable with
             member this.Dispose() = 
-                disposeFn ()
                 memPin.Dispose()
 
 
@@ -61,17 +61,29 @@ module internal BLAS =
                      offset:    nativeint,
                      size:      int64,
                      inc:       int64,
-                     disposeFn: (unit -> unit)) =
+                     fetchFn:   (unit -> unit)) =
 
         let memPin, basePtr = storage.Pin()
 
         member this.Ptr       : nativeint            = basePtr + offset
         member this.Size                             = size
         member this.Inc                              = inc
+        member this.FetchResult () = fetchFn()
 
         interface IDisposable with
             member this.Dispose() = 
-                disposeFn ()
+                memPin.Dispose()
+
+    /// Information for passing a scalar to BLAS/LAPACK routines.
+    type ScalarInfo (storage:   IBLASStorage,
+                     offset:    nativeint) = 
+
+        let memPin, basePtr = storage.Pin()
+
+        member this.Ptr       : nativeint            = basePtr + offset
+
+        interface IDisposable with
+            member this.Dispose() = 
                 memPin.Dispose()
 
 
@@ -80,16 +92,24 @@ open BLAS
 /// backend-neutral BLAS support 
 type internal BLAS =
 
+    /// Returns a Blas.ScalarInfo that exposes the specfied scalar to BLAS
+    /// as a source and/or target. 
+    static member GetScalar (scalar: Tensor<'T>) =
+        if scalar.NDims <> 0 then 
+            failwithf "BLAS operation requires a scalar but got tensor of shape %A" scalar.Shape
+        let storage = scalar.Storage :?> IBLASStorage
+        new ScalarInfo (storage, nativeint (sizeof64<'T> * scalar.Layout.Offset))
+            
     /// Internal function for GetBlasVector.
-    static member private GetVectorInfo (vec: Tensor<'T>, ?disposeFn) =
-        let disposeFn = defaultArg disposeFn id
+    static member private GetVectorInfo (vec: Tensor<'T>, ?fetchFn) =
+        let fetchFn = defaultArg fetchFn id
         if vec.NDims <> 1 then 
             failwithf "BLAS operation requires a vector but got tensor of shape %A" vec.Shape
         let storage = vec.Storage :?> IBLASStorage
         match vec.Layout.Stride, vec.Layout.Shape with
         | [m], [ms] when m <> 0L ->   // increment <> 0
             new VectorInfo (storage, nativeint (sizeof64<'T> * vec.Layout.Offset), 
-                            ms, m, disposeFn) |> Some
+                            ms, m, fetchFn) |> Some
         | _  -> None                  // not acceptable BLAS layout
 
     /// Returns a BlasVectorInfo that exposes the specfied vector to BLAS
@@ -105,16 +125,16 @@ type internal BLAS =
         | None when allowCopy ->
             let tmp = Tensor<'T>(vec.Shape, vec.Device, order=ColumnMajor)
             if isSource then tmp.CopyFrom vec
-            let disposeFn () = if isTarget then vec.CopyFrom tmp
-            BLAS.GetVectorInfo (tmp, disposeFn=disposeFn) 
+            let fetchFn () = if isTarget then vec.CopyFrom tmp
+            BLAS.GetVectorInfo (tmp, fetchFn=fetchFn) 
             |> Option.get
         | None ->
             failwithf "tensor with shape %A and strides %A is not a valid BLAS vector"
                       vec.Shape vec.Layout.Stride
 
     /// Internal function for GetBlasMatrix.
-    static member private GetMatrixInfo (mat: Tensor<'T>, canTranspose, ?disposeFn) =
-        let disposeFn = defaultArg disposeFn id
+    static member private GetMatrixInfo (mat: Tensor<'T>, canTranspose, ?fetchFn) =
+        let fetchFn = defaultArg fetchFn id
         if mat.NDims < 2 then 
             failwithf "BLAS operation requires a matrix but got tensor of shape %A" mat.Shape
         let storage = mat.Storage :?> IBLASStorage
@@ -126,9 +146,9 @@ type internal BLAS =
             |> Array.ofSeq
         match mat.Layout.Stride.[mat.NDims-2 ..], mat.Layout.Shape.[mat.NDims-2 ..] with
         | [m;  1L], [ms; ns] when m >= max 1L ns && canTranspose ->   // row-major
-            new MatrixInfo (storage, offsets, ns, ms, m, Trans, disposeFn) |> Some
+            new MatrixInfo (storage, offsets, ns, ms, m, Trans, fetchFn) |> Some
         | [1L; n],  [ms; ns] when n >= max 1L ms ->                   // column-major
-            new MatrixInfo (storage, offsets, ms, ns, n, NoTrans, disposeFn) |> Some            
+            new MatrixInfo (storage, offsets, ms, ns, n, NoTrans, fetchFn) |> Some            
         | _  -> None                                                  // not acceptable BLAS layout
 
     /// Returns a BlasMatrixInfo that exposes the specfied matrix to BLAS
@@ -147,8 +167,8 @@ type internal BLAS =
             let order = [mat.NDims-2; mat.NDims-1] @ [0 .. mat.NDims-3]
             let tmp = Tensor<'T> (mat.Shape, mat.Device, order=CustomOrder order)
             if isSource then tmp.CopyFrom mat
-            let disposeFn () = if isTarget then mat.CopyFrom tmp
-            BLAS.GetMatrixInfo (tmp, canTranspose=canTranspose, disposeFn=disposeFn) 
+            let fetchFn () = if isTarget then mat.CopyFrom tmp
+            BLAS.GetMatrixInfo (tmp, canTranspose=canTranspose, fetchFn=fetchFn) 
             |> Option.get
         | None ->
             failwithf "tensor with shape %A and strides %A is not a valid BLAS matrix"
