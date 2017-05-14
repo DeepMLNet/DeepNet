@@ -103,6 +103,7 @@
       
   version: 0.3.0.{build}     
   shallow_clone: true  
+  image: Visual Studio 2017
       
   environment:
     access_token:
