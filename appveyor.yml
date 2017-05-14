@@ -3,8 +3,9 @@
     only:
       - master
 
-  version: 0.2.0.{build}
+  version: 0.3.0.{build}
   shallow_clone: true  
+  image: Visual Studio 2017
 
   environment:
     VERSUFFIX: master
@@ -54,8 +55,9 @@
     only:
       - develop
 
-  version: 0.2.0.{build}
+  version: 0.3.0.{build}
   shallow_clone: true  
+  image: Visual Studio 2017
       
   environment:
     VERSUFFIX: develop
@@ -155,8 +157,9 @@
  
 # all other branches: 
 -
-  version: 0.2.0.{build}-{branch}
+  version: 0.3.0.{build}-{branch}
   shallow_clone: true
+  image: Visual Studio 2017
 
   environment:
     VERSUFFIX: branch
