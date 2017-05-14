@@ -166,10 +166,7 @@
   </ItemGroup>
   <Target Name="BeforeBuild">
   </Target>
-  <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release' And '$(VERSUFFIX)' != ''">
-    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix $(VERSUFFIX)" />
-  </Target>
-  <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release' And '$(VERSUFFIX)' == ''">
-    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration)" />
+  <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
+    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)  -Suffix &quot;$(VERSUFFIX)&quot;" />
   </Target>
 </Project>
