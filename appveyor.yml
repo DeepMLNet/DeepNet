@@ -99,9 +99,9 @@
 -
   branches:
     only:
-      - 0.2
+      - 0.3
       
-  version: 0.2.0.{build}     
+  version: 0.3.0.{build}     
   shallow_clone: true  
       
   environment:
