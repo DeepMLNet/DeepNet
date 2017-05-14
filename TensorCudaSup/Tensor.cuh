@@ -18,7 +18,7 @@ struct Tensor {
 		: _Base(base), _Offset(offset), _Shape(shape), _Stride(stride)
 	{
 		for (dim_t d = 0; d < TNDims; d++) {
-			assert(0 <= _Shape[d]);
+			//assert(0 <= _Shape[d]);
 		}
 	}
 
@@ -32,7 +32,7 @@ struct Tensor {
 	_dev_ idx_t LinearPos(const TIdxs &pos) const {
 		idx_t linearPos = Offset();
 		for (dim_t d = 0; d < TNDims; d++) {
-			assert(0 <= pos[d] && pos[d] < Shape()[d]);
+			//assert(0 <= pos[d] && pos[d] < Shape()[d]);
 			linearPos += pos[d] * Stride()[d];
 		}
 		return linearPos;

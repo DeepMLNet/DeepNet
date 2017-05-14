@@ -11,12 +11,12 @@ struct Idxs {
 	}
 
 	_dev_ idx_t &operator[] (dim_t dim) {
-		assert(0 <= dim && dim < TNDims);
+		//assert(0 <= dim && dim < TNDims);
 		return Data[dim]; 
 	}
 
 	_dev_ const idx_t &operator[] (dim_t dim) const {
-		assert(0 <= dim && dim < TNDims);
+		//assert(0 <= dim && dim < TNDims);
 		return Data[dim];
 	}
 
@@ -58,12 +58,12 @@ struct Idxs<(dim_t)0> {
 	}
 
 	_dev_ idx_t &operator[] (dim_t dim) {
-		assert(false);
+		//assert(false);
 		return Dummy; 
 	}
 
 	_dev_ const idx_t &operator[] (dim_t dim) const {
-		assert(false);
+		//assert(false);
 		return Dummy; 
 	}
 

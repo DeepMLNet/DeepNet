@@ -221,18 +221,19 @@ type internal ModCacheKey = {
 } with
     member this.Bytes =
         let sb = StringBuilder()
-        sb.AppendLine(sprintf "Code=%s" this.Code) |> ignore
+        sb.AppendLine(sprintf "// CompilerArgs=%s" (String.concat " " this.CompilerArgs)) |> ignore
         for KeyValue(k, v) in this.HeaderHashes do
-            sb.Append(sprintf "HeaderHashes[%s]=" k) |> ignore
-            sb.Append(v) |> ignore
+            sb.Append(sprintf "// HeaderHashes[%s]=" k) |> ignore
+            for h in v do
+                sb.Append(sprintf "%x " h) |> ignore
             sb.AppendLine() |> ignore
-        sb.AppendLine(sprintf "CompilerArgs=%s" (String.concat " " this.CompilerArgs)) |> ignore
+        sb.AppendLine(sprintf "// Code=\n%s" this.Code) |> ignore
         Encoding.UTF8.GetBytes(sb.ToString())
 
 /// compiles CUDA C++ code to CUDA kernels.
 module internal KernelCompiler =
     let krnlPtxCacheDir = Path.Combine(Util.localAppData "Tensor", "PTXCache")
-    let krnlPtxCache = DiskBinaryMap (krnlPtxCacheDir, "code.dat", "mod.ptx")
+    let krnlPtxCache = DiskBinaryMap (krnlPtxCacheDir, "code.cu", "mod.ptx")
     let compileDirRoot = Path.Combine(Util.localAppData "Tensor", "Compile")
 
     /// prepares a compile directory
