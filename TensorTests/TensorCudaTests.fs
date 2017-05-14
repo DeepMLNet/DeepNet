@@ -9,6 +9,7 @@ open Tensor
 
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Tensor transfer to Cuda``() =   
     let data = HostTensor.arange 30L |> Tensor.float |> Tensor.reshape [3L; 10L]
     let cuda = CudaTensor.transfer data
@@ -21,6 +22,7 @@ let ``Tensor transfer to Cuda``() =
 
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Tensor transfer to Cuda 2``() =    
     let data = HostTensor.arange 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
     let data = data.Copy (order=CustomOrder [1; 0; 2])
@@ -36,6 +38,7 @@ let ``Tensor transfer to Cuda 2``() =
 
 
 [<Fact>]
+[<Trait("Category", "Skip_CI")>]
 let ``Mixed Cuda tests`` () =
     // TODO: this needs cleanup
 
