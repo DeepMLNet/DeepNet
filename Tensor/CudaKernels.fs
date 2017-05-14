@@ -11,6 +11,7 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor.Utils
+open System.Text
 
 
 /// CUDA backend configuration
@@ -217,12 +218,21 @@ type internal ModCacheKey = {
     Code:           string
     HeaderHashes:   Map<string, byte list>
     CompilerArgs:   string list
-}
+} with
+    member this.Bytes =
+        let sb = StringBuilder()
+        sb.AppendLine(sprintf "Code=%s" this.Code) |> ignore
+        for KeyValue(k, v) in this.HeaderHashes do
+            sb.Append(sprintf "HeaderHashes[%s]=" k) |> ignore
+            sb.Append(v) |> ignore
+            sb.AppendLine() |> ignore
+        sb.AppendLine(sprintf "CompilerArgs=%s" (String.concat " " this.CompilerArgs)) |> ignore
+        Encoding.UTF8.GetBytes(sb.ToString())
 
 /// compiles CUDA C++ code to CUDA kernels.
 module internal KernelCompiler =
     let krnlPtxCacheDir = Path.Combine(Util.localAppData "Tensor", "PTXCache")
-    let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
+    let krnlPtxCache = DiskBinaryMap (krnlPtxCacheDir, "code.dat", "mod.ptx")
     let compileDirRoot = Path.Combine(Util.localAppData "Tensor", "Compile")
 
     /// prepares a compile directory
@@ -288,8 +298,9 @@ module internal KernelCompiler =
             baseCmplrArgs @ [sprintf "--include-path=\"%s\"" compileDir]
 
         let cacheKey = {Code=modCode; HeaderHashes=headerHashes; CompilerArgs=baseCmplrArgs}
+        let cacheKeyBytes = cacheKey.Bytes
         let ptx =
-            match krnlPtxCache.TryGet cacheKey with
+            match krnlPtxCache.TryGet cacheKeyBytes with
             | Some ptx when not Cfg.DisableKernelCache -> ptx
             | _ ->
                 if Cfg.DebugCompile then
@@ -303,7 +314,7 @@ module internal KernelCompiler =
                     let log = cmplr.GetLogAsString()
                     printf "%s" log
                 let ptx = cmplr.GetPTX()
-                krnlPtxCache.Set cacheKey ptx                
+                krnlPtxCache.Set cacheKeyBytes ptx                
                 ptx    
 
         if not Cfg.DebugCompile then 

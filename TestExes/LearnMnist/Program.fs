@@ -1,4 +1,5 @@
 ﻿open Tensor
+open Tensor.Utils
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -16,7 +17,7 @@ let main argv =
     let device = DevHost
     //let device = DevCuda
 
-    let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
+    let mnist = Mnist.load (Util.assemblyDirectory + "/../../../../Data/MNIST") 0.1
 
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
 

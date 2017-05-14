@@ -134,9 +134,6 @@
       <HintPath>..\packages\ManagedCuda-CUBLAS.8.0.13\lib\net46\CudaBlas.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="FsPickler">
-      <HintPath>..\packages\FsPickler.3.2.0\lib\net45\FsPickler.dll</HintPath>
-    </Reference>
     <Reference Include="HDF.PInvoke">
       <HintPath>HDF5\HDF.PInvoke.dll</HintPath>
     </Reference>
