@@ -4,8 +4,8 @@
 open Xunit
 open FsUnit.Xunit
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open TestUtils
@@ -98,9 +98,9 @@ let ``Max, min output`` (device: IDevice) =
     let fdb = Func.make<single> device.DefaultFactory db |> arg3 a b c
     let fdc = Func.make<single> device.DefaultFactory dc |> arg3 a b c
     let rng = System.Random (123)
-    let av = rng.UniformArrayND (-1.0f, 1.0f) [2L; 2L] |> post device
-    let bv = rng.UniformArrayND (-1.0f, 1.0f) [2L; 2L] |> post device
-    let cv = rng.UniformArrayND (-1.0f, 1.0f) [2L; 2L] |> post device
+    let av = rng.UniformTensor (-1.0f, 1.0f) [2L; 2L] |> post device
+    let bv = rng.UniformTensor (-1.0f, 1.0f) [2L; 2L] |> post device
+    let cv = rng.UniformTensor (-1.0f, 1.0f) [2L; 2L] |> post device
     let res = fn av bv cv
     let dav = fda av bv cv
     let dbv = fdb av bv cv
@@ -130,7 +130,7 @@ let ``Max reduction output`` (device: IDevice) =
     let da = dexpr |> Deriv.ofVar a
     let fda = Func.make<single> device.DefaultFactory da |> arg1 a
     let rng = System.Random (123)
-    let av = rng.UniformArrayND (-1.0f, 1.0f) [3L; 4L] |> post device
+    let av = rng.UniformTensor (-1.0f, 1.0f) [3L; 4L] |> post device
     let res = fn av 
     let dav = fda av 
     printfn "a=\n%A" av
@@ -154,10 +154,10 @@ let ``Gather`` () =
 
     let expr = a |> Expr.gather [Some i0; Some i1]
 
-    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+    let av = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
+    let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> ITensor; i0, i0v :> ITensor; i1, i1v :> ITensor]
 
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr
 
@@ -170,9 +170,9 @@ let ``Scatter`` () =
 
     let expr = a |> Expr.scatter [Some i0; Some i1] trgtShp
 
-    let av = Seq.counting |> ArrayNDHost.ofSeqWithShape [4L; 3L] |> ArrayND.float
-    let i0v = [1L; 2L; 2L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let i1v = [0L; 0L; 1L] |> ArrayNDHost.ofList |> ArrayND.padLeft
-    let varEnv = VarEnv.ofSeq [a, av :> IArrayNDT; i0, i0v :> IArrayNDT; i1, i1v :> IArrayNDT]
+    let av = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+    let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
+    let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
+    let varEnv = VarEnv.ofSeq [a, av :> ITensor; i0, i0v :> ITensor; i1, i1v :> ITensor]
 
     DerivCheck.checkExprTree DevHost 1e-6 1e-7 varEnv expr

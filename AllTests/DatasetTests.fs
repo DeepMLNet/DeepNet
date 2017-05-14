@@ -4,14 +4,14 @@ open Xunit
 open FsUnit.Xunit
 open System.IO
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Datasets
 
 
 let dataDir = Util.assemblyDirectory + "/../../TestData/curve"
 
-type Arrayf = ArrayNDT<float>
+type Arrayf = Tensor<float>
 type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
 
 let dataSamples = 
@@ -37,11 +37,11 @@ type CurveDataset () =
         printfn "\naccessing elements:"
         for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) |> Seq.take 3 do
             printfn "idx %d has sample biotac %A pos %A" 
-                idx (smpl.Biotac |> ArrayND.shape) (smpl.Pos |> ArrayND.shape)
-            smpl.Biotac ==== orig.Biotac |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Pos ==== orig.Pos |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Vels ==== orig.Vels |> ArrayND.all |> ArrayND.value |> should equal true
-            smpl.Biotac ==== orig.Biotac |> ArrayND.all |> ArrayND.value |> should equal true
+                idx (smpl.Biotac |> Tensor.shape) (smpl.Pos |> Tensor.shape)
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> should equal true
+            smpl.Pos ==== orig.Pos |> Tensor.all |> should equal true
+            smpl.Vels ==== orig.Vels |> Tensor.all |> should equal true
+            smpl.Biotac ==== orig.Biotac |> Tensor.all |> should equal true
 
     [<Fact>]
     member this.``Partitioning`` () =
@@ -60,8 +60,8 @@ type CurveDataset () =
         printfn "\nbatching:"
         for idx, batch in Seq.indexed (batchGen()) do
             printfn "batch: %d has biotac: %A;  pos: %A" 
-                idx (batch.Biotac |> ArrayND.shape) (batch.Pos |> ArrayND.shape)
-            batch.Biotac |> ArrayND.shape |> List.head |> should equal batchSize
+                idx (batch.Biotac |> Tensor.shape) (batch.Pos |> Tensor.shape)
+            batch.Biotac |> Tensor.shape |> List.head |> should equal batchSize
 
     [<Fact>]
     [<Trait("Category", "Skip_CI")>]
@@ -98,12 +98,12 @@ let ``Loading CSV datasets`` () =
         printfn ""
 
 
-type SeqSample = {SeqData: ArrayNDT<int64>}
+type SeqSample = {SeqData: Tensor<int64>}
 
 type SequenceDataset () = 
-    let smpl1 = {SeqData = ArrayNDHost.arange 98L}
-    let smpl2 = {SeqData = 100L + ArrayNDHost.arange 98L}
-    let smpl3 = {SeqData = 200L + ArrayNDHost.arange 98L}
+    let smpl1 = {SeqData = HostTensor.arange 98L}
+    let smpl2 = {SeqData = 100L + HostTensor.arange 98L}
+    let smpl3 = {SeqData = 200L + HostTensor.arange 98L}
     let dataset = Dataset.ofSeqSamples [smpl1; smpl2; smpl3]
 
     [<Fact>]

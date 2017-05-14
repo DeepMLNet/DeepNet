@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open System
 
 
@@ -9,26 +9,26 @@ open System
 module DerivCheck =
 
     /// evaluates the Jacobian of f at x numerically with specified finite difference step
-    let inline numDerivEpsilon (epsilon: 'T) (f: ArrayNDT<'T> -> ArrayNDT<'T>) (x: ArrayNDT<'T>) =
+    let inline numDerivEpsilon (epsilon: 'T) (f: Tensor<'T> -> Tensor<'T>) (x: Tensor<'T>) =
         let y = f x
-        let xElems, yElems = ArrayND.nElems x, ArrayND.nElems y
-        let xShp = ArrayND.shape x
+        let xElems, yElems = Tensor.nElems x, Tensor.nElems y
+        let xShp = Tensor.shape x
 
-        let jac = ArrayND.zerosOfSameType [yElems; xElems] x
-        let xd = x |> ArrayND.reshape [xElems] |> ArrayND.copy
+        let jac = Tensor.zeros x.Dev [yElems; xElems] 
+        let xd = x |> Tensor.reshape [xElems] |> Tensor.copy
         for xi in 0L .. xElems-1L do
             let xiVal = xd.[[xi]]
 
             // f (x+epsilon)
             xd.[[xi]] <- xiVal + epsilon
-            let ydf = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
+            let ydf = xd |> Tensor.reshape xShp |> f |> Tensor.reshape [yElems]
 
             // f (x-epsilon)
             xd.[[xi]] <- xiVal - epsilon
-            let ydb = xd |> ArrayND.reshape xShp |> f |> ArrayND.reshape [yElems]
+            let ydb = xd |> Tensor.reshape xShp |> f |> Tensor.reshape [yElems]
 
             // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
-            jac.[*, xi] <- (ydf - ydb) / (ArrayND.scalarOfSameType ydf (epsilon + epsilon))
+            jac.[*, xi] <- (ydf - ydb) / (Tensor.scalar ydf.Dev (epsilon + epsilon))
             xd.[[xi]] <- xiVal
         jac 
 
@@ -51,13 +51,13 @@ module DerivCheck =
                 let exprGradVal = numDerivEpsilon epsilon exprFun value
                 let gradDiff = abs (symGradVal - exprGradVal)
 
-                let deviation = ArrayND.sum gradDiff |> ArrayND.value
+                let deviation = Tensor.sum gradDiff |> Tensor.value
                 if deviation > maxDeviation then
                     printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
-                            (truncStr expr) wrt (truncStr rDiff) symGradVal
+                            (String.truncObj expr) wrt (String.truncObj rDiff) symGradVal
                     printfn "and numeric grad has value \n%A." exprGradVal
                     failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
-                        (truncStr expr) deviation maxDeviation
+                        (String.truncObj expr) deviation maxDeviation
             else
                 printfn "DerivCheck: Skipping variable %A because it does not match type %A."
                         wrt typeof<'T>

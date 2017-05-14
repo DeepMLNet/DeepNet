@@ -4,7 +4,7 @@ open SymTensor.Compiler.Cuda
 open RProvider.graphics
 open RProvider.plotrix
 open Models
-open ArrayNDNS
+open Tensor
 open SymTensor
 open RProvider
 open RTools
@@ -60,8 +60,8 @@ module GPPlots =
         /// Creates num samples from in range minValue to maxValue with constant distance.
         /// Calculates mean covariance and standerdDeviation of these samples given a Gaussian process
         /// with hyper parameters hyperPars, training noise sigmaN train values trnX and train targets trnT.
-        static member predictGP hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
-                (trnT: ArrayNDT<single>) (minValue, maxValue) nPoints =
+        static member predictGP hyperPars (sigmaN: Tensor<single>) (trnX: Tensor<single>) 
+                (trnT: Tensor<single>) (minValue, maxValue) nPoints =
             let config = {HyperPars = hyperPars
                           NTrain = trnX.NElems
                           NTest = nPoints}
@@ -69,21 +69,21 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-ArrayNDHost.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- ArrayNDHost.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
             | _ -> ()
             let mean, cov = GaussianProcess.predict pars x t sigNs inp      
             let stdev = cov |> Expr.diag |> Expr.sqrtt
         
             let meanCovStdFn = mi.Func (mean, cov, stdev) |> arg4 x t sigNs inp
         
-            let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
+            let sX = HostTensor.linspace minValue maxValue nPoints |> CudaTensor.transfer
             let sMean, sCov, sStd = meanCovStdFn trnX trnT sigmaN sX
             sX, sMean, sCov, sStd
 
 
-        static member predictGPDeriv hyperPars (sigmaN: ArrayNDT<single>) (trnX: ArrayNDT<single>) 
-                (trnT: ArrayNDT<single>) (minValue:single, maxValue) nPoints =
+        static member predictGPDeriv hyperPars (sigmaN: Tensor<single>) (trnX: Tensor<single>) 
+                (trnT: Tensor<single>) (minValue:single, maxValue) nPoints =
             let config = {HyperPars = hyperPars
                           NTrain = trnX.NElems
                           NTest = nPoints}
@@ -91,15 +91,15 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-ArrayNDHost.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- ArrayNDHost.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
             | _ -> ()
 
             let mean, _ = GaussianProcess.predict pars x t sigNs inp  
             let dMeanDInp = Deriv.compute mean |> Deriv.ofVar inp |> Expr.diag                   
             let dMeanDInpFn = mi.Func (dMeanDInp) |> arg4 x t sigNs inp
         
-            let sX = ArrayNDHost.linSpaced minValue maxValue nPoints |> ArrayNDCuda.toDev
+            let sX = HostTensor.linspace minValue maxValue nPoints |> CudaTensor.transfer
             let sDMeanDInp = dMeanDInpFn trnX trnT sigmaN sX
             sX, sDMeanDInp
 
@@ -107,13 +107,13 @@ module GPPlots =
         /// train values trnX and train targets trnT.
         /// Step is the distance between two sample, smaller step => higher plot smoothness and accuraccy,
         /// longer plot creation. 
-        static member simplePlot (hyperPars, trnSigma: ArrayNDT<single>, trnX: ArrayNDT<single>, trnT: ArrayNDT<single>, 
+        static member simplePlot (hyperPars, trnSigma: Tensor<single>, trnX: Tensor<single>, trnT: Tensor<single>, 
                                   ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
         
             let nPoints = defaultArg nPoints 20L
-            let trnDist = ArrayND.max trnX - ArrayND.min trnX |> ArrayND.value
-            let minValue = defaultArg minX ((trnX |> ArrayND.min |> ArrayND.value) - trnDist * 0.1f)
-            let maxValue = defaultArg maxX ((trnX |> ArrayND.max |> ArrayND.value) + trnDist * 0.1f)
+            let trnDist = Tensor.max trnX - Tensor.min trnX |> Tensor.value
+            let minValue = defaultArg minX ((trnX |> Tensor.min |> Tensor.value) - trnDist * 0.1f)
+            let maxValue = defaultArg maxX ((trnX |> Tensor.max |> Tensor.value) + trnDist * 0.1f)
 
             let sX, sMean, sCov, sStd = Plots.predictGP hyperPars trnSigma trnX trnT (minValue, maxValue) nPoints
         

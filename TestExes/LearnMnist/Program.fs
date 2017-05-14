@@ -1,4 +1,5 @@
-﻿open ArrayNDNS
+﻿open Tensor
+open Tensor.Utils
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -9,13 +10,23 @@ open Optimizers
 [<EntryPoint>]
 let main argv =
 
-    //let device = DevHost
-    let device = DevCuda
+    //Debug.VisualizeUExpr <- true
+    Debug.DisableCombineIntoElementsOptimization <- true
+    //Debug.DisableOptimizer <- true
 
-    let mnist = Mnist.load ("../../../../Data/MNIST") 0.1
+    let device = 
+        match List.ofArray argv with
+        | ["Host"] -> DevHost
+        | ["Cuda"] -> DevCuda
+        | _ -> DevHost
 
+    printfn "Device: %A" device
+
+    printfn "Loading MNIST..."
+    let mnist = Mnist.load (Util.assemblyDirectory + "/../../../../Data/MNIST") 0.1
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
-
+    
+    printfn "Building model..."
     let mb = ModelBuilder<single> "NeuralNetModel"
 
     // define symbolic sizes
@@ -58,10 +69,10 @@ let main argv =
         Train.trainableFromLossExpr mi loss smplVarEnv Adam.New Adam.DefaultCfg
 
     let misclassificationRate inputs targets =
-        let preds = predFn inputs |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
-        let targets = targets |> ArrayNDHost.fetch |> ArrayND.argMaxAxis 1
-        let isErr = ArrayND.ifThenElse (preds ==== targets) (ArrayND.zerosLike preds) (ArrayND.onesLike preds)
-        let errCnt = ArrayND.sum isErr |> ArrayND.value
+        let preds = predFn inputs |> HostTensor.transfer |> Tensor.argMaxAxis 1
+        let targets = targets |> HostTensor.transfer |> Tensor.argMaxAxis 1
+        let isErr = Tensor.ifThenElse (preds ==== targets) (Tensor.zerosLike preds) (Tensor.onesLike preds)
+        let errCnt = Tensor.sum isErr |> Tensor.value
         let errRate = float errCnt / float inputs.Shape.[0]
         errRate        
 
@@ -86,8 +97,9 @@ let main argv =
             MinIters           = Some 100 
             MaxIters           = None  
             LearningRates      = [1e-3; 1e-4; 1e-5]       
-            CheckpointFile     = Some "MNIST-%ITER%.h5"
+            CheckpointFile     = Some (Util.assemblyDirectory + "/MNIST-%ITER%.h5")
             CheckpointInterval = Some 50
+            DiscardCheckpoint  = true
     } 
 
     //Debug.Timing <- true
@@ -98,7 +110,8 @@ let main argv =
     //let ts = Trace.startSession "LearnMnist"
 
     let lossFn = mi.Func loss |> arg2 input target
-    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> ArrayND.value
+    printfn "Calculating initial loss..."
+    let initialLoss = lossFn mnist.Trn.All.Input mnist.Trn.All.Target |> Tensor.value
     printfn "Initial training loss: %f" initialLoss
     let result = Train.train trainable mnist trainCfg
 

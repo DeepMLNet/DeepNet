@@ -5,8 +5,8 @@ open System.IO
 open System.Collections.Generic
 open System.Threading
 
-open ArrayNDNS
-open Basics
+open Tensor
+open Tensor.Utils
 open UExprTypes
 
 
@@ -22,7 +22,7 @@ module Trace =
     type LoopStack = LoopIter list
     
     type EvalEvent = 
-        | ExprEvaled of UExprT * LoopStack * IArrayNDT * string
+        | ExprEvaled of UExprT * LoopStack * ITensor * string
         | EnteringLoop of UExprT
         | LeavingLoop of UExprT
         | LoopIteration of LoopIter
@@ -170,45 +170,45 @@ module Trace =
     let loopStack () : LoopStack =
         activeLoopStack.Value.ToArray() |> List.ofArray |> List.rev
 
-    let private empty = ArrayNDHost.zeros<int> [0L] :> IArrayNDT
+    let private empty = HostTensor.zeros<int> [0L] :> ITensor
 
-    let exprEvaledWithMsg uexpr (res: Lazy<IArrayNDT>) msg =
+    let exprEvaledWithMsg uexpr (res: Lazy<ITensor>) msg =
         if isActive () then
             let ee, es = getActiveExpr (), getActiveTraceSession ()
             let id = ee.Trace.Count
             let first, last = es.StoreResultEventRng
             let first, last = first |? 0, last |? Int32.MaxValue
             let resVal =
-                if (first <= id && id <= last) then ArrayND.copyUntyped (res.Force())
+                if (first <= id && id <= last) then Tensor.copy (res.Force())
                 else empty
             ee.Trace.Add (ExprEvaled (uexpr, loopStack(), resVal, msg))
             
     let exprEvaled uexpr res =
         exprEvaledWithMsg uexpr res ""
 
-    let maxSimilar (a: IArrayNDT) (b: IArrayNDT) =
+    let maxSimilar (a: ITensor) (b: ITensor) =
         match a.DataType, b.DataType with
         | ta, tb when ta <> tb -> false
         | t, _ when t = typeof<float> ->
-            let a = a :?> ArrayNDT<float>
-            let b = b :?> ArrayNDT<float>
-            ArrayND.almostEqualWithTol 1e-5 1e-5 a b |> ArrayND.value
+            let a = a :?> Tensor<float>
+            let b = b :?> Tensor<float>
+            Tensor.almostEqualWithTol (a, b, absTol=1e-5, relTol=1e-5) 
         | t, _ when t = typeof<single> ->
-            let a = a :?> ArrayNDT<single>
-            let b = b :?> ArrayNDT<single>
-            ArrayND.almostEqualWithTol 1e-5f 1e-5f a b |> ArrayND.value
+            let a = a :?> Tensor<single>
+            let b = b :?> Tensor<single>
+            Tensor.almostEqualWithTol (a, b, absTol=1e-5f, relTol=1e-5f) 
         | t, _ when t = typeof<bool> ->
-            let a = a :?> ArrayNDT<bool>
-            let b = b :?> ArrayNDT<bool>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            let a = a :?> Tensor<bool>
+            let b = b :?> Tensor<bool>
+            Tensor.all (a ==== b) 
         | t, _ when t = typeof<int> ->
-            let a = a :?> ArrayNDT<int>
-            let b = b :?> ArrayNDT<int>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            let a = a :?> Tensor<int>
+            let b = b :?> Tensor<int>
+            Tensor.all (a ==== b) 
         | t, _ when t = typeof<int64> ->
-            let a = a :?> ArrayNDT<int64>
-            let b = b :?> ArrayNDT<int64>
-            ArrayND.all (a ==== b) |> ArrayND.value
+            let a = a :?> Tensor<int64>
+            let b = b :?> Tensor<int64>
+            Tensor.all (a ==== b) 
         | t -> failwithf "unsupported trace data type %A" t
 
     let compareCustom isSimilar a b =
@@ -313,7 +313,7 @@ module Trace =
                     if WithMessage then out "Message: %s" msg
 
                     let hdfPath = sprintf "%s/%05d" hdfGroup idx
-                    ArrayNDHDF.writeUntyped hdfFile hdfPath (res :?> IArrayNDHostT)
+                    HostTensor.write hdfFile hdfPath res
                     hdfFile.SetAttribute(hdfPath, "Expression", exprStr)
                     hdfFile.SetAttribute(hdfPath, "LoopStack", loopStackStr)
                 out ""

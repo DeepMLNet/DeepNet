@@ -1,6 +1,6 @@
 ﻿namespace RTools
 
-open Basics
+open Tensor.Utils
 open MathNet.Numerics
 open RProvider
 open RProvider.graphics

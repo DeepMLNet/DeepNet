@@ -1,7 +1,7 @@
 ﻿namespace SymTensor
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 
 
 /// functions for loop evaluation
@@ -10,15 +10,21 @@ module LoopEval =
 
     /// channel information for loop execution
     type LoopChannelInfoT = {
-        Shape:      NShapeSpecT
-        SliceDim:   int
-        Target:     IArrayNDT
-    }
+        Shape:          NShapeSpecT
+        SliceDim:       int
+        Target:         ITensor
+    } 
 
+    /// channel layout information for building loop strides
+    type LoopChannelLayoutInfoT = {
+        Shape:          NShapeSpecT
+        SliceDim:       int
+        TargetLayout:   TensorLayout
+    } 
 
     /// build strides information for loop sources and targets
-    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: IArrayNDT list) 
-                     (channels: Map<ChannelT, LoopChannelInfoT>) 
+    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: TensorLayout list) 
+                     (channels: Map<ChannelT, LoopChannelLayoutInfoT>) 
                      : VarStridesT * ChannelStridesT * int list option list =
 
         let mutable argRequiredStrideOrder = List.replicate args.Length None
@@ -27,15 +33,15 @@ module LoopEval =
             vars |> Map.map (fun vs li ->
                 match li with
                 | ConstArg idx -> 
-                    args.[idx].Layout.Stride
+                    args.[idx].Stride
                 | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
-                    args.[idx].Layout.Stride |> List.without dim
+                    args.[idx].Stride |> List.without dim
                 | PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
                     let sliceDim = channels.[ch].SliceDim
-                    let chStride = channels.[ch].Target.Layout.Stride |> List.without sliceDim
+                    let chStride = channels.[ch].TargetLayout.Stride |> List.without sliceDim
 
                     // check that initial value has same stride as channel target
-                    let ivStride = args.[ivIdx].Layout.Stride |> List.without sliceDim
+                    let ivStride = args.[ivIdx].Stride |> List.without sliceDim
                     if chStride <> ivStride then
                         // Stride mismatch. 
                         // Check that copying argument to temporary array would
@@ -44,12 +50,12 @@ module LoopEval =
                         let strideOrder = 
                             [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
                         let ivCopyStride = 
-                            ArrayNDLayout.orderedStride args.[ivIdx].Shape strideOrder
+                            TensorLayout.orderedStride args.[ivIdx].Shape strideOrder
                             |> List.without sliceDim
                         if chStride <> ivCopyStride then 
                             printfn "Loop stride problem:"
                             printfn "Channel %s:\n%A" ch channels.[ch]
-                            printfn "Initial value layout:\n%A" args.[ivIdx].Layout
+                            printfn "Initial value layout:\n%A" args.[ivIdx]
                             printfn "Copy stride:    %A" ivCopyStride
                             printfn "Channel stride: %A" chStride
                             failwithf "channel %A slice strides %A are different from initial \
@@ -64,19 +70,19 @@ module LoopEval =
                 | IterationsRemaining -> [])
 
         let channelStrides =
-            channels |> Map.map (fun ch lv -> lv.Target.Layout.Stride |> List.without lv.SliceDim)
+            channels |> Map.map (fun ch lv -> lv.TargetLayout.Stride |> List.without lv.SliceDim)
 
         varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
-    let buildInOut (nIters: int64) (iter: int64) (iterAry: IArrayNDT) (itersRemainingAry: IArrayNDT)
+    let buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
                    (vars: Map<VarSpecT, LoopInputT>)
-                   (args: IArrayNDT list) (channels: Map<ChannelT, LoopChannelInfoT>)
-                   : VarEnvT * Map<ChannelT, IArrayNDT> =
+                   (args: ITensor list) (channels: Map<ChannelT, LoopChannelInfoT>)
+                   : VarEnvT * Map<ChannelT, ITensor> =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 
-            List.replicate (ArrayND.nDims ary) RngAll
+            List.replicate (Tensor.nDims ary) RngAll
             |> List.set dim dimSlice
 
         /// The slice of the channel's target for the specified iteration.

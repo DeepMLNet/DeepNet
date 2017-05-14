@@ -1,5 +1,14 @@
+cblas_sdot
+cblas_ddot
+
+cblas_sgemv
+cblas_dgemv
+
 cblas_sgemm
 cblas_dgemm
+
+cblas_sgemm_batch
+cblas_dgemm_batch
 
 LAPACKE_sgetrf
 LAPACKE_dgetrf

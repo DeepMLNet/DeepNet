@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Basics
+open Tensor.Utils
 
 
 module Utils =
@@ -869,7 +869,7 @@ module BaseRangesSpec =
 
 
 module SimpleRangeSpec =
-    open ArrayNDNS
+    open Tensor
 
     /// evaluate a SimpleRangeSpecT to a RangeT
     let eval dynEvaluator rs =

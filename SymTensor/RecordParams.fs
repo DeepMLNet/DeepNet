@@ -4,28 +4,29 @@ open System
 open System.Reflection
 open FSharp.Reflection
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open UExprTypes
 
 type private VarRecordHelpers () =
-    static member PublishLocStride<'T when 'T: equality and 'T: comparison> (expr: ExprT) (loc: ArrayLocT) (stride: int64 list option) (mi: ModelInstance<'T>) =
+    static member PublishLocStride<'T when 'T: equality and 'T: comparison> 
+            (expr: ExprT) (loc: ITensorDevice) (stride: int64 list option) (mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
         match stride with
         | Some stride -> mi.SetStride expr stride
         | None -> ()
     static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
-        ArrayNDHost.scalar value |> dev.ToDev :> IArrayNDT
+        HostTensor.scalar value |> dev.ToDev :> ITensor
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
         Expr.extractVar expr
-    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: ArrayNDT<'T>) =
-        value |> dev.ToHost |> ArrayNDHDF.write hdf name
+    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: Tensor<'T>) =
+        value |> dev.ToHost |> HostTensor.write hdf name
     static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
-        value |> ArrayNDHost.scalar |> ArrayNDHDF.write hdf name
-    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : ArrayNDT<'T> =
-        ArrayNDHDF.read hdf name |> dev.ToDev
+        value |> HostTensor.scalar |> HostTensor.write hdf name
+    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : Tensor<'T> =
+        HostTensor.read hdf name |> dev.ToDev
     static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
-        ArrayNDHDF.read hdf name |> ArrayND.value
+        HostTensor.read hdf name |> Tensor.value
 
 type private ValueType =
     | Scalar of Type
@@ -61,7 +62,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 // get value type and corresponding expression type
                 let baseType, valueType, exprType =                   
                     if valField.PropertyType.IsGenericType && 
-                            valField.PropertyType.GetGenericTypeDefinition() = typedefof<ArrayNDT<_>> then
+                            valField.PropertyType.GetGenericTypeDefinition() = typedefof<Tensor<_>> then
                         // ArrayNDT<'T> => ExprT
                         let bt = valField.PropertyType.GetGenericArguments().[0]
                         bt, Array bt, typeof<ExprT>
@@ -75,7 +76,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                         valField.Name valField.PropertyType exprType exprField.PropertyType
 
                 // extract UVarSpecT
-                let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", allBindingFlags) 
+                let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", Util.allBindingFlags) 
                 let m = mi.MakeGenericMethod baseType
                 let varSpec = m.Invoke(null, [|exprData|]) :?> VarSpecT
 
@@ -101,12 +102,12 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 ||> Seq.fold (fun varEnv (fi, value) ->
                     match fi.ValueType with
                     | Scalar baseType ->
-                        let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", allBindingFlags) 
+                        let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", Util.allBindingFlags) 
                         let m = mi.MakeGenericMethod baseType
-                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> IArrayNDT
+                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> ITensor
                         varEnv |> VarEnv.addVarSpec fi.VarSpec valueAry
                     | Array _ ->
-                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> IArrayNDT)
+                        varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> ITensor)
                 )
             varEnvCache <- Some (value, varEnv)
             varEnv      
@@ -124,10 +125,10 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 fi.VarSpec.Shape 
                 |> SymSizeEnv.substShape model.CompileEnv.SymSizes
                 |> ShapeSpec.tryEval
-            let stride = Option.map ArrayNDLayout.cStride shp
+            let stride = Option.map TensorLayout.cStride shp
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLocStride", allBindingFlags)
+                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLocStride", Util.allBindingFlags)
                 let m = mi.MakeGenericMethod typeof<'T>
                 m.Invoke(null, [|fi.Expr; loc; stride; model|]) |> ignore
         )
@@ -138,11 +139,11 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
         for fi, value in Seq.zip fieldInfos values do
             match fi.ValueType with
             | Scalar typ ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("WriteScalarToHDF", allBindingFlags)
+                let mi = typeof<VarRecordHelpers>.GetMethod("WriteScalarToHDF", Util.allBindingFlags)
                 let m = mi.MakeGenericMethod typ
                 m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
             | Array typ ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("WriteArrayToHDF", allBindingFlags)
+                let mi = typeof<VarRecordHelpers>.GetMethod("WriteArrayToHDF", Util.allBindingFlags)
                 let m = mi.MakeGenericMethod typ
                 m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
 
@@ -152,11 +153,11 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
             for fi in fieldInfos do
                 match fi.ValueType with
                 | Scalar typ ->
-                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadScalarFromHDF", allBindingFlags)
+                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadScalarFromHDF", Util.allBindingFlags)
                     let m = mi.MakeGenericMethod typ
                     yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|]) 
                 | Array typ ->
-                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadArrayFromHDF", allBindingFlags)
+                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadArrayFromHDF", Util.allBindingFlags)
                     let m = mi.MakeGenericMethod typ
                     yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|])         
         }

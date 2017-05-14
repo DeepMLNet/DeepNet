@@ -3,8 +3,8 @@
 open System
 open System.Reflection
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open UExprTypes
 open SymTensor.Compiler
@@ -46,20 +46,19 @@ module CudaEvalTypes =
 
     type private HelperT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (shp: NShapeSpecT) : ArrayNDT<'T> =
-            let ary : ArrayNDCudaT<'T> = ArrayNDCuda.newC shp 
-            ary :> ArrayNDT<'T>
+                (shp: NShapeSpecT) : Tensor<'T> =
+            Tensor<'T> (shp, CudaTensor.Dev)
 
         static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: ArrayNDHostT<'T>) : ArrayNDT<'T> =
-            ArrayNDCuda.toDev ary :> ArrayNDT<'T>
+                (ary: Tensor<'T>) : Tensor<'T> =
+            CudaTensor.transfer ary
 
         static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
-                (ary: ArrayNDT<'T>) : ArrayNDHostT<'T> =
-            ArrayNDCuda.toHost (ary :?> ArrayNDCudaT<'T>)
+                (ary: Tensor<'T>) : Tensor<'T> =
+            HostTensor.transfer ary
 
     let private invokeHelperMethod<'T> name args = 
-        let gm = typeof<HelperT>.GetMethod (name, allBindingFlags)
+        let gm = typeof<HelperT>.GetMethod (name, Util.allBindingFlags)
         let m = gm.MakeGenericMethod ([|typeof<'T>|])
         m.Invoke(null, args)  
 
@@ -69,9 +68,9 @@ module CudaEvalTypes =
         new IDevice with
             
             #if !CUDA_DUMMY
-            member this.Allocator shp : ArrayNDT<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
-            member this.ToDev ary : ArrayNDT<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
-            member this.ToHost ary : ArrayNDHostT<'T2>  = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
+            member this.Allocator shp : Tensor<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
+            member this.ToDev ary : Tensor<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
+            member this.ToHost ary : Tensor<'T2>      = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
 
             #else
 
@@ -83,7 +82,7 @@ module CudaEvalTypes =
             member this.Compiler = { new IUExprCompiler with 
                                         member this.Name = "Cuda"
                                         member this.Compile env exprs = CudaEval.cudaEvaluator env exprs }
-            member this.DefaultLoc = LocDev
+            member this.DefaultLoc = CudaTensor.Dev
             member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
 
     }

@@ -5,7 +5,7 @@ open System.IO
 open Xunit
 open FsUnit.Xunit
 
-open Basics
+open Tensor.Utils
 open ArrayNDNS
 open SymTensor
 open SymTensor.Compiler.Cuda

@@ -4,8 +4,8 @@
 open Xunit
 open FsUnit.Xunit
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open TestUtils
@@ -41,7 +41,7 @@ let ``Simple loop`` (device: IDevice) =
 
     let resultFn = Func.make<single> device.DefaultFactory result |> arg1 initialA
     
-    let initialAv = ArrayNDHost.zeros<single> [1L; 3L; 2L]
+    let initialAv = HostTensor.zeros<single> [1L; 3L; 2L]
     printfn "initialAv=\n%A" initialAv
 
     let resultVal = resultFn initialAv
@@ -112,10 +112,10 @@ let ``Build complicated loop 1`` () =
 
     
 let ``Values for complicated loop 1`` () =
-    let initialAv = Seq.countingFrom 0 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [1L; 3L; 2L]
-    let initialBv = Seq.countingFrom 100 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [3L; 2L; 2L]
-    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> ArrayNDHost.ofSeqWithShape [2L; 5L; 3L]
-    let constAv   = ArrayNDHost.ofList [0.001f; 0.0004f] 
+    let initialAv = Seq.countingFrom 0 |> Seq.map single |> HostTensor.ofSeqWithShape [1L; 3L; 2L]
+    let initialBv = Seq.countingFrom 100 |> Seq.map single |> HostTensor.ofSeqWithShape [3L; 2L; 2L]
+    let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> HostTensor.ofSeqWithShape [2L; 5L; 3L]
+    let constAv   = HostTensor.ofList [0.001f; 0.0004f] 
     printfn "initialAv=\n%A" initialAv
     printfn "initialBv=\n%A" initialBv
     printfn "seqAv=\n%A" seqAv
@@ -177,10 +177,10 @@ let ``Derivative of complicated loop 1`` (device: IDevice) =
 
     let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
     let resultV, dInitialAV, dInitialBV, dSeqAV, dConstAExtV = resultFn initialAv initialBv seqAv constAv
-    let dInitialAV = dInitialAV |> ArrayND.reshape initialAv.Shape
-    let dInitialBV = dInitialBV |> ArrayND.reshape initialBv.Shape
-    let dSeqAV = dSeqAV |> ArrayND.reshape seqAv.Shape
-    let dConstAExtV = dConstAExtV |> ArrayND.reshape constAv.Shape
+    let dInitialAV = dInitialAV |> Tensor.reshape initialAv.Shape
+    let dInitialBV = dInitialBV |> Tensor.reshape initialBv.Shape
+    let dSeqAV = dSeqAV |> Tensor.reshape seqAv.Shape
+    let dConstAExtV = dConstAExtV |> Tensor.reshape constAv.Shape
     printfn "resultV=\n%A" resultV
     printfn "dInitialAV=\n%A" dInitialAV.Full
     printfn "dInitialBV=\n%A" dInitialBV.Full

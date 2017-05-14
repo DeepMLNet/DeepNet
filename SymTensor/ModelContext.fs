@@ -2,14 +2,14 @@
 
 open System
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 
 [<AutoOpen>]
 module ModelContextTypes =
 
     /// function that returns an initialization value for a parameter
-    type Initializer<'T> = int -> int64 list -> ArrayNDHostT<'T>
+    type Initializer<'T> = int -> int64 list -> Tensor<'T>
 
     /// model parameter
     type ParameterInfo<'T> = {
@@ -19,24 +19,24 @@ module ModelContextTypes =
 
     /// Model evaluation device specification.
     type IDevice =
-        abstract member Allocator:      NShapeSpecT -> ArrayNDT<'T> 
-        abstract member ToDev:          ArrayNDHostT<'T> -> ArrayNDT<'T>
-        abstract member ToHost:         ArrayNDT<'T> -> ArrayNDHostT<'T>
+        abstract member Allocator:      NShapeSpecT -> Tensor<'T> 
+        abstract member ToDev:          Tensor<'T> -> Tensor<'T>
+        abstract member ToHost:         Tensor<'T> -> Tensor<'T>
         abstract member Compiler:       IUExprCompiler
-        abstract member DefaultLoc:     ArrayLocT
+        abstract member DefaultLoc:     ITensorDevice
         abstract member DefaultFactory: IUExprCompiler * CompileEnvT
 
     /// Evaluates the model on the host.
     let DevHost = { 
         new IDevice with
-            member this.Allocator shp = ArrayNDHost.newC shp :> ArrayNDT<_>
-            member this.ToDev ary =     ary :> ArrayNDT<_>
-            member this.ToHost ary =    ary :?> ArrayNDHostT<_>
-            member this.Compiler =      { new IUExprCompiler with 
-                                            member this.Name = "Host"
-                                            member this.Compile env exprs = onHost env exprs }
-            member this.DefaultLoc =    LocHost
-            member this.DefaultFactory = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
+            member this.Allocator shp   = HostTensor.zeros shp 
+            member this.ToDev ary       = ary
+            member this.ToHost ary      = ary
+            member this.Compiler        = { new IUExprCompiler with 
+                                              member this.Name = "Host"
+                                              member this.Compile env exprs = onHost env exprs }
+            member this.DefaultLoc      = HostTensor.Dev
+            member this.DefaultFactory  = this.Compiler, {CompileEnv.empty with ResultLoc=this.DefaultLoc}
     }
 
     /// A set of symbolic variables forming a set of parameters for a model.
@@ -142,7 +142,7 @@ module ModelContextTypes =
             ||> List.map2 (fun startIdx shp ->
                 let elems = List.fold (*) 1L shp
                 let v = dataVal.[startIdx .. startIdx + elems - 1L]
-                ArrayND.reshapeView shp v)
+                Tensor.reshapeView shp v)
             |> List.zip parameterSet.Parameters
             |> Map.ofList
 
@@ -153,13 +153,13 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: VarSpecT) : ArrayNDT<'T> = parameterVals.[par]
-            and set (par: VarSpecT) (value: ArrayNDT<'T>) = parameterVals.[par].[Fill] <- value
+            with get (par: VarSpecT) : Tensor<'T> = parameterVals.[par]
+            and set (par: VarSpecT) (value: Tensor<'T>) = parameterVals.[par].[Fill] <- value
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : ArrayNDT<'T> = this.[Expr.extractVar par]
-            and set (par: ExprT) (value: ArrayNDT<'T>) = this.[Expr.extractVar par] <- value
+            with get (par: ExprT) : Tensor<'T> = this.[Expr.extractVar par]
+            and set (par: ExprT) (value: Tensor<'T>) = this.[Expr.extractVar par] <- value
 
         /// Uses the values of this ParameterStorageT for the the corresponding
         /// ParameterSetT in the given variable environment.
@@ -170,7 +170,7 @@ module ModelContextTypes =
         member this.Load (hdf, ?prefix) = 
             let prefix = defaultArg prefix ""
             for KeyValue(vs, vsView) in parameterVals do
-                let value = ArrayNDHDF.read hdf (prefix + "/" + vs.Name)
+                let value = HostTensor.read hdf (prefix + "/" + vs.Name)
                 vsView.[Fill] <- device.ToDev value
 
         /// Saves the parameter values to a HDF5 file.
@@ -179,7 +179,7 @@ module ModelContextTypes =
             let prefix = defaultArg prefix ""
             for KeyValue(vs, vsView) in parameterVals do
                 let value = device.ToHost vsView
-                ArrayNDHDF.write hdf (prefix + "/" + vs.Name) value
+                HostTensor.write hdf (prefix + "/" + vs.Name) value
 
         /// prints the shapes of all parameters contained in this ParameterStorage
         member this.PrintShapes () =
@@ -225,7 +225,7 @@ module ModelContextTypes =
             let rng = Random(seed)
             rng.SeqDouble (-0.01, 0.01) 
             |> Seq.map conv<'T>
-            |> ArrayNDHost.ofSeqWithShape shp
+            |> HostTensor.ofSeqWithShape shp
 
         new (context: string) = ModelBuilder(context, false)
 
@@ -323,7 +323,7 @@ module ModelContextTypes =
 
         /// Infers variable location, variable strides and symbolic sizes by 
         /// matching a symbolic variable to the given value.
-        member this.UseTmplVal var (value: ArrayNDT<'T>) =
+        member this.UseTmplVal var (value: Tensor<'T>) =
             // infer symbolic sizes
             let inferredSizes = 
                 VarEnv.empty 
@@ -332,8 +332,8 @@ module ModelContextTypes =
             symSizeEnv <- Map.join symSizeEnv inferredSizes
 
             // infer location and strides
-            varLocs <- varLocs |> Map.add (Expr.extractVar var) (ArrayND.location value)
-            varStrides <- varStrides |> Map.add (Expr.extractVar var) (ArrayND.stride value)
+            varLocs <- varLocs |> Map.add (Expr.extractVar var) (Tensor.dev value)
+            varStrides <- varStrides |> Map.add (Expr.extractVar var) (value.Layout.Stride)
 
         /// Inferred size symbol values
         member this.SymSizeEnv = symSizeEnv
@@ -384,7 +384,7 @@ module ModelContextTypes =
                     (varStrides, vars)
                     ||> Set.fold (fun varStrides var ->
                         match varStrides |> Map.tryFind var, ShapeSpec.tryEval var.Shape with
-                        | None, Some nShape -> varStrides |> Map.add var (ArrayNDLayout.cStride nShape)
+                        | None, Some nShape -> varStrides |> Map.add var (TensorLayout.cStride nShape)
                         | _, _ -> varStrides)
 
             // create compile environement
@@ -428,10 +428,10 @@ module ModelContextTypes =
             let psVal = parameterStorage.Flat
             let varLocs =
                 compileEnv.VarLocs
-                |> Map.add psVar (ArrayND.location psVal)
+                |> Map.add psVar (Tensor.dev psVal)
             let varStrides =
                 compileEnv.VarStrides
-                |> Map.add psVar (ArrayND.stride psVal)
+                |> Map.add psVar psVal.Layout.Stride
 
             device.Compiler, {compileEnv with ResultLoc  = resultLoc
                                               VarLocs    = varLocs
@@ -519,41 +519,41 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : ArrayNDT<'T> = this.ParameterStorage.[par]
-            and set (par: ExprT) (value: ArrayNDT<'T>) = this.ParameterStorage.[par] <- value
+            with get (par: ExprT) : Tensor<'T> = this.ParameterStorage.[par]
+            and set (par: ExprT) (value: Tensor<'T>) = this.ParameterStorage.[par] <- value
 
-        member this.Func (resultLoc: ArrayLocT, exprs: ExprT list) =
+        member this.Func (resultLoc: ITensorDevice, exprs: ExprT list) =
             let exprs = exprs |> List.map this.Use 
             Func.makeMany<'T> (compileSpec resultLoc) exprs << useParStorage
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
-        member this.Func<'T0> (resultLoc: ArrayLocT, expr0: ExprT) =
+        member this.Func<'T0> (resultLoc: ITensorDevice, expr0: ExprT) =
             let expr0 = this.Use expr0
             Func.make<'T0> (compileSpec resultLoc) expr0 << useParStorage
 
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT) = 
+        member this.Func (resultLoc: ITensorDevice, expr0: ExprT) = 
             this.Func<'T> (resultLoc, expr0)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func<'T0, 'T1> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+        member this.Func<'T0, 'T1> (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             Func.make2<'T0, 'T1> (compileSpec resultLoc) expr0 expr1 << useParStorage
 
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT) =
+        member this.Func (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT) =
             this.Func<'T, 'T> (resultLoc, expr0, expr1)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func<'T0, 'T1, 'T2> (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func<'T0, 'T1, 'T2> (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
             Func.make3<'T0, 'T1, 'T2> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
 
-        member this.Func (resultLoc: ArrayLocT, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
             this.Func<'T, 'T, 'T> (resultLoc, expr0, expr1, expr2)
 
         member this.Func (exprs: ExprT list) =

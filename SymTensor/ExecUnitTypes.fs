@@ -4,7 +4,7 @@ open System
 open System.Diagnostics
 open System.Collections.Generic
 
-open Basics
+open Tensor.Utils
 open SymTensor
 open UExprTypes
 

@@ -5,8 +5,8 @@ open System.Diagnostics
 open System.IO
 open Nessos.FsPickler.Json
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Datasets
 open SymTensor
 open Optimizers
@@ -54,7 +54,7 @@ module TrainingLog =
     type Log<'P> = {
         MinImprovement:     float
         BestOn:             Partition
-        Best:               (Entry * ArrayNDT<'P>) option
+        Best:               (Entry * Tensor<'P>) option
         History:            Entry list
     }
 
@@ -73,7 +73,7 @@ module TrainingLog =
             | Some (bestEntry, _) when
                     (relevantLoss log.BestOn entry) 
                      <= (relevantLoss log.BestOn bestEntry) - log.MinImprovement ->
-                Some (entry, ArrayND.copy parVals)
+                Some (entry, Tensor.copy parVals)
             | _ -> log.Best
         {log with Best=best; History=entry :: log.History}
 
@@ -223,7 +223,7 @@ module Train =
         /// Save model parameters to specified file.
         abstract member SaveModel: hdf:HDF5 -> prefix:string -> unit
         /// Model parameter values (i.e. weights).
-        abstract member ModelParameters: ArrayNDT<'T> with get, set
+        abstract member ModelParameters: Tensor<'T> with get, set
         /// Resets the internal model state. (for example the latent state of an RNN)
         abstract member ResetModelState: unit -> unit
         /// Initialize optimizer state.
@@ -238,7 +238,7 @@ module Train =
             (modelInstance: ModelInstance<'T>) 
             (losses: ExprT list) 
             (nextStateExpr: ExprT option)
-            (varEnvBuilder: ArrayNDT<'T> option -> 'Smpl -> VarEnvT)
+            (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnvT)
             (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
@@ -274,10 +274,10 @@ module Train =
                 |> List.tail |> updateStateAndGetLosses
    
         {new ITrainable<'Smpl, 'T> with
-            member this.Losses sample = lossesFn sample |> List.map (ArrayND.value >> conv<float>)
+            member this.Losses sample = lossesFn sample |> List.map (Tensor.value >> conv<float>)
             member this.Optimize learningRate sample = 
                 let losses = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
-                lazy (losses |> List.map (ArrayND.value >> conv<float>))
+                lazy (losses |> List.map (Tensor.value >> conv<float>))
             member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
             member this.InitModel seed = modelInstance.InitPars seed
             member this.LoadModel hdf prefix = modelInstance.LoadPars (hdf, prefix)
@@ -541,7 +541,7 @@ module Train =
                     match state.BestEntry with
                     | Some bestEntry ->
                         trainable.LoadModel cp "BestModel"
-                        Some (bestEntry, trainable.ModelParameters |> ArrayND.copy)
+                        Some (bestEntry, trainable.ModelParameters |> Tensor.copy)
                     | None -> None
                 let log = {TrainingLog.create cfg.MinImprovement cfg.BestOn with 
                             Best=best; History=state.History}
@@ -577,7 +577,7 @@ module Train =
                         let bestEntry =
                             match log.Best with
                             | Some (bestEntry, bestPars) ->
-                                let curPars = trainable.ModelParameters |> ArrayND.copy
+                                let curPars = trainable.ModelParameters |> Tensor.copy
                                 trainable.ModelParameters <- bestPars
                                 trainable.SaveModel cp "BestModel"
                                 trainable.ModelParameters <- curPars

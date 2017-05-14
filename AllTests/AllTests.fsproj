@@ -11,7 +11,7 @@
     <RootNamespace>AllTests</RootNamespace>
     <AssemblyName>AllTests</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Name>AllTests</Name>
     <TargetFrameworkProfile />
@@ -59,8 +59,6 @@
     <Compile Include="AssemblyInfo.fs" />
     <Content Include="packages.config" />
     <Compile Include="TestUtils.fs" />
-    <Compile Include="ArrayNDTests.fs" />
-    <Compile Include="NumpyFilesTest.fs" />
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
     <None Include="CompilerPipeline.fs" />
@@ -71,14 +69,6 @@
     <Compile Include="ElemExprTests.fs" />
     <Compile Include="LoopTests.fs" />
     <Content Include="App.config" />
-    <None Include="TestData\NPZ1.npz">
-      <Link>NPZ1.npz</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="TestData\MatInv.h5">
-      <Link>MatInv.h5</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="TestData\abalone.txt">
       <Link>abalone.txt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -95,10 +85,13 @@
       <Link>arrhythmia.txt.gz</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="TestData\PCA.npz">
+      <Link>TestData\PCA.npz</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
     <Reference Include="FsUnit.Xunit">

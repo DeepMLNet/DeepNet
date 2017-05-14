@@ -1,2 +1,17 @@
-TODO:
+- what is necessary to make CUDA copy kernel work?
+  1. Tensor structure in F#
+    - structure has dynamic size
+	- to make kernel invocation efficient we should build it
+	- DONE.
 
+  2. Generating wrapper code with extern "C"
+    - how to best implement type-safe wrappers?
+	- DONE.
+
+  3. nvrtc invocation
+	- DONE.
+
+  4. module loading
+    - DONE.
+
+  5. kernel invocation

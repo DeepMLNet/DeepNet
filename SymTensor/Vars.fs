@@ -2,7 +2,7 @@
 
 open System.Runtime.InteropServices
 
-open Basics
+open Tensor.Utils
 open ShapeSpec
 
 

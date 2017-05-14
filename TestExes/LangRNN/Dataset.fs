@@ -1,11 +1,11 @@
 ﻿namespace LangRNN
 
 
-open Basics
+open Tensor.Utils
 open System.IO
 open System.Text
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -15,7 +15,7 @@ open Datasets
 
 
 type WordSeq = {
-    Words:  ArrayNDT<int>
+    Words:  Tensor<int>
 }
 
 exception UnknownWord of string
@@ -75,7 +75,7 @@ type WordData (dataPath:      string,
         |> fun t -> printfn "Having %d tokens in total." t.Length; t
         |> fun t -> match tokenLimit with | Some n -> t |> List.truncate n | None -> t
         |> fun t -> printfn "Using %d tokens." t.Length; t
-        |> fun t -> Seq.singleton {Words = ArrayNDHost.ofList t}
+        |> fun t -> Seq.singleton {Words = HostTensor.ofList t}
         |> Dataset.ofSeqSamples
         |> Dataset.cutToMinSamples minSamples
         |> TrnValTst.ofDatasetWithRatios (0.95, 0.04, 0.01)
@@ -89,7 +89,7 @@ type WordData (dataPath:      string,
     member this.Random =
         let rng = System.Random 123
         Seq.init tokenLimit.Value (fun _ -> 
-            {WordSeq.Words = rng.Seq (0, vocSize-1) |> ArrayNDHost.ofSeqWithShape [stepsPerSmpl]})
+            {WordSeq.Words = rng.Seq (0, vocSize-1) |> HostTensor.ofSeqWithShape [stepsPerSmpl]})
         |> Dataset.ofSeqSamples
         |> TrnValTst.ofDatasetWithRatios (0.90, 0.05, 0.05)
         |> TrnValTst.toCuda

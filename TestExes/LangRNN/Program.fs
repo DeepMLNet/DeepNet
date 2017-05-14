@@ -3,8 +3,8 @@
 open System.IO
 open Argu
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Models
 
 
@@ -58,7 +58,7 @@ module Program =
         //SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
         // required for SlackBot
-        Cuda.CudaSup.setContext ()
+        Cuda.setContext ()
 
         // tests
         //verifyRNNGradientOneHot DevCuda
@@ -91,7 +91,7 @@ module Program =
 
         // output some training samples
         if args.Contains <@PrintSamples@> then
-            for smpl=0 to 3 do
+            for smpl in 0L .. 3L do
                 for i, s in Seq.indexed (data.Dataset.Trn.SlotBatches batchSize stepsPerSmpl) do
                     let words = s.Words.[smpl, *] |> data.ToStr
                     printfn "Batch %d, sample %d:\n%s\n" i smpl words
@@ -108,7 +108,7 @@ module Program =
                 BatchSize          = System.Int64.MaxValue
                 SlotSize           = Some stepsPerSmpl
                 BestOn             = Training
-                CheckpointFile      = Some "."
+                CheckpointFile     = Some "LangRNN-%ITER%.h5"
                 CheckpointInterval = Some checkpointInterval
                 PerformTraining    = args.Contains <@Train@>
         }
@@ -139,15 +139,15 @@ module Program =
                     )
                 |> Seq.map data.Tokenize
                 |> List.ofSeq
-                |> ArrayNDHost.ofList2D
+                |> HostTensor.ofList2D
 
-            let genWords = model.Generate 1001 {Words=startWords |> ArrayNDCuda.toDev}
-            let genWords = genWords.Words |> ArrayNDHost.fetch
-            for s=0 to NPred-1 do
+            let genWords = model.Generate 1001 {Words=startWords |> CudaTensor.transfer}
+            let genWords = genWords.Words |> HostTensor.transfer
+            for s in 0 .. NPred-1 do
                 printfn "======================= Sample %d ====================================" s
-                printfn "====> prime:      \n%s" (data.ToStr startWords.[s, 0..NStart-1])
-                printfn "\n====> generated:\n> %s" (data.ToStr genWords.[s, *])
-                printfn "\n====> original: \n> %s" (data.ToStr startWords.[s, NStart..])
+                printfn "====> prime:      \n%s" (data.ToStr startWords.[int64 s, 0L .. int64 NStart-1L])
+                printfn "\n====> generated:\n> %s" (data.ToStr genWords.[int64 s, *])
+                printfn "\n====> original: \n> %s" (data.ToStr startWords.[int64 s, int64 NStart ..])
                 printfn ""
         | None -> ()
 
@@ -161,7 +161,7 @@ module Program =
         | None -> ()
 
         // shutdown
-        Cuda.CudaSup.shutdown ()
+        Cuda.shutdown ()
         0 
 
 

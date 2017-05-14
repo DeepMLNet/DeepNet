@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Basics
+open Tensor.Utils
 
 [<AutoOpen>]
 module SymSizeEnvTypes =

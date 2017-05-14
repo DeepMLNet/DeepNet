@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.4
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor", "Tensor\Tensor.fsproj", "{82DE3BAE-BCEC-4DF8-9C46-07B7FAF4E31A}"
 EndProject
@@ -45,6 +45,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DeepNet", "DeepNet\DeepNet.fsproj", "{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MLPlots", "MLPlots\MLPlots.fsproj", "{853082BE-359E-4F7E-B35C-7B10C8BD3970}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TensorTests", "TensorTests\TensorTests.fsproj", "{73235C57-C9E3-4A03-B334-C6F566C907F4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -116,6 +118,12 @@ Global
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|Any CPU.Build.0 = Release|Any CPU
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|x64.ActiveCfg = Release|x64
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970}.Release|x64.Build.0 = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|x64.ActiveCfg = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Debug|x64.Build.0 = Debug|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|Any CPU.ActiveCfg = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|x64.ActiveCfg = Release|x64
+		{73235C57-C9E3-4A03-B334-C6F566C907F4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -131,5 +139,6 @@ Global
 		{BDB5D832-BC10-4B8F-BDE0-7142646AA9CF} = {74B877B5-D69A-4DA5-BE59-90A1E191BD22}
 		{7C53D1C7-8ED2-4E04-8F2D-CF0384C51F33} = {69798A19-ECB9-414E-AD43-8350B6C17203}
 		{853082BE-359E-4F7E-B35C-7B10C8BD3970} = {69798A19-ECB9-414E-AD43-8350B6C17203}
+		{73235C57-C9E3-4A03-B334-C6F566C907F4} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 	EndGlobalSection
 EndGlobal

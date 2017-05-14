@@ -1,7 +1,7 @@
 ﻿namespace Optimizers
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 
 
@@ -26,12 +26,12 @@ module Adam =
     }
 
     type State<'T> = {
-        Iter:           ArrayNDT<'T>  
-        LastStep:       ArrayNDT<'T>
-        EstMom1:        ArrayNDT<'T>
-        EstMom2:        ArrayNDT<'T>
-        EstMom1B:       ArrayNDT<'T>
-        EstMom2B:       ArrayNDT<'T>
+        Iter:           Tensor<'T>  
+        LastStep:       Tensor<'T>
+        EstMom1:        Tensor<'T>
+        EstMom2:        Tensor<'T>
+        EstMom1B:       Tensor<'T>
+        EstMom2B:       Tensor<'T>
     } 
 
     type StateExpr = {
@@ -85,14 +85,14 @@ type Adam<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
-        let shp = ArrayND.shape parVals
+        let shp = Tensor.shape parVals
         {
-            Iter        = ArrayNDHost.zeros []  |> dev.ToDev
-            LastStep    = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom1     = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom2     = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom1B    = ArrayNDHost.zeros shp |> dev.ToDev
-            EstMom2B    = ArrayNDHost.zeros shp |> dev.ToDev
+            Iter        = HostTensor.zeros []  |> dev.ToDev
+            LastStep    = HostTensor.zeros shp |> dev.ToDev
+            EstMom1     = HostTensor.zeros shp |> dev.ToDev
+            EstMom2     = HostTensor.zeros shp |> dev.ToDev
+            EstMom1B    = HostTensor.zeros shp |> dev.ToDev
+            EstMom2B    = HostTensor.zeros shp |> dev.ToDev
         }
 
     member this.Minimize : ExprT =

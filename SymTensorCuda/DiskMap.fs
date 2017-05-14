@@ -6,12 +6,10 @@ open System.Linq
 open Nessos.FsPickler
 open System.Threading
 open System.Security.Cryptography
-open ArrayNDNS.ArrayND
 
 
-let binarySerializer = FsPickler.CreateBinarySerializer()
-let sha1 = SHA1CryptoServiceProvider()
-
+let private binarySerializer = FsPickler.CreateBinarySerializer()
+let private sha1 = new SHA1CryptoServiceProvider()
 
 /// a filesystem backed map for binary keys and values
 type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string) =

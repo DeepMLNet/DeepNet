@@ -8,12 +8,11 @@ open System.Security.Cryptography
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
-open Basics.Cuda
 open DiskMap
 
 
@@ -28,13 +27,13 @@ module Compile =
 
     let hostCompilerDir = @"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64"
 
-    let krnlPtxCacheDir = Path.Combine(Util.localAppData, "PTXCache")
+    let krnlPtxCacheDir = Path.Combine(Util.localAppData "DeepNet", "PTXCache")
     let krnlPtxCache = DiskMap<ModCacheKey, byte[]> (krnlPtxCacheDir, "code.dat", "mod.ptx")
 
-    let cppModCacheDir = Path.Combine(Util.localAppData, "CPPCache")
+    let cppModCacheDir = Path.Combine(Util.localAppData "DeepNet", "CPPCache")
     let cppModCache = DiskMap<ModCacheKey, byte[]> (cppModCacheDir, "code.dat", "mod.dll")
 
-    let compileDirRoot = Path.Combine(Util.localAppData, "Compile")
+    let compileDirRoot = Path.Combine(Util.localAppData "DeepNet", "Compile")
 
     /// prepares a compile directory
     let prepareCompileDir code =        
@@ -101,7 +100,7 @@ module Compile =
             yield "--std=c++11"
             yield "-DWIN32_LEAN_AND_MEAN"
             yield "-Xcudafe"; yield "--diag_suppress=declared_but_not_referenced"
-            yield sprintf "--gpu-architecture=%s" CudaSup.nvccArch
+            yield sprintf "--gpu-architecture=%s" Cuda.nvccArch
             if Debug.FastKernelMath then yield "--use_fast_math"
             if Debug.RestrictKernels then yield "--restrict"
             if Debug.DebugCompile then yield "--device-debug"
@@ -153,7 +152,7 @@ module Compile =
         use jitLogVerbose = new CudaJOLogVerbose(true)
         jitOpts.Add(jitLogVerbose)
 
-        let cuMod = CudaSup.context.LoadModulePTX(ptx, jitOpts)
+        let cuMod = Cuda.context.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
         if Debug.PtxasInfo then
@@ -165,7 +164,7 @@ module Compile =
         let krnls =
             (Map.empty, krnlNames)
             ||> Seq.fold (fun krnls name -> 
-                krnls |> Map.add name (CudaKernel(name, cuMod, CudaSup.context))) 
+                krnls |> Map.add name (CudaKernel(name, cuMod, Cuda.context))) 
 
         if Debug.Timing then printfn "JITing PTX code took %A" sw.Elapsed
 
@@ -180,7 +179,7 @@ module Compile =
 
     /// unloads previously loaded CUDA kernel code
     let unloadCudaCode cuMod =
-        CudaSup.context.UnloadModule(cuMod)
+        Cuda.context.UnloadModule(cuMod)
 
 
     /// Compiles the given CUDA C++ device/host code into a module, loads it and returns
@@ -198,8 +197,8 @@ module Compile =
             "-DWIN32_LEAN_AND_MEAN"
             "-Xcudafe"; "--diag_suppress=declared_but_not_referenced";
             sprintf "--compiler-bindir \"%s\"" hostCompilerDir                        
-            sprintf "--gpu-architecture=%s" CudaSup.nvccArch 
-            sprintf "--gpu-code=%s" CudaSup.nvccCode
+            sprintf "--gpu-architecture=%s" Cuda.nvccArch 
+            sprintf "--gpu-code=%s" Cuda.nvccCode
         ]
         let dbgArgs = 
             if Debug.DebugCompile then ["--debug"; "--device-debug"; "--generate-line-info"]
@@ -321,7 +320,7 @@ module CudaExprWorkspaceTypes =
             |> Set.toSeq
             |> Seq.map (fun (name, workDim) ->
                 let maxBlockSize = kernels.[name].GetOccupancyMaxPotentialBlockSize().blockSize
-                (name, workDim), CudaSup.computeLaunchDim workDim maxBlockSize)
+                (name, workDim), Cuda.computeLaunchDim workDim maxBlockSize)
             |> Map.ofSeq
         #else
         let kernelLaunchDims = Map.empty    
@@ -417,17 +416,17 @@ module CudaExprWorkspaceTypes =
                     let devAry, resDsc =
                         match tex.Contents.NDims with
                         | 1 ->
-                            if (ArrayND.stride tex.Contents).[0] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[0] <> 1L then
                                 failwith "texture contents must be continuous"
                             let nElems = tex.Contents.Shape.[0]
                             let devAry = new CudaArray1D
                                            (CUArrayFormat.Float, SizeT nElems, CudaArray1DNumChannels.One)
                             devAry.CopyFromDeviceToArray1D 
                                 (devVar.DevicePointer, SizeT (nElems * sizeof64<single>), 
-                                 SizeT (ArrayND.offset tex.Contents * sizeof64<single>))
+                                 SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 2 ->
-                            if (ArrayND.stride tex.Contents).[1] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[1] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
                             let devAry = new CudaArray2D(CUArrayFormat.Float, 
                                                          SizeT tex.Contents.Shape.[1],
@@ -435,16 +434,16 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray2DNumChannels.One)
                             use pdv = 
                                 new CudaPitchedDeviceVariable<single> 
-                                    (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof64<single>), 
+                                    (devVar.DevicePointer + SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>), 
                                      SizeT tex.Contents.Shape.[1], SizeT tex.Contents.Shape.[0], 
-                                     SizeT (((ArrayND.stride tex.Contents).[0]) * sizeof64<single>)) 
+                                     SizeT (((ArrayNDManikin.stride tex.Contents).[0]) * sizeof64<single>)) 
                             devAry.CopyFromDeviceToThis (pdv)
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | 3 ->
-                            if (ArrayND.stride tex.Contents).[2] <> 1L then
+                            if (ArrayNDManikin.stride tex.Contents).[2] <> 1L then
                                 failwith "texture contents must be continuous in last dimension"
-                            if (ArrayND.stride tex.Contents).[0] <> 
-                               (ArrayND.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
+                            if (ArrayNDManikin.stride tex.Contents).[0] <> 
+                               (ArrayNDManikin.stride tex.Contents).[1] * tex.Contents.Shape.[1] then
                                 failwith "texture contents must be continuous in first dimension"
                             let devAry = new CudaArray3D(CUArrayFormat.Float, 
                                                          SizeT tex.Contents.Shape.[2],
@@ -453,9 +452,9 @@ module CudaExprWorkspaceTypes =
                                                          CudaArray3DNumChannels.One,
                                                          CUDAArray3DFlags.None)
                             devAry.CopyFromDeviceToThis 
-                                (devVar.DevicePointer + SizeT (ArrayND.offset tex.Contents * sizeof64<single>),
+                                (devVar.DevicePointer + SizeT (ArrayNDManikin.offset tex.Contents * sizeof64<single>),
                                  SizeT sizeof64<single>, 
-                                 SizeT (((ArrayND.stride tex.Contents).[1]) * sizeof64<single>))
+                                 SizeT (((ArrayNDManikin.stride tex.Contents).[1]) * sizeof64<single>))
                             (devAry :> System.IDisposable), CudaResourceDesc (devAry)
                         | d -> failwithf "unsupported number of dimensions for texture: %d" d
                     let texObj = new CudaTexObject (resDsc, tex.Descriptor)
@@ -485,9 +484,9 @@ module CudaExprWorkspaceTypes =
                     let argArray = args |> List.toArray
 
                     // launch configuration
-                    let {Block=blockDim; Grid=gridDim} = kernelLaunchDims.[(krnl, workDim)]
-                    kernels.[krnl].BlockDimensions <- CudaSup.toDim3 blockDim
-                    kernels.[krnl].GridDimensions <- CudaSup.toDim3 gridDim
+                    let {Cuda.Block=blockDim; Cuda.Grid=gridDim} = kernelLaunchDims.[(krnl, workDim)]
+                    kernels.[krnl].BlockDimensions <- Cuda.toDim3 blockDim
+                    kernels.[krnl].GridDimensions <- Cuda.toDim3 gridDim
                     kernels.[krnl].DynamicSharedMemory <- uint32 smemSize
 
                     if Debug.TraceCalls then
@@ -566,8 +565,8 @@ module CudaExprWorkspaceTypes =
                     let ldA = a.GetLeadingDimension execEnv |> int32
                     let ldB = b.GetLeadingDimension execEnv |> int32
                     let ldTrgt = trgt.GetLeadingDimension execEnv |> int32
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.Gemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
+                    Cuda.blas.Stream <- getStream strm
+                    Cuda.blas.Gemm(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                       m, n, k, aFac, aVar, ldA, bVar, ldB, trgtFac, 
                                       trgtVar, ldTrgt)
 
@@ -584,12 +583,12 @@ module CudaExprWorkspaceTypes =
                     let nSamples = a.NSamples |> int32
 
                     if Debug.TraceCalls then
-                        printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, \
+                        printfn "Executing GemmBatched on stream %d with m=%d, n=%d, k=%d, 
                                  ldA=%d, ldB=%d, ldTrgt=%d, nSamples=%d" 
                             strm m n k ldA ldB ldTrgt nSamples
 
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
+                    Cuda.blas.Stream <- getStream strm
+                    Cuda.blas.GemmBatched(aOp.CudaBlasOperation, bOp.CudaBlasOperation, 
                                              m, n, k, aFac, aAry, ldA, bAry, ldB, trgtFac, 
                                              trgtAry, ldTrgt, nSamples)
 
@@ -600,8 +599,8 @@ module CudaExprWorkspaceTypes =
                     let pVar = pivot.GetVar execEnv
                     let infoVar = info.GetVar execEnv
                     let nSamples = a.NSamples |> int32
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, nSamples)
+                    Cuda.blas.Stream <- getStream strm
+                    Cuda.blas.GetrfBatchedS (n, aAry, ldA, pVar, infoVar, nSamples)
 
                 | ExecItem (BlasGetriBatched (a, pivot, trgt, info), strm) ->
                     use aAry = a.GetPointerArrayDevice execEnv
@@ -612,8 +611,8 @@ module CudaExprWorkspaceTypes =
                     let ldC = trgt.LeadingDimension |> int32
                     let infoVar = info.GetVar execEnv
                     let nSamples = a.NSamples |> int32
-                    CudaSup.blas.Stream <- getStream strm
-                    CudaSup.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, 
+                    Cuda.blas.Stream <- getStream strm
+                    Cuda.blas.GetriBatchedS (n, aAry, ldA, pVar, trgtAry, ldC, infoVar, 
                                                 nSamples)
 
                 | ExecItem (BlasInitPointerArray (aryTmpl), strm) ->
@@ -654,17 +653,16 @@ module CudaExprWorkspaceTypes =
                         iterMem.MemsetAsync (uint32 iter, getStream strm)
                         iterRemMem.MemsetAsync (uint32 (info.Length - iter - 1L), getStream strm)
 
-                        // obtain real ArrayNDCudaTs for array manikins
+                        // obtain real tensors for manikins
                         let lcis = 
                             info.Channels 
                             |> Map.map (fun ch ci -> 
-                                {ci with 
-                                  LoopEval.Target = 
-                                   CudaExecEnv.getArrayNDForManikin execEnv (ci.Target :?> ArrayNDManikinT)})
+                                { LoopEval.Shape    = ci.Shape
+                                  LoopEval.SliceDim = ci.SliceDim
+                                  LoopEval.Target   = CudaExecEnv.getArrayNDForManikin execEnv ci.TargetManikin })
                         let args = 
                             info.Args 
-                            |> List.map (fun manikin -> 
-                                manikin |> CudaExecEnv.getArrayNDForManikin execEnv :> IArrayNDT)
+                            |> List.map (CudaExecEnv.getArrayNDForManikin execEnv)
                         let srcVarEnv, resTrgts =
                             LoopEval.buildInOut info.Length iter iterAry iterRemAry info.Vars args lcis
 
@@ -690,16 +688,16 @@ module CudaExprWorkspaceTypes =
 
                 // misc
                 | ExecItem (PrintWithMsg (msg, res), strm) ->
-                    CudaSup.context.Synchronize ()
+                    Cuda.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = resDev.ToHost()    
+                    let resHost = HostTensor.transfer resDev
                     printfn "%s=\n%A\n" msg resHost                
 
                 | ExecItem (DumpValue (name, res), strm) ->
                     if Dump.isActive () then
-                        CudaSup.context.Synchronize ()
+                        Cuda.context.Synchronize ()
                         let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                        let resHost = resDev.ToHost()    
+                        let resHost = HostTensor.transfer resDev
                         Dump.dumpValue name resHost
 
                 | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
@@ -728,7 +726,7 @@ module CudaExprWorkspaceTypes =
                 // trace
                 | ExecItem (Trace (uexpr, res), _) ->
                     try
-                        CudaSup.context.Synchronize ()
+                        Cuda.context.Synchronize ()
                     with :? CudaException as ex ->
                         printfn "CUDA exception during trace: %A" ex
                         match previousCall with
@@ -746,7 +744,7 @@ module CudaExprWorkspaceTypes =
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = lazy (resDev.ToHost() :> IArrayNDT)
+                    let resHost = lazy (HostTensor.transfer resDev)
                     let msg = 
                         match previousCall with
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"
@@ -761,7 +759,7 @@ module CudaExprWorkspaceTypes =
                 // synchronize to make sure that CUDA errors occur here
                 if Debug.SyncAfterEachCudaCall then
                     try
-                        CudaSup.context.Synchronize ()
+                        Cuda.context.Synchronize ()
                     with :? CudaException as ex ->
                         printfn "CUDA exception: %A" ex
                         match previousCall with
@@ -772,7 +770,7 @@ module CudaExprWorkspaceTypes =
         // initialize
         #if !CUDA_DUMMY
         do 
-            CudaSup.checkContext ()
+            Cuda.checkContext ()
             execCalls recipe.InitCalls
         #endif
 
@@ -784,14 +782,14 @@ module CudaExprWorkspaceTypes =
                 try 
                     // execute dummy CUDA function to check that CUDA context is not
                     // disposed yet
-                    CudaSup.context.PushContext ()
-                    CudaSup.context.GetDeviceInfo() |> ignore
+                    Cuda.context.PushContext ()
+                    Cuda.context.GetDeviceInfo() |> ignore
 
                     // cleanup CUDA resources
                     execCalls recipe.DisposeCalls
                     if krnlModHndl <> Unchecked.defaultof<CUmodule> then
                         Compile.unloadCudaCode krnlModHndl
-                    CudaSup.context.PopContext ()
+                    Cuda.context.PopContext ()
                 with :? System.ObjectDisposedException -> ()
 
                 match cLibHndl, cCompileDir with
@@ -809,12 +807,12 @@ module CudaExprWorkspaceTypes =
         /// evaluates the workspace using the specified variable environment
         member this.Eval (varEnv: VarEnvT) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
-            CudaSup.checkContext ()
+            Cuda.checkContext ()
 
             // partition variables depending on location
             let vsLoc = VarEnv.valueLocations varEnv
             let externalVar, hostVar = 
-                varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = LocDev)
+                varEnv |> Map.partition (fun vs _ -> vsLoc.[vs] = CudaTensor.Dev)
 
             // check the shapes and strides of external variables match with recipe
             for KeyValue(vs, ev) in externalVar do              
@@ -829,25 +827,25 @@ module CudaExprWorkspaceTypes =
 
             lock this (fun () ->
                 // prepare environment
-                execEnv.ExternalVar <- externalVar |> Map.map (fun _ value -> value :?> IArrayNDCudaT)
-                execEnv.HostVar <- hostVar |> Map.map (fun _ value -> value :?> IArrayNDHostT)
+                execEnv.ExternalVar <- externalVar 
+                execEnv.HostVar <- hostVar 
 
                 // Register host variables with CUDA.
                 // This does nothing if a variable is already registered.
                 let hostVarRegs =
                     hostVar
                     |> Map.toList
-                    |> List.map (fun (_, hvAry) -> ArrayNDHostReg.lock (hvAry :?> IArrayNDHostT))
+                    |> List.map (fun (_, hvAry) -> CudaRegMem.register (hvAry.Storage :?> ITensorHostStorage))
 
                 // TODO: implement proper synchronization.
                 // For now we synchronize the whole context to make sure that data transfers
                 // from and to the GPU do not overlap with the computation that may involve
                 // the targets/sources of these transfers as input/output variables.
                 if not Debug.DisableStreams then
-                    CudaSup.context.Synchronize () 
+                    Cuda.context.Synchronize () 
                 execCalls recipe.ExecCalls
                 if not Debug.DisableStreams then
-                    CudaSup.context.Synchronize () 
+                    Cuda.context.Synchronize () 
             )
 
         interface ICudaExprWorkspace with

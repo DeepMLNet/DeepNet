@@ -2,8 +2,8 @@
 
 open System
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open ShapeSpec
 open VarSpec
 open ElemExpr
@@ -56,7 +56,7 @@ module ElemExprHostEval =
         conv<'T> (sign x)
 
     /// evaluates the specified element of an element expression
-    let evalElement (expr: ElemExprT) (args: ArrayNDT<'T> list) (idxs: ShapeSpecT) : 'T =
+    let evalElement (expr: ElemExprT) (args: Tensor<'T> list) (idxs: ShapeSpecT) : 'T =
         let retType = (ElemExpr.typeName expr).Type
         if retType <> typeof<'T> then
             failwithf "elements expression of type %A does not match eval function of type %A"
@@ -73,7 +73,7 @@ module ElemExprHostEval =
                 | ArgElement ((Arg n, argIdxs), _) ->
                     let argIdxs = ShapeSpec.substSymbols symVals argIdxs
                     let argIdxsVal = ShapeSpec.eval argIdxs
-                    args.[n] |> ArrayND.get argIdxsVal
+                    args.[n].[argIdxsVal]
 
             | Unary (op, a) ->
                 let av () = doEval symVals a
@@ -134,10 +134,10 @@ module ElemExprHostEval =
 
 
     /// evaluates all elements of an element expression
-    let eval (expr: ElemExprT) (args: ArrayNDT<'T> list) (resShape: NShapeSpecT) =
-        let res = ArrayNDHost.zeros<'T> resShape
-        for idx in ArrayNDLayout.allIdxOfShape resShape do
+    let eval (expr: ElemExprT) (args: Tensor<'T> list) (resShape: NShapeSpecT) =
+        let res = HostTensor.zeros<'T> resShape
+        for idx in TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix
             let ev = evalElement expr args symIdx 
-            ArrayND.set idx ev res
+            res.[idx] <- ev
         res

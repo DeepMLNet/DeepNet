@@ -5,9 +5,8 @@ open System.Runtime.InteropServices
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
-open Basics
-open Basics.Cuda
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
@@ -61,9 +60,9 @@ module Types =
         /// variables storing the results of the expressions
         ChannelVars:                Map<ChannelT, VarSpecT option>
         /// function to allocate new storage for the result
-        ChannelAllocators:          Map<ChannelT, unit -> IArrayNDT>
+        ChannelAllocators:          Map<ChannelT, unit -> ITensor>
         /// storage location of variables
-        VarStorLoc:                 Map<VarSpecT, ArrayLocT>
+        VarStorLoc:                 Map<VarSpecT, ITensorDevice>
         /// optional stride specification for variables
         VarStrides:                 Map<VarSpecT, int64 list>
         /// op names for each elements function
@@ -73,7 +72,7 @@ module Types =
         /// textures for interpolator
         InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
         /// values for constants
-        ConstantValues:             Dictionary<MemConstManikinT, IArrayNDCudaT>
+        ConstantValues:             Dictionary<MemConstManikinT, ITensor>
         /// recipe descriptions for sub-workspaces (e.g. loop iteration)
         SubWorkspaces:              ResizeArray<CudaRecipeDescT>
     }
@@ -127,10 +126,10 @@ module Types =
         Event:                  Dictionary<EventObjectT, CudaEvent>
         InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>
         RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
-        mutable ExternalVar:    Map<VarSpecT, IArrayNDCudaT>
-        mutable HostVar:        Map<VarSpecT, IArrayNDHostT>
+        mutable ExternalVar:    Map<VarSpecT, ITensor>
+        mutable HostVar:        Map<VarSpecT, ITensor>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
-        ConstantValues:         Map<MemConstManikinT, IArrayNDCudaT>
+        ConstantValues:         Map<MemConstManikinT, ITensor>
         SubWorkspaces:          Dictionary<SubWorkspaceT, ICudaExprWorkspace>
     }
     
@@ -167,8 +166,8 @@ module Types =
 module CudaCompileEnv =
 
     /// creates a new texture object
-    let newTextureObject contents descriptor (env: CudaCompileEnvT) =
-        if not (ArrayND.isC contents && contents.Layout.Offset = 0L) then
+    let newTextureObject (contents: ArrayNDManikinT) descriptor (env: CudaCompileEnvT) =
+        if not (TensorLayout.isC contents.Layout && contents.Layout.Offset = 0L) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
             Contents   = contents
@@ -178,7 +177,7 @@ module CudaCompileEnv =
         texObj
 
     /// creates a new constant
-    let newConstant (value: IArrayNDCudaT) (env: CudaCompileEnvT) =   
+    let newConstant (value: ITensor) (env: CudaCompileEnvT) =   
         let mc : MemConstManikinT = {
             Id = env.ConstantValues.Keys.Count
             TypeName = TypeName.ofTypeInst value.DataType
@@ -213,10 +212,12 @@ module CudaExecEnv =
         | MemAlloc im -> env.InternalMem.[im], 0L
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
-            ev.Storage.ByteData, (ArrayND.offset ev) * int64 (Marshal.SizeOf (ev.DataType))
+            let evStorage = ev.Storage :?> ITensorCudaStorage
+            evStorage.ByteData, ev.Layout.Offset * int64 (Marshal.SizeOf (ev.DataType))
         | MemConst mc -> 
             let ary = env.ConstantValues.[mc]
-            ary.Storage.ByteData, 0L            
+            let aryStorage = ary.Storage :?> ITensorCudaStorage
+            aryStorage.ByteData, 0L            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
     let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
@@ -226,9 +227,10 @@ module CudaExecEnv =
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         match manikin.Storage with
         | MemExternal vs ->
-            let hv = env.HostVar.[vs]
-            if ArrayND.offset hv = 0L && ArrayND.isC hv then
-                ArrayNDHostReg.getCudaRegisteredMemory hv
+            let hv = env.HostVar.[vs]            
+            if hv.Offset = 0L && Tensor.isRowMajor hv then
+                let hvStorage = hv.Storage :?> ITensorHostStorage
+                CudaRegMem.getCudaRegisteredMemory hvStorage
             else
                 failwithf "host variable %A was expected to be contiguous \
                            with zero offset" vs
@@ -238,7 +240,8 @@ module CudaExecEnv =
     let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
         let devMem, offset = getDevMemForManikin env manikin
         let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
-        ArrayNDCuda.fromPtrAndType (devMem.DevicePointer + SizeT offset) (devMem.SizeInBytes - SizeT offset) 
+        CudaTensor.usingPtrAndType (devMem.DevicePointer + SizeT offset) 
+                                   (devMem.SizeInBytes - SizeT offset) 
                                    typ manikin.Layout
 
     /// gets a CudaTexObject
@@ -302,7 +305,7 @@ module ArgTemplates =
             member this.GetArg env strm =
                 // C++ struct just contains the pointer to data memory
                 let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
-                let ptr = mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
+                let ptr = mem.DevicePointer + SizeT offset |> Cuda.getIntPtr
                 ArrayNDSSArg ptr |> box
 
     /// ArrayND argument with null data pointer template
@@ -327,9 +330,9 @@ module ArgTemplates =
             | Some manikin ->
                 if manikin.DataType <> typeof<int32> then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be of type idx_t, i.e. int32"
-                if ArrayND.nDims manikin <> 0 then 
+                if manikin.NDims <> 0 then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must be a scalar"
-                if ArrayND.offset manikin <> 0L then 
+                if manikin.Layout.Offset <> 0L then 
                     failwith "SizeTPtrFromArrayNDIdxTmpl manikin must have zero offset"
             | None -> ()
 
@@ -340,7 +343,7 @@ module ArgTemplates =
                 | Some manikin ->
                     // pass pointer to (only) element
                     let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
-                    mem.DevicePointer + SizeT offset |> CudaSup.getIntPtr
+                    mem.DevicePointer + SizeT offset |> Cuda.getIntPtr
                 | None -> IntPtr.Zero
 
     type CPPArrayTmpl<'T when 'T :> ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
@@ -367,9 +370,9 @@ module ArgTemplates =
                     match memManikin with
                     | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0)
                     | MemAlloc im -> env.InternalMem.[im]
-                    | MemExternal vs -> env.ExternalVar.[vs].Storage.ByteData
-                    | MemConst mc -> env.ConstantValues.[mc].Storage.ByteData
-                storage.DevicePointer |> CudaSup.getIntPtr |> box
+                    | MemExternal vs -> (env.ExternalVar.[vs].Storage :?> ITensorCudaStorage).ByteData
+                    | MemConst mc -> (env.ConstantValues.[mc].Storage :?> ITensorCudaStorage).ByteData
+                storage.DevicePointer |> Cuda.getIntPtr |> box
 
     type ExecStreamArgTmpl () =
         interface ICudaArgTmpl with
@@ -378,7 +381,9 @@ module ArgTemplates =
 
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
+        do 
+            if not (TensorLayout.isC manikin.Layout) then 
+                failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
                 let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
@@ -388,7 +393,9 @@ module ArgTemplates =
     
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
-        do if not (ArrayND.isC manikin) then failwith "manikin for MemRng is not contiguous"
+        do 
+            if not (TensorLayout.isC manikin.Layout) then 
+                failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =
                 {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;
@@ -396,8 +403,8 @@ module ArgTemplates =
                  LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}      
 
     /// checks that the specified manikin is usable with BLAS
-    let checkBlasManikin isBatch manikin =
-        let nDims = ArrayND.nDims manikin
+    let checkBlasManikin isBatch (manikin: ArrayNDManikinT) =
+        let nDims = manikin.NDims
         match isBatch with
         | true when nDims < 2 -> failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
         | false when nDims <> 2 -> failwith "ArrayND for use with BLAS must be 2-dimensional" 
@@ -406,7 +413,7 @@ module ArgTemplates =
         if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
             failwith "CUBLAS currently requires single values"
 
-        let stride, shape = ArrayND.stride manikin, ArrayND.shape manikin
+        let stride, shape = manikin.Layout.Stride, manikin.Layout.Shape
         match stride.[nDims-2 ..], shape.[nDims-2 ..] with
         | [0L; _], _ -> 
             failwithf "ArrayND for use with BLAS cannot be broadcasted in first dimension"
@@ -434,13 +441,13 @@ module ArgTemplates =
         member this.Manikin = manikin
 
         member this.GetLeadingDimension env =
-            (ArrayND.stride manikin).[0] 
+            manikin.Layout.Stride.[0] 
 
         member this.GetColumns env =
-            (ArrayND.shape manikin).[0]
+            manikin.Shape.[0]
 
         member this.GetRows env =
-            (ArrayND.shape manikin).[1]
+            manikin.Shape.[1]
 
         member this.GetColumnsForOp env op =
             match op with 
@@ -472,7 +479,7 @@ module ArgTemplates =
                                         ptrAryDevMem:    MemManikinT,
                                         ptrAryHostMem:   MemManikinT) =
 
-        let nDims = ArrayND.nDims manikin
+        let nDims = manikin.NDims
         let rowDim = nDims - 2
         let colDim = nDims - 1
         let batchShp = manikin.Shape.[0 .. nDims-3]
@@ -488,9 +495,9 @@ module ArgTemplates =
 
         member this.NSamples = nSmpls
         member this.Manikin = manikin
-        member this.LeadingDimension = (ArrayND.stride manikin).[rowDim] 
-        member this.Columns = (ArrayND.shape manikin).[rowDim]
-        member this.Rows = (ArrayND.shape manikin).[colDim]
+        member this.LeadingDimension = manikin.Layout.Stride.[rowDim] 
+        member this.Columns = manikin.Shape.[rowDim]
+        member this.Rows = manikin.Shape.[colDim]
 
         member this.GetColumnsForOp op =
             match op with 
@@ -508,7 +515,7 @@ module ArgTemplates =
 
         member this.GetPointerArrayValues env = 
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
-            [| for idx in ArrayNDLayout.allIdxOfShape batchShp do
+            [| for idx in TensorLayout.allIdxOfShape batchShp do
                 let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0L; 0L]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
 
@@ -640,12 +647,10 @@ module ArgTemplates =
     type InterpolateEOpArgTmpl (ip:           InterpolatorT,
                                 compileEnv:   CudaCompileEnvT) =
 
-        let tbl = 
-            match Interpolator.getTableAsIArrayNDT ip with
-            | :? IArrayNDCudaT as tbl -> tbl
-            | _ -> failwith "interpolation table must be stored on CUDA device"
-    
-        do 
+        let tbl = Interpolator.getTableAsIArrayNDT ip
+        do
+            if tbl.Dev <> CudaTensor.Dev then
+                failwith "interpolation table must be stored on CUDA device"
             if ip.NDims > 3 then
                 failwith "interpolation on CUDA device is currently only supported for up to 3 dimensions"
             if tbl.DataType <> typeof<single> then

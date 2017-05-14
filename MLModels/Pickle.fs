@@ -1,4 +1,4 @@
-namespace Basics
+namespace Models
 
 open System.IO
 open Nessos.FsPickler

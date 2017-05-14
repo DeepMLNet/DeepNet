@@ -4,18 +4,18 @@ open Xunit
 open FsUnit.Xunit
 open System.IO
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Datasets
 
-type TestSample = {Data: ArrayNDT<double>}
+type TestSample = {Data: Tensor<double>}
 
 type CurveNormalizationTests () =
-    let dataFile = NPZFile.Open (Util.assemblyDirectory + "/../../TestData/PCA.npz")
-    let data : ArrayNDHostT<double> = dataFile.Get "data"
-    let refPCAWhitenedFull : ArrayNDHostT<double> = dataFile.Get "pca_whitened_full"
-    let refPCAWhitened10 : ArrayNDHostT<double> = dataFile.Get "pca_whitened_10"
-    let refZCAWhitened : ArrayNDHostT<double> = dataFile.Get "zca_whitened"
+    let dataFile = NPZFile.Open (Util.assemblyDirectory + "/TestData/PCA.npz")
+    let data : Tensor<double> = dataFile.Get "data"
+    let refPCAWhitenedFull : Tensor<double> = dataFile.Get "pca_whitened_full"
+    let refPCAWhitened10 : Tensor<double> = dataFile.Get "pca_whitened_10"
+    let refZCAWhitened : Tensor<double> = dataFile.Get "zca_whitened"
     let dataset = Dataset<TestSample> ([data])
 
     //do printfn "CurveNormalization Dataset shape: %A" dataset.All.Data.Shape
@@ -27,13 +27,14 @@ type CurveNormalizationTests () =
         let reversed = normalized |> Normalization.reverse infos
 
         use hdf = HDF5.OpenWrite "PCADebug.h5"
-        ArrayNDHDF.write hdf "data" data
-        ArrayNDHDF.write hdf "normalized" (normalized.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "reversed" (reversed.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "refPCAWhitenedFull" refPCAWhitenedFull
+        HostTensor.write hdf "data" data
+        HostTensor.write hdf "normalized" normalized.All.Data
+        HostTensor.write hdf "reversed" reversed.All.Data 
+        HostTensor.write hdf "refPCAWhitenedFull" refPCAWhitenedFull
 
-        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 normalized.All.Data refPCAWhitenedFull |> ArrayND.value |> should equal true
+        // PCA axes are not sign unique.
+        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitenedFull, absTol=1e-5, relTol=1e-4) |> should equal true
         
     [<Fact>]
     member this.``PCA Whitening 10`` () =
@@ -42,13 +43,14 @@ type CurveNormalizationTests () =
         let reversed = normalized |> Normalization.reverse infos
 
         use hdf = HDF5.OpenWrite "PCADebug2.h5"
-        ArrayNDHDF.write hdf "data" data
-        ArrayNDHDF.write hdf "normalized" (normalized.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "reversed" (reversed.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "refPCAWhitened10" refPCAWhitened10
+        HostTensor.write hdf "data" data
+        HostTensor.write hdf "normalized" normalized.All.Data
+        HostTensor.write hdf "reversed" reversed.All.Data
+        HostTensor.write hdf "refPCAWhitened10" refPCAWhitened10
 
+        // PCA axes are not sign unique.
         //ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 normalized.All.Data refPCAWhitened10 |> ArrayND.value |> should equal true
+        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitened10, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``ZCA Whitening`` () =
@@ -57,13 +59,13 @@ type CurveNormalizationTests () =
         let reversed = normalized |> Normalization.reverse infos
 
         use hdf = HDF5.OpenWrite "ZCADebug.h5"
-        ArrayNDHDF.write hdf "data" data
-        ArrayNDHDF.write hdf "normalized" (normalized.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "reversed" (reversed.All.Data :?> ArrayNDHostT<double>)
-        ArrayNDHDF.write hdf "refZCAWhitened10" refZCAWhitened
+        HostTensor.write hdf "data" data
+        HostTensor.write hdf "normalized" normalized.All.Data 
+        HostTensor.write hdf "reversed" reversed.All.Data 
+        HostTensor.write hdf "refZCAWhitened10" refZCAWhitened
 
-        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 normalized.All.Data refZCAWhitened |> ArrayND.value |> should equal true
+        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (normalized.All.Data, refZCAWhitened, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``Rescaling`` () =
@@ -71,12 +73,12 @@ type CurveNormalizationTests () =
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
-        let min = ArrayND.min normalized.All.Data 
-        let max = ArrayND.max normalized.All.Data 
+        let min = Tensor.min normalized.All.Data 
+        let max = Tensor.max normalized.All.Data 
         
-        ArrayND.almostEqualWithTol 1e-5 1e-4 min (ArrayNDHost.scalar 0.0) |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 max (ArrayNDHost.scalar 1.0) |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
+        Tensor.almostEqualWithTol (min, HostTensor.scalar 0.0, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (max, HostTensor.scalar 1.0, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``Standardization`` () =
@@ -84,16 +86,16 @@ type CurveNormalizationTests () =
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
-        let means = ArrayND.meanAxis 0 normalized.All.Data 
-        let stdevs = ArrayND.stdAxis 0 normalized.All.Data
+        let means = Tensor.meanAxis 0 normalized.All.Data 
+        let stdevs = Tensor.stdAxis (0, normalized.All.Data)
 
         printfn "after standardization:"
         printfn "means=\n%A" means.Full
         printfn "stdevs=\n%A" stdevs.Full
 
-        ArrayND.almostEqualWithTol 1e-3 1e-4 means (ArrayND.zerosLike means) |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-3 1e-4 stdevs (ArrayND.onesLike stdevs) |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
+        Tensor.almostEqualWithTol (means, Tensor.zerosLike means, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (stdevs, Tensor.onesLike stdevs, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``ScaleToUnitLength`` () =
@@ -101,10 +103,10 @@ type CurveNormalizationTests () =
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
-        let lengths = ArrayND.normAxis 1 normalized.All.Data 
+        let lengths = Tensor.normAxis (1, normalized.All.Data)
 
         printfn "after standardization:"
         printfn "lengths=\n%A" lengths.Full
 
-        ArrayND.almostEqualWithTol 1e-3 1e-4 lengths (ArrayND.onesLike lengths) |> ArrayND.value |> should equal true
-        ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
+        Tensor.almostEqualWithTol (lengths, Tensor.onesLike lengths, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true

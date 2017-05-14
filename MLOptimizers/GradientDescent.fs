@@ -1,7 +1,7 @@
 ﻿namespace Optimizers
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 
     
@@ -16,7 +16,7 @@ module GradientDescent =
     }
 
     type State<'T> = {
-        LastStep:       ArrayNDT<'T>       
+        LastStep:       Tensor<'T>       
     }
 
     type StateExpr = {
@@ -50,7 +50,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> = {
-        LastStep    = ArrayNDHost.zeros (ArrayND.shape parVals) |> dev.ToDev
+        LastStep    = HostTensor.zeros (Tensor.shape parVals) |> dev.ToDev
     }
 
     member this.Minimize =

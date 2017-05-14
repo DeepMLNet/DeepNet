@@ -2,8 +2,8 @@
 
 open System.Diagnostics
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open UExprTypes
 
 
@@ -11,10 +11,10 @@ open UExprTypes
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable value collection
-    type VarEnvT = Map<VarSpecT, IArrayNDT>
+    type VarEnvT = Map<VarSpecT, ITensor>
 
     /// specification of variable storage locations
-    type VarLocsT = Map<VarSpecT, ArrayLocT>
+    type VarLocsT = Map<VarSpecT, ITensorDevice>
 
     /// specification of variable strides
     type VarStridesT = Map<VarSpecT, int64 list>
@@ -27,21 +27,21 @@ module VarEnvTypes =
 module VarEnv = 
 
     /// add variable value to environment
-    let addVarSpec (vs: VarSpecT) (value: #IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
-        Map.add vs (value :> IArrayNDT) varEnv
+    let addVarSpec (vs: VarSpecT) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
+        Map.add vs (value :> ITensor) varEnv
 
     /// remove variable value from environment
     let removeVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : VarEnvT =
         Map.remove vs varEnv
 
     /// get variable value from environment
-    let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #IArrayNDT =
+    let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #ITensor =
         match varEnv |> Map.tryFind vs with
         | Some v -> v |> box |> unbox
         | None -> failwithf "variable %A is not present in the specified VarEnv" vs
 
     /// add variable value to environment
-    let add (var: Expr.ExprT) (value: #IArrayNDT) (varEnv: VarEnvT) : VarEnvT =
+    let add (var: Expr.ExprT) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
         addVarSpec (Expr.extractVar var) value varEnv
 
     /// remove variable value from environment
@@ -49,7 +49,7 @@ module VarEnv =
         removeVarSpec (Expr.extractVar var) varEnv
 
     /// get variable value from environment
-    let get (var: Expr.ExprT) (varEnv: VarEnvT) : #IArrayNDT =
+    let get (var: Expr.ExprT) (varEnv: VarEnvT) : #ITensor =
         getVarSpec (Expr.extractVar var) varEnv
 
     /// empty variable environment
@@ -64,11 +64,11 @@ module VarEnv =
     let inferSymSizes (symSizeEnv: SymSizeEnvT) (varEnv: VarEnvT) : SymSizeEnvT =
         (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
-                if VarSpec.nDims vSym <> ArrayND.nDims vVal then
+                if VarSpec.nDims vSym <> Tensor.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
-                        (ArrayND.shape vVal) vSym
+                        (Tensor.shape vVal) vSym
 
-                (VarSpec.shape vSym, ArrayND.shape vVal)
+                (VarSpec.shape vSym, Tensor.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     let failShape () =
@@ -103,9 +103,9 @@ module VarEnv =
 
             let ss = VarSpec.shape vs
             match ShapeSpec.tryEval ss with
-            | Some ns when ArrayND.shape value <> ns ->
+            | Some ns when Tensor.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A was provided" vs.Name ns ss (ArrayND.shape value)
+                           value with shape %A waTensorded" vs.Name ns ss (Tensor.shape value)
             | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
             | _ -> ()
         )
@@ -116,14 +116,14 @@ module VarEnv =
 
     /// gets the locations of the variable value arrays
     let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> ArrayND.location vVal)
+        varEnv |> Map.map (fun _ vVal -> Tensor.dev vVal)
 
     /// gets the strides of the variable value arrays
     let valueStrides (varEnv: VarEnvT) : VarStridesT =
-        varEnv |> Map.map (fun _ vVal -> ArrayND.stride vVal)
+        varEnv |> Map.map (fun _ vVal -> vVal.Layout.Stride)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (ExprT * #IArrayNDT) seq) =
+    let ofSeq (entries: (ExprT * #ITensor) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
@@ -145,12 +145,12 @@ module EnvTypes =
         VarLocs:            VarLocsT
         VarStrides:         VarStridesT
         ChannelStrides:     ChannelStridesT
-        ResultLoc:          ArrayLocT
+        ResultLoc:          ITensorDevice
         CanDelay:           bool
     }
 
     /// an evaluation function
-    type EvalFn = EvalEnvT -> IArrayNDT list
+    type EvalFn = EvalEnvT -> ITensor list
 
     /// The result of the compilation of an expression.
     type CompiledUExprsT = {
@@ -210,7 +210,7 @@ module CompileEnv =
         VarLocs         = Map.empty 
         VarStrides      = Map.empty
         ChannelStrides  = Map.empty
-        ResultLoc       = LocHost
+        ResultLoc       = HostTensor.Dev
         SymSizes        = SymSizeEnv.empty
         CanDelay        = true
     }
@@ -247,7 +247,7 @@ module Func =
         vars, Expr.canEvalAllSymSizes expr
 
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) 
-            : (VarEnvT -> IArrayNDT list) =     
+            : (VarEnvT -> ITensor list) =     
              
         let compiler, baseCompileEnv = compileSpec
 
@@ -415,7 +415,7 @@ module Func =
         let evalAll = evalWrapper factory [expr0gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
-            res.[0] :?> ArrayNDT<'T0>
+            res.[0] :?> Tensor<'T0>
 
     let make2<'T0, 'T1> factory (expr0: ExprT) (expr1: ExprT) =    
         checkType<'T0> "first" expr0
@@ -425,7 +425,7 @@ module Func =
         let evalAll = evalWrapper factory [expr0gen; expr1gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
-            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>
+            res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>
 
     let make3<'T0, 'T1, 'T2> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) =    
         checkType<'T0> "first" expr0
@@ -437,7 +437,7 @@ module Func =
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
-            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>
+            res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>
 
     let make4<'T0, 'T1, 'T2, 'T3> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) =    
         checkType<'T0> "first" expr0
@@ -451,7 +451,7 @@ module Func =
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
-            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>
+            res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>
 
     let make5<'T0, 'T1, 'T2, 'T3, 'T4> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) (expr4: ExprT) =    
         checkType<'T0> "first" expr0
@@ -467,7 +467,7 @@ module Func =
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen; expr4gen]        
         fun (varEnv: VarEnvT) ->
             let res = evalAll varEnv
-            res.[0] :?> ArrayNDT<'T0>, res.[1] :?> ArrayNDT<'T1>, res.[2] :?> ArrayNDT<'T2>, res.[3] :?> ArrayNDT<'T3>, res.[4] :?> ArrayNDT<'T4>
+            res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>, res.[4] :?> Tensor<'T4>
 
     let makeMany<'T> factory (exprs: ExprT list) =
         exprs |> List.iter (checkType<'T> "all")
@@ -478,7 +478,7 @@ module Func =
         let evalAll = evalWrapper factory exprsGen
         fun (varEnv: VarEnvT) ->
             let reses = evalAll varEnv
-            reses |> List.map (fun res -> res :?> ArrayNDT<'T>)
+            reses |> List.map (fun res -> res :?> Tensor<'T>)
 
 
 [<AutoOpen>]
@@ -489,43 +489,43 @@ module FuncTypes =
         fun () -> 
             VarEnv.empty |> f
 
-    type Arg1Func<'T0, 'TR> = ArrayNDT<'T0> -> 'TR
+    type Arg1Func<'T0, 'TR> = Tensor<'T0> -> 'TR
     let arg1<'T0, 'TR> (vs0: ExprT) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
-        fun (val0: ArrayNDT<'T0>) -> 
+        fun (val0: Tensor<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
-    type Arg2Func<'T0, 'T1, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> 'TR
+    type Arg2Func<'T0, 'T1, 'TR> = Tensor<'T0> -> Tensor<'T1> -> 'TR
     let arg2<'T0, 'T1, 'TR> (vs0: ExprT) (vs1: ExprT) (f: VarEnvT -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
-    type Arg3Func<'T0, 'T1, 'T2, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> 'TR
+    type Arg3Func<'T0, 'T1, 'T2, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> 'TR
     let arg3<'T0, 'T1, 'T2, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) f : Arg3Func<'T0, 'T1, 'T2, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
 
-    type Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> 'TR
+    type Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> 'TR
     let arg4<'T0, 'T1, 'T2, 'T3, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) f : Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> f           
    
-    type Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> ArrayNDT<'T4> -> 'TR
+    type Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> 'TR
     let arg5<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT)f : Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> f  
     
-    type Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> ArrayNDT<'T4> -> ArrayNDT<'T5> -> 'TR
+    type Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> Tensor<'T5> -> 'TR
     let arg6<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) f : Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) (val5: ArrayNDT<'T5>)  -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) (val5: Tensor<'T5>)  -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> f  
 
-    type Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> = ArrayNDT<'T0> -> ArrayNDT<'T1> -> ArrayNDT<'T2> -> ArrayNDT<'T3> -> ArrayNDT<'T4> -> ArrayNDT<'T5> -> ArrayNDT<'T6> -> 'TR
+    type Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> Tensor<'T5> -> Tensor<'T6> -> 'TR
     let arg7<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) (vs6: ExprT) f : Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> =
-        fun (val0: ArrayNDT<'T0>) (val1: ArrayNDT<'T1>) (val2: ArrayNDT<'T2>) (val3: ArrayNDT<'T3>) (val4: ArrayNDT<'T4>) (val5: ArrayNDT<'T5>) (val6: ArrayNDT<'T6>) -> 
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) (val5: Tensor<'T5>) (val6: Tensor<'T6>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> VarEnv.add vs6 val6 |> f  
 
     let addArg<'T, 'TR> (vs: ExprT) (f: VarEnvT -> 'TR) =
-        fun (ve: VarEnvT) (value: ArrayNDT<'T>) ->
+        fun (ve: VarEnvT) (value: Tensor<'T>) ->
             f (ve |> VarEnv.add vs value)
 
     let addVarEnv (varEnv: VarEnvT) f =

@@ -1,9 +1,9 @@
 ﻿namespace LangRNN
 
-open Basics
+open Tensor.Utils
 open System.IO
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -43,9 +43,9 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.UniformArrayND (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
-        let vInitial = ArrayNDHost.zeros [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.UniformArrayND (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
+        let vInput = rng.UniformTensor (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
+        let vInitial = HostTensor.zeros [NBatch; NRecurrent] |> device.ToDev
+        let vTarget = rng.UniformTensor (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput; initial, vInitial; target, vTarget] 
 
         DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
@@ -81,12 +81,12 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
-                                   initial, vInitial :> IArrayNDT 
-                                   target, vTarget :> IArrayNDT] 
+        let vInput = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vInitial = HostTensor.zeros<single> [NBatch; NRecurrent] |> device.ToDev
+        let vTarget = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
+                                   initial, vInitial :> ITensor 
+                                   target, vTarget :> ITensor] 
 
         DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
         printfn "Done."
@@ -121,12 +121,12 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let vInitial = ArrayNDHost.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntArrayND (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
-        let varEnv = VarEnv.ofSeq [input, vInput :> IArrayNDT 
-                                   initial, vInitial :> IArrayNDT 
-                                   target, vTarget :> IArrayNDT] 
+        let vInput = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vInitial = HostTensor.zeros<single> [NBatch; NRecurrent] |> device.ToDev
+        let vTarget = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
+                                   initial, vInitial :> ITensor 
+                                   target, vTarget :> ITensor] 
 
         let dloss = Deriv.compute loss
         let dinitial = dloss |> Deriv.ofVar initial

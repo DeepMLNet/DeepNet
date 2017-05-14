@@ -2,15 +2,14 @@
 
 open System.Runtime.InteropServices
 open ManagedCuda
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open UExprTypes
 
 
 [<AutoOpen>]
 module ArrayNDManikinTypes = 
-    open ArrayND
 
     /// memory allocation type
     type MemAllocKindT =
@@ -56,12 +55,43 @@ module ArrayNDManikinTypes =
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     [<StructuredFormatDisplay("{Pretty}")>]
-    type ArrayNDManikinT (layout:           ArrayNDLayoutT, 
+    type ArrayNDManikinT (layout:           TensorLayout, 
                           storage:          MemManikinT) = 
-        inherit ArrayNDT<int> (layout)  // generic type does not matter since we do not store data
 
         /// storage manikin
         member this.Storage = storage
+
+        member this.Layout = layout
+
+        member this.Shape = this.Layout.Shape
+
+        member this.NDims = this.Layout.NDims
+
+        /// C++ type name
+        member this.CPPType = 
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
+            let str = TensorLayout.stride layout
+            let ofst = TensorLayout.offset layout
+            let cppDataType = Util.cppTypeInst this.DataType
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            let strideStr = 
+                "<" + ((ofst :: str) |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
+                dims cppDataType dims shapeStr dims strideStr     
+
+        /// C++ type name for ArrayND with static shape and dynamic offset/strides
+        member this.DynamicCPPType =
+            let dims = TensorLayout.nDims layout
+            let shp = TensorLayout.shape layout
+            let cppDataType = Util.cppTypeInst this.DataType
+            let shapeStr = 
+                if dims = 0 then "" 
+                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
+            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
+                dims cppDataType dims shapeStr dims   
 
         /// typename of the data stored in this array
         member this.TypeName = 
@@ -71,40 +101,14 @@ module ArrayNDManikinTypes =
             | MemConst mc -> mc.TypeName
             | MemZero t -> t
 
-        override this.Item
-            with get pos = failwith "ArrayNDManikin does not store data"
-            and set pos value = failwith "ArrayNDManikin does not store data"
+        member this.NewView (layout: TensorLayout) = 
+            ArrayNDManikinT(layout, storage) 
 
-        override this.NewOfSameType (layout: ArrayNDLayoutT) = 
-            failwith "ArrayNDManikin cannot allocate memory on its own"
+        member this.DataType =
+            TypeName.getType this.TypeName    
 
-        override this.NewOfType<'N> (layout: ArrayNDLayoutT) : ArrayNDT<'N> = 
-            failwith "ArrayNDManikin cannot allocate memory on its own"
-
-        override this.NewView (layout: ArrayNDLayoutT) = 
-            ArrayNDManikinT(layout, storage) :> ArrayNDT<int>
-
-        override this.DataType =
-            TypeName.getType this.TypeName
-
-        override this.Location = ArrayLoc "Manikin"
-
-        /// C++ type name for ArrayND with static shape and dynamic offset/strides
-        member this.DynamicCPPType =
-            let dims = ArrayNDLayout.nDims layout
-            let shp = ArrayNDLayout.shape layout
-            let cppDataType = Util.cppType this.DataType
-            let shapeStr = 
-                if dims = 0 then "" 
-                else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
-            sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideDynamic%dD>" 
-                dims cppDataType dims shapeStr dims        
-
-        override this.Invert () = 
-            failwith "ArrayNDManikin does not store data"
-
-        override this.SymmetricEigenDecomposition () =
-            failwith "ArrayNDManikin does not store data"
+        member this.T = 
+            ArrayNDManikinT (TensorLayout.transpose this.Layout, this.Storage)
 
         member this.Pretty = 
             sprintf "ArrayNDManikinT (Storage=%A; Shape=%A; Strides=%A)" 
@@ -121,27 +125,26 @@ module ArrayNDManikinTypes =
 
 
 module ArrayNDManikin =
-    open ArrayND
 
     /// creates a new ArrayNDManikinT using no storage
     let newZero typ shape =
-        let layout = ArrayNDLayout.newC shape
+        let layout = TensorLayout.newC shape
         ArrayNDManikinT (layout, MemZero typ)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with C-order
     let newC memAllocator typ shape = 
-        let layout = ArrayNDLayout.newC shape
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newC shape
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran-order
     let newF memAllocator typ shape = 
-        let layout = ArrayNDLayout.newF shape
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newF shape
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new MemoryManikinT and a new ArrayNDManikinT with specifed stride order
     let newOrdered memAllocator typ shape strideOrder =
-        let layout = ArrayNDLayout.newOrdered shape strideOrder
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        let layout = TensorLayout.newOrdered shape strideOrder
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// create a new MemoryManikinT and a new ArrayNDManikinT with layout suitable for being a BLAS target
     let newBlasTarget memAllocator typ shape = 
@@ -160,17 +163,125 @@ module ArrayNDManikin =
         let stride = smplStride smplShp @ [1L; matRows]
         
         let layout = {Shape=shape; Stride=stride; Offset=0L}
-        ArrayNDManikinT (layout, memAllocator typ (ArrayNDLayout.nElems layout) MemAllocDev)
+        ArrayNDManikinT (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
     /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
     let externalC storage shape =
-        let layout = ArrayNDLayout.newC shape
+        let layout = TensorLayout.newC shape
         ArrayNDManikinT (layout, storage) 
 
     /// creates a new ArrayNDManikinT with specified strides and using the specified storage
     let external storage shape stride =
         let layout = {Shape=shape; Stride=stride; Offset=0L}
         ArrayNDManikinT (layout, storage)
+
+    let layout (ary: ArrayNDManikinT) =
+        ary.Layout
+
+    let shape (ary: ArrayNDManikinT) =
+        ary.Layout.Shape
+
+    let nDims (ary: ArrayNDManikinT) =
+        ary.Layout.NDims
+
+    let nElems (ary: ArrayNDManikinT) =
+        ary.Layout.NElems
+
+    let stride (ary: ArrayNDManikinT) =
+        ary.Layout.Stride
+
+    let offset (ary: ArrayNDManikinT) =
+        ary.Layout.Offset
+
+    let relayout newLayout (ary: ArrayNDManikinT) =
+        ArrayNDManikinT (newLayout, ary.Storage)
+
+    let isC (ary: ArrayNDManikinT) =
+        ary |> layout |> TensorLayout.isC
+
+    let isF (ary: ArrayNDManikinT) =
+        ary |> layout |> TensorLayout.isF
+        
+    /// a view of the specified tensor over the given range 
+    let range (rng: TensorRng list) a =
+        a |> relayout (a |> layout |> TensorLayout.view rng)
+
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, None is returned.
+    let tryReshapeView shp a =
+        match a |> layout |> TensorLayout.tryReshape shp with
+        | Some newLayout -> a |> relayout newLayout |> Some
+        | None -> None
+
+    /// Tries to reshape the tensor without copying.
+    /// For this to succeed, the tensor must have row-major layout.
+    /// If this a reshape without copying is impossible, an error is raised.
+    let reshapeView shp a =
+        match tryReshapeView shp a with
+        | Some res -> res
+        | None -> 
+            let msg =
+                sprintf "cannot reshape tensor of shape %A and strides %A without copying"
+                    (layout a).Shape (layout a).Stride
+            raise (ImpossibleWithoutCopy msg)
+
+    /// Returns true if the tensor can be reshaped without copying.
+    let canReshapeView shp a =
+        match tryReshapeView shp a with
+        | Some _ -> true
+        | None -> false
+
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the new position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    let permuteAxes (permut: int list) a =
+        a |> relayout (a |> layout |> TensorLayout.permuteAxes permut)
+
+    /// inserts a broadcastable dimension of size one as first dimension
+    let padLeft a =
+        a |> relayout (a.Layout |> TensorLayout.padLeft)
+
+    /// appends a broadcastable dimension of size one as last dimension
+    let padRight a =
+        a |> relayout (a.Layout |> TensorLayout.padRight)
+
+    /// Inserts an axis of size 1 before the specified position.
+    let insertAxis ax a =
+        a |> relayout (a.Layout |> TensorLayout.insertAxis ax)
+
+    /// removes the first dimension from the tensor
+    let cutLeft a =
+        a |> relayout (a.Layout |> TensorLayout.cutLeft)
+      
+    /// removes the last dimension from the tensor
+    let cutRight a =
+        a |> relayout (a.Layout |> TensorLayout.cutRight)
+
+    /// transpose
+    let transpose (a: ArrayNDManikinT) =
+        a.T
+
+    /// C++ type string
+    let cppType (a: ArrayNDManikinT) = 
+        a.CPPType
+
+    /// Reverses the elements in the specified dimension.
+    let reverseAxis ax a =
+        a |> relayout (a |> layout |> TensorLayout.reverseAxis ax)      
+
+    /// Returns a view of the diagonal along the given axes.
+    /// The diagonal replaces the first axis and the second axis is removed.
+    let diagAxis ax1 ax2 a =
+        a |> relayout (a |> layout |> TensorLayout.diagAxis ax1 ax2)
+
+    /// broadcasts the tensor to the given shape
+    let broadcastTo shp a =
+        a |> relayout (a |> layout |> TensorLayout.broadcastToShape shp)
+
+    /// returns true if at least one dimension is broadcasted
+    let isBroadcasted a =
+        a |> layout |> TensorLayout.isBroadcasted 
 
     /// storage
     let storage (ary: ArrayNDManikinT) =
@@ -189,23 +300,23 @@ module ArrayNDManikin =
         ary |> typeName |> TypeName.size64
 
     /// offset in bytes
-    let offsetInBytes ary =
-        typeSize64 ary * ArrayND.offset ary
+    let offsetInBytes (ary: ArrayNDManikinT) =
+        typeSize64 ary * ary.Layout.Offset
 
     /// address of given element in bytes (relative to start of array)
-    let addrInBytes idx ary =
-        typeSize64 ary * (ary |> ArrayND.layout |> ArrayNDLayout.addr idx)
+    let addrInBytes idx (ary: ArrayNDManikinT) =
+        typeSize64 ary * (ary.Layout |> TensorLayout.addr idx)
 
     /// size in bytes 
-    let sizeInBytes ary =
-        typeSize64 ary * ArrayND.nElems ary
+    let sizeInBytes (ary: ArrayNDManikinT) =
+        typeSize64 ary * TensorLayout.nElems ary.Layout
 
     /// True if array can be target of BLAS operation.
-    let canBeBlasTarget ary =
-        let nd = ArrayND.nDims ary
+    let canBeBlasTarget (ary: ArrayNDManikinT) =
+        let nd = ary.NDims
         if nd >= 2 then
-            let st = ArrayND.stride ary
-            let shp = ArrayND.shape ary
+            let st = ary.Layout.Stride
+            let shp = ary.Shape
             match st.[nd-2 ..] with
             | [1L; ld] when ld >= 1L && ld >= shp.[nd-2] -> true
             | _ -> false

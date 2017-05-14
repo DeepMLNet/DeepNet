@@ -2,9 +2,8 @@
 
 open System
 
-open Basics
-open Basics.Cuda
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 
@@ -247,7 +246,7 @@ module CudaElemExpr =
                     idxs
                     |> List.indexed
                     |> List.filter (fun (_, pos) -> pos = ElemExpr.idx warpDim)
-                    |> List.sumBy (fun (argDim, _) -> (ArrayND.stride arg).[argDim])
+                    |> List.sumBy (fun (argDim, _) -> arg.Layout.Stride.[argDim])
                     |> fun strIncr -> if strIncr = 1L then 1L else 0L)
             | UElemExpr (UUnaryOp (Sum (sumSym, first, last)), [summand], _) ->
                 let iters = SizeSpec.eval last - SizeSpec.eval first + 1L 
@@ -257,7 +256,7 @@ module CudaElemExpr =
 
         let trgtStats =         
             List.init nTrgtDims (fun warpDim ->
-                if (ArrayND.stride trgt).[warpDim] = 1L then 1L else 0L)
+                if trgt.Layout.Stride.[warpDim] = 1L then 1L else 0L)
 
         List.addElemwise (srcStats expr) trgtStats
         |> List.mapi (fun warpDim oneStrs -> oneStrs * trgt.Shape.[warpDim])

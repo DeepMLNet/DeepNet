@@ -1,7 +1,7 @@
 ﻿namespace Datasets
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Util
 
 
@@ -34,9 +34,9 @@ module NormalizationTypes =
     /// performed normalization operation
     type Normalization<'T> =
         | NotNormalized
-        | Rescaled of minVals:ArrayNDHostT<'T> * maxVals:ArrayNDHostT<'T>
-        | Standardized of means:ArrayNDHostT<'T> * stds:ArrayNDHostT<'T> * onlyZeroOne:ArrayNDHostT<bool> option
-        | ScaledToUnitLength of lengths:ArrayNDHostT<'T> 
+        | Rescaled of minVals:Tensor<'T> * maxVals:Tensor<'T>
+        | Standardized of means:Tensor<'T> * stds:Tensor<'T> * onlyZeroOne:Tensor<bool> option
+        | ScaledToUnitLength of lengths:Tensor<'T> 
         | PCAWhitened of Decomposition.PCAInfo<'T>
         | ZCAWhitened of Decomposition.PCAInfo<'T>
 
@@ -46,30 +46,30 @@ module NormalizationTypes =
 /// Dataset normalization functions.
 module Normalization =
 
-    let private performField normalizer (data: ArrayNDHostT<'T>)  =
-        let epsilon = ArrayNDHost.scalar (conv<'T> 1e-5)
+    let private performField normalizer (data: Tensor<'T>)  =
+        let epsilon = HostTensor.scalar (conv<'T> 1e-5)
         match normalizer with 
         | NoNormalizer ->
             NotNormalized, data
         | Rescaling -> 
-            let minVals = data |> ArrayND.minAxis 0
-            let maxVals = data |> ArrayND.maxAxis 0
-            let maxVals = ArrayND.maxElemwise maxVals (minVals + epsilon)
+            let minVals = data |> Tensor.minAxis 0
+            let maxVals = data |> Tensor.maxAxis 0
+            let maxVals = Tensor.maxElemwise maxVals (minVals + epsilon)
             Rescaled (minVals, maxVals), (data - minVals.[NewAxis, *]) / (maxVals - minVals).[NewAxis, *]
         | Standardization keepZeroOne ->
-            let zero = ArrayND.scalarOfSameType data (conv<'T> 0)
-            let one = ArrayND.scalarOfSameType data (conv<'T> 1)
-            let means = data |> ArrayND.meanAxis 0
-            let stds = (data |> ArrayND.stdAxis 0) + epsilon
+            let zero = HostTensor.scalar (conv<'T> 0)
+            let one = HostTensor.scalar (conv<'T> 1)
+            let means = data |> Tensor.meanAxis 0
+            let stds = Tensor.stdAxis(0, data) + epsilon
             let standardized = (data - means.[NewAxis, *]) / stds.[NewAxis, *]
             let res, onlyZeroOne = 
                 if keepZeroOne then
-                    let onlyZeroOne = (data ==== zero) |||| (data ==== one) |> ArrayND.allAxis 0
-                    ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] data standardized, Some onlyZeroOne
+                    let onlyZeroOne = (data ==== zero) |||| (data ==== one) |> Tensor.allAxis 0
+                    Tensor.ifThenElse onlyZeroOne.[NewAxis, *] data standardized, Some onlyZeroOne
                 else standardized, None
             Standardized (means, stds, onlyZeroOne), res
         | ScaleToUnitLength ->
-            let lengths = (data |> ArrayND.normAxis 1) + epsilon
+            let lengths = Tensor.normAxis(1, data) + epsilon
             ScaledToUnitLength lengths, data / lengths.[*, NewAxis]
         | PCAWhitening nComps ->
             let whitened, info = Decomposition.PCA.Perform (data, ?nComps=nComps)
@@ -78,7 +78,7 @@ module Normalization =
             let whitened, info = Decomposition.ZCA.Perform data
             ZCAWhitened info, whitened
 
-    let private reverseField normalization (nData: ArrayNDHostT<'T>) =
+    let private reverseField normalization (nData: Tensor<'T>) =
         match normalization with
         | NotNormalized ->
             nData
@@ -87,7 +87,7 @@ module Normalization =
         | Standardized (means, stds, onlyZeroOne) ->
             let unstd = nData * stds.[NewAxis, *] + means.[NewAxis, *]
             match onlyZeroOne with
-            | Some onlyZeroOne -> ArrayND.ifThenElse onlyZeroOne.[NewAxis, *] nData unstd
+            | Some onlyZeroOne -> Tensor.ifThenElse onlyZeroOne.[NewAxis, *] nData unstd
             | None -> unstd            
         | ScaledToUnitLength lengths ->
             nData * lengths.[*, NewAxis]
@@ -96,21 +96,21 @@ module Normalization =
         | ZCAWhitened info ->
             Decomposition.ZCA.Reverse (nData, info)
 
-    let private performFieldUntyped n (fs: IArrayNDT) =
+    let private performFieldUntyped n (fs: ITensor) =
         match fs with
-        | :? ArrayNDHostT<single> as fs -> 
-            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
-        | :? ArrayNDHostT<double> as fs -> 
-            let info, res = performField n fs in info :> INormalization, res :> IArrayNDT
-        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
+        | :? Tensor<single> as fs -> 
+            let info, res = performField n fs in info :> INormalization, res :> ITensor
+        | :? Tensor<double> as fs -> 
+            let info, res = performField n fs in info :> INormalization, res :> ITensor
+        | _ -> failwithf "normalization requires single or double data type"
 
-    let private reverseFieldUntyped (n: INormalization) (fs: IArrayNDT) =
+    let private reverseFieldUntyped (n: INormalization) (fs: ITensor) =
         match fs with
-        | :? ArrayNDHostT<single> as fs -> 
-            reverseField (n :?> Normalization<single>) fs :> IArrayNDT
-        | :? ArrayNDHostT<double> as fs -> 
-            reverseField (n :?> Normalization<double>) fs :> IArrayNDT
-        | _ -> failwithf "normalization requires a dataset stored in CPU memory"
+        | :? Tensor<single> as fs -> 
+            reverseField (n :?> Normalization<single>) fs :> ITensor
+        | :? Tensor<double> as fs -> 
+            reverseField (n :?> Normalization<double>) fs :> ITensor
+        | _ -> failwithf "unnormalization requires single or double data type"
 
     /// Normalizes each field of the specified Dataset using the specified normalizier.
     let perform (normalizers: Normalizer list) (dataset: Dataset<'S>) =

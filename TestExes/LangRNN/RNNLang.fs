@@ -1,9 +1,9 @@
 ﻿namespace LangRNN
 
-open Basics
+open Tensor.Utils
 open System.IO
 
-open ArrayNDNS
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -82,14 +82,14 @@ module RNNLang =
                                                nRecurrent, NRecurrent])
 
         let smplVarEnv stateOpt (smpl: WordSeq) =
-            let zeroInitial = ArrayNDCuda.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
+            let zeroInitial = CudaTensor.zeros<single> [smpl.Words.Shape.[0]; NRecurrent]
             let state =
                 match stateOpt with
-                | Some state -> state :> IArrayNDT
-                | None -> zeroInitial :> IArrayNDT
+                | Some state -> state :> ITensor
+                | None -> zeroInitial :> ITensor
             let n = smpl.Words.Shape.[1]
-            VarEnv.ofSeq [input,   smpl.Words.[*, 0L .. n-2L] :> IArrayNDT
-                          target,  smpl.Words.[*, 1L .. n-1L] :> IArrayNDT
+            VarEnv.ofSeq [input,   smpl.Words.[*, 0L .. n-2L] :> ITensor
+                          target,  smpl.Words.[*, 1L .. n-1L] :> ITensor
                           initial, state]
                           
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
@@ -100,7 +100,7 @@ module RNNLang =
                 //MaxIters     = Some 10
                 BatchSize      = NBatch
                 BestOn         = Training
-                CheckpointFile  = Some "."
+                CheckpointFile = Some "LangRNN-%ITER%.h5"
         }
         Train.train trainable dataset trainCfg |> ignore
 

@@ -4,9 +4,8 @@ open System.Collections.Generic
 open System.Diagnostics
 
 open ManagedCuda
-open Basics
-open Basics.Cuda
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
@@ -39,8 +38,8 @@ module CudaRecipeTypes =
         | SubWorkspaceNew     of SubWorkspaceT
         | SubWorkspaceDispose of SubWorkspaceT
         // execution control
-        | LaunchCPPKernel   of TmplInstT * WorkDimT * int * StreamT * (ICudaArgTmpl list)
-        | LaunchCKernel     of string * WorkDimT * int * StreamT * (ICudaArgTmpl list)
+        | LaunchCPPKernel   of TmplInstT * Cuda.WorkDim * int * StreamT * (ICudaArgTmpl list)
+        | LaunchCKernel     of string * Cuda.WorkDim * int * StreamT * (ICudaArgTmpl list)
         | CallCFunc         of string * System.Type * StreamT * (ICudaArgTmpl list)
         // execution item
         | ExecItem          of CudaExecItemT * StreamT
@@ -54,7 +53,7 @@ module CudaRecipeTypes =
     /// CUDA execution recipe
     type CudaRecipeT = {
         ChannelVars:        Map<ChannelT, VarSpecT option>
-        ChannelAllocators:  Map<ChannelT, unit -> IArrayNDT>
+        ChannelAllocators:  Map<ChannelT, unit -> ITensor>
         VarStrides:         VarStridesT
         VarStorLoc:         VarLocsT
         KernelCode:         string
@@ -62,7 +61,7 @@ module CudaRecipeTypes =
         InitCalls:          CudaCallT list
         DisposeCalls:       CudaCallT list
         ExecCalls:          CudaCallT list
-        ConstantValues:     Map<MemConstManikinT, IArrayNDCudaT>
+        ConstantValues:     Map<MemConstManikinT, ITensor>
         SubRecipes:         Map<SubWorkspaceT, CudaRecipeT>
     } 
 
@@ -338,7 +337,7 @@ module CudaRecipe =
         TransferUExpr:  UExprT
         Var:            VarSpecT option
         Stride:         int64 list option
-        Allocator:      unit -> IArrayNDT
+        Allocator:      unit -> ITensor
     }
 
     /// builds a CUDA recipe for the given unified expression
@@ -434,14 +433,13 @@ module CudaRecipe =
             uexprs
             |> Map.map (fun channel (UExpr (_, _, {ChannelType=ct; ChannelShape=cs}) as uexpr) ->
                 let tn, nshp = ct.[dfltChId], cs.[dfltChId]
-                let layout = ArrayNDLayout.newC nshp
 
                 // create result storage allocator
                 let resAllocator = fun () ->
                     match compileEnv.ResultLoc with
-                    | LocHost -> ArrayNDHost.newOfType (TypeName.getType tn) layout :> IArrayNDT
-                    | LocDev  -> ArrayNDCuda.newOfType (TypeName.getType tn) layout :> IArrayNDT  
-                    | l -> failwithf "CUDA cannot work with result location %A" l      
+                    | dev when dev=HostTensor.Dev || dev=CudaTensor.Dev ->
+                        Tensor.NewOfType (nshp, tn.Type, dev, order=RowMajor)
+                    | dev -> failwithf "CUDA cannot work with result location %A" dev
 
                 if List.fold (*) 1L nshp > 0L then
                     // expression has data that needs to be stored       
@@ -484,7 +482,7 @@ module CudaRecipe =
                     let stride = 
                         match resInfo.Stride with
                         | Some stride -> stride
-                        | None -> ArrayNDLayout.cStride vs.NShape
+                        | None -> TensorLayout.cStride vs.NShape
                     let locs = locs |> Map.add vs compileEnv.ResultLoc                    
                     let strides = strides |> Map.add vs stride
                     locs, strides                                

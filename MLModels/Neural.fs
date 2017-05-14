@@ -1,7 +1,7 @@
 ﻿namespace Models
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 
 
@@ -89,15 +89,15 @@ module NeuralLayer =
         HyperPars:      HyperPars
     }
 
-    let internal initWeights seed (shp: int64 list) : ArrayNDHostT<'T> = 
+    let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
         let rng = System.Random seed
         let fanOut = shp.[0] |> float
         let fanIn = shp.[1] |> float
         let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
-        rng.UniformArrayND (conv<'T> -r, conv<'T> r) shp
+        rng.UniformTensor (conv<'T> -r, conv<'T> r) shp
         
-    let internal initBias seed (shp: int64 list) : ArrayNDHostT<'T> =
-        ArrayNDHost.zeros shp
+    let internal initBias seed (shp: int64 list) : Tensor<'T> =
+        HostTensor.zeros shp
 
     /// Creates the parameters for the neural-layer in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.

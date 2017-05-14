@@ -3,9 +3,8 @@
 open System
 open Microsoft.FSharp.Reflection
 
-open Basics
-open Basics.Cuda
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler
 open Expr
@@ -15,10 +14,16 @@ open UExprTypes
 [<AutoOpen>]
 module CudaExecUnitTypes =
 
+    type LoopChannelManikinInfoT = {
+        Shape:          NShapeSpecT
+        SliceDim:       int
+        TargetManikin:  ArrayNDManikinT
+    }
+
     /// information for executing a loop
     type ExecLoopInfoT = {
         Length:                int64
-        Channels:              Map<ChannelT, LoopEval.LoopChannelInfoT>
+        Channels:              Map<ChannelT, LoopChannelManikinInfoT>
         Vars:                  Map<VarSpecT, LoopInputT>
         Workspace:             SubWorkspaceT
         Args:                  ArrayNDManikinT list
@@ -40,7 +45,7 @@ module CudaExecUnitTypes =
         | MemsetSingle of single * IDevMemRngTmpl
         | MemsetUInt32 of uint32 * IDevMemRngTmpl
         // execution control
-        | LaunchKernel of TmplInstT * WorkDimT * (ICudaArgTmpl list)
+        | LaunchKernel of TmplInstT * Cuda.WorkDim * (ICudaArgTmpl list)
         | CallCFunc    of TmplInstT * System.Type * (ICudaArgTmpl list)
         // CUBLAS calls 
         | BlasGemm of BlasTransposeOpT * BlasTransposeOpT *  
@@ -166,6 +171,9 @@ module CudaExecUnit =
     let needExtra op =
         failwith "the op %A requires extra handling and should have been converted to an UExtraOp"
 
+    let unsupLoc (dev: ITensorDevice) =
+        failwithf "unsupported location: %A" dev
+
     /// The operation the blasArg will perform.
     type BlasArgOperation =
         /// no operation
@@ -178,7 +186,7 @@ module CudaExecUnit =
 
     /// Returns the operation that blasArg will perform.
     let blasArgOperation (manikin: ArrayNDManikinT) shared willOverwrite =
-        let st, shp = ArrayND.stride manikin, ArrayND.shape manikin
+        let st, shp = manikin.Layout.Stride, manikin.Shape
         match st.[st.Length-2 ..], shp.[st.Length-2 ..] with
         | [m;  1L], [ms; ns] when m >= max 1L ns && not (shared && willOverwrite) -> BlasArgId
         | [1L; n],  [ms; ns] when n >= max 1L ms && not (shared && willOverwrite) -> BlasArgTranspose
@@ -268,29 +276,29 @@ module CudaExecUnit =
         // shape operations
         | UUnaryOp (Reshape _) ->        
             match trgtDfltChReq () with
-            | Some rv when ArrayND.isC rv ->
-                [dfltChReq (Some (ArrayND.reshapeView srcShapes.[0].[dfltChId] rv))]
+            | Some rv when ArrayNDManikin.isC rv ->
+                [dfltChReq (Some (ArrayNDManikin.reshapeView srcShapes.[0].[dfltChId] rv))]
             | _ -> dfltSrcWithNoViewReq ()
         | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq ()
         | UUnaryOp (PermuteAxes perm) ->
             match trgtDfltChReq () with
-            | Some rv -> [dfltChReq (Some (ArrayND.permuteAxes (Permutation.invert perm) rv))]
+            | Some rv -> [dfltChReq (Some (ArrayNDManikin.permuteAxes (Permutation.invert perm) rv))]
             | _ -> dfltSrcWithNoViewReq ()
         | UUnaryOp (ReverseAxis ax) ->
             match trgtDfltChReq () with
-            | Some rv -> [dfltChReq (Some (ArrayND.reverseAxis ax rv))]
+            | Some rv -> [dfltChReq (Some (ArrayNDManikin.reverseAxis ax rv))]
             | _ -> dfltSrcWithNoViewReq ()
 
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match cudaEnv.VarStorLoc |> Map.find vs with
-            | LocDev -> 
+            | dev when dev=CudaTensor.Dev -> 
                 // request to store directly into external var
                 let shp = vs.Shape |> ShapeSpec.eval
                 let stride = cudaEnv |> CudaCompileEnv.strideForVar vs
                 [dfltChReq (Some (ArrayNDManikin.external (MemExternal vs) shp stride))]
-            | LocHost -> dfltSrcWithNoViewReq ()
-            | loc -> unsupLoc loc
+            | dev when dev=HostTensor.Dev -> dfltSrcWithNoViewReq ()
+            | dev -> unsupLoc dev
 
         // misc
         | UUnaryOp (Print _) -> inplaceFirstSrcReq ()
@@ -330,12 +338,12 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDfltChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) && 
+            | Some req when not (ArrayNDManikin.isBroadcasted req) && 
                     BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
                         Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
-                    dfltChReq (Some (req.[aryRng] :?> ArrayNDManikinT)))
+                    dfltChReq (Some (req |> ArrayNDManikin.range aryRng)))
             | _ -> dfltSrcWithNoViewReq ()            
 
         // extra
@@ -355,7 +363,7 @@ module CudaExecUnit =
             // but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
             match trgtDfltChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) -> inplaceFirstSrcReq ()
+            | Some req when not (ArrayNDManikin.isBroadcasted req) -> inplaceFirstSrcReq ()
             | _ -> dfltSrcWithNoViewReq ()            
 
         | UNaryOp (Expr.Elements _) -> needExtra op
@@ -428,14 +436,14 @@ module CudaExecUnit =
         let dfltChOutplaceTrgt () =
             match trgtDefChReq () with
             | Some rv when not (overlappingWithAnySrc rv) && 
-                           not (ArrayND.isBroadcasted rv) && matchingDfltChTypeAndShape rv
+                           not (ArrayNDManikin.isBroadcasted rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
              
         /// default channel target that shares no elements with any srcView and has C-continguous layout
         let dfltChOutplaceCTrgt () =
             match trgtDefChReq () with
-            | Some rv when ArrayND.isC rv &&
+            | Some rv when ArrayNDManikin.isC rv &&
                            not (overlappingWithAnySrc rv) && matchingDfltChTypeAndShape rv
                 -> dfltChTrgt rv false
             | _ -> newDfltChTrgt () 
@@ -467,7 +475,7 @@ module CudaExecUnit =
                   |> List.tryFind (fun srcChs ->
                                     let view, shared = srcChs.[dfltChId] 
                                     matchingDfltChTypeAndShape view &&
-                                    not (ArrayND.isBroadcasted view) && 
+                                    not (ArrayNDManikin.isBroadcasted view) && 
                                     not shared) with
             | Some srcChs -> Map [dfltChId, srcChs.[dfltChId]]
             | None -> dfltChOutplaceTrgt ()     
@@ -491,24 +499,24 @@ module CudaExecUnit =
         // variable access
         | ULeafOp (Var vs) ->       
            match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev ->
+            | dev when dev=CudaTensor.Dev ->
                 // create manikin for external variable
                 let stride = compileEnv |> CudaCompileEnv.strideForVar vs
                 dfltChTrgt (ArrayNDManikin.external (MemExternal vs) vs.NShape stride) true
-            | LocHost ->
+            | dev when dev=HostTensor.Dev ->
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (ArrayNDLayout.isC hvLayout) then
+                if not (TensorLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // We will transfer variable from host to device during execution.
                 // We allocate contiguous device memory for that.
                 match trgtDefChReq () with
-                | Some rv when ArrayND.isC rv -> dfltChTrgt rv false
+                | Some rv when ArrayNDManikin.isC rv -> dfltChTrgt rv false
                 | _ -> 
                     dfltChTrgt (ArrayNDManikin.newC memAllocator vs.TypeName vs.NShape) false    
-            | loc -> unsupLoc loc     
+            | dev -> unsupLoc dev     
                            
         // tensor creation
         | ULeafOp _ -> dfltChOutplaceTrgt ()      
@@ -540,7 +548,7 @@ module CudaExecUnit =
 
         // tensor ops
         | UUnaryOp (Diag (ax1, ax2)) ->
-            dfltChTrgt (ArrayND.diagAxis ax1 ax2 (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (ArrayNDManikin.diagAxis ax1 ax2 (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (DiagMat (ax1, ax2)) -> dfltChOutplaceTrgt ()
         | UUnaryOp Invert -> 
             // If source will be transposed, then target will also be transposed.
@@ -564,15 +572,15 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->        
-            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            match firstSrcDfltCh() |> ArrayNDManikin.tryReshapeView (trgtDfltChShape()) with
             | Some reshapedSrc -> dfltChTrgt reshapedSrc (firstSrcDfltChShared()) 
             | None -> dfltChOutplaceTrgt () // will copy
         | UUnaryOp (DoBroadcast _) ->
-            dfltChTrgt (ArrayND.broadcastToShape (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (ArrayNDManikin.broadcastTo (trgtDfltChShape()) (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (PermuteAxes perm) ->
-            dfltChTrgt (ArrayND.permuteAxes perm (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (ArrayNDManikin.permuteAxes perm (firstSrcDfltCh())) (firstSrcDfltChShared())
         | UUnaryOp (ReverseAxis ax) ->
-            dfltChTrgt (ArrayND.reverseAxis ax (firstSrcDfltCh())) (firstSrcDfltChShared())
+            dfltChTrgt (ArrayNDManikin.reverseAxis ax (firstSrcDfltCh())) (firstSrcDfltChShared())
 
         // variable access
         | UUnaryOp (StoreToVar _) -> 
@@ -617,7 +625,7 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDefChReq () with
-            | Some req when not (ArrayND.isBroadcasted req) -> 
+            | Some req when not (ArrayNDManikin.isBroadcasted req) -> 
                 let anySrcShared = srcsDfltChShared() |> List.exists id
                 dfltChTrgt req anySrcShared
             | _ -> newDfltChTrgt ()            
@@ -651,11 +659,11 @@ module CudaExecUnit =
             else
                 // symbolic sub-tensors use a view of the src 
                 let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
-                dfltChTrgt ((firstSrcDfltCh()).[rng] :?> ArrayNDManikinT) (firstSrcDfltChShared())
+                dfltChTrgt (firstSrcDfltCh() |> ArrayNDManikin.range rng) (firstSrcDfltChShared())
 
         | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) ->
-            if not (firstSrcDfltChShared()) && not (ArrayND.isBroadcasted (firstSrcDfltCh())) then 
+            if not (firstSrcDfltChShared()) && not (ArrayNDManikin.isBroadcasted (firstSrcDfltCh())) then 
                 dfltChTrgt (firstSrcDfltCh()) false
             else dfltChOutplaceTrgt ()
 
@@ -705,8 +713,8 @@ module CudaExecUnit =
             (workSize.[d-1], workSize.[d-2], rest)
 
     /// returns the CUDA work dimensions (x, y, z) for an element-wise or elements operation
-    let workDimForElemwise (trgt: IArrayNDT) hetero =
-        workDimForWorkSize trgt.Shape hetero
+    let workDimForElemwise trgt hetero =
+        workDimForWorkSize (ArrayNDManikin.shape trgt) hetero
 
     /// returns the C++ template instantiation code for the given template and argument list
     let cppTemplateInstantiation tmpl args =
@@ -721,24 +729,24 @@ module CudaExecUnit =
             (List.map (fun v -> (ArrayNDArgTmpl v) :> ICudaArgTmpl) srcViews)
 
         let nSrc = List.length srcViews
-        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
+        let hetero = srcViews |> List.exists (fun sv -> (ArrayNDManikin.shape trgt) <> (ArrayNDManikin.shape sv))
         let indexedStr = if (cOp :> ICudaOp).IsIndexed then "Indexed" else ""
-        let dimsStr = if hetero then "Heterogenous" else sprintf "%dD" (ArrayND.nDims trgt)
+        let dimsStr = if hetero then "Heterogenous" else sprintf "%dD" (ArrayNDManikin.nDims trgt)
         let funcName = sprintf "elemwise%dAry%s%s" nSrc dimsStr indexedStr 
         funcName, args
 
     /// execution items for an element-wise operation
     let execItemsForElemwise trgt cOp srcViews =
-        if srcViews |> List.exists (fun sv -> ArrayND.nElems trgt <> ArrayND.nElems sv) then
+        if srcViews |> List.exists (fun sv -> ArrayNDManikin.nElems trgt <> ArrayNDManikin.nElems sv) then
             failwithf "a source of an elemwise op has different number of elements than target"
 
         let funcName, args = elemwiseFuncnameAndArgs trgt cOp srcViews
-        let hetero = srcViews |> List.exists (fun sv -> (ArrayND.shape trgt) <> (ArrayND.shape sv))
+        let hetero = srcViews |> List.exists (fun sv -> (ArrayNDManikin.shape trgt) <> (ArrayNDManikin.shape sv))
         execItemsForKernel funcName args args (workDimForElemwise trgt hetero)
 
     /// execution items for a gather operation
     let execItemsForGather trgt src idxViews =
-        let funcName = sprintf "gather%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let funcName = sprintf "gather%dDTo%dD" (ArrayNDManikin.nDims src) (ArrayNDManikin.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
@@ -749,7 +757,7 @@ module CudaExecUnit =
 
     /// execution items for a scatter operation
     let execItemsForScatter trgt src idxViews =
-        let funcName = sprintf "scatter%dDTo%dD" (ArrayND.nDims src) (ArrayND.nDims trgt)
+        let funcName = sprintf "scatter%dDTo%dD" (ArrayNDManikin.nDims src) (ArrayNDManikin.nDims trgt)
         let args = 
             ((ArrayNDArgTmpl trgt) :> ICudaArgTmpl) ::
             ((ArrayNDArgTmpl src) :> ICudaArgTmpl) ::
@@ -765,12 +773,12 @@ module CudaExecUnit =
                     ArrayNDArgTmpl trgt :> ICudaArgTmpl
                     ArrayNDArgTmpl src :> ICudaArgTmpl]
         let idxStr = if indexed then "Idx" else ""
-        let funcName = sprintf "reduce%sTo%dD" idxStr (ArrayND.nDims trgt)
+        let funcName = sprintf "reduce%sTo%dD" idxStr (ArrayNDManikin.nDims trgt)
         funcName, args
 
     /// execution items for a reduction operation
     let execItemsForReduction trgt indexed cOp cInitialOp src =
-        match ArrayND.shape trgt, ArrayND.shape src with
+        match ArrayNDManikin.shape trgt, ArrayNDManikin.shape src with
         | _, [] -> failwith "cannot reduce a scalar array"
         | trgtShp, srcShp when trgtShp.Length <> srcShp.Length - 1  ->
             failwithf "cannot reduce from %d dimensions to %d dimensions" srcShp.Length trgtShp.Length
@@ -791,14 +799,14 @@ module CudaExecUnit =
             args @
             (workSize |> List.map (fun ws -> sprintf "%dLL" ws |> CPPTemplateValue :> ICudaArgTmpl))
         let nSrc = List.length srcViews
-        let dimsStr = sprintf "%dD" (ArrayND.nDims trgt)
+        let dimsStr = sprintf "%dD" (ArrayNDManikin.nDims trgt)
         let funcName = sprintf "elements%dAry%s" nSrc dimsStr 
         funcName, tmpls, args
 
     /// execution items for an element-wise operation
-    let execItemsForElements compileEnv trgt elemFunc srcViews =
+    let execItemsForElements compileEnv (trgt: ArrayNDManikinT) elemFunc (srcViews: ArrayNDManikinT list) =
         let posOrder = 
-            if Debug.DisableElementsWorkOrdering then Permutation.identity (ArrayND.nDims trgt)
+            if Debug.DisableElementsWorkOrdering then Permutation.identity (ArrayNDManikin.nDims trgt)
             else CudaElemExpr.bestPosOrder trgt srcViews elemFunc
         let inst = {UElemFunc=elemFunc; PosOrder=posOrder}
         let opName = 
@@ -811,14 +819,15 @@ module CudaExecUnit =
                 opName
         let opTmplArgs = 
             trgt::srcViews
-            |> List.map (fun (manikin: ArrayNDManikinT) -> manikin.CPPType)
+            |> List.map ArrayNDManikin.cppType
             |> String.concat ", "       
         let opTypeName = 
             if opTmplArgs = "" then opName
             else sprintf "%s<%s>" opName opTmplArgs
 
         let workSize = trgt.Shape |> Permutation.apply (Permutation.invert posOrder)
-        let funcName, tmpls, args = elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews workSize
+        let funcName, tmpls, args = 
+            elementsFuncnameAndArgs trgt (ElementsOpArgTmpl opTypeName) srcViews workSize
         let workDims = workDimForWorkSize workSize false
 
         //let strideStats = CudaElemExpr.strideStats trgt srcViews elemFunc
@@ -830,7 +839,8 @@ module CudaExecUnit =
     let dynamicSubtensorTmplAndIdx (bas: ArrayNDManikinT) (rngs: UExprRngsSpecT) (rngManikins: ArrayNDManikinT list) =
         // Apply symbolic ranges to src, and leave dynamic axes unharmed.
         // (0 is added to offset and their size is changed appropriately)
-        let basStatic = bas.[SimpleRangesSpec.eval (fun _ -> 0L) rngs] :?> ArrayNDManikinT
+        let evalRngs = SimpleRangesSpec.eval (fun _ -> 0L) rngs
+        let basStatic = bas |> ArrayNDManikin.range evalRngs
 
         // convert simplified range specification to array of pointers to expressions calculating
         // the indices
@@ -859,7 +869,7 @@ module CudaExecUnit =
         //                                   const TBaseSrc &baseSrc, const Array<idx_t, nDims> &srcIdx)
 
         let srcTmpl, srcDynTmpl, srcIdxPntrsTmpl = dynamicSubtensorTmplAndIdx src rngs rngManikins
-        let nDimsStr = sprintf "%d" (ArrayND.nDims trgt)
+        let nDimsStr = sprintf "%d" (ArrayNDManikin.nDims trgt)
 
         execItemsForKernel 
             "copyFromDynamicSubtensor" 
@@ -875,7 +885,7 @@ module CudaExecUnit =
         //                                 const TSrc &src)
           
         let trgtTmpl, trgtDynTmpl, trgtIdxPntrsTmpl = dynamicSubtensorTmplAndIdx trgt rngs rngManikins
-        let nDimsStr = sprintf "%d" (ArrayND.nDims src)  
+        let nDimsStr = sprintf "%d" (ArrayNDManikin.nDims src)  
 
         execItemsForKernel 
             "copyToDynamicSubtensor" 
@@ -905,9 +915,9 @@ module CudaExecUnit =
 
     /// generates ExecItems to copy srcView to trgtView 
     let copyExecItems trgt src =
-        if ArrayND.nElems trgt <> ArrayND.nElems src then
+        if ArrayNDManikin.nElems trgt <> ArrayNDManikin.nElems src then
             failwithf "cannot copy array with %d elements to array with %d elements"
-                (ArrayND.nElems trgt) (ArrayND.nElems src)
+                (ArrayNDManikin.nElems trgt) (ArrayNDManikin.nElems src)
         execItemsForElemwise trgt (NoArgEOpArgTmpl("IdEOp_t", false)) [src]
 
     /// Generates ExecItems to copy srcView into newly allocated memory in C-order.
@@ -925,10 +935,10 @@ module CudaExecUnit =
                             | _, true, true -> 1L, Rng (Some 0L, Some 0L)    // keep broadcasted
                             | _, true, false -> size, RngAll)                // unbroadcast by copying
             |> List.unzip
-        let srcView = src.[srcRngs] :?> ArrayNDManikinT
+        let srcView = src |> ArrayNDManikin.range srcRngs
         let tmpView = ArrayNDManikin.newC memAllocator src.TypeName tmpShp
         let copyOps = copyExecItems tmpView srcView
-        let dstView = tmpView |> ArrayND.broadcastToShape src.Shape
+        let dstView = tmpView |> ArrayNDManikin.broadcastTo src.Shape
         dstView, copyOps                             
 
     /// If all batch dimensions (all dimensions but the last two) of the array are of
@@ -940,7 +950,7 @@ module CudaExecUnit =
             let isUnitary = manikin.Shape.[0..nd-3] |> List.forall ((=) 1L)
             if isUnitary then
                 let mutable m = manikin
-                for i=0 to nd-3 do m <- ArrayND.cutLeft m
+                for i=0 to nd-3 do m <- ArrayNDManikin.cutLeft m
                 m
             else manikin
         else manikin           
@@ -949,11 +959,11 @@ module CudaExecUnit =
     /// Can return copy items if deemed necessary.
     let blasArg memAllocator (manikin: ArrayNDManikinT) shared willOverwrite =
         let manikin = trimUnitaryBatchedBlasDims manikin
-        if ArrayND.nDims manikin < 2 then
+        if ArrayNDManikin.nDims manikin < 2 then
             failwith "need at least 2-dimensional array for BLAS argument"
         match blasArgOperation manikin shared willOverwrite with
         | BlasArgId        -> manikin, BlasTranspose, [], shared
-        | BlasArgTranspose -> ArrayND.transpose manikin, BlasId, [], shared
+        | BlasArgTranspose -> ArrayNDManikin.transpose manikin, BlasId, [], shared
         | BlasArgCopy -> 
             let bcAllowed = (List.replicate (manikin.NDims - 2) true) @ [false; false]
             let tmpView, copyOps = copyKeepingBroadcasted memAllocator bcAllowed manikin
@@ -964,8 +974,8 @@ module CudaExecUnit =
         let manikin = trimUnitaryBatchedBlasDims manikin
         if not (ArrayNDManikin.canBeBlasTarget manikin) then
             failwithf "cannot use specified view with shape %A and stride %A as BLAS target" 
-                manikin.Shape (ArrayND.stride manikin)
-        ArrayND.transpose manikin
+                manikin.Shape (ArrayNDManikin.stride manikin)
+        ArrayNDManikin.transpose manikin
 
     /// exection items to reduce src over the last axis into trgt
     let rec batchReduceLastAxis (memAllocator: MemAllocatorT) reduceFn (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) 
@@ -983,12 +993,12 @@ module CudaExecUnit =
 
             // create array manikin for source with split last dimension
             let batchSrcShp = 
-                (ArrayND.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
-            let reduceStride = (ArrayND.stride src).[src.NDims-1]
+                (ArrayNDManikin.shape src).[0 .. src.NDims-2] @ [reduceBatches; reduceBatchSize]
+            let reduceStride = (ArrayNDManikin.stride src).[src.NDims-1]
             let batchSrcStride = 
-                (ArrayND.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
+                (ArrayNDManikin.stride src).[0 .. src.NDims-2] @ [reduceStride * reduceBatchSize; reduceStride]
             let batchSrc = 
-                src |> ArrayND.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
+                src |> ArrayNDManikin.relayout {src.Layout with Shape=batchSrcShp; Stride=batchSrcStride}
 
             // create temporary target
             let tmpShp = 
@@ -997,15 +1007,18 @@ module CudaExecUnit =
             let tmpTrgt = ArrayNDManikin.newC memAllocator trgt.TypeName tmpShp
 
             // perform reduction of batch
-            let batchTrgt = tmpTrgt.[Fill, 0L .. reduceBatches-1L] :?> ArrayNDManikinT
+            let batchTrgtRng = [RngAllFill; Rng (Some 0L, Some (reduceBatches-1L))]
+            let batchTrgt = tmpTrgt |> ArrayNDManikin.range batchTrgtRng
             let batchExecItems = reduceFn batchTrgt batchSrc
 
             // perform reduction of remaining elements, if necessary
             let remExecItems =
                 if reduceRem = 0L then []
                 else
-                    let remSrc = src.[Fill, reduceBatches*reduceBatchSize ..] :?> ArrayNDManikinT
-                    let remTrgt = tmpTrgt.[Fill, reduceBatches] :?> ArrayNDManikinT
+                    let remSrcRng = [RngAllFill; Rng (Some (reduceBatches*reduceBatchSize), None)]
+                    let remSrc = src |> ArrayNDManikin.range remSrcRng
+                    let remTrgtRng = [RngAllFill; RngElem reduceBatches]
+                    let remTrgt = tmpTrgt |> ArrayNDManikin.range remTrgtRng
                     reduceFn remTrgt remSrc
 
             // recursively reduce temporary target
@@ -1016,29 +1029,29 @@ module CudaExecUnit =
     /// reduce one axis by appling an operation such as sum, max, min, ...
     let execItemsForReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the reduction is performed over comes last
-        let nd = ArrayND.nDims src
+        let nd = ArrayNDManikin.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.permuteAxes axOrder src
+        let srcAdj = ArrayNDManikin.permuteAxes axOrder src
         (trgt, srcAdj) ||> batchReduceLastAxis memAllocator (fun tmpTrgt tmpSrc ->
             execItemsForReduction tmpTrgt false (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) tmpSrc)
 
     /// reduce one axis by appling an operation on indices such as argMax, argMin, ...
     let execItemsForIdxReduceAxis memAllocator ax eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
         // we need to swap axes so that the axes the reduction is performed over comes last
-        let nd = ArrayND.nDims src
+        let nd = ArrayNDManikin.nDims src
         let axOrder = Seq.concat [{0 .. ax-1}; {nd-1 .. nd-1}; {ax .. nd-2}] |> Seq.toList
-        let srcAdj = ArrayND.permuteAxes axOrder src
+        let srcAdj = ArrayNDManikin.permuteAxes axOrder src
         execItemsForReduction trgt true (NoArgEOpArgTmpl(eOpName, false)) (ConstEOpArgTmpl initial) srcAdj
 
     /// exection items to reduce all elements of src into the scalar trgt
     let rec execItemsForReduce memAllocator eOpName initial (trgt: ArrayNDManikinT) (src: ArrayNDManikinT) =
-        if ArrayND.nDims trgt <> 0 then failwith "reduce target must be scalar"
+        if ArrayNDManikin.nDims trgt <> 0 then failwith "reduce target must be scalar"
         match src.Shape with
         | [_] -> execItemsForReduceAxis memAllocator 0 eOpName initial trgt src
         | [] -> copyExecItems trgt src
         | srcShp ->
             // create temporary target
-            let nDims = ArrayND.nDims src
+            let nDims = ArrayNDManikin.nDims src
             let tmpShp = srcShp.[0 .. nDims-2]
             let tmp = ArrayNDManikin.newC memAllocator src.TypeName tmpShp            
 
@@ -1103,12 +1116,12 @@ module CudaExecUnit =
         // variable access
         | ULeafOp (Var vs) -> 
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev -> []
-            | LocHost -> 
+            | dev when dev=CudaTensor.Dev -> []
+            | dev when dev=HostTensor.Dev -> 
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt()))]       
-            | loc -> unsupLoc loc
+            | dev -> unsupLoc dev
 
         // unary element-wise
         | UUnaryOp Negate -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NegateEOp_t", false)) (srcsDfltCh())
@@ -1150,7 +1163,7 @@ module CudaExecUnit =
         // tensor ops
         | UUnaryOp (Diag _) -> []
         | UUnaryOp (DiagMat (ax1, ax2)) ->
-            let trgtDiag = ArrayND.diagAxis ax1 ax2 (dfltChTrgt())
+            let trgtDiag = ArrayNDManikin.diagAxis ax1 ax2 (dfltChTrgt())
             let zeroItems = execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("ZerosEOp_t", false)) []
             let copyItems = copyExecItems trgtDiag (firstSrcDfltCh())
             zeroItems @ copyItems
@@ -1162,7 +1175,7 @@ module CudaExecUnit =
                 // as well to preserve orientation. The blasTarget function always transposes.
                 match blasArgOperation (firstSrcDfltCh()) (firstSrcDfltChShared()) true with
                 | BlasArgTranspose -> blasTarget (dfltChTrgt())
-                | _ -> blasTarget (ArrayND.transpose (dfltChTrgt()))
+                | _ -> blasTarget (ArrayNDManikin.transpose (dfltChTrgt()))
 
             // allocate variables and initialize pointer arrays
             let aArg = BlasTransposedMatrixBatchTmpl (aView, memAllocator)
@@ -1184,7 +1197,7 @@ module CudaExecUnit =
 
         // shape operations
         | UUnaryOp (Reshape _) ->
-            match firstSrcDfltCh() |> ArrayND.tryReshapeView (trgtDfltChShape()) with
+            match firstSrcDfltCh() |> ArrayNDManikin.tryReshapeView (trgtDfltChShape()) with
             | Some reshapedSrc when reshapedSrc = dfltChTrgt() -> []
             | _ ->
                 //printfn "Reshape: copying from\n%A\nto\n%A." (firstSrcDfltCh()) (dfltChTrgt())
@@ -1196,19 +1209,19 @@ module CudaExecUnit =
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match compileEnv.VarStorLoc |> Map.find vs with
-            | LocDev when (firstSrcDfltCh()).Storage = (MemExternal vs) ->
+            | dev when dev=CudaTensor.Dev && (firstSrcDfltCh()).Storage = (MemExternal vs) ->
                 // Source was evaluated directly into the variable storage.
                 // No copy necessary.
                 []
-            | LocDev  -> 
+            | dev when dev=CudaTensor.Dev -> 
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
                 let varStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let dv = ArrayNDManikin.external (MemExternal vs) vs.NShape varStride
                 copyExecItems dv (firstSrcDfltCh())
-            | LocHost ->            
+            | dev when dev=HostTensor.Dev ->            
                 let copyItems, memcpySrc = 
-                    if ArrayND.isC (firstSrcDfltCh()) then 
+                    if ArrayNDManikin.isC (firstSrcDfltCh()) then 
                         // Source has C-strides. Can directly copy to host.
                         [], firstSrcDfltCh()
                     else
@@ -1219,13 +1232,13 @@ module CudaExecUnit =
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (ArrayNDLayout.isC hvLayout) then
+                if not (TensorLayout.isC hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // copy
                 let hv = ArrayNDManikin.external (MemExternal vs) vs.NShape hvStride
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
-            | loc -> unsupLoc loc         
+            | dev -> unsupLoc dev
                                  
         // misc
         | UUnaryOp (Print msg) -> [PrintWithMsg (msg, firstSrcDfltCh())]
@@ -1307,7 +1320,7 @@ module CudaExecUnit =
             let parts = rngs |> List.map (fun rng ->
                 let aryRng = rng |> List.map (fun (first, last) -> 
                     Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
-                dfltChTrgt().[aryRng] :?> ArrayNDManikinT)            
+                dfltChTrgt() |> ArrayNDManikin.range aryRng)            
             let copyItems = 
                 List.zip (srcsDfltCh()) parts 
                 |> List.collect (fun (src, part) ->
@@ -1323,25 +1336,32 @@ module CudaExecUnit =
 
         | UExtraOp (Loop loopSpec) ->
             // build channel infos
-            let channelInfos = 
+            let channelManikinInfos = 
                 loopSpec.Channels 
                 |> Map.map (fun ch lv ->
                     {
-                        LoopEval.Shape       = UExpr.dfltChShape lv.UExpr
-                        LoopEval.SliceDim    = lv.SliceDim
-                        LoopEval.Target      = trgtChs.[ch] :> IArrayNDT
+                        Shape         = UExpr.dfltChShape lv.UExpr
+                        SliceDim      = lv.SliceDim
+                        TargetManikin = trgtChs.[ch]
+                    })
+            let channelLayoutInfos = 
+                loopSpec.Channels 
+                |> Map.map (fun ch lv ->
+                    {
+                        LoopEval.LoopChannelLayoutInfoT.Shape        = UExpr.dfltChShape lv.UExpr
+                        LoopEval.LoopChannelLayoutInfoT.SliceDim     = lv.SliceDim
+                        LoopEval.LoopChannelLayoutInfoT.TargetLayout = trgtChs.[ch].Layout 
                     })
 
             // obtain stride information
-            let srcs = srcsDfltCh() |> List.map (fun s -> s :> IArrayNDT)
+            let srcs = srcsDfltCh()
             let argStrides, chStrides, srcReqStrideOrder = 
-                LoopEval.buildStrides loopSpec.Vars srcs channelInfos 
+                LoopEval.buildStrides loopSpec.Vars (srcs |> List.map ArrayNDManikin.layout) channelLayoutInfos 
 
             // copy sources to temporary variable if necessary to match strides
             let copiedSrcs, copyItems =   
                 ([], List.zip srcs srcReqStrideOrder)
                 ||> List.mapFold (fun copyItems (src, reqOrder) ->
-                    let src = src :?> ArrayNDManikinT
                     match reqOrder with
                     | Some order ->
                         let tmp = ArrayNDManikin.newOrdered memAllocator src.TypeName src.Shape order
@@ -1353,10 +1373,10 @@ module CudaExecUnit =
             // loop iteration
             let recipeDesc = {
                 CompileEnv  = {SymSizes       = SymSizeEnv.empty  
-                               VarLocs        = loopSpec.Vars |> Map.map (fun _ _ -> LocDev)
+                               VarLocs        = loopSpec.Vars |> Map.map (fun _ _ -> CudaTensor.Dev)
                                VarStrides     = argStrides      
                                ChannelStrides = chStrides                        
-                               ResultLoc      = LocDev
+                               ResultLoc      = CudaTensor.Dev
                                CanDelay       = false}
                 UExprs      = loopSpec.Channels |> Map.map (fun ch lv -> lv.UExpr) 
                 OwnerUExpr  = Some uExpr
@@ -1365,7 +1385,7 @@ module CudaExecUnit =
             // emit loop executor
             let execLoopInfo = {
                 Length                = loopSpec.Length
-                Channels              = channelInfos
+                Channels              = channelManikinInfos
                 Vars                  = loopSpec.Vars
                 Workspace             = compileEnv |> CudaCompileEnv.newSubrecipe recipeDesc
                 Args                  = copiedSrcs

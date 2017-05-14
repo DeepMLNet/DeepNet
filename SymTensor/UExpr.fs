@@ -4,8 +4,8 @@ open System.Diagnostics
 open System.Reflection
 open System.Collections.Generic
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open Expr
 
 

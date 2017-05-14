@@ -5,8 +5,8 @@ open System.IO
 open Xunit
 open FsUnit.Xunit
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 open Models
@@ -42,8 +42,8 @@ let build device batch =
     mc.SetSize nTarget 10L
 
     // set strides
-    mc.SetStride input (ArrayNDLayout.cStride [batch; 784L])
-    mc.SetStride target (ArrayNDLayout.cStride [batch; 10L])
+    mc.SetStride input (TensorLayout.cStride [batch; 784L])
+    mc.SetStride target (TensorLayout.cStride [batch; 10L])
 
     // instantiate model
     let mi = mc.Instantiate (device, canDelay=false)
@@ -65,7 +65,7 @@ let build device batch =
     lossFun, optFun, optCfg, opt.InitialState optCfg mi.ParameterValues
 
 let getMnist device samples =
-    let cut (x: ArrayNDT<_>) =
+    let cut (x: Tensor<_>) =
         match samples with
         | Some samples -> x.[0L .. samples-1L, *]
         | None -> x
@@ -73,7 +73,7 @@ let getMnist device samples =
     let mnist = Mnist.loadRaw mnistPath
     let tstImgs =  
         mnist.TstImgs
-        |> ArrayND.reshape [mnist.TstImgs.Shape.[0]; -1L]
+        |> Tensor.reshape [mnist.TstImgs.Shape.[0]; Remainder]
         |> cut
         |> post device
     let tstLbls =  
@@ -85,12 +85,12 @@ let getMnist device samples =
 let train device samples iters = 
     let tstImgs, tstLbls = getMnist device (Some samples)
     let lossFun, optFun, optCfg, optState = build device samples
-    let initialLoss = lossFun tstImgs tstLbls |> ArrayND.value
+    let initialLoss = lossFun tstImgs tstLbls |> Tensor.value
     printfn "Initial loss: %f" initialLoss
     for itr = 0 to iters-1 do
         optFun tstImgs tstLbls optCfg optState |> ignore
-        printfn "%d: %f" itr (lossFun tstImgs tstLbls |> ArrayND.value)
-    let finalLoss = lossFun tstImgs tstLbls |> ArrayND.value
+        printfn "%d: %f" itr (lossFun tstImgs tstLbls |> Tensor.value)
+    let finalLoss = lossFun tstImgs tstLbls |> Tensor.value
     printfn "Final loss: %f" finalLoss
     initialLoss, finalLoss
 

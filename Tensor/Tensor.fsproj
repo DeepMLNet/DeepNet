@@ -7,10 +7,10 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>82de3bae-bcec-4df8-9c46-07b7faf4e31a</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>ArrayND</RootNamespace>
+    <RootNamespace>Tensor</RootNamespace>
     <AssemblyName>Tensor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Name>Tensor</Name>
     <TargetFrameworkProfile />
@@ -39,6 +39,8 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Tensor.XML</DocumentationFile>
     <PlatformTarget>x64</PlatformTarget>
+    <OtherFlags>
+    </OtherFlags>
   </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
@@ -59,17 +61,17 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Util.fs" />
-    <Compile Include="CudaSup.fs" />
-    <Compile Include="MKL.fs" />
-    <Compile Include="ArrayNDLayout.fs" />
-    <Compile Include="FastLayout.fs" />
-    <Compile Include="ArrayND.fs" />
-    <Compile Include="ArrayNDHost.fs" />
-    <Compile Include="ArrayNDHostReg.fs" />
-    <Compile Include="ArrayNDCuda.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="CudaUtils.fs" />
+    <Compile Include="DiskMap.fs" />
+    <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
-    <Compile Include="ArrayNDHDF.fs" />
+    <Compile Include="Sgn.fs" />
+    <Compile Include="TensorLayout.fs" />
+    <Compile Include="Tensor.fs" />
+    <Compile Include="BlasSupport.fs" />
+    <Compile Include="HostBackend.fs" />
+    <Compile Include="CudaBackend.fs" />
     <Compile Include="NumpyFiles.fs" />
     <Compile Include="Random.fs" />
     <Compile Include="Decomposition.fs" />
@@ -102,6 +104,30 @@
       <Link>LIBIOMP5MD.DLL</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="..\TensorCudaSup\Common.cuh">
+      <Link>Common.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Idxs.cuh">
+      <Link>Idxs.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Tensor.cuh">
+      <Link>Tensor.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Work.cuh">
+      <Link>Work.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Elemwise.cuh">
+      <Link>Elemwise.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\Reduction.cuh">
+      <Link>Reduction.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\GatherScatter.cuh">
+      <Link>GatherScatter.cuh</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\TensorCudaSup\BlasSupport.cuh">
+      <Link>BlasSupport.cuh</Link>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CudaBlas">
@@ -123,15 +149,24 @@
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="NVRTC">
+      <HintPath>..\packages\ManagedCuda-NVRTC.8.0.13\lib\net46\NVRTC.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors">
+      <HintPath>..\packages\System.Numerics.Vectors.4.3.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild" Condition=" '$(Configuration)' == 'Release'">
-    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -OutputDirectory ..\dist\$(Configuration) -Suffix &quot;$(VERSUFFIX)&quot;" />
+    <Exec Command="..\dist\nuget.exe pack Tensor.fsproj -Prop Configuration=$(Configuration) -Prop Platform=x64 -IncludeReferencedProjects -OutputDirectory ..\dist\$(Configuration)  -Suffix &quot;$(VERSUFFIX)&quot;" />
   </Target>
 </Project>

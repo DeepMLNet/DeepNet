@@ -12,10 +12,12 @@
     <description>$description$</description>
     <releaseNotes>Initial release.</releaseNotes>
     <copyright>$copyright$</copyright>
-    <tags>Machine Learning Deep Tensor Array NDimensional ND NDArray ArrayND DeepNet</tags>
+    <tags>Tensor NDArray CUDA</tags>
   </metadata>
   <files>
     <file src="HDF5\HDF.PInvoke.dll" target="lib\net461" /> 
-    <file src="build\**" target="build" /> 
+    <file src="build\**" target="build" />
+    <file src="..\MKL\tensor_mkl.dll" target="build" />
+    <file src="..\MKL\LIBIOMP5MD.dll" target="build" />
   </files>
 </package>

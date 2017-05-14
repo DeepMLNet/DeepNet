@@ -2,7 +2,7 @@
 
 
 open System
-open ArrayNDNS
+open Tensor
 open SymTensor
 
 
@@ -11,7 +11,7 @@ type VarEnvReg (varEnv: VarEnvT) =
     let varLocks =
         varEnv
         |> Map.toList
-        |> List.map (fun (name, ary) -> ArrayNDHostReg.lock (ary :?> IArrayNDHostT))
+        |> List.map (fun (name, ary) -> CudaRegMem.register (ary.Storage :?> ITensorHostStorage))
 
     interface IDisposable with
         member this.Dispose () =

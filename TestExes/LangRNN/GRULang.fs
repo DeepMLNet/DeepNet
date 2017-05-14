@@ -1,8 +1,8 @@
 ﻿namespace LangRNN
 
 
-open Basics
-open ArrayNDNS
+open Tensor.Utils
+open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
 
@@ -43,10 +43,10 @@ module GRULang =
 
     let internal initWeights seed (shp: int64 list) = 
         let r = 1.0f / sqrt (single shp.[1])       
-        (System.Random seed).SeqSingle(-r, r) |> ArrayNDHost.ofSeqWithShape shp
+        (System.Random seed).SeqSingle(-r, r) |> HostTensor.ofSeqWithShape shp
         
     let internal initBias seed (shp: int64 list) =
-        ArrayNDHost.zeros<single> shp
+        HostTensor.zeros<single> shp
 
     let pars (mb: ModelBuilder<_>) hp = {
         WordToEmb     = mb.Param ("WordToEmb",     [hp.NWords; hp.EmbeddingDim],       initWeights)
@@ -197,16 +197,16 @@ type GRUInst (VocSize:       int64,
 
     member this.Train (dataset: TrnValTst<WordSeq>) dropStateProb trainCfg =
         let rng = System.Random 1
-        let smplVarEnv (stateOpt: ArrayNDT<single> option) (smpl: WordSeq) =
+        let smplVarEnv (stateOpt: Tensor<single> option) (smpl: WordSeq) =
             let nBatch = smpl.Words.Shape.[0]
             let dropState = rng.NextDouble() < dropStateProb 
             let state =
                 match stateOpt with
                 | Some state when state.Shape.[0] = nBatch && not dropState -> state
-                | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0 .. nBatch-1L, *]
-                | _ -> ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<_>
+                | Some state when state.Shape.[0] > nBatch && not dropState -> state.[0L .. nBatch-1L, *]
+                | _ -> CudaTensor.zeros<single> [nBatch; EmbeddingDim] 
             if smpl.Words.Shape.[1] < 2L then failwithf "need more than two steps per sample: %A" smpl.Words.Shape
-            VarEnv.ofSeq [words, smpl.Words :> IArrayNDT; initial, state :> IArrayNDT]
+            VarEnv.ofSeq [words, smpl.Words :> ITensor; initial, state :> ITensor]
 
         //let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv GradientDescent.New GradientDescent.DefaultCfg
         let trainable = Train.newStatefulTrainable mi [loss] final smplVarEnv Adam.New Adam.DefaultCfg
@@ -219,11 +219,10 @@ type GRUInst (VocSize:       int64,
 
         let initial = 
             if seed = 0 then 
-                ArrayNDCuda.zeros<single> [nBatch; EmbeddingDim] :> ArrayNDT<single>
+                CudaTensor.zeros<single> [nBatch; EmbeddingDim] 
             else
                 let rng = System.Random seed 
-                rng.UniformArrayND (-0.1f, 0.1f) [nBatch; EmbeddingDim]
-                |> ArrayNDCuda.toDev :> ArrayNDT<_>
+                rng.UniformTensor (-0.1f, 0.1f) [nBatch; EmbeddingDim] |> CudaTensor.transfer 
         let primed = 
             // last word of array is not actually processed
             if nStart > 1L then processFn initial sw.[*, 0L .. nStart-1L]

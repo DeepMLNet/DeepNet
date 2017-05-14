@@ -7,7 +7,7 @@ open Microsoft.Msagl
 open Microsoft.Msagl.Drawing
 open Microsoft.Msagl.GraphViewerGdi
 
-open Basics
+open Tensor.Utils
 open SymTensor.Compiler
 
 

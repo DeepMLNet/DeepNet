@@ -1,11 +1,11 @@
-﻿namespace ArrayNDNS
+﻿namespace Tensor
 
 open System
 open System.IO
 open System.IO.Compression
 open System.Text.RegularExpressions
 
-open Basics
+open Tensor.Utils
 
 
 /// methods for accessing Numpy .npy data files.
@@ -22,10 +22,10 @@ module NPYFile =
         | Float
 
     /// loads a .npy file from the specified stream
-    let loadFromStream (stream: Stream) name : ArrayNDHostT<'T> =
+    let loadFromStream (stream: Stream) name : Tensor<'T> =
         // read and check prelude
         let inline checkByte req value =
-            if (byte req) <> (byte value) then failwithf "not a valid npy file header in %s" name
+            if byte req <> byte value then failwithf "not a valid npy file header in %s" name
         stream.ReadByte () |> checkByte 0x93
         stream.ReadByte () |> checkByte 'N'
         stream.ReadByte () |> checkByte 'U'
@@ -101,9 +101,9 @@ module NPYFile =
 
         // create layout
         let layout =
-            if fortranOrder then ArrayNDLayout.newF shp
-            else ArrayNDLayout.newC shp
-        let nElems = ArrayNDLayout.nElems layout
+            if fortranOrder then TensorLayout.newF shp
+            else TensorLayout.newC shp
+        let nElems = TensorLayout.nElems layout
 
         // read data
         let sizeInBytes = nElems * sizeof64<'T>
@@ -117,8 +117,8 @@ module NPYFile =
         let data : 'T[] = Array.zeroCreate (int32 nElems)
         Buffer.BlockCopy (dataBytes, 0, data, 0, int32 sizeInBytes)
 
-        // create ArrayNDHostT
-        ArrayNDHostT (layout, data)
+        // create HostTensor
+        Tensor<'T> (layout, TensorHostStorage<'T> data)
 
 
     /// loads a .npy file from the specified path 
@@ -127,41 +127,39 @@ module NPYFile =
         loadFromStream fs path
 
 
-[<AutoOpen>]
-module NPZFileTypes =
 
-    /// A Numpy .npz data file.
-    type NPZFile (path: string) =
+/// A Numpy .npz data file.
+type NPZFile (path: string) =
         
-        let zipFile = ZipFile.OpenRead path
+    let zipFile = ZipFile.OpenRead path
 
-        /// path to this .npz file
-        member this.Path = path
+    /// path to this .npz file
+    member this.Path = path
 
-        /// returns all variable names in the .npz file
-        member this.Names = [
-            for entry in zipFile.Entries do
-                let filename = entry.Name
-                if not (filename.EndsWith ".npy") then
-                    failwithf "invalid zip entry %s in npz file %s" filename path
-                let name = filename.[0 .. filename.Length-5]
-                yield name
-        ]
+    /// returns all variable names in the .npz file
+    member this.Names = [
+        for entry in zipFile.Entries do
+            let filename = entry.Name
+            if not (filename.EndsWith ".npy") then
+                failwithf "invalid zip entry %s in npz file %s" filename path
+            let name = filename.[0 .. filename.Length-5]
+            yield name
+    ]
 
-        /// gets the variable with the specified name from the .npz file
-        member this.Get name =
-            let filename = name + ".npy"
-            match zipFile.GetEntry filename with
-            | null -> failwithf "variable %s does not exist in %s" name path
-            | entry ->
-                use stream = entry.Open()
-                NPYFile.loadFromStream stream (path + ":" + name)
+    /// gets the variable with the specified name from the .npz file
+    member this.Get name =
+        let filename = name + ".npy"
+        match zipFile.GetEntry filename with
+        | null -> failwithf "variable %s does not exist in %s" name path
+        | entry ->
+            use stream = entry.Open()
+            NPYFile.loadFromStream stream (path + ":" + name)
 
-        /// opens the specified .npz file
-        static member Open path = new NPZFile (path)
+    /// opens the specified .npz file
+    static member Open path = new NPZFile (path)
 
-        interface IDisposable with
-            member this.Dispose () = zipFile.Dispose()
+    interface IDisposable with
+        member this.Dispose () = zipFile.Dispose()
 
 
 
