@@ -86,15 +86,15 @@ NeuralLayers and one LossLayer on top.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '239', 239)" onmouseover="showTip(event, '239', 239)">
+          <code onmouseout="hideTip(event, '64', 64)" onmouseover="showTip(event, '64', 64)">
             loss pars input target
           </code>
-          <div class="tip" id="239">
-            <strong>Signature:</strong> pars:Pars&lt;&#39;?182005&gt; -&gt; input:ExprT&lt;&#39;?182005&gt; -&gt; target:ExprT&lt;&#39;?182005&gt; -&gt; ExprT&lt;&#39;?182005&gt;<br />
-                          <strong>Type parameters:</strong> '?182005          </div>
+          <div class="tip" id="64">
+            <strong>Signature:</strong> pars:Pars&lt;&#39;?176151&gt; -&gt; input:ExprT -&gt; target:ExprT -&gt; ExprT<br />
+                          <strong>Type parameters:</strong> '?176151          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L150-150" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L187-187" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -108,15 +108,15 @@ target values <code>target</code>.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '240', 240)" onmouseover="showTip(event, '240', 240)">
+          <code onmouseout="hideTip(event, '65', 65)" onmouseover="showTip(event, '65', 65)">
             pars mb hp
           </code>
-          <div class="tip" id="240">
-            <strong>Signature:</strong> mb:ModelBuilder&lt;&#39;?182001&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;?182001&gt;<br />
-                          <strong>Type parameters:</strong> '?182001          </div>
+          <div class="tip" id="65">
+            <strong>Signature:</strong> mb:ModelBuilder&lt;&#39;T&gt; -&gt; hp:HyperPars -&gt; Pars&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L134-134" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L171-171" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -130,20 +130,40 @@ See <code>NeuralLayer.pars</code> for documentation about the initialization.</p
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '241', 241)" onmouseover="showTip(event, '241', 241)">
+          <code onmouseout="hideTip(event, '66', 66)" onmouseover="showTip(event, '66', 66)">
             pred pars input
           </code>
-          <div class="tip" id="241">
-            <strong>Signature:</strong> pars:Pars&lt;&#39;T&gt; -&gt; input:ExprT&lt;&#39;T&gt; -&gt; ExprT&lt;&#39;T&gt;<br />
+          <div class="tip" id="66">
+            <strong>Signature:</strong> pars:Pars&lt;&#39;T&gt; -&gt; input:ExprT -&gt; ExprT<br />
                           <strong>Type parameters:</strong> 'T          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L143-143" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L180-180" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Returns an expression for the output (predictions) of the
 neural network with parameters <code>pars</code> given the input <code>input</code>.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '67', 67)" onmouseover="showTip(event, '67', 67)">
+            regualrizationTerm pars input
+          </code>
+          <div class="tip" id="67">
+            <strong>Signature:</strong> pars:Pars&lt;&#39;?176153&gt; -&gt; input:ExprT -&gt; ExprT<br />
+                          <strong>Type parameters:</strong> '?176153          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L191-191" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Calculates sum of all regularization terms of this model.</p>
 
 
         </td>
@@ -174,7 +194,6 @@ neural network with parameters <code>pars</code> given the input <code>input</co
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

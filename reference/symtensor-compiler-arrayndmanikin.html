@@ -56,15 +56,196 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '449', 449)" onmouseover="showTip(event, '449', 449)">
-            externalC storage shape
+          <code onmouseout="hideTip(event, '508', 508)" onmouseover="showTip(event, '508', 508)">
+            addrInBytes idx ary
           </code>
-          <div class="tip" id="449">
-            <strong>Signature:</strong> storage:MemManikinT -&gt; shape:int list -&gt; ArrayNDManikinT<br />
+          <div class="tip" id="508">
+            <strong>Signature:</strong> idx:int64 list -&gt; ary:ArrayNDManikinT -&gt; int64<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L92-92" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L307-307" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>address of given element in bytes (relative to start of array)</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '509', 509)" onmouseover="showTip(event, '509', 509)">
+            broadcastTo shp a
+          </code>
+          <div class="tip" id="509">
+            <strong>Signature:</strong> shp:int64 list -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L279-279" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>broadcasts the tensor to the given shape</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '510', 510)" onmouseover="showTip(event, '510', 510)">
+            canBeBlasTarget ary
+          </code>
+          <div class="tip" id="510">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L315-315" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>True if array can be target of BLAS operation.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '511', 511)" onmouseover="showTip(event, '511', 511)">
+            canReshapeView shp a
+          </code>
+          <div class="tip" id="511">
+            <strong>Signature:</strong> shp:int64 list -&gt; a:ArrayNDManikinT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L230-230" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns true if the tensor can be reshaped without copying.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '512', 512)" onmouseover="showTip(event, '512', 512)">
+            cppType a
+          </code>
+          <div class="tip" id="512">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; string<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L266-266" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>C++ type string</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '513', 513)" onmouseover="showTip(event, '513', 513)">
+            cutLeft a
+          </code>
+          <div class="tip" id="513">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L254-254" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>removes the first dimension from the tensor</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '514', 514)" onmouseover="showTip(event, '514', 514)">
+            cutRight a
+          </code>
+          <div class="tip" id="514">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L258-258" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>removes the last dimension from the tensor</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '515', 515)" onmouseover="showTip(event, '515', 515)">
+            diagAxis ax1 ax2 a
+          </code>
+          <div class="tip" id="515">
+            <strong>Signature:</strong> ax1:int -&gt; ax2:int -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L275-275" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns a view of the diagonal along the given axes.
+The diagonal replaces the first axis and the second axis is removed.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '516', 516)" onmouseover="showTip(event, '516', 516)">
+            external storage shape stride
+          </code>
+          <div class="tip" id="516">
+            <strong>Signature:</strong> storage:MemManikinT -&gt; shape:int64 list -&gt; stride:int64 list -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L174-174" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>creates a new ArrayNDManikinT with specified strides and using the specified storage</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '517', 517)" onmouseover="showTip(event, '517', 517)">
+            externalC storage shape
+          </code>
+          <div class="tip" id="517">
+            <strong>Signature:</strong> storage:MemManikinT -&gt; shape:int64 list -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L169-169" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -76,19 +257,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '450', 450)" onmouseover="showTip(event, '450', 450)">
-            newC memAllocator typ shape
+          <code onmouseout="hideTip(event, '518', 518)" onmouseover="showTip(event, '518', 518)">
+            insertAxis ax a
           </code>
-          <div class="tip" id="450">
-            <strong>Signature:</strong> memAllocator:(&#39;a -&gt; int -&gt; MemManikinT) -&gt; typ:&#39;a -&gt; shape:int list -&gt; ArrayNDManikinT<br />
-                          <strong>Type parameters:</strong> 'a          </div>
+          <div class="tip" id="518">
+            <strong>Signature:</strong> ax:int -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L80-80" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L250-250" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>creates a new MemoryManikinT and a new ArrayNDManikinT with contiguous layout</p>
+          <p>Inserts an axis of size 1 before the specified position.</p>
 
 
         </td>
@@ -96,19 +277,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '451', 451)" onmouseover="showTip(event, '451', 451)">
-            newF memAllocator typ shape
+          <code onmouseout="hideTip(event, '519', 519)" onmouseover="showTip(event, '519', 519)">
+            isBroadcasted a
           </code>
-          <div class="tip" id="451">
-            <strong>Signature:</strong> memAllocator:(&#39;a -&gt; int -&gt; MemManikinT) -&gt; typ:&#39;a -&gt; shape:int list -&gt; ArrayNDManikinT<br />
-                          <strong>Type parameters:</strong> 'a          </div>
+          <div class="tip" id="519">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; bool<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L86-86" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L283-283" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran layout</p>
+          <p>returns true if at least one dimension is broadcasted</p>
 
 
         </td>
@@ -116,15 +297,243 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '452', 452)" onmouseover="showTip(event, '452', 452)">
-            offsetInBytes ary
+          <code onmouseout="hideTip(event, '520', 520)" onmouseover="showTip(event, '520', 520)">
+            isC ary
           </code>
-          <div class="tip" id="452">
+          <div class="tip" id="520">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L199-199" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '521', 521)" onmouseover="showTip(event, '521', 521)">
+            isF ary
+          </code>
+          <div class="tip" id="521">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L202-202" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '522', 522)" onmouseover="showTip(event, '522', 522)">
+            layout ary
+          </code>
+          <div class="tip" id="522">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; TensorLayout<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L178-178" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '523', 523)" onmouseover="showTip(event, '523', 523)">
+            maybeOverlapping a b
+          </code>
+          <div class="tip" id="523">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; b:ArrayNDManikinT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L326-326" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>true if a and b may overlap</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '524', 524)" onmouseover="showTip(event, '524', 524)">
+            nDims ary
+          </code>
+          <div class="tip" id="524">
             <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L109-109" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L184-184" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '525', 525)" onmouseover="showTip(event, '525', 525)">
+            nElems ary
+          </code>
+          <div class="tip" id="525">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L187-187" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '526', 526)" onmouseover="showTip(event, '526', 526)">
+            newBlasTarget memAllocator typ shape
+          </code>
+          <div class="tip" id="526">
+            <strong>Signature:</strong> memAllocator:(&#39;?177455 -&gt; int64 -&gt; MemAllocKindT -&gt; MemManikinT) -&gt; typ:&#39;?177455 -&gt; shape:int64 list -&gt; ArrayNDManikinT<br />
+                          <strong>Type parameters:</strong> '?177455          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L150-150" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>create a new MemoryManikinT and a new ArrayNDManikinT with layout suitable for being a BLAS target</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '527', 527)" onmouseover="showTip(event, '527', 527)">
+            newC memAllocator typ shape
+          </code>
+          <div class="tip" id="527">
+            <strong>Signature:</strong> memAllocator:(&#39;?177449 -&gt; int64 -&gt; MemAllocKindT -&gt; MemManikinT) -&gt; typ:&#39;?177449 -&gt; shape:int64 list -&gt; ArrayNDManikinT<br />
+                          <strong>Type parameters:</strong> '?177449          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L135-135" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>creates a new MemoryManikinT and a new ArrayNDManikinT with C-order</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '528', 528)" onmouseover="showTip(event, '528', 528)">
+            newF memAllocator typ shape
+          </code>
+          <div class="tip" id="528">
+            <strong>Signature:</strong> memAllocator:(&#39;?177451 -&gt; int64 -&gt; MemAllocKindT -&gt; MemManikinT) -&gt; typ:&#39;?177451 -&gt; shape:int64 list -&gt; ArrayNDManikinT<br />
+                          <strong>Type parameters:</strong> '?177451          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L140-140" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>creates a new MemoryManikinT and a new ArrayNDManikinT with Fortran-order</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '529', 529)" onmouseover="showTip(event, '529', 529)">
+            newOrdered (...)
+          </code>
+          <div class="tip" id="529">
+            <strong>Signature:</strong> memAllocator:(&#39;?177453 -&gt; int64 -&gt; MemAllocKindT -&gt; MemManikinT) -&gt; typ:&#39;?177453 -&gt; shape:int64 list -&gt; strideOrder:int list -&gt; ArrayNDManikinT<br />
+                          <strong>Type parameters:</strong> '?177453          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L145-145" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>creates a new MemoryManikinT and a new ArrayNDManikinT with specifed stride order</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '530', 530)" onmouseover="showTip(event, '530', 530)">
+            newZero typ shape
+          </code>
+          <div class="tip" id="530">
+            <strong>Signature:</strong> typ:TypeNameT -&gt; shape:int64 list -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L130-130" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>creates a new ArrayNDManikinT using no storage</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '531', 531)" onmouseover="showTip(event, '531', 531)">
+            offset ary
+          </code>
+          <div class="tip" id="531">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L193-193" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '532', 532)" onmouseover="showTip(event, '532', 532)">
+            offsetInBytes ary
+          </code>
+          <div class="tip" id="532">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L303-303" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -136,15 +545,175 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '453', 453)" onmouseover="showTip(event, '453', 453)">
-            sizeInBytes ary
+          <code onmouseout="hideTip(event, '533', 533)" onmouseover="showTip(event, '533', 533)">
+            padLeft a
           </code>
-          <div class="tip" id="453">
-            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int<br />
+          <div class="tip" id="533">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L113-113" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L242-242" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>inserts a broadcastable dimension of size one as first dimension</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '534', 534)" onmouseover="showTip(event, '534', 534)">
+            padRight a
+          </code>
+          <div class="tip" id="534">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L246-246" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>appends a broadcastable dimension of size one as last dimension</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '535', 535)" onmouseover="showTip(event, '535', 535)">
+            permuteAxes permut a
+          </code>
+          <div class="tip" id="535">
+            <strong>Signature:</strong> permut:int list -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L238-238" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Permutes the axes as specified.
+Each entry in the specified permutation specifies the new position of
+the corresponding axis, i.e. to which position the axis should move.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '536', 536)" onmouseover="showTip(event, '536', 536)">
+            range rng a
+          </code>
+          <div class="tip" id="536">
+            <strong>Signature:</strong> rng:TensorRng list -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L206-206" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>a view of the specified tensor over the given range</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '537', 537)" onmouseover="showTip(event, '537', 537)">
+            relayout newLayout ary
+          </code>
+          <div class="tip" id="537">
+            <strong>Signature:</strong> newLayout:TensorLayout -&gt; ary:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L196-196" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '538', 538)" onmouseover="showTip(event, '538', 538)">
+            reshapeView shp a
+          </code>
+          <div class="tip" id="538">
+            <strong>Signature:</strong> shp:int64 list -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L220-220" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Tries to reshape the tensor without copying.
+For this to succeed, the tensor must have row-major layout.
+If this a reshape without copying is impossible, an error is raised.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '539', 539)" onmouseover="showTip(event, '539', 539)">
+            reverseAxis ax a
+          </code>
+          <div class="tip" id="539">
+            <strong>Signature:</strong> ax:int -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L270-270" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Reverses the elements in the specified dimension.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '540', 540)" onmouseover="showTip(event, '540', 540)">
+            shape ary
+          </code>
+          <div class="tip" id="540">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64 list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L181-181" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '541', 541)" onmouseover="showTip(event, '541', 541)">
+            sizeInBytes ary
+          </code>
+          <div class="tip" id="541">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L311-311" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -156,15 +725,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '454', 454)" onmouseover="showTip(event, '454', 454)">
+          <code onmouseout="hideTip(event, '542', 542)" onmouseover="showTip(event, '542', 542)">
             storage ary
           </code>
-          <div class="tip" id="454">
+          <div class="tip" id="542">
             <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; MemManikinT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L97-97" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L287-287" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -176,15 +745,75 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '455', 455)" onmouseover="showTip(event, '455', 455)">
+          <code onmouseout="hideTip(event, '543', 543)" onmouseover="showTip(event, '543', 543)">
+            stride ary
+          </code>
+          <div class="tip" id="543">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64 list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L190-190" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '544', 544)" onmouseover="showTip(event, '544', 544)">
+            transpose a
+          </code>
+          <div class="tip" id="544">
+            <strong>Signature:</strong> a:ArrayNDManikinT -&gt; ArrayNDManikinT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L262-262" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>transpose</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '545', 545)" onmouseover="showTip(event, '545', 545)">
+            tryReshapeView shp a
+          </code>
+          <div class="tip" id="545">
+            <strong>Signature:</strong> shp:int64 list -&gt; a:ArrayNDManikinT -&gt; ArrayNDManikinT option<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L212-212" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Tries to reshape the tensor without copying.
+For this to succeed, the tensor must have row-major layout.
+If this a reshape without copying is impossible, None is returned.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '546', 546)" onmouseover="showTip(event, '546', 546)">
             typeName ary
           </code>
-          <div class="tip" id="455">
+          <div class="tip" id="546">
             <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; TypeNameT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L101-101" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L291-291" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -196,19 +825,39 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '456', 456)" onmouseover="showTip(event, '456', 456)">
+          <code onmouseout="hideTip(event, '547', 547)" onmouseover="showTip(event, '547', 547)">
             typeSize ary
           </code>
-          <div class="tip" id="456">
+          <div class="tip" id="547">
             <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ArrayNDManikin.fs#L105-105" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L295-295" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>size of the used data type</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '548', 548)" onmouseover="showTip(event, '548', 548)">
+            typeSize64 ary
+          </code>
+          <div class="tip" id="548">
+            <strong>Signature:</strong> ary:ArrayNDManikinT -&gt; int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ArrayNDManikin.fs#L299-299" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>size of the used data type as int64</p>
 
 
         </td>
@@ -239,7 +888,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

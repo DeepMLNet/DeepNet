@@ -55,7 +55,7 @@
     <tbody>
         <tr>
           <td class="type-name">
-            <a href="symtensor-compiler-execunit-collection-1.html">Collection<'e></a>
+            <a href="symtensor-compiler-execunit-collection.html">Collection</a>
           </td>
           <td class="xmldoc"><p>a collection of ExecUnits</p>
 
@@ -75,56 +75,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '457', 457)" onmouseover="showTip(event, '457', 457)">
-            buildLastStorageAccess coll
-          </code>
-          <div class="tip" id="457">
-            <strong>Signature:</strong> coll:Collection&lt;&#39;e&gt; -&gt; Map&lt;MemManikinT,Set&lt;ExecUnitIdT&gt;&gt;<br />
-                          <strong>Type parameters:</strong> 'e          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ExecUnit.fs#L200-200" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Builds a map that for every storage contains a set of the ids of the ExecUnits
-that will access it last during execution.</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '458', 458)" onmouseover="showTip(event, '458', 458)">
-            buildRerunAfter execUnits
-          </code>
-          <div class="tip" id="458">
-            <strong>Signature:</strong> execUnits:seq&lt;ExecUnitT&lt;&#39;?183829&gt;&gt; -&gt; ExecUnitT&lt;&#39;?183829&gt; list<br />
-                          <strong>Type parameters:</strong> '?183829          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ExecUnit.fs#L260-260" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Builds the rerun-after dependencies for the ExecUnits.</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '459', 459)" onmouseover="showTip(event, '459', 459)">
+          <code onmouseout="hideTip(event, '549', 549)" onmouseover="showTip(event, '549', 549)">
             exprToExecUnits gen expr
           </code>
-          <div class="tip" id="459">
-            <strong>Signature:</strong> gen:ExecUnitsGeneratorT&lt;&#39;a&gt; -&gt; expr:UExprT -&gt; ExecUnitT&lt;&#39;a&gt; list * EvalResultT option * MemAllocManikinT list * &#39;a list<br />
-                          <strong>Type parameters:</strong> 'a          </div>
+          <div class="tip" id="549">
+            <strong>Signature:</strong> gen:ExecUnitsGeneratorT -&gt; expr:UExprT -&gt; ExecUnitsForExprT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/ExecUnit.fs#L425-425" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ExecUnit.fs#L288-288" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -159,7 +118,6 @@ that will access it last during execution.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

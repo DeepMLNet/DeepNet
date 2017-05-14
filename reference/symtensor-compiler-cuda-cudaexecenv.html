@@ -56,15 +56,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '474', 474)" onmouseover="showTip(event, '474', 474)">
+          <code onmouseout="hideTip(event, '575', 575)" onmouseover="showTip(event, '575', 575)">
             getArrayNDForManikin env manikin
           </code>
-          <div class="tip" id="474">
-            <strong>Signature:</strong> env:CudaExecEnvT -&gt; manikin:ArrayNDManikinT -&gt; IArrayNDCudaT<br />
+          <div class="tip" id="575">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; manikin:ArrayNDManikinT -&gt; ITensor<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L134-134" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L240-240" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -76,15 +76,35 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '475', 475)" onmouseover="showTip(event, '475', 475)">
-            getDevMemForManikin env manikin
+          <code onmouseout="hideTip(event, '576', 576)" onmouseover="showTip(event, '576', 576)">
+            getDevMem env memManikin
           </code>
-          <div class="tip" id="475">
-            <strong>Signature:</strong> env:CudaExecEnvT -&gt; manikin:ArrayNDManikinT -&gt; CudaDeviceVariable&lt;byte&gt; * int<br />
+          <div class="tip" id="576">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; memManikin:MemManikinT -&gt; CudaDeviceVariable&lt;byte&gt; * int64<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L111-111" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L209-209" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Gets device memory and offset in bytes for an internal allocation or external reference.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '577', 577)" onmouseover="showTip(event, '577', 577)">
+            getDevMemForManikin env manikin
+          </code>
+          <div class="tip" id="577">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; manikin:ArrayNDManikinT -&gt; CudaDeviceVariable&lt;byte&gt; * int64<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L223-223" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -96,19 +116,79 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '476', 476)" onmouseover="showTip(event, '476', 476)">
+          <code onmouseout="hideTip(event, '578', 578)" onmouseover="showTip(event, '578', 578)">
+            getHostRegMem env memManikin
+          </code>
+          <div class="tip" id="578">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; memManikin:MemManikinT -&gt; RegHostMemT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L203-203" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Gets allocated host memory.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '579', 579)" onmouseover="showTip(event, '579', 579)">
             getHostRegMemForManikin env manikin
           </code>
-          <div class="tip" id="476">
+          <div class="tip" id="579">
             <strong>Signature:</strong> env:CudaExecEnvT -&gt; manikin:ArrayNDManikinT -&gt; CudaRegisteredHostMemory&lt;byte&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L121-121" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L227-227" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>gets host memory for an external reference</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '580', 580)" onmouseover="showTip(event, '580', 580)">
+            getSubworkspace env ws
+          </code>
+          <div class="tip" id="580">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; ws:SubWorkspaceT -&gt; ICudaExprWorkspace<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L252-252" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets a sub-workspace</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '581', 581)" onmouseover="showTip(event, '581', 581)">
+            getTextureObj env tex
+          </code>
+          <div class="tip" id="581">
+            <strong>Signature:</strong> env:CudaExecEnvT -&gt; tex:TextureObjectT -&gt; CudaTexObject<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L248-248" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets a CudaTexObject</p>
 
 
         </td>
@@ -139,7 +219,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

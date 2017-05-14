@@ -56,15 +56,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '328', 328)" onmouseover="showTip(event, '328', 328)">
+          <code onmouseout="hideTip(event, '338', 338)" onmouseover="showTip(event, '338', 338)">
             debug 
           </code>
-          <div class="tip" id="328">
+          <div class="tip" id="338">
             <strong>Signature:</strong> bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L17-17" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L16-16" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -76,39 +76,20 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '329', 329)" onmouseover="showTip(event, '329', 329)">
-            eval evalEnv expr
+          <code onmouseout="hideTip(event, '339', 339)" onmouseover="showTip(event, '339', 339)">
+            evalUExpr evalEnv uExpr
           </code>
-          <div class="tip" id="329">
-            <strong>Signature:</strong> evalEnv:EvalEnvT -&gt; expr:ExprT&lt;&#39;T&gt; -&gt; ArrayNDHostT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L20-20" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>evaluate expression to numeric array</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '330', 330)" onmouseover="showTip(event, '330', 330)">
-            evalUExpr evalEnv arg2
-          </code>
-          <div class="tip" id="330">
-            <strong>Signature:</strong> evalEnv:EvalEnvT -&gt; UExprT -&gt; IArrayNDT<br />
+          <div class="tip" id="339">
+            <strong>Signature:</strong> evalEnv:EvalEnvT -&gt; uExpr:UExprT -&gt; ITensor<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L107-107" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L263-263" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>evaluates a unified expression</p>
+          <p>Evaluates a unified expression.
+This is done by evaluating the generating expression.</p>
 
 
         </td>
@@ -116,19 +97,20 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '331', 331)" onmouseover="showTip(event, '331', 331)">
+          <code onmouseout="hideTip(event, '340', 340)" onmouseover="showTip(event, '340', 340)">
             evalUExprs evalEnv uexprs
           </code>
-          <div class="tip" id="331">
-            <strong>Signature:</strong> evalEnv:EvalEnvT -&gt; uexprs:UExprT list -&gt; IArrayNDT list<br />
+          <div class="tip" id="340">
+            <strong>Signature:</strong> evalEnv:EvalEnvT -&gt; uexprs:UExprT list -&gt; ITensor list<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L118-118" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/HostEval.fs#L269-269" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>evaluates all unified expressions</p>
+          <p>Evaluates the specified unified expressions.
+This is done by evaluating the generating expressions.</p>
 
 
         </td>
@@ -159,7 +141,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

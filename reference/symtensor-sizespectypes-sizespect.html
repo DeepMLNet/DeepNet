@@ -56,61 +56,55 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1163', 1163)" onmouseover="showTip(event, '1163', 1163)">
+          <code onmouseout="hideTip(event, '1605', 1605)" onmouseover="showTip(event, '1605', 1605)">
             Base(BaseSizeT)
           </code>
-          <div class="tip" id="1163">
+          <div class="tip" id="1605">
             <strong>Signature:</strong> BaseSizeT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L187-187" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L310-310" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>fixed size or symbol</p>
-
-
+          
         </td>
       </tr>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1164', 1164)" onmouseover="showTip(event, '1164', 1164)">
+          <code onmouseout="hideTip(event, '1606', 1606)" onmouseover="showTip(event, '1606', 1606)">
             Broadcast
           </code>
-          <div class="tip" id="1164">
+          <div class="tip" id="1606">
             <strong>Signature:</strong> <br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L189-189" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L311-311" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>size 1 and broadcastable</p>
-
-
+          
         </td>
       </tr>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1165', 1165)" onmouseover="showTip(event, '1165', 1165)">
+          <code onmouseout="hideTip(event, '1607', 1607)" onmouseover="showTip(event, '1607', 1607)">
             Multinom(SizeMultinomT)
           </code>
-          <div class="tip" id="1165">
+          <div class="tip" id="1607">
             <strong>Signature:</strong> SizeMultinomT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L191-191" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L312-312" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>product of fixed sizes and symbols</p>
-
-
+          
         </td>
       </tr>
     </tbody>
@@ -124,20 +118,61 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1166', 1166)" onmouseover="showTip(event, '1166', 1166)">
-            PrettyString
+          <code onmouseout="hideTip(event, '1608', 1608)" onmouseover="showTip(event, '1608', 1608)">
+            ContainedSizeSymbols
           </code>
-          <div class="tip" id="1166">
+          <div class="tip" id="1608">
+            <strong>Signature:</strong> Set&lt;SizeSymbolT&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L402-402" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the set of all contained SizeSymbols</p>
+
+
+              <p>CompiledName: <code>get_ContainedSizeSymbols</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1609', 1609)" onmouseover="showTip(event, '1609', 1609)">
+            ContainsSymbol(sym)
+          </code>
+          <div class="tip" id="1609">
+            <strong>Signature:</strong> sym:SizeSymbolT -&gt; bool<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L410-410" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>true if the specified SizeSymbol occurs in this SizeSpec</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1610', 1610)" onmouseover="showTip(event, '1610', 1610)">
+            Pretty
+          </code>
+          <div class="tip" id="1610">
             <strong>Signature:</strong> string<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L269-269" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L413-413" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           
-              <p>CompiledName: <code>get_PrettyString</code></p>
+              <p>CompiledName: <code>get_Pretty</code></p>
         </td>
       </tr>
     </tbody>
@@ -151,15 +186,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1167', 1167)" onmouseover="showTip(event, '1167', 1167)">
+          <code onmouseout="hideTip(event, '1611', 1611)" onmouseover="showTip(event, '1611', 1611)">
             ( - )(ssa, ssb)
           </code>
-          <div class="tip" id="1167">
-            <strong>Signature:</strong> (ssa:int * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+          <div class="tip" id="1611">
+            <strong>Signature:</strong> (ssa:int64 * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L252-252" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L384-384" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -170,15 +205,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1168', 1168)" onmouseover="showTip(event, '1168', 1168)">
+          <code onmouseout="hideTip(event, '1612', 1612)" onmouseover="showTip(event, '1612', 1612)">
             ( - )(ssa, ssb)
           </code>
-          <div class="tip" id="1168">
-            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int) -&gt; SizeSpecT<br />
+          <div class="tip" id="1612">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int64) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L251-251" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L383-383" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -189,15 +224,53 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1169', 1169)" onmouseover="showTip(event, '1169', 1169)">
+          <code onmouseout="hideTip(event, '1613', 1613)" onmouseover="showTip(event, '1613', 1613)">
             ( - )(ssa, ssb)
           </code>
-          <div class="tip" id="1169">
+          <div class="tip" id="1613">
+            <strong>Signature:</strong> (ssa:FracT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L376-376" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Subtraction</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1614', 1614)" onmouseover="showTip(event, '1614', 1614)">
+            ( - )(ssa, ssb)
+          </code>
+          <div class="tip" id="1614">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:FracT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L375-375" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Subtraction</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1615', 1615)" onmouseover="showTip(event, '1615', 1615)">
+            ( - )(ssa, ssb)
+          </code>
+          <div class="tip" id="1615">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L220-220" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L344-344" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -208,15 +281,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1170', 1170)" onmouseover="showTip(event, '1170', 1170)">
+          <code onmouseout="hideTip(event, '1616', 1616)" onmouseover="showTip(event, '1616', 1616)">
             ( %= )(ssa, ssb)
           </code>
-          <div class="tip" id="1170">
+          <div class="tip" id="1616">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L257-257" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L389-389" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -229,15 +302,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1171', 1171)" onmouseover="showTip(event, '1171', 1171)">
+          <code onmouseout="hideTip(event, '1617', 1617)" onmouseover="showTip(event, '1617', 1617)">
             ( * )(ssa, ssb)
           </code>
-          <div class="tip" id="1171">
-            <strong>Signature:</strong> (ssa:int * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+          <div class="tip" id="1617">
+            <strong>Signature:</strong> (ssa:int64 * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L254-254" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L386-386" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -248,15 +321,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1172', 1172)" onmouseover="showTip(event, '1172', 1172)">
+          <code onmouseout="hideTip(event, '1618', 1618)" onmouseover="showTip(event, '1618', 1618)">
             ( * )(ssa, ssb)
           </code>
-          <div class="tip" id="1172">
-            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int) -&gt; SizeSpecT<br />
+          <div class="tip" id="1618">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int64) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L253-253" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L385-385" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -267,15 +340,53 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1173', 1173)" onmouseover="showTip(event, '1173', 1173)">
+          <code onmouseout="hideTip(event, '1619', 1619)" onmouseover="showTip(event, '1619', 1619)">
             ( * )(ssa, ssb)
           </code>
-          <div class="tip" id="1173">
+          <div class="tip" id="1619">
+            <strong>Signature:</strong> (ssa:FracT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L378-378" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Multiply</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1620', 1620)" onmouseover="showTip(event, '1620', 1620)">
+            ( * )(ssa, ssb)
+          </code>
+          <div class="tip" id="1620">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:FracT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L377-377" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Multiply</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1621', 1621)" onmouseover="showTip(event, '1621', 1621)">
+            ( * )(ssa, ssb)
+          </code>
+          <div class="tip" id="1621">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L223-223" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L347-347" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -286,15 +397,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1174', 1174)" onmouseover="showTip(event, '1174', 1174)">
+          <code onmouseout="hideTip(event, '1622', 1622)" onmouseover="showTip(event, '1622', 1622)">
             ( .&lt;&gt; )(ssa, ssb)
           </code>
-          <div class="tip" id="1174">
+          <div class="tip" id="1622">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L267-267" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L399-399" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -307,15 +418,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1175', 1175)" onmouseover="showTip(event, '1175', 1175)">
+          <code onmouseout="hideTip(event, '1623', 1623)" onmouseover="showTip(event, '1623', 1623)">
             ( .= )(ssa, ssb)
           </code>
-          <div class="tip" id="1175">
+          <div class="tip" id="1623">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L261-261" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L393-393" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -328,15 +439,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1176', 1176)" onmouseover="showTip(event, '1176', 1176)">
+          <code onmouseout="hideTip(event, '1624', 1624)" onmouseover="showTip(event, '1624', 1624)">
             ( ~- )(ssa)
           </code>
-          <div class="tip" id="1176">
+          <div class="tip" id="1624">
             <strong>Signature:</strong> ssa:SizeSpecT -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L203-203" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L327-327" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -347,15 +458,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1177', 1177)" onmouseover="showTip(event, '1177', 1177)">
+          <code onmouseout="hideTip(event, '1625', 1625)" onmouseover="showTip(event, '1625', 1625)">
             ( + )(ssa, ssb)
           </code>
-          <div class="tip" id="1177">
-            <strong>Signature:</strong> (ssa:int * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+          <div class="tip" id="1625">
+            <strong>Signature:</strong> (ssa:int64 * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L250-250" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L382-382" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -366,15 +477,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1178', 1178)" onmouseover="showTip(event, '1178', 1178)">
+          <code onmouseout="hideTip(event, '1626', 1626)" onmouseover="showTip(event, '1626', 1626)">
             ( + )(ssa, ssb)
           </code>
-          <div class="tip" id="1178">
-            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int) -&gt; SizeSpecT<br />
+          <div class="tip" id="1626">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:int64) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L249-249" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L381-381" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -385,15 +496,53 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1179', 1179)" onmouseover="showTip(event, '1179', 1179)">
+          <code onmouseout="hideTip(event, '1627', 1627)" onmouseover="showTip(event, '1627', 1627)">
             ( + )(ssa, ssb)
           </code>
-          <div class="tip" id="1179">
+          <div class="tip" id="1627">
+            <strong>Signature:</strong> (ssa:FracT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L374-374" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Addition</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1628', 1628)" onmouseover="showTip(event, '1628', 1628)">
+            ( + )(ssa, ssb)
+          </code>
+          <div class="tip" id="1628">
+            <strong>Signature:</strong> (ssa:SizeSpecT * ssb:FracT) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L373-373" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_Addition</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1629', 1629)" onmouseover="showTip(event, '1629', 1629)">
+            ( + )(ssa, ssb)
+          </code>
+          <div class="tip" id="1629">
             <strong>Signature:</strong> (ssa:SizeSpecT * ssb:SizeSpecT) -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L211-211" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L335-335" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -404,15 +553,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1180', 1180)" onmouseover="showTip(event, '1180', 1180)">
-            Pow(ssa, pow)
+          <code onmouseout="hideTip(event, '1630', 1630)" onmouseover="showTip(event, '1630', 1630)">
+            get_Zero()
           </code>
-          <div class="tip" id="1180">
-            <strong>Signature:</strong> (ssa:SizeSpecT * pow:int) -&gt; SizeSpecT<br />
+          <div class="tip" id="1630">
+            <strong>Signature:</strong> unit -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L232-232" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L325-325" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -422,15 +571,33 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1181', 1181)" onmouseover="showTip(event, '1181', 1181)">
+          <code onmouseout="hideTip(event, '1631', 1631)" onmouseover="showTip(event, '1631', 1631)">
+            Pow(ssa, pow)
+          </code>
+          <div class="tip" id="1631">
+            <strong>Signature:</strong> (ssa:SizeSpecT * pow:int64) -&gt; SizeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L356-356" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1632', 1632)" onmouseover="showTip(event, '1632', 1632)">
             Simplify(ss)
           </code>
-          <div class="tip" id="1181">
+          <div class="tip" id="1632">
             <strong>Signature:</strong> ss:SizeSpecT -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L194-194" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L315-315" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -465,7 +632,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

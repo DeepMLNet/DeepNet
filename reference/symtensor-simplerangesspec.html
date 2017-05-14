@@ -56,15 +56,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '366', 366)" onmouseover="showTip(event, '366', 366)">
+          <code onmouseout="hideTip(event, '404', 404)" onmouseover="showTip(event, '404', 404)">
             canEvalSymbols rs
           </code>
-          <div class="tip" id="366">
-            <strong>Signature:</strong> rs:SimpleRangeSpecT&lt;&#39;a&gt; list -&gt; bool<br />
-                          <strong>Type parameters:</strong> 'a          </div>
+          <div class="tip" id="404">
+            <strong>Signature:</strong> rs:SimpleRangeSpecT&lt;&#39;b&gt; list -&gt; bool<br />
+                          <strong>Type parameters:</strong> 'b          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L547-547" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L913-913" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -74,15 +74,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '367', 367)" onmouseover="showTip(event, '367', 367)">
+          <code onmouseout="hideTip(event, '405', 405)" onmouseover="showTip(event, '405', 405)">
             eval dynEvaluator rs
           </code>
-          <div class="tip" id="367">
-            <strong>Signature:</strong> dynEvaluator:(&#39;a -&gt; int) -&gt; rs:SimpleRangeSpecT&lt;&#39;a&gt; list -&gt; RangeT list<br />
+          <div class="tip" id="405">
+            <strong>Signature:</strong> dynEvaluator:(&#39;a -&gt; int64) -&gt; rs:SimpleRangeSpecT&lt;&#39;a&gt; list -&gt; TensorRng list<br />
                           <strong>Type parameters:</strong> 'a          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L539-539" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L907-907" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -94,19 +94,64 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '368', 368)" onmouseover="showTip(event, '368', 368)">
+          <code onmouseout="hideTip(event, '406', 406)" onmouseover="showTip(event, '406', 406)">
             isDynamic rs
           </code>
-          <div class="tip" id="368">
-            <strong>Signature:</strong> rs:SimpleRangeSpecT&lt;&#39;?182869&gt; list -&gt; bool<br />
-                          <strong>Type parameters:</strong> '?182869          </div>
+          <div class="tip" id="406">
+            <strong>Signature:</strong> rs:SimpleRangeSpecT&lt;&#39;?178914&gt; list -&gt; bool<br />
+                          <strong>Type parameters:</strong> '?178914          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L543-543" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L910-910" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '407', 407)" onmouseover="showTip(event, '407', 407)">
+            toBaseRangesSpec shape rs
+          </code>
+          <div class="tip" id="407">
+            <strong>Signature:</strong> shape:ShapeSpecT -&gt; rs:SimpleRangeSpecT&lt;&#39;a&gt; list -&gt; (SizeSpecT * SizeSpecT) list<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L919-919" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <h3>Active patterns</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Active pattern</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '408', 408)" onmouseover="showTip(event, '408', 408)">
+            ( |Dynamic|Static| ) rs
+          </code>
+          <div class="tip" id="408">
+            <strong>Signature:</strong> rs:SimpleRangeSpecT&lt;&#39;a&gt; list -&gt; Choice&lt;unit,unit&gt;<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/SymShape.fs#L916-916" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>|Dynamic|Static|</code></p>
         </td>
       </tr>
     </tbody>
@@ -135,7 +180,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

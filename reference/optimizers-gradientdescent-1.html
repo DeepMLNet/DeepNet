@@ -53,15 +53,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '918', 918)" onmouseover="showTip(event, '918', 918)">
+          <code onmouseout="hideTip(event, '1080', 1080)" onmouseover="showTip(event, '1080', 1080)">
             new(loss, pars, dev)
           </code>
-          <div class="tip" id="918">
-            <strong>Signature:</strong> (loss:ExprT&lt;&#39;T&gt; * pars:ExprT&lt;&#39;T&gt; * dev:IDevice) -&gt; GradientDescent&lt;&#39;T&gt;<br />
+          <div class="tip" id="1080">
+            <strong>Signature:</strong> (loss:ExprT * pars:ExprT * dev:IDevice) -&gt; GradientDescent&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L21-21" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L28-28" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -80,15 +80,33 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '919', 919)" onmouseover="showTip(event, '919', 919)">
-            Minimize
+          <code onmouseout="hideTip(event, '1081', 1081)" onmouseover="showTip(event, '1081', 1081)">
+            InitialState(cfg parVals)
           </code>
-          <div class="tip" id="919">
-            <strong>Signature:</strong> ExprT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1081">
+            <strong>Signature:</strong> cfg:Cfg&lt;&#39;T&gt; -&gt; parVals:ITensor -&gt; State&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L31-31" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L52-52" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1082', 1082)" onmouseover="showTip(event, '1082', 1082)">
+            Minimize
+          </code>
+          <div class="tip" id="1082">
+            <strong>Signature:</strong> ExprT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L56-56" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -99,15 +117,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '920', 920)" onmouseover="showTip(event, '920', 920)">
+          <code onmouseout="hideTip(event, '1083', 1083)" onmouseover="showTip(event, '1083', 1083)">
             PublishLoc(mb)
           </code>
-          <div class="tip" id="920">
-            <strong>Signature:</strong> mb:ModelInstance&lt;&#39;?182111&gt; -&gt; unit<br />
+          <div class="tip" id="1083">
+            <strong>Signature:</strong> mb:ModelInstance&lt;&#39;?176348&gt; -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L38-38" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L63-63" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -117,15 +135,60 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '921', 921)" onmouseover="showTip(event, '921', 921)">
+          <code onmouseout="hideTip(event, '1084', 1084)" onmouseover="showTip(event, '1084', 1084)">
             Use(f)
           </code>
-          <div class="tip" id="921">
-            <strong>Signature:</strong> (f:(VarEnvT -&gt; &#39;?182108)) -&gt; VarEnvT -&gt; Cfg&lt;&#39;T&gt; -&gt; &#39;?182108<br />
+          <div class="tip" id="1084">
+            <strong>Signature:</strong> (f:(VarEnvT -&gt; &#39;?176345)) -&gt; VarEnvT -&gt; Cfg&lt;&#39;T&gt; -&gt; State&lt;&#39;T&gt; -&gt; &#39;?176345<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L35-35" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L60-60" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <h3>Static members</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Static member</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1085', 1085)" onmouseover="showTip(event, '1085', 1085)">
+            DefaultCfg
+          </code>
+          <div class="tip" id="1085">
+            <strong>Signature:</strong> Cfg&lt;&#39;T&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L48-48" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>get_DefaultCfg</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1086', 1086)" onmouseover="showTip(event, '1086', 1086)">
+            New(loss pars dev)
+          </code>
+          <div class="tip" id="1086">
+            <strong>Signature:</strong> loss:ExprT -&gt; pars:ExprT -&gt; dev:IDevice -&gt; IOptimizer&lt;&#39;T,Cfg&lt;&#39;T&gt;,State&lt;&#39;T&gt;&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLOptimizers/GradientDescent.fs#L45-45" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -158,7 +221,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

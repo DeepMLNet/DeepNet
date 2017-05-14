@@ -47,7 +47,7 @@
 The first dimension of each record field is the sample.
 All record fields must contain the same number of samples.
 The default constructor expects a list of ArrayNDTs corresponding to the fields
-in 'S. The first dimension must be the sample index.
+in 'S.
 To construct a Dataset<_> from a sequence of samples use the
 Dataset<_>.FromSamples method.</p>
 
@@ -61,11 +61,32 @@ Dataset<_>.FromSamples method.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '782', 782)" onmouseover="showTip(event, '782', 782)">
+          <code onmouseout="hideTip(event, '894', 894)" onmouseover="showTip(event, '894', 894)">
             new(fieldStorages)
           </code>
-          <div class="tip" id="782">
-            <strong>Signature:</strong> (fieldStorages:IArrayNDT list) -&gt; Dataset&lt;&#39;S&gt;<br />
+          <div class="tip" id="894">
+            <strong>Signature:</strong> (fieldStorages:ITensor list) -&gt; Dataset&lt;&#39;S&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L58-58" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a non-sequence dataset using the specified field storages.</p>
+
+
+              <p>CompiledName: <code>.ctor</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '895', 895)" onmouseover="showTip(event, '895', 895)">
+            new(fieldStorages, isSeq)
+          </code>
+          <div class="tip" id="895">
+            <strong>Signature:</strong> (fieldStorages:ITensor list * isSeq:bool) -&gt; Dataset&lt;&#39;S&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
@@ -88,15 +109,15 @@ Dataset<_>.FromSamples method.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '783', 783)" onmouseover="showTip(event, '783', 783)">
+          <code onmouseout="hideTip(event, '896', 896)" onmouseover="showTip(event, '896', 896)">
             All
           </code>
-          <div class="tip" id="783">
+          <div class="tip" id="896">
             <strong>Signature:</strong> &#39;S<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L80-80" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L139-139" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -109,15 +130,15 @@ Dataset<_>.FromSamples method.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '784', 784)" onmouseover="showTip(event, '784', 784)">
+          <code onmouseout="hideTip(event, '897', 897)" onmouseover="showTip(event, '897', 897)">
             Batches(batchSize)
           </code>
-          <div class="tip" id="784">
-            <strong>Signature:</strong> batchSize:int -&gt; seq&lt;&#39;S&gt;<br />
+          <div class="tip" id="897">
+            <strong>Signature:</strong> batchSize:int64 -&gt; seq&lt;&#39;S&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L132-132" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L239-239" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -131,15 +152,57 @@ the last batch will be smaller.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '785', 785)" onmouseover="showTip(event, '785', 785)">
-            GetSlice(start, stop)
+          <code onmouseout="hideTip(event, '898', 898)" onmouseover="showTip(event, '898', 898)">
+            FieldStorages
           </code>
-          <div class="tip" id="785">
-            <strong>Signature:</strong> (start:int option * stop:int option) -&gt; &#39;S<br />
+          <div class="tip" id="898">
+            <strong>Signature:</strong> ITensor list<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L72-72" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L160-160" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>list of arrays corresponding to the data of each field in the sample record</p>
+
+
+              <p>CompiledName: <code>get_FieldStorages</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '899', 899)" onmouseover="showTip(event, '899', 899)">
+            GetSlice(...)
+          </code>
+          <div class="tip" id="899">
+            <strong>Signature:</strong> (startSmpl:int64 option * stopSmpl:int64 option * startStep:int64 option * stopStep:int64 option) -&gt; &#39;S<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L129-129" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>For a sequence dataset,
+returns a record of type 'S containing a slice of samples and slots.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '900', 900)" onmouseover="showTip(event, '900', 900)">
+            GetSlice(start, stop)
+          </code>
+          <div class="tip" id="900">
+            <strong>Signature:</strong> (start:int64 option * stop:int64 option) -&gt; &#39;S<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L121-121" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -151,15 +214,36 @@ the last batch will be smaller.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '786', 786)" onmouseover="showTip(event, '786', 786)">
-            [smpl]
+          <code onmouseout="hideTip(event, '901', 901)" onmouseover="showTip(event, '901', 901)">
+            IsSeq
           </code>
-          <div class="tip" id="786">
-            <strong>Signature:</strong> smpl:int -&gt; &#39;S<br />
+          <div class="tip" id="901">
+            <strong>Signature:</strong> bool<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L65-65" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L157-157" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>true if this is a sequence dataset</p>
+
+
+              <p>CompiledName: <code>get_IsSeq</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '902', 902)" onmouseover="showTip(event, '902', 902)">
+            [smpl]
+          </code>
+          <div class="tip" id="902">
+            <strong>Signature:</strong> smpl:int64 -&gt; &#39;S<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L104-104" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -172,15 +256,37 @@ the last batch will be smaller.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '787', 787)" onmouseover="showTip(event, '787', 787)">
-            Location
+          <code onmouseout="hideTip(event, '903', 903)" onmouseover="showTip(event, '903', 903)">
+            [smpl, step]
           </code>
-          <div class="tip" id="787">
-            <strong>Signature:</strong> ArrayLocT<br />
+          <div class="tip" id="903">
+            <strong>Signature:</strong> smpl:int64 * step:int64 -&gt; &#39;S<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L92-92" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L113-113" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>For a sequence dataset,
+returns a record of type 'S containing the sample and slot with the given indices.</p>
+
+
+              <p>CompiledName: <code>get_Item</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '904', 904)" onmouseover="showTip(event, '904', 904)">
+            Location
+          </code>
+          <div class="tip" id="904">
+            <strong>Signature:</strong> ITensorDevice<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L166-166" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -193,35 +299,15 @@ the last batch will be smaller.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '788', 788)" onmouseover="showTip(event, '788', 788)">
-            MapFieldStorage(f)
-          </code>
-          <div class="tip" id="788">
-            <strong>Signature:</strong> (f:(IArrayNDT -&gt; &#39;?181611)) -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L152-152" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>maps the field storages using the given function creating a new dataset</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '789', 789)" onmouseover="showTip(event, '789', 789)">
+          <code onmouseout="hideTip(event, '905', 905)" onmouseover="showTip(event, '905', 905)">
             NSamples
           </code>
-          <div class="tip" id="789">
-            <strong>Signature:</strong> int<br />
+          <div class="tip" id="905">
+            <strong>Signature:</strong> int64<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L86-86" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L151-151" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -234,15 +320,36 @@ the last batch will be smaller.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '790', 790)" onmouseover="showTip(event, '790', 790)">
-            PaddedBatches(batchSize)
+          <code onmouseout="hideTip(event, '906', 906)" onmouseover="showTip(event, '906', 906)">
+            NSteps
           </code>
-          <div class="tip" id="790">
-            <strong>Signature:</strong> batchSize:int -&gt; unit -&gt; seq&lt;&#39;S&gt;<br />
+          <div class="tip" id="906">
+            <strong>Signature:</strong> int64<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L97-97" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L154-154" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>number of steps for sequence dataset</p>
+
+
+              <p>CompiledName: <code>get_NSteps</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '907', 907)" onmouseover="showTip(event, '907', 907)">
+            PaddedBatches(batchSize)
+          </code>
+          <div class="tip" id="907">
+            <strong>Signature:</strong> batchSize:int64 -&gt; unit -&gt; seq&lt;&#39;S&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L171-171" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -256,19 +363,19 @@ the last batch will still have the specified size but is padded with zeros.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '791', 791)" onmouseover="showTip(event, '791', 791)">
-            Partition(ratios)
+          <code onmouseout="hideTip(event, '908', 908)" onmouseover="showTip(event, '908', 908)">
+            Part(start, stop)
           </code>
-          <div class="tip" id="791">
-            <strong>Signature:</strong> (ratios:float list) -&gt; Dataset&lt;&#39;S&gt; list<br />
+          <div class="tip" id="908">
+            <strong>Signature:</strong> (start:int64 * stop:int64) -&gt; Dataset&lt;&#39;S&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L43-43" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L145-145" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Partitions this dataset using the given ratios.</p>
+          <p>Returns a new dataset containing the samples from start to stop.</p>
 
 
         </td>
@@ -276,15 +383,36 @@ the last batch will still have the specified size but is padded with zeros.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '792', 792)" onmouseover="showTip(event, '792', 792)">
+          <code onmouseout="hideTip(event, '909', 909)" onmouseover="showTip(event, '909', 909)">
+            Pretty
+          </code>
+          <div class="tip" id="909">
+            <strong>Signature:</strong> string<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L256-256" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>pretty string</p>
+
+
+              <p>CompiledName: <code>get_Pretty</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '910', 910)" onmouseover="showTip(event, '910', 910)">
             SampleType
           </code>
-          <div class="tip" id="792">
+          <div class="tip" id="910">
             <strong>Signature:</strong> Type<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L89-89" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L163-163" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -297,19 +425,20 @@ the last batch will still have the specified size but is padded with zeros.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '793', 793)" onmouseover="showTip(event, '793', 793)">
+          <code onmouseout="hideTip(event, '911', 911)" onmouseover="showTip(event, '911', 911)">
             Save(filename)
           </code>
-          <div class="tip" id="793">
+          <div class="tip" id="911">
             <strong>Signature:</strong> filename:string -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L174-174" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L276-276" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>saves this dataset into a HDF5 file</p>
+          <p>Saves this dataset into the specified HDF5 file.
+The file is overwritten.</p>
 
 
         </td>
@@ -317,59 +446,61 @@ the last batch will still have the specified size but is padded with zeros.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '794', 794)" onmouseover="showTip(event, '794', 794)">
-            TmplBatch(batchSize)
+          <code onmouseout="hideTip(event, '912', 912)" onmouseover="showTip(event, '912', 912)">
+            Save(hdf, hdfPrefixPath)
           </code>
-          <div class="tip" id="794">
-            <strong>Signature:</strong> batchSize:int -&gt; &#39;S<br />
+          <div class="tip" id="912">
+            <strong>Signature:</strong> (hdf:HDF5 * hdfPrefixPath:string option) -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L148-148" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L266-266" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Saves this dataset into the specified HDF5 file.
+<code>hdfPrefixPath</code> optionally specifies a prefix path within the HDF5 file for the dataset.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '913', 913)" onmouseover="showTip(event, '913', 913)">
+            SlotBatches(batchSize slotSize)
+          </code>
+          <div class="tip" id="913">
+            <strong>Signature:</strong> batchSize:int64 -&gt; slotSize:int64 -&gt; seq&lt;&#39;S&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L244-244" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns a sequence of batches of time slots with size <code>batchSize</code> and <code>slotSize</code>
+respectively of the dataset.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '914', 914)" onmouseover="showTip(event, '914', 914)">
+            TmplBatch(batchSize)
+          </code>
+          <div class="tip" id="914">
+            <strong>Signature:</strong> batchSize:int64 -&gt; &#39;S<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L204-204" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>template batch</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '795', 795)" onmouseover="showTip(event, '795', 795)">
-            ToCuda()
-          </code>
-          <div class="tip" id="795">
-            <strong>Signature:</strong> unit -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L158-158" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>copies this dataset to a CUDA GPU</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '796', 796)" onmouseover="showTip(event, '796', 796)">
-            ToHost()
-          </code>
-          <div class="tip" id="796">
-            <strong>Signature:</strong> unit -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L163-163" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>copies this dataset to the host</p>
 
 
         </td>
@@ -385,44 +516,19 @@ the last batch will still have the specified size but is padded with zeros.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '797', 797)" onmouseover="showTip(event, '797', 797)">
-            FromSamples(samples)
-          </code>
-          <div class="tip" id="797">
-            <strong>Signature:</strong> samples:seq&lt;&#39;S&gt; -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L211-211" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Constructs a dataset from a sequence of samples of record type 'S.
-Each field in 'S must be of type ArrayNDT<_> and the dimensionality of each field
-must be constant over all samples.
-If the shape of a field varies over the samples it is padded (with zeros) to the largest
-shape in the sample sequence.
-The given sequence is enumerated only one time and the data is copied once.</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '798', 798)" onmouseover="showTip(event, '798', 798)">
+          <code onmouseout="hideTip(event, '915', 915)" onmouseover="showTip(event, '915', 915)">
             Load(filename)
           </code>
-          <div class="tip" id="798">
+          <div class="tip" id="915">
             <strong>Signature:</strong> filename:string -&gt; Dataset&lt;&#39;S&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L183-183" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L296-296" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>loads a dataset from a HDF5 file</p>
+          <p>Loads a dataset from the specified HDF5 file.</p>
 
 
         </td>
@@ -430,11 +536,32 @@ The given sequence is enumerated only one time and the data is copied once.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '799', 799)" onmouseover="showTip(event, '799', 799)">
-            Partition(this, ratios)
+          <code onmouseout="hideTip(event, '916', 916)" onmouseover="showTip(event, '916', 916)">
+            Load(hdf, hdfPrefixPath)
           </code>
-          <div class="tip" id="799">
-            <strong>Signature:</strong> (this:Dataset&lt;&#39;S&gt; * ratios:float list) -&gt; Dataset&lt;&#39;S&gt; list<br />
+          <div class="tip" id="916">
+            <strong>Signature:</strong> (hdf:HDF5 * hdfPrefixPath:string option) -&gt; Dataset&lt;&#39;S&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L282-282" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Loads a dataset from the specified HDF5 file.
+<code>hdfPrefixPath</code> optionally specifies a prefix path within the HDF5 file for the dataset.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '917', 917)" onmouseover="showTip(event, '917', 917)">
+            New(samples, isSeq)
+          </code>
+          <div class="tip" id="917">
+            <strong>Signature:</strong> (samples:seq&lt;&#39;S&gt; * isSeq:bool) -&gt; Dataset&lt;&#39;S&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
@@ -442,47 +569,7 @@ The given sequence is enumerated only one time and the data is copied once.</p>
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Partitions this dataset using the given ratios.</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '800', 800)" onmouseover="showTip(event, '800', 800)">
-            ToCuda(this)
-          </code>
-          <div class="tip" id="800">
-            <strong>Signature:</strong> this:Dataset&lt;&#39;S&gt; -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L168-168" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>copies this dataset to a CUDA GPU</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '801', 801)" onmouseover="showTip(event, '801', 801)">
-            ToHost(this)
-          </code>
-          <div class="tip" id="801">
-            <strong>Signature:</strong> this:Dataset&lt;&#39;S&gt; -&gt; Dataset&lt;&#39;S&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLDatasets/Dataset.fs#L171-171" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>copies this dataset to the host</p>
+          <p>Constructs a dataset from samples.</p>
 
 
         </td>
@@ -513,7 +600,6 @@ The given sequence is enumerated only one time and the data is copied once.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

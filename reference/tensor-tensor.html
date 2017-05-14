@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Tensor - Deep.Net</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content=""/>
+    <meta name="author" content="Deep.Net developers"/>
+
+    <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet"/>
+
+    <link type="text/css" rel="stylesheet" href="http://www.deepml.net/content/style.css" />
+    <script type="text/javascript" src="http://www.deepml.net/content/tips.js"></script>
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <![endif]-->
+
+    <script type="text/javascript" async
+              src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://github.com/DeepMLNet/DeepNet">github page</a></li>
+        </ul>
+        <h3 class="muted"><a href="http://www.deepml.net/index.html">Deep.Net</a></h3>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="span9" id="main">
+          
+
+
+
+<h1>Tensor</h1>
+<p>
+  <span>Namespace: Tensor</span><br />
+</p>
+<div class="xmldoc">
+<p>An N-dimensional array with elements of type 'T.</p>
+
+</div>
+  <h3>Static members</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Static member</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2671', 2671)" onmouseover="showTip(event, '2671', 2671)">
+            allFinite(a)
+          </code>
+          <div class="tip" id="2671">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; bool<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2126-2126" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns true if all values in the tensor are finite (not NaN and not infinite).</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2672', 2672)" onmouseover="showTip(event, '2672', 2672)">
+            almostEqual(a b)
+          </code>
+          <div class="tip" id="2672">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; b:Tensor&lt;&#39;T&gt; -&gt; bool<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2122-2122" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns true if two tensors have same (within machine precision) values in all elements.
+If tensors have different shape, then false is returned.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2673', 2673)" onmouseover="showTip(event, '2673', 2673)">
+            almostEqualWithTol(a, b, absTol, relTol)
+          </code>
+          <div class="tip" id="2673">
+            <strong>Signature:</strong> (a:Tensor&lt;&#39;T&gt; * b:Tensor&lt;&#39;T&gt; * absTol:&#39;T option * relTol:&#39;T option) -&gt; bool<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2115-2115" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns true if two tensors have same (within specified precision) values in all elements.
+If tensors have different shape, then false is returned.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2674', 2674)" onmouseover="showTip(event, '2674', 2674)">
+            arange(dev nElems)
+          </code>
+          <div class="tip" id="2674">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; nElems:int64 -&gt; Tensor&lt;int64&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2037-2037" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Int64 vector containing the numbers [0L; 1L; ...; nElems-1L].</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2675', 2675)" onmouseover="showTip(event, '2675', 2675)">
+            bool(a)
+          </code>
+          <div class="tip" id="2675">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182104&gt; -&gt; Tensor&lt;bool&gt;<br />
+                          <strong>Type parameters:</strong> '?182104          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2055-2055" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to bool</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2676', 2676)" onmouseover="showTip(event, '2676', 2676)">
+            byte(a)
+          </code>
+          <div class="tip" id="2676">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182106&gt; -&gt; Tensor&lt;byte&gt;<br />
+                          <strong>Type parameters:</strong> '?182106          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2058-2058" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to byte</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2677', 2677)" onmouseover="showTip(event, '2677', 2677)">
+            concat(ax ts)
+          </code>
+          <div class="tip" id="2677">
+            <strong>Signature:</strong> ax:int -&gt; ts:seq&lt;Tensor&lt;&#39;T&gt;&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2289-2289" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Concatenates the sequence of tensors along the given axis.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2678', 2678)" onmouseover="showTip(event, '2678', 2678)">
+            diag(a)
+          </code>
+          <div class="tip" id="2678">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2177-2177" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns a view of the diagonal of a matrix as a vector.
+If the specified tensor has more than two dimensions, the diagonals
+along the last two dimensions are returned.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2679', 2679)" onmouseover="showTip(event, '2679', 2679)">
+            diagAxis(ax1 ax2 a)
+          </code>
+          <div class="tip" id="2679">
+            <strong>Signature:</strong> ax1:int -&gt; ax2:int -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2171-2171" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Returns a view of the diagonal along the given axes.
+The diagonal replaces the first axis and the second axis is removed.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2680', 2680)" onmouseover="showTip(event, '2680', 2680)">
+            diagMat(a)
+          </code>
+          <div class="tip" id="2680">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2204-2204" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new matrix that has the specified diagonal.
+All other elements are zero.
+If the specified array has more than one dimension, the operation is
+performed batch-wise on the last dimension.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2681', 2681)" onmouseover="showTip(event, '2681', 2681)">
+            diagMatAxis(ax1 ax2 a)
+          </code>
+          <div class="tip" id="2681">
+            <strong>Signature:</strong> ax1:int -&gt; ax2:int -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2186-2186" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of same shape but with ax2 inserted.
+The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
+The other elements are set to zero.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2682', 2682)" onmouseover="showTip(event, '2682', 2682)">
+            diff(a)
+          </code>
+          <div class="tip" id="2682">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2353-2353" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>calculates the pairwise differences along the last axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2683', 2683)" onmouseover="showTip(event, '2683', 2683)">
+            diffAxis(ax a)
+          </code>
+          <div class="tip" id="2683">
+            <strong>Signature:</strong> ax:int -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2340-2340" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>calculates the pairwise differences along the given axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2684', 2684)" onmouseover="showTip(event, '2684', 2684)">
+            double(a)
+          </code>
+          <div class="tip" id="2684">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182128&gt; -&gt; Tensor&lt;double&gt;<br />
+                          <strong>Type parameters:</strong> '?182128          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2091-2091" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to double</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2685', 2685)" onmouseover="showTip(event, '2685', 2685)">
+            falses(dev shape)
+          </code>
+          <div class="tip" id="2685">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; Tensor&lt;bool&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1995-1995" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new boolean tensor of given shape filled with false.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2686', 2686)" onmouseover="showTip(event, '2686', 2686)">
+            filled(dev shape value)
+          </code>
+          <div class="tip" id="2686">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; value:&#39;T -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2024-2024" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a tensor filled with the specified value.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2687', 2687)" onmouseover="showTip(event, '2687', 2687)">
+            fillLinspace(start stop a)
+          </code>
+          <div class="tip" id="2687">
+            <strong>Signature:</strong> start:^V -&gt; stop:^V -&gt; a:Tensor&lt;^V&gt; -&gt; unit<br />
+                          <strong>Type parameters:</strong> ^V, ^?182095, ^?182096, ^?182097          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2041-2041" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Fills the vector with linearly spaced values from start to (including) stop.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2688', 2688)" onmouseover="showTip(event, '2688', 2688)">
+            float(a)
+          </code>
+          <div class="tip" id="2688">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182130&gt; -&gt; Tensor&lt;float&gt;<br />
+                          <strong>Type parameters:</strong> '?182130          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2094-2094" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to float</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2689', 2689)" onmouseover="showTip(event, '2689', 2689)">
+            float32(a)
+          </code>
+          <div class="tip" id="2689">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182132&gt; -&gt; Tensor&lt;float32&gt;<br />
+                          <strong>Type parameters:</strong> '?182132          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2097-2097" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to float32</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2690', 2690)" onmouseover="showTip(event, '2690', 2690)">
+            identity(dev size)
+          </code>
+          <div class="tip" id="2690">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; size:int64 -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2030-2030" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Identity matrix of given size.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2691', 2691)" onmouseover="showTip(event, '2691', 2691)">
+            init(dev shape fn)
+          </code>
+          <div class="tip" id="2691">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; (fn:(int64 [] -&gt; &#39;T)) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2018-2018" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a tensor with the values returned by the function.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2692', 2692)" onmouseover="showTip(event, '2692', 2692)">
+            int(a)
+          </code>
+          <div class="tip" id="2692">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182122&gt; -&gt; Tensor&lt;int&gt;<br />
+                          <strong>Type parameters:</strong> '?182122          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2082-2082" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to int</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2693', 2693)" onmouseover="showTip(event, '2693', 2693)">
+            int16(a)
+          </code>
+          <div class="tip" id="2693">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182110&gt; -&gt; Tensor&lt;int16&gt;<br />
+                          <strong>Type parameters:</strong> '?182110          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2064-2064" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to int16</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2694', 2694)" onmouseover="showTip(event, '2694', 2694)">
+            int32(a)
+          </code>
+          <div class="tip" id="2694">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182114&gt; -&gt; Tensor&lt;int32&gt;<br />
+                          <strong>Type parameters:</strong> '?182114          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2070-2070" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to int32</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2695', 2695)" onmouseover="showTip(event, '2695', 2695)">
+            int64(a)
+          </code>
+          <div class="tip" id="2695">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182118&gt; -&gt; Tensor&lt;int64&gt;<br />
+                          <strong>Type parameters:</strong> '?182118          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2076-2076" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to int64</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2696', 2696)" onmouseover="showTip(event, '2696', 2696)">
+            isClose(a b)
+          </code>
+          <div class="tip" id="2696">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182136&gt; -&gt; b:Tensor&lt;&#39;?182136&gt; -&gt; Tensor&lt;bool&gt;<br />
+                          <strong>Type parameters:</strong> '?182136          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2111-2111" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Element-wise check if two tensors have same (within machine precision) values.
+Checks for exact equality for non-floating-point types.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2697', 2697)" onmouseover="showTip(event, '2697', 2697)">
+            isCloseWithTol(a, b, absTol, relTol)
+          </code>
+          <div class="tip" id="2697">
+            <strong>Signature:</strong> (a:Tensor&lt;&#39;T&gt; * b:Tensor&lt;&#39;T&gt; * absTol:&#39;T option * relTol:&#39;T option) -&gt; Tensor&lt;bool&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2101-2101" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Element-wise check if two tensors have same (within machine precision) values.
+Checks for exact equality for non-floating-point types.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2698', 2698)" onmouseover="showTip(event, '2698', 2698)">
+            linspace(dev start stop nElems)
+          </code>
+          <div class="tip" id="2698">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; start:^V -&gt; stop:^V -&gt; nElems:int64 -&gt; Tensor&lt;^V&gt;<br />
+                          <strong>Type parameters:</strong> ^V, ^e, ^f, ^g          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2049-2049" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a one-dimensional tensor filled with linearly spaced values from start
+to (including) stop.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2699', 2699)" onmouseover="showTip(event, '2699', 2699)">
+            mean(a)
+          </code>
+          <div class="tip" id="2699">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182146&gt; -&gt; Tensor&lt;&#39;?182146&gt;<br />
+                          <strong>Type parameters:</strong> '?182146          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2134-2134" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>mean</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2700', 2700)" onmouseover="showTip(event, '2700', 2700)">
+            meanAxis(axis a)
+          </code>
+          <div class="tip" id="2700">
+            <strong>Signature:</strong> axis:int -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2130-2130" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>mean over given axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2701', 2701)" onmouseover="showTip(event, '2701', 2701)">
+            nativeint(a)
+          </code>
+          <div class="tip" id="2701">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182124&gt; -&gt; Tensor&lt;nativeint&gt;<br />
+                          <strong>Type parameters:</strong> '?182124          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2085-2085" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to nativeint</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2702', 2702)" onmouseover="showTip(event, '2702', 2702)">
+            NewOfType(shape, dataType, dev, order)
+          </code>
+          <div class="tip" id="2702">
+            <strong>Signature:</strong> (shape:int64 list * dataType:Type * dev:ITensorDevice * order:TensorOrder option) -&gt; ITensor<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1969-1969" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of the given shape and data type.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2703', 2703)" onmouseover="showTip(event, '2703', 2703)">
+            norm(a, ord)
+          </code>
+          <div class="tip" id="2703">
+            <strong>Signature:</strong> (a:Tensor&lt;&#39;T&gt; * ord:&#39;T option) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2166-2166" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>tensor, matrix or vector norm of given order</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2704', 2704)" onmouseover="showTip(event, '2704', 2704)">
+            normAxis(axis, a, ord)
+          </code>
+          <div class="tip" id="2704">
+            <strong>Signature:</strong> (axis:int * a:Tensor&lt;&#39;T&gt; * ord:&#39;T option) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2158-2158" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>tensor, matrix or vector norm of given order over given axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2705', 2705)" onmouseover="showTip(event, '2705', 2705)">
+            ofBlocks(bs)
+          </code>
+          <div class="tip" id="2705">
+            <strong>Signature:</strong> bs:BlockTensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2224-2224" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>tensor constructed of subtensors using a BlockTensor specification</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2706', 2706)" onmouseover="showTip(event, '2706', 2706)">
+            ones(dev shape)
+          </code>
+          <div class="tip" id="2706">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1985-1985" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of given shape filled with ones.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2707', 2707)" onmouseover="showTip(event, '2707', 2707)">
+            onesLike(tmpl)
+          </code>
+          <div class="tip" id="2707">
+            <strong>Signature:</strong> tmpl:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1991-1991" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Tensor of same shape as specifed tensor and filled with ones.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2708', 2708)" onmouseover="showTip(event, '2708', 2708)">
+            replicate(ax reps a)
+          </code>
+          <div class="tip" id="2708">
+            <strong>Signature:</strong> ax:int -&gt; reps:int64 -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2326-2326" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Replicates the tensor the given number of repetitions along the given axis.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2709', 2709)" onmouseover="showTip(event, '2709', 2709)">
+            sbyte(a)
+          </code>
+          <div class="tip" id="2709">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182108&gt; -&gt; Tensor&lt;sbyte&gt;<br />
+                          <strong>Type parameters:</strong> '?182108          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2061-2061" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to sbyte</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2710', 2710)" onmouseover="showTip(event, '2710', 2710)">
+            scalar(dev value)
+          </code>
+          <div class="tip" id="2710">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; value:&#39;T -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2007-2007" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of scalar shape with the given value and storage.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2711', 2711)" onmouseover="showTip(event, '2711', 2711)">
+            scalarLike(tmpl value)
+          </code>
+          <div class="tip" id="2711">
+            <strong>Signature:</strong> tmpl:ITensor -&gt; value:&#39;T -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2014-2014" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of scalar shape with the given value and
+same storage as the specified tensor.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2712', 2712)" onmouseover="showTip(event, '2712', 2712)">
+            single(a)
+          </code>
+          <div class="tip" id="2712">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182126&gt; -&gt; Tensor&lt;single&gt;<br />
+                          <strong>Type parameters:</strong> '?182126          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2088-2088" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to single</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2713', 2713)" onmouseover="showTip(event, '2713', 2713)">
+            std(a, ddof)
+          </code>
+          <div class="tip" id="2713">
+            <strong>Signature:</strong> (a:Tensor&lt;&#39;?182154&gt; * ddof:int64 option) -&gt; Tensor&lt;&#39;?182154&gt;<br />
+                          <strong>Type parameters:</strong> '?182154          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2154-2154" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>standard deviation</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2714', 2714)" onmouseover="showTip(event, '2714', 2714)">
+            stdAxis(ax, a, ddof)
+          </code>
+          <div class="tip" id="2714">
+            <strong>Signature:</strong> (ax:int * a:Tensor&lt;&#39;?182152&gt; * ddof:int64 option) -&gt; Tensor&lt;&#39;?182152&gt;<br />
+                          <strong>Type parameters:</strong> '?182152          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2150-2150" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>standard deviation over given axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2715', 2715)" onmouseover="showTip(event, '2715', 2715)">
+            tensorProduct(a b)
+          </code>
+          <div class="tip" id="2715">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; b:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2276-2276" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>tensor product</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2716', 2716)" onmouseover="showTip(event, '2716', 2716)">
+            trace(a)
+          </code>
+          <div class="tip" id="2716">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2217-2217" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Computes the trace of a matrix.
+If the specified tensor has more than two dimensions, the traces
+along the last two dimensions are returned.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2717', 2717)" onmouseover="showTip(event, '2717', 2717)">
+            traceAxis(ax1 ax2 a)
+          </code>
+          <div class="tip" id="2717">
+            <strong>Signature:</strong> ax1:int -&gt; ax2:int -&gt; a:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2210-2210" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Computes the traces along the given axes.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2718', 2718)" onmouseover="showTip(event, '2718', 2718)">
+            trues(dev shape)
+          </code>
+          <div class="tip" id="2718">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; Tensor&lt;bool&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2001-2001" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new boolean tensor of given shape filled with true.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2719', 2719)" onmouseover="showTip(event, '2719', 2719)">
+            uint16(a)
+          </code>
+          <div class="tip" id="2719">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182112&gt; -&gt; Tensor&lt;uint16&gt;<br />
+                          <strong>Type parameters:</strong> '?182112          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2067-2067" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to uint16</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2720', 2720)" onmouseover="showTip(event, '2720', 2720)">
+            uint32(a)
+          </code>
+          <div class="tip" id="2720">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182116&gt; -&gt; Tensor&lt;uint32&gt;<br />
+                          <strong>Type parameters:</strong> '?182116          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2073-2073" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to uint32</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2721', 2721)" onmouseover="showTip(event, '2721', 2721)">
+            uint64(a)
+          </code>
+          <div class="tip" id="2721">
+            <strong>Signature:</strong> a:Tensor&lt;&#39;?182120&gt; -&gt; Tensor&lt;uint64&gt;<br />
+                          <strong>Type parameters:</strong> '?182120          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2079-2079" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>convert tensor data type to uint64</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2722', 2722)" onmouseover="showTip(event, '2722', 2722)">
+            var(a, ddof)
+          </code>
+          <div class="tip" id="2722">
+            <strong>Signature:</strong> (a:Tensor&lt;&#39;?182150&gt; * ddof:int64 option) -&gt; Tensor&lt;&#39;?182150&gt;<br />
+                          <strong>Type parameters:</strong> '?182150          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2146-2146" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>variances</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2723', 2723)" onmouseover="showTip(event, '2723', 2723)">
+            varAxis(axis, a, ddof)
+          </code>
+          <div class="tip" id="2723">
+            <strong>Signature:</strong> (axis:int * a:Tensor&lt;&#39;T&gt; * ddof:int64 option) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L2138-2138" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>variance over given axis</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2724', 2724)" onmouseover="showTip(event, '2724', 2724)">
+            zeros(dev shape)
+          </code>
+          <div class="tip" id="2724">
+            <strong>Signature:</strong> dev:ITensorDevice -&gt; (shape:int64 list) -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1974-1974" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Creates a new tensor of given shape filled with zeros.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '2725', 2725)" onmouseover="showTip(event, '2725', 2725)">
+            zerosLike(tmpl)
+          </code>
+          <div class="tip" id="2725">
+            <strong>Signature:</strong> tmpl:Tensor&lt;&#39;T&gt; -&gt; Tensor&lt;&#39;T&gt;<br />
+                          <strong>Type parameters:</strong> 'T          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/Tensor/Tensor.fs#L1981-1981" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Tensor of same shape as specifed tensor and filled with zeros.</p>
+
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+        </div>
+        <div class="span3">
+          <!-- <img src="http://www.deepml.net/img/logo.png" alt="Deep.Net logo" style="width:150px;margin:10px" /> -->  
+          <ul class="nav nav-list" id="menu" style="margin-top: 20px;">
+            <li class="nav-header">Deep.Net</li>
+            <li><a href="http://www.deepml.net/index.html">Home page</a></li>
+            <li class="divider"></li>
+            <li><a href="http://nuget.org/packages/DeepNet">Get Library via NuGet</a></li>
+            <li><a href="http://github.com/DeepMLNet/DeepNet">Source Code on GitHub</a></li>
+            <li><a href="http://www.deepml.net/release-notes.html">Release Notes</a></li>
+            
+            <li class="nav-header">Basics</li>
+            <li><a href="http://www.deepml.net/tensor.html">Working with Tensors</a></li>
+            <li><a href="http://www.deepml.net/model.html">Model Definition</a></li>
+            <li><a href="http://www.deepml.net/components.html">Model Components</a></li>
+            <li><a href="http://www.deepml.net/dataset.html">Dataset Handling</a></li>
+            <li><a href="http://www.deepml.net/training.html">Training</a></li>
+
+            <li class="nav-header">Advanced</li>
+            <li><a href="http://www.deepml.net/diff.html">Automatic Differentiation</a></li>
+
+            <li class="nav-header">Documentation</li>
+            <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <a href="http://github.com/DeepMLNet/DeepNet"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"/></a>
+  </body>
+  </html>

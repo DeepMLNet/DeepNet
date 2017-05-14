@@ -44,7 +44,8 @@
   <span>Parent Module: <a href="symtensor-modelcontexttypes.html">ModelContextTypes</a></span>
 </p>
 <div class="xmldoc">
-<p>A model builder.</p>
+<p>A model builder.
+The type 'T specifies the data type of the model parameters.</p>
 
 </div>
   <h3>Constructors</h3>
@@ -56,15 +57,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1054', 1054)" onmouseover="showTip(event, '1054', 1054)">
+          <code onmouseout="hideTip(event, '1461', 1461)" onmouseover="showTip(event, '1461', 1461)">
             new(context)
           </code>
-          <div class="tip" id="1054">
+          <div class="tip" id="1461">
             <strong>Signature:</strong> context:string -&gt; ModelBuilder&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L197-197" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L230-230" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -75,15 +76,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1055', 1055)" onmouseover="showTip(event, '1055', 1055)">
+          <code onmouseout="hideTip(event, '1462', 1462)" onmouseover="showTip(event, '1462', 1462)">
             new(context, isSubModule)
           </code>
-          <div class="tip" id="1055">
+          <div class="tip" id="1462">
             <strong>Signature:</strong> (context:string * isSubModule:bool) -&gt; ModelBuilder&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L168-168" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L195-195" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -102,15 +103,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1056', 1056)" onmouseover="showTip(event, '1056', 1056)">
+          <code onmouseout="hideTip(event, '1463', 1463)" onmouseover="showTip(event, '1463', 1463)">
             Context
           </code>
-          <div class="tip" id="1056">
+          <div class="tip" id="1463">
             <strong>Signature:</strong> string<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L240-240" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L273-273" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -123,19 +124,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1057', 1057)" onmouseover="showTip(event, '1057', 1057)">
+          <code onmouseout="hideTip(event, '1464', 1464)" onmouseover="showTip(event, '1464', 1464)">
             Fix(size)
           </code>
-          <div class="tip" id="1057">
-            <strong>Signature:</strong> size:int -&gt; SizeSpecT<br />
+          <div class="tip" id="1464">
+            <strong>Signature:</strong> size:int64 -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L235-235" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L268-268" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Returns a fixed size. If size is -1 then a broadcastable size one is created.</p>
+          <p>Returns a fixed size. If size is -1L then a broadcastable size one is created.</p>
 
 
         </td>
@@ -143,19 +144,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1058', 1058)" onmouseover="showTip(event, '1058', 1058)">
-            Instantiate(device, canDelay)
+          <code onmouseout="hideTip(event, '1465', 1465)" onmouseover="showTip(event, '1465', 1465)">
+            GetSize(size)
           </code>
-          <div class="tip" id="1058">
-            <strong>Signature:</strong> (device:IDevice * canDelay:bool option) -&gt; ModelInstance&lt;&#39;T&gt;<br />
+          <div class="tip" id="1465">
+            <strong>Signature:</strong> size:SizeSpecT -&gt; int64<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L291-291" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L304-304" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>instantiates the model with numeric sizes for all size symbols and initializes the parameter values</p>
+          <p>gets the numeric value of a previously set symbolic size</p>
 
 
         </td>
@@ -163,15 +164,36 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1059', 1059)" onmouseover="showTip(event, '1059', 1059)">
+          <code onmouseout="hideTip(event, '1466', 1466)" onmouseover="showTip(event, '1466', 1466)">
+            Instantiate(...)
+          </code>
+          <div class="tip" id="1466">
+            <strong>Signature:</strong> (device:IDevice * sizeValues:Map&lt;SizeSpecT,int64&gt; option * canDelay:bool option) -&gt; ModelInstance&lt;&#39;T&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L346-346" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>instantiates the model with numeric sizes for all size symbols and initializes
+the parameter values</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1467', 1467)" onmouseover="showTip(event, '1467', 1467)">
             Module(name)
           </code>
-          <div class="tip" id="1059">
+          <div class="tip" id="1467">
             <strong>Signature:</strong> name:string -&gt; ModelBuilder&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L200-200" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L233-233" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -183,15 +205,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1060', 1060)" onmouseover="showTip(event, '1060', 1060)">
+          <code onmouseout="hideTip(event, '1468', 1468)" onmouseover="showTip(event, '1468', 1468)">
             Param(name, shape, initializer)
           </code>
-          <div class="tip" id="1060">
-            <strong>Signature:</strong> (name:string * shape:ShapeSpecT * initializer:Initializer&lt;&#39;T&gt; option) -&gt; ExprT&lt;&#39;T&gt; ref<br />
+          <div class="tip" id="1468">
+            <strong>Signature:</strong> (name:string * shape:ShapeSpecT * initializer:Initializer&lt;&#39;T&gt; option) -&gt; ExprT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L218-218" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L252-252" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -203,15 +225,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1061', 1061)" onmouseover="showTip(event, '1061', 1061)">
+          <code onmouseout="hideTip(event, '1469', 1469)" onmouseover="showTip(event, '1469', 1469)">
             Parameters
           </code>
-          <div class="tip" id="1061">
-            <strong>Signature:</strong> Map&lt;VarSpecT&lt;&#39;T&gt;,ParameterInfo&lt;&#39;T&gt;&gt;<br />
+          <div class="tip" id="1469">
+            <strong>Signature:</strong> Map&lt;VarSpecT,ParameterInfo&lt;&#39;T&gt;&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L246-246" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L279-279" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -224,15 +246,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1062', 1062)" onmouseover="showTip(event, '1062', 1062)">
+          <code onmouseout="hideTip(event, '1470', 1470)" onmouseover="showTip(event, '1470', 1470)">
             PrettyString
           </code>
-          <div class="tip" id="1062">
+          <div class="tip" id="1470">
             <strong>Signature:</strong> string<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L327-327" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L406-406" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -243,15 +265,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1063', 1063)" onmouseover="showTip(event, '1063', 1063)">
+          <code onmouseout="hideTip(event, '1471', 1471)" onmouseover="showTip(event, '1471', 1471)">
             SetLoc(var loc)
           </code>
-          <div class="tip" id="1063">
-            <strong>Signature:</strong> var:ExprT&lt;&#39;?183056&gt; -&gt; loc:ArrayLocT -&gt; unit<br />
+          <div class="tip" id="1471">
+            <strong>Signature:</strong> var:ExprT -&gt; loc:ITensorDevice -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L271-271" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L313-313" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -263,19 +285,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1064', 1064)" onmouseover="showTip(event, '1064', 1064)">
+          <code onmouseout="hideTip(event, '1472', 1472)" onmouseover="showTip(event, '1472', 1472)">
             SetSize(size value)
           </code>
-          <div class="tip" id="1064">
-            <strong>Signature:</strong> size:SizeSpecT -&gt; value:int -&gt; unit<br />
+          <div class="tip" id="1472">
+            <strong>Signature:</strong> size:SizeSpecT -&gt; value:int64 -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L265-265" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L298-298" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>sets a symbolic size to a value</p>
+          <p>sets a symbolic size to a numeric value</p>
 
 
         </td>
@@ -283,15 +305,35 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1065', 1065)" onmouseover="showTip(event, '1065', 1065)">
+          <code onmouseout="hideTip(event, '1473', 1473)" onmouseover="showTip(event, '1473', 1473)">
+            SetStride(var stride)
+          </code>
+          <div class="tip" id="1473">
+            <strong>Signature:</strong> var:ExprT -&gt; (stride:int64 list) -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L319-319" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>sets the stride of the given variable</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1474', 1474)" onmouseover="showTip(event, '1474', 1474)">
             Size(name)
           </code>
-          <div class="tip" id="1065">
+          <div class="tip" id="1474">
             <strong>Signature:</strong> name:string -&gt; SizeSpecT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L229-229" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L262-262" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -304,15 +346,15 @@ If the name starts with "&gt;" a dynamic size is created.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1066', 1066)" onmouseover="showTip(event, '1066', 1066)">
+          <code onmouseout="hideTip(event, '1475', 1475)" onmouseover="showTip(event, '1475', 1475)">
             SubModels
           </code>
-          <div class="tip" id="1066">
+          <div class="tip" id="1475">
             <strong>Signature:</strong> Map&lt;string,ModelBuilder&lt;&#39;T&gt;&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L243-243" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L276-276" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -325,15 +367,15 @@ If the name starts with "&gt;" a dynamic size is created.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1067', 1067)" onmouseover="showTip(event, '1067', 1067)">
+          <code onmouseout="hideTip(event, '1476', 1476)" onmouseover="showTip(event, '1476', 1476)">
             SymSizeEnv
           </code>
-          <div class="tip" id="1067">
+          <div class="tip" id="1476">
             <strong>Signature:</strong> Map&lt;SizeSymbolT,SizeSpecT&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L285-285" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L339-339" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -346,15 +388,15 @@ If the name starts with "&gt;" a dynamic size is created.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1068', 1068)" onmouseover="showTip(event, '1068', 1068)">
+          <code onmouseout="hideTip(event, '1477', 1477)" onmouseover="showTip(event, '1477', 1477)">
             SymSizes
           </code>
-          <div class="tip" id="1068">
+          <div class="tip" id="1477">
             <strong>Signature:</strong> SizeSpecT list<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L257-257" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L290-290" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -367,20 +409,20 @@ If the name starts with "&gt;" a dynamic size is created.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1069', 1069)" onmouseover="showTip(event, '1069', 1069)">
+          <code onmouseout="hideTip(event, '1478', 1478)" onmouseover="showTip(event, '1478', 1478)">
             UseTmplVal(var value)
           </code>
-          <div class="tip" id="1069">
-            <strong>Signature:</strong> var:ExprT&lt;&#39;?183059&gt; -&gt; value:ArrayNDT&lt;&#39;?183059&gt; -&gt; unit<br />
+          <div class="tip" id="1478">
+            <strong>Signature:</strong> var:ExprT -&gt; value:Tensor&lt;&#39;T&gt; -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L276-276" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L326-326" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Infers localtion symbolic size by matching a variables symbolic shape to the shape
-of the given variable value.</p>
+          <p>Infers variable location, variable strides and symbolic sizes by
+matching a symbolic variable to the given value.</p>
 
 
         </td>
@@ -388,15 +430,15 @@ of the given variable value.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1070', 1070)" onmouseover="showTip(event, '1070', 1070)">
+          <code onmouseout="hideTip(event, '1479', 1479)" onmouseover="showTip(event, '1479', 1479)">
             Var(name shape)
           </code>
-          <div class="tip" id="1070">
-            <strong>Signature:</strong> name:string -&gt; shape:ShapeSpecT -&gt; ExprT&lt;&#39;V&gt;<br />
+          <div class="tip" id="1479">
+            <strong>Signature:</strong> name:string -&gt; shape:ShapeSpecT -&gt; ExprT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L212-212" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L246-246" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -408,15 +450,15 @@ of the given variable value.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1071', 1071)" onmouseover="showTip(event, '1071', 1071)">
+          <code onmouseout="hideTip(event, '1480', 1480)" onmouseover="showTip(event, '1480', 1480)">
             VarLocs
           </code>
-          <div class="tip" id="1071">
+          <div class="tip" id="1480">
             <strong>Signature:</strong> VarLocsT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L288-288" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L342-342" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -429,15 +471,15 @@ of the given variable value.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1072', 1072)" onmouseover="showTip(event, '1072', 1072)">
+          <code onmouseout="hideTip(event, '1481', 1481)" onmouseover="showTip(event, '1481', 1481)">
             Vars
           </code>
-          <div class="tip" id="1072">
-            <strong>Signature:</strong> Set&lt;IVarSpec&gt;<br />
+          <div class="tip" id="1481">
+            <strong>Signature:</strong> Set&lt;VarSpecT&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L251-251" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L284-284" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -473,7 +515,6 @@ of the given variable value.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

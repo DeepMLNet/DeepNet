@@ -77,23 +77,23 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '238', 238)" onmouseover="showTip(event, '238', 238)">
+          <code onmouseout="hideTip(event, '63', 63)" onmouseover="showTip(event, '63', 63)">
             loss lm pred target
           </code>
-          <div class="tip" id="238">
-            <strong>Signature:</strong> lm:Measures -&gt; pred:ExprT&lt;&#39;T&gt; -&gt; target:ExprT&lt;&#39;T&gt; -&gt; ExprT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="63">
+            <strong>Signature:</strong> lm:Measures -&gt; pred:ExprT -&gt; target:ExprT -&gt; ExprT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L27-27" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Neural.fs#L30-30" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Returns an expression for the loss given the loss measure <code>lm</code>, the predictions
 <code>pred</code> and the target values <code>target</code>.
 If the multi-class cross entropy loss measure is used then
-pred.[cls, smpl] must be the predicted probability that the sample
-belong to class cls and target.[cls, smpl] must be 1 if the sample
+pred.[smpl, cls] must be the predicted probability that the sample
+belong to class cls and target.[smpl, cls] must be 1 if the sample
 actually belongs to class cls and 0 otherwise.</p>
 
 
@@ -125,7 +125,6 @@ actually belongs to class cls and 0 otherwise.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

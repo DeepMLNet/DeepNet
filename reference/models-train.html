@@ -109,15 +109,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '244', 244)" onmouseover="showTip(event, '244', 244)">
+          <code onmouseout="hideTip(event, '86', 86)" onmouseover="showTip(event, '86', 86)">
             defaultCfg 
           </code>
-          <div class="tip" id="244">
+          <div class="tip" id="86">
             <strong>Signature:</strong> Cfg<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L106-106" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L165-165" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -129,15 +129,36 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '245', 245)" onmouseover="showTip(event, '245', 245)">
+          <code onmouseout="hideTip(event, '87', 87)" onmouseover="showTip(event, '87', 87)">
+            newStatefulTrainable (...)
+          </code>
+          <div class="tip" id="87">
+            <strong>Signature:</strong> modelInstance:ModelInstance&lt;&#39;?175955&gt; -&gt; losses:ExprT list -&gt; nextState:ExprT -&gt; varEnvBuilder:(Tensor&lt;&#39;?175955&gt; option -&gt; &#39;?175956 -&gt; VarEnvT) -&gt; optNew:(ExprT -&gt; ExprT -&gt; IDevice -&gt; IOptimizer&lt;&#39;?175955,&#39;?175957,&#39;?175958&gt;) -&gt; optCfg:&#39;?175957 -&gt; ITrainable&lt;&#39;?175956,&#39;?175955&gt;<br />
+                          <strong>Type parameters:</strong> '?175955, '?175956, '?175957, '?175958          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L296-296" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Constructs an ITrainable<_> for the given stateful model using the specified loss
+expressions, state update expression and optimizer.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '88', 88)" onmouseover="showTip(event, '88', 88)">
             train trainable dataset cfg
           </code>
-          <div class="tip" id="245">
+          <div class="tip" id="88">
             <strong>Signature:</strong> trainable:ITrainable&lt;&#39;Smpl,&#39;T&gt; -&gt; dataset:TrnValTst&lt;&#39;Smpl&gt; -&gt; cfg:Cfg -&gt; TrainingResult<br />
                           <strong>Type parameters:</strong> 'Smpl, 'T          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L221-221" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L319-319" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -150,19 +171,39 @@ Returns the training history.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '246', 246)" onmouseover="showTip(event, '246', 246)">
+          <code onmouseout="hideTip(event, '89', 89)" onmouseover="showTip(event, '89', 89)">
             trainableFromLossExpr (...)
           </code>
-          <div class="tip" id="246">
-            <strong>Signature:</strong> modelInstance:ModelInstance&lt;&#39;T&gt; -&gt; loss:ExprT&lt;&#39;T&gt; -&gt; varEnvBuilder:(&#39;Smpl -&gt; VarEnvT) -&gt; optimizer:IOptimizer&lt;&#39;T,&#39;OptCfg,&#39;OptState&gt; -&gt; optCfg:&#39;OptCfg -&gt; ITrainable&lt;&#39;Smpl,&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T, 'Smpl, 'OptCfg, 'OptState          </div>
+          <div class="tip" id="89">
+            <strong>Signature:</strong> modelInstance:ModelInstance&lt;&#39;?175965&gt; -&gt; loss:ExprT -&gt; varEnvBuilder:(&#39;?175966 -&gt; VarEnvT) -&gt; optNew:(ExprT -&gt; ExprT -&gt; IDevice -&gt; IOptimizer&lt;&#39;?175965,&#39;?175967,&#39;?175968&gt;) -&gt; optCfg:&#39;?175967 -&gt; ITrainable&lt;&#39;?175966,&#39;?175965&gt;<br />
+                          <strong>Type parameters:</strong> '?175965, '?175966, '?175967, '?175968          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L164-164" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L304-304" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '90', 90)" onmouseover="showTip(event, '90', 90)">
+            trainableFromLossExprs (...)
+          </code>
+          <div class="tip" id="90">
+            <strong>Signature:</strong> modelInstance:ModelInstance&lt;&#39;?175960&gt; -&gt; losses:ExprT list -&gt; varEnvBuilder:(&#39;?175961 -&gt; VarEnvT) -&gt; optNew:(ExprT -&gt; ExprT -&gt; IDevice -&gt; IOptimizer&lt;&#39;?175960,&#39;?175962,&#39;?175963&gt;) -&gt; optCfg:&#39;?175962 -&gt; ITrainable&lt;&#39;?175961,&#39;?175960&gt;<br />
+                          <strong>Type parameters:</strong> '?175960, '?175961, '?175962, '?175963          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/MLModels/Train.fs#L300-300" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.</p>
 
 
         </td>
@@ -193,7 +234,6 @@ Returns the training history.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

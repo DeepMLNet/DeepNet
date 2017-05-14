@@ -56,15 +56,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1274', 1274)" onmouseover="showTip(event, '1274', 1274)">
+          <code onmouseout="hideTip(event, '1773', 1773)" onmouseover="showTip(event, '1773', 1773)">
             new(rExpr, dev)
           </code>
-          <div class="tip" id="1274">
+          <div class="tip" id="1773">
             <strong>Signature:</strong> (rExpr:&#39;RExpr * dev:IDevice) -&gt; VarRecord&lt;&#39;RVal,&#39;RExpr&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L38-38" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L43-43" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -83,15 +83,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1275', 1275)" onmouseover="showTip(event, '1275', 1275)">
+          <code onmouseout="hideTip(event, '1774', 1774)" onmouseover="showTip(event, '1774', 1774)">
             Dev
           </code>
-          <div class="tip" id="1275">
+          <div class="tip" id="1774">
             <strong>Signature:</strong> IDevice<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L84-84" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L89-89" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -104,15 +104,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1276', 1276)" onmouseover="showTip(event, '1276', 1276)">
+          <code onmouseout="hideTip(event, '1775', 1775)" onmouseover="showTip(event, '1775', 1775)">
             Expr
           </code>
-          <div class="tip" id="1276">
+          <div class="tip" id="1775">
             <strong>Signature:</strong> &#39;RExpr<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L87-87" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L92-92" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -125,19 +125,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1277', 1277)" onmouseover="showTip(event, '1277', 1277)">
-            LoadValue(path)
+          <code onmouseout="hideTip(event, '1776', 1776)" onmouseover="showTip(event, '1776', 1776)">
+            LoadValue(hdf prefix)
           </code>
-          <div class="tip" id="1277">
-            <strong>Signature:</strong> path:string -&gt; &#39;RVal<br />
+          <div class="tip" id="1776">
+            <strong>Signature:</strong> hdf:&#39;?176749 -&gt; prefix:string -&gt; &#39;RVal<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L141-141" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L151-151" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Load the record value from a HDF5 file.</p>
+          <p>Load the record value from a HDF5 file using the specifed prefix</p>
 
 
         </td>
@@ -145,19 +145,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1278', 1278)" onmouseover="showTip(event, '1278', 1278)">
-            PublishLoc(model)
+          <code onmouseout="hideTip(event, '1777', 1777)" onmouseover="showTip(event, '1777', 1777)">
+            PublishLocAndStride(model)
           </code>
-          <div class="tip" id="1278">
-            <strong>Signature:</strong> model:ModelInstance&lt;&#39;?182457&gt; -&gt; unit<br />
+          <div class="tip" id="1777">
+            <strong>Signature:</strong> model:ModelInstance&lt;&#39;T&gt; -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L115-115" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L120-120" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>publishes the locations of the used variables to the given ModelInstance</p>
+          <p>publishes the locations and strides of the used variables to the given ModelInstance</p>
 
 
         </td>
@@ -165,15 +165,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1279', 1279)" onmouseover="showTip(event, '1279', 1279)">
-            SaveValue(path value)
+          <code onmouseout="hideTip(event, '1778', 1778)" onmouseover="showTip(event, '1778', 1778)">
+            SaveValue(hdf prefix value)
           </code>
-          <div class="tip" id="1279">
-            <strong>Signature:</strong> path:string -&gt; value:&#39;RVal -&gt; unit<br />
+          <div class="tip" id="1778">
+            <strong>Signature:</strong> hdf:&#39;?176745 -&gt; prefix:string -&gt; value:&#39;RVal -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L126-126" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L137-137" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -185,15 +185,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1280', 1280)" onmouseover="showTip(event, '1280', 1280)">
+          <code onmouseout="hideTip(event, '1779', 1779)" onmouseover="showTip(event, '1779', 1779)">
             Use(f)
           </code>
-          <div class="tip" id="1280">
+          <div class="tip" id="1779">
             <strong>Signature:</strong> (f:(VarEnvT -&gt; &#39;R)) -&gt; VarEnvT -&gt; &#39;RVal -&gt; &#39;R<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L111-111" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L116-116" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -205,15 +205,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1281', 1281)" onmouseover="showTip(event, '1281', 1281)">
+          <code onmouseout="hideTip(event, '1780', 1780)" onmouseover="showTip(event, '1780', 1780)">
             VarEnv(value)
           </code>
-          <div class="tip" id="1281">
+          <div class="tip" id="1780">
             <strong>Signature:</strong> value:&#39;RVal -&gt; VarEnvT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L90-90" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/RecordParams.fs#L95-95" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -248,7 +248,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

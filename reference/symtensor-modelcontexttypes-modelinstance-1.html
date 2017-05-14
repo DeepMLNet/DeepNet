@@ -56,15 +56,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1073', 1073)" onmouseover="showTip(event, '1073', 1073)">
+          <code onmouseout="hideTip(event, '1482', 1482)" onmouseover="showTip(event, '1482', 1482)">
             new(...)
           </code>
-          <div class="tip" id="1073">
-            <strong>Signature:</strong> (context:string * parameters:Map&lt;VarSpecT&lt;&#39;T&gt;,ParameterInfo&lt;&#39;T&gt;&gt; * device:IDevice * compileEnv:CompileEnvT) -&gt; ModelInstance&lt;&#39;T&gt;<br />
+          <div class="tip" id="1482">
+            <strong>Signature:</strong> (context:string * parameters:Map&lt;VarSpecT,ParameterInfo&lt;&#39;T&gt;&gt; * device:IDevice * compileEnv:CompileEnvT) -&gt; ModelInstance&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L333-333" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L412-412" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -83,15 +83,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1074', 1074)" onmouseover="showTip(event, '1074', 1074)">
+          <code onmouseout="hideTip(event, '1483', 1483)" onmouseover="showTip(event, '1483', 1483)">
             CompileEnv
           </code>
-          <div class="tip" id="1074">
+          <div class="tip" id="1483">
             <strong>Signature:</strong> CompileEnvT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L379-379" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L479-479" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -104,15 +104,54 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1075', 1075)" onmouseover="showTip(event, '1075', 1075)">
+          <code onmouseout="hideTip(event, '1484', 1484)" onmouseover="showTip(event, '1484', 1484)">
+            Device
+          </code>
+          <div class="tip" id="1484">
+            <strong>Signature:</strong> IDevice<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L460-460" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the device this model instance is stored on</p>
+
+
+              <p>CompiledName: <code>get_Device</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1485', 1485)" onmouseover="showTip(event, '1485', 1485)">
             Func(expr0, expr1, expr2)
           </code>
-          <div class="tip" id="1075">
-            <strong>Signature:</strong> (expr0:ExprT&lt;&#39;T&gt; * expr1:ExprT&lt;&#39;T&gt; * expr2:ExprT&lt;&#39;T&gt;) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1485">
+            <strong>Signature:</strong> (expr0:ExprT * expr1:ExprT * expr2:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt; * Tensor&lt;&#39;T1&gt; * Tensor&lt;&#39;T2&gt;<br />
+                          <strong>Type parameters:</strong> 'T1, 'T2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L583-583" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1486', 1486)" onmouseover="showTip(event, '1486', 1486)">
+            Func(expr0, expr1, expr2)
+          </code>
+          <div class="tip" id="1486">
+            <strong>Signature:</strong> (expr0:ExprT * expr1:ExprT * expr2:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L439-439" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L580-580" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -125,15 +164,33 @@ using the devices default result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1076', 1076)" onmouseover="showTip(event, '1076', 1076)">
+          <code onmouseout="hideTip(event, '1487', 1487)" onmouseover="showTip(event, '1487', 1487)">
             Func(expr0, expr1)
           </code>
-          <div class="tip" id="1076">
-            <strong>Signature:</strong> (expr0:ExprT&lt;&#39;T&gt; * expr1:ExprT&lt;&#39;T&gt;) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1487">
+            <strong>Signature:</strong> (expr0:ExprT * expr1:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt; * Tensor&lt;&#39;T1&gt;<br />
+                          <strong>Type parameters:</strong> 'T1          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L575-575" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1488', 1488)" onmouseover="showTip(event, '1488', 1488)">
+            Func(expr0, expr1)
+          </code>
+          <div class="tip" id="1488">
+            <strong>Signature:</strong> (expr0:ExprT * expr1:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L434-434" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L572-572" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -146,15 +203,33 @@ using the devices default result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1077', 1077)" onmouseover="showTip(event, '1077', 1077)">
+          <code onmouseout="hideTip(event, '1489', 1489)" onmouseover="showTip(event, '1489', 1489)">
             Func(expr0)
           </code>
-          <div class="tip" id="1077">
-            <strong>Signature:</strong> expr0:ExprT&lt;&#39;T&gt; -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1489">
+            <strong>Signature:</strong> expr0:ExprT -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L429-429" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L567-567" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1490', 1490)" onmouseover="showTip(event, '1490', 1490)">
+            Func(expr0)
+          </code>
+          <div class="tip" id="1490">
+            <strong>Signature:</strong> expr0:ExprT -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L564-564" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -167,15 +242,51 @@ using the devices default result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1078', 1078)" onmouseover="showTip(event, '1078', 1078)">
+          <code onmouseout="hideTip(event, '1491', 1491)" onmouseover="showTip(event, '1491', 1491)">
+            Func(exprs)
+          </code>
+          <div class="tip" id="1491">
+            <strong>Signature:</strong> (exprs:ExprT list) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; list<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L559-559" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1492', 1492)" onmouseover="showTip(event, '1492', 1492)">
             Func(resultLoc, expr0, expr1, expr2)
           </code>
-          <div class="tip" id="1078">
-            <strong>Signature:</strong> (resultLoc:ArrayLocT * expr0:ExprT&lt;&#39;T&gt; * expr1:ExprT&lt;&#39;T&gt; * expr2:ExprT&lt;&#39;T&gt;) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1492">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT * expr1:ExprT * expr2:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L424-424" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L556-556" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1493', 1493)" onmouseover="showTip(event, '1493', 1493)">
+            Func(resultLoc, expr0, expr1, expr2)
+          </code>
+          <div class="tip" id="1493">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT * expr1:ExprT * expr2:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt; * Tensor&lt;&#39;T1&gt; * Tensor&lt;&#39;T2&gt;<br />
+                          <strong>Type parameters:</strong> 'T1, 'T2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L550-550" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -188,15 +299,33 @@ using the devices default result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1079', 1079)" onmouseover="showTip(event, '1079', 1079)">
+          <code onmouseout="hideTip(event, '1494', 1494)" onmouseover="showTip(event, '1494', 1494)">
             Func(resultLoc, expr0, expr1)
           </code>
-          <div class="tip" id="1079">
-            <strong>Signature:</strong> (resultLoc:ArrayLocT * expr0:ExprT&lt;&#39;T&gt; * expr1:ExprT&lt;&#39;T&gt;) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt; * ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1494">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT * expr1:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; * Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L419-419" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L545-545" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1495', 1495)" onmouseover="showTip(event, '1495', 1495)">
+            Func(resultLoc, expr0, expr1)
+          </code>
+          <div class="tip" id="1495">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT * expr1:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt; * Tensor&lt;&#39;T1&gt;<br />
+                          <strong>Type parameters:</strong> 'T1          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L540-540" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -209,15 +338,33 @@ using the devices default result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1080', 1080)" onmouseover="showTip(event, '1080', 1080)">
+          <code onmouseout="hideTip(event, '1496', 1496)" onmouseover="showTip(event, '1496', 1496)">
             Func(resultLoc, expr0)
           </code>
-          <div class="tip" id="1080">
-            <strong>Signature:</strong> (resultLoc:ArrayLocT * expr0:ExprT&lt;&#39;T&gt;) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1496">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L414-414" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L535-535" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1497', 1497)" onmouseover="showTip(event, '1497', 1497)">
+            Func(resultLoc, expr0)
+          </code>
+          <div class="tip" id="1497">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * expr0:ExprT) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T0&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L531-531" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -230,15 +377,33 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1081', 1081)" onmouseover="showTip(event, '1081', 1081)">
-            InitPar(seed ps)
+          <code onmouseout="hideTip(event, '1498', 1498)" onmouseover="showTip(event, '1498', 1498)">
+            Func(resultLoc, exprs)
           </code>
-          <div class="tip" id="1081">
-            <strong>Signature:</strong> seed:int -&gt; ps:VarSpecT&lt;&#39;T&gt; -&gt; unit<br />
+          <div class="tip" id="1498">
+            <strong>Signature:</strong> (resultLoc:ITensorDevice * exprs:ExprT list) -&gt; VarEnvT -&gt; Tensor&lt;&#39;T&gt; list<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L400-400" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L525-525" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1499', 1499)" onmouseover="showTip(event, '1499', 1499)">
+            InitPar(seed ps)
+          </code>
+          <div class="tip" id="1499">
+            <strong>Signature:</strong> seed:int -&gt; ps:VarSpecT -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L508-508" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -250,15 +415,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1082', 1082)" onmouseover="showTip(event, '1082', 1082)">
+          <code onmouseout="hideTip(event, '1500', 1500)" onmouseover="showTip(event, '1500', 1500)">
             InitPars(globalSeed)
           </code>
-          <div class="tip" id="1082">
+          <div class="tip" id="1500">
             <strong>Signature:</strong> globalSeed:int -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L406-406" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L514-514" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -270,15 +435,57 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1083', 1083)" onmouseover="showTip(event, '1083', 1083)">
-            LoadPars(filename)
+          <code onmouseout="hideTip(event, '1501', 1501)" onmouseover="showTip(event, '1501', 1501)">
+            [par]
           </code>
-          <div class="tip" id="1083">
-            <strong>Signature:</strong> filename:string -&gt; unit<br />
+          <div class="tip" id="1501">
+            <strong>Signature:</strong> par:ExprT -&gt; Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L394-394" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L521-521" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>value for a given parameter</p>
+
+
+              <p>CompiledName: <code>set_Item</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1502', 1502)" onmouseover="showTip(event, '1502', 1502)">
+            [()]
+          </code>
+          <div class="tip" id="1502">
+            <strong>Signature:</strong> unit -&gt; ExprT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L521-521" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>value for a given parameter</p>
+
+
+              <p>CompiledName: <code>get_Item</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1503', 1503)" onmouseover="showTip(event, '1503', 1503)">
+            LoadPars(hdf, prefix)
+          </code>
+          <div class="tip" id="1503">
+            <strong>Signature:</strong> (hdf:HDF5 * prefix:string option) -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L502-502" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -290,15 +497,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1084', 1084)" onmouseover="showTip(event, '1084', 1084)">
+          <code onmouseout="hideTip(event, '1504', 1504)" onmouseover="showTip(event, '1504', 1504)">
             ParameterSet
           </code>
-          <div class="tip" id="1084">
+          <div class="tip" id="1504">
             <strong>Signature:</strong> ParameterSetT&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L363-363" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L463-463" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -311,15 +518,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1085', 1085)" onmouseover="showTip(event, '1085', 1085)">
+          <code onmouseout="hideTip(event, '1505', 1505)" onmouseover="showTip(event, '1505', 1505)">
             ParameterStorage
           </code>
-          <div class="tip" id="1085">
+          <div class="tip" id="1505">
             <strong>Signature:</strong> ParameterStorageT&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L373-373" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L471-471" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -332,15 +539,36 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1086', 1086)" onmouseover="showTip(event, '1086', 1086)">
-            ParameterValues
+          <code onmouseout="hideTip(event, '1506', 1506)" onmouseover="showTip(event, '1506', 1506)">
+            ParameterValues()
           </code>
-          <div class="tip" id="1086">
-            <strong>Signature:</strong> ArrayNDT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1506">
+            <strong>Signature:</strong> unit -&gt; Tensor&lt;&#39;T&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L376-376" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L474-474" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>numeric flat parameter vector</p>
+
+
+              <p>CompiledName: <code>set_ParameterValues</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1507', 1507)" onmouseover="showTip(event, '1507', 1507)">
+            ParameterValues()
+          </code>
+          <div class="tip" id="1507">
+            <strong>Signature:</strong> unit -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L474-474" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -353,15 +581,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1087', 1087)" onmouseover="showTip(event, '1087', 1087)">
+          <code onmouseout="hideTip(event, '1508', 1508)" onmouseover="showTip(event, '1508', 1508)">
             ParameterVector
           </code>
-          <div class="tip" id="1087">
-            <strong>Signature:</strong> ExprT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1508">
+            <strong>Signature:</strong> ExprT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L366-366" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L466-466" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -374,15 +602,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1088', 1088)" onmouseover="showTip(event, '1088', 1088)">
-            SavePars(filename)
+          <code onmouseout="hideTip(event, '1509', 1509)" onmouseover="showTip(event, '1509', 1509)">
+            SavePars(hdf, prefix)
           </code>
-          <div class="tip" id="1088">
-            <strong>Signature:</strong> filename:string -&gt; unit<br />
+          <div class="tip" id="1509">
+            <strong>Signature:</strong> (hdf:HDF5 * prefix:string option) -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L397-397" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L505-505" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -394,15 +622,15 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1089', 1089)" onmouseover="showTip(event, '1089', 1089)">
+          <code onmouseout="hideTip(event, '1510', 1510)" onmouseover="showTip(event, '1510', 1510)">
             SetLoc(var loc)
           </code>
-          <div class="tip" id="1089">
-            <strong>Signature:</strong> var:ExprT&lt;&#39;b&gt; -&gt; loc:ArrayLocT -&gt; unit<br />
+          <div class="tip" id="1510">
+            <strong>Signature:</strong> var:ExprT -&gt; loc:ITensorDevice -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L382-382" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L482-482" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -414,19 +642,59 @@ using the specified result location.</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '1090', 1090)" onmouseover="showTip(event, '1090', 1090)">
-            WrtParameters(expr)
+          <code onmouseout="hideTip(event, '1511', 1511)" onmouseover="showTip(event, '1511', 1511)">
+            SetStride(var stride)
           </code>
-          <div class="tip" id="1090">
-            <strong>Signature:</strong> expr:ExprT&lt;&#39;T&gt; -&gt; ExprT&lt;&#39;T&gt;<br />
+          <div class="tip" id="1511">
+            <strong>Signature:</strong> var:ExprT -&gt; (stride:int64 list) -&gt; unit<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L369-369" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L492-492" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Derivative of "expr" w.r.t. flat vector containing all model parameters</p>
+          <p>sets the stride of the given variable</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1512', 1512)" onmouseover="showTip(event, '1512', 1512)">
+            Use(varEnv)
+          </code>
+          <div class="tip" id="1512">
+            <strong>Signature:</strong> varEnv:VarEnvT -&gt; VarEnvT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L454-454" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>inserts the ParameterStorage into the given variable environment</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '1513', 1513)" onmouseover="showTip(event, '1513', 1513)">
+            Use(expr)
+          </code>
+          <div class="tip" id="1513">
+            <strong>Signature:</strong> expr:ExprT -&gt; ExprT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/ModelContext.fs#L443-443" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>substitutes the ParameterStorage into the given expression</p>
 
 
         </td>
@@ -457,7 +725,6 @@ using the specified result location.</p>
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

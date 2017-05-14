@@ -43,6 +43,8 @@
   <span>Namespace: SymTensor</span><br />
 </p>
 <div class="xmldoc">
+<p>Functions for dealing with unified expressions.</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -56,15 +58,135 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '410', 410)" onmouseover="showTip(event, '410', 410)">
-            opOf uexpr
+          <code onmouseout="hideTip(event, '466', 466)" onmouseover="showTip(event, '466', 466)">
+            channelShapes arg1
           </code>
-          <div class="tip" id="410">
-            <strong>Signature:</strong> uexpr:UExprT -&gt; UOpT<br />
+          <div class="tip" id="466">
+            <strong>Signature:</strong> UExprT -&gt; Map&lt;ChannelT,NShapeSpecT&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L320-320" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L487-487" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the shape of all channels of the given unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '467', 467)" onmouseover="showTip(event, '467', 467)">
+            countUniqueOps uexpr
+          </code>
+          <div class="tip" id="467">
+            <strong>Signature:</strong> uexpr:UExprT -&gt; int<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L491-491" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>counts unique subexpressions in a unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '468', 468)" onmouseover="showTip(event, '468', 468)">
+            dfltChShape arg1
+          </code>
+          <div class="tip" id="468">
+            <strong>Signature:</strong> UExprT -&gt; NShapeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L483-483" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the shape of the default channel of the given unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '469', 469)" onmouseover="showTip(event, '469', 469)">
+            dfltChType arg1
+          </code>
+          <div class="tip" id="469">
+            <strong>Signature:</strong> UExprT -&gt; Type<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L475-475" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the type of the default channel of the given unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '470', 470)" onmouseover="showTip(event, '470', 470)">
+            dfltChTypename arg1
+          </code>
+          <div class="tip" id="470">
+            <strong>Signature:</strong> UExprT -&gt; TypeNameT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L479-479" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>the type of the default channel of the given unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '471', 471)" onmouseover="showTip(event, '471', 471)">
+            extractVars arg1
+          </code>
+          <div class="tip" id="471">
+            <strong>Signature:</strong> UExprT -&gt; Set&lt;VarSpecT&gt;<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L189-189" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>extracts all variables from the unified expression</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '472', 472)" onmouseover="showTip(event, '472', 472)">
+            op arg1
+          </code>
+          <div class="tip" id="472">
+            <strong>Signature:</strong> UExprT -&gt; UOpT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L471-471" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -76,19 +198,20 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '411', 411)" onmouseover="showTip(event, '411', 411)">
-            shapeOf uexpr
+          <code onmouseout="hideTip(event, '473', 473)" onmouseover="showTip(event, '473', 473)">
+            toExpr uExpr
           </code>
-          <div class="tip" id="411">
-            <strong>Signature:</strong> uexpr:UExprT -&gt; ShapeSpecT<br />
+          <div class="tip" id="473">
+            <strong>Signature:</strong> uExpr:UExprT -&gt; ExprT<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L332-332" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L465-465" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>the shape of the given unified expression</p>
+          <p>Converts a unified expression to an expression.
+Only works if the unified expression was created using the toUExpr function.</p>
 
 
         </td>
@@ -96,75 +219,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '412', 412)" onmouseover="showTip(event, '412', 412)">
-            subExprOccurrences uexpr
-          </code>
-          <div class="tip" id="412">
-            <strong>Signature:</strong> uexpr:UExprT -&gt; UExprT -&gt; int<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L336-336" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>counts how many times subExpr occurs in unified expression uexpr</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '413', 413)" onmouseover="showTip(event, '413', 413)">
-            toExpr arg1
-          </code>
-          <div class="tip" id="413">
-            <strong>Signature:</strong> UExprT -&gt; obj<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L311-311" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>converts a unified expression to an expression of the correct type</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '414', 414)" onmouseover="showTip(event, '414', 414)">
-            toExprOfType arg1
-          </code>
-          <div class="tip" id="414">
-            <strong>Signature:</strong> UExprT -&gt; ExprT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L241-241" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>converts a unified expression to an expression of (known) type</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '415', 415)" onmouseover="showTip(event, '415', 415)">
+          <code onmouseout="hideTip(event, '474', 474)" onmouseover="showTip(event, '474', 474)">
             toUExpr expr
           </code>
-          <div class="tip" id="415">
-            <strong>Signature:</strong> expr:ExprT&lt;&#39;T&gt; -&gt; UExprT<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="474">
+            <strong>Signature:</strong> expr:ExprT -&gt; UExprT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L173-173" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L298-298" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -176,19 +239,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '416', 416)" onmouseover="showTip(event, '416', 416)">
-            typenameOf uexpr
+          <code onmouseout="hideTip(event, '475', 475)" onmouseover="showTip(event, '475', 475)">
+            toUExprs exprs
           </code>
-          <div class="tip" id="416">
-            <strong>Signature:</strong> uexpr:UExprT -&gt; TypeNameT<br />
+          <div class="tip" id="475">
+            <strong>Signature:</strong> exprs:ExprT list -&gt; UExprT list<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L328-328" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L286-286" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>the type of the given unified expression</p>
+          <p>converts a list of expressions to a list of unified expressions</p>
 
 
         </td>
@@ -196,19 +259,20 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '417', 417)" onmouseover="showTip(event, '417', 417)">
-            typeOf uexpr
+          <code onmouseout="hideTip(event, '476', 476)" onmouseover="showTip(event, '476', 476)">
+            tryToExpr arg1
           </code>
-          <div class="tip" id="417">
-            <strong>Signature:</strong> uexpr:UExprT -&gt; Type<br />
+          <div class="tip" id="476">
+            <strong>Signature:</strong> UExprT -&gt; ExprT option<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L324-324" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/UExpr.fs#L458-458" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>the type of the given unified expression</p>
+          <p>Converts a unified expression to an expression if the unified expression
+was created using the toUExpr function. Otherwise returns None.</p>
 
 
         </td>
@@ -239,7 +303,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

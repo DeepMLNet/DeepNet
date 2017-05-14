@@ -43,6 +43,8 @@
   <span>Namespace: SymTensor</span><br />
 </p>
 <div class="xmldoc">
+<p>variable specification</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -56,15 +58,53 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '444', 444)" onmouseover="showTip(event, '444', 444)">
-            name vs
+          <code onmouseout="hideTip(event, '498', 498)" onmouseover="showTip(event, '498', 498)">
+            create name typ shape
           </code>
-          <div class="tip" id="444">
-            <strong>Signature:</strong> vs:&#39;?182512 -&gt; string<br />
-                          <strong>Type parameters:</strong> '?182512          </div>
+          <div class="tip" id="498">
+            <strong>Signature:</strong> name:string -&gt; typ:Type -&gt; shape:ShapeSpecT -&gt; VarSpecT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L86-86" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L206-206" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '499', 499)" onmouseover="showTip(event, '499', 499)">
+            findByName vs map
+          </code>
+          <div class="tip" id="499">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; map:Map&lt;VarSpecT,&#39;a&gt; -&gt; &#39;a<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L245-245" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets variable by name</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '500', 500)" onmouseover="showTip(event, '500', 500)">
+            name vs
+          </code>
+          <div class="tip" id="500">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; string<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L214-214" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -76,19 +116,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '445', 445)" onmouseover="showTip(event, '445', 445)">
-            ofNameAndShape name shape
+          <code onmouseout="hideTip(event, '501', 501)" onmouseover="showTip(event, '501', 501)">
+            nDims vs
           </code>
-          <div class="tip" id="445">
-            <strong>Signature:</strong> name:string -&gt; shape:ShapeSpecT -&gt; VarSpecT&lt;&#39;a&gt;<br />
-                          <strong>Type parameters:</strong> 'a          </div>
+          <div class="tip" id="501">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; int<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L82-82" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L222-222" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>create variable specifation by name and shape</p>
+          <p>number of dimensions of variable</p>
 
 
         </td>
@@ -96,15 +136,35 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '446', 446)" onmouseover="showTip(event, '446', 446)">
-            shape vs
+          <code onmouseout="hideTip(event, '502', 502)" onmouseover="showTip(event, '502', 502)">
+            ofNameShapeAndTypeName (...)
           </code>
-          <div class="tip" id="446">
-            <strong>Signature:</strong> vs:&#39;b -&gt; ShapeSpecT<br />
-                          <strong>Type parameters:</strong> 'b          </div>
+          <div class="tip" id="502">
+            <strong>Signature:</strong> name:string -&gt; shape:ShapeSpecT -&gt; typeName:TypeNameT -&gt; VarSpecT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L89-89" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L210-210" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>create variable specifation by name and shape and type</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '503', 503)" onmouseover="showTip(event, '503', 503)">
+            shape vs
+          </code>
+          <div class="tip" id="503">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; ShapeSpecT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L218-218" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -116,15 +176,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '447', 447)" onmouseover="showTip(event, '447', 447)">
-            substSymSizes symSizeEnv vs
+          <code onmouseout="hideTip(event, '504', 504)" onmouseover="showTip(event, '504', 504)">
+            substSymSizes symSizes vs
           </code>
-          <div class="tip" id="447">
-            <strong>Signature:</strong> symSizeEnv:SymSizeEnvT -&gt; vs:&#39;T -&gt; &#39;T<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="504">
+            <strong>Signature:</strong> symSizes:Map&lt;SizeSymbolT,SizeSpecT&gt; -&gt; vs:VarSpecT -&gt; VarSpecT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L95-95" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L234-234" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -136,15 +196,55 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '448', 448)" onmouseover="showTip(event, '448', 448)">
-            typeName vs
+          <code onmouseout="hideTip(event, '505', 505)" onmouseover="showTip(event, '505', 505)">
+            tryFindByName vs map
           </code>
-          <div class="tip" id="448">
-            <strong>Signature:</strong> vs:&#39;?182516 -&gt; TypeNameT<br />
-                          <strong>Type parameters:</strong> '?182516          </div>
+          <div class="tip" id="505">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; map:Map&lt;VarSpecT,&#39;?178583&gt; -&gt; &#39;?178583 option<br />
+                          <strong>Type parameters:</strong> '?178583          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L92-92" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L238-238" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>gets variable by name</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '506', 506)" onmouseover="showTip(event, '506', 506)">
+            typ vs
+          </code>
+          <div class="tip" id="506">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; Type<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L226-226" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>type of variable</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '507', 507)" onmouseover="showTip(event, '507', 507)">
+            typeName vs
+          </code>
+          <div class="tip" id="507">
+            <strong>Signature:</strong> vs:VarSpecT -&gt; TypeNameT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Vars.fs#L230-230" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -179,7 +279,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

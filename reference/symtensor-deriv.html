@@ -43,6 +43,8 @@
   <span>Namespace: SymTensor</span><br />
 </p>
 <div class="xmldoc">
+<p>derivative calculation</p>
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -56,19 +58,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '255', 255)" onmouseover="showTip(event, '255', 255)">
-            compute expr
+          <code onmouseout="hideTip(event, '130', 130)" onmouseover="showTip(event, '130', 130)">
+            compute rootExpr
           </code>
-          <div class="tip" id="255">
-            <strong>Signature:</strong> expr:ExprT&lt;&#39;T&gt; -&gt; DerivT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="130">
+            <strong>Signature:</strong> rootExpr:ExprT -&gt; DerivT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L145-145" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L701-701" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>reverse accumulation autodifferentiation of an expression</p>
+          <p>computes the derivatives of the specified expression w.r.t. all variables occuring in it</p>
 
 
         </td>
@@ -76,15 +78,35 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '256', 256)" onmouseover="showTip(event, '256', 256)">
-            ofVar var varDiffs
+          <code onmouseout="hideTip(event, '131', 131)" onmouseover="showTip(event, '131', 131)">
+            computeWithRootJacobian (...)
           </code>
-          <div class="tip" id="256">
-            <strong>Signature:</strong> var:ExprT&lt;&#39;T&gt; -&gt; varDiffs:DerivT&lt;&#39;T&gt; -&gt; ExprT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="131">
+            <strong>Signature:</strong> rootJacobian:ExprT -&gt; rootExpr:ExprT -&gt; DerivT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L150-150" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L601-601" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>computes the derivatives of the specified expression w.r.t. all variables occuring in it</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '132', 132)" onmouseover="showTip(event, '132', 132)">
+            ofVar var deriv
+          </code>
+          <div class="tip" id="132">
+            <strong>Signature:</strong> var:ExprT -&gt; deriv:DerivT -&gt; ExprT<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L720-720" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -96,19 +118,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '257', 257)" onmouseover="showTip(event, '257', 257)">
-            reverseDiffStep expr eg
+          <code onmouseout="hideTip(event, '133', 133)" onmouseover="showTip(event, '133', 133)">
+            ofVarSpec var deriv
           </code>
-          <div class="tip" id="257">
-            <strong>Signature:</strong> expr:ExprT&lt;&#39;T&gt; -&gt; eg:ExprT&lt;&#39;T&gt; -&gt; DerivT&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
+          <div class="tip" id="133">
+            <strong>Signature:</strong> var:VarSpecT -&gt; deriv:DerivT -&gt; ExprT<br />
+                      </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L17-17" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Deriv.fs#L710-710" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>reverse accumulation autodifferentiation of an expression</p>
+          <p>extracts the Jacobian of the given VarSpecT</p>
 
 
         </td>
@@ -139,7 +161,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

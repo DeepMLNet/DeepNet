@@ -55,6 +55,12 @@
     <tbody>
         <tr>
           <td class="type-name">
+            <a href="symtensor-functypes-arg0func-1.html">Arg0Func<'TR></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
             <a href="symtensor-functypes-arg1func-2.html">Arg1Func<'T0, 'TR></a>
           </td>
           <td class="xmldoc"></td>
@@ -68,6 +74,30 @@
         <tr>
           <td class="type-name">
             <a href="symtensor-functypes-arg3func-4.html">Arg3Func<'T0, 'T1, 'T2, 'TR></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-functypes-arg4func-5.html">Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-functypes-arg5func-6.html">Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-functypes-arg6func-7.html">Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-functypes-arg7func-8.html">Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR></a>
           </td>
           <td class="xmldoc"></td>
         </tr>
@@ -85,53 +115,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '321', 321)" onmouseover="showTip(event, '321', 321)">
-            ( ^@^ ) a b
-          </code>
-          <div class="tip" id="321">
-            <strong>Signature:</strong> a:ExprT&lt;&#39;?183224&gt; -&gt; b:(VarEnvT -&gt; &#39;?183225) -&gt; VarEnvT -&gt; ArrayNDT&lt;&#39;?183224&gt; -&gt; &#39;?183225<br />
-                          <strong>Type parameters:</strong> '?183224, '?183225          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L332-332" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-              <p>CompiledName: <code>op_HatAtHat</code></p>
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '322', 322)" onmouseover="showTip(event, '322', 322)">
-            ( ^&lt;| ) a b
-          </code>
-          <div class="tip" id="322">
-            <strong>Signature:</strong> a:(&#39;?183227 -&gt; &#39;?183228) -&gt; b:&#39;?183227 -&gt; &#39;?183228<br />
-                          <strong>Type parameters:</strong> '?183227, '?183228          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L335-335" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-              <p>CompiledName: <code>op_HatLessBar</code></p>
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '323', 323)" onmouseover="showTip(event, '323', 323)">
+          <code onmouseout="hideTip(event, '327', 327)" onmouseover="showTip(event, '327', 327)">
             addArg vs f ve value
           </code>
-          <div class="tip" id="323">
-            <strong>Signature:</strong> vs:ExprT&lt;&#39;T&gt; -&gt; f:(VarEnvT -&gt; &#39;?183220) -&gt; ve:VarEnvT -&gt; value:ArrayNDT&lt;&#39;T&gt; -&gt; &#39;?183220<br />
-                          <strong>Type parameters:</strong> 'T, '?183220          </div>
+          <div class="tip" id="327">
+            <strong>Signature:</strong> vs:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; ve:VarEnvT -&gt; value:Tensor&lt;&#39;T&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T, 'TR          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L324-324" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L527-527" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -141,15 +133,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '324', 324)" onmouseover="showTip(event, '324', 324)">
-            addVarEnv f ve varEnv
+          <code onmouseout="hideTip(event, '328', 328)" onmouseover="showTip(event, '328', 328)">
+            addVarEnv varEnv f ve
           </code>
-          <div class="tip" id="324">
-            <strong>Signature:</strong> f:(Map&lt;UVarSpecT,IArrayNDT&gt; -&gt; &#39;?183222) -&gt; ve:VarEnvT -&gt; varEnv:VarEnvT -&gt; &#39;?183222<br />
-                          <strong>Type parameters:</strong> '?183222          </div>
+          <div class="tip" id="328">
+            <strong>Signature:</strong> varEnv:VarEnvT -&gt; f:(Map&lt;VarSpecT,ITensor&gt; -&gt; &#39;a) -&gt; ve:VarEnvT -&gt; &#39;a<br />
+                          <strong>Type parameters:</strong> 'a          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L328-328" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L531-531" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -159,15 +151,33 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '325', 325)" onmouseover="showTip(event, '325', 325)">
+          <code onmouseout="hideTip(event, '329', 329)" onmouseover="showTip(event, '329', 329)">
+            arg0 f ()
+          </code>
+          <div class="tip" id="329">
+            <strong>Signature:</strong> f:(VarEnvT -&gt; &#39;TR) -&gt; unit -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'TR          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L488-488" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '330', 330)" onmouseover="showTip(event, '330', 330)">
             arg1 vs0 f val0
           </code>
-          <div class="tip" id="325">
-            <strong>Signature:</strong> vs0:ExprT&lt;&#39;T0&gt; -&gt; f:(VarEnvT -&gt; &#39;?183208) -&gt; val0:ArrayNDT&lt;&#39;T0&gt; -&gt; &#39;?183208<br />
-                          <strong>Type parameters:</strong> 'T0, '?183208          </div>
+          <div class="tip" id="330">
+            <strong>Signature:</strong> vs0:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'TR          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L310-310" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L493-493" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -177,15 +187,15 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '326', 326)" onmouseover="showTip(event, '326', 326)">
+          <code onmouseout="hideTip(event, '331', 331)" onmouseover="showTip(event, '331', 331)">
             arg2 vs0 vs1 f val0 val1
           </code>
-          <div class="tip" id="326">
-            <strong>Signature:</strong> vs0:ExprT&lt;&#39;T0&gt; -&gt; vs1:ExprT&lt;&#39;T1&gt; -&gt; f:(VarEnvT -&gt; &#39;?183212) -&gt; val0:ArrayNDT&lt;&#39;T0&gt; -&gt; val1:ArrayNDT&lt;&#39;T1&gt; -&gt; &#39;?183212<br />
-                          <strong>Type parameters:</strong> 'T0, 'T1, '?183212          </div>
+          <div class="tip" id="331">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'TR          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L315-315" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L498-498" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -195,15 +205,87 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '327', 327)" onmouseover="showTip(event, '327', 327)">
+          <code onmouseout="hideTip(event, '332', 332)" onmouseover="showTip(event, '332', 332)">
             arg3 vs0 vs1 vs2 f val0 val1 val2
           </code>
-          <div class="tip" id="327">
-            <strong>Signature:</strong> vs0:ExprT&lt;&#39;T0&gt; -&gt; vs1:ExprT&lt;&#39;T1&gt; -&gt; vs2:ExprT&lt;&#39;T2&gt; -&gt; f:(VarEnvT -&gt; &#39;?183217) -&gt; val0:ArrayNDT&lt;&#39;T0&gt; -&gt; val1:ArrayNDT&lt;&#39;T1&gt; -&gt; val2:ArrayNDT&lt;&#39;T2&gt; -&gt; &#39;?183217<br />
-                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, '?183217          </div>
+          <div class="tip" id="332">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; vs2:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; val2:Tensor&lt;&#39;T2&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, 'TR          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L320-320" class="github-link">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L503-503" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '333', 333)" onmouseover="showTip(event, '333', 333)">
+            arg4 (...)
+          </code>
+          <div class="tip" id="333">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; vs2:ExprT -&gt; vs3:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; val2:Tensor&lt;&#39;T2&gt; -&gt; val3:Tensor&lt;&#39;T3&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, 'T3, 'TR          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L508-508" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '334', 334)" onmouseover="showTip(event, '334', 334)">
+            arg5 (...)
+          </code>
+          <div class="tip" id="334">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; vs2:ExprT -&gt; vs3:ExprT -&gt; vs4:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; val2:Tensor&lt;&#39;T2&gt; -&gt; val3:Tensor&lt;&#39;T3&gt; -&gt; val4:Tensor&lt;&#39;T4&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, 'T3, 'T4, 'TR          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L513-513" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '335', 335)" onmouseover="showTip(event, '335', 335)">
+            arg6 (...)
+          </code>
+          <div class="tip" id="335">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; vs2:ExprT -&gt; vs3:ExprT -&gt; vs4:ExprT -&gt; vs5:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; val2:Tensor&lt;&#39;T2&gt; -&gt; val3:Tensor&lt;&#39;T3&gt; -&gt; val4:Tensor&lt;&#39;T4&gt; -&gt; val5:Tensor&lt;&#39;T5&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L518-518" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '336', 336)" onmouseover="showTip(event, '336', 336)">
+            arg7 (...)
+          </code>
+          <div class="tip" id="336">
+            <strong>Signature:</strong> vs0:ExprT -&gt; vs1:ExprT -&gt; vs2:ExprT -&gt; vs3:ExprT -&gt; vs4:ExprT -&gt; vs5:ExprT -&gt; vs6:ExprT -&gt; f:(VarEnvT -&gt; &#39;TR) -&gt; val0:Tensor&lt;&#39;T0&gt; -&gt; val1:Tensor&lt;&#39;T1&gt; -&gt; val2:Tensor&lt;&#39;T2&gt; -&gt; val3:Tensor&lt;&#39;T3&gt; -&gt; val4:Tensor&lt;&#39;T4&gt; -&gt; val5:Tensor&lt;&#39;T5&gt; -&gt; val6:Tensor&lt;&#39;T6&gt; -&gt; &#39;TR<br />
+                          <strong>Type parameters:</strong> 'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensor/Function.fs#L523-523" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -236,7 +318,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>

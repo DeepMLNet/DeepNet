@@ -79,6 +79,14 @@
         </tr>
         <tr>
           <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-arrayndnullargtmpl.html">ArrayNDNullArgTmpl</a>
+          </td>
+          <td class="xmldoc"><p>ArrayND argument with null data pointer template</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
             <a href="symtensor-compiler-cuda-argtemplates-arrayndsdargtmpl.html">ArrayNDSDArgTmpl</a>
           </td>
           <td class="xmldoc"></td>
@@ -88,6 +96,23 @@
             <a href="symtensor-compiler-cuda-argtemplates-arrayndssarg.html">ArrayNDSSArg</a>
           </td>
           <td class="xmldoc"><p>C++ ArrayND with static shape and static offset/stride</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-blasintarraytmpl.html">BlasIntArrayTmpl</a>
+          </td>
+          <td class="xmldoc"><p>BLAS int array. For example it is used for pivot and info arrays of CUDA LAPACK routines.</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-blastransposedmatrixbatchtmpl.html">BlasTransposedMatrixBatchTmpl</a>
+          </td>
+          <td class="xmldoc"><p>BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "(float *)[]".
+All but the last two dimensions are exposed as batches.</p>
 
 </td>
         </tr>
@@ -121,6 +146,20 @@
         </tr>
         <tr>
           <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-checkfiniteieoparg.html">CheckFiniteIEOpArg</a>
+          </td>
+          <td class="xmldoc"><p>check finite elementwise operation C++ structure</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-checkfiniteieopargtmpl-1.html">CheckFiniteIEOpArgTmpl<'T></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
             <a href="symtensor-compiler-cuda-argtemplates-consteoparg-1.html">ConstEOpArg<'T></a>
           </td>
           <td class="xmldoc"><p>const value elementwise operation C++ structure</p>
@@ -129,9 +168,25 @@
         </tr>
         <tr>
           <td class="type-name">
-            <a href="symtensor-compiler-cuda-argtemplates-consteopargtmpl-1.html">ConstEOpArgTmpl<'T></a>
+            <a href="symtensor-compiler-cuda-argtemplates-consteopargtmpl.html">ConstEOpArgTmpl</a>
           </td>
           <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-elementsoparg.html">ElementsOpArg</a>
+          </td>
+          <td class="xmldoc"><p>elments operation C++ structure with no fields</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-elementsopargtmpl.html">ElementsOpArgTmpl</a>
+          </td>
+          <td class="xmldoc"><p>arg template for elements op C++ structure</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
@@ -187,31 +242,59 @@
         </tr>
         <tr>
           <td class="type-name">
-            <a href="symtensor-compiler-cuda-argtemplates-noargeoparg.html">NoArgEOpArg</a>
+            <a href="symtensor-compiler-cuda-argtemplates-idxtptrfromarrayndidxtmpl.html">IdxTPtrFromArrayNDIdxTmpl</a>
           </td>
           <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-interpolate1deoparg.html">Interpolate1DEOpArg</a>
+          </td>
+          <td class="xmldoc"><p>1d interpolation op C++ structure</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-interpolate2deoparg.html">Interpolate2DEOpArg</a>
+          </td>
+          <td class="xmldoc"><p>2d interpolation op C++ structure</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-interpolate3deoparg.html">Interpolate3DEOpArg</a>
+          </td>
+          <td class="xmldoc"><p>3d interpolation op C++ structure</p>
+
+</td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-interpolateeopargtmpl.html">InterpolateEOpArgTmpl</a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="symtensor-compiler-cuda-argtemplates-noargeoparg.html">NoArgEOpArg</a>
+          </td>
+          <td class="xmldoc"><p>elmentwise operation C++ structure with no fields</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="symtensor-compiler-cuda-argtemplates-noargeopargtmpl.html">NoArgEOpArgTmpl</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>arg template for elmentwise op C++ structure</p>
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="symtensor-compiler-cuda-argtemplates-nullptrargtmpl.html">NullPtrArgTmpl</a>
-          </td>
-          <td class="xmldoc"></td>
-        </tr>
-        <tr>
-          <td class="type-name">
-            <a href="symtensor-compiler-cuda-argtemplates-sizetargtmpl.html">SizeTArgTmpl</a>
-          </td>
-          <td class="xmldoc"></td>
-        </tr>
-        <tr>
-          <td class="type-name">
-            <a href="symtensor-compiler-cuda-argtemplates-sizetptrfromarrayndidxtmpl.html">SizeTPtrFromArrayNDIdxTmpl</a>
           </td>
           <td class="xmldoc"></td>
         </tr>
@@ -220,6 +303,34 @@
 
   </div>
 
+  <h3>Functions and values</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Function or value</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '550', 550)" onmouseover="showTip(event, '550', 550)">
+            checkBlasManikin isBatch manikin
+          </code>
+          <div class="tip" id="550">
+            <strong>Signature:</strong> isBatch:bool -&gt; manikin:ArrayNDManikinT -&gt; unit<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/DeepMLNet/DeepNet/tree/master/SymTensorCuda/CudaTypes.fs#L406-406" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>checks that the specified manikin is usable with BLAS</p>
+
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
 
         </div>
         <div class="span3">
@@ -244,7 +355,6 @@
 
             <li class="nav-header">Documentation</li>
             <li><a href="http://www.deepml.net/reference/index.html">API Reference</a></li>
-            <li><a href="http://www.deepml.net/architecture.html">Architecture</a></li>
           </ul>
         </div>
       </div>
