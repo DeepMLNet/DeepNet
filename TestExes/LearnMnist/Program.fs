@@ -14,13 +14,18 @@ let main argv =
     Debug.DisableCombineIntoElementsOptimization <- true
     //Debug.DisableOptimizer <- true
 
-    let device = DevHost
-    //let device = DevCuda
+    let device = 
+        match List.ofArray argv with
+        | ["Host"] -> DevHost
+        | ["Cuda"] -> DevCuda
+        | _ -> DevHost
 
+    printfn "Device: %A" device
+
+    printfn "Loading MNIST..."
     let mnist = Mnist.load (Util.assemblyDirectory + "/../../../../Data/MNIST") 0.1
-
     let mnist = if device = DevCuda then TrnValTst.toCuda mnist else mnist
-
+    
     printfn "Building model..."
     let mb = ModelBuilder<single> "NeuralNetModel"
 
@@ -92,7 +97,7 @@ let main argv =
             MinIters           = Some 100 
             MaxIters           = None  
             LearningRates      = [1e-3; 1e-4; 1e-5]       
-            CheckpointFile     = Some "MNIST-%ITER%.h5"
+            CheckpointFile     = Some (Util.assemblyDirectory + "/MNIST-%ITER%.h5")
             CheckpointInterval = Some 50
             DiscardCheckpoint  = true
     } 
