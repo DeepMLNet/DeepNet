@@ -69,8 +69,8 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <- HostTensor.scalar l |> mi.Device.ToDev
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s |> mi.Device.ToDev
             | _ -> ()
             let mean, cov = GaussianProcess.predict pars x t sigNs inp      
             let stdev = cov |> Expr.diag |> Expr.sqrtt
@@ -91,8 +91,8 @@ module GPPlots =
 
             match pars, hyperPars.Kernel with
             | GaussianProcess.SEPars parsSE, GaussianProcess.SquaredExponential (l,s) ->
-                mi.ParameterStorage.[parsSE.Lengthscale] <-HostTensor.scalar l
-                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s
+                mi.ParameterStorage.[parsSE.Lengthscale] <- HostTensor.scalar l |> mi.Device.ToDev
+                mi.ParameterStorage.[parsSE.SignalVariance] <- HostTensor.scalar s |> mi.Device.ToDev
             | _ -> ()
 
             let mean, _ = GaussianProcess.predict pars x t sigNs inp  
