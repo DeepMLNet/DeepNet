@@ -116,7 +116,7 @@ let main argv =
     let result = Train.train trainable mnist trainCfg
 
     //let ts = ts.End ()
-    //ts |> Trace.dumpToFile "LearnMNIST.txt"
+    //ts |> Trace.dumpToFile "LearnMNIST.txt" "LearnMNIST.h5"
 
     0
 
