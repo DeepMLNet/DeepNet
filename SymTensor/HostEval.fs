@@ -189,7 +189,9 @@ module HostEval =
 
                 | Nary(op, es) ->
                     match op with 
-                    | Discard -> HostTensor.zeros<'R> [0L] |> box
+                    | Discard -> 
+                        es |> List.iter (subEvalTypeNeutral >> ignore)
+                        HostTensor.zeros<'R> [0L] |> box
                     | BuildTensor (shp, rngs) ->
                         let trgt = HostTensor.zeros<'R> (shapeEval shp)
                         for rng, e in List.zip rngs es do                            
