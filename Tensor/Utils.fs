@@ -482,3 +482,26 @@ module Util =
         | _ -> None
 
 
+    /// part of a limited string length format specifier
+    type LimitedStringPart =
+        /// a delimiter that is always inserted
+        | Delim of string
+        /// a formatter that is replaced by "..." if string becomes too long
+        | Formatter of (int -> string)
+
+    /// builds a string of approximate maximum length from the given format specifier parts
+    let limitedToString maxLength parts =
+        ("", parts)
+        ||> List.fold (fun s p ->
+            match p with
+            | Delim d -> s + d
+            | Formatter fmtFn -> 
+                match maxLength - s.Length with
+                | remLength when remLength > 0 -> s + fmtFn remLength
+                | _ -> s + "..."
+            )
+
+
+
+        
+

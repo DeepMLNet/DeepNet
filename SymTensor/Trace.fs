@@ -260,6 +260,7 @@ module Trace =
     let compare = compareCustom maxSimilar
 
     let dump txtFile (hdfFile: HDF5) trace =
+        let exprMaxLength = 300
         let out fmt = fprintfn txtFile fmt
         out "Trace session %s" trace.Name
         out "Start: %A" trace.Start
@@ -271,8 +272,14 @@ module Trace =
         out ""
 
         for exprEval in trace.ExprEvals do
-            let exprsStr = sprintf "%A" (exprEval.Exprs |> List.map UExpr.toExpr)
-            out "Evaluation of expression(s) %s" exprsStr
+            let exprsStr = 
+                exprEval.Exprs 
+                |> List.map UExpr.toExpr
+                |> List.map (fun e -> e.ToString exprMaxLength)
+                |> String.concat "\n"
+            out "Evaluation of expression(s):" 
+            out "%s" exprsStr
+            out ""
             out "Id:       %d" exprEval.Id
             out "Compiler: %s" exprEval.Compiler
             out "Start:    %A" exprEval.Start
@@ -302,7 +309,7 @@ module Trace =
                 | ExprEvaled (uexpr, ls, res, msg) ->
                     let exprStr =
                         match UExpr.tryToExpr uexpr with
-                        | Some expr -> sprintf "%A" expr
+                        | Some expr -> expr.ToString exprMaxLength
                         | None -> sprintf "%A" uexpr
                     let loopStackStr =
                         sprintf "%A" (ls |> List.map (fun l -> l.Iter))

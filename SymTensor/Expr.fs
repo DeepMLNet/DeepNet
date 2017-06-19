@@ -387,13 +387,40 @@ module Expr =
                 | :? ExprT as other -> (this :> System.IComparable<_>).CompareTo other
                 | _ -> failwithf "cannot compare ExprT to type %A" (other.GetType())
 
-        /// pretty string
-        member this.Pretty =
+        /// converts expression to string with approximate maximum length
+        member this.ToString maxLength =
             match this with
-            | Leaf op -> sprintf "{%A}" op 
-            | Unary (op, a) -> sprintf "{%A} (%A)" op a
-            | Binary (op, a, b) -> sprintf "{%A} (%A, %A)" op a b
-            | Nary (op, es) -> sprintf "{%A} (%A)" op es
+            | Leaf op -> sprintf "{%A}" op
+            | Unary (op, a) -> 
+                Util.limitedToString maxLength [Util.Formatter (fun _ -> sprintf "{%A}" op)
+                                                Util.Delim " ("
+                                                Util.Formatter (fun ml -> a.ToString ml)
+                                                Util.Delim ")"]
+            | Binary (op, a, b) -> 
+                Util.limitedToString maxLength [Util.Formatter (fun _ -> sprintf "{%A}" op)
+                                                Util.Delim " ("
+                                                Util.Formatter (fun ml -> a.ToString ml)
+                                                Util.Delim ", "
+                                                Util.Formatter (fun ml -> b.ToString ml)
+                                                Util.Delim ")"]
+            | Nary (op, es) -> 
+                Util.limitedToString maxLength [yield Util.Formatter (fun _ -> sprintf "{%A}" op)
+                                                yield Util.Delim " ("
+                                                for p, e in List.indexed es do
+                                                    yield Util.Formatter (fun ml -> e.ToString ml)
+                                                    if p < List.length es - 1 then yield Util.Delim ", "
+                                                yield Util.Delim ")"]               
+
+        /// converts expression to string with unlimited length
+        override this.ToString () = this.ToString System.Int32.MaxValue
+
+        /// pretty string
+        member this.Pretty = this.ToString 80
+            //match this with
+            //| Leaf op -> sprintf "{%A}" op 
+            //| Unary (op, a) -> sprintf "{%A} (%A)" op a
+            //| Binary (op, a, b) -> sprintf "{%A} (%A, %A)" op a b
+            //| Nary (op, es) -> sprintf "{%A} (%A)" op es
 
     type FullExprRngSpecT = RangeSpecT<ExprT>
     type FullExprRngsSpecT = RangesSpecT<ExprT>
