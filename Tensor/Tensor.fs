@@ -526,7 +526,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
     /// If the array is currently not in row-major order, a reshaped copy is returned.
     /// Otherwise, a reshaped view of the same tensor is returned.
     /// The number of elements must not change.
-    /// One element can be -1, in which case the size of that element is
+    /// One element can be 'Remainder', in which case the size of that element is
     /// inferred automatically.
     static member reshape shp a =
         match a |> Tensor<_>.tryReshapeView shp with
@@ -1891,7 +1891,7 @@ type Tensor =
     static member internal CheckSameShape (a: ITensor) (b: ITensor) =
         if a.Shape <> b.Shape then
             raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
-                                           to have same shape" a.Shape b.Shape))
+                                           to have same shape" a.Shape b.Shape))    
 
     /// prepares the sources of an elementwise operation by broadcasting them to the target shape
     static member internal PrepareElemwiseSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
@@ -2220,7 +2220,7 @@ type Tensor =
                 (sprintf "need at least a two dimensional array for trace but got shape %A" a.Shape)
         Tensor.traceAxis (a.NDims-2) (a.NDims-1) a
 
-    /// tensor constructed of subtensors using a BlockTensor specification
+    /// N-dimensional tensor constructed of subtensors using a BlockTensor specification.
     static member ofBlocks (bs: BlockTensor<'T>) =
         let rec commonShape joinDim shps =               
             match shps with
@@ -2228,7 +2228,7 @@ type Tensor =
             | shp::rShps ->
                 let commonShp = commonShape joinDim [shp]
                 if commonShp <> commonShape joinDim rShps then
-                    invalidArg "bs" "block tensor blocks must have same rank and be 
+                    invalidArg "bs" "block tensor blocks must have same number of dimensions and be 
                                      identical in all but the join dimension"
                 commonShp
             | [] -> []
@@ -2271,6 +2271,18 @@ type Tensor =
             let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng (Some p, Some (p + s))) 
             joined.[slice] <- ary
         joined
+
+    /// 1d vector constructed of blocks 
+    static member ofBlocks (bs: Tensor<'T> list) =
+        bs |> List.map Block |> SubBlocks |> Tensor.ofBlocks
+
+    /// 2d matrix constructed of blocks 
+    static member ofBlocks (bs: Tensor<'T> list list) =
+        bs |> List.map (List.map Block >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
+
+    /// 3d tensor constructed of blocks
+    static member ofBlocks (bs: Tensor<'T> list list list) =
+        bs |> List.map (List.map (List.map Block >> SubBlocks) >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
     /// tensor product
     static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
