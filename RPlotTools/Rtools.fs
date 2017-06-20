@@ -62,6 +62,11 @@ type R () =
         |> RCall.param "col" color
         |> RCall.call R.points
 
+    static member fillBetween (x: float[], y1: float[], y2: float[], ?color) =
+        if x.Length <> y1.Length || x.Length <> y2.Length then
+            failwith "x, y1, y2 must be of same length"
+        R.polygon (x=R.c(x, R.rev(x)), y=R.c(y2, R.rev(y1)), col=color)
+
     static member par2 (param: string, value: 'f) =
         RCall.empty
         |> RCall.param param (Some value)
