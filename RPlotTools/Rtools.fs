@@ -48,6 +48,16 @@ type R () =
         |> RCall.param "y" (Some (R.vector()))
         |> RCall.call R.plot
 
+    static member plot3 (?xRng, ?yRng, ?title, ?xlabel, ?ylabel) =
+        let xRng = defaultArg xRng (-6., 6.)
+        let yRng = defaultArg yRng (-3., 3.)
+        let title = defaultArg title ""
+        let xlabel = defaultArg xlabel ""
+        let ylabel = defaultArg ylabel ""
+        let xlim = [|fst xRng; snd xRng|]
+        let ylim = [|fst yRng; snd yRng|]
+        R.plot2(xlim, ylim, title, xlabel, ylabel)
+
     static member lines2 (?x, ?y, ?color) =
         RCall.empty
         |> RCall.param "x" x
@@ -63,6 +73,9 @@ type R () =
         |> RCall.param "col" color
         |> RCall.param "bg" bg
         |> RCall.call R.points
+
+    static member points3 (?x: float[], ?y: float[], ?pch: int, ?color: string, ?bg: string) =
+        R.points2(?x=x, ?y=y, ?pch=pch, ?color=color, ?bg=bg)
 
     static member fillBetween (x: float[], y1: float[], y2: float[], ?color) =
         if x.Length <> y1.Length || x.Length <> y2.Length then
@@ -119,4 +132,11 @@ type R () =
         R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
         R.par2 ("mgp", [1.7; 0.7; 0.0])
         R.par2 ("mfrow", [nPlots; 1])
+
+    static member multiplot (nPlots) =
+        R.par2 ("oma", [0; 0; 0; 0])
+        R.par2 ("mar", [3.2; 2.6; 1.0; 0.5])
+        R.par2 ("mgp", [1.7; 0.7; 0.0])
+        R.par2 ("mfrow", [nPlots; 1])
+ 
  

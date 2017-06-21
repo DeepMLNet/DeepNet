@@ -74,13 +74,13 @@
       <HintPath>$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\$(TargetFSharpCoreVersion)\FSharp.Core.dll</HintPath>
     </Reference>
     <Reference Include="RDotNet">
-      <HintPath>..\..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.dll</HintPath>
+      <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.dll</HintPath>
     </Reference>
-    <Reference Include="RDotNet.FSharp">
-      <HintPath>..\..\packages\R.NET.Community.FSharp.1.6.5\lib\net40\RDotNet.FSharp.dll</HintPath>
+    <Reference Include="RProvider">
+      <HintPath>..\packages\RProvider.1.1.20\lib\net40\RProvider.dll</HintPath>
     </Reference>
-    <Reference Include="RDotNet.NativeLibrary">
-      <HintPath>..\..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.NativeLibrary.dll</HintPath>
+    <Reference Include="RProvider.Runtime">
+      <HintPath>..\packages\RProvider.1.1.20\lib\net40\RProvider.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
