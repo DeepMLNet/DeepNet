@@ -1628,7 +1628,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         Tensor.CheckSameStorage [trgt; a]
         if a.NDims < 2 then
             invalidArg "a" 
-                (sprintf "need at least a matrix to invert but got shape %A" a.Shape)
+                (sprintf "need at least a matrix to pseudo invert but got shape %A" a.Shape)
         let a = a |> Tensor.broadcastTo trgt.Shape
 
         let u, s, v = Tensor.SVD a
