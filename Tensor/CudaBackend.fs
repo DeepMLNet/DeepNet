@@ -690,6 +690,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 info.Dispose())                
 
         // unsupported for now on CUDA
+        member this.BatchedSVD (trgtS, trgtUV, src) = unsup "BatchedSVD"
         member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) = unsup "SymmetricEigenDecomposition"
         member this.Fill(fn, trgt, useThreads) = unsup "Fill"
         member this.FillIndexed(fn, trgt, useThreads) = unsup "FillIndexed"

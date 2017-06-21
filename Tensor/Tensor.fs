@@ -243,7 +243,9 @@ type ITensorBackend<'T> =
     abstract MatMatDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract BatchedMatMatDot:  trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
 
-    abstract BatchedInvert:     trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    //abstract BatchedLU:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
+    abstract BatchedSVD:            trgtS:Tensor<'T> * trgtUV:(Tensor<'T> * Tensor<'T>) option * src1:Tensor<'T> -> unit
+    abstract BatchedInvert:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * 
                                           src:Tensor<'T> -> unit
 
@@ -1570,6 +1572,80 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillInvert a
         trgt
 
+    /// Helper function to compute SVD sizes.
+    static member internal SVDSizes (a: Tensor<'T>) =
+        if a.NDims < 2 then
+            invalidArg "a" 
+                (sprintf "need at least a matrix to SVD but got shape %A" a.Shape)
+        let batchShp = a.Shape.[0 .. a.NDims-3]
+        let M, N = a.Shape.[a.NDims-2], a.Shape.[a.NDims-1]
+        let K = min M N
+        batchShp, M, N, K
+
+    /// Singular value decomposition so that a = U .* S .* V.T with trgtUV=(U,V).
+    member trgtS.FillSVD (a: Tensor<'T>, ?trgtUV: Tensor<'T> * Tensor<'T>) =
+        let batchShp, M, N, K = Tensor.SVDSizes a
+        Tensor.CheckSameStorage [trgtS; a]
+        if trgtS.Shape <> batchShp @ [K] then
+            invalidArg "trgtS"
+                (sprintf "need a tensor of shape %A for SVD singular values but got shape %A"
+                         (batchShp @ [K]) trgtS.Shape)
+        match trgtUV with
+        | Some (trgtU, trgtV) -> 
+            Tensor.CheckSameStorage [trgtS; a; trgtU; trgtV]
+            if trgtU.Shape <> batchShp @ [M; M] then
+                invalidArg "trgtUV"
+                    (sprintf "need a tensor of shape %A for SVD left unitary matrices but got shape %A"
+                             (batchShp @ [M; M]) trgtU.Shape)
+            if trgtV.Shape <> batchShp @ [N; N] then
+                invalidArg "trgtUV"
+                    (sprintf "need a tensor of shape %A for SVD right unitary matrices but got shape %A"
+                             (batchShp @ [N; N]) trgtV.Shape)            
+        | None -> ()
+        trgtS.Backend.BatchedSVD (trgtS, trgtUV, a)                
+
+    /// Singular value decomposition returning (U, S, V) so that a = U .* diagMat(S) .* V.T.    
+    static member SVD (a: Tensor<'T>) =
+        let batchShp, M, N, K = Tensor.SVDSizes a
+        let U = Tensor<'T> (batchShp @ [M;M], a.Dev, order=ColumnMajor)
+        let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
+        let V = Tensor<'T> (batchShp @ [N;N], a.Dev, order=RowMajor)
+        S.FillSVD(a, trgtUV=(U, V))
+        U, S, V
+
+    /// Singular value decomposition returning S so that a = U .* diagMat(S) .* V.T.
+    static member SVDWithoutUV (a: Tensor<'T>) =
+        let batchShp, M, N, K = Tensor.SVDSizes a
+        let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
+        S.FillSVD(a)
+        S
+
+    /// Matrix pseudo inversion using this tensor as target.
+    /// If the specified tensor has more than two dimensions, the matrices
+    /// consisting of the last two dimensions are inverted.
+    member trgt.FillPseudoInvert (a: Tensor<'T>, ?rCond: 'T)  = 
+        let rCond = defaultArg rCond (conv<'T> 1e-15)
+        Tensor.CheckSameStorage [trgt; a]
+        if a.NDims < 2 then
+            invalidArg "a" 
+                (sprintf "need at least a matrix to invert but got shape %A" a.Shape)
+        let a = a |> Tensor.broadcastTo trgt.Shape
+
+        let u, s, v = Tensor.SVD a
+        let rCond = Tensor.scalarLike s rCond
+        let zero = Tensor.scalarLike s (conv<'T> 0)
+        let one = Tensor.scalarLike s (conv<'T> 1)
+        s.FillIfThenElse (s >>== rCond) (one / s) (zero)
+        trgt.FillDot (v) (Tensor.padRight s * u.T)
+
+    /// Matrix pseudo inversion.
+    /// If the specified tensor has more than two dimensions, the matrices
+    /// consisting of the last two dimensions are inverted.
+    static member pseudoInvert (a: Tensor<'T>, ?rCond: 'T) = 
+        let trgt = Tensor<'T> (a.Shape, a.Dev)
+        trgt.FillPseudoInvert (a, ?rCond=rCond)
+        trgt
+
     /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
     /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
     /// corresponding eigenvalue in 'vals'.
@@ -2069,14 +2145,14 @@ type Tensor =
         a.FillIndexed (fun idx -> start + conv<'V> idx.[0] * incr)
 
     /// Creates a one-dimensiona tensor filled with equaly spaced values from start 
-    /// to (including) stop using the given increment.
+    /// to (excluding) stop using the given increment.
     static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
-        let nElems = max 0L ((stop + incr - start) / incr |> int64)
+        let nElems = max 0L ((stop - start) / incr |> int64)
         let x = Tensor<'V> ([nElems], dev)
         x |> Tensor.fillArange start incr
         x
 
-    /// Fills the vector with equaly spaced values from start to (including) stop.
+    /// Fills the vector with equaly spaced values from start to (excluding) stop.
     static member inline fillLinspace (start: 'V) (stop: 'V) (a: Tensor<'V>) =
         if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
         if a.NElems < 2L then raise (ShapeMismatch "tensor must have at least two elements")

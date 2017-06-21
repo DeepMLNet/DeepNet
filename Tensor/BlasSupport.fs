@@ -58,16 +58,20 @@ module internal BLAS =
 
     /// Information for passing a vector to BLAS/LAPACK routines.
     type VectorInfo (storage:   IBLASStorage,
-                     offset:    nativeint,
+                     offsets:   nativeint[],
                      size:      int64,
                      inc:       int64,
                      fetchFn:   (unit -> unit)) =
 
         let memPin, basePtr = storage.Pin()
 
-        member this.Ptr       : nativeint            = basePtr + offset
-        member this.Size                             = size
-        member this.Inc                              = inc
+        member this.Ptr : nativeint =
+            if offsets.Length = 1 then basePtr + offsets.[0]
+            else failwith "this Blas.VectorInfo is representing a batch of vectors"
+        member this.Ptrs : nativeint [] =
+            offsets |> Array.map (fun o -> basePtr + o)       
+        member this.Size = size
+        member this.Inc  = inc
         member this.FetchResult () = fetchFn()
 
         interface IDisposable with
@@ -101,15 +105,20 @@ type internal BLAS =
         new ScalarInfo (storage, nativeint (sizeof64<'T> * scalar.Layout.Offset))
             
     /// Internal function for GetBlasVector.
-    static member private GetVectorInfo (vec: Tensor<'T>, ?fetchFn) =
+    static member private GetVectorInfo (vec: Tensor<'T>, reqLinear: bool, ?fetchFn) =
         let fetchFn = defaultArg fetchFn id
-        if vec.NDims <> 1 then 
+        if vec.NDims < 1 then 
             failwithf "BLAS operation requires a vector but got tensor of shape %A" vec.Shape
         let storage = vec.Storage :?> IBLASStorage
-        match vec.Layout.Stride, vec.Layout.Shape with
-        | [m], [ms] when m <> 0L ->   // increment <> 0
-            new VectorInfo (storage, nativeint (sizeof64<'T> * vec.Layout.Offset), 
-                            ms, m, fetchFn) |> Some
+        let offsets = 
+            TensorLayout.allIdxOfShape vec.Shape.[0 .. vec.NDims-2]
+            |> Seq.map (fun batchIdx -> 
+                let idx = batchIdx @ [0L]
+                sizeof64<'T> * TensorLayout.addr idx vec.Layout |> nativeint)
+            |> Array.ofSeq
+        match vec.Layout.Stride.[vec.NDims-1] , vec.Layout.Shape.[vec.NDims-1] with
+        | m, ms when (if reqLinear then m = 1L else m <> 0L) ->   
+            new VectorInfo (storage, offsets, ms, m, fetchFn) |> Some
         | _  -> None                  // not acceptable BLAS layout
 
     /// Returns a BlasVectorInfo that exposes the specfied vector to BLAS
@@ -118,16 +127,19 @@ type internal BLAS =
     /// - the source might be copied into a temporary tensor,
     /// - the result might be copied from a temporary tensor into the target, when
     ///   the returned BlasMatrixInfo is disposed.
-    static member GetVector (vec: Tensor<'T>, isSource: bool, isTarget: bool, ?allowCopy: bool) =
+    /// When reqLinear is true, it ensures that the resulting vector is
+    /// densely packed, i.e. has increment one.
+    static member GetVector (vec: Tensor<'T>, isSource: bool, isTarget: bool, 
+                             ?allowCopy: bool, ?reqLinear: bool) =
         let allowCopy = defaultArg allowCopy true                        
-        match BLAS.GetVectorInfo (vec) with
+        let reqLinear = defaultArg reqLinear false
+        match BLAS.GetVectorInfo (vec, reqLinear) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T>(vec.Shape, vec.Dev, order=ColumnMajor)
+            let tmp = Tensor<'T>(vec.Shape, vec.Dev, order=RowMajor)
             if isSource then tmp.CopyFrom vec
             let fetchFn () = if isTarget then vec.CopyFrom tmp
-            BLAS.GetVectorInfo (tmp, fetchFn=fetchFn) 
-            |> Option.get
+            BLAS.GetVectorInfo (tmp, reqLinear, fetchFn=fetchFn) |> Option.get
         | None ->
             failwithf "tensor with shape %A and strides %A is not a valid BLAS vector"
                       vec.Shape vec.Layout.Stride

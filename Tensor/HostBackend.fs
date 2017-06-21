@@ -137,6 +137,21 @@ module internal BLAS =
                                       nativeint a, lapack_int lda,
                                       nativeint w)
 
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_sgesdd (int matrix_layout, char jobz, lapack_int m, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      nativeint s, 
+                                      nativeint u, lapack_int ldu, 
+                                      nativeint vt, lapack_int ldvt)
+
+    [<DllImport("tensor_mkl.dll", CallingConvention=CallingConvention.Cdecl)>]
+    extern lapack_int LAPACKE_dgesdd (int matrix_layout, char jobz, lapack_int m, lapack_int n, 
+                                      nativeint a, lapack_int lda, 
+                                      nativeint s, 
+                                      nativeint u, lapack_int ldu, 
+                                      nativeint vt, lapack_int ldvt)
+
+
 module internal HostBLASExtensions = 
     type Tensor.Backend.BLAS.MatrixInfo with
         member this.CTrans = 
@@ -1901,6 +1916,32 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
             a.FetchResult()
+
+        member this.BatchedSVD (trgtS, trgtUV, src) =
+            let src = src.Copy(order=ColumnMajor) // LAPACK destorys src
+            let batchShp, M, N, K = Tensor.SVDSizes src
+
+            use a = BLAS.GetMatrix (src, isSource=true, isTarget=false, canTranspose=false)
+            use s = BLAS.GetVector (trgtS, isSource=false, isTarget=true, reqLinear=true)
+            match trgtUV with
+            | Some (trgtU, trgtV) ->
+                use u = BLAS.GetMatrix (trgtU, isSource=false, isTarget=true, canTranspose=false)
+                use vt = BLAS.GetMatrix (trgtV.T, isSource=false, isTarget=true, canTranspose=false)
+                for smpl in 0 .. int a.BatchSize - 1 do
+                    let info =
+                        BLAS.Invoke<'T, BLAS.lapack_int>
+                            (singleFn=(fun() -> BLAS.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)),
+                             doubleFn=(fun() -> BLAS.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)))
+                    if info < 0L then failwithf "LAPACK argument error %d" info
+                    if info > 0L then failwithf "SVD did not converge: %d" info
+            | None -> 
+                for smpl in 0 .. int a.BatchSize - 1 do
+                    let info =
+                        BLAS.Invoke<'T, BLAS.lapack_int>
+                            (singleFn=(fun() -> BLAS.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)),
+                             doubleFn=(fun() -> BLAS.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)))
+                    if info < 0L then failwithf "LAPACK argument error %d" info
+                    if info > 0L then failwithf "SVD did not converge: %d" info
 
         member this.SymmetricEigenDecomposition (part, eigVals, eigVecs, src) =
             let size = src.Shape.[0]

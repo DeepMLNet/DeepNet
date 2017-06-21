@@ -26,8 +26,8 @@ type GP () =
         0.0
 
     /// squared-exponential covariance function
-    static member covSe lengthscale xa xb =
-        exp (-(xa-xb)**2. / (2. * lengthscale))
+    static member covSe var lengthscale xa xb =
+        var * exp (-(xa-xb)**2. / (2. * lengthscale))
 
     /// Returns the mean and covariance of a GP prior.
     static member prior (x, meanFn, covFn) =
@@ -81,15 +81,19 @@ type GP () =
 
     /// Plots the mean and variance of a GP.
     /// Optionally the training points for a GP regression can be specified.
-    static member plot (tstX, tstMu, tstSigma, ?trnX, ?trnY, ?trnV) =
+    static member plot (tstX, tstMu: Tensor<float>, tstSigma, ?trnX, ?trnY, ?trnV) =
         R.lock (fun () ->
             let ary = HostTensor.toArray
             let tstStd = tstSigma |> Tensor.diag |> sqrt
             let tstYL = tstMu - tstStd
             let tstYH = tstMu + tstStd
+            //R.plot2(xlim=[|Tensor.min tstX; Tensor.max tstX|],
+            //        ylim=[|Tensor.min tstYL; Tensor.max tstYH|],
+            //        xlabel="x", ylabel="y")
             R.plot2(xlim=[|Tensor.min tstX; Tensor.max tstX|],
-                    ylim=[|Tensor.min tstYL; Tensor.max tstYH|])
-            R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="skyblue")
+                    ylim=[|-2.0; 2.0|],
+                    xlabel="x", ylabel="y")
+            //R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="skyblue")
             R.lines2 (ary tstX, ary tstMu, color="red")
             match trnX, trnY, trnV with
             | Some trnX, Some trnY, Some trnV ->

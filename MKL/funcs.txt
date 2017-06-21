@@ -22,4 +22,9 @@ LAPACKE_dgeev
 LAPACKE_ssyevd 
 LAPACKE_dsyevd
 
+LAPACKE_sgetrf
+LAPACKE_dgetrf
+
+LAPACKE_sgesdd
+LAPACKE_dgesdd
 

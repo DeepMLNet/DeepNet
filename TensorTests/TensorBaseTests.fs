@@ -202,6 +202,31 @@ let ``Invert Kk matrix`` () =
     printfn "maxdiff: %f" (Tensor.max diff)
     Tensor.almostEqualWithTol (id, ids, absTol=1e-5f, relTol=1e-5f)  |> Assert.True
 
+[<Fact>]
+let ``Pseudo Invert random matrix`` () =
+    let rng = System.Random 123
+
+    let dm = rng.UniformTensor (-1.0, 1.0) [4L; 4L]
+    let dmInv = Tensor.pseudoInvert dm
+    let dmInvInv = Tensor.pseudoInvert dmInv
+
+    printfn "dm=\n%A" dm
+    printfn "dm^-1=\n%A" dmInv
+    printfn "dm^-1^-1=\n%A" dmInvInv 
+
+    Tensor.almostEqual dm dmInvInv |> Assert.True
+
+[<Fact>]
+let ``Pseudo Invert singular matrix`` () =
+    let dm = HostTensor.ofList2D [[1.0; 0.0; 0.0]
+                                  [1.0; 2.0; 0.0]
+                                  [1.0; 0.0; 0.0]]
+
+    let dmInv = Tensor.pseudoInvert dm
+
+    printfn "dm=\n%A" dm
+    printfn "dm^-1=\n%A" dmInv
+
 
 [<Fact>]
 let ``Select`` () =
