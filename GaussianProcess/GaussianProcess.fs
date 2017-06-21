@@ -21,6 +21,14 @@ type GP () =
         HostTensor.init [getNSamples xa; getNSamples xb] 
             (fun pos -> covFn xa.[[pos.[0]]] xb.[[pos.[1]]])
 
+    /// zero mean function
+    static member meanZero (x: float) = 
+        0.0
+
+    /// squared-exponential covariance function
+    static member covSe lengthscale xa xb =
+        exp (-(xa-xb)**2. / (2. * lengthscale))
+
     /// Returns the mean and covariance of a GP prior.
     static member prior (x, meanFn, covFn) =
         let mu = meanVec meanFn x 
@@ -71,6 +79,8 @@ type GP () =
         let tstDSigma = dTstDTstCov - KDstar .* Kinv .* KDstar.T
         (tstMu, tstSigma), (tstDMu, tstDSigma)
 
+    /// Plots the mean and variance of a GP.
+    /// Optionally the training points for a GP regression can be specified.
     static member plot (tstX, tstMu, tstSigma, ?trnX, ?trnY, ?trnV) =
         R.lock (fun () ->
             let ary = HostTensor.toArray
@@ -78,6 +88,11 @@ type GP () =
             let tstYL = tstMu - tstStd
             let tstYH = tstMu + tstStd
             R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="skyblue")
+            R.lines2 (ary tstX, ary tstMu, color="red")
+            match trnX, trnY, trnV with
+            | Some trnX, Some trnY, Some trnV ->
+                R.points2 (ary trnX, ary trnY, color="black")
+            | _ -> ()
         )
 
 

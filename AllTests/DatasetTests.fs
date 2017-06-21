@@ -101,9 +101,9 @@ let ``Loading CSV datasets`` () =
 type SeqSample = {SeqData: Tensor<int64>}
 
 type SequenceDataset () = 
-    let smpl1 = {SeqData = HostTensor.arange 98L}
-    let smpl2 = {SeqData = 100L + HostTensor.arange 98L}
-    let smpl3 = {SeqData = 200L + HostTensor.arange 98L}
+    let smpl1 = {SeqData = HostTensor.counting 98L}
+    let smpl2 = {SeqData = 100L + HostTensor.counting 98L}
+    let smpl3 = {SeqData = 200L + HostTensor.counting 98L}
     let dataset = Dataset.ofSeqSamples [smpl1; smpl2; smpl3]
 
     [<Fact>]

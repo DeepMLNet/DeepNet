@@ -72,7 +72,7 @@ module HostEval =
                     | Identity (ss, tn) -> HostTensor.identity (sizeEval ss) 
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> HostTensor.scalar
                     | Arange (ss, tn) -> 
-                        HostTensor.arange (sizeEval ss) |> Tensor.convert<'T>
+                        HostTensor.counting (sizeEval ss) |> Tensor.convert<'T>
                     | ScalarConst sc -> HostTensor.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox

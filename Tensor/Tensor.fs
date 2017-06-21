@@ -2034,17 +2034,30 @@ type Tensor =
         x           
 
     /// Int64 vector containing the numbers [0L; 1L; ...; nElems-1L].
-    static member arange (dev: ITensorDevice) (nElems: int64) =
+    static member counting (dev: ITensorDevice) (nElems: int64) =
         Tensor.init dev [nElems] (fun idx -> idx.[0])        
 
-    /// Fills the vector with linearly spaced values from start to (including) stop.
+    /// Fills the vector with equaly spaced values from start using the given increment.
+    static member inline fillArange (start: 'V) (incr: 'V) (a: Tensor<'V>) =
+        if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
+        a.FillIndexed (fun idx -> start + conv<'V> idx.[0] * incr)
+
+    /// Creates a one-dimensiona tensor filled with equaly spaced values from start 
+    /// to (including) stop using the given increment.
+    static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
+        let nElems = max 0L ((stop + incr - start) / incr |> int64)
+        let x = Tensor<'V> ([nElems], dev)
+        x |> Tensor.fillArange start incr
+        x
+
+    /// Fills the vector with equaly spaced values from start to (including) stop.
     static member inline fillLinspace (start: 'V) (stop: 'V) (a: Tensor<'V>) =
         if a.NDims <> 1 then raise (ShapeMismatch "tensor must be one dimensional")
         if a.NElems < 2L then raise (ShapeMismatch "tensor must have at least two elements")
         let step = (stop - start) / conv<'V> (a.NElems - 1L)
         a.FillIndexed (fun idx -> start + conv<'V> idx.[0] * step)     
 
-    /// Creates a one-dimensional tensor filled with linearly spaced values from start 
+    /// Creates a one-dimensional tensor filled with equaly spaced values from start 
     /// to (including) stop.
     static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
         let x = Tensor<'V> ([nElems], dev)

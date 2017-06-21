@@ -1992,7 +1992,10 @@ module HostTensor =
 
     let identity<'T> = Tensor.identity<'T> Dev
 
-    let arange = Tensor.arange Dev
+    let counting = Tensor.counting Dev
+
+    let inline arange start incr stop = 
+        Tensor.arange Dev start incr stop
 
     let inline linspace start stop nElems = 
         Tensor.linspace Dev start stop nElems
