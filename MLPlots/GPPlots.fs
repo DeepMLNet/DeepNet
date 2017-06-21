@@ -111,9 +111,9 @@ module GPPlots =
                                   ?nPoints, ?minX, ?maxX, ?minY, ?maxY) =
         
             let nPoints = defaultArg nPoints 20L
-            let trnDist = Tensor.max trnX - Tensor.min trnX |> Tensor.value
-            let minValue = defaultArg minX ((trnX |> Tensor.min |> Tensor.value) - trnDist * 0.1f)
-            let maxValue = defaultArg maxX ((trnX |> Tensor.max |> Tensor.value) + trnDist * 0.1f)
+            let trnDist = Tensor.max trnX - Tensor.min trnX 
+            let minValue = defaultArg minX (Tensor.min trnX - trnDist * 0.1f)
+            let maxValue = defaultArg maxX (Tensor.max trnX + trnDist * 0.1f)
 
             let sX, sMean, sCov, sStd = Plots.predictGP hyperPars trnSigma trnX trnT (minValue, maxValue) nPoints
         

@@ -22,7 +22,6 @@ module Accuracy =
 
         Tensor.ifThenElse (predClass ==== trgtClass) (HostTensor.scalar 1.0) (HostTensor.scalar 0.0)
         |> Tensor.sum
-        |> Tensor.value 
 
     /// Calculates the accuracies of a classifier on the training, validation and test sets.
     let ofClassifier (dataset: TrnValTst<'S>) batchSize 
@@ -47,7 +46,6 @@ module SSE =
 
         (pred - trgt) ** 2.0
         |> Tensor.sum
-        |> Tensor.value
 
 
 /// Mean over samples of squared error.

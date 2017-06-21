@@ -51,7 +51,7 @@ module DerivCheck =
                 let exprGradVal = numDerivEpsilon epsilon exprFun value
                 let gradDiff = abs (symGradVal - exprGradVal)
 
-                let deviation = Tensor.sum gradDiff |> Tensor.value
+                let deviation = Tensor.sum gradDiff 
                 if deviation > maxDeviation then
                     printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
                             (String.truncObj expr) wrt (String.truncObj rDiff) symGradVal

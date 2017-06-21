@@ -107,9 +107,9 @@ module HostEval =
                         | Diag(ax1, ax2) -> Tensor.diagAxis ax1 ax2 av
                         | DiagMat(ax1, ax2) -> Tensor.diagMatAxis ax1 ax2 av
                         | Invert -> Tensor.invert av
-                        | Sum -> Tensor.sum av
+                        | Sum -> Tensor.sumTensor av
                         | SumAxis ax -> Tensor.sumAxis ax av
-                        | Product -> Tensor.product av
+                        | Product -> Tensor.productTensor av
                         | ProductAxis ax -> Tensor.productAxis ax av
                         | MaxAxis ax -> Tensor.maxAxis ax av
                         | MinAxis ax -> Tensor.minAxis ax av

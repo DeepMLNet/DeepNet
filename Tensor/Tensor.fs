@@ -1341,9 +1341,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillSumAxis ax src
         trgt
 
+    /// sum of all elements as tensor
+    static member sumTensor (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.sumAxis 0
+
     /// sum of all elements
     static member sum (src: Tensor<'T>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.sumAxis 0
+        src |> Tensor.sumTensor |> Tensor.value
 
     /// product over given axis using this tensor as target
     member trgt.FillProductAxis (ax: int) (src: Tensor<'T>) =
@@ -1356,9 +1360,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillProductAxis ax src
         trgt
 
+    /// product of all elements as tensor
+    static member productTensor (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.productAxis 0
+
     /// product of all elements
     static member product (src: Tensor<'T>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.productAxis 0
+        src |> Tensor.productTensor |> Tensor.value
 
     /// minimum value over given axis using this tensor as target
     member trgt.FillMinAxis (ax: int) (src: Tensor<'T>) =
@@ -1371,9 +1379,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillMinAxis ax src
         trgt
 
+    /// minimum of all elements as tensor
+    static member minTensor (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.minAxis 0
+
     /// minimum of all elements
     static member min (src: Tensor<'T>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.minAxis 0
+        src |> Tensor.minTensor |> Tensor.value
 
     /// maximum value over given axis using this tensor as target
     member trgt.FillMaxAxis (ax: int) (src: Tensor<'T>) =
@@ -1386,9 +1398,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillMaxAxis ax src
         trgt
 
+    /// maximum of all elements as tensor
+    static member maxTensor (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
+
     /// maximum of all elements
     static member max (src: Tensor<'T>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
+        src |> Tensor.maxTensor |> Tensor.value
 
     /// positions of minimum values along given axis using this tensor as target
     member trgt.FillArgMinAxis (ax: int) (src: Tensor<'R>) =
@@ -1442,9 +1458,14 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt.FillAllAxis ax src
         trgt
 
+    /// False if there is at least one false element in the tensor, otherwise true.
+    /// Returns value as Tensor<bool>.
+    static member allTensor (src: Tensor<bool>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.allAxis 0 
+
     /// false if there is at least one false element in the tensor, otherwise true
     static member all (src: Tensor<bool>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.allAxis 0 |> Tensor<_>.value
+        src |> Tensor.allTensor |> Tensor.value
 
     /// true if there is at least one true element in given axis, using this tensor as target
     member trgt.FillAnyAxis (ax: int) (src: Tensor<bool>) =
@@ -1459,8 +1480,13 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
         trgt
 
     /// true if there is at least one true element in the tensor, otherwise false
+    /// Returns value as Tensor<bool>.
+    static member anyTensor (src: Tensor<bool>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0 
+
+    /// true if there is at least one true element in the tensor, otherwise false
     static member any (src: Tensor<bool>) =
-        src |> Tensor<_>.flatten |> Tensor<_>.anyAxis 0 |> Tensor<_>.value
+        src |> Tensor.anyTensor |> Tensor.value
 
     /// Dot product of two tensors using this tensor as target:
     /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat).

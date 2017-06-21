@@ -73,8 +73,8 @@ type CurveNormalizationTests () =
         let infos, normalized = dataset |> Normalization.perform normalizers
         let reversed = normalized |> Normalization.reverse infos
 
-        let min = Tensor.min normalized.All.Data 
-        let max = Tensor.max normalized.All.Data 
+        let min = Tensor.minTensor normalized.All.Data 
+        let max = Tensor.maxTensor normalized.All.Data 
         
         Tensor.almostEqualWithTol (min, HostTensor.scalar 0.0, absTol=1e-5, relTol=1e-4) |> should equal true
         Tensor.almostEqualWithTol (max, HostTensor.scalar 1.0, absTol=1e-5, relTol=1e-4) |> should equal true

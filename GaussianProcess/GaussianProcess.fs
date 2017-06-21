@@ -87,6 +87,8 @@ type GP () =
             let tstStd = tstSigma |> Tensor.diag |> sqrt
             let tstYL = tstMu - tstStd
             let tstYH = tstMu + tstStd
+            R.plot2(xlim=[|Tensor.min tstX; Tensor.max tstX|],
+                    ylim=[|Tensor.min tstYL; Tensor.max tstYH|])
             R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="skyblue")
             R.lines2 (ary tstX, ary tstMu, color="red")
             match trnX, trnY, trnV with

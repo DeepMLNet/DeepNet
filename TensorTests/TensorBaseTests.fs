@@ -199,7 +199,7 @@ let ``Invert Kk matrix`` () =
     let ids = Tensor.concat 0 [for i in 0L .. s-1L do yield (HostTensor.identity n).[NewAxis, *, *]]
 
     let diff = id - ids
-    printfn "maxdiff: %f" (Tensor.max diff |> Tensor.value)
+    printfn "maxdiff: %f" (Tensor.max diff)
     Tensor.almostEqualWithTol (id, ids, absTol=1e-5f, relTol=1e-5f)  |> Assert.True
 
 
