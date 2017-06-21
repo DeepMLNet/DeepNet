@@ -55,17 +55,19 @@ type R () =
         |> RCall.param "col" color
         |> RCall.call R.lines
 
-    static member points2 (?x, ?y, ?color) =
+    static member points2 (?x, ?y, ?pch, ?color, ?bg) =
         RCall.empty
         |> RCall.param "x" x
         |> RCall.param "y" y
+        |> RCall.param "pch" pch
         |> RCall.param "col" color
+        |> RCall.param "bg" bg
         |> RCall.call R.points
 
     static member fillBetween (x: float[], y1: float[], y2: float[], ?color) =
         if x.Length <> y1.Length || x.Length <> y2.Length then
             failwith "x, y1, y2 must be of same length"
-        R.polygon (x=R.c(x, R.rev(x)), y=R.c(y2, R.rev(y1)), ?col=color) |> ignore
+        R.polygon (x=R.c(x, R.rev(x)), y=R.c(y2, R.rev(y1)), ?col=color, border="NA") |> ignore
 
     static member par2 (param: string, value: 'f) =
         RCall.empty

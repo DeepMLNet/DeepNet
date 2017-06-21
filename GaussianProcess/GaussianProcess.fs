@@ -27,7 +27,7 @@ type GP () =
 
     /// squared-exponential covariance function
     static member covSe var lengthscale xa xb =
-        var * exp (-(xa-xb)**2. / (2. * lengthscale))
+        var * exp (- ((xa-xb)**2.) / (2. * lengthscale))
 
     /// Returns the mean and covariance of a GP prior.
     static member prior (x, meanFn, covFn) =
@@ -42,8 +42,8 @@ type GP () =
         let trnTrnCov = covMat covFn trnX trnX + Tensor.diagMat trnV
         let tstTstCov = covMat covFn tstX tstX 
         let tstTrnCov = covMat covFn tstX trnX 
-        
-        let Kinv = Tensor.invert trnTrnCov
+       
+        let Kinv = Tensor.pseudoInvert trnTrnCov
         let tstMu = tstMean + tstTrnCov .* Kinv .* (trnY - trnMean)
         let tstSigma = tstTstCov - tstTrnCov .* Kinv .* tstTrnCov.T
         tstMu, tstSigma
@@ -87,17 +87,14 @@ type GP () =
             let tstStd = tstSigma |> Tensor.diag |> sqrt
             let tstYL = tstMu - tstStd
             let tstYH = tstMu + tstStd
-            //R.plot2(xlim=[|Tensor.min tstX; Tensor.max tstX|],
-            //        ylim=[|Tensor.min tstYL; Tensor.max tstYH|],
-            //        xlabel="x", ylabel="y")
             R.plot2(xlim=[|Tensor.min tstX; Tensor.max tstX|],
-                    ylim=[|-2.0; 2.0|],
+                    ylim=[|Tensor.min tstYL; Tensor.max tstYH|],
                     xlabel="x", ylabel="y")
-            //R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="skyblue")
+            R.fillBetween (ary tstX, ary tstYL, ary tstYH, color="lightgrey")
             R.lines2 (ary tstX, ary tstMu, color="red")
             match trnX, trnY, trnV with
             | Some trnX, Some trnY, Some trnV ->
-                R.points2 (ary trnX, ary trnY, color="black")
+                R.points2 (ary trnX, ary trnY, color="black", bg="black", pch=19)
             | _ -> ()
         )
 
