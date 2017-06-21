@@ -2017,6 +2017,8 @@ module HostTensor =
 
     let transfer x = Tensor.transfer Dev x
 
+    let empty<'T> = Tensor.empty<'T> Dev
+
     let zeros<'T> = Tensor.zeros<'T> Dev 
 
     let ones<'T> = Tensor.ones<'T> Dev

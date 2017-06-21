@@ -2,6 +2,7 @@ namespace rec Tensor
 
 open System.Collections
 open System.Collections.Generic
+open System.Diagnostics
 
 open Tensor.Utils
 open System
@@ -293,8 +294,9 @@ type BaseTensorDevice() =
 
 
 /// An N-dimensional array with elements of type 'T.
-type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T> 
-        (layout: TensorLayout, storage: ITensorStorage<'T>) =
+type [<StructuredFormatDisplay("{Pretty}");
+       DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
+    Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
 
     do TensorLayout.check layout
     let backend = storage.Backend layout
@@ -1868,7 +1870,7 @@ type [<StructuredFormatDisplay("{Pretty}")>] Tensor<'T>
 
     /// full contents string
     member this.Full = this.ToString (maxElems=Int64.MaxValue)
-                                
+                               
     // type-neural interface
     interface ITensor with
         member this.Layout = this.Layout
@@ -2071,6 +2073,10 @@ type Tensor =
     static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
         Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor
+
+    /// Creates a new empty tensor with the given number of dimensions.
+    static member empty<'T> (dev: ITensorDevice) (nDims: int) : Tensor<'T> =
+        Tensor<'T> (List.init nDims (fun _ -> 0L), dev)
 
     /// Creates a new tensor of given shape filled with zeros.
     static member zeros<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
@@ -2367,7 +2373,7 @@ type Tensor =
                 let mutable pos = startPos
                 for blck in blcks do
                     yield! blockPosAndContents (joinDim + 1) pos blck 
-                    let blckShape = joinedBlocksShape joinDim blck
+                    let blckShape = joinedBlocksShape (joinDim + 1) blck
                     pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
             | Block ary -> yield startPos, ary
         }
@@ -2383,7 +2389,7 @@ type Tensor =
         let startPos = List.replicate (List.length joinedShape) 0L
 
         for pos, ary in blockPosAndContents 0 startPos bs do
-            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng (Some p, Some (p + s))) 
+            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng (Some p, Some (p + s - 1L))) 
             joined.[slice] <- ary
         joined
 
