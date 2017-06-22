@@ -530,6 +530,7 @@ type internal ScalarOps =
                     for d in 0 .. nd - 1 do
                         pos64.[d] <- int64 trgtPosIter.Pos.[d]
                     for i in 0 .. shape.[nd-1] - 1 do
+                        //printfn "shape: %A pos64: %A" trgt.FastLayout.Shape pos64
                         trgt.Data.[trgtAddr] <- scalarOp pos64
                         trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
                         pos64.[nd-1] <- pos64.[nd-1] + 1L
@@ -1493,9 +1494,19 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         {Data=this.Data; FastLayout=this.FastLayout}
               
     /// gets DataAndLayout for specified tensors
+    static member internal GetDataAndLayout (t: Tensor<'T>) =
+        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout
+
+    /// gets DataAndLayout for specified tensors
     static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
+
+    /// gets DataAndLayout for specified tensors
+    static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
+        (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
+        (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
+        (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout 
 
     /// gets layouts for specified targets and sources, optimized for an element-wise operation
     static member internal ElemwiseLayouts (trgt: TensorLayout, srcs: TensorLayout list) =
@@ -1577,7 +1588,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.ApplyNoaryOp (scalarOp, trgt, isIndexed=false, useThreads=useThreads)
 
         member this.FillIndexed (fn, trgt, useThreads) = 
-            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            let trgt = TensorHostBackend<_>.GetDataAndLayout (trgt)
             ScalarOps.ApplyNoaryOp (fn, trgt, isIndexed=true, useThreads=useThreads)
 
         member this.Map (fn, trgt, a, useThreads) = 
@@ -1586,7 +1597,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.ApplyUnaryOp (scalarOp, trgt, a, isIndexed=false, useThreads=useThreads)
 
         member this.MapIndexed (fn, trgt, a, useThreads) = 
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            let trgt, a = TensorHostBackend<_>.GetDataAndLayout (trgt, a)
             ScalarOps.ApplyUnaryOp (fn, trgt, a, isIndexed=true, useThreads=useThreads)
 
         member this.Map2 (fn, trgt, a, b, useThreads) = 
@@ -1595,7 +1606,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.ApplyBinaryOp (scalarOp, trgt, a, b, isIndexed=false, useThreads=useThreads)
 
         member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
-            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+            let trgt, a, b = TensorHostBackend<_>.GetDataAndLayout (trgt, a, b)
             ScalarOps.ApplyBinaryOp (fn, trgt, a, b, isIndexed=true, useThreads=useThreads)
       
         member this.UnaryPlus (trgt, a) =
