@@ -52,9 +52,14 @@ type GP () =
     static member meanVec meanFn x : Tensor<float>  = 
         HostTensor.init [GP.getNSamples x] (fun pos -> meanFn x.[[pos.[0]]])
 
+    static member varVec covFn x : Tensor<float>  = 
+        HostTensor.init [GP.getNSamples x] (fun pos -> covFn x.[[pos.[0]]] x.[[pos.[0]]])
+
     static member covMat covFn xa xb : Tensor<float> = 
         HostTensor.init [GP.getNSamples xa; GP.getNSamples xb] 
             (fun pos -> covFn xa.[[pos.[0]]] xb.[[pos.[1]]])
+
+
 
     /// Returns the mean and covariance of a GP prior.
     static member prior (x, meanFn, covFn) =
@@ -62,8 +67,10 @@ type GP () =
         let sigma = GP.covMat covFn x x 
         mu, sigma
 
-    /// Returns the mean and covariance of a GP regression.
-    static member regression (meanFn, covFn, tstX, trnX, trnY, trnV) =                              
+    /// Returns the mean and covariance (or variance) of a GP regression.
+    static member regression (meanFn, covFn, tstX, trnX, trnY, trnV, ?varOnly) =                              
+        let varOnly = defaultArg varOnly false
+
         let trnMean = GP.meanVec meanFn trnX 
         let tstMean = GP.meanVec meanFn tstX 
         let trnTrnCov = GP.covMat covFn trnX trnX + Tensor.diagMat trnV
@@ -72,8 +79,16 @@ type GP () =
        
         let Kinv = Tensor.pseudoInvert trnTrnCov
         let tstMu = tstMean + tstTrnCov .* Kinv .* (trnY - trnMean)
-        let tstSigma = tstTstCov - tstTrnCov .* Kinv .* tstTrnCov.T
-        tstMu, tstSigma 
+
+        if not varOnly then
+            let tstSigma = tstTstCov - tstTrnCov .* Kinv .* tstTrnCov.T
+            tstMu, tstSigma 
+        else
+            let tstTstVar = GP.varVec covFn tstX
+            let KinvTstTrnCovT = Tensor.sumAxis 2 (tstTrnCov.[*, NewAxis, *] * Kinv.[NewAxis, *, *])
+            let tstTrnCovKinvTstTrnCovT = Tensor.sumAxis 1 (tstTrnCov * KinvTstTrnCovT)
+            let tstVar = tstTstVar - tstTrnCovKinvTstTrnCovT           
+            tstMu, tstVar
 
     /// Returns the mean and covariance and the mean and covariance of the derivative of a
     /// a GP regression with derivative targets.

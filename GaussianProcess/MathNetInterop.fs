@@ -35,6 +35,19 @@ module HostTensor =
         a.ToArray() |> HostTensor.ofArray2D
         
 
+/// Normal distribution.        
+type Normal () =
+
+    /// Gets multiple samples from the normal distribution.
+    static member sampleN (rnd: System.Random, mean: double, var: double, nSamples: int64) =
+        Normal.Samples (rnd, mean, sqrt var)
+        |> Seq.take (int nSamples)
+        |> HostTensor.ofSeq
+
+    /// Gets one sample from the normal distribution.
+    static member sample (rnd, mean, var) =
+        Normal.Sample (rnd, mean, sqrt var)
+
 
 /// Multivariate normal distribution
 type MVN () =
