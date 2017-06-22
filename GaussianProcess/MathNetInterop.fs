@@ -58,5 +58,19 @@ type MVN () =
         s.[*, 0L]
 
 
+/// Uniform distribution.
+type Uniform () =
+
+    /// Gets multiple samples from the uniform distribution.
+    static member sampleN (rnd: System.Random, low, high, nSamples) =
+        HostTensor.init [nSamples] (fun _ ->
+            low + (high - low) * rnd.NextDouble())
+
+    /// Gets one sample from the uniform distribution.
+    static member sample (rnd, low, high) =
+        Uniform.sampleN (rnd, low, high, 1L)
+
+
+
 
 

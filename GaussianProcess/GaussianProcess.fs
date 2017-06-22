@@ -7,56 +7,68 @@ open Tensor
 open RTools
 
 
+/// Parameters for the squared-exponential covariance function.
+type CovSeParams = {
+    /// Variance
+    Variance:       float
+    /// Lengthscale
+    Lengthscale:    float
+}
+
+/// Mean functions.
+module MeanFns =
+    /// zero mean function
+    let zero (x: float) = 
+        0.0
+
+/// Covariance functions.
+module CovFns = 
+    /// squared-exponential covariance function
+    let Se {Variance=v; Lengthscale=l} xa xb =
+        v * exp (- ((xa-xb)**2.) / (2. * l**2.))
+
+    /// 1st derivative of squared-exponential covariance function
+    let DSe {Variance=v; Lengthscale=l} dxa xb =
+        -v * exp (- ((dxa-xb)**2.) / (2. * l**2.)) * (dxa - xb) / (l**2.)
+
+    /// 2nd derivative of squared-exponential covariance function
+    let DDSe {Variance=v; Lengthscale=l} dxa dxb =
+        v * exp (- ((dxa-dxb)**2.) / (2. * l**2.)) * 
+            (1. / l**2. - (dxa - dxb)**2. / l**4.)
+
+    /// squared-exponential covariance function and its derivatives
+    let SeWithDerivs pars =
+        Se pars, DSe pars, DDSe pars
+
 
 /// Gaussian Process
 type GP () =
     
-    static let getNSamples (x: Tensor<float>) = 
+    static member getNSamples (x: Tensor<float>) = 
         match Tensor.shape x with
         | [s] -> s
         | _ -> failwithf "training/test samples must be a vector but got %A" x.Shape
 
-    static let meanVec meanFn x : Tensor<float>  = 
-        HostTensor.init [getNSamples x] (fun pos -> meanFn x.[[pos.[0]]])
+    static member meanVec meanFn x : Tensor<float>  = 
+        HostTensor.init [GP.getNSamples x] (fun pos -> meanFn x.[[pos.[0]]])
 
-    static let covMat covFn xa xb : Tensor<float> = 
-        HostTensor.init [getNSamples xa; getNSamples xb] 
+    static member covMat covFn xa xb : Tensor<float> = 
+        HostTensor.init [GP.getNSamples xa; GP.getNSamples xb] 
             (fun pos -> covFn xa.[[pos.[0]]] xb.[[pos.[1]]])
-
-    /// zero mean function
-    static member meanZero (x: float) = 
-        0.0
-
-    /// squared-exponential covariance function
-    static member covSe var lengthscale xa xb =
-        var * exp (- ((xa-xb)**2.) / (2. * lengthscale**2.))
-
-    /// 1st derivative of squared-exponential covariance function
-    static member covDSe var lengthscale dxa xb =
-        -var * exp (- ((dxa-xb)**2.) / (2. * lengthscale**2.)) * (dxa - xb) / (lengthscale**2.)
-
-    /// 2nd derivative of squared-exponential covariance function
-    static member covDDSe var lengthscale dxa dxb =
-        var * exp (- ((dxa-dxb)**2.) / (2. * lengthscale**2.)) * 
-            (1. / lengthscale**2. - (dxa - dxb)**2. / lengthscale**4.)
-
-    /// squared-exponential covariance function and its derivatives
-    static member covSeWithDerivs var lengthscale =
-        GP.covSe var lengthscale, GP.covDSe var lengthscale, GP.covDDSe var lengthscale
 
     /// Returns the mean and covariance of a GP prior.
     static member prior (x, meanFn, covFn) =
-        let mu = meanVec meanFn x 
-        let sigma = covMat covFn x x 
+        let mu = GP.meanVec meanFn x 
+        let sigma = GP.covMat covFn x x 
         mu, sigma
 
     /// Returns the mean and covariance of a GP regression.
     static member regression (meanFn, covFn, tstX, trnX, trnY, trnV) =                              
-        let trnMean = meanVec meanFn trnX 
-        let tstMean = meanVec meanFn tstX 
-        let trnTrnCov = covMat covFn trnX trnX + Tensor.diagMat trnV
-        let tstTstCov = covMat covFn tstX tstX 
-        let tstTrnCov = covMat covFn tstX trnX 
+        let trnMean = GP.meanVec meanFn trnX 
+        let tstMean = GP.meanVec meanFn tstX 
+        let trnTrnCov = GP.covMat covFn trnX trnX + Tensor.diagMat trnV
+        let tstTstCov = GP.covMat covFn tstX tstX 
+        let tstTrnCov = GP.covMat covFn tstX trnX 
        
         let Kinv = Tensor.pseudoInvert trnTrnCov
         let tstMu = tstMean + tstTrnCov .* Kinv .* (trnY - trnMean)
@@ -80,23 +92,23 @@ type GP () =
 
         let trnT = Tensor.ofBlocks [trnY; trnDY]
 
-        let trnTrnCov = covMat covFn trnX trnX + Tensor.diagMat trnV
-        let dTrnTrnCov = covMat covDFn trnDX trnX
+        let trnTrnCov = GP.covMat covFn trnX trnX + Tensor.diagMat trnV
+        let dTrnTrnCov = GP.covMat covDFn trnDX trnX
         let trnDTrnCov = dTrnTrnCov.T
-        let dTrnDTrnCov = covMat covDDFn trnDX trnDX + Tensor.diagMat trnDV
+        let dTrnDTrnCov = GP.covMat covDDFn trnDX trnDX + Tensor.diagMat trnDV
         let K = Tensor.ofBlocks [[trnTrnCov;  trnDTrnCov ]
                                  [dTrnTrnCov; dTrnDTrnCov]]
         let Kinv = Tensor.pseudoInvert K
 
-        let tstTrnCov = covMat covFn tstX trnX 
-        let dTstTrnCov = covMat covDFn tstX trnX
-        let tstDTrnCov = covMat covDFn trnDX tstX |> Tensor.transpose
-        let dTstDTrnCov = covMat covDDFn tstX trnDX
+        let tstTrnCov = GP.covMat covFn tstX trnX 
+        let dTstTrnCov = GP.covMat covDFn tstX trnX
+        let tstDTrnCov = GP.covMat covDFn trnDX tstX |> Tensor.transpose
+        let dTstDTrnCov = GP.covMat covDDFn tstX trnDX
         let Kstar = Tensor.ofBlocks [[tstTrnCov; tstDTrnCov]]
         let KDstar = Tensor.ofBlocks [[dTstTrnCov; dTstDTrnCov]]
 
-        let tstTstCov = covMat covFn tstX tstX 
-        let dTstDTstCov = covMat covDDFn tstX tstX
+        let tstTstCov = GP.covMat covFn tstX tstX 
+        let dTstDTstCov = GP.covMat covDDFn tstX tstX
 
         let tstMu = Kstar .* Kinv .* trnT
         let tstDMu = KDstar .* Kinv .* trnT
