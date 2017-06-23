@@ -59,11 +59,15 @@ type MVN () =
         | [m; n] when m = mu.Shape.[0] && m = n -> ()
         | _ -> invalidArg "sigma" "sigma must be a square matrix with same size as mu"
         
-        let muMat = mu.[*, NewAxis] |> Tensor.replicate 1 nSamples |> HostTensor.toMatrix
+        let muMat = mu.[*, NewAxis] |> HostTensor.toMatrix
         let sigmaMat = sigma |> HostTensor.toMatrix
-        let k = Double.DenseMatrix.CreateDiagonal(int nSamples, int nSamples, 1.0)
-        let normal = MatrixNormal.Sample(rnd, muMat, sigmaMat, k)
-        normal |> HostTensor.ofMatrix
+        let k = Double.DenseMatrix.CreateDiagonal(1, 1, 1.0)
+
+        let normal = Tensor ([mu.Shape.[0]; nSamples], HostTensor.Dev)
+        for smpl in 0L .. nSamples-1L do
+            normal.[*, smpl..smpl] <- 
+                MatrixNormal.Sample(rnd, muMat, sigmaMat, k) |> HostTensor.ofMatrix
+        normal
 
     /// Gets one sample from the multivariate normal distribution.
     static member sample (rnd, mu, sigma) =

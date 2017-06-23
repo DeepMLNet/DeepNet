@@ -74,13 +74,13 @@ type GP () =
         let trnMean = GP.meanVec meanFn trnX 
         let tstMean = GP.meanVec meanFn tstX 
         let trnTrnCov = GP.covMat covFn trnX trnX + Tensor.diagMat trnV
-        let tstTstCov = GP.covMat covFn tstX tstX 
         let tstTrnCov = GP.covMat covFn tstX trnX 
        
         let Kinv = Tensor.pseudoInvert trnTrnCov
         let tstMu = tstMean + tstTrnCov .* Kinv .* (trnY - trnMean)
 
         if not varOnly then
+            let tstTstCov = GP.covMat covFn tstX tstX 
             let tstSigma = tstTstCov - tstTrnCov .* Kinv .* tstTrnCov.T
             tstMu, tstSigma 
         else
@@ -95,7 +95,7 @@ type GP () =
     static member regressionWithDeriv ((covFn, covDFn, covDDFn), 
                                        tstX, 
                                        trnX, trnY: Tensor<float>, trnV,
-                                       ?trnDX, ?trnDY, ?trnDV) =                              
+                                       ?trnDX, ?trnDY, ?trnDV, ?varOnly) =                              
 
         let trnDX, trnDY, trnDV =
             match trnDX, trnDY, trnDV with
@@ -104,6 +104,7 @@ type GP () =
                 let empty = Tensor.empty trnY.Dev 1
                 empty, empty, empty
             | _ -> failwith "trnDX, trnDY, trnDV must be specified together"
+        let varOnly = defaultArg varOnly false
 
         let trnT = Tensor.ofBlocks [trnY; trnDY]
 
@@ -122,14 +123,27 @@ type GP () =
         let Kstar = Tensor.ofBlocks [[tstTrnCov; tstDTrnCov]]
         let KDstar = Tensor.ofBlocks [[dTstTrnCov; dTstDTrnCov]]
 
-        let tstTstCov = GP.covMat covFn tstX tstX 
-        let dTstDTstCov = GP.covMat covDDFn tstX tstX
-
         let tstMu = Kstar .* Kinv .* trnT
         let tstDMu = KDstar .* Kinv .* trnT
-        let tstSigma = tstTstCov - Kstar .* Kinv .* Kstar.T
-        let tstDSigma = dTstDTstCov - KDstar .* Kinv .* KDstar.T
-        (tstMu, tstSigma), (tstDMu, tstDSigma)
+
+        if not varOnly then
+            let tstTstCov = GP.covMat covFn tstX tstX 
+            let dTstDTstCov = GP.covMat covDDFn tstX tstX
+            let tstSigma = tstTstCov - Kstar .* Kinv .* Kstar.T
+            let tstDSigma = dTstDTstCov - KDstar .* Kinv .* KDstar.T
+            (tstMu, tstSigma), (tstDMu, tstDSigma)
+        else
+            let tstTstVar = GP.varVec covFn tstX
+            let KinvKstarT = Tensor.sumAxis 2 (Kstar.[*, NewAxis, *] * Kinv.[NewAxis, *, *])
+            let KstarKinvKstarT = Tensor.sumAxis 1 (Kstar * KinvKstarT)           
+            let tstVar = tstTstVar - KstarKinvKstarT           
+
+            let dTstDTstVar = GP.varVec covDDFn tstX 
+            let KinvKDstarT = Tensor.sumAxis 2 (KDstar.[*, NewAxis, *] * Kinv.[NewAxis, *, *])
+            let KDstarKinvKDstarT = Tensor.sumAxis 1 (KDstar * KinvKDstarT)           
+            let tstDVar = dTstDTstVar - KDstarKinvKDstarT           
+            (tstMu, tstVar), (tstDMu, tstDVar)
+
 
     /// Plots the mean and variance of a GP.
     /// Optionally the training points for a GP regression can be specified.
