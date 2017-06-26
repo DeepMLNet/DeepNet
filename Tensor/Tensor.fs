@@ -1852,14 +1852,18 @@ type [<StructuredFormatDisplay("{Pretty}");
                     (subPrint leftIdx) @ [elipsis] @ (subPrint rightIdx)
             match a.NDims with
             | 0 -> 
-                let v = a.Value
-                if   typeof<'T>.Equals(typeof<single>) then sprintf "%9.4f" (v |> box :?> single)
-                elif typeof<'T>.Equals(typeof<double>) then sprintf "%9.4f" (v |> box :?> double)
-                elif typeof<'T>.Equals(typeof<int>)    then sprintf "%4d"  (v |> box :?> int)
-                elif typeof<'T>.Equals(typeof<int64>)  then sprintf "%4d"  (v |> box :?> int64)
-                elif typeof<'T>.Equals(typeof<byte>)   then sprintf "%3d"  (v |> box :?> byte)
-                elif typeof<'T>.Equals(typeof<bool>)   then if (v |> box :?> bool) then "true " else "false"
-                else sprintf "%A;" v
+                let v = box a.Value
+                match typeof<'T> with
+                | t when t = typeof<single> && unbox v >= 0.0f -> sprintf "%9.4f" (v :?> single)
+                | t when t = typeof<single> && unbox v <  0.0f -> sprintf "%9.3f" (v :?> single)
+                | t when t = typeof<double> && unbox v >= 0.0  -> sprintf "%9.4f" (v :?> double)
+                | t when t = typeof<double> && unbox v <  0.0  -> sprintf "%9.3f" (v :?> double)
+                | t when t = typeof<int>                       -> sprintf "%4d"   (v :?> int)
+                | t when t = typeof<int64>                     -> sprintf "%4d"   (v :?> int64)
+                | t when t = typeof<byte>                      -> sprintf "%3d"   (v :?> byte)
+                | t when t = typeof<bool>   && unbox v = true  -> "true "
+                | t when t = typeof<bool>   && unbox v = false -> "false"
+                | _                                            -> sprintf "%A;" v
             | 1 -> "[" + (String.concat " " (subStrs ())) + "]"
             | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
         prettyDim " " this                       
