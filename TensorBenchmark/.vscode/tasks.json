@@ -15,6 +15,16 @@
         },
         {
             "taskName": "run",
+            "command": "dotnet run",
+            "type": "shell",
+            "group": "none",
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": "$msCompile"
+        },            
+        {
+            "taskName": "run release",
             "command": "dotnet run -c Release",
             "type": "shell",
             "group": "none",

@@ -42,6 +42,10 @@
     <EmbeddedResource Include="..\TensorCudaSup\BlasSupport.cuh">
       <Link>BlasSupport.cuh</Link>
     </EmbeddedResource>
+    <None Include="..\MKL\libtensor_mkl.so">
+      <Link>libtensor_mkl.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>    
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="HDF.PInvoke" Version="1.10.1.0" NoWarn="NU1701" />
