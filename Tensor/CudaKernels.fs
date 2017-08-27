@@ -49,7 +49,7 @@ type Cfg () =
 module internal DynamicTypes =
     let currentDomain = Thread.GetDomain()
     let dynAsmName = new AssemblyName("TensorDynamicTypes")
-    let asmBuilder = currentDomain.DefineDynamicAssembly(dynAsmName, AssemblyBuilderAccess.Run)
+    let asmBuilder = AssemblyBuilder.DefineDynamicAssembly(dynAsmName, AssemblyBuilderAccess.Run)
     let modBuilder = asmBuilder.DefineDynamicModule("Module")
 
 
@@ -94,7 +94,7 @@ module internal NativeTensor =
                     tb.DefineField(sprintf "Stride%d" d, typeof<int64>, FieldAttributes.Public) |> ignore
 
                 // create defined type and cache it
-                let typ = tb.CreateType()
+                let typ = tb.CreateTypeInfo().AsType()
                 typeCache.[typeName] <- typ
                 typ
             )
@@ -166,7 +166,7 @@ module internal NativeIdxTensors =
                     tb.DefineField(sprintf "Specified%d" d, typeof<byte>, FieldAttributes.Public) |> ignore
 
                 // create defined type and cache it
-                let typ = tb.CreateType()
+                let typ = tb.CreateTypeInfo().AsType()
                 typeCache.[typeName] <- typ
                 typ
             )
