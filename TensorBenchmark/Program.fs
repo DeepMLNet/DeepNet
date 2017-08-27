@@ -109,8 +109,8 @@ let testCuda () =
 let main argv = 
     Tensor.Utils.Util.disableCrashDialog ()
        
-    //let dev = HostTensor.Dev
-    let dev = CudaTensor.Dev
+    let dev = HostTensor.Dev
+    //let dev = CudaTensor.Dev
     let shape = [10000L; 1000L]
 
     let sync () =

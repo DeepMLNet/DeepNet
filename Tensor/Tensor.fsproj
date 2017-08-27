@@ -44,11 +44,11 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="HDF.PInvoke" Version="1.10.1.0" />
-    <PackageReference Include="ManagedCuda-80" Version="8.0.22" />
-    <PackageReference Include="ManagedCuda-CUBLAS" Version="8.0.22" />
-    <PackageReference Include="ManagedCuda-NVRTC" Version="8.0.22" />
-    <PackageReference Include="MathNet.Numerics" Version="3.20.0" />
+    <PackageReference Include="HDF.PInvoke" Version="1.10.1.0" NoWarn="NU1701" />
+    <PackageReference Include="ManagedCuda-80" Version="8.0.22" NoWarn="NU1701" />
+    <PackageReference Include="ManagedCuda-CUBLAS" Version="8.0.22" NoWarn="NU1701" />
+    <PackageReference Include="ManagedCuda-NVRTC" Version="8.0.22" NoWarn="NU1701" />
+    <PackageReference Include="MathNet.Numerics" Version="3.20.0" NoWarn="NU1701" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
     <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
   </ItemGroup>

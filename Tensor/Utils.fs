@@ -365,6 +365,14 @@ module UtilTypes =
 
 /// Utility functions
 module Util =
+ 
+    /// true if running on Windows
+    let onWindows =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+
+    /// true if running on Linux
+    let onLinux =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
 
     /// all BindingFlags, i.e. public and non-public, static and instance
     let allBindingFlags = 
@@ -410,10 +418,11 @@ module Util =
 
     /// disables the Windows WER dialog box on crash of this application
     let disableCrashDialog () =
-        SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX |||
-                     ErrorModes.SEM_FAILCRITICALERRORS |||
-                     ErrorModes.SEM_NOOPENFILEERRORBOX)
-        |> ignore
+        if onWindows then        
+            SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX |||
+                         ErrorModes.SEM_FAILCRITICALERRORS |||
+                         ErrorModes.SEM_NOOPENFILEERRORBOX)
+            |> ignore
 
     /// C++ data type for given type instance
     let cppTypeInst (typ: System.Type) = 
