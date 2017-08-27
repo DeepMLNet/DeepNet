@@ -8,13 +8,44 @@ open HDF.PInvoke
 
 open Tensor.Utils
  
+ /// HDF5 error
+exception HDF5Error of msg:string with override __.Message = __.msg
 
 /// HDF5 support functions
 module private HDF5Support =
 
+    /// Raises an HDF5 error with an error message generated form the 
+    /// current HDF5 error stack.
+    let raiseErr () =
+        let mutable fullMsg = "HDF5 error:\n"
+        let walkFn (pos: uint32) (err: H5E.error_t) =
+            let majorMsg = Text.StringBuilder()
+            let minorMsg = Text.StringBuilder()
+            let mutable msgType = H5E.type_t.MAJOR
+            H5E.get_msg (err.maj_num, ref msgType, majorMsg, nativeint 1024) |> ignore
+            H5E.get_msg (err.min_num, ref msgType, minorMsg, nativeint 1024) |> ignore
+            let line =
+                sprintf "%s in %s(%d): %s / %s / %s\n" 
+                        err.func_name err.file_name err.line 
+                        err.desc (majorMsg.ToString()) (minorMsg.ToString())
+            fullMsg <- fullMsg + line
+            0
+        H5E.walk (H5E.DEFAULT, H5E.direction_t.H5E_WALK_UPWARD, 
+                  H5E.walk_t (fun pos err _ -> walkFn pos err), nativeint 0) |> ignore
+        raise (HDF5Error fullMsg)
+
+    /// Checks if HDF5 return value indicates success and if not,
+    /// raises an error.
     let inline check retVal =
-        if retVal < 0 then failwithf "HDF5 function failed" 
-        else retVal
+        match box retVal with
+        | :? int as rv ->            
+            if rv < 0 then raiseErr()
+            else retVal
+        | :? int64 as rv ->
+            if rv < 0L then raiseErr()
+            else retVal        
+        | rv -> 
+            failwithf "unknown HDF5 return type: %A" (rv.GetType())
 
     do
         H5.``open`` () |> check |> ignore
@@ -99,9 +130,9 @@ type HDF5 (path: string, mode: HDF5Mode) =
     /// closes the HDF5 file
     member this.Dispose () = 
         if not disposed then             
-            if fileHnd >= 0 then
+            if fileHnd >= 0L then
                 H5F.close fileHnd |> check |> ignore
-            if fileAccessProps >= 0 then
+            if fileAccessProps >= 0L then
                 H5P.close fileAccessProps |> check |> ignore
             disposed <- true
 
@@ -186,7 +217,7 @@ type HDF5 (path: string, mode: HDF5Mode) =
         let dataHnd = H5D.create (fileHnd, name, typeHnd, shapeHnd) |> check
 
         let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
-        H5D.write (dataHnd, typeHnd, H5S.ALL, H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
+        H5D.write (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
         gcHnd.Free ()
 
         H5D.close dataHnd |> check |> ignore
@@ -215,7 +246,7 @@ type HDF5 (path: string, mode: HDF5Mode) =
 
         let data : 'T array = Array.zeroCreate nElems
         let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
-        H5D.read (dataHnd, typeHnd, H5S.ALL, H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
+        H5D.read (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
         gcHnd.Free ()
 
         H5D.close dataHnd |> check |> ignore
