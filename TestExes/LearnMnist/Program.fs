@@ -72,7 +72,7 @@ let main argv =
         let preds = predFn inputs |> HostTensor.transfer |> Tensor.argMaxAxis 1
         let targets = targets |> HostTensor.transfer |> Tensor.argMaxAxis 1
         let isErr = Tensor.ifThenElse (preds ==== targets) (Tensor.zerosLike preds) (Tensor.onesLike preds)
-        let errCnt = Tensor.sum isErr |> Tensor.value
+        let errCnt = Tensor.sum isErr 
         let errRate = float errCnt / float inputs.Shape.[0]
         errRate        
 
