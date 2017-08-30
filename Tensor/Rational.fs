@@ -70,8 +70,9 @@ type Rat =
     static member (*) (a: Rat, b: Rat) = Rat (a.Num * b.Num, a.Dnm * b.Dnm)
     static member (/) (a: Rat, b: Rat) = Rat (a.Num * b.Dnm, a.Dnm * b.Num)
     static member get_Sign (a: Rat) = sign a.Num
-    static member get_Zero () = Rat (bigint.Zero)
-    static member get_One () = Rat (bigint.One)
+    static member Zero = Rat (bigint.Zero)
+    static member One = Rat (bigint.One)
+    static member MinusOne = Rat (bigint.MinusOne)
 
     // conversions
     static member op_Explicit(a: Rat) : int32 = a.CheckInteger(); int32 a.Num
@@ -86,7 +87,7 @@ type Rat =
     override a.Equals b =
         match b with
         | :? Rat as b -> (a :> IEquatable<_>).Equals b
-        | _ -> failwith "can only compare to another Rat"
+        | _ -> failwith "can only equate to another Rat"
 
     interface IComparable<Rat> with
         member a.CompareTo b = compare (a.Num * b.Dnm) (b.Num * a.Dnm)
