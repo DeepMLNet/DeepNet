@@ -107,10 +107,14 @@ let testCuda () =
 
 [<EntryPoint>]
 let main argv = 
-    Tensor.Utils.Util.disableCrashDialog ()
-       
-    //let dev = HostTensor.Dev
-    let dev = CudaTensor.Dev
+    Tensor.Utils.Util.disableCrashDialog ()      
+    let dev = 
+        match List.ofArray argv with
+        | ["cuda"] -> CudaTensor.Dev
+        | ["host"] | [] -> HostTensor.Dev
+        | _ -> 
+            printfn "unknown device"
+            exit 1
     let shape = [10000L; 1000L]
 
     let sync () =
