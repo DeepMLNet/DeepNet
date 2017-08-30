@@ -4,24 +4,6 @@ open System
 open System.Numerics
 
 
-//[<AutoOpen>]
-//module internal Helpers =
-
-//    /// greatest common divisor of a and b 
-//    let rec gcd (a: bigint) (b: bigint) =
-//        // Euclidean algorithm
-//        if a < bigint.Zero then gcd -a b
-//        elif b < bigint.Zero then gcd a -b
-//        elif a = bigint.Zero then b
-//        elif b = bigint.Zero then a
-//        elif a < b then gcd b a
-//        else gcd b (a % b)
-
-//    /// least common multiple of a and b
-//    let lcm (a: bigint) (b: bigint) =
-//        abs (a * b) / gcd a b
-
-
 /// A rational number, i.e. a fraction of arbitrary precision.
 [<Struct; CustomEquality; CustomComparison; StructuredFormatDisplay("{Pretty}")>]
 type Rat =
