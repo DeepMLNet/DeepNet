@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.7
+VisualStudioVersion = 15.0.26730.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SymTensorCudaSup", "SymTensorCudaSup\SymTensorCudaSup.vcxproj", "{D746A1DB-9C71-4B76-B184-A38031879282}"
 EndProject
@@ -20,6 +20,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Misc", "0. Misc", "{D513
 		Misc\OldCode.txt = Misc\OldCode.txt
 		Misc\Script1.fsx = Misc\Script1.fsx
 		Misc\Script2.fsx = Misc\Script2.fsx
+		Misc\Script3.fsx = Misc\Script3.fsx
 		Misc\TODO.txt = Misc\TODO.txt
 	EndProjectSection
 EndProject
@@ -248,5 +249,8 @@ Global
 		{A3E00A5C-A679-416A-8D2C-4D2721C90D6D} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 		{9CA15DFC-8043-4267-AD35-04ADDD23987B} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
 		{73235C57-C9E3-4A03-B334-C6F566C907F4} = {42C89650-7C3B-469E-91AD-4678EE1C8F6A}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9B34BF13-17C7-4342-BC1D-7DB48A4F0FB2}
 	EndGlobalSection
 EndGlobal

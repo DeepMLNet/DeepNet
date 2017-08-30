@@ -66,6 +66,7 @@
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
+    <Compile Include="Rational.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
