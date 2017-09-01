@@ -73,7 +73,30 @@ let ``Rat Conversions`` () =
     bv |> should equal v
 
 
+[<Fact>]
+let ``Rat Tensor Conversions`` () =
+    let A = HostTensor.arange 1 2 10
+    let B = A |> Tensor.convert<Rat>
+    let C = B |> Tensor.convert<int32>
 
+    printfn "A=\n%A" A
+    printfn "B=\n%A" B
+    printfn "C=\n%A" C
+
+    C ==== A |> Tensor.all |> should equal true
+     
+
+[<Fact>]
+let ``Rat Tensor Arange`` () =
+    let A = HostTensor.arange (Rat(1)) (Rat(1,3)) (Rat(3))
+    printfn "arange:\n%A" A
+
+
+[<Fact>]
+let ``Rat Tensor Linspace`` () =
+    let A = HostTensor.linspace (Rat 1) (Rat 3) 10L
+    printfn "linspace:\n%A" A
+     
 
 
 
