@@ -269,13 +269,33 @@ module UtilTypes =
     type Queue<'T> = System.Collections.Generic.Queue<'T>
     type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>
 
+    let private primitiveTypes = 
+        [typeof<byte>; typeof<sbyte>; typeof<int16>; typeof<uint16>;
+         typeof<int32>; typeof<uint32>; typeof<int64>; typeof<uint64>;
+         typeof<single>; typeof<double>]
+
     /// convert given value to specified type and return as obj
-    let convTo (typ: System.Type) value =
-        Convert.ChangeType(box value, typ)
+    let convTo (toType: System.Type) (value: obj) =
+        let fromType = value.GetType()
+        if primitiveTypes |> List.contains toType &&
+           primitiveTypes |> List.contains fromType then
+            Convert.ChangeType(value, toType)
+        else
+            let fms = fromType.GetMethods(BindingFlags.Static ||| BindingFlags.Public)
+            match fms |> Array.tryFind (fun m -> m.Name = "op_Explicit" 
+                                              && m.ReturnType = toType) with
+            | Some m -> m.Invoke(null, [|value|])
+            | None ->
+                match toType.GetMethod("op_Implicit", BindingFlags.Static ||| BindingFlags.Public,
+                                       null, [|fromType|], null) with
+                | null -> 
+                    failwithf "no conversion possible from type %s to type %s"
+                              fromType.Name toType.Name
+                | m -> m.Invoke(null, [|value|])
 
     /// convert given value to type 'T
     let conv<'T> value : 'T =
-        Convert.ChangeType(box value, typeof<'T>) :?> 'T
+        convTo typeof<'T> (box value) :?> 'T
 
     let private getStaticProperty (typ: Type) name =
         match typ.GetProperty(name, BindingFlags.Public ||| BindingFlags.Static,

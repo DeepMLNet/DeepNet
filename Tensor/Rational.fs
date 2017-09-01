@@ -8,10 +8,10 @@ open System.Numerics
 [<Struct; CustomEquality; CustomComparison; StructuredFormatDisplay("{Pretty}")>]
 type Rat =
     
-    // The default constructor in .NET initializes all fields to zero and
+    // The default constructor for structs in .NET initializes all fields to zero and
     // this behavior cannot be changed. Thus we store the denominator minus one
     // to have "0/1" as our default value instead of "0/0" which would be
-    // undefined.
+    // an undefined fraction.
 
     /// the numerator
     val Num: bigint 
@@ -83,14 +83,22 @@ type Rat =
     static member Zero = Rat (bigint.Zero)
     static member One = Rat (bigint.One)
     static member MinusOne = Rat (bigint.MinusOne)
-
-    // conversions
+    
+    // conversions to other types
+    static member op_Explicit(a: Rat) : bigint = a.CheckInteger(); a.Num
     static member op_Explicit(a: Rat) : int32 = a.CheckInteger(); int32 a.Num
     static member op_Explicit(a: Rat) : uint32 = a.CheckInteger(); uint32 a.Num
     static member op_Explicit(a: Rat) : int64 = a.CheckInteger(); int64 a.Num
     static member op_Explicit(a: Rat) : uint64 = a.CheckInteger(); uint64 a.Num
-    static member op_Explicit(a: Rat) : single = single a.Num / single a.Dnm
+    static member op_Explicit(a: Rat) : single = double a.Num / double a.Dnm |> single
     static member op_Explicit(a: Rat) : double = double a.Num / double a.Dnm
+
+    // conversions from other types
+    static member op_Implicit(v: bigint) = Rat (v)
+    static member op_Implicit(v: int32) = Rat (v)
+    static member op_Implicit(v: uint32) = Rat (v)
+    static member op_Implicit(v: int64) = Rat (v)
+    static member op_Implicit(v: uint64) = Rat (v)
 
     interface IEquatable<Rat> with
         member a.Equals b = a.Num = b.Num && a.Dnm = b.Dnm

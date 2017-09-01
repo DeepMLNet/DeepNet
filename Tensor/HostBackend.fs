@@ -1118,12 +1118,12 @@ type internal ScalarOps =
     static member SumLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Add res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=conv<'T> 0, isIndexed=false, useThreads=true)     
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=zero<'T>, isIndexed=false, useThreads=true)     
 
     static member ProductLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Multiply res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=conv<'T> 1, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=one<'T>, isIndexed=false, useThreads=true)  
 
     static member MaxLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()

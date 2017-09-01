@@ -12,9 +12,11 @@ let ``Basic Rat operations`` () =
     let a = Rat (2, 3)
     let b = Rat (7, 8)
     let c = Rat (10)
+    let d = Rat (0, 5)
     let n = Unchecked.defaultof<Rat>
 
     printfn "zero n=%A" n
+    printfn "d=%A" d
     printfn "a=%A b=%A c=%A" a b c
     printfn "a+b=%A" (a+b)
     printfn "a-b=%A" (a-b)
@@ -56,6 +58,21 @@ let ``Rat Tensors`` () =
 
     printfn "C ==== C=\n%A" (C ==== C)
     printfn "A >>== B=\n%A" (A >>== B)
+    printfn "sum C= %A" (Tensor.sum C)
+
+
+[<Fact>]
+let ``Rat Conversions`` () =
+    let v = 3
+    
+    let rv = conv<Rat> v
+    let bv = conv<int> rv
+
+    printfn "v=%A rv=%A bv=%A" v rv bv
+
+    bv |> should equal v
+
+
 
 
 
