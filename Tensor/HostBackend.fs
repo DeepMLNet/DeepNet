@@ -281,6 +281,7 @@ type internal DataAndLayout<'T> = {
     FastLayout: FastLayout32
 }
 
+
 /// Generic scalar operation primitives.
 type internal ScalarPrimitives<'T, 'TC> () =
     static let fscAsm = Assembly.GetAssembly(typeof<unit>)
@@ -293,34 +294,45 @@ type internal ScalarPrimitives<'T, 'TC> () =
     static let c = Expression.Parameter(typeof<'TC>, "c")
     static let cond = Expression.Parameter(typeof<bool>, "cond")
 
-    static let tryUnary (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T>>(Expression.Block(thrw, a), a).Compile()
+    static let compileAny (fns: (unit -> Expression<_>) list) =        
+        match fns |> List.tryPick (fun fn ->
+                try Some (fn().Compile())
+                with :? InvalidOperationException -> None) with
+        | Some expr -> expr
+        | None -> 
+            failwithf "cannot compile scalar primitive for type %s" typeof<'T>.Name
 
-    static let tryBinary (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Block(thrw, a), a, b).Compile()
+    static let tryUnary op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T>>(Expression.Block(thrw, a), a)
+        compileAny (fns @ [errExpr])
 
-    static let tryCompare (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Block(thrw, Expression.Constant(false)), a, b).Compile()
+    static let tryBinary op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Block(thrw, a), a, b)
+        compileAny (fns @ [errExpr])
+
+    static let tryCompare op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Block(thrw, Expression.Constant(false)), a, b)
+        compileAny (fns @ [errExpr])
 
     member val ConvertFunc = 
         Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
     member inline this.Convert cv = this.ConvertFunc.Invoke(cv)
 
     member val UnaryPlusFunc = 
-        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a))
+        tryUnary "~+" [fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a)]
     member inline this.UnaryPlus av = this.UnaryPlusFunc.Invoke(av)
 
     member val UnaryMinusFunc = 
-        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a))
+        tryUnary "~-" [fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a)]
     member inline this.UnaryMinus av = this.UnaryMinusFunc.Invoke(av)
 
     member val AbsFunc = 
@@ -419,23 +431,23 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.Truncate av = this.TruncateFunc.Invoke(av)
 
     member val AddFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b))
+        tryBinary "+" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b)]
     member inline this.Add av bv = this.AddFunc.Invoke(av, bv)
         
     member val SubtractFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b))
+        tryBinary "-" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b)]
     member inline this.Subtract av bv = this.SubtractFunc.Invoke(av, bv)
 
     member val MultiplyFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b))
+        tryBinary "*" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b)]
     member inline this.Multiply av bv = this.MultiplyFunc.Invoke(av, bv)
 
     member val DivideFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b))
+        tryBinary "/" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b)]
     member inline this.Divide av bv = this.DivideFunc.Invoke(av, bv)
 
     member val ModuloFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b))
+        tryBinary "%" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b)]
     member inline this.Modulo av bv = this.ModuloFunc.Invoke(av, bv)
 
     member val PowerFunc = 
@@ -443,14 +455,6 @@ type internal ScalarPrimitives<'T, 'TC> () =
         let m = fso.GetMethod("op_Exponentiation").MakeGenericMethod (typeof<'T>, typeof<'T>)        
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Call(m, a, b), a, b).Compile()
     member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
-
-    member val MaxFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.GreaterThan(a, b), a, b), a, b))
-    member inline this.Max av bv = this.MaxFunc.Invoke(av, bv)
-
-    member val MinFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.LessThan(a, b), a, b), a, b))
-    member inline this.Min av bv = this.MinFunc.Invoke(av, bv)
 
     member val IsFiniteFunc : ('T -> bool) =
         match typeof<'T> with
@@ -462,27 +466,55 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.IsFinite av = this.IsFiniteFunc av
 
     member val EqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IEquatable<'T>>.GetMethod("Equals") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Call(a, m, b), a, b)
+        tryCompare "=" [fnOp; fnInterface]          
     member inline this.Equal av bv = this.EqualFunc.Invoke(av, bv)
 
     member val NotEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IEquatable<'T>>.GetMethod("Equals") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.IsFalse(Expression.Call(a, m, b)), a, b)
+        tryCompare "!=" [fnOp; fnInterface]      
     member inline this.NotEqual av bv = this.NotEqualFunc.Invoke(av, bv)
 
     member val LessFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(Expression.Call(a, m, b), 
+                                                                      Expression.Constant(0)), a, b)
+        tryCompare "<" [fnOp; fnInterface]
     member inline this.Less av bv = this.LessFunc.Invoke(av, bv)
 
     member val LessOrEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(Expression.Call(a, m, b), 
+                                                                            Expression.Constant(0)), a, b)
+        tryCompare "<=" [fnOp; fnInterface]
     member inline this.LessOrEqual av bv = this.LessOrEqualFunc.Invoke(av, bv)
 
     member val GreaterFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(Expression.Call(a, m, b), 
+                                                                         Expression.Constant(0)), a, b)
+        tryCompare ">" [fnOp; fnInterface]
     member inline this.Greater av bv = this.GreaterFunc.Invoke(av, bv)
 
     member val GreaterOrEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(Expression.Call(a, m, b), 
+                                                                                Expression.Constant(0)), a, b)
+        tryCompare ">=" [fnOp; fnInterface]
     member inline this.GreaterOrEqual av bv = this.GreaterOrEqualFunc.Invoke(av, bv)
 
     member val IfThenElseFunc =
@@ -1004,12 +1036,12 @@ type internal ScalarOps =
 
     static member MaxElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op pos a b = p.Max a b
+        let inline op pos a b = if p.Greater a b then a else b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
     static member MinElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op pos a b = p.Min a b
+        let inline op pos a b = if p.Less a b then a else b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
     static member Equal (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
@@ -1095,12 +1127,12 @@ type internal ScalarOps =
 
     static member MaxLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Max res v
+        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Greater res v then res else v
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=minValue<'T>, isIndexed=false, useThreads=true)  
 
     static member MinLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Min res v
+        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Less res v then res else v
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=maxValue<'T>, isIndexed=false, useThreads=true)  
 
     static member AllLastAxis (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =

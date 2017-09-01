@@ -8,10 +8,18 @@ open System.Numerics
 [<Struct; CustomEquality; CustomComparison; StructuredFormatDisplay("{Pretty}")>]
 type Rat =
     
+    // The default constructor in .NET initializes all fields to zero and
+    // this behavior cannot be changed. Thus we store the denominator minus one
+    // to have "0/1" as our default value instead of "0/0" which would be
+    // undefined.
+
     /// the numerator
-    val Num: bigint
+    val Num: bigint 
+    /// the denominator minus one
+    val private DnmMinusOne: bigint
+
     /// the denominator
-    val Dnm: bigint
+    member a.Dnm = a.DnmMinusOne + bigint.One
 
     /// Constructs a fraction from numerator and denominator.
     new (num, dnm) = 
@@ -22,7 +30,7 @@ type Rat =
             | _ when dnm < bigint.Zero -> -num, -dnm
             | _ -> num, dnm
         let cd = bigint.GreatestCommonDivisor(num, dnm)
-        {Num=num/cd; Dnm=dnm/cd}
+        {Num=num/cd; DnmMinusOne=dnm/cd - bigint.One}
 
     /// Constructs a fraction from numerator and denominator.
     new (num: int32, dnm: int32) = Rat (bigint num, bigint dnm)
@@ -69,6 +77,8 @@ type Rat =
         Rat (a.Num * b.Dnm - b.Num * a.Dnm, a.Dnm * b.Dnm)
     static member (*) (a: Rat, b: Rat) = Rat (a.Num * b.Num, a.Dnm * b.Dnm)
     static member (/) (a: Rat, b: Rat) = Rat (a.Num * b.Dnm, a.Dnm * b.Num)
+    static member (%) (a: Rat, b: Rat) = 
+        Rat ((a.Num * b.Dnm) % (b.Num * a.Dnm), a.Dnm * b.Dnm)
     static member get_Sign (a: Rat) = sign a.Num
     static member Zero = Rat (bigint.Zero)
     static member One = Rat (bigint.One)

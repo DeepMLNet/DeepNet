@@ -50,3 +50,13 @@ let fl = 2.3
 bigint.GreatestCommonDivisor(bigint 0, bigint 0)
 
 uint32 -3
+
+max 2 3
+
+///ist.sum
+
+type MyType =
+    static member Zero = 111
+
+typeof<MyType>.GetProperty("Zero", typeof<int>).GetValue(null)
+
