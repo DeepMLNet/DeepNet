@@ -27,8 +27,10 @@ let calcRowEchelon M =
     printfn "M^-1:\n%A" Arr
     if Mr.Shape.[0] = Mr.Shape.[1] then
         let id = Arr .* Mr
+        let idT = Mr .* Arr
         let idf = Tensor.convert<float> Mr .* Tensor.convert<float> Arr
         printfn "M^-1 .* M:\n%A" id
+        printfn "M .* M^-1:\n%A" idT
         //printfn "M^-1 .* M (float):\n%A" idf
         if Tensor.all (Mrr ==== A) then
             Tensor.all (id ==== A) |> should equal true
