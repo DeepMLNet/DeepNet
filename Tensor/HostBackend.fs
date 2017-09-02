@@ -1925,7 +1925,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                            0.0, c.Ptr, c.Ld)))              
                 c.FetchResult()
             else
-                trgt.FillSumAxis 0 (Tensor.padRight a * Tensor.padLeft b)
+                trgt.FillSumAxis 1 (Tensor.padRight a * Tensor.padLeft b)
 
         member this.BatchedMatMatDot (trgt, a, b) =
             if isBlasSupported then
@@ -1947,7 +1947,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                                  1L, [|a.BatchSize|])))
                 c.FetchResult()
             else
-                trgt.FillSumAxis 1 (a.[*, *, *, NewAxis] * b.[*, NewAxis, *, *])
+                trgt.FillSumAxis 2 (a.[*, *, *, NewAxis] * b.[*, NewAxis, *, *])
 
         member this.BatchedInvert (trgt, src) =
             if not isBlasSupported then

@@ -28,7 +28,7 @@ module RowEchelonForm =
         // step of Gaussian Elimination algroithm
         let rec step row col =
             if row < rows && col < cols then
-                //printfn "-------- GE step with active row=%d col=%d:\n%A" row col R
+                //printfn "-------- GE step with active row=%d col=%d:\nR=\n%A\nB=\n%A" row col R B
 
                 // find pivot row by maximum magnitude
                 let pivot = 
@@ -42,25 +42,23 @@ module RowEchelonForm =
                 // swap active row with pivot row
                 swapRows R row pivot
                 swapRows B row pivot
-                //printfn "After swap:\n%A" R
+                //printfn "After swap:\nR=\n%A\nB=\n%A" R B
 
-                let pivotVal = R.[row, col]
+                let pivotVal = R.[row, col] |> Tensor.copy
                 if Tensor.value pivotVal <> zero<'T> then
                     // make active row start with a one
                     R.[row, *] <- R.[row, *] / pivotVal
                     B.[row, *] <- B.[row, *] / pivotVal   
-                    //printfn "After division:\n%A" R
+                    //printfn "After division:\nR=\n%A\nB=\n%A" R B
 
                     // eliminate active column from all other rows
-                    R.[0L .. row-1L, *] <- 
-                        R.[0L .. row-1L, *] - R.[0L .. row-1L, col..col] * R.[row..row, *]
-                    B.[0L .. row-1L, *] <- 
-                        B.[0L .. row-1L, *] - R.[0L .. row-1L, col..col] * B.[row..row, *]
-                    R.[row+1L .., *] <- 
-                        R.[row+1L .., *] - R.[row+1L .., col..col] * R.[row..row, *]
-                    B.[row+1L .., *] <- 
-                        B.[row+1L .., *] - R.[row+1L .., col..col] * B.[row..row, *]
-                    //printfn "After elimination:\n%A" R
+                    let facs = R.[0L .. row-1L, col..col] |> Tensor.copy
+                    R.[0L .. row-1L, *] <- R.[0L .. row-1L, *] - facs * R.[row..row, *]
+                    B.[0L .. row-1L, *] <- B.[0L .. row-1L, *] - facs * B.[row..row, *]
+                    let facs = R.[row+1L .., col..col] |> Tensor.copy
+                    R.[row+1L .., *] <- R.[row+1L .., *] - facs * R.[row..row, *]
+                    B.[row+1L .., *] <- B.[row+1L .., *] - facs * B.[row..row, *]
+                    //printfn "After elimination:\nR=\n%A\nB=\n%A" R B
 
                     // continue with next row and column
                     step (row+1L) (col+1L)

@@ -22,12 +22,19 @@ let calcRowEchelon M =
     let Mrr, Arr = RowEchelonForm.computeAugmented Mr A
     printfn "---------------------------"
     printfn "M=\n%A" Mr
-    printfn "A=\n%A" A
+    //printfn "A=\n%A" A
     printfn "row echelon:\n%A" Mrr
-    printfn "augmented row echelon:\n%A" Arr
+    printfn "M^-1:\n%A" Arr
     if Mr.Shape.[0] = Mr.Shape.[1] then
         let id = Arr .* Mr
-        printfn "identity:\n%A" id
+        let idf = Tensor.convert<float> Mr .* Tensor.convert<float> Arr
+        printfn "M^-1 .* M:\n%A" id
+        //printfn "M^-1 .* M (float):\n%A" idf
+        if Tensor.all (Mrr ==== A) then
+            Tensor.all (id ==== A) |> should equal true
+            printfn "Inverse is okay."
+        else
+            printfn "Matrix not inverible."
     printfn "---------------------------"
 
 [<Fact>]
@@ -37,6 +44,12 @@ let ``Row echelon: Wikipedia example`` () =
                                  [ -2;  1;  2]]
     calcRowEchelon M
 
+[<Fact>]
+let ``Row echelon: Wikipedia example 2`` () =
+    let M = HostTensor.ofList2D [[  2; -1;  0]
+                                 [ -1;  2; -1]
+                                 [  0; -1;  2]]
+    calcRowEchelon M
 
 [<Fact>]
 let ``Row echelon: Colinear 1`` () =
