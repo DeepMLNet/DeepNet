@@ -187,6 +187,7 @@ type Rat =
         if   a.IsNaN    then "NaN"
         elif a.IsNegInf then "-Inf"
         elif a.IsPosInf then "Inf"
+        elif a.IsInt    then sprintf "%A" a.Num
         else sprintf "%A/%A" a.Num a.Dnm
     override a.ToString() = a.Pretty
 

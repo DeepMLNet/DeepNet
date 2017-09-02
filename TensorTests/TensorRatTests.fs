@@ -62,6 +62,30 @@ let ``Rat Tensors`` () =
 
 
 [<Fact>]
+let ``Rat Dot`` () =
+    let A = HostTensor.identity<Rat> 5L
+    A.[2L, *] <- (Rat 2) * A.[2L, *]
+    let B = HostTensor.linspace (Rat 0) (Rat 5) 5L
+    let B = Tensor.replicate 0 5L B.[NewAxis, *]
+
+    printfn "A=\n%A" A
+    printfn "B=\n%A" B
+    printfn "A.*B=\n%A" (A .* B)
+    printfn "A.*B (float)=\n%A" (Tensor.convert<float> A .* Tensor.convert<float> B)
+
+    let C1 = Tensor.convert<float> (A .* B)
+    let C2 = Tensor.convert<float> A .* Tensor.convert<float> B
+    Tensor.almostEqual C1 C2 |> should equal true
+
+    let C1 = Tensor.convert<float> (A .* B.[0L, *])
+    let C2 = Tensor.convert<float> A .* Tensor.convert<float> B.[0L, *]
+    Tensor.almostEqual C1 C2 |> should equal true
+
+    let C1 = Tensor.convert<float> (Tensor.padLeft A .* Tensor.padLeft B)
+    let C2 = Tensor.convert<float> (Tensor.padLeft A) .* Tensor.convert<float> (Tensor.padLeft B)
+    Tensor.almostEqual C1 C2 |> should equal true
+
+[<Fact>]
 let ``Rat Conversions`` () =
     let v = 3   
     let rv = conv<Rat> v
