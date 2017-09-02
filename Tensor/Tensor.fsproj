@@ -66,7 +66,7 @@
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
-    <Compile Include="Rational.fs" />
+    <Compile Include="Rat.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
@@ -76,6 +76,7 @@
     <Compile Include="NumpyFiles.fs" />
     <Compile Include="Random.fs" />
     <Compile Include="Decomposition.fs" />
+    <Compile Include="LinAlg.fs" />
     <Content Include="packages.config" />
     <None Include="Tensor.nuspec" />
     <None Include="build\Tensor.targets">

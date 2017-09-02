@@ -61,6 +61,7 @@
     <Compile Include="TensorCudaTests.fs" />
     <Compile Include="NumpyFilesTest.fs" />
     <Compile Include="TensorRatTests.fs" />
+    <Compile Include="LinAlgTests.fs" />
     <Content Include="App.config" />
     <None Include="TestData\MatInv.h5">
       <Link>TestData\MatInv.h5</Link>

@@ -35,11 +35,11 @@ let ``Basic Rat operations`` () =
         printfn "a= %A / %A" p q
         p |> should equal (bigint 2)
         q |> should equal (bigint 3)
-    | RatInteger _ -> failwith "a is not an integer"
+    | RatInt _ -> failwith "a is not an integer"
 
     match c with
     | RatFrac _ -> failwith "c is not a fraciton"
-    | RatInteger p ->
+    | RatInt p ->
         p |> should equal (bigint 10)
 
 
@@ -63,14 +63,31 @@ let ``Rat Tensors`` () =
 
 [<Fact>]
 let ``Rat Conversions`` () =
-    let v = 3
-    
+    let v = 3   
     let rv = conv<Rat> v
     let bv = conv<int> rv
-
     printfn "v=%A rv=%A bv=%A" v rv bv
-
     bv |> should equal v
+
+[<Fact>]
+let ``Rat Infinites`` () =
+    Rat.PosInf + Rat.PosInf |> Rat.isPosInf |> should equal true
+    Rat.PosInf + Rat.NegInf |> Rat.isNaN |> should equal true
+    Rat.NegInf + Rat.PosInf |> Rat.isNaN |> should equal true
+    Rat.NegInf + Rat.NegInf |> Rat.isNegInf |> should equal true
+    Rat.One + Rat.NaN |> Rat.isNaN |> should equal true
+    Rat.PosInf * Rat.Zero |> Rat.isNaN |> should equal true
+    Rat.PosInf * Rat.NegInf |> Rat.isNegInf |> should equal true
+
+[<Fact>]
+let ``Rat Ordering`` () =
+    let l = [Rat.MinusOne; Rat.One; Rat.Zero; Rat.NaN
+             Rat.PosInf; Rat.NegInf; Rat.PosInf; Rat.NegInf; Rat.NaN]
+    let ls = List.sort l
+    printfn "sorted: %A" ls
+    (ls.[0].IsNaN && ls.[1].IsNaN && ls.[2].IsNegInf && ls.[3].IsNegInf &&
+     ls.[4] = Rat.MinusOne && ls.[5] = Rat.Zero && ls.[6] = Rat.One &&
+     ls.[7].IsPosInf && ls.[8].IsPosInf) |> should equal true
 
 
 [<Fact>]
@@ -78,11 +95,9 @@ let ``Rat Tensor Conversions`` () =
     let A = HostTensor.arange 1 2 10
     let B = A |> Tensor.convert<Rat>
     let C = B |> Tensor.convert<int32>
-
     printfn "A=\n%A" A
     printfn "B=\n%A" B
     printfn "C=\n%A" C
-
     C ==== A |> Tensor.all |> should equal true
      
 

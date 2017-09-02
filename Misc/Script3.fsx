@@ -53,7 +53,23 @@ uint32 -3
 
 max 2 3
 
+
+System.Double.PositiveInfinity = System.Double.PositiveInfinity
+System.Double.PositiveInfinity > 3.0
 ///ist.sum
+
+System.Double.NaN = System.Double.NaN
+System.Double.NaN <> System.Double.NaN
+System.Double.NaN > 3.0
+
+compare System.Double.NaN System.Double.NaN
+compare System.Double.NaN System.Double.NegativeInfinity
+
+compare 3.0 System.Double.NaN
+
+
+compare System.Double.NegativeInfinity System.Double.NaN
+
 
 type MyType =
     static member Zero = 111
