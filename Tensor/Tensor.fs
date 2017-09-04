@@ -2424,6 +2424,7 @@ type Tensor =
         generate [] |> Tensor.ofBlocks
 
     /// Concatenates the sequence of tensors along the given axis.
+    /// The source tensors are copied.
     static member concat (ax: int) (ts: Tensor<'T> seq) =
         let ts = List.ofSeq ts
         if List.isEmpty ts then

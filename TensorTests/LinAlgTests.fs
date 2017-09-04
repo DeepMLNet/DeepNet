@@ -19,11 +19,19 @@ let calcRowEchelon M =
 
     let A = HostTensor.identity (List.max Mr.Shape)
     let A = A.[0L .. Mr.Shape.[0]-1L, *]
-    let Mrr, Arr = RowEchelonForm.computeAugmented Mr A
+    let Mrr, nzRows, unCols, Arr = RowEchelonForm.computeAugmented Mr A
+    let Minv, S, N = RowEchelonForm.pseudoInvert Mr
     printfn "---------------------------"
     printfn "M=\n%A" Mr
     //printfn "A=\n%A" A
     printfn "row echelon:\n%A" Mrr
+    printfn "non-zero rows:        %d" nzRows
+    printfn "unnormalized columns: %A" unCols
+    printfn "Minv:\n%A" Minv
+    printfn "Solvability constraint:\n%A" S
+    printfn "Nullspace of M:\n%A" N
+    printfn "M .* Minv:\n%A" (Mr .* Minv)
+    printfn "***************************"
     printfn "M^-1:\n%A" Arr
     if Mr.Shape.[0] = Mr.Shape.[1] then
         let id = Arr .* Mr
