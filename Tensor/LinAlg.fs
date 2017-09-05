@@ -13,6 +13,9 @@ module LinAlg =
         | _ -> failwithf "L must be a matrix but it has shape %A" L.Shape
 
     /// Computes the reduced row echelon form of L augmented with matrix A.
+    /// Returns a tuple of 
+    /// (row echelon form, number of non-zero rows, list of non-normalized columns,
+    ///  transformed augmentation matrix).
     let rowEchelonAugmented (L: Tensor<'T>) (A: Tensor<'T>) =
         let rows, cols = getRowsCols L
         match A.Shape with
@@ -73,6 +76,8 @@ module LinAlg =
         R, nonZeroRows, unnormalizedCols, B
 
     /// Computes the reduced row echelon form of L.
+    /// Returns a tuple of 
+    /// (row echelon form, number of non-zero rows, list of non-normalized columns).
     let rowEchelon (L: Tensor<'T>) =
         let rows, _ = getRowsCols L
         let A = Tensor.zeros L.Dev [rows; 0L]
