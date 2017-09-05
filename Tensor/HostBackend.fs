@@ -1605,8 +1605,9 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                trgt.Layout.Stride = src.Layout.Stride then
                 // use array block copy for contiguous memory block
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
-                Array.Copy (src.Data, src.FastLayout.Offset, 
-                            trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
+                if trgt.FastLayout.NElems > 0 then
+                    Array.Copy (src.Data, src.FastLayout.Offset, 
+                                trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
             else 
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
                 if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
