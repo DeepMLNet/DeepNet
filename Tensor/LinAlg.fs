@@ -90,7 +90,9 @@ module LinAlg =
     /// This has the following consequences for a linear equation system of the
     /// form y = M .* x:
     /// If y comes from the solvable space (i.e. S .* y = 0), 
-    /// then the value x = I .* y solves y = M .* x.
+    /// then the value x = I .* y gives one solution of y = M .* x.
+    /// Adding any linear combination of the columns of N to this x yields 
+    /// another solution, i.e. y = M .* x = M .* (x + N .* z) for any z.
     /// If x contains no component from the null-space (i.e. N^T .* x = 0),
     /// then we can recover x from y = M .* x by x = I .* y.
     let generalInverse (L: Tensor<'T>) =
