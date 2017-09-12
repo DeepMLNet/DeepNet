@@ -1,6 +1,7 @@
-﻿module CudaTests
+﻿namespace global
 
 open Xunit
+open Xunit.Abstractions
 open FsUnit.Xunit
 
 open Tensor.Utils
@@ -16,131 +17,135 @@ type CudaFactAttribute() as this =
             this.Skip <- "CUDA not present"
 
 
-[<CudaFact>]
-let ``Tensor transfer to Cuda``() =   
-    let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 10L]
-    let cuda = CudaTensor.transfer data
-    let back = HostTensor.transfer cuda
+type CudaTests (output: ITestOutputHelper) =
 
-    printfn "data:\n%A" data
-    printfn "back:\n%A" back
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
-    Tensor.almostEqual data back |> should equal true
+    [<CudaFact>]
+    let ``Tensor transfer to Cuda``() =   
+        let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 10L]
+        let cuda = CudaTensor.transfer data
+        let back = HostTensor.transfer cuda
 
+        printfn "data:\n%A" data
+        printfn "back:\n%A" back
 
-[<CudaFact>]
-let ``Tensor transfer to Cuda 2``() =    
-    let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
-    let data = data.Copy (order=CustomOrder [1; 0; 2])
-    printfn "data layout:%A" data.Layout
-
-    let cuda = CudaTensor.transfer data
-    let back = HostTensor.transfer cuda
-
-    printfn "data:\n%A" data
-    printfn "back:\n%A" back
-
-    Tensor.almostEqual data back |> should equal true
+        Tensor.almostEqual data back |> should equal true
 
 
-[<CudaFact>]
-let ``Mixed Cuda tests`` () =
-    // TODO: this needs cleanup
+    [<CudaFact>]
+    let ``Tensor transfer to Cuda 2``() =    
+        let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
+        let data = data.Copy (order=CustomOrder [1; 0; 2])
+        printfn "data layout:%A" data.Layout
 
-    let shape = [5L; 5L]
+        let cuda = CudaTensor.transfer data
+        let back = HostTensor.transfer cuda
 
-    //Tensor.Cuda.Backend.Cfg.DebugCompile <- true
-    Tensor.Cuda.Backend.Cfg.Stacktrace <- true
+        printfn "data:\n%A" data
+        printfn "back:\n%A" back
 
-    let a = HostTensor.ones<single> shape
-    printfn "a=\n%A" a
+        Tensor.almostEqual data back |> should equal true
 
-    printfn "copy to cuda..."
-    let ca = a |> CudaTensor.transfer
-    printfn "ca=\n%A" ca.Full
-    printfn "copy to host..."
-    let ha = ca |> HostTensor.transfer
-    printfn "ha=\n%A" ha
 
-    printfn "copy cuda to cuda..."
-    let cb = Tensor.copy ca
-    printfn "cb=\n%A" cb
+    [<CudaFact>]
+    let ``Mixed Cuda tests`` () =
+        // TODO: this needs cleanup
 
-    printfn "fill cuda..."
-    cb.FillConst(-5.5f)
-    printfn "cb=\n%A" cb
+        let shape = [5L; 5L]
 
-    printfn "cuda diagonal * 3..."
-    let cdiag = 3.0f * CudaTensor.identity 3L
-    printfn "cdiag=\n%A" cdiag
+        //Tensor.Cuda.Backend.Cfg.DebugCompile <- true
+        Tensor.Cuda.Backend.Cfg.Stacktrace <- true
 
-    printfn "cuda invert..."
-    //let cinv = Tensor.invert cb
-    let cinv = Tensor.invert cdiag
-    printfn "cinv=\n%A" cinv
+        let a = HostTensor.ones<single> shape
+        printfn "a=\n%A" a
 
-    printfn "cuda abs..."
-    let cb = abs cb
-    printfn "cb=\n%A" cb
+        printfn "copy to cuda..."
+        let ca = a |> CudaTensor.transfer
+        printfn "ca=\n%A" ca.Full
+        printfn "copy to host..."
+        let ha = ca |> HostTensor.transfer
+        printfn "ha=\n%A" ha
 
-    printfn "cuda ca + cb..."
-    let cc = ca + cb
-    printfn "cc=\n%A" cc
+        printfn "copy cuda to cuda..."
+        let cb = Tensor.copy ca
+        printfn "cb=\n%A" cb
 
-    printfn "cuda sumAxis cc..."
-    let ci = Tensor.sumAxis 0 cc
-    printfn "ci=\n%A" ci
+        printfn "fill cuda..."
+        cb.FillConst(-5.5f)
+        printfn "cb=\n%A" cb
 
-    printfn "cuda maxAxis cc..."
-    let cg = Tensor.maxAxis 0 cc
-    printfn "cg=\n%A" cg
+        printfn "cuda diagonal * 3..."
+        let cdiag = 3.0f * CudaTensor.identity 3L
+        printfn "cdiag=\n%A" cdiag
 
-    printfn "cuda argMinAxis cc..."
-    let cj = Tensor.argMinAxis 1 cc
-    printfn "cj=\n%A" cj
+        printfn "cuda invert..."
+        //let cinv = Tensor.invert cb
+        let cinv = Tensor.invert cdiag
+        printfn "cinv=\n%A" cinv
 
-    printfn "cuda convert to int..."
-    let cgInt = Tensor.convert<int> cg
-    printfn "cgInt=\n%A" cgInt
+        printfn "cuda abs..."
+        let cb = abs cb
+        printfn "cb=\n%A" cb
 
-    printfn "cuda ca <<== cb..."
-    let cd = ca <<== cb
-    printfn "cd=\n%A" cd
+        printfn "cuda ca + cb..."
+        let cc = ca + cb
+        printfn "cc=\n%A" cc
 
-    printfn "not cd..."
-    let ce = ~~~~cd
-    printfn "ce=\n%A" ce
+        printfn "cuda sumAxis cc..."
+        let ci = Tensor.sumAxis 0 cc
+        printfn "ci=\n%A" ci
 
-    printfn "ifthenelse..."
-    let ck = Tensor.ifThenElse ce ca cc
-    printfn "ck=\n%A" ck
+        printfn "cuda maxAxis cc..."
+        let cg = Tensor.maxAxis 0 cc
+        printfn "cg=\n%A" cg
 
-    printfn "cd or ce..."
-    let cf = cd |||| ce
-    printfn "cf=\n%A" cf
+        printfn "cuda argMinAxis cc..."
+        let cj = Tensor.argMinAxis 1 cc
+        printfn "cj=\n%A" cj
 
-    printfn "all cf..."
-    let ch = Tensor.allAxis 0 cf
-    printfn "ch=\n%A" ch
+        printfn "cuda convert to int..."
+        let cgInt = Tensor.convert<int> cg
+        printfn "cgInt=\n%A" cgInt
 
-    printfn "cuda gather..."
-    let idxs0 = CudaTensor.zeros<int64> [3L; 3L]
-    let cgather = Tensor.gather [Some idxs0; None] cb
-    printfn "cgather=\n%A" cgather
+        printfn "cuda ca <<== cb..."
+        let cd = ca <<== cb
+        printfn "cd=\n%A" cd
 
-    printfn "cuda scatter..."
-    let idxs1 = CudaTensor.ones<int64> shape
-    let cscatter = Tensor.scatter [Some idxs1; None] [6L; 6L] cb
-    printfn "cscatter=\n%A" cscatter
+        printfn "not cd..."
+        let ce = ~~~~cd
+        printfn "ce=\n%A" ce
 
-    printfn "cuda dot..."
-    let c1 = cscatter .* cscatter
-    printfn "c1=\n%A" c1
+        printfn "ifthenelse..."
+        let ck = Tensor.ifThenElse ce ca cc
+        printfn "ck=\n%A" ck
 
-    printfn "cuda replicate..."
-    let cscatterRep = Tensor.replicate 0 2L cscatter.[NewAxis, *, *]
-    printfn "cscatterRep=\n%A" cscatterRep
+        printfn "cd or ce..."
+        let cf = cd |||| ce
+        printfn "cf=\n%A" cf
 
-    printfn "cuda batched dot..."
-    let c2 = cscatterRep .* cscatterRep
-    printfn "c2=\n%A" c2
+        printfn "all cf..."
+        let ch = Tensor.allAxis 0 cf
+        printfn "ch=\n%A" ch
+
+        printfn "cuda gather..."
+        let idxs0 = CudaTensor.zeros<int64> [3L; 3L]
+        let cgather = Tensor.gather [Some idxs0; None] cb
+        printfn "cgather=\n%A" cgather
+
+        printfn "cuda scatter..."
+        let idxs1 = CudaTensor.ones<int64> shape
+        let cscatter = Tensor.scatter [Some idxs1; None] [6L; 6L] cb
+        printfn "cscatter=\n%A" cscatter
+
+        printfn "cuda dot..."
+        let c1 = cscatter .* cscatter
+        printfn "c1=\n%A" c1
+
+        printfn "cuda replicate..."
+        let cscatterRep = Tensor.replicate 0 2L cscatter.[NewAxis, *, *]
+        printfn "cscatterRep=\n%A" cscatterRep
+
+        printfn "cuda batched dot..."
+        let c2 = cscatterRep .* cscatterRep
+        printfn "c2=\n%A" c2
