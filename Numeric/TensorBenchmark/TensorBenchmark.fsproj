@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <NoWarn>NU1701;0203</NoWarn>
+    <IsPackable>false</IsPackable>    
   </PropertyGroup>
 
   <ItemGroup>
