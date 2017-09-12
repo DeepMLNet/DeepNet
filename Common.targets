@@ -9,6 +9,7 @@
       <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    
       <GenerateDocumentationFile>true</GenerateDocumentationFile>
       <IncludeSymbols>true</IncludeSymbols>
+      <IncludeSource>true</IncludeSource>
 
       <Product>Deep.Net</Product>    
       <Company>Deep.Net Developers</Company>

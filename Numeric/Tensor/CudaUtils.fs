@@ -37,7 +37,7 @@ module Cuda =
             try
                 new CudaContext(createNew=false)
             with e ->
-                failwithf "Cannot creat CUDA context: %s" e.Message
+                failwithf "Cannot create CUDA context: %s" e.Message
         cudaCntxt
 
     /// CUDA device info

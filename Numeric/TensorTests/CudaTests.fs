@@ -14,7 +14,7 @@ type CudaFactAttribute() as this =
     do
         try ignore Cuda.context
         with err ->
-            this.Skip <- "CUDA not present"
+            this.Skip <- err.Message
 
 
 type CudaTests (output: ITestOutputHelper) =
