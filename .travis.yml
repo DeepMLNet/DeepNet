@@ -16,6 +16,6 @@ script:
   - dotnet xunit
   - popd
   - dotnet pack -c Release
-  - dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'
-
+deploy:
+  - for PKG in Packages/Release/*.nupkg; do dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY "$PKG"; done
 
