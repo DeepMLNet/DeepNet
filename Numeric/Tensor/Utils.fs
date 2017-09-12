@@ -269,13 +269,79 @@ module UtilTypes =
     type Queue<'T> = System.Collections.Generic.Queue<'T>
     type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>
 
+    let private primitiveTypes = 
+        [typeof<byte>; typeof<sbyte>; typeof<int16>; typeof<uint16>;
+         typeof<int32>; typeof<uint32>; typeof<int64>; typeof<uint64>;
+         typeof<single>; typeof<double>]
+
     /// convert given value to specified type and return as obj
-    let convTo (typ: System.Type) value =
-        Convert.ChangeType(box value, typ)
+    let convTo (toType: System.Type) (value: obj) =
+        let fromType = value.GetType()
+        if primitiveTypes |> List.contains toType &&
+           primitiveTypes |> List.contains fromType then
+            Convert.ChangeType(value, toType)
+        else
+            let fms = fromType.GetMethods(BindingFlags.Static ||| BindingFlags.Public)
+            match fms |> Array.tryFind (fun m -> m.Name = "op_Explicit" 
+                                              && m.ReturnType = toType) with
+            | Some m -> m.Invoke(null, [|value|])
+            | None ->
+                match toType.GetMethod("op_Implicit", BindingFlags.Static ||| BindingFlags.Public,
+                                       null, [|fromType|], null) with
+                | null -> 
+                    failwithf "no conversion possible from type %s to type %s"
+                              fromType.Name toType.Name
+                | m -> m.Invoke(null, [|value|])
 
     /// convert given value to type 'T
     let conv<'T> value : 'T =
-        Convert.ChangeType(box value, typeof<'T>) :?> 'T
+        convTo typeof<'T> (box value) :?> 'T
+
+    let private getStaticProperty (typ: Type) name =
+        match typ.GetProperty(name, BindingFlags.Public ||| BindingFlags.Static,
+                              null, typ, [||], [||]) with
+        | null -> 
+                failwithf "the type %s must implement the static property %s" 
+                          typ.Name name
+        | p -> p.GetValue(null)
+
+    /// zero value for the specifed data type
+    let zeroOf dataType =
+        match dataType with
+        | t when t=typeof<byte>   -> LanguagePrimitives.GenericZero<byte> |> box
+        | t when t=typeof<sbyte>  -> LanguagePrimitives.GenericZero<sbyte> |> box
+        | t when t=typeof<int16>  -> LanguagePrimitives.GenericZero<int16> |> box
+        | t when t=typeof<uint16> -> LanguagePrimitives.GenericZero<uint16> |> box
+        | t when t=typeof<int32>  -> LanguagePrimitives.GenericZero<int32> |> box
+        | t when t=typeof<uint32> -> LanguagePrimitives.GenericZero<uint32> |> box
+        | t when t=typeof<int64>  -> LanguagePrimitives.GenericZero<int64> |> box
+        | t when t=typeof<uint64> -> LanguagePrimitives.GenericZero<uint64> |> box
+        | t when t=typeof<single> -> LanguagePrimitives.GenericZero<single> |> box
+        | t when t=typeof<double> -> LanguagePrimitives.GenericZero<double> |> box
+        | t -> getStaticProperty t "Zero"
+
+    /// zero value for type 'T
+    let zero<'T> : 'T =
+        zeroOf typeof<'T> |> unbox
+
+    /// one value for the specifed data type
+    let oneOf dataType =
+        match dataType with
+        | t when t=typeof<byte>   -> LanguagePrimitives.GenericOne<byte> |> box
+        | t when t=typeof<sbyte>  -> LanguagePrimitives.GenericOne<sbyte> |> box
+        | t when t=typeof<int16>  -> LanguagePrimitives.GenericOne<int16> |> box
+        | t when t=typeof<uint16> -> LanguagePrimitives.GenericOne<uint16> |> box
+        | t when t=typeof<int32>  -> LanguagePrimitives.GenericOne<int32> |> box
+        | t when t=typeof<uint32> -> LanguagePrimitives.GenericOne<uint32> |> box
+        | t when t=typeof<int64>  -> LanguagePrimitives.GenericOne<int64> |> box
+        | t when t=typeof<uint64> -> LanguagePrimitives.GenericOne<uint64> |> box
+        | t when t=typeof<single> -> LanguagePrimitives.GenericOne<single> |> box
+        | t when t=typeof<double> -> LanguagePrimitives.GenericOne<double> |> box
+        | t -> getStaticProperty t "One"
+
+    /// one value for type 'T
+    let one<'T> : 'T =
+        oneOf typeof<'T> |> unbox
 
     /// minimum value for the specifed numeric data type
     let minValueOf dataType =
@@ -290,7 +356,7 @@ module UtilTypes =
         | t when t=typeof<uint64> -> box System.UInt64.MinValue
         | t when t=typeof<single> -> box System.Single.MinValue
         | t when t=typeof<double> -> box System.Double.MinValue
-        | _ -> failwithf "no minimum value defined for type %s" dataType.Name
+        | t -> getStaticProperty t "MinValue"
 
     /// minimum value for numeric type 'T
     let minValue<'T> : 'T = 
@@ -309,7 +375,7 @@ module UtilTypes =
         | t when t=typeof<uint64> -> box System.UInt64.MaxValue
         | t when t=typeof<single> -> box System.Single.MaxValue
         | t when t=typeof<double> -> box System.Double.MaxValue
-        | _ -> failwithf "no maximum value defined for type %s" dataType.Name
+        | t -> getStaticProperty t "MaxValue"
 
     /// maximum value for numeric type 'T
     let maxValue<'T> : 'T = 

@@ -201,3 +201,4 @@ type internal BLAS =
         | t when t=typeof<int64> && int64Fn.IsSome -> int64Fn.Value () 
         | t -> failwithf "unsupported data type for BLAS operation: %A" t
 
+

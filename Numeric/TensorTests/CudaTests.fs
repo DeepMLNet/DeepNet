@@ -7,9 +7,16 @@ open Tensor.Utils
 open Tensor
 
 
+/// Test that only runs when CUDA is available.
+type CudaFactAttribute() as this =
+    inherit FactAttribute()
+    do
+        try ignore Cuda.context
+        with err ->
+            this.Skip <- "CUDA not present"
 
-[<Fact>]
-[<Trait("Category", "Skip_CI")>]
+
+[<CudaFact>]
 let ``Tensor transfer to Cuda``() =   
     let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 10L]
     let cuda = CudaTensor.transfer data
@@ -21,8 +28,7 @@ let ``Tensor transfer to Cuda``() =
     Tensor.almostEqual data back |> should equal true
 
 
-[<Fact>]
-[<Trait("Category", "Skip_CI")>]
+[<CudaFact>]
 let ``Tensor transfer to Cuda 2``() =    
     let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
     let data = data.Copy (order=CustomOrder [1; 0; 2])
@@ -37,8 +43,7 @@ let ``Tensor transfer to Cuda 2``() =
     Tensor.almostEqual data back |> should equal true
 
 
-[<Fact>]
-[<Trait("Category", "Skip_CI")>]
+[<CudaFact>]
 let ``Mixed Cuda tests`` () =
     // TODO: this needs cleanup
 

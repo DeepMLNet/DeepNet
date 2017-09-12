@@ -1,5 +1,6 @@
-﻿namespace Tensor
+﻿namespace Tensor.Algorithms
 
+open Tensor
 open Tensor.Utils
 
 

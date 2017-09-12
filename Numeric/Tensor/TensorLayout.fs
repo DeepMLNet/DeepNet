@@ -515,16 +515,19 @@ module TensorLayout =
                 | Rng(start, stop) ->
                     let start = defaultArg start 0L
                     let stop = defaultArg stop (shp - 1L)
-                    if start = stop + 1L then
-                        // allow slices starting at the element past the last 
-                        // element and are empty
-                        checkElementRange true shp start
-                    else
+                    if stop >= start then
+                        // non-empty slice
                         checkElementRange false shp start
-                    checkElementRange true shp stop
-                    {ra with Offset = ra.Offset + start*str;
-                              Shape = (stop + 1L - start)::ra.Shape;
-                              Stride = str::ra.Stride} 
+                        checkElementRange true shp stop
+                        {ra with Offset = ra.Offset + start*str;
+                                  Shape = (stop + 1L - start)::ra.Shape;
+                                 Stride = str::ra.Stride} 
+                    else
+                        // empty slice
+                        // We allow start and stop to be out of range in this case.
+                        {ra with Offset = ra.Offset;
+                                  Shape = 0L::ra.Shape;
+                                 Stride = str::ra.Stride} 
                 | RngAllFill | RngNewAxis -> failwith "impossible"
             | RngNewAxis::rRanges, _, _ ->
                 let ra = recView rRanges a

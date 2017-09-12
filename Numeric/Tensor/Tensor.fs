@@ -302,10 +302,10 @@ type [<StructuredFormatDisplay("{Pretty}");
     let backend = storage.Backend layout
 
     /// value zero of type 'T
-    static member Zero = conv<'T> 0
+    static member Zero : 'T = zero<'T>
 
     /// value one of type 'T
-    static member One = conv<'T> 1
+    static member One = one<'T>
 
     /// layout of this tensor (shape, offset and strides)
     member val Layout = layout
@@ -2085,6 +2085,7 @@ type Tensor =
     /// Creates a new tensor of given shape filled with zeros.
     static member zeros<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
+        //x.FillConst Tensor<'T>.Zero
         if not dev.Zeroed then 
             x.FillConst Tensor<'T>.Zero
         x
@@ -2423,6 +2424,7 @@ type Tensor =
         generate [] |> Tensor.ofBlocks
 
     /// Concatenates the sequence of tensors along the given axis.
+    /// The source tensors are copied.
     static member concat (ax: int) (ts: Tensor<'T> seq) =
         let ts = List.ofSeq ts
         if List.isEmpty ts then

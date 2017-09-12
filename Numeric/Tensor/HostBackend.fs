@@ -281,6 +281,7 @@ type internal DataAndLayout<'T> = {
     FastLayout: FastLayout32
 }
 
+
 /// Generic scalar operation primitives.
 type internal ScalarPrimitives<'T, 'TC> () =
     static let fscAsm = Assembly.GetAssembly(typeof<unit>)
@@ -293,34 +294,45 @@ type internal ScalarPrimitives<'T, 'TC> () =
     static let c = Expression.Parameter(typeof<'TC>, "c")
     static let cond = Expression.Parameter(typeof<bool>, "cond")
 
-    static let tryUnary (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T>>(Expression.Block(thrw, a), a).Compile()
+    static let compileAny (fns: (unit -> Expression<_>) list) =        
+        match fns |> List.tryPick (fun fn ->
+                try Some (fn().Compile())
+                with :? InvalidOperationException -> None) with
+        | Some expr -> expr
+        | None -> 
+            failwithf "cannot compile scalar primitive for type %s" typeof<'T>.Name
 
-    static let tryBinary (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Block(thrw, a), a, b).Compile()
+    static let tryUnary op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T>>(Expression.Block(thrw, a), a)
+        compileAny (fns @ [errExpr])
 
-    static let tryCompare (fn: unit -> Expression<_>) =
-        try (fn ()).Compile()
-        with :? InvalidOperationException as ex ->
-            let thrw = Expression.Throw(Expression.Constant(ex))
-            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Block(thrw, Expression.Constant(false)), a, b).Compile()
+    static let tryBinary op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Block(thrw, a), a, b)
+        compileAny (fns @ [errExpr])
+
+    static let tryCompare op fns =
+        let errExpr () =
+            let msg = sprintf "the type %s does not implemented %s" typeof<'T>.Name op
+            let thrw = Expression.Throw(Expression.Constant(InvalidOperationException msg))
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Block(thrw, Expression.Constant(false)), a, b)
+        compileAny (fns @ [errExpr])
 
     member val ConvertFunc = 
         Expression.Lambda<Func<'TC, 'T>>(Expression.Convert(c, typeof<'T>), c).Compile()
     member inline this.Convert cv = this.ConvertFunc.Invoke(cv)
 
     member val UnaryPlusFunc = 
-        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a))
+        tryUnary "~+" [fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.UnaryPlus(a), a)]
     member inline this.UnaryPlus av = this.UnaryPlusFunc.Invoke(av)
 
     member val UnaryMinusFunc = 
-        tryUnary (fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a))
+        tryUnary "~-" [fun () -> Expression.Lambda<Func<'T, 'T>>(Expression.Negate(a), a)]
     member inline this.UnaryMinus av = this.UnaryMinusFunc.Invoke(av)
 
     member val AbsFunc = 
@@ -419,23 +431,23 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.Truncate av = this.TruncateFunc.Invoke(av)
 
     member val AddFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b))
+        tryBinary "+" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Add(a, b), a, b)]
     member inline this.Add av bv = this.AddFunc.Invoke(av, bv)
         
     member val SubtractFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b))
+        tryBinary "-" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Subtract(a, b), a, b)]
     member inline this.Subtract av bv = this.SubtractFunc.Invoke(av, bv)
 
     member val MultiplyFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b))
+        tryBinary "*" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Multiply(a, b), a, b)]
     member inline this.Multiply av bv = this.MultiplyFunc.Invoke(av, bv)
 
     member val DivideFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b))
+        tryBinary "/" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Divide(a, b), a, b)]
     member inline this.Divide av bv = this.DivideFunc.Invoke(av, bv)
 
     member val ModuloFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b))
+        tryBinary "%" [fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Modulo(a, b), a, b)]
     member inline this.Modulo av bv = this.ModuloFunc.Invoke(av, bv)
 
     member val PowerFunc = 
@@ -443,14 +455,6 @@ type internal ScalarPrimitives<'T, 'TC> () =
         let m = fso.GetMethod("op_Exponentiation").MakeGenericMethod (typeof<'T>, typeof<'T>)        
         Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Call(m, a, b), a, b).Compile()
     member inline this.Power av bv = this.PowerFunc.Invoke(av, bv)
-
-    member val MaxFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.GreaterThan(a, b), a, b), a, b))
-    member inline this.Max av bv = this.MaxFunc.Invoke(av, bv)
-
-    member val MinFunc = 
-        tryBinary (fun () -> Expression.Lambda<Func<'T, 'T, 'T>>(Expression.Condition(Expression.LessThan(a, b), a, b), a, b))
-    member inline this.Min av bv = this.MinFunc.Invoke(av, bv)
 
     member val IsFiniteFunc : ('T -> bool) =
         match typeof<'T> with
@@ -462,27 +466,55 @@ type internal ScalarPrimitives<'T, 'TC> () =
     member inline this.IsFinite av = this.IsFiniteFunc av
 
     member val EqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.Equal(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IEquatable<'T>>.GetMethod("Equals") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.Call(a, m, b), a, b)
+        tryCompare "=" [fnOp; fnInterface]          
     member inline this.Equal av bv = this.EqualFunc.Invoke(av, bv)
 
     member val NotEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.NotEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IEquatable<'T>>.GetMethod("Equals") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.IsFalse(Expression.Call(a, m, b)), a, b)
+        tryCompare "!=" [fnOp; fnInterface]      
     member inline this.NotEqual av bv = this.NotEqualFunc.Invoke(av, bv)
 
     member val LessFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThan(Expression.Call(a, m, b), 
+                                                                      Expression.Constant(0)), a, b)
+        tryCompare "<" [fnOp; fnInterface]
     member inline this.Less av bv = this.LessFunc.Invoke(av, bv)
 
     member val LessOrEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.LessThanOrEqual(Expression.Call(a, m, b), 
+                                                                            Expression.Constant(0)), a, b)
+        tryCompare "<=" [fnOp; fnInterface]
     member inline this.LessOrEqual av bv = this.LessOrEqualFunc.Invoke(av, bv)
 
     member val GreaterFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThan(Expression.Call(a, m, b), 
+                                                                         Expression.Constant(0)), a, b)
+        tryCompare ">" [fnOp; fnInterface]
     member inline this.Greater av bv = this.GreaterFunc.Invoke(av, bv)
 
     member val GreaterOrEqualFunc = 
-        tryCompare (fun () -> Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b))
+        let fnOp () = Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(a, b), a, b)
+        let fnInterface () =
+            let m = typeof<IComparable<'T>>.GetMethod("CompareTo") 
+            Expression.Lambda<Func<'T, 'T, bool>>(Expression.GreaterThanOrEqual(Expression.Call(a, m, b), 
+                                                                                Expression.Constant(0)), a, b)
+        tryCompare ">=" [fnOp; fnInterface]
     member inline this.GreaterOrEqual av bv = this.GreaterOrEqualFunc.Invoke(av, bv)
 
     member val IfThenElseFunc =
@@ -1004,12 +1036,12 @@ type internal ScalarOps =
 
     static member MaxElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op pos a b = p.Max a b
+        let inline op pos a b = if p.Greater a b then a else b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
     static member MinElemwise (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op pos a b = p.Min a b
+        let inline op pos a b = if p.Less a b then a else b
         ScalarOps.ApplyBinaryOp (op, trgt, src1, src2, isIndexed=false, useThreads=true)
 
     static member Equal (trgt: DataAndLayout<bool>, src1: DataAndLayout<'T>, src2: DataAndLayout<'T>) =
@@ -1086,21 +1118,21 @@ type internal ScalarOps =
     static member SumLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Add res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=conv<'T> 0, isIndexed=false, useThreads=true)     
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=zero<'T>, isIndexed=false, useThreads=true)     
 
     static member ProductLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Multiply res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=conv<'T> 1, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=one<'T>, isIndexed=false, useThreads=true)  
 
     static member MaxLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Max res v
+        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Greater res v then res else v
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=minValue<'T>, isIndexed=false, useThreads=true)  
 
     static member MinLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
-        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Min res v
+        let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Less res v then res else v
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=maxValue<'T>, isIndexed=false, useThreads=true)  
 
     static member AllLastAxis (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =
@@ -1480,6 +1512,11 @@ type TensorHostStorage<'T> (data: 'T []) =
 /// Backend for host tensors.
 and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>) =
 
+    /// true if BLAS operations support type 'T 
+    let isBlasSupported =
+        let blasSupportedTypes = [typeof<single>; typeof<double>]
+        blasSupportedTypes |> List.contains typeof<'T> 
+
     /// fast layout
     member val internal FastLayout = FastLayout32 layout
 
@@ -1568,8 +1605,9 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                trgt.Layout.Stride = src.Layout.Stride then
                 // use array block copy for contiguous memory block
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
-                Array.Copy (src.Data, src.FastLayout.Offset, 
-                            trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
+                if trgt.FastLayout.NElems > 0 then
+                    Array.Copy (src.Data, src.FastLayout.Offset, 
+                                trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
             else 
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
                 if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
@@ -1841,66 +1879,81 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.ArgMaxLastAxis (trgt, src)
 
         member this.VecVecDot (trgt, a, b) =
-            use x = BLAS.GetVector (a, isSource=true, isTarget=false)
-            use y = BLAS.GetVector (b, isSource=true, isTarget=false)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> 
-                    let trgt = trgt |> box :?> Tensor<single>
-                    trgt.Value <- BLAS.cblas_sdot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)),
-                 doubleFn=(fun () -> 
-                    let trgt = trgt |> box :?> Tensor<double>
-                    trgt.Value <- BLAS.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
+            if isBlasSupported then
+                use x = BLAS.GetVector (a, isSource=true, isTarget=false)
+                use y = BLAS.GetVector (b, isSource=true, isTarget=false)
+                BLAS.Invoke<'T, unit>
+                    (singleFn=(fun () -> 
+                        let trgt = trgt |> box :?> Tensor<single>
+                        trgt.Value <- BLAS.cblas_sdot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)),
+                        doubleFn=(fun () -> 
+                        let trgt = trgt |> box :?> Tensor<double>
+                        trgt.Value <- BLAS.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
+            else
+                trgt.FillSumAxis 0 (a * b)
 
         member this.MatVecDot (trgt, a, b) =
-            use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
-            use x = BLAS.GetVector (b, isSource=true, isTarget=false)
-            use y = BLAS.GetVector (trgt, isSource=false, isTarget=true)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> BLAS.cblas_sgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                       a.CTrans, a.Rows, a.Cols, 1.0f,
-                                                       a.Ptr, a.Ld, x.Ptr, x.Inc,
-                                                       0.0f, y.Ptr, y.Inc)),
-                 doubleFn=(fun () -> BLAS.cblas_dgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                       a.CTrans, a.Rows, a.Cols, 1.0,
-                                                       a.Ptr, a.Ld, x.Ptr, x.Inc,
-                                                       0.0, y.Ptr, y.Inc)))  
-            y.FetchResult()
+            if isBlasSupported then
+                use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+                use x = BLAS.GetVector (b, isSource=true, isTarget=false)
+                use y = BLAS.GetVector (trgt, isSource=false, isTarget=true)
+                BLAS.Invoke<'T, unit>
+                    (singleFn=(fun () -> BLAS.cblas_sgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                           a.CTrans, a.Rows, a.Cols, 1.0f,
+                                                           a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                           0.0f, y.Ptr, y.Inc)),
+                     doubleFn=(fun () -> BLAS.cblas_dgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                           a.CTrans, a.Rows, a.Cols, 1.0,
+                                                           a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                           0.0, y.Ptr, y.Inc)))  
+                y.FetchResult()
+            else
+                trgt.FillSumAxis 0 (a * Tensor.padLeft b)
 
         member this.MatMatDot (trgt, a, b) =
-            use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
-            use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
-            use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> BLAS.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                       a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
-                                                       1.0f, a.Ptr, a.Ld, b.Ptr, b.Ld,
-                                                       0.0f, c.Ptr, c.Ld)),
-                 doubleFn=(fun () -> BLAS.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                       a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
-                                                       1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
-                                                       0.0, c.Ptr, c.Ld)))              
-            c.FetchResult()
+            if isBlasSupported then
+                use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+                use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
+                use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
+                BLAS.Invoke<'T, unit>
+                    (singleFn=(fun () -> BLAS.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                           a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                           1.0f, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                           0.0f, c.Ptr, c.Ld)),
+                     doubleFn=(fun () -> BLAS.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                           a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                           1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                           0.0, c.Ptr, c.Ld)))              
+                c.FetchResult()
+            else
+                trgt.FillSumAxis 1 (Tensor.padRight a * Tensor.padLeft b)
 
         member this.BatchedMatMatDot (trgt, a, b) =
-            use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
-            use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
-            use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            BLAS.Invoke<'T, unit>
-                (singleFn=(fun () -> BLAS.cblas_sgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                             [|a.CTrans|], [|b.CTrans|], 
-                                                             [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0f|],
-                                                             a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
-                                                             [|0.0f|], c.Ptrs, [|c.Ld|],
-                                                             1L, [|a.BatchSize|])),
-                 doubleFn=(fun () -> BLAS.cblas_dgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                             [|a.CTrans|], [|b.CTrans|], 
-                                                             [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0|],
-                                                             a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
-                                                             [|0.0|], c.Ptrs, [|c.Ld|],
-                                                             1L, [|a.BatchSize|])))
-            c.FetchResult()
+            if isBlasSupported then
+                use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
+                use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
+                use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
+                BLAS.Invoke<'T, unit>
+                    (singleFn=(fun () -> BLAS.cblas_sgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                 [|a.CTrans|], [|b.CTrans|], 
+                                                                 [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0f|],
+                                                                 a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                                 [|0.0f|], c.Ptrs, [|c.Ld|],
+                                                                 1L, [|a.BatchSize|])),
+                     doubleFn=(fun () -> BLAS.cblas_dgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                 [|a.CTrans|], [|b.CTrans|], 
+                                                                 [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0|],
+                                                                 a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                                 [|0.0|], c.Ptrs, [|c.Ld|],
+                                                                 1L, [|a.BatchSize|])))
+                c.FetchResult()
+            else
+                trgt.FillSumAxis 2 (a.[*, *, *, NewAxis] * b.[*, NewAxis, *, *])
 
         member this.BatchedInvert (trgt, src) =
+            if not isBlasSupported then
+                raise (NotImplementedException("this operation is only supported for floating point numbers"))
+
             // inversion is done in place, so we have to copy first if trgt and src are different
             if not (trgt = src) then
                 (this :> ITensorBackend<_>).Copy (trgt, src)
@@ -1915,7 +1968,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 let info =
                     BLAS.Invoke<'T, BLAS.lapack_int> 
                         (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)),
-                         doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
+                            doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
 
@@ -1923,12 +1976,15 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 let info =
                     BLAS.Invoke<'T, BLAS.lapack_int> 
                         (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)),
-                         doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
+                            doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
             a.FetchResult()
 
         member this.BatchedSVD (trgtS, trgtUV, src) =
+            if not isBlasSupported then
+                raise (NotImplementedException("this operation is only supported for floating point numbers"))
+
             let src = src.Copy(order=ColumnMajor) // LAPACK destorys src
             let batchShp, M, N, K = Tensor.SVDSizes src
 
@@ -1955,6 +2011,9 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                     if info > 0L then failwithf "SVD did not converge: %d" info
 
         member this.SymmetricEigenDecomposition (part, eigVals, eigVecs, src) =
+            if not isBlasSupported then
+                raise (NotImplementedException("this operation is only supported for floating point numbers"))
+
             let size = src.Shape.[0]
             let part = 
                 match part with

@@ -8,6 +8,8 @@
     <Compile Include="CudaTests.fs" />
     <Compile Include="NumpyFilesTest.fs" />
     <Compile Include="HDF5Tests.fs" />
+    <Compile Include="RatTests.fs" />
+    <Compile Include="LinAlgTests.fs" />
     <Content Include="App.config" />
     <None Include="TestData\MatInv.h5">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
