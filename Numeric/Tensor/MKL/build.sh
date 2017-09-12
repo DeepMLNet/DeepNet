@@ -4,7 +4,7 @@ set -e
 
 if [ -z "$MKLROOT" ]; then
     echo "Set the MKLROOT environment variable to the root of your Intel MKL directory,"
-    echo "for example: export MKLROOT=/opt/intel/compilers_and_libraries/linux/mkl."
+    echo "for example: export MKLROOT=/opt/intel/compilers_and_libraries/linux/mkl"
     exit 1
 fi
 

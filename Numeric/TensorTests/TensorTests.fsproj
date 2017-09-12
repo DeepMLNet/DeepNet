@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <NoWarn>NU1701;0203</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="BaseTests.fs" />
+    <Compile Include="CudaTests.fs" />
+    <Compile Include="NumpyFilesTest.fs" />
+    <Compile Include="HDF5Tests.fs" />
+    <Content Include="App.config" />
+    <None Include="TestData\MatInv.h5">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestData\NPZ1.npz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tensor\Tensor.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsUnit.Xunit" Version="3.0.0" />
+    <PackageReference Include="xunit" Version="2.3.0-beta4-build3742" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.0-beta4-build3742" />
+  </ItemGroup>
+</Project>

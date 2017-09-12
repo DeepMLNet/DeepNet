@@ -1,6 +1,7 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project>
   <ItemGroup>
-    <NativeLibs Include="$(MSBuildThisFileDirectory)\*.dll" />
+    <NativeLibs Include="$(MSBuildThisFileDirectory)/*.dll" />
+    <NativeLibs Include="$(MSBuildThisFileDirectory)/*.so" />
     <None Include="@(NativeLibs)">
       <Link>%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

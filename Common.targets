@@ -1,0 +1,29 @@
+<Project>
+
+  <Import Project="Revision.targets" />
+
+  <PropertyGroup>
+      <TargetFramework>netstandard2.0</TargetFramework>
+      <Platform>x64</Platform>      
+
+      <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    
+      <GenerateDocumentationFile>true</GenerateDocumentationFile>
+      <IncludeSymbols>true</IncludeSymbols>
+
+      <Product>Deep.Net</Product>    
+      <Company>Deep.Net Developers</Company>
+      <authors>Deep.Net Developers</authors>
+      <owners>Deep.Net Developers</owners>
+      <Copyright>Copyright (C) Deep.Net Developers. Licensed under the Apache 2.0 license.</Copyright>
+      <requireLicenseAcceptance>false</requireLicenseAcceptance>
+      <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0.txt</PackageLicenseUrl>
+      <PackageProjectUrl>http://www.deepml.net</PackageProjectUrl>
+      <PackageOutputPath>$(MSBuildThisFileDirectory)/Packages/$(Configuration)/</PackageOutputPath>
+
+      <BaseVersion>0.4</BaseVersion>
+      <PackageVersion>$(BaseVersion).$(Rev)</PackageVersion>
+      <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
+      <FileVersion>$(PackageVersion)</FileVersion>  
+  </PropertyGroup>
+
+</Project>
