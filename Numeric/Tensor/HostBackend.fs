@@ -2154,4 +2154,23 @@ module HostTensor =
         let dataType = hdf5.GetDataType path
         callGeneric<HDFFuncs, ITensor> "Read" [dataType] (hdf5, path)
 
+    /// Creates a tensor of given shape filled with random integer numbers between
+    /// minValue and maxValue.
+    let randomInt (rnd: Random) (minValue, maxValue) shp =
+        rnd.Seq (minValue, maxValue) 
+        |> ofSeqWithShape shp  
 
+    /// Creates a tensor of given shape filled with random floating-point numbers 
+    /// uniformly placed between minValue and maxValue.
+    let randomUniform (rnd: Random) (minValue: 'T, maxValue: 'T) shp =
+        rnd.SeqDouble (conv<float> minValue, conv<float> maxValue) 
+        |> Seq.map conv<'T>
+        |> ofSeqWithShape shp    
+
+    /// Creates a tensor of given shape filled with random samples from a normal
+    /// distribution with the specified mean and variance.
+    let randomNormal (rnd: Random) (mean: 'T, variance: 'T) shp =
+        rnd.SeqNormal (conv<float> mean, conv<float> variance) 
+        |> Seq.map conv<'T>
+        |> ofSeqWithShape shp       
+    

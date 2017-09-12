@@ -2257,7 +2257,7 @@ type Tensor =
 
     /// mean 
     static member mean a =
-        a |> Tensor.flatten |> Tensor.meanAxis 0
+        a |> Tensor.flatten |> Tensor.meanAxis 0 |> Tensor.value
 
     /// variance over given axis
     static member varAxis (axis, a: Tensor<'T>, ?ddof) =
@@ -2269,7 +2269,7 @@ type Tensor =
 
     /// variances
     static member var (a, ?ddof) =
-        Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof)
+        Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof) |> Tensor.value
 
     /// standard deviation over given axis
     static member stdAxis (ax, a, ?ddof) =
@@ -2289,7 +2289,7 @@ type Tensor =
 
     /// tensor, matrix or vector norm of given order
     static member norm (a: Tensor<'T>, ?ord: 'T) =
-        Tensor.normAxis (0, Tensor.flatten a, ?ord=ord)
+        Tensor.normAxis (0, Tensor.flatten a, ?ord=ord) |> Tensor.value
 
     /// Returns a view of the diagonal along the given axes.
     /// The diagonal replaces the first axis and the second axis is removed.

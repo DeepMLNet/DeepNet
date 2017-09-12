@@ -1,4 +1,4 @@
-﻿module TensorBaseTests
+﻿module BaseTests
 
 open Xunit
 open FsUnit.Xunit
@@ -55,8 +55,8 @@ let ``Pretty printing works`` () =
 let ``Batched matrix-matrix dot product`` () =
     let N, M = 2L, 3L
     let rng = System.Random(123)
-    let a = rng.UniformTensor (-3., 3.) [N; M; 4L; 3L]
-    let b = rng.UniformTensor (-1., 1.) [N; M; 3L; 2L]
+    let a = HostTensor.randomUniform rng (-3., 3.) [N; M; 4L; 3L]
+    let b = HostTensor.randomUniform rng (-1., 1.) [N; M; 3L; 2L]
     let c = a .* b
 
     let cr = HostTensor.zeros<float> [N; M; 4L; 2L]
@@ -69,8 +69,8 @@ let ``Batched matrix-matrix dot product`` () =
 let ``Batched matrix-vector dot product`` () =
     let N, M = 2L, 3L
     let rng = System.Random(123)
-    let a = rng.UniformTensor (-3., 3.) [N; M; 4L; 3L]
-    let b = rng.UniformTensor (-1., 1.) [N; M; 3L]
+    let a = HostTensor.randomUniform rng (-3., 3.) [N; M; 4L; 3L]
+    let b = HostTensor.randomUniform rng (-1., 1.) [N; M; 3L]
     let c = a .* b
 
     let cr = HostTensor.zeros<float> [N; M; 4L]
@@ -88,7 +88,7 @@ let ``Batched matrix-vector dot product`` () =
 let ``Build and extract diagonal`` () =
     let N = 3L
     let rng = System.Random 123
-    let v = rng.UniformTensor (-1., 1.) [N]
+    let v = HostTensor.randomUniform rng (-1., 1.) [N]
     let dm = Tensor.diagMat v
     
     printfn "v=%A" v
@@ -103,7 +103,7 @@ let ``Batched build and extract diagonal`` () =
     let S1, S2 = 2L, 3L
     let N = 4L
     let rng = System.Random 123
-    let v = rng.UniformTensor (-1., 1.) [S1; S2; N]
+    let v = HostTensor.randomUniform rng (-1., 1.) [S1; S2; N]
     let dm = Tensor.diagMat v
     
     printfn "v=\n%A" v
@@ -147,7 +147,7 @@ let ``Invert diagonal matrix`` () =
 let ``Invert random matrix`` () =
     let rng = System.Random 123
 
-    let dm = rng.UniformTensor (-1.0, 1.0) [4L; 4L]
+    let dm = HostTensor.randomUniform rng (-1.0, 1.0) [4L; 4L]
     let dmInv = Tensor.invert dm
     let dmInvInv = Tensor.invert dmInv
 
@@ -161,7 +161,7 @@ let ``Invert random matrix`` () =
 let ``Batch invert random matrices`` () =
     let rng = System.Random 123
 
-    let dm = rng.UniformTensor (-1.0, 1.0) [2L; 4L; 3L; 3L]
+    let dm = HostTensor.randomUniform rng (-1.0, 1.0) [2L; 4L; 3L; 3L]
     let dmInv = Tensor.invert dm
     let dmInvInv = Tensor.invert dmInv
 
@@ -206,7 +206,7 @@ let ``Invert Kk matrix`` () =
 let ``Pseudo Invert random matrix`` () =
     let rng = System.Random 123
 
-    let dm = rng.UniformTensor (-1.0, 1.0) [4L; 4L]
+    let dm = HostTensor.randomUniform rng (-1.0, 1.0) [4L; 4L]
     let dmInv = Tensor.pseudoInvert dm
     let dmInvInv = Tensor.pseudoInvert dmInv
 
@@ -316,4 +316,16 @@ let ``Disperse 3`` () =
     printfn "idxs=\n%A" idxs
     printfn "disperse idxs shp a=\n%A" s
 
+
+[<Fact>]
+let ``Normal distribution sampling`` () =
+    let rng = System.Random 124
+    let mean, var = 3.0, 1.5
+    let samples = 10000L
+    let x = HostTensor.randomNormal rng (mean, var) [samples]
+    printfn "Generating mean=%f variance=%f" mean var
+    let xMean, xVar = Tensor.mean x, Tensor.var x
+    printfn "Caluclated mean=%f variance=%f" xMean xVar
+    abs (mean - xMean) < 0.06 |> should equal true
+    abs (var - xVar) < 0.06 |> should equal true
 

@@ -1,4 +1,4 @@
-﻿module TensorCudaTests
+﻿module CudaTests
 
 open Xunit
 open FsUnit.Xunit
