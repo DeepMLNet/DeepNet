@@ -1,6 +1,7 @@
 language: csharp
 mono: none
 dotnet: 2.0.0
+secure: "fRLB3ZnIWTLJECstFjA+dfZUcmf/YI4B5QesZpmohVVvoVUWvC2rs8x40Pjrov6egE3df/LDtvANuY5u4Njvl58lG8psJ8PbtB+f14FlRHOBNHmWJUOA4ABajz537ddxVNgXlMCLDzd9WRxDSd1PZhzhL35FL/yH7H8EYCfAX1b1/Y7GgicBa1t6x0vHjLjFLFIVGqC6B/EPG89/zt+RfFMmo3g6B+B33tbXXhIDSpci6LwOATDGGN9PWuS5KYqAZghAKOAL28NaEdTsvyMZZxISDGLYPoSrJOCm5BNranUYQSad98m7Va7NKJcvPnpq8oC44uFXemJu4oLbMV6lISLEnkrURY/TR1mY+haymw4PDF4EUL8N2BPtKgdvX6cHd1mTe++jOEP/eODB5rnM/gnNPLIr5HddACJVws4JEikxvVrnbZpqbXh9DB0yp3rtxpHrmVnRn2cem34K7kbpQNYEykE98Hs1wB5SmyAMTr/Co23V7wVIJDWMaei468jHnlYIg/6VvX/3Qow4MdVewqsBpvSkNcVBlL6us0q54BpwAkscgvOwKyuCM+pht8+ZoH3M7hdw2k0njVKMPZJTmg8oXQSVWC+J1wZAUMIrRO4EsBCZ5NxzUb77OTEi5z49UaUb9zMgbyU9PA1AKwD7XShNgnMFpMrTOmImUSyNnho="
 solution: DeepNet.sln
 install:
   - mkdir -p ~/.nuget/NuGet
@@ -15,5 +16,6 @@ script:
   - dotnet xunit
   - popd
   - dotnet pack -c Release
+  - dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'
 
 
