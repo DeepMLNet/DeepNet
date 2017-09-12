@@ -75,6 +75,7 @@
 
   <ItemGroup>        
     <Content Include="Tensor.targets" PackagePath="build" />
+    <Content Include="MKL/libtensor_mkl.so" PackagePath="lib/netstandard2.0" />
     <Content Include="MKL/libtensor_mkl.so" PackagePath="build">
       <Link>libtensor_mkl.so</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
