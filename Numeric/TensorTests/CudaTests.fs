@@ -12,7 +12,9 @@ open Tensor
 type CudaFactAttribute() as this =
     inherit FactAttribute()
     do
-        try ignore Cuda.context
+        try 
+            use dummy = new ManagedCuda.CudaContext(createNew=false)
+            ()
         with err ->
             this.Skip <- err.Message
 
