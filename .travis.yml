@@ -2,7 +2,17 @@ language: csharp
 mono: none
 dotnet: 2.0.0
 solution: DeepNet.sln
-
-
+install:
+  - echo '<?xml version="1.0" encoding="utf-8"?>' > ~/.nuget/NuGet/NuGet.config
+  - echo '<configuration><packageSources>' >> ~/.nuget/NuGet/NuGet.config
+  - echo '<add key="Core Ports" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />' >> ~/.nuget/NuGet/NuGet.config
+  - echo '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />' >> ~/.nuget/NuGet/NuGet.config
+  - echo '</packageSources></configuration>' >> ~/.nuget/NuGet/NuGet.config
+script: 
+  - dotnet build
+  - pushd Numeric/TensorTests
+  - dotnet xunit
+  - popd
+  - dotnet pack -c Release
 
 
