@@ -1908,7 +1908,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                            0.0, y.Ptr, y.Inc)))  
                 y.FetchResult()
             else
-                trgt.FillSumAxis 0 (a * Tensor.padLeft b)
+                trgt.FillSumAxis 1 (a * Tensor.padLeft b)
 
         member this.MatMatDot (trgt, a, b) =
             if isBlasSupported then
