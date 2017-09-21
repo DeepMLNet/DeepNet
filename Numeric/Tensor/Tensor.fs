@@ -176,9 +176,9 @@ type ITensorBackend<'T> =
     abstract MapIndexed2:       fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
                                 trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
                                 useThreads:bool -> unit
-    abstract FoldLastAxis:      fn:('T -> 'T1 -> 'T) * initial:'T *
+    abstract FoldLastAxis:      fn:('T -> 'T1 -> 'T) * initial:Tensor<'T> *
                                 trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
-    abstract FoldLastAxisIndexed: fn:(int64[] -> 'T -> 'T1 -> 'T) * initial:'T *
+    abstract FoldLastAxisIndexed: fn:(int64[] -> 'T -> 'T1 -> 'T) * initial:Tensor<'T> *
                                 trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
 
     abstract UnaryPlus:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
@@ -1319,24 +1319,24 @@ type [<StructuredFormatDisplay("{Pretty}");
         trgt
 
     /// folds the function over the given axis, using this tensor as target
-    member trgt.FillFoldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
-        let a = Tensor.PrepareAxisReduceSources (trgt, axis, a)
-        trgt.Backend.FoldLastAxis (fn=fn, initial=initial, trgt=trgt, src=a, useThreads=false)        
+    member trgt.FillFoldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
+        let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
+        trgt.Backend.FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, src=a, useThreads=false)        
 
     /// folds the function over the given axis, using this tensor as target and multiple threads
-    member trgt.FillParallelFoldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
-        let a = Tensor.PrepareAxisReduceSources (trgt, axis, a)
-        trgt.Backend.FoldLastAxis (fn=fn, initial=initial, trgt=trgt, src=a, useThreads=true) 
+    member trgt.FillParallelFoldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
+        let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
+        trgt.Backend.FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, src=a, useThreads=true) 
 
     /// folds the function over the given axis
-    static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+    static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
         let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
         trgt.FillFoldAxis fn initial axis a
         trgt
 
     /// sum over given axis using this tensor as target
     member trgt.FillSumAxis (ax: int) (src: Tensor<'T>) =
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.SumLastAxis (trgt=trgt, src1=src)
 
     /// sum over given axis
@@ -1355,7 +1355,7 @@ type [<StructuredFormatDisplay("{Pretty}");
 
     /// product over given axis using this tensor as target
     member trgt.FillProductAxis (ax: int) (src: Tensor<'T>) =
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.ProductLastAxis (trgt=trgt, src1=src)
 
     /// product over given axis
@@ -1374,7 +1374,7 @@ type [<StructuredFormatDisplay("{Pretty}");
 
     /// minimum value over given axis using this tensor as target
     member trgt.FillMinAxis (ax: int) (src: Tensor<'T>) =
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.MinLastAxis (trgt=trgt, src1=src)
 
     /// minimum value over given axis
@@ -1393,7 +1393,7 @@ type [<StructuredFormatDisplay("{Pretty}");
 
     /// maximum value over given axis using this tensor as target
     member trgt.FillMaxAxis (ax: int) (src: Tensor<'T>) =
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.MaxLastAxis (trgt=trgt, src1=src)
 
     /// maximum value over given axis
@@ -1413,7 +1413,7 @@ type [<StructuredFormatDisplay("{Pretty}");
     /// positions of minimum values along given axis using this tensor as target
     member trgt.FillArgMinAxis (ax: int) (src: Tensor<'R>) =
         let trgt = trgt.AsInt64
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         src.Backend.ArgMinLastAxis (trgt=trgt, src1=src)
 
     /// positions of minimum values along given axis 
@@ -1425,7 +1425,7 @@ type [<StructuredFormatDisplay("{Pretty}");
     /// positions of maximum values along given axis using this tensor as target
     member trgt.FillArgMaxAxis (ax: int) (src: Tensor<'R>) =
         let trgt = trgt.AsInt64
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         src.Backend.ArgMaxLastAxis (trgt=trgt, src1=src)
 
     /// positions of maximum values along given axis 
@@ -1453,7 +1453,7 @@ type [<StructuredFormatDisplay("{Pretty}");
     /// false if there is at least one false element in given axis, using this tensor as target
     member trgt.FillAllAxis (ax: int) (src: Tensor<bool>) =
         let trgt = trgt.AsBool
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.AllLastAxis (trgt=trgt, src1=src)
 
     /// false if there is at least one false element in given axis, otherwise true
@@ -1474,7 +1474,7 @@ type [<StructuredFormatDisplay("{Pretty}");
     /// true if there is at least one true element in given axis, using this tensor as target
     member trgt.FillAnyAxis (ax: int) (src: Tensor<bool>) =
         let trgt = trgt.AsBool
-        let src = Tensor.PrepareAxisReduceSources (trgt, ax, src)
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.AnyLastAxis (trgt=trgt, src1=src)
 
     /// true if there is at least one true element in given axis, otherwise false
@@ -2026,13 +2026,21 @@ type Tensor =
 
     /// Prepares the sources of an axis reduce operation (e.g. sum over axis),
     /// by moving the reduction axis to be the last axis in the source.
-    static member internal PrepareAxisReduceSources<'TR, 'TA> (trgt: Tensor<'TR>, axis: int, a: Tensor<'TA>) : Tensor<'TA> =
+    static member internal PrepareAxisReduceSources<'TR, 'TA> 
+            (trgt: Tensor<'TR>, axis: int, a: Tensor<'TA>,
+             initial: Tensor<'TR> option) : (Tensor<'TA> * Tensor<'TR> option) =
         Tensor.CheckSameStorage [trgt; a]
         a.CheckAxis axis
         let redShp = a.Shape |> List.without axis
         if trgt.Shape <> redShp then
             raise (ShapeMismatch (sprintf "Reduction of tensor %A along axis %d gives shape %A but
                                            target has shape %A" a.Shape axis redShp trgt.Shape))
+        let initial =
+            match initial with
+            | Some initial -> 
+                Tensor.CheckSameStorage [trgt; initial]
+                initial |> Tensor.broadcastTo redShp |> Some  
+            | None -> None                                       
         let axisToLast = [
             for d in 0 .. axis-1 do yield d
             yield a.NDims-1
@@ -2041,7 +2049,7 @@ type Tensor =
         let a = a |> Tensor<_>.permuteAxes axisToLast
         if not (trgt.Shape = a.Shape.[0 .. a.NDims-2]) then
             failwith "axis reduce shape computation error"
-        a
+        a, initial
 
     /// prepares an axis reduce operation by allocating a target of appropriate size and storage
     static member internal PrepareAxisReduceTarget<'TR, 'TA> (axis: int, a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =

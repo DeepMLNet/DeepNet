@@ -11,6 +11,7 @@
     <Compile Include="HDF5Tests.fs" />
     <Compile Include="RatTests.fs" />
     <Compile Include="LinAlgTests.fs" />
+    <Compile Include="Main.fs" />
     <Content Include="App.config" />
     <None Include="TestData\MatInv.h5">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

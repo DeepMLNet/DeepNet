@@ -825,9 +825,9 @@ type internal ScalarOps =
             outerLoops false 0
 
     static member inline ApplyAxisFold (foldOp: int64[] -> 'TS -> 'T1 -> 'TS, 
-                                        extractOp: 'TS -> 'T,
+                                        extractOp: 'TS -> 'T, 
                                         trgt: DataAndLayout<'T>, src1: DataAndLayout<'T1>, 
-                                        initial: 'TS,
+                                        initial: Choice<'TS, DataAndLayout<'TS>>,
                                         isIndexed: bool, useThreads: bool) =        
         let nd = src1.FastLayout.NDims
         let shape = src1.FastLayout.Shape
@@ -846,12 +846,21 @@ type internal ScalarOps =
 
             let mutable trgtPosIter = 
                 PosIter32 (trgt.FastLayout, startPos.[0 .. nd-2], fromDim=fromDim, toDim=nd-2)
+            let initialPosIter =
+                match initial with
+                | Choice1Of2 initialVal -> None 
+                | Choice2Of2 initialTensor -> 
+                    Some (ref (PosIter32 (initialTensor.FastLayout, startPos.[0 .. nd-2], fromDim=fromDim, toDim=nd-2)))
             let mutable src1PosIter = 
                 PosIter32 (src1.FastLayout, startPos, fromDim=fromDim, toDim=nd-2)
             let pos64 = Array.zeroCreate nd
             while trgtPosIter.Active do
                 let mutable src1Addr = src1PosIter.Addr
-                let mutable state = initial
+                let mutable state =
+                    match initial with
+                    | Choice1Of2 initialVal -> initialVal
+                    | Choice2Of2 initialTensor ->                                   
+                        initialTensor.Data.[initialPosIter.Value.contents.Addr]
                 if nd = 0 then
                     trgt.Data.[trgtPosIter.Addr] <- foldOp [||] state src1.Data.[src1Addr] |> extractOp
                 elif isIndexed then
@@ -864,12 +873,14 @@ type internal ScalarOps =
                         pos64.[nd-1] <- pos64.[nd-1] + 1L
                     trgt.Data.[trgtPosIter.Addr] <- extractOp state
                 else
-                    let mutable value = initial
                     for i in 0 .. shape.[nd-1] - 1 do
-                        value <- foldOp [||] value src1.Data.[src1Addr]
+                        state <- foldOp [||] state src1.Data.[src1Addr]
                         src1Addr <- src1Addr + src1.FastLayout.Stride.[nd-1]
-                    trgt.Data.[trgtPosIter.Addr] <- extractOp value
+                    trgt.Data.[trgtPosIter.Addr] <- extractOp state
                 trgtPosIter.MoveNext()
+                match initial with
+                | Choice1Of2 _ -> () 
+                | Choice2Of2 _ -> initialPosIter.Value.contents.MoveNext()
                 src1PosIter.MoveNext()
                     
         if useThreads && nd > 1 then
@@ -1118,30 +1129,30 @@ type internal ScalarOps =
     static member SumLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Add res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=zero<'T>, isIndexed=false, useThreads=true)     
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 zero<'T>, isIndexed=false, useThreads=true)     
 
     static member ProductLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Multiply res v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=one<'T>, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 one<'T>, isIndexed=false, useThreads=true)  
 
     static member MaxLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Greater res v then res else v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=minValue<'T>, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 minValue<'T>, isIndexed=false, useThreads=true)  
 
     static member MinLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = if p.Less res v then res else v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=maxValue<'T>, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 maxValue<'T>, isIndexed=false, useThreads=true)  
 
     static member AllLastAxis (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =
         let inline op (srcIdx: int64[]) (res: bool) (v: bool) = res && v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=true, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 true, isIndexed=false, useThreads=true)  
 
     static member AnyLastAxis (trgt: DataAndLayout<bool>, src1: DataAndLayout<bool>) =
         let inline op (srcIdx: int64[]) (res: bool) (v: bool) = res || v
-        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=false, isIndexed=false, useThreads=true)  
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 false, isIndexed=false, useThreads=true)  
 
     static member ArgMaxLastAxis (trgt: DataAndLayout<int64>, src1: DataAndLayout<'T>) =
         let nd = src1.FastLayout.NDims
@@ -1149,7 +1160,7 @@ type internal ScalarOps =
         let inline op (srcIdx: int64[]) (maxPos, maxVal) (v: 'T) = 
             if p.Greater v maxVal then srcIdx.[nd-1], v
             else maxPos, maxVal
-        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=(-1L, minValue<'T>), 
+        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (-1L, minValue<'T>), 
                                  isIndexed=true, useThreads=true)     
 
     static member ArgMinLastAxis (trgt: DataAndLayout<int64>, src1: DataAndLayout<'T>) =
@@ -1158,7 +1169,7 @@ type internal ScalarOps =
         let inline op (srcIdx: int64[]) (minPos, minVal) (v: 'T) = 
             if p.Less v minVal then srcIdx.[nd-1], v
             else minPos, minVal
-        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=(-1L, maxValue<'T>), 
+        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (-1L, maxValue<'T>), 
                                  isIndexed=true, useThreads=true)     
 
 
@@ -1838,13 +1849,13 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             ScalarOps.Scatter (trgt, trgtIndices, src)
 
         member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
             let inline foldOp idx state xv = fn state xv
-            ScalarOps.ApplyAxisFold (foldOp, id, trgt, a, initial, isIndexed=false, useThreads=useThreads)
+            ScalarOps.ApplyAxisFold (foldOp, id, trgt, a, Choice2Of2 initial, isIndexed=false, useThreads=useThreads)
 
         member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            ScalarOps.ApplyAxisFold (fn, id, trgt, a, initial, isIndexed=true, useThreads=useThreads)
+            let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
+            ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
 
         member this.SumLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
