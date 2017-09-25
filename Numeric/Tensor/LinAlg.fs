@@ -100,6 +100,7 @@ module LinAlg =
     /// another solution, i.e. y = M .* x = M .* (x + N .* z) for any z.
     /// If x contains no component from the null-space (i.e. N^T .* x = 0),
     /// then we can recover x from y = M .* x by x = I .* y.
+    /// (TODO: check last sentence, because it was violated in test1)
     let generalInverse (L: Tensor<'T>) =
         // compute row echelon form
         let rows, cols = getRowsCols L
@@ -115,6 +116,7 @@ module LinAlg =
                 |> Tensor.concat 1
 
         // zero unnormalized columns in row echelon form E
+        // (setting undetermined values of solution to zero)
         for c in unCols do
             E.[*, c] <- Tensor.scalar E.Dev Tensor.Zero
         
@@ -132,7 +134,18 @@ module LinAlg =
         LI, S, N
 
 
+    /// Computes the smith normal form.
+    let smithNormalForm (A: Tensor<bigint>) =
+        
+        let A = Tensor.copy A
+        
+        //bigint.Bezout 
 
+        let rowStep row =
+
+            ()
+
+        ()
         
 
 

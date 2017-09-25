@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="BaseTests.fs" />
+    <Compile Include="BigIntegerTests.fs" />
     <Compile Include="CudaTests.fs" />
     <Compile Include="NumpyFilesTest.fs" />
     <Compile Include="HDF5Tests.fs" />
@@ -29,6 +30,6 @@
     <PackageReference Include="xunit" Version="2.3.0-beta5-build3769" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.3.0-beta5-build3769" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.0-beta5-build3769" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />    
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
   </ItemGroup>
 </Project>
