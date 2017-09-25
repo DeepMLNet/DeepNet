@@ -189,3 +189,18 @@ type LinAlgTests (output: ITestOutputHelper) =
         calcRowEchelon M
         checkGeneralInverse (Tensor.convert<Rat> M) 1L 0L
 
+
+    let calcSmith M =
+        printfn "M=\n%A" M
+        let S = LinAlg.smithNormalForm M
+        printfn "Smith Normal Form S=\n%A" S    
+
+    [<Fact>]
+    let ``Smith Normal Form 1`` () =
+        let M = HostTensor.ofList2D [[ 2;  4;   4]
+                                     [-6;  6;  12]
+                                     [10; -4; -16]]
+        calcSmith (Tensor.convert<bigint> M)
+        
+
+                                      
