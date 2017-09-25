@@ -139,9 +139,9 @@ module LinAlg =
         
         let A = Tensor.copy A
         
-        //bigint.Bezout 
-
         let rowStep row =
+        
+        
 
             ()
 
