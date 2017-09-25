@@ -132,7 +132,7 @@ struct FindLastAxisInitialFn {
 template<typename T> struct FindLastAxisUpdateFn {
     T searchValue;
     _dev_ idx_t operator() (idx_t foundPos, T value, idx_t pos) {
-        if (foundPos <> NotFound)
+        if (foundPos != NotFound)
             return foundPos;
         else {
             if (value == searchValue) 
