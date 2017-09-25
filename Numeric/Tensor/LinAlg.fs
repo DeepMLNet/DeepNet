@@ -135,12 +135,15 @@ module LinAlg =
 
 
     /// Computes the smith normal form.
-    let smithNormalForm (A: Tensor<bigint>) =
-        
+    let smithNormalForm (A: Tensor<bigint>) =       
+        let rows, cols = getRowsCols A                  
         let A = Tensor.copy A
-        
-        let rowStep row =
-        
+               
+        let choosePivot (M: Tensor<bigint>) =
+            // find left-most column with at least a non-zero entry
+            match M <<>> bigint.Zero |> Tensor.anyAxis 0 |> Tensor.tryFind true with
+            | Some [nzCol] ->
+                   
         
 
             ()

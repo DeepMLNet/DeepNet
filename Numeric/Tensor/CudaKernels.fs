@@ -598,7 +598,14 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
             (fun _ -> failwith "ArgAxisReduceKernel requires at least a vector")
     let argMinLastAxis  = getArgAxisReduceKernel "ArgMinLastAxis" [] []
     let argMaxLastAxis  = getArgAxisReduceKernel "ArgMaxLastAxis" [] []
-
+    
+    // find element index kernel
+    let findLastAxis  = 
+        if nDims > 0 then
+            getKernel "FindLastAxis" [scalar; argReductionTrgtTensor; fullTensor] [] []
+        else
+            (fun _ -> failwith "FindAxisKernel requires at least a vector")
+        
     do this.Build (headers)
 
     member this.FillConst (stream, value: obj, trgt: NativeTensor) = 
@@ -762,6 +769,9 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
     member this.ArgMaxLastAxis (stream, trgt: NativeTensor, src: NativeTensor) =         
         let initial = minValueOf dataType
         argMaxLastAxis (stream, workDimForElemwise trgt, [|initial; box trgt; box src|])
+        
+    member this.FindLastAxis (value: obj) (stream, trgt: NativeTensor, src: NativeTensor) =         
+        findLastAxis (stream, workDimForElemwise trgt, [|value; box trgt; box src|])        
 
     static member Get (dataType, nDims) = instances.Get (dataType, nDims)
 

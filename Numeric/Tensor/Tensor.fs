@@ -29,6 +29,9 @@ exception SeqTooShort of msg:string with override __.Message = __.msg
 /// transfer between used storages is not possible
 exception UnsupportedTransfer of msg:string with override __.Message = __.msg
 
+/// specified value was not found
+exception ValueNotFound of msg:string with override __.Message = __.msg
+ 
 
 /// memory ordering of tensor
 type TensorOrder =
@@ -238,6 +241,7 @@ type ITensorBackend<'T> =
 
     abstract ArgMinLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
     abstract ArgMaxLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
+    abstract FindLastAxis:      value:'T * trgt:Tensor<int64> * src1:Tensor<'T> -> unit
 
     abstract VecVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
     abstract MatVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
@@ -1449,6 +1453,41 @@ type [<StructuredFormatDisplay("{Pretty}");
         |> Tensor<_>.argMaxAxis 0 
         |> Tensor.value 
         |> TensorLayout.linearToIdx a.Layout
+        
+    /// Positions of first occurence of value along given axis using this tensor as target.
+    /// Sets index to NotFound, if value does not occur.
+    member trgt.FillFindAxis (value: 'R) (ax: int) (src: Tensor<'R>) =
+        let trgt = trgt.AsInt64
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
+        src.Backend.FindLastAxis (value=value, trgt=trgt, src1=src)
+
+    /// Positions of first occurence of value along given axis.
+    /// Sets index to NotFound, if value does not occur. 
+    static member findAxis (value: 'T) (ax: int) (src: Tensor<'T>) : Tensor<int64> =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillFindAxis value ax src
+        trgt
+
+    /// Position of first occurence of value.
+    /// Returns None if value was not found.
+    static member tryFind (value: 'T) (a: Tensor<'T>) =
+        let pos = 
+            a 
+            |> Tensor<_>.flatten 
+            |> Tensor<_>.findAxis value 0 
+            |> Tensor.value
+        if pos <> NotFound then
+            pos |> TensorLayout.linearToIdx a.Layout |> Some
+        else None
+        
+    /// Position of first occurence of value.
+    /// Raises an exception if value cannot be found.
+    static member find (value: 'T) (a: Tensor<'T>) =
+        match Tensor<_>.tryFind value a with
+        | Some pos -> pos
+        | None -> 
+            let msg = sprintf "value %A was not found in specifed tensor" value
+            raise (ValueNotFound msg)             
 
     /// false if there is at least one false element in given axis, using this tensor as target
     member trgt.FillAllAxis (ax: int) (src: Tensor<bool>) =

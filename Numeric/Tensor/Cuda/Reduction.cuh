@@ -115,3 +115,48 @@ template<typename T> struct ArgReduceState {
 ARG_AXIS_REDUCE(ArgMinLastAxis,	less);
 ARG_AXIS_REDUCE(ArgMaxLastAxis,	greater);
 
+
+// =============================================================================================
+// find value
+// =============================================================================================
+
+// must match the value of TensorLayoutTypes.NotFound
+static const idx_t NotFound = -9223372036854775804LL;
+
+struct FindLastAxisInitialFn { 
+    _dev_ idx_t operator() () {         
+        return NotFound;
+    } 
+}; 
+
+template<typename T> struct FindLastAxisUpdateFn {
+    T searchValue;
+    _dev_ idx_t operator() (idx_t foundPos, T value, idx_t pos) {
+        if (foundPos <> NotFound)
+            return foundPos;
+        else {
+            if (value == searchValue) 
+                return pos; 
+            else 
+                return NotFound;
+        } 
+    } 
+}; 
+
+struct FindLastAxisResultFn { 
+    _dev_ idx_t operator() (idx_t foundPos) { 
+        return foundPos; 
+    } 
+}; 
+
+template<typename T, dim_t TTrgtDims> _dev_ 
+void FindLastAxis (T searchValue, Tensor<idx_t, TTrgtDims> &trgt, const Tensor<T, TTrgtDims+1> &src) { 
+    FindLastAxisInitialFn initialFn; 
+    FindLastAxisUpdateFn<T> updateFn = {searchValue}; 
+    FindLastAxisResultFn resultFn; 
+    AxisReduce<idx_t, TTrgtDims, T, idx_t, FindLastAxisInitialFn, 
+               FindLastAxisUpdateFn<T>, FindLastAxisResultFn> (trgt, src, initialFn, updateFn, resultFn); 
+};
+
+
+

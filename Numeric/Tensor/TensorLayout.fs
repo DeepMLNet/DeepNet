@@ -44,6 +44,9 @@ module TensorLayoutTypes =
 
     /// For reshape: remainder, so that number of elements stays constant.
     let Remainder = Int64.MinValue + 3L
+    
+    /// For search: value was not found.
+    let NotFound = Int64.MinValue + 4L
 
     /// range specification
     [<StructuredFormatDisplay("{Pretty}")>]

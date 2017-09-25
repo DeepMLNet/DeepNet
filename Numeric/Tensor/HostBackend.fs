@@ -1171,6 +1171,17 @@ type internal ScalarOps =
             else minPos, minVal
         ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (-1L, maxValue<'T>), 
                                  isIndexed=true, useThreads=true)     
+                                 
+    static member FindLastAxis (value: 'T, trgt: DataAndLayout<int64>, src1: DataAndLayout<'T>) =
+        let nd = src1.FastLayout.NDims
+        let p = ScalarPrimitives.For<'T, 'T>()
+        let inline op (srcIdx: int64[]) pos (v: 'T) =
+            if pos <> NotFound then pos
+            else 
+                if p.Equal v value then srcIdx.[nd-1]
+                else NotFound
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 NotFound, 
+                                 isIndexed=true, useThreads=true)                                      
 
 
 // delegates for VectorOps
@@ -1888,6 +1899,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.ArgMaxLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
             ScalarOps.ArgMaxLastAxis (trgt, src)
+            
+        member this.FindLastAxis (value, trgt, src) =
+            let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
+            ScalarOps.FindLastAxis (value, trgt, src)            
 
         member this.VecVecDot (trgt, a, b) =
             if isBlasSupported then

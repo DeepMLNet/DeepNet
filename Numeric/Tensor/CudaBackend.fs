@@ -48,6 +48,8 @@ module private CudaHelpers =
         if freeMem < (neededMem + 10000L) || freeMem < minAvailMem then
             GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
             GC.Collect (2, GCCollectionMode.Forced, true, true)
+            GC.WaitForPendingFinalizers ()
+            GC.WaitForFullGCComplete() |> ignore
             Thread.Yield() |> ignore
             if retries < 3 then
                 Thread.Sleep(20)
@@ -564,6 +566,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
         member this.ArgMinLastAxis(trgt, src1)  = callUnary kernels.ArgMinLastAxis trgt src1
         member this.ArgMaxLastAxis(trgt, src1)  = callUnary kernels.ArgMaxLastAxis trgt src1
+        member this.FindLastAxis(value, trgt, src1) = callUnary (kernels.FindLastAxis value) trgt src1        
 
         member this.Gather(trgt, srcIdxs, src) = 
             let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
