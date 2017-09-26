@@ -194,6 +194,11 @@ type LinAlgTests (output: ITestOutputHelper) =
         printfn "M=\n%A" M
         let S = LinAlg.smithNormalForm M
         printfn "Smith Normal Form S=\n%A" S    
+        
+        // check that each diagonal entry divides its successor
+        for i in 0L .. S.Shape.[0]-2L do
+            if S.[[i; i]] <> bigint.Zero then
+                S.[[i+1L; i+1L]] % S.[[i; i]] |> should equal bigint.Zero 
 
     [<Fact>]
     let ``Smith Normal Form 1`` () =
@@ -201,6 +206,20 @@ type LinAlgTests (output: ITestOutputHelper) =
                                      [-6;  6;  12]
                                      [10; -4; -16]]
         calcSmith (Tensor.convert<bigint> M)
+        
+    [<Fact>]
+    let ``Smith Normal Form 2`` () =
+        let M = HostTensor.ofList2D [[ 2;  1; -3; -1]
+                                     [ 1; -1; -3;  1]
+                                     [ 4; -4;  0; 16]]
+        calcSmith (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Smith Normal Form 3`` () =
+        let M = HostTensor.ofList2D [[ 1;  2;  3]
+                                     [ 4;  5;  6]
+                                     [ 7;  8;  9]]
+        calcSmith (Tensor.convert<bigint> M)        
         
 
                                       

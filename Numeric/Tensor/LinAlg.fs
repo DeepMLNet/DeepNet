@@ -139,13 +139,18 @@ module LinAlg =
         let rows, cols = getRowsCols A                  
         let A = Tensor.copy A
              
-        /// Discards all zero columns from the left and swaps rows so that the 
+        /// Moves a non-zero column to the left and swaps rows so that the 
         /// element in the upper-left corner of the returned matrix is non-zero.
         /// M is modified in-place. Returns None if M is zero.   
         let movePivot (M: Tensor<bigint>) =
             // find left-most column with at least a non-zero entry
             match M <<>> bigint.Zero |> Tensor.anyAxis 0 |> Tensor.tryFind true with
             | Some [nzCol] ->
+                // move non-zero column to the left
+                if nzCol <> 0L then
+                    M.[*, 0L] <- M.[*, nzCol]
+                    M.[*, nzCol].FillConst bigint.Zero
+                
                 // find first row that has non-zero element in that column
                 let nzRow = M.[*, nzCol] <<>> bigint.Zero |> Tensor.find true |> List.exactlyOne
                 // and swap that row with the first row, if necessary
@@ -192,7 +197,7 @@ module LinAlg =
         /// Ensures that the first element of all but the first row is zero by substracting
         /// an appropriate multiple of the first row from these rows.
         let eliminateRows (M: Tensor<bigint>) =
-            let f = M.[1L.., 0L] / M.[[0L; 0L]]
+            let f = M.[1L.., 0L..0L] / M.[0L, 0L]
             M.[1L.., *] <- M.[1L.., *] - f * M.[0L..0L, *]
                            
         /// Brings the matrix M into diagonal form with zero columns moved to the right end.                    
@@ -218,10 +223,12 @@ module LinAlg =
         /// Ensures that M.[[i; i]] divides M.[[i+1; i+1]] for all i.
         /// Thus an element on the diagonal will divide all elements that follw it.    
         let rec makeDivChain (M: Tensor<bigint>) =
-            if M.Shape.[0] < 2L || M.Shape.[1] < 2L || M.[[0L; 0L]] = bigint.Zero then
-                // end of matrix reached
-                ()
-            else            
+            if M.Shape.[0] >= 1L && M.Shape.[1] >= 1L then
+                // ensure that diagonal element is positive
+                if M.[[0L; 0L]] < bigint.Zero then
+                    M.[*, 0L] <- bigint.MinusOne * M.[*, 0L]
+                     
+            if M.Shape.[0] >= 2L && M.Shape.[1] >= 2L && M.[[0L; 0L]] <> bigint.Zero then
                 // check divisibility
                 if M.[[1L; 1L]] % M.[[0L; 0L]] <> bigint.Zero then
                     // diagonal element does not divide following element
