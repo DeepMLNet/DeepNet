@@ -195,8 +195,14 @@ type LinAlgTests (output: ITestOutputHelper) =
         let S = LinAlg.smithNormalForm M
         printfn "Smith Normal Form S=\n%A" S    
         
-        // check that each diagonal entry divides its successor
-        for i in 0L .. S.Shape.[0]-2L do
+        for i in 0L .. List.min S.Shape - 2L do
+            // check that off-diagonal elements are zero
+            S.[i, ..i-1L] ==== bigint.Zero |> Tensor.all |> should equal true
+            S.[i, i+1L..] ==== bigint.Zero |> Tensor.all |> should equal true
+            S.[..i-1L, i] ==== bigint.Zero |> Tensor.all |> should equal true
+            S.[i+1L.., i] ==== bigint.Zero |> Tensor.all |> should equal true
+
+            // check that each diagonal entry divides its successor        
             if S.[[i; i]] <> bigint.Zero then
                 S.[[i+1L; i+1L]] % S.[[i; i]] |> should equal bigint.Zero 
 
@@ -221,5 +227,28 @@ type LinAlgTests (output: ITestOutputHelper) =
                                      [ 7;  8;  9]]
         calcSmith (Tensor.convert<bigint> M)        
         
-
+    [<Fact>]
+    let ``Smith Normal Form Zero`` () =
+        let M = HostTensor.ofList2D [[ 0;  0;  0]
+                                     [ 0;  0;  0]
+                                     [ 0;  0;  0]]
+        calcSmith (Tensor.convert<bigint> M)
+        
+    [<Fact>]
+    let ``Smith Normal Form Two`` () =
+        let M = HostTensor.ofList2D [[ 2;  2;  2]
+                                     [ 2;  2;  2]
+                                     [ 2;  2;  2]]
+        calcSmith (Tensor.convert<bigint> M)                                
+        
+    [<Fact>]
+    let ``Smith Normal Form Random`` () =
+        let rnd = System.Random 234
+        for nx in 1L .. 8L do
+            for ny in 1L .. 8L do
+                for i=1 to 20 do
+                    printfn "Random %dx%d matrix %d" nx ny i
+                    let M = rnd.Seq(-30, 30) |> HostTensor.ofSeqWithShape [nx; ny]
+                    calcSmith (Tensor.convert<bigint> M)
+                    printfn "----------------"    
                                       

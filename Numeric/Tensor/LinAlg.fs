@@ -151,16 +151,18 @@ module LinAlg =
                     M.[*, 0L] <- M.[*, nzCol]
                     M.[*, nzCol].FillConst bigint.Zero
                 
-                // find first row that has non-zero element in that column
-                let nzRow = M.[*, nzCol] <<>> bigint.Zero |> Tensor.find true |> List.exactlyOne
+                // find first row that has non-zero element in left-most column
+                let nzRow = M.[*, 0L] <<>> bigint.Zero |> Tensor.find true |> List.exactlyOne
                 // and swap that row with the first row, if necessary
                 if nzRow <> 0L then
                     let tmp = Tensor.copy M.[0L, *] 
                     M.[0L, *] <- M.[nzRow, *]
                     M.[nzRow, *] <- tmp
-                // return submatrix with pivot in upper-left corner
-                Some M.[*, nzCol..]
-            | None -> None
+                    
+                true
+            | None -> 
+                // all columns are zero
+                false
             | _ -> failwith "unexpected find result"                              
 
         /// Ensures that the pivot element in the upper-left corner of M divides the 
@@ -170,7 +172,7 @@ module LinAlg =
             let pivot = M.[[0L; 0L]]           
             // find any row that is not divisable by pivot
             let R = M.[*, 0L] % pivot
-            match R >>>> bigint.Zero |> Tensor.tryFind true with
+            match R <<>> bigint.Zero |> Tensor.tryFind true with
             | Some [ndRow] ->
                 // row ndRow is not divisble by pivot, because offender % pivot <> 0
                 let offender = M.[[ndRow; 0L]]
@@ -202,48 +204,61 @@ module LinAlg =
                            
         /// Brings the matrix M into diagonal form with zero columns moved to the right end.                    
         let rec diagonalize (M: Tensor<bigint>) =
-            match movePivot M with
-            | Some M ->
+            if movePivot M then
                 // non-zero columns remaining
                 // Apply row and column reductions until pivot is the only non-zero element in the
                 // first row and first column.
                 let mutable changed = true
                 while changed do
                     makePivotGCD M false |> ignore
+                    //printfn "after makePivotGCD M:\n%A" M
                     eliminateRows M
+                    //printfn "after eliminateRows M:\n%A" M
                     changed <- makePivotGCD M.T false
+                    //printfn "after makePivotGCD M.T:\n%A" M
                     eliminateRows M.T
+                    //printfn "after eliminateRows M.T:\n%A" M                   
+                //printfn "after diagonalization loop:\n%A" M
                     
                 // proceed to next row and column
                 diagonalize M.[1L.., 1L..]
-            | None ->
-                // complete matrix processed or only zero columns remaining
-                ()
         
         /// Ensures that M.[[i; i]] divides M.[[i+1; i+1]] for all i.
         /// Thus an element on the diagonal will divide all elements that follw it.    
-        let rec makeDivChain (M: Tensor<bigint>) =
+        let rec makeDivChain (startM: Tensor<bigint>) (M: Tensor<bigint>) =
             if M.Shape.[0] >= 1L && M.Shape.[1] >= 1L then
                 // ensure that diagonal element is positive
                 if M.[[0L; 0L]] < bigint.Zero then
                     M.[*, 0L] <- bigint.MinusOne * M.[*, 0L]
                      
             if M.Shape.[0] >= 2L && M.Shape.[1] >= 2L && M.[[0L; 0L]] <> bigint.Zero then
+                if M.[[1L; 0L]] <> bigint.Zero || M.[[0L; 1L]] <> bigint.Zero then
+                    printfn "matrix invalid:\n%A" M
+                    failwith "matrix invalid"
+            
                 // check divisibility
                 if M.[[1L; 1L]] % M.[[0L; 0L]] <> bigint.Zero then
                     // diagonal element does not divide following element
                     // add following column to this column to get non-zero entry in M.[[1L; 1L]]
                     M.[*, 0L] <- M.[*, 0L] + M.[*, 1L]
-                    // apply pivot GCD procedure 
-                    makePivotGCD M false |> ignore
+                    // reapply diagonalization procedure 
+                    //printfn "makeDivChain; before diagonalize: \n%A" M
+                    diagonalize M
+                    //printfn "makeDivChain; after diagonalize: \n%A" M
                     // M.[[0L; 0L]] is now GCD(M.[[0L; 0L]], M.[[1L; 1L]]) and the   
                     // new M.[[1L; 1L]] is a linear combination of M.[[0L; 0L]] and M.[[1L; 1L]],
                     // thus divisable by their GCD.
-                // proceed with next diagonal element
-                makeDivChain M.[1L.., 1L..]
+                    // Diagonal has to be rechecked now because it can happen that 
+                    // M.[[-1L; -1L]] does not divide M.[[0; 0L]] anymore.
+                    makeDivChain startM startM
+                else
+                    // proceed with next diagonal element
+                    makeDivChain startM M.[1L.., 1L..]
 
+        //printfn "main: before diagonalize:\n%A" A
         diagonalize A
-        makeDivChain A
+        //printfn "main: after diagonalize:\n%A" A
+        makeDivChain A A
         A
         
 
