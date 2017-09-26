@@ -190,10 +190,15 @@ type LinAlgTests (output: ITestOutputHelper) =
         checkGeneralInverse (Tensor.convert<Rat> M) 1L 0L
 
 
-    let calcSmith M =
-        printfn "M=\n%A" M
-        let S = LinAlg.smithNormalForm M
-        printfn "Smith Normal Form S=\n%A" S    
+    let calcSmith A =
+        printfn "A=\n%A" A
+        let U, S, V = LinAlg.smithNormalForm A
+        printfn "----------------------"
+        printfn "Smith Normal Form:"
+        printfn "U=\n%A" U
+        printfn "S = U .* A .* V =\n%A" S
+        printfn "V=\n%A" V
+        printfn "----------------------"    
         
         for i in 0L .. List.min S.Shape - 2L do
             // check that off-diagonal elements are zero
@@ -205,6 +210,20 @@ type LinAlgTests (output: ITestOutputHelper) =
             // check that each diagonal entry divides its successor        
             if S.[[i; i]] <> bigint.Zero then
                 S.[[i+1L; i+1L]] % S.[[i; i]] |> should equal bigint.Zero 
+                
+        // check that S = U .* A .* V
+        S ==== U .* A .* V |> Tensor.all |> should equal true
+        
+        // check that U is invertible
+        let _, US, UN = LinAlg.generalInverse (Tensor.convert<Rat> U)
+        Tensor.nElems US |> should equal 0L
+        Tensor.nElems UN |> should equal 0L
+
+        // check that V is invertible
+        let _, VS, VN = LinAlg.generalInverse (Tensor.convert<Rat> V)
+        Tensor.nElems VS |> should equal 0L
+        Tensor.nElems VN |> should equal 0L
+        
 
     [<Fact>]
     let ``Smith Normal Form 1`` () =
@@ -226,6 +245,27 @@ type LinAlgTests (output: ITestOutputHelper) =
                                      [ 4;  5;  6]
                                      [ 7;  8;  9]]
         calcSmith (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Smith Normal Form 4`` () =
+        let M = HostTensor.ofList2D [[ -6; 111; -36;   6]
+                                     [  5;-672; 210;  74]
+                                     [  0;-255;  81;  24]
+                                     [ -7; 255; -81; -10]]
+        calcSmith (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Smith Normal Form 5`` () =
+        let M = HostTensor.ofList2D [[ 9;   -36;  30]
+                                     [ -36; 192;-180]
+                                     [ 30; -180; 180]]
+        calcSmith (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Smith Normal Form 6`` () =
+        let M = HostTensor.ofList2D [[ 13;  5;  7]
+                                     [ 17;  31; 39]]
+        calcSmith (Tensor.convert<bigint> M)                                       
         
     [<Fact>]
     let ``Smith Normal Form Zero`` () =

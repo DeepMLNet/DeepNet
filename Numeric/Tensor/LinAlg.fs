@@ -134,31 +134,44 @@ module LinAlg =
         LI, S, N
 
 
-    /// Computes the Smith normal form of integer matrix A.
+    /// Computes the Smith Normal Form S of integer matrix A and returns a tuple
+    /// (U, S, V) so that S = U .* A .* V, where U and V are invertible matrices and
+    /// S is a positive, diagonal matrix with the property that each element of the diagonal
+    /// divides all of its successors. 
+    /// The Smith Normal Form exists for a matrix of any shape or rank.
     let smithNormalForm (A: Tensor<bigint>) =       
-        let rows, cols = getRowsCols A                  
-        let A = Tensor.copy A
              
+        /// Swaps row1 with row2 in M.
+        let swapRows row1 row2 (M: Tensor<bigint>) =
+            let tmp = Tensor.copy M.[row1, *]
+            M.[row1, *] <- M.[row2, *]
+            M.[row2, *] <- tmp
+        
+        /// Replaces     row1 by f11 * row1 + f12 * row2
+        /// and replaces row2 by f21 * row1 + f22 * row2 in M.    
+        let linComb row1 row2 (f11, f12) (f21, f22) (M: Tensor<bigint>) =
+            let v1, v2 = Tensor.copy M.[row1, *], Tensor.copy M.[row2, *]
+            M.[row1, *] <- f11 * v1 + f12 * v2
+            M.[row2, *] <- f21 * v1 + f22 * v2
+                     
         /// Moves a non-zero column to the left and swaps rows so that the 
         /// element in the upper-left corner of the returned matrix is non-zero.
         /// M is modified in-place. Returns None if M is zero.   
-        let movePivot (M: Tensor<bigint>) =
+        let movePivot (R: Tensor<bigint>) (C: Tensor<bigint>) (M: Tensor<bigint>) =
             // find left-most column with at least a non-zero entry
             match M <<>> bigint.Zero |> Tensor.anyAxis 0 |> Tensor.tryFind true with
             | Some [nzCol] ->
                 // move non-zero column to the left
                 if nzCol <> 0L then
-                    M.[*, 0L] <- M.[*, nzCol]
-                    M.[*, nzCol].FillConst bigint.Zero
-                
+                    swapRows 0L nzCol M.T
+                    swapRows 0L nzCol C.T               
                 // find first row that has non-zero element in left-most column
                 let nzRow = M.[*, 0L] <<>> bigint.Zero |> Tensor.find true |> List.exactlyOne
                 // and swap that row with the first row, if necessary
                 if nzRow <> 0L then
-                    let tmp = Tensor.copy M.[0L, *] 
-                    M.[0L, *] <- M.[nzRow, *]
-                    M.[nzRow, *] <- tmp
-                    
+                    swapRows 0L nzRow M
+                    swapRows 0L nzRow R
+                // non-zero column found                    
                 true
             | None -> 
                 // all columns are zero
@@ -168,29 +181,24 @@ module LinAlg =
         /// Ensures that the pivot element in the upper-left corner of M divides the 
         /// first element of all following rows.
         /// This is done by replacing rows by linear combinations of other rows.
-        let rec makePivotGCD (M: Tensor<bigint>) changed =
+        let rec makePivotGCD (R: Tensor<bigint>) (M: Tensor<bigint>) changed =
             let pivot = M.[[0L; 0L]]           
             // find any row that is not divisable by pivot
-            let R = M.[*, 0L] % pivot
-            match R <<>> bigint.Zero |> Tensor.tryFind true with
+            match (M.[*, 0L] % pivot) <<>> bigint.Zero |> Tensor.tryFind true with
             | Some [ndRow] ->
                 // row ndRow is not divisble by pivot, because offender % pivot <> 0
-                let offender = M.[[ndRow; 0L]]
-                
+                let offender = M.[[ndRow; 0L]]               
                 // apply extended Euclidean algorithm to obtain:
                 // beta = gcd(pivot, offender) = sigma * pivot + tau * offener
                 let beta, sigma, tau = bigint.Bezout (pivot, offender)
-                let gamma, alpha = offender / beta, pivot / beta
-                
+                let gamma, alpha = offender / beta, pivot / beta                
                 // replace rows by linear combinations so that after replacement:
                 // 1. M.[[0L; 0L]] = beta = gcd(pivot, offender)
-                // 2. M.[[ndRow; 0L]] = 0
-                let M0, MO = Tensor.copy M.[0L, *], Tensor.copy M.[ndRow, *]
-                M.[0L, *] <- sigma * M0 + tau * MO
-                M.[ndRow, *] <-  -gamma * M0 + alpha * MO
-            
+                // 2. M.[[ndRow; 0L]] = 0                
+                linComb 0L ndRow (sigma, tau) (-gamma, alpha) M
+                linComb 0L ndRow (sigma, tau) (-gamma, alpha) R            
                 // iterate until all rows are divisible by pivot
-                makePivotGCD M true
+                makePivotGCD R M true
             | None ->
                 // all rows are divisable by pivot
                 changed
@@ -198,55 +206,68 @@ module LinAlg =
         
         /// Ensures that the first element of all but the first row is zero by substracting
         /// an appropriate multiple of the first row from these rows.
-        let eliminateRows (M: Tensor<bigint>) =
+        let eliminateRows (R: Tensor<bigint>) (M: Tensor<bigint>) =
             let f = M.[1L.., 0L..0L] / M.[0L, 0L]
             M.[1L.., *] <- M.[1L.., *] - f * M.[0L..0L, *]
+            R.[1L.., *] <- R.[1L.., *] - f * R.[0L..0L, *]
                            
         /// Brings the matrix M into diagonal form with zero columns moved to the right end.                    
-        let rec diagonalize (M: Tensor<bigint>) =
-            if movePivot M then
+        let rec diagonalize (R: Tensor<bigint>) (C: Tensor<bigint>) (M: Tensor<bigint>) =
+            if movePivot R C M then
                 // non-zero columns remaining
                 // Apply row and column reductions until pivot is the only non-zero element in the
                 // first row and first column.
                 let mutable changed = true
                 while changed do
-                    makePivotGCD M false |> ignore
-                    eliminateRows M
-                    changed <- makePivotGCD M.T false
-                    eliminateRows M.T
+                    makePivotGCD R M false |> ignore
+                    eliminateRows R M
+                    changed <- makePivotGCD C.T M.T false
+                    eliminateRows C.T M.T
                     
                 // proceed to next row and column
-                diagonalize M.[1L.., 1L..]
+                diagonalize R.[1L.., *] C.[*, 1L..] M.[1L.., 1L..]
         
         /// Ensures that M.[[i; i]] divides M.[[i+1; i+1]] for all i.
-        /// Thus an element on the diagonal will divide all elements that follw it.    
-        let rec makeDivChain (startM: Tensor<bigint>) (M: Tensor<bigint>) =
+        /// Thus an element on the diagonal will divide all elements that follow it.    
+        let rec makeDivChain (R: Tensor<bigint>) (C: Tensor<bigint>) (M: Tensor<bigint>) =
             if M.Shape.[0] >= 1L && M.Shape.[1] >= 1L then
                 // ensure that diagonal element is positive
                 if M.[[0L; 0L]] < bigint.Zero then
                     M.[*, 0L] <- bigint.MinusOne * M.[*, 0L]
+                    C.[*, 0L] <- bigint.MinusOne * C.[*, 0L]
                      
             if M.Shape.[0] >= 2L && M.Shape.[1] >= 2L && M.[[0L; 0L]] <> bigint.Zero then           
                 // check divisibility
                 if M.[[1L; 1L]] % M.[[0L; 0L]] <> bigint.Zero then
                     // diagonal element does not divide following element
                     // add following column to this column to get non-zero entry in M.[[1L; 1L]]
-                    M.[*, 0L] <- M.[*, 0L] + M.[*, 1L]
+                    linComb 0L 1L (bigint.One, bigint.One) (bigint.Zero, bigint.One) M.T
+                    linComb 0L 1L (bigint.One, bigint.One) (bigint.Zero, bigint.One) C.T
                     // reapply diagonalization procedure 
-                    diagonalize M
+                    diagonalize R C M
                     // M.[[0L; 0L]] is now GCD(M.[[0L; 0L]], M.[[1L; 1L]]) and the   
                     // new M.[[1L; 1L]] is a linear combination of M.[[0L; 0L]] and M.[[1L; 1L]],
                     // thus divisable by their GCD.
                     // Diagonal has to be rechecked now because it can happen that 
                     // M.[[-1L; -1L]] does not divide M.[[0; 0L]] anymore.
-                    makeDivChain startM startM
+                    true
                 else
                     // proceed with next diagonal element
-                    makeDivChain startM M.[1L.., 1L..]
+                    makeDivChain R.[1L.., *] C.[*, 1L..] M.[1L.., 1L..]
+            else
+                // finished without change
+                false
 
-        diagonalize A
-        makeDivChain A A
-        A
+        // initialize U, S, V
+        let rows, cols = getRowsCols A
+        let U = Tensor.identity A.Dev rows
+        let V = Tensor.identity A.Dev cols                  
+        let S = Tensor.copy A        
+        
+        // apply Smith algorithm
+        diagonalize U V S
+        while makeDivChain U V S do ()
+        U, S, V
         
 
 
