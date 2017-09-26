@@ -211,14 +211,9 @@ module LinAlg =
                 let mutable changed = true
                 while changed do
                     makePivotGCD M false |> ignore
-                    //printfn "after makePivotGCD M:\n%A" M
                     eliminateRows M
-                    //printfn "after eliminateRows M:\n%A" M
                     changed <- makePivotGCD M.T false
-                    //printfn "after makePivotGCD M.T:\n%A" M
                     eliminateRows M.T
-                    //printfn "after eliminateRows M.T:\n%A" M                   
-                //printfn "after diagonalization loop:\n%A" M
                     
                 // proceed to next row and column
                 diagonalize M.[1L.., 1L..]
@@ -231,20 +226,14 @@ module LinAlg =
                 if M.[[0L; 0L]] < bigint.Zero then
                     M.[*, 0L] <- bigint.MinusOne * M.[*, 0L]
                      
-            if M.Shape.[0] >= 2L && M.Shape.[1] >= 2L && M.[[0L; 0L]] <> bigint.Zero then
-                if M.[[1L; 0L]] <> bigint.Zero || M.[[0L; 1L]] <> bigint.Zero then
-                    printfn "matrix invalid:\n%A" M
-                    failwith "matrix invalid"
-            
+            if M.Shape.[0] >= 2L && M.Shape.[1] >= 2L && M.[[0L; 0L]] <> bigint.Zero then           
                 // check divisibility
                 if M.[[1L; 1L]] % M.[[0L; 0L]] <> bigint.Zero then
                     // diagonal element does not divide following element
                     // add following column to this column to get non-zero entry in M.[[1L; 1L]]
                     M.[*, 0L] <- M.[*, 0L] + M.[*, 1L]
                     // reapply diagonalization procedure 
-                    //printfn "makeDivChain; before diagonalize: \n%A" M
                     diagonalize M
-                    //printfn "makeDivChain; after diagonalize: \n%A" M
                     // M.[[0L; 0L]] is now GCD(M.[[0L; 0L]], M.[[1L; 1L]]) and the   
                     // new M.[[1L; 1L]] is a linear combination of M.[[0L; 0L]] and M.[[1L; 1L]],
                     // thus divisable by their GCD.
@@ -255,9 +244,7 @@ module LinAlg =
                     // proceed with next diagonal element
                     makeDivChain startM M.[1L.., 1L..]
 
-        //printfn "main: before diagonalize:\n%A" A
         diagonalize A
-        //printfn "main: after diagonalize:\n%A" A
         makeDivChain A A
         A
         
