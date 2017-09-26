@@ -134,11 +134,11 @@ module LinAlg =
         LI, S, N
 
 
-    /// Computes the Smith Normal Form S of integer matrix A and returns a tuple
+    /// <summary>Computes the Smith Normal Form S of integer matrix A and returns a tuple
     /// (U, S, V) so that S = U .* A .* V, where U and V are invertible matrices and
     /// S is a positive, diagonal matrix with the property that each element of the diagonal
-    /// divides all of its successors. 
-    /// The Smith Normal Form exists for a matrix of any shape or rank.
+    /// divides all of its successors.</summary> 
+    /// <remarks>The Smith Normal Form exists for a matrix of any shape or rank.</remarks>
     let smithNormalForm (A: Tensor<bigint>) =       
              
         /// Swaps row1 with row2 in M.
@@ -269,6 +269,49 @@ module LinAlg =
         while makeDivChain U V S do ()
         U, S, V
         
+
+    /// Computes the inverse I, solvability constraints S and null-space N of the specified integer matrix M,
+    /// which can be of any shape and rank.
+    /// The inversion is carried out over the domain of integers.
+    /// The return values is a tuple (I, S, N), which fulfilles the following properties:
+    /// Inverse:     M .* I .* M = M.
+    /// Solvability: S .* M = 0.
+    /// Null-space:  M .* N = 0.
+    /// The equation system M .* x = y is solvable when S .* y = 0 and I .* y is an integer vector.
+    /// In this case, the set of solutions is given by x = I .* y + N .* z where z is any integer vector.    
+    let integerInverse (M: Tensor<bigint>) =
+               
+        // Obtain Smith Normal form, so that S = U .* M .* V.
+        let U, S, V = smithNormalForm M
+                
+        // Compute rank, i.e. number of non-zero columns of S.
+        let rec diagRank r (T: Tensor<bigint>) =
+            if T.Shape.[0] = 0L || T.Shape.[1] = 0L then r
+            elif T.[[0L; 0L]] = bigint.Zero then r
+            else diagRank (r+1L) T.[1L.., 1L..]        
+        let rank = diagRank 0L S        
+        
+        // We want to solve the equation system M .* x = y.
+        // Using the Smith Normal Form this can be rewritten as 
+        // S .* x' = y' with x = V .* x' and y' = U .* y.
+        // The diagonal of S has 'rank' non-zero entries and all zero entries are at the lower right.
+        
+        // For a non-zero entry S_ii <> 0, we must have x'_i = y'_i / S_ii.
+        let toRat = Tensor.convert<Rat>        
+        let nzS = S.[..rank-1L, ..rank-1L] |> Tensor.diag 
+        let nzU = U.[..rank-1L, *]
+        let nzV = V.[*, ..rank-1L]         
+        let nzVSU = toRat nzV .* (toRat nzU / toRat nzS.[*, NewAxis])
+                       
+        // For each zero row S_*i = 0, we must have y'_i = 0 for the system to be solvable. 
+        let zU = U.[rank.., *]   
+      
+        // For each zero column S_*i = 0, the corresponding x'_i can have any integer value and thus the
+        // corresponding columns of V form a basis of the null-space.
+        let zV = V.[*, rank..]
+        
+        // inverse, solvability, null-space
+        nzVSU, zU, zV
 
 
     

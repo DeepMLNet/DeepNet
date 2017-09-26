@@ -191,9 +191,9 @@ type LinAlgTests (output: ITestOutputHelper) =
 
 
     let calcSmith A =
-        printfn "A=\n%A" A
         let U, S, V = LinAlg.smithNormalForm A
         printfn "----------------------"
+        printfn "A=\n%A" A
         printfn "Smith Normal Form:"
         printfn "U=\n%A" U
         printfn "S = U .* A .* V =\n%A" S
@@ -223,7 +223,7 @@ type LinAlgTests (output: ITestOutputHelper) =
         let _, VS, VN = LinAlg.generalInverse (Tensor.convert<Rat> V)
         Tensor.nElems VS |> should equal 0L
         Tensor.nElems VN |> should equal 0L
-        
+             
 
     [<Fact>]
     let ``Smith Normal Form 1`` () =
@@ -283,12 +283,97 @@ type LinAlgTests (output: ITestOutputHelper) =
         
     [<Fact>]
     let ``Smith Normal Form Random`` () =
+        //let nMat = 20
+        let nMat = 4
         let rnd = System.Random 234
         for nx in 1L .. 8L do
             for ny in 1L .. 8L do
-                for i=1 to 20 do
+                for i=1 to nMat do
                     printfn "Random %dx%d matrix %d" nx ny i
                     let M = rnd.Seq(-30, 30) |> HostTensor.ofSeqWithShape [nx; ny]
                     calcSmith (Tensor.convert<bigint> M)
                     printfn "----------------"    
                                       
+                                      
+    let calcIntegerInverse (M: Tensor<bigint>) =
+        let I, S, N = LinAlg.integerInverse M
+        printfn "----------------------"
+        printfn "M=\n%A" M
+        printfn "Integer inverse of M:"
+        printfn "Inverse     I=\n%A" I
+        printfn "Solvability S=\n%A" S
+        printfn "Nullspace   N=\n%A" N
+        printfn "----------------------"           
+               
+        let Mr = Tensor.convert<Rat> M
+        Mr .* I .* Mr ==== Mr |> Tensor.all |> should equal true
+        S .* M ==== bigint.Zero |> Tensor.all |> should equal true
+        M .* N ==== bigint.Zero |> Tensor.all |> should equal true
+        
+    [<Fact>]
+    let ``Integer Inverse 1`` () =
+        let M = HostTensor.ofList2D [[ 2;  4;   4]
+                                     [-6;  6;  12]
+                                     [10; -4; -16]]
+        calcIntegerInverse (Tensor.convert<bigint> M)
+        
+    [<Fact>]
+    let ``Integer Inverse 2`` () =
+        let M = HostTensor.ofList2D [[ 2;  1; -3; -1]
+                                     [ 1; -1; -3;  1]
+                                     [ 4; -4;  0; 16]]
+        calcIntegerInverse (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Integer Inverse 3`` () =
+        let M = HostTensor.ofList2D [[ 1;  2;  3]
+                                     [ 4;  5;  6]
+                                     [ 7;  8;  9]]
+        calcIntegerInverse (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Integer Inverse 4`` () =
+        let M = HostTensor.ofList2D [[ -6; 111; -36;   6]
+                                     [  5;-672; 210;  74]
+                                     [  0;-255;  81;  24]
+                                     [ -7; 255; -81; -10]]
+        calcIntegerInverse (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Integer Inverse 5`` () =
+        let M = HostTensor.ofList2D [[ 9;   -36;  30]
+                                     [ -36; 192;-180]
+                                     [ 30; -180; 180]]
+        calcIntegerInverse (Tensor.convert<bigint> M)        
+        
+    [<Fact>]
+    let ``Integer Inverse 6`` () =
+        let M = HostTensor.ofList2D [[ 13;  5;  7]
+                                     [ 17;  31; 39]]
+        calcIntegerInverse (Tensor.convert<bigint> M)                                       
+        
+    [<Fact>]
+    let ``Integer Inverse Zero`` () =
+        let M = HostTensor.ofList2D [[ 0;  0;  0]
+                                     [ 0;  0;  0]
+                                     [ 0;  0;  0]]
+        calcIntegerInverse (Tensor.convert<bigint> M)
+        
+    [<Fact>]
+    let ``Integer Inverse Two`` () =
+        let M = HostTensor.ofList2D [[ 2;  2;  2]
+                                     [ 2;  2;  2]
+                                     [ 2;  2;  2]]
+        calcIntegerInverse (Tensor.convert<bigint> M)                                                      
+        
+    [<Fact>]
+    let ``Integer Inverse Random`` () =
+        let nMat = 5
+        //let nMat = 20
+        let rnd = System.Random 234
+        for nx in 1L .. 8L do
+            for ny in 1L .. 8L do
+                for i=1 to nMat do
+                    printfn "Random %dx%d matrix %d" nx ny i
+                    let M = rnd.Seq(-30, 30) |> HostTensor.ofSeqWithShape [nx; ny]
+                    calcIntegerInverse (Tensor.convert<bigint> M)
