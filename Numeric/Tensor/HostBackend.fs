@@ -1126,6 +1126,10 @@ type internal ScalarOps =
         // currently cannot use threads, because we have no interlocked addition
         ScalarOps.ApplyUnaryMethod (op, src, isIndexed=true, useThreads=false)     
 
+    static member CountTrueLastAxis (trgt: DataAndLayout<int64>, src1: DataAndLayout<bool>) =
+        let inline op (srcIdx: int64[]) (res: int64) (v: bool) = if v then res+1L else res
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 0L, isIndexed=false, useThreads=true)     
+
     static member SumLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Add res v
@@ -1181,7 +1185,64 @@ type internal ScalarOps =
                 if p.Equal v value then srcIdx.[nd-1]
                 else NotFound
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 NotFound, 
-                                 isIndexed=true, useThreads=true)                                      
+                                 isIndexed=true, useThreads=true)             
+                                 
+    static member inline MaskedGet (trgt: DataAndLayout<'T>, 
+                                    src: DataAndLayout<'T>, mask: DataAndLayout<bool>) =
+        if trgt.FastLayout.NDims <> 1 then failwith "MaskedGet target must be one dimensional"                                          
+
+        let nd = src.FastLayout.NDims                             
+        let mutable collected = 0L                              
+        let mutable srcPosIter = PosIter32 (src.FastLayout, fromDim=0, toDim=nd-2)
+        let mutable maskPosIter = PosIter32 (mask.FastLayout, fromDim=0, toDim=nd-2)
+        let mutable trgtAddr = trgt.FastLayout.Offset
+        
+        if nd = 0 then
+            if mask.Data.[maskPosIter.Addr] then 
+                collected <- collected + 1L
+                trgt.Data.[trgtAddr] <- src.Data.[srcPosIter.Addr]
+        else         
+            while srcPosIter.Active do
+                let mutable srcAddr, maskAddr = srcPosIter.Addr, maskPosIter.Addr
+                for i in 0 .. src.FastLayout.Shape.[nd-1] - 1 do
+                    if mask.Data.[maskAddr] then
+                        collected <- collected + 1L
+                        trgt.Data.[trgtAddr] <- src.Data.[srcAddr]
+                        trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[0]                        
+                    srcAddr <- srcAddr + src.FastLayout.Stride.[nd-1]
+                    maskAddr <- maskAddr + mask.FastLayout.Stride.[nd-1]
+                srcPosIter.MoveNext()
+                maskPosIter.MoveNext()             
+                
+        collected      
+                                 
+    static member inline MaskedSet (trgt: DataAndLayout<'T>, mask: DataAndLayout<bool>,
+                                    src: DataAndLayout<'T>) =
+        if src.FastLayout.NDims <> 0 && src.FastLayout.NDims <> 1 then 
+            failwith "MaskedSet source must be zero or one dimensional"                                          
+
+        let nd = trgt.FastLayout.NDims                             
+        let mutable trgtPosIter = PosIter32 (trgt.FastLayout, fromDim=0, toDim=nd-2)
+        let mutable maskPosIter = PosIter32 (mask.FastLayout, fromDim=0, toDim=nd-2)
+        let mutable srcAddr = src.FastLayout.Offset
+        
+        if nd = 0 then
+            if mask.Data.[maskPosIter.Addr] then 
+                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcAddr]
+        else         
+            while trgtPosIter.Active do
+                let mutable trgtAddr, maskAddr = trgtPosIter.Addr, maskPosIter.Addr
+                for i in 0 .. trgt.FastLayout.Shape.[nd-1] - 1 do
+                    if mask.Data.[maskAddr] then
+                        trgt.Data.[trgtAddr] <- src.Data.[srcAddr]
+                        if src.FastLayout.NDims <> 0 then
+                            srcAddr <- srcAddr + src.FastLayout.Stride.[0]                        
+                    trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
+                    maskAddr <- maskAddr + mask.FastLayout.Stride.[nd-1]
+                trgtPosIter.MoveNext()
+                maskPosIter.MoveNext()             
+                
+                                                                                                    
 
 
 // delegates for VectorOps
@@ -1858,6 +1919,16 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 |> List.map (Option.map (fun i -> (i.Backend :?> TensorHostBackend<int64>).DataAndLayout))
                 |> Array.ofList
             ScalarOps.Scatter (trgt, trgtIndices, src)
+            
+        member this.MaskedGet (trgt, src, mask) =
+            let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
+            let src, mask = TensorHostBackend<_>.ElemwiseDataAndLayout (src, mask)
+            ScalarOps.MaskedGet (trgt, src, mask)
+
+        member this.MaskedSet (trgt, mask, src) =
+            let trgt, mask = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, mask)
+            let src = TensorHostBackend<_>.GetDataAndLayout src
+            ScalarOps.MaskedSet (trgt, mask, src)            
 
         member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
@@ -1867,6 +1938,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
             ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
+
+        member this.CountTrueLastAxis (trgt, src) =
+            let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
+            ScalarOps.CountTrueLastAxis (trgt, src)
 
         member this.SumLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)

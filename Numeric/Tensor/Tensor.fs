@@ -85,6 +85,10 @@ type ITensor =
     /// fills the tensors with zeros
     abstract FillZero:          unit -> unit
 
+    /// element selection by boolean mask 
+    abstract Item : mask:Tensor<bool> -> ITensor with get
+    abstract Item : mask:Tensor<bool> -> ITensor with set
+
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
     /// n-dimensional slicing using a list of TensorRngs
@@ -231,6 +235,8 @@ type ITensorBackend<'T> =
     abstract IfThenElse:        trgt:Tensor<'T> * cond:Tensor<bool> * ifTrue:Tensor<'T> * ifFalse:Tensor<'T> -> unit  
     abstract Gather:            trgt:Tensor<'T> * srcIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
     abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
+    abstract MaskedGet:         trgt:Tensor<'T> * src:Tensor<'T> * mask:Tensor<bool> -> int64
+    abstract MaskedSet:         trgt:Tensor<'T> * mask:Tensor<bool> * src:Tensor<'T> -> unit
 
     abstract SumLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract ProductLastAxis:   trgt:Tensor<'T> * src1:Tensor<'T> -> unit
@@ -238,6 +244,7 @@ type ITensorBackend<'T> =
     abstract MaxLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract AllLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
     abstract AnyLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
+    abstract CountTrueLastAxis: trgt:Tensor<int64> * src1:Tensor<bool> -> unit
 
     abstract ArgMinLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
     abstract ArgMaxLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
@@ -1337,6 +1344,26 @@ type [<StructuredFormatDisplay("{Pretty}");
         let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
         trgt.FillFoldAxis fn initial axis a
         trgt
+        
+    /// count true elements over given axis using this tensor as target
+    member trgt.FillCountTrueAxis (ax: int) (src: Tensor<bool>) =
+        let trgt = trgt.AsInt64
+        let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
+        trgt.Backend.CountTrueLastAxis (trgt=trgt, src1=src)
+
+    /// count true elements over given axis
+    static member countTrueAxis (ax: int) (src: Tensor<bool>) : Tensor<int64> =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillCountTrueAxis ax src
+        trgt
+
+    /// count true elements as tensor
+    static member countTrueTensor (src: Tensor<bool>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.countTrueAxis 0
+
+    /// count of all true elements
+    static member countTrue (src: Tensor<bool>) =
+        src |> Tensor.countTrueTensor |> Tensor.value        
 
     /// sum over given axis using this tensor as target
     member trgt.FillSumAxis (ax: int) (src: Tensor<'T>) =
@@ -1752,16 +1779,62 @@ type [<StructuredFormatDisplay("{Pretty}");
         let args = allArgs.[0 .. allArgs.Length-2]
         this.ISetRng args value
 
+    /// Collect all elements of this tensor where mask is true and return them as a
+    /// one-dimensional tensor.
+    member this.MaskedGet (mask: Tensor<bool>) =
+        Tensor.CheckSameStorage [this; mask]
+        let mask = mask |> Tensor<_>.broadcastTo this.Shape
+        let cnt = Tensor.countTrue mask
+        let trgt = Tensor<'T> ([cnt], this.Dev)
+        backend.MaskedGet (trgt=trgt, src=this, mask=mask) |> ignore
+        trgt    
+    member inline internal this.IMaskedGet (mask: Tensor<bool>) = 
+        this.MaskedGet mask :> ITensor     
+        
+    /// Set all elements of this tensor where mask is true to the specfied values.
+    /// The value tensor must be one-dimensional or scalar.
+    member this.MaskedSet (mask: Tensor<bool>) (value: Tensor<'T>) =
+        Tensor.CheckSameStorage [this; mask; value]
+        let mask = mask |> Tensor<_>.broadcastTo this.Shape
+        if value.NDims <> 0 then
+            let cnt = Tensor.countTrue mask
+            if cnt <> value.NElems then
+                let msg = 
+                    sprintf "Mask selects %d elements but %d values to set were given."
+                            cnt value.NElems
+                raise (ShapeMismatch msg)
+        backend.MaskedSet (trgt=this, mask=mask, src=value)     
+    member inline internal this.IMaskedSet (mask: Tensor<bool>) (value: ITensor) = 
+        match value with
+        | :? Tensor<'T> as value -> this.MaskedSet mask value
+        | _ ->
+            let msg = 
+                sprintf "cannot assign data type %s to tensor of data type %s"
+                        value.DataType.Name this.DataType.Name
+            raise (DataTypeMismatch msg)             
+
     /// access to a single item using an array of indices
     member this.Item
         with get (idx: int64[]) : 'T = backend.[idx]
         and set (idx: int64[]) (value: 'T) = backend.[idx] <- value
-
+          
     /// access to a single item using a list of indices 
     /// (use array of indices for faster access)
     member this.Item
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
+
+    /// element selection using boolean mask 
+    member this.Item
+        with get (mask: Tensor<bool>) = this.MaskedGet mask
+        and set (mask: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet mask value                          
+
+    // This does not work for some reason:
+    /// element selection using boolean mask
+    //member this.Item
+    //    with set (mask: Tensor<bool>) (value: 'T) =
+    //        let value = Tensor.scalarLike this value
+    //        this.MaskedSet mask value
 
     /// n-dimensional slicing using a list of TensorRngs
     member this.Item
@@ -1931,6 +2004,10 @@ type [<StructuredFormatDisplay("{Pretty}");
         member this.FillZero () = this.FillConst Tensor<'T>.Zero
         member this.Pretty = this.Pretty
         member this.Full = this.Full
+
+        member this.Item
+            with get (mask: Tensor<bool>) = this.IMaskedGet mask
+            and set (mask: Tensor<bool>) (value: ITensor) = this.IMaskedSet mask value
 
         member this.Item
             with get (rng: TensorRng list) = this.IGetRng [|rng|]
