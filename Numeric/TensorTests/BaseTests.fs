@@ -58,10 +58,13 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "ary=\n%A" ary
                 
         printfn "ary ==== 3=\n%A" (ary====3)
-        printfn "ary.[ary====3]=\n%A" (ary.[ary====3])
-        ary.[ary====3] <- ary.[ary====3] + 2
+        printfn "ary.[*,0L] ==== 1=\n%A" (ary.[*,0L] ==== 1)
+        printfn "ary.Masked(ary====3)=\n%A" (ary.Masked(ary====3))
+        printfn "ary.Masked(ary.[*,0L] ==== 1, NoMask)=\n%A" (ary.Masked(ary.[*,0L] ==== 1, NoMask)) 
+        printfn "ary.Masked(ary.[*,0L] ==== 1, ary.[0L, *]====3)=\n%A" (ary.Masked(ary.[*,0L]====1, ary.[0L,*]====3))
+        ary.Masked(ary====3) <- ary.Masked(ary====3) + 2
         printfn "ary.[ary====3] <- ary.[ary====3] + 2:\n%A" ary
-        ary.[ary====5] <- HostTensor.scalar 11
+        ary.Masked(ary====5) <- HostTensor.scalar 11
         printfn "ary.[ary====5] <- 11:\n%A" ary                
 
     [<Fact>]

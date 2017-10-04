@@ -1186,63 +1186,38 @@ type internal ScalarOps =
                 else NotFound
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 NotFound, 
                                  isIndexed=true, useThreads=true)             
-                                 
+                                          
     static member inline MaskedGet (trgt: DataAndLayout<'T>, 
-                                    src: DataAndLayout<'T>, mask: DataAndLayout<bool>) =
-        if trgt.FastLayout.NDims <> 1 then failwith "MaskedGet target must be one dimensional"                                          
-
-        let nd = src.FastLayout.NDims                             
-        let mutable collected = 0L                              
-        let mutable srcPosIter = PosIter32 (src.FastLayout, fromDim=0, toDim=nd-2)
-        let mutable maskPosIter = PosIter32 (mask.FastLayout, fromDim=0, toDim=nd-2)
-        let mutable trgtAddr = trgt.FastLayout.Offset
-        
-        if nd = 0 then
-            if mask.Data.[maskPosIter.Addr] then 
-                collected <- collected + 1L
-                trgt.Data.[trgtAddr] <- src.Data.[srcPosIter.Addr]
-        else         
-            while srcPosIter.Active do
-                let mutable srcAddr, maskAddr = srcPosIter.Addr, maskPosIter.Addr
-                for i in 0 .. src.FastLayout.Shape.[nd-1] - 1 do
-                    if mask.Data.[maskAddr] then
-                        collected <- collected + 1L
-                        trgt.Data.[trgtAddr] <- src.Data.[srcAddr]
-                        trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[0]                        
-                    srcAddr <- srcAddr + src.FastLayout.Stride.[nd-1]
-                    maskAddr <- maskAddr + mask.FastLayout.Stride.[nd-1]
-                srcPosIter.MoveNext()
-                maskPosIter.MoveNext()             
-                
-        collected      
-                                 
-    static member inline MaskedSet (trgt: DataAndLayout<'T>, mask: DataAndLayout<bool>,
-                                    src: DataAndLayout<'T>) =
-        if src.FastLayout.NDims <> 0 && src.FastLayout.NDims <> 1 then 
-            failwith "MaskedSet source must be zero or one dimensional"                                          
-
-        let nd = trgt.FastLayout.NDims                             
-        let mutable trgtPosIter = PosIter32 (trgt.FastLayout, fromDim=0, toDim=nd-2)
-        let mutable maskPosIter = PosIter32 (mask.FastLayout, fromDim=0, toDim=nd-2)
-        let mutable srcAddr = src.FastLayout.Offset
-        
-        if nd = 0 then
-            if mask.Data.[maskPosIter.Addr] then 
-                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcAddr]
-        else         
-            while trgtPosIter.Active do
-                let mutable trgtAddr, maskAddr = trgtPosIter.Addr, maskPosIter.Addr
-                for i in 0 .. trgt.FastLayout.Shape.[nd-1] - 1 do
-                    if mask.Data.[maskAddr] then
-                        trgt.Data.[trgtAddr] <- src.Data.[srcAddr]
-                        if src.FastLayout.NDims <> 0 then
-                            srcAddr <- srcAddr + src.FastLayout.Stride.[0]                        
-                    trgtAddr <- trgtAddr + trgt.FastLayout.Stride.[nd-1]
-                    maskAddr <- maskAddr + mask.FastLayout.Stride.[nd-1]
+                                    src: DataAndLayout<'T>, 
+                                    masks: DataAndLayout<bool> option []) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            let maskVal =
+                Array.zip masks srcPosIter.Pos 
+                |> Array.fold (fun s (m, p) -> match m with 
+                                               | Some m -> s && m.Data.[m.FastLayout.UncheckedAddr [|p|]]
+                                               | _ -> s) true 
+            if maskVal then
+                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcPosIter.Addr]
                 trgtPosIter.MoveNext()
-                maskPosIter.MoveNext()             
-                
-                                                                                                    
+            srcPosIter.MoveNext()
+                                 
+    static member inline MaskedSet (trgt: DataAndLayout<'T>, 
+                                    masks: DataAndLayout<bool> option [],
+                                    src: DataAndLayout<'T>) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            let maskVal =
+                Array.zip masks trgtPosIter.Pos 
+                |> Array.fold (fun s (m, p) -> match m with 
+                                               | Some m -> s && m.Data.[m.FastLayout.UncheckedAddr [|p|]]
+                                               | _ -> s) true 
+            if maskVal then
+                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcPosIter.Addr]
+                srcPosIter.MoveNext()
+            trgtPosIter.MoveNext()                                                                                                                   
 
 
 // delegates for VectorOps
@@ -1920,15 +1895,17 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 |> Array.ofList
             ScalarOps.Scatter (trgt, trgtIndices, src)
             
-        member this.MaskedGet (trgt, src, mask) =
+        member this.MaskedGet (trgt, src, masks) =
             let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
-            let src, mask = TensorHostBackend<_>.ElemwiseDataAndLayout (src, mask)
-            ScalarOps.MaskedGet (trgt, src, mask)
-
-        member this.MaskedSet (trgt, mask, src) =
-            let trgt, mask = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, mask)
+            let masks = masks |> Array.map (Option.map TensorHostBackend<_>.GetDataAndLayout)
             let src = TensorHostBackend<_>.GetDataAndLayout src
-            ScalarOps.MaskedSet (trgt, mask, src)            
+            ScalarOps.MaskedGet (trgt, src, masks)
+
+        member this.MaskedSet (trgt, masks, src) =
+            let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
+            let masks = masks |> Array.map (Option.map TensorHostBackend<_>.GetDataAndLayout)
+            let src = TensorHostBackend<_>.GetDataAndLayout src
+            ScalarOps.MaskedSet (trgt, masks, src)            
 
         member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)

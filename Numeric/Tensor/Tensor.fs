@@ -85,9 +85,18 @@ type ITensor =
     /// fills the tensors with zeros
     abstract FillZero:          unit -> unit
 
-    /// element selection by boolean mask 
-    abstract Item : mask:Tensor<bool> -> ITensor with get
-    abstract Item : mask:Tensor<bool> -> ITensor with set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : m0:Tensor<bool> -> ITensor with get, set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> -> ITensor with get, set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> -> ITensor with get, set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> -> ITensor with get, set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> * m4:Tensor<bool> -> ITensor with get, set
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    abstract Masked : masks:Tensor<bool> list -> ITensor with get, set
 
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
@@ -235,8 +244,8 @@ type ITensorBackend<'T> =
     abstract IfThenElse:        trgt:Tensor<'T> * cond:Tensor<bool> * ifTrue:Tensor<'T> * ifFalse:Tensor<'T> -> unit  
     abstract Gather:            trgt:Tensor<'T> * srcIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
     abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
-    abstract MaskedGet:         trgt:Tensor<'T> * src:Tensor<'T> * mask:Tensor<bool> -> int64
-    abstract MaskedSet:         trgt:Tensor<'T> * mask:Tensor<bool> * src:Tensor<'T> -> unit
+    abstract MaskedGet:         trgt:Tensor<'T> * src:Tensor<'T> * masks:Tensor<bool> option [] -> unit
+    abstract MaskedSet:         trgt:Tensor<'T> * masks:Tensor<bool> option [] * src:Tensor<'T> -> unit
 
     abstract SumLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract ProductLastAxis:   trgt:Tensor<'T> * src1:Tensor<'T> -> unit
@@ -1779,34 +1788,67 @@ type [<StructuredFormatDisplay("{Pretty}");
         let args = allArgs.[0 .. allArgs.Length-2]
         this.ISetRng args value
 
-    /// Collect all elements of this tensor where mask is true and return them as a
-    /// one-dimensional tensor.
-    member this.MaskedGet (mask: Tensor<bool>) =
-        Tensor.CheckSameStorage [this; mask]
-        let mask = mask |> Tensor<_>.broadcastTo this.Shape
-        let cnt = Tensor.countTrue mask
-        let trgt = Tensor<'T> ([cnt], this.Dev)
-        backend.MaskedGet (trgt=trgt, src=this, mask=mask) |> ignore
+    /// Computes the shape of the targets and sources of a mask operation. 
+    static member internal MaskShapes (masks: Tensor<bool> option list) (shape: int64 list) =
+        match masks with
+        | None :: rMasks ->
+            // non-specified mask consumes one dimension of tensor
+            match List.tryHead shape with
+            | Some s -> (s, s) :: Tensor<_>.MaskShapes rMasks (List.tail shape)
+            | None -> invalidArg "masks" "dimension mismatch between masks and tensor shape"
+        | Some mask :: rMasks ->
+            // specified mask consumes as many dimensions as it has
+            if mask.NDims > List.length shape then 
+                invalidArg "masks" "dimension mismatch between masks and tensor shape"
+            let s, rShape = shape.[..mask.NDims-1], shape.[mask.NDims..]
+            if mask.Shape <> s then
+                let msg = sprintf "shape of mask %A does not match part %A of tensor shape it applies to" 
+                                  mask.Shape s
+                raise (ShapeMismatch msg)                 
+            (Tensor<_>.countTrue mask, mask.NElems) :: Tensor<_>.MaskShapes rMasks rShape
+        | [] ->
+            if not (List.isEmpty shape) then
+                invalidArg "masks" "dimension mismatch between masks and tensor shape"
+            []
+
+    /// Converts a list of masks (which may be null) to a list of mask options.
+    static member internal MaskOptions (masks: Tensor<bool> list) =
+        masks |> List.map (fun m -> match box m with
+                                    | null -> None
+                                    | _ -> Some m)
+
+    /// Collect all elements of this tensor where mask is true.
+    member internal this.MaskedGet (masks: Tensor<bool> list) =
+        let masks = Tensor<_>.MaskOptions masks
+        masks |> List.iter (Option.iter (fun m -> Tensor.CheckSameStorage [this; m]))
+        let trgtShp, srcShp = Tensor<_>.MaskShapes masks this.Shape |> List.unzip
+        let trgt = Tensor<'T> (trgtShp, this.Dev)
+        let src = this |> Tensor.reshape srcShp
+        let masks = masks |> List.map (Option.map Tensor<_>.flatten) |> List.toArray
+        backend.MaskedGet (trgt=trgt, src=src, masks=masks) 
         trgt    
-    member inline internal this.IMaskedGet (mask: Tensor<bool>) = 
-        this.MaskedGet mask :> ITensor     
+        
+    member inline internal this.IMaskedGet (masks: Tensor<bool> list) = 
+        this.MaskedGet masks :> ITensor     
         
     /// Set all elements of this tensor where mask is true to the specfied values.
-    /// The value tensor must be one-dimensional or scalar.
-    member this.MaskedSet (mask: Tensor<bool>) (value: Tensor<'T>) =
-        Tensor.CheckSameStorage [this; mask; value]
-        let mask = mask |> Tensor<_>.broadcastTo this.Shape
-        if value.NDims <> 0 then
-            let cnt = Tensor.countTrue mask
-            if cnt <> value.NElems then
-                let msg = 
-                    sprintf "Mask selects %d elements but %d values to set were given."
-                            cnt value.NElems
-                raise (ShapeMismatch msg)
-        backend.MaskedSet (trgt=this, mask=mask, src=value)     
-    member inline internal this.IMaskedSet (mask: Tensor<bool>) (value: ITensor) = 
+    member internal this.MaskedSet (masks: Tensor<bool> list) (value: Tensor<'T>) =
+        let masks = Tensor<_>.MaskOptions masks
+        Tensor.CheckSameStorage [this; value]
+        masks |> List.iter (Option.iter (fun m -> Tensor.CheckSameStorage [this; m]))       
+        let valueShp, trgtShp = Tensor<_>.MaskShapes masks this.Shape |> List.unzip        
+        let masks = masks |> List.map (Option.map Tensor<_>.flatten) |> List.toArray
+        let value = value |> Tensor<_>.broadcastTo valueShp        
+        match this |> Tensor.tryReshapeView trgtShp with
+        | Some trgtView -> backend.MaskedSet (trgt=trgtView, masks=masks, src=value)
+        | None ->
+            let trgt = this |> Tensor.reshape trgtShp
+            backend.MaskedSet (trgt=trgt, masks=masks, src=value)
+            this.CopyFrom (trgt |> Tensor.reshape this.Shape)
+             
+    member inline internal this.IMaskedSet (masks: Tensor<bool> list) (value: ITensor) = 
         match value with
-        | :? Tensor<'T> as value -> this.MaskedSet mask value
+        | :? Tensor<'T> as value -> this.MaskedSet masks value
         | _ ->
             let msg = 
                 sprintf "cannot assign data type %s to tensor of data type %s"
@@ -1824,17 +1866,35 @@ type [<StructuredFormatDisplay("{Pretty}");
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
 
-    /// element selection using boolean mask 
-    member this.Item
-        with get (mask: Tensor<bool>) = this.MaskedGet mask
-        and set (mask: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet mask value                          
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    member this.Masked
+        with get (m0: Tensor<bool>) = this.MaskedGet [m0]
+        and set (m0: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0] value                          
 
-    // This does not work for some reason:
-    /// element selection using boolean mask
-    //member this.Item
-    //    with set (mask: Tensor<bool>) (value: 'T) =
-    //        let value = Tensor.scalarLike this value
-    //        this.MaskedSet mask value
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    member this.Masked
+        with get (m0: Tensor<bool>, m1: Tensor<bool>) = this.MaskedGet [m0; m1]
+        and set (m0: Tensor<bool>, m1: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1] value                          
+
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    member this.Masked
+        with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) = this.MaskedGet [m0; m1; m2]
+        and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2] value                          
+
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    member this.Masked
+        with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3]
+        and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3] value                          
+
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    member this.Masked
+        with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3; m4]
+        and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3; m4] value                          
+
+    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    member this.Masked
+        with get (masks: Tensor<bool> list) = this.MaskedGet masks
+        and set (masks: Tensor<bool> list) (value: Tensor<'T>) = this.MaskedSet masks value                          
 
     /// n-dimensional slicing using a list of TensorRngs
     member this.Item
@@ -2006,12 +2066,32 @@ type [<StructuredFormatDisplay("{Pretty}");
         member this.Full = this.Full
 
         member this.Item
-            with get (mask: Tensor<bool>) = this.IMaskedGet mask
-            and set (mask: Tensor<bool>) (value: ITensor) = this.IMaskedSet mask value
-
-        member this.Item
             with get (rng: TensorRng list) = this.IGetRng [|rng|]
             and set (rng: TensorRng list) (value: ITensor) = this.ISetRng [|rng|] value
+
+        member this.Masked
+            with get (m0: Tensor<bool>) = this.IMaskedGet [m0]
+            and set (m0: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0] value                          
+    
+        member this.Masked
+            with get (m0: Tensor<bool>, m1: Tensor<bool>) = this.IMaskedGet [m0; m1]
+            and set (m0: Tensor<bool>, m1: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1] value                          
+    
+        member this.Masked
+            with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) = this.IMaskedGet [m0; m1; m2]
+            and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2] value                          
+    
+        member this.Masked
+            with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) = this.IMaskedGet [m0; m1; m2; m3]
+            and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2; m3] value                          
+    
+        member this.Masked
+            with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) = this.IMaskedGet [m0; m1; m2; m3; m4]
+            and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2; m3; m4] value                          
+    
+        member this.Masked
+            with get (masks: Tensor<bool> list) = this.IMaskedGet masks
+            and set (masks: Tensor<bool> list) (value: ITensor) = this.IMaskedSet masks value                          
 
         member this.Item
             with get (i0: int64) = this.IGetRng [|i0|]
@@ -2661,3 +2741,12 @@ module Tensor =
             let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
             trgt.FillParallelFoldAxis fn initial axis a
             trgt
+
+
+/// Most commonly used types for working with tensors.
+[<AutoOpen>]
+module TensorTypes =
+
+    /// Indicates that the dimension is unmasked, i.e. equals specifying a tensor filled with trues. 
+    let NoMask : Tensor<bool> = Unchecked.defaultof<_> // = null
+        
