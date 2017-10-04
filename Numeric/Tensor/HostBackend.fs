@@ -1217,8 +1217,18 @@ type internal ScalarOps =
             if maskVal then
                 trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcPosIter.Addr]
                 srcPosIter.MoveNext()
-            trgtPosIter.MoveNext()                                                                                                                   
-
+            trgtPosIter.MoveNext()              
+            
+    static member inline TrueIndices (trgt: DataAndLayout<int64>, src: DataAndLayout<bool>) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            if src.Data.[srcPosIter.Addr] then
+                for d in 0 .. src.FastLayout.NDims-1 do
+                    trgt.Data.[trgtPosIter.Addr] <- int64 srcPosIter.Pos.[d]
+                    trgtPosIter.MoveNext()
+            srcPosIter.MoveNext()
+                                                                                                                                   
 
 // delegates for VectorOps
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
@@ -1905,7 +1915,11 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
             let masks = masks |> Array.map (Option.map TensorHostBackend<_>.GetDataAndLayout)
             let src = TensorHostBackend<_>.GetDataAndLayout src
-            ScalarOps.MaskedSet (trgt, masks, src)            
+            ScalarOps.MaskedSet (trgt, masks, src)        
+            
+        member this.TrueIndices (trgt, src) =
+            let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
+            ScalarOps.TrueIndices (trgt, src)    
 
         member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)

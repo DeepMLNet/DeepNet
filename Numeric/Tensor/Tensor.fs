@@ -246,6 +246,7 @@ type ITensorBackend<'T> =
     abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
     abstract MaskedGet:         trgt:Tensor<'T> * src:Tensor<'T> * masks:Tensor<bool> option [] -> unit
     abstract MaskedSet:         trgt:Tensor<'T> * masks:Tensor<bool> option [] * src:Tensor<'T> -> unit
+    abstract TrueIndices:       trgt:Tensor<int64> * src1:Tensor<bool> -> unit
 
     abstract SumLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
     abstract ProductLastAxis:   trgt:Tensor<'T> * src1:Tensor<'T> -> unit
@@ -1372,7 +1373,16 @@ type [<StructuredFormatDisplay("{Pretty}");
 
     /// count of all true elements
     static member countTrue (src: Tensor<bool>) =
-        src |> Tensor.countTrueTensor |> Tensor.value        
+        src |> Tensor.countTrueTensor |> Tensor.value
+    
+    /// Finds all elements that are true and returns their indices as a matrix.
+    /// Each row correspond to a true entry in the original tensor.
+    /// Each column corresponds to a dimension of the original tensor. 
+    static member trueIdx (src: Tensor<bool>) : Tensor<int64> =
+        let nTrue = Tensor<_>.countTrue src
+        let trgt = Tensor<int64> ([nTrue; int64 src.NDims], src.Storage.Dev)
+        trgt.Backend.TrueIndices (trgt=trgt, src1=src)                
+        trgt
 
     /// sum over given axis using this tensor as target
     member trgt.FillSumAxis (ax: int) (src: Tensor<'T>) =
@@ -1853,7 +1863,7 @@ type [<StructuredFormatDisplay("{Pretty}");
             let msg = 
                 sprintf "cannot assign data type %s to tensor of data type %s"
                         value.DataType.Name this.DataType.Name
-            raise (DataTypeMismatch msg)             
+            raise (DataTypeMismatch msg)                             
 
     /// access to a single item using an array of indices
     member this.Item

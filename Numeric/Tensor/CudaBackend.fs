@@ -706,6 +706,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.CountTrueLastAxis(trgt, src1) = unsup "CountTrueLastAxis"
         member this.MaskedGet(trgt, src, mask) = unsup "MaskedGet"
         member this.MaskedSet(trgt, mask, src) = unsup "MaskedSet"
+        member this.TrueIndices(trgt, src) = unsup "TrueIndices"
 
 
 /// Creates Tensors on a CUDA device.

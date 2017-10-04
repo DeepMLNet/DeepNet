@@ -65,7 +65,15 @@ type BaseTests (output: ITestOutputHelper) =
         ary.Masked(ary====3) <- ary.Masked(ary====3) + 2
         printfn "ary.[ary====3] <- ary.[ary====3] + 2:\n%A" ary
         ary.Masked(ary====5) <- HostTensor.scalar 11
-        printfn "ary.[ary====5] <- 11:\n%A" ary                
+        printfn "ary.[ary====5] <- 11:\n%A" ary               
+        
+    [<Fact>]
+    let ``True indices`` () =
+        let m = [[true; true; false; true]
+                 [false; true; true; true]] |> HostTensor.ofList2D
+        printfn "m=\n%A" m
+        let i = Tensor.trueIdx m
+        printfn "idx where m ==== true:\n%A" i                          
 
     [<Fact>]
     let ``Pretty printing works`` () =
