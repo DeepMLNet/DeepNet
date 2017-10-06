@@ -100,6 +100,11 @@ type Rat =
     static member (~+) (a: Rat) = a
     static member (~-) (a: Rat) = Rat (-a.Num, a.Dnm)
     static member Abs (a: Rat) = Rat (abs a.Num, a.Dnm)
+    static member Floor (a: Rat) = Rat(a.Num - (a.Num % a.Dnm), a.Dnm)
+    static member Ceiling (a: Rat) = 
+        let r = a.Num % a.Dnm
+        if r <> bigint.Zero then Rat(a.Num + (a.Dnm - r), a.Dnm)
+        else a
     static member (+) (a: Rat, b: Rat) = 
         if a.IsNaN || b.IsNaN then Rat.NaN
         else
