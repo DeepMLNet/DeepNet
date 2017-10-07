@@ -86,17 +86,17 @@ type ITensor =
     abstract FillZero:          unit -> unit
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : m0:Tensor<bool> -> ITensor with get, set
+    abstract M : m0:Tensor<bool> -> ITensor with get, set
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> -> ITensor with get, set
+    abstract M : m0:Tensor<bool> * m1:Tensor<bool> -> ITensor with get, set
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> -> ITensor with get, set
+    abstract M : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> -> ITensor with get, set
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> -> ITensor with get, set
+    abstract M : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> -> ITensor with get, set
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> * m4:Tensor<bool> -> ITensor with get, set
+    abstract M : m0:Tensor<bool> * m1:Tensor<bool> * m2:Tensor<bool> * m3:Tensor<bool> * m4:Tensor<bool> -> ITensor with get, set
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    abstract Masked : masks:Tensor<bool> list -> ITensor with get, set
+    abstract M : masks:Tensor<bool> list -> ITensor with get, set
 
     /// n-dimensional slicing using a list of TensorRngs
     abstract Item : rng:TensorRng list -> ITensor with get
@@ -1877,32 +1877,32 @@ type [<StructuredFormatDisplay("{Pretty}");
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
-    member this.Masked
+    member this.M
         with get (m0: Tensor<bool>) = this.MaskedGet [m0]
         and set (m0: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0] value                          
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
-    member this.Masked
+    member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>) = this.MaskedGet [m0; m1]
         and set (m0: Tensor<bool>, m1: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1] value                          
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
-    member this.Masked
+    member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) = this.MaskedGet [m0; m1; m2]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2] value                          
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
-    member this.Masked
+    member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3] value                          
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
-    member this.Masked
+    member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3; m4]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3; m4] value                          
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
-    member this.Masked
+    member this.M
         with get (masks: Tensor<bool> list) = this.MaskedGet masks
         and set (masks: Tensor<bool> list) (value: Tensor<'T>) = this.MaskedSet masks value                          
 
@@ -2079,27 +2079,27 @@ type [<StructuredFormatDisplay("{Pretty}");
             with get (rng: TensorRng list) = this.IGetRng [|rng|]
             and set (rng: TensorRng list) (value: ITensor) = this.ISetRng [|rng|] value
 
-        member this.Masked
+        member this.M
             with get (m0: Tensor<bool>) = this.IMaskedGet [m0]
             and set (m0: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0] value                          
     
-        member this.Masked
+        member this.M
             with get (m0: Tensor<bool>, m1: Tensor<bool>) = this.IMaskedGet [m0; m1]
             and set (m0: Tensor<bool>, m1: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1] value                          
     
-        member this.Masked
+        member this.M
             with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) = this.IMaskedGet [m0; m1; m2]
             and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2] value                          
     
-        member this.Masked
+        member this.M
             with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) = this.IMaskedGet [m0; m1; m2; m3]
             and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2; m3] value                          
     
-        member this.Masked
+        member this.M
             with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) = this.IMaskedGet [m0; m1; m2; m3; m4]
             and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) (value: ITensor) = this.IMaskedSet [m0; m1; m2; m3; m4] value                          
     
-        member this.Masked
+        member this.M
             with get (masks: Tensor<bool> list) = this.IMaskedGet masks
             and set (masks: Tensor<bool> list) (value: ITensor) = this.IMaskedSet masks value                          
 
