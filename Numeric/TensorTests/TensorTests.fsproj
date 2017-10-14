@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
     <NoWarn>988</NoWarn>
     <Platform>x64</Platform>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="BaseTests.fs" />
