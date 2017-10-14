@@ -49,6 +49,31 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "slc4=\n%A" slc4
 
         ary2.[NewAxis, 1L..3L, 2L..4L] <- slc3
+        
+    [<Fact>]
+    let ``Boolean slicing`` () =
+        let ary = HostTensor.arange 1 1 10
+        let ary = Tensor.concat 0 [ary.[NewAxis, *]; ary.[NewAxis, *]]
+        ary.[[1L; 0L]] <- 3 
+        printfn "ary=\n%A" ary
+                
+        printfn "ary ==== 3=\n%A" (ary====3)
+        printfn "ary.[*,0L] ==== 1=\n%A" (ary.[*,0L] ==== 1)
+        printfn "ary.M(ary====3)=\n%A" (ary.M(ary====3))
+        printfn "ary.M(ary.[*,0L] ==== 1, NoMask)=\n%A" (ary.M(ary.[*,0L] ==== 1, NoMask)) 
+        printfn "ary.M(ary.[*,0L] ==== 1, ary.[0L, *]====3)=\n%A" (ary.M(ary.[*,0L]====1, ary.[0L,*]====3))
+        ary.M(ary====3) <- ary.M(ary====3) + 2
+        printfn "ary.[ary====3] <- ary.[ary====3] + 2:\n%A" ary
+        ary.M(ary====5) <- HostTensor.scalar 11
+        printfn "ary.[ary====5] <- 11:\n%A" ary               
+        
+    [<Fact>]
+    let ``True indices`` () =
+        let m = [[true; true; false; true]
+                 [false; true; true; true]] |> HostTensor.ofList2D
+        printfn "m=\n%A" m
+        let i = Tensor.trueIdx m
+        printfn "idx where m ==== true:\n%A" i                          
 
     [<Fact>]
     let ``Pretty printing works`` () =

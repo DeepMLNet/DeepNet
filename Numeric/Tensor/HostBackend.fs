@@ -1126,6 +1126,10 @@ type internal ScalarOps =
         // currently cannot use threads, because we have no interlocked addition
         ScalarOps.ApplyUnaryMethod (op, src, isIndexed=true, useThreads=false)     
 
+    static member CountTrueLastAxis (trgt: DataAndLayout<int64>, src1: DataAndLayout<bool>) =
+        let inline op (srcIdx: int64[]) (res: int64) (v: bool) = if v then res+1L else res
+        ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 0L, isIndexed=false, useThreads=true)     
+
     static member SumLastAxis (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let p = ScalarPrimitives.For<'T, 'T>()
         let inline op (srcIdx: int64[]) (res: 'T) (v: 'T) = p.Add res v
@@ -1181,8 +1185,50 @@ type internal ScalarOps =
                 if p.Equal v value then srcIdx.[nd-1]
                 else NotFound
         ScalarOps.ApplyAxisFold (op, id, trgt, src1, initial=Choice1Of2 NotFound, 
-                                 isIndexed=true, useThreads=true)                                      
-
+                                 isIndexed=true, useThreads=true)             
+                                          
+    static member inline MaskedGet (trgt: DataAndLayout<'T>, 
+                                    src: DataAndLayout<'T>, 
+                                    masks: DataAndLayout<bool> option []) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            let maskVal =
+                Array.zip masks srcPosIter.Pos 
+                |> Array.fold (fun s (m, p) -> match m with 
+                                               | Some m -> s && m.Data.[m.FastLayout.UncheckedAddr [|p|]]
+                                               | _ -> s) true 
+            if maskVal then
+                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcPosIter.Addr]
+                trgtPosIter.MoveNext()
+            srcPosIter.MoveNext()
+                                 
+    static member inline MaskedSet (trgt: DataAndLayout<'T>, 
+                                    masks: DataAndLayout<bool> option [],
+                                    src: DataAndLayout<'T>) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            let maskVal =
+                Array.zip masks trgtPosIter.Pos 
+                |> Array.fold (fun s (m, p) -> match m with 
+                                               | Some m -> s && m.Data.[m.FastLayout.UncheckedAddr [|p|]]
+                                               | _ -> s) true 
+            if maskVal then
+                trgt.Data.[trgtPosIter.Addr] <- src.Data.[srcPosIter.Addr]
+                srcPosIter.MoveNext()
+            trgtPosIter.MoveNext()              
+            
+    static member inline TrueIndices (trgt: DataAndLayout<int64>, src: DataAndLayout<bool>) =
+        let mutable trgtPosIter = PosIter32 trgt.FastLayout
+        let mutable srcPosIter = PosIter32 src.FastLayout
+        while trgtPosIter.Active do                      
+            if src.Data.[srcPosIter.Addr] then
+                for d in 0 .. src.FastLayout.NDims-1 do
+                    trgt.Data.[trgtPosIter.Addr] <- int64 srcPosIter.Pos.[d]
+                    trgtPosIter.MoveNext()
+            srcPosIter.MoveNext()
+                                                                                                                                   
 
 // delegates for VectorOps
 type internal FillDelegate<'T>   = delegate of 'T * DataAndLayout<'T> -> unit
@@ -1858,6 +1904,22 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 |> List.map (Option.map (fun i -> (i.Backend :?> TensorHostBackend<int64>).DataAndLayout))
                 |> Array.ofList
             ScalarOps.Scatter (trgt, trgtIndices, src)
+            
+        member this.MaskedGet (trgt, src, masks) =
+            let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
+            let masks = masks |> Array.map (Option.map TensorHostBackend<_>.GetDataAndLayout)
+            let src = TensorHostBackend<_>.GetDataAndLayout src
+            ScalarOps.MaskedGet (trgt, src, masks)
+
+        member this.MaskedSet (trgt, masks, src) =
+            let trgt = TensorHostBackend<_>.GetDataAndLayout trgt
+            let masks = masks |> Array.map (Option.map TensorHostBackend<_>.GetDataAndLayout)
+            let src = TensorHostBackend<_>.GetDataAndLayout src
+            ScalarOps.MaskedSet (trgt, masks, src)        
+            
+        member this.TrueIndices (trgt, src) =
+            let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
+            ScalarOps.TrueIndices (trgt, src)    
 
         member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
@@ -1867,6 +1929,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
             let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
             ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
+
+        member this.CountTrueLastAxis (trgt, src) =
+            let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
+            ScalarOps.CountTrueLastAxis (trgt, src)
 
         member this.SumLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)

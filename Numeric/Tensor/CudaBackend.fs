@@ -703,6 +703,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = unsup "MapIndexed2"
         member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxis"
         member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxisIndexed"
+        member this.CountTrueLastAxis(trgt, src1) = unsup "CountTrueLastAxis"
+        member this.MaskedGet(trgt, src, mask) = unsup "MaskedGet"
+        member this.MaskedSet(trgt, mask, src) = unsup "MaskedSet"
+        member this.TrueIndices(trgt, src) = unsup "TrueIndices"
 
 
 /// Creates Tensors on a CUDA device.

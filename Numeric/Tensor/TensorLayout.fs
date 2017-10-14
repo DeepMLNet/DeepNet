@@ -19,6 +19,7 @@ exception IndexOutOfRange of msg:string with override __.Message = __.msg
 exception ImpossibleWithoutCopy of msg:string with override __.Message = __.msg
 
 
+/// Most commonly used types for working with tensors.
 [<AutoOpen>]
 module TensorLayoutTypes =
     // layout (shape, offset, stride) of a Tensor
