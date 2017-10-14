@@ -2291,6 +2291,11 @@ module HostTensor =
     let toList (ary: Tensor<_>) =
         ary |> toArray |> Array.toList
 
+    /// Creates a list of lists from the data in the two-dimensional Tensor. The data is copied.
+    let toList2D (ary: Tensor<_>) =
+        if Tensor.nDims ary <> 2 then failwith "Tensor must have 2 dimensions"
+        [0L .. ary.Shape.[0]-1L] |> List.map (fun i0 -> toList ary.[i0, *])
+
     /// Writes the given host tensor into the HDF5 file under the given path.
     let write (hdf5: HDF5) (path: string) (x: ITensor) =
         callGeneric<HDFFuncs, unit> "Write" [x.DataType] (hdf5, path, x)
