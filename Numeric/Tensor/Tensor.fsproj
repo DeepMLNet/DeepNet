@@ -32,6 +32,7 @@
     </description>
     <PackageTags>Tensor ndarray array MKL SIMD BLAS CUDA CUBLAS HDF5</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HDF.PInvoke" Version="1.10.1.1" />
