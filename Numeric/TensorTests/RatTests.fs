@@ -145,6 +145,36 @@ type RatTests (output: ITestOutputHelper) =
         printfn "linspace:\n%A" A
          
 
+    [<Fact>]
+    let ``Floor and Ceiling`` () =
+        let doTest a =
+            let af = float a
+            
+            printfn "floor:"
+            printfn "Rat:     a=%A   floor a=%A   floor (-a)=%A" a (floor a) (floor -a)
+            printfn "float:   a=%A   floor a=%A   floor (-a)=%A" af (floor af) (floor -af)
+            floor af |> should equal (float (floor a))
+            floor -af |> should equal (float (floor -a))
+
+            printfn "ceil:"
+            printfn "Rat:     a=%A   ceil a=%A   ceil (-a)=%A" a (ceil a) (ceil -a)
+            printfn "float:   a=%A   ceil a=%A   ceil (-a)=%A" a (ceil af) (ceil -af)
+            ceil af |> should equal (float (ceil a))
+            ceil -af |> should equal (float (ceil -a))
+
+            printfn "truncate:"
+            printfn "Rat:     a=%A   truncate a=%A   truncate (-a)=%A" a (truncate a) (truncate -a)
+            printfn "float:   a=%A   truncate a=%A   truncate (-a)=%A" a (truncate af) (truncate -af)
+            truncate af |> should equal (float (truncate a))
+            truncate -af |> should equal (float (truncate -a))            
+
+        doTest (Rat(1, 10))
+        doTest (Rat(0, 10))
+        doTest (Rat(10, 10))
+        doTest (Rat(9, 10))
+        doTest (Rat(12, 10))
+
+
 
 
 
