@@ -12,6 +12,7 @@ open ManagedCuda.BasicTypes
 
 open Tensor.Utils
 open System.Text
+open System.Text.RegularExpressions
 
 
 /// CUDA backend configuration
@@ -246,7 +247,8 @@ module internal KernelCompiler =
         let compileDir = getTempDir ()
         Directory.CreateDirectory compileDir |> ignore
 
-        // get embedded header files from out assembly
+        // Get embedded header resources from our assembly.
+        // They are in the form: Tensor.Cuda.FILENAME.cuh, i.e. slashes have been replaced by dots.
         let asmbly = Assembly.GetExecutingAssembly()
         let headers =
             asmbly.GetManifestResourceNames ()
@@ -264,9 +266,11 @@ module internal KernelCompiler =
         // write headers to compile directory
         headers
         |> Seq.iter (fun header -> 
+            // extract header file name from resource name
+            let filename = Regex.Match(header, @"\.(\w+\.\w+)$").Groups.[1].Value
+            let path = Path.Combine (compileDir, filename)
+            use fileStrm = File.OpenWrite path
             use strm = asmbly.GetManifestResourceStream(header)
-            let filename = Path.Combine (compileDir, header)
-            use fileStrm = File.OpenWrite filename
             strm.CopyTo fileStrm)
 
         // write module code
