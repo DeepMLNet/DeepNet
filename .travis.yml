@@ -15,7 +15,7 @@ script:
   - echo "<Project><PropertyGroup><Rev>$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets
   - dotnet build Numeric/Tensor.sln
   - dotnet test Numeric/Tensor.Tests/Tensor.Tests.fsproj
-  - dotnet pack -c Release
+  - dotnet pack -c Release Numeric/Tensor.sln
 after_success:
   - if [ "$TRAVIS_BRANCH" = "core2" ]; then dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'; fi
 
