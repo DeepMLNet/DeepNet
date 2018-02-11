@@ -12,7 +12,6 @@
     <Compile Include="BlasSupport.fs" />
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
-    <Compile Include="NumpyFiles.fs" />
     <EmbeddedResource Include="Cuda/Common.cuh" />
     <EmbeddedResource Include="Cuda/Idxs.cuh" />
     <EmbeddedResource Include="Cuda/Tensor.cuh" />
