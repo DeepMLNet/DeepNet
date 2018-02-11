@@ -8,7 +8,7 @@ open System.Security.Cryptography
 
 
 /// a filesystem backed map for binary keys and values
-type DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string) =
+type internal DiskBinaryMap (baseDir: string, keyFilename: string, valueFilename: string) =
 
     let sha1 = new SHA1CryptoServiceProvider()
     

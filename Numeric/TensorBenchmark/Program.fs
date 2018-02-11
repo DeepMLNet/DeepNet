@@ -1,8 +1,38 @@
 ﻿open System.Diagnostics
 open System
+open System.Runtime.InteropServices
 
 open Tensor
 open Tensor.Utils
+
+
+module Util = 
+    /// true if running on Windows
+    let onWindows =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+
+    /// true if running on Linux
+    let onLinux =
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+
+    [<Flags>]
+    type ErrorModes = 
+        | SYSTEM_DEFAULT = 0x0
+        | SEM_FAILCRITICALERRORS = 0x0001
+        | SEM_NOALIGNMENTFAULTEXCEPT = 0x0004
+        | SEM_NOGPFAULTERRORBOX = 0x0002
+        | SEM_NOOPENFILEERRORBOX = 0x8000
+
+    [<DllImport("kernel32.dll")>]
+    extern ErrorModes private SetErrorMode(ErrorModes mode)
+
+    /// disables the Windows WER dialog box on crash of this application
+    let disableCrashDialog () =
+        if onWindows then        
+            SetErrorMode(ErrorModes.SEM_NOGPFAULTERRORBOX |||
+                         ErrorModes.SEM_FAILCRITICALERRORS |||
+                         ErrorModes.SEM_NOOPENFILEERRORBOX)
+            |> ignore
 
 
 let testCuda () =
@@ -107,7 +137,7 @@ let testCuda () =
 
 [<EntryPoint>]
 let main argv = 
-    Tensor.Utils.Util.disableCrashDialog ()      
+    Util.disableCrashDialog ()      
     let dev = 
         match List.ofArray argv with
         | ["cuda"] -> CudaTensor.Dev
@@ -115,11 +145,14 @@ let main argv =
         | _ -> 
             printfn "unknown device"
             exit 1
+    let cudaCtx = 
+        if dev = CudaTensor.Dev then Some (new ManagedCuda.CudaContext(createNew=false))
+        else None 
     let shape = [10000L; 1000L]
 
     let sync () =
         if dev = CudaTensor.Dev then
-            Cuda.context.Synchronize()
+            cudaCtx.Value.Synchronize()
 
     let collect () =
         ()

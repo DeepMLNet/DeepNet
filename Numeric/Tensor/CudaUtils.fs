@@ -1,5 +1,6 @@
 ﻿namespace Tensor.Utils
 
+open System
 open System.Threading
 open System.Collections.Concurrent
 
@@ -8,8 +9,7 @@ open ManagedCuda.BasicTypes
 
 
 /// Cuda support types functions
-module Cuda =
-    open System
+module internal Cuda =
 
     /// dimensionality of parallel work to perform (x, y, z)
     type WorkDim = int64 * int64 * int64
@@ -40,6 +40,10 @@ module Cuda =
                 failwithf "Cannot create CUDA context: %s" e.Message
         cudaCntxt
 
+    // CUDA BLAS handle
+    let blas =
+        new CudaBlas.CudaBlas()
+
     /// CUDA device info
     let deviceInfo =
         context.GetDeviceInfo()
@@ -59,55 +63,6 @@ module Cuda =
     /// nvcc sm code
     let nvccCode =
         sprintf "sm_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
-
-    /// prints CUDA info
-    let printInfo () =
-        let di = deviceInfo
-        printfn "CUDA device:                                         %s" di.DeviceName
-        printfn "CUDA driver version:                                 %A" di.DriverVersion
-        printfn "CUDA device global memory:                           %A bytes" di.TotalGlobalMemory
-        printfn "CUDA device free memory:                             %A bytes" (context.GetFreeDeviceMemorySize())
-        printfn "CUDA device compute capability:                      %A" di.ComputeCapability
-        printfn "CUDA device maximum block size:                      %A" di.MaxThreadsPerBlock                       
-        printfn "CUDA device maximum block dimensions:                %A" di.MaxBlockDim
-        printfn "CUDA device maximum grid dimensions:                 %A" di.MaxGridDim    
-        printfn "CUDA device async engine count:                      %d" di.AsyncEngineCount
-        printfn "CUDA device can execute kernels concurrently:        %A" di.ConcurrentKernels
-        printfn "CUDA device can overlap kernels and memory transfer: %A" di.GpuOverlap
-
-    /// prints short CUDA device information
-    let printDevice () =
-        let di = deviceInfo
-        printfn "Using CUDA device \"%s\" with %d multiprocessors @ %.2f GHz and %d MB memory." 
-            di.DeviceName di.MultiProcessorCount 
-            (float di.ClockRate / 10.0**6.0) (int64 di.TotalGlobalMemory / pown 2L 20)
-
-    // CUDA BLAS handle
-    let blas =
-        new CudaBlas.CudaBlas()
-
-    /// Ensures that CUDA is initialized. Multiple calls are allowed and have no effect.
-    let init () =       
-        // make a dummy call on the context to ensure that it is created
-        context.GetSharedMemConfig() |> ignore
-
-    /// shutsdown CUDA (necessary for correct profiler results)  
-    let shutdown () =
-        context.Synchronize ()
-        CudaContext.ProfilerStop ()
-        context.Synchronize ()
-        blas.Dispose ()
-        context.Dispose ()
-
-    /// Checks that the thread's current CUDA context is the CUDA context that was active
-    /// or created while this module was initialized.
-    let checkContext () =
-        let ctx = ref (CUcontext ())
-        if DriverAPINativeMethods.ContextManagement.cuCtxGetCurrent (ctx) <> CUResult.Success then
-            failwith "cuCtxGetCurrent failed"
-        if context.Context <> (!ctx) then
-            failwithf "Current CUDA context %A does not match library initialization CUDA context %A"
-                (!ctx).Pointer context.Context.Pointer
 
     /// Sets the thread's current CUDA context to the CUDA context that was active
     /// or created while this module was initialized.
