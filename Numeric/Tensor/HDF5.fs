@@ -88,7 +88,7 @@ module private HDF5Support =
 open HDF5Support
 
 
-type HDF5Mode =
+type private HDF5Mode =
     /// read HDF5 file
     | HDF5Read
     /// (over-)write HDF5 file
@@ -96,7 +96,7 @@ type HDF5Mode =
 
 
 /// A HDF5 file.
-type HDF5 (path: string, mode: HDF5Mode) = 
+type HDF5 private (path: string, mode: HDF5Mode) = 
         
     let mutable disposed = false
 
@@ -123,9 +123,6 @@ type HDF5 (path: string, mode: HDF5Mode) =
 
     let checkDisposed () =
         if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
-
-    /// opens a HDF5 file for reading
-    new (path: string) = new HDF5 (path, HDF5Read)
 
     /// closes the HDF5 file
     member this.Dispose () = 

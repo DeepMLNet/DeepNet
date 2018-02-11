@@ -33,7 +33,7 @@ type NumpyFilesTests (output: ITestOutputHelper) =
 
         let hdfPath = Util.assemblyDirectory + "/TestData/NPZ1.h5"
         //#if WRITE_HDF5_REF
-        using (new HDF5 (hdfPath, HDF5Overwrite)) (fun hdf ->
+        using (HDF5.OpenWrite hdfPath) (fun hdf ->
             HostTensor.write hdf "curve_pos" curvePos
             HostTensor.write hdf "dt" dt
             HostTensor.write hdf "distortion_actives" distortionActives
@@ -42,7 +42,7 @@ type NumpyFilesTests (output: ITestOutputHelper) =
         //#endif
 
         printfn "Loading HDF5 reference from %s" hdfPath
-        use hdf = new HDF5 (hdfPath)
+        use hdf = HDF5.OpenRead hdfPath
         let curvePosRef : Tensor<float> = HostTensor.read hdf "curve_pos" 
         let dtRef : Tensor<float> = HostTensor.read hdf "dt"
         let distortionActivesRef : Tensor<bool> = HostTensor.read hdf "distortion_actives"

@@ -18,11 +18,13 @@ module Operators =
                  (fun x -> unbox(mi.Invoke(null, [|box x|])))
         static member Result : ('T -> 'T) = result
 
-    /// Signum of value using same type.
+    /// Sign of value returned using same type.
+    /// In contrast, the F# builtin function sign returns an int.
     /// Calls static method Sgn on non-primitive types.
     [<CompiledName("Sgn")>]
     let sgn x = 
         SgnDynamicImplTable<_>.Result x 
+        
 
 
 
