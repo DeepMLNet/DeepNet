@@ -45,12 +45,10 @@
   <ItemGroup>
     <Compile Include="Utils.fs" />
     <Compile Include="CudaUtils.fs" />
-    <Compile Include="BigIntegerExtensions.fs" />
     <Compile Include="RandomExtensions.fs" />
     <Compile Include="DiskMap.fs" />
     <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
-    <Compile Include="Rat.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
@@ -58,8 +56,6 @@
     <Compile Include="HostBackend.fs" />
     <Compile Include="CudaBackend.fs" />
     <Compile Include="NumpyFiles.fs" />
-    <Compile Include="Decomposition.fs" />
-    <Compile Include="LinAlg.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Cuda/Common.cuh" />

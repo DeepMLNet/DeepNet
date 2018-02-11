@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor", "Tensor\Tensor.fsproj", "{41FAB7BF-1CC7-413F-9C5C-8A85D5C84EDA}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor.Algorithms", "Tensor.Algorithms\Tensor.Algorithms.fsproj", "{6F710D01-9BE1-4026-9434-2A9AE1C148F5}"
+EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor.Tests", "Tensor.Tests\Tensor.Tests.fsproj", "{8F1D7C78-3C28-42BD-88FD-4AFD364863E1}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor.Benchmark", "Tensor.Benchmark\Tensor.Benchmark.fsproj", "{9194C36F-44C3-4DFB-9419-BDF879CBBE8F}"
@@ -30,5 +32,9 @@ Global
 		{9194C36F-44C3-4DFB-9419-BDF879CBBE8F}.Debug|x64.Build.0 = Debug|x64
 		{9194C36F-44C3-4DFB-9419-BDF879CBBE8F}.Release|x64.ActiveCfg = Release|x64
 		{9194C36F-44C3-4DFB-9419-BDF879CBBE8F}.Release|x64.Build.0 = Release|x64
+		{6F710D01-9BE1-4026-9434-2A9AE1C148F5}.Debug|x64.ActiveCfg = Debug|x64
+		{6F710D01-9BE1-4026-9434-2A9AE1C148F5}.Debug|x64.Build.0 = Debug|x64
+		{6F710D01-9BE1-4026-9434-2A9AE1C148F5}.Release|x64.ActiveCfg = Release|x64
+		{6F710D01-9BE1-4026-9434-2A9AE1C148F5}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
