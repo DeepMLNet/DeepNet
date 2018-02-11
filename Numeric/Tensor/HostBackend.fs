@@ -892,6 +892,11 @@ type internal ScalarOps =
         let inline op pos = value
         ScalarOps.ApplyNoaryOp (op, trgt, isIndexed=false, useThreads=true)
 
+    static member FillIncrementing (start: 'T, incr: 'T, trgt: DataAndLayout<'T>) =
+        let p = ScalarPrimitives.For<'T, int64>()
+        let inline op (pos: int64[]) = p.Add start (p.Multiply incr (p.Convert pos.[0]))
+        ScalarOps.ApplyNoaryOp (op, trgt, isIndexed=true, useThreads=true)        
+
     static member Copy (trgt: DataAndLayout<'T>, src1: DataAndLayout<'T>) =
         let inline op pos a = a
         ScalarOps.ApplyUnaryOp (op, trgt, src1, isIndexed=false, useThreads=true)
@@ -1666,6 +1671,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
             if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
             else ScalarOps.Fill (value, trgt)
+
+        member this.FillIncrementing (start, incr, trgt) =
+            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+            ScalarOps.FillIncrementing (start, incr, trgt)        
 
         member this.Copy (trgt, src) =
             if TensorLayout.hasContiguousMemory trgt.Layout &&

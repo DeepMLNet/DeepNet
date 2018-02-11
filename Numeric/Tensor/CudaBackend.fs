@@ -488,6 +488,11 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             kernels.FillConst (Cfg.Stream, box value, trgt)
             Cuda.keepAlive Cfg.Stream trgt
 
+        member this.FillIncrementing (start, incr, trgt) = 
+            let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
+            kernels.FillIncrementing (Cfg.Stream, box start, box incr, trgt)
+            Cuda.keepAlive Cfg.Stream trgt            
+
         member this.Copy(trgt, src) = 
             if TensorLayout.hasContiguousMemory trgt.Layout && 
                TensorLayout.hasContiguousMemory src.Layout &&

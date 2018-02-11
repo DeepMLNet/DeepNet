@@ -26,6 +26,23 @@ void FillConst(T value, Tensor<T, TDims> &trgt) {
 };
 
 
+template<typename T, dim_t TDims>
+struct FillIncrementingFn {
+	T start;
+	T increment;
+	Tensor<T, TDims> trgt;
+	_dev_ void operator() (Idxs<TDims> &pos) {
+		trgt[pos] = start + increment * static_cast<T>(pos[0]);
+	}
+};
+
+template<typename T, dim_t TDims> _dev_
+void FillIncrementing(T value, T increment, Tensor<T, TDims> &trgt) {
+	FillIncrementingFn<T, TDims> workFn = {value, increment, trgt};
+	PerformWork(trgt.Shape(), workFn);
+};
+
+
 // =============================================================================================
 // data type conversion
 // =============================================================================================

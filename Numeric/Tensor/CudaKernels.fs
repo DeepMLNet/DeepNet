@@ -45,7 +45,6 @@ type Cfg () =
         and set(v) = stacktrace.Value <- v
         
 
-
 /// Dynamic type helpers.
 module internal DynamicTypes =
     let currentDomain = Thread.GetDomain()
@@ -69,6 +68,28 @@ type internal NativeTensorInfo = {
     DataType:       Type
     NDims:          int
 }
+
+
+/// C++ data type helpers
+module internal Cpp =
+    /// C++ data type for given type instance
+    let cppTypeInst (typ: System.Type) = 
+        match typ with
+        | _ when typ = typeof<single>    -> "float"
+        | _ when typ = typeof<double>    -> "double"
+        | _ when typ = typeof<sbyte>     -> "int8_t"
+        | _ when typ = typeof<byte>      -> "uint8_t"
+        | _ when typ = typeof<int32>     -> "int32_t"
+        | _ when typ = typeof<uint32>    -> "uint32_t"
+        | _ when typ = typeof<int64>     -> "int64_t"
+        | _ when typ = typeof<uint64>    -> "uint64_t"
+        | _ when typ = typeof<bool>      -> "bool"
+        | _ when typ = typeof<nativeint> -> "ptr_t"
+        | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// C++ data type for given type 
+    let cppType<'T> = cppTypeInst typeof<'T>
+
 
 /// C++ tensor marshaling
 module internal NativeTensor =
@@ -120,10 +141,10 @@ module internal NativeTensor =
 
     /// C++ native tensor type string
     let cppName (nti: NativeTensorInfo) =
-        sprintf "Tensor<%s, %d>" (Util.cppTypeInst nti.DataType) nti.NDims
+        sprintf "Tensor<%s, %d>" (Cpp.cppTypeInst nti.DataType) nti.NDims
 
     let mangledName (nti: NativeTensorInfo) =
-        sprintf "Tensor_%s_%d" (Util.cppTypeInst nti.DataType) nti.NDims
+        sprintf "Tensor_%s_%d" (Cpp.cppTypeInst nti.DataType) nti.NDims
 
     let validInstance (nti: NativeTensorInfo) (nt: NativeTensor) =
         nt.DataType = nti.DataType && 
@@ -366,13 +387,13 @@ module internal KernelArgType =
         match at with
         | ArgTypeTensor nti -> NativeTensor.cppName nti
         | ArgTypeIdxTensors niti -> NativeIdxTensors.cppName niti
-        | ArgTypeScalar t -> Util.cppTypeInst t
+        | ArgTypeScalar t -> Cpp.cppTypeInst t
 
     let mangleName at =
         match at with
         | ArgTypeTensor nti -> NativeTensor.mangledName nti
         | ArgTypeIdxTensors niti -> NativeIdxTensors.mangledName niti
-        | ArgTypeScalar t -> Util.cppTypeInst t
+        | ArgTypeScalar t -> Cpp.cppTypeInst t
 
     let marshal at (av: obj) =
         match at, av with
@@ -530,7 +551,8 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
     let scalar = ArgTypeScalar dataType
 
     // noary kernels
-    let fillConst = getKernel "FillConst" [scalar; fullTensor] [] []
+    let fillConst        = getKernel "FillConst" [scalar; fullTensor] [] []
+    let fillIncrementing = getKernel "FillIncrementing" [scalar; scalar; fullTensor] [] []
 
     // unary kernels
     let getUnaryKernel name = getKernel name [fullTensor; fullTensor] 
@@ -614,6 +636,9 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
 
     member this.FillConst (stream, value: obj, trgt: NativeTensor) = 
         fillConst (stream, workDimForElemwise trgt, [|value; box trgt|])
+
+    member this.FillIncrementing (stream, start: obj, incr: obj, trgt: NativeTensor) = 
+        fillIncrementing (stream, workDimForElemwise trgt, [|start; incr; box trgt|])        
 
     member this.Copy (stream, trgt: NativeTensor, src: NativeTensor) = 
         copy (stream, workDimForElemwise trgt, [|box trgt; box src|])
