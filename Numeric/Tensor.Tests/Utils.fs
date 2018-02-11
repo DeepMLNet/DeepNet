@@ -32,3 +32,23 @@ module Seq =
     /// sequence counting from zero to infinity
     let counting = countingFrom 0
     
+
+/// Extensions to System.Random.
+[<AutoOpen>]
+module internal RandomExtensions = 
+
+    type System.Random with
+
+        /// Generates an infinite sequence of non-negative random integers.
+        member this.Seq () =
+            Seq.initInfinite (fun _ -> this.Next())    
+
+        /// Generates an infinite sequence of non-negative random integers that is less than the specified maximum.
+        member this.Seq (maxValue) =
+            Seq.initInfinite (fun _ -> this.Next(maxValue))    
+
+        /// Generates an infinite sequence of random integers within the given range.
+        member this.Seq (minValue, maxValue) =
+            Seq.initInfinite (fun _ -> this.Next(minValue, maxValue))
+            
+                
