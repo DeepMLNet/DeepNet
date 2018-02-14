@@ -6,6 +6,7 @@ open System.IO.Compression
 open System.Text.RegularExpressions
 
 open Tensor.Utils
+open Tensor.Host
 
 
 /// methods for accessing Numpy .npy data files.

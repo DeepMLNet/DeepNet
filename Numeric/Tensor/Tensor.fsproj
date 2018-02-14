@@ -45,26 +45,37 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Utils.fs" />
-    <Compile Include="CudaUtils.fs" />
     <Compile Include="DiskMap.fs" />
-    <Compile Include="CudaKernels.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="BlasSupport.fs" />
-    <Compile Include="HostBackend.fs" />
-    <Compile Include="CudaBackend.fs" />
+    <Compile Include="Host/HostBLAS.fs" />
+    <Compile Include="Host/FastAccess.fs" />
+    <Compile Include="Host/ScalarOps.fs" />
+    <Compile Include="Host/VectorOps.fs" />
+    <Compile Include="Host/HostBackend.fs" />
+    <Compile Include="Host/HostFrontend.fs" />
+    <Compile Include="Cuda/CudaCfg.fs" />
+    <Compile Include="Cuda/CudaUtils.fs" />
+    <Compile Include="Cuda/CudaBLAS.fs" />    
+    <Compile Include="Cuda/CudaRegMem.fs" />
+    <Compile Include="Cuda/NativeTensor.fs" />
+    <Compile Include="Cuda/KernelCompiler.fs" />
+    <Compile Include="Cuda/CudaKernels.fs" />
+    <Compile Include="Cuda/CudaBackend.fs" />
+    <Compile Include="Cuda/CudaFrontend.fs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Cuda/Common.cuh" />
-    <EmbeddedResource Include="Cuda/Idxs.cuh" />
+    <EmbeddedResource Include="Cuda/Kernels/*.cuh" />
+    <!--<EmbeddedResource Include="Cuda/Idxs.cuh" />
     <EmbeddedResource Include="Cuda/Tensor.cuh" />
     <EmbeddedResource Include="Cuda/Work.cuh" />
     <EmbeddedResource Include="Cuda/Elemwise.cuh" />
     <EmbeddedResource Include="Cuda/Reduction.cuh" />
     <EmbeddedResource Include="Cuda/GatherScatter.cuh" />
-    <EmbeddedResource Include="Cuda/BlasSupport.cuh" />
+    <EmbeddedResource Include="Cuda/BlasSupport.cuh" /> //-->
   </ItemGroup>
   <ItemGroup>
     <Content Include="Tensor.targets" PackagePath="build" />

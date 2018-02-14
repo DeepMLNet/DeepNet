@@ -1,11 +1,21 @@
-﻿namespace Tensor.Utils
+﻿namespace Tensor.Cuda
 
 open System
+open System.Runtime
 open System.Threading
 open System.Collections.Concurrent
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
+
+open Tensor.Utils
+
+
+/// out of CUDA memory
+exception OutOfCudaMemory of msg:string with override __.Message = __.msg
+
+/// generic CUDA error
+exception CudaError of msg:string with override __.Message = __.msg
 
 
 /// Cuda support types functions
@@ -33,12 +43,10 @@ module internal Cuda =
 
     /// CUDA context
     let context = 
-        let cudaCntxt = 
-            try
-                new CudaContext(createNew=false)
-            with e ->
-                failwithf "Cannot create CUDA context: %s" e.Message
-        cudaCntxt
+        try new CudaContext(createNew=false)
+        with e ->
+            let msg = sprintf "Cannot create CUDA context: %s" e.Message
+            raise (CudaError msg)        
 
     // CUDA BLAS handle
     let blas =
@@ -167,3 +175,38 @@ module internal Cuda =
     /// up to now have been executed.
     let keepAliveMany (cuStream: CUstream) (xs: obj list) =
         xs |> List.iter (keepAlive cuStream)
+
+    /// minimum available CUDA memory before triggering GC
+    let minAvailMem = 100000000L
+
+    /// tries to obtain neededMem bytes of CUDA memory by invoking the GC if necessary
+    let rec tryObtainMem neededMem retries = 
+        let freeMem = context.GetFreeDeviceMemorySize() |> int64
+        if freeMem < (neededMem + 10000L) || freeMem < minAvailMem then
+            GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
+            GC.Collect (2, GCCollectionMode.Forced, true, true)
+            GC.WaitForPendingFinalizers ()
+            GC.WaitForFullGCComplete() |> ignore
+            Thread.Yield() |> ignore
+            if retries < 3 then
+                Thread.Sleep(20)
+            if retries > 0 then
+                tryObtainMem neededMem (retries - 1)
+        //printfn "CUDA has %d MB available" (freeMem / 1000000L)
+
+    /// create a new CUDA device variable
+    let newDevVar<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
+            (elems: int64) = 
+
+        let sizeInBytes = elems * sizeof64<'T>        
+        tryObtainMem sizeInBytes 10
+
+        try new CudaDeviceVariable<'T> (SizeT elems)
+        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
+                                     || e.CudaError = CUResult.ErrorUnknown ->
+            let msg = 
+                sprintf "CUDA memory allocation of %d MB failed (%A)" 
+                        (sizeInBytes / pown 2L 20) e.CudaError
+            raise (OutOfCudaMemory msg)
+
+

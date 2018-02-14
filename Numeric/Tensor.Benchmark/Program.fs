@@ -39,7 +39,7 @@ let testCuda () =
     let shape = [5L; 5L]
 
     //Tensor.Cuda.Backend.Cfg.DebugCompile <- true
-    Tensor.Cuda.Backend.Cfg.Stacktrace <- true
+    Tensor.Cuda.Cfg.Stacktrace <- true
 
     let a = HostTensor.ones<single> shape
     printfn "a=\n%A" a

@@ -1,252 +1,38 @@
-﻿namespace Tensor
+﻿namespace Tensor.Cuda
 
 open System
-open System.Runtime
 open System.Threading
 open System.Runtime.InteropServices
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
+open Tensor
 open Tensor.Utils
 open Tensor.Backend
-open Tensor.Cuda.Backend
+open Tensor.Host
+open Tensor.Cuda.CudaBLASExtensions
 
 
-/// cannot register host memory with CUDA, maybe because it is not properly aligned
-exception CannotCudaRegisterMemory of msg:string with override __.Message = __.msg
 
-/// out of CUDA memory
-exception OutOfCudaMemory of msg:string with override __.Message = __.msg
-
-/// generic CUDA error
-exception CudaError of msg:string with override __.Message = __.msg
-
-
-/// CUDA helpers
-module private CudaHelpers =
-
-    /// minimum available CUDA memory before triggering GC
-    let minAvailMem = 100000000L
+/// CUDA context helper
+module private CudaContext =
 
     /// the CUDA context we are using
-    let mutable context = None
+    let mutable private context = None
 
-    /// initializes the CUDA context if necessary
-    let initContext () =
+    /// Checks if CUDA context access is possible.
+    /// If not, a CudaError is thrown.
+    let check () =
         match context with
         | Some _ -> ()
         | None ->
             try context <- Some (new CudaContext(createNew=false))
             with e ->
-                let msg = sprintf "cannot create CUDA context: %s" e.Message
+                let msg = sprintf "Cannot create CUDA context: %s" e.Message
                 raise (CudaError msg)
 
-    /// tries to obtain neededMem bytes of CUDA memory by invoking the GC if necessary
-    let rec tryObtainMem neededMem retries = 
-        let freeMem = Cuda.context.GetFreeDeviceMemorySize() |> int64
-        if freeMem < (neededMem + 10000L) || freeMem < minAvailMem then
-            GCSettings.LargeObjectHeapCompactionMode <- GCLargeObjectHeapCompactionMode.CompactOnce
-            GC.Collect (2, GCCollectionMode.Forced, true, true)
-            GC.WaitForPendingFinalizers ()
-            GC.WaitForFullGCComplete() |> ignore
-            Thread.Yield() |> ignore
-            if retries < 3 then
-                Thread.Sleep(20)
-            if retries > 0 then
-                tryObtainMem neededMem (retries - 1)
-        //printfn "CUDA has %d MB available" (freeMem / 1000000L)
 
-    /// create a new CUDA device variable
-    let newDevVar<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-            (elems: int64) = 
-
-        let sizeInBytes = elems * sizeof64<'T>        
-        tryObtainMem sizeInBytes 10
-
-        try new CudaDeviceVariable<'T> (SizeT elems)
-        with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
-                                     || e.CudaError = CUResult.ErrorUnknown ->
-            let msg = 
-                sprintf "CUDA memory allocation of %d MB failed (%A)" 
-                        (sizeInBytes / pown 2L 20) e.CudaError
-            raise (OutOfCudaMemory msg)
-
-
-/// CUDA registered memory support
-module internal CudaRegMemSupport =
-
-    /// synchronization lock
-    let syncLock = obj ()
-
-    /// registration count
-    let registeredCount = new Dictionary<ITensorHostStorage, int>()
-
-    /// master data registrations
-    let dataRegistrations = new Dictionary<ITensorHostStorage, obj>()
-
-    /// decreases reference count for page locked data
-    let decrRefCount data  =
-        registeredCount.[data] <- registeredCount.[data] - 1
-        if registeredCount.[data] = 0 then
-            dataRegistrations.Remove data |> ignore
-            true
-        else false
-
-
-/// CUDA registered memory for fast data transfer.
-/// Dispose to unregister memory with CUDA.
-type CudaRegMemHnd internal (hostArray:  ITensorHostStorage, 
-                             pinHnd:     PinnedMemory, 
-                             cudaMem:    CudaRegisteredHostMemory<byte>) =
-           
-    let mutable disposed = false
-    let checkDisposed () =
-        if disposed then raise (ObjectDisposedException "CudaRegMemHnd")
-
-    interface IDisposable with
-        member this.Dispose() =          
-            lock CudaRegMemSupport.syncLock (fun () ->
-                if not disposed then 
-                    if CudaRegMemSupport.decrRefCount hostArray then            
-                        // unregister memory
-                        try cudaMem.Unregister() 
-                        with :? CudaException -> ()
-                        // release cuda memory handle 
-                        try cudaMem.Dispose()
-                        with :? CudaException -> ()
-                        // unpin managed memory
-                        (pinHnd :> IDisposable).Dispose()
-                disposed <- true)
-
-    override this.Finalize () =
-        (this :> IDisposable).Dispose()
-
-    /// the data array
-    member this.HostArray = 
-        checkDisposed ()
-        hostArray
-    member internal this.HostArrayPriv = hostArray
-
-    /// GC memory pin handle
-    member this.PinHnd = 
-        checkDisposed ()
-        pinHnd
-    member internal this.PinHndPriv = pinHnd
-
-    /// pointer to data 
-    member this.Ptr =
-        this.PinHnd.Ptr
-
-    /// the CudaRegisteredHostMemory
-    member this.CudaRegisteredMemory = 
-        checkDisposed ()
-        cudaMem
-    member internal this.CudaRegisteredMemoryPriv = cudaMem
-
-
-/// Methods for locking a TensorHostStorage into memory and registering the memory with CUDA
-/// for fast data transfers with GPU device.
-module CudaRegMem =
-    open CudaRegMemSupport
-
-    /// get CudaRegMemHnd for already locked TensorHostStorage          
-    let get data =      
-        lock syncLock (fun () ->
-            if not (dataRegistrations.ContainsKey data) then
-                failwith "the specified TensorHostStorage is not registered with CUDA for fast data transfer" 
-            registeredCount.[data] <- registeredCount.[data] + 1
-            let dr = dataRegistrations.[data] :?> CudaRegMemHnd
-            new CudaRegMemHnd(dr.HostArrayPriv, dr.PinHndPriv, dr.CudaRegisteredMemoryPriv)   
-        )
-        
-    /// gets the CudaRegisteredMemory for already locked TensorHostStorage without 
-    /// incrementing the reference count
-    let getCudaRegisteredMemory data =
-        lock syncLock (fun () ->
-            if not (dataRegistrations.ContainsKey data) then
-                failwith "the specified TensorHostStorage is not registered with CUDA for fast data transfer" 
-            let dr = dataRegistrations.[data] :?> CudaRegMemHnd
-            dr.CudaRegisteredMemory
-        )            
-
-    /// registers a TensorHostStorage (multiple registrations are okay) and returns the corresponding CudaRegMemHnd
-    let register (data: ITensorHostStorage) = 
-        lock syncLock (fun () ->
-            if dataRegistrations.ContainsKey data then get data      
-            else
-                // pin managed memory so that address cannot change
-                let pinHnd = data.Pin ()
-                let dataAddr = pinHnd.Ptr
-                let dataByteSize = data.DataSizeInBytes
-
-                // construct cuda memory handle and register it
-                let cudaMem = new CudaRegisteredHostMemory<byte> (dataAddr, SizeT dataByteSize)    
-                try cudaMem.Register (BasicTypes.CUMemHostRegisterFlags.None)
-                with :? CudaException as ex ->
-                    if ex.CudaError = CUResult.ErrorInvalidValue then
-                        // probably memory is not properly aligned
-                        raise (CannotCudaRegisterMemory ex.Message)
-                    else reraise ()
-
-                // create handle object
-                let dr = new CudaRegMemHnd(data, pinHnd, cudaMem)     
-                dataRegistrations.[data] <- dr
-                registeredCount.[data] <- 1
-                dr
-        )
-              
-
-module internal CudaBLASExtensions = 
-
-    type Tensor.Backend.BLAS.MatrixInfo with
-        member this.CTrans = 
-            match this.Trans with
-            | BLAS.NoTrans   -> CudaBlas.Operation.NonTranspose
-            | BLAS.Trans     -> CudaBlas.Operation.Transpose
-            | BLAS.ConjTrans -> CudaBlas.Operation.ConjugateTranspose
-        member this.CPtr<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> () =
-            let ptr = this.Ptr |> SizeT |> CUdeviceptr
-            new CudaDeviceVariable<'T> (ptr, false, SizeT 4)
-        member this.CPtrs (stream: CUstream) =
-            let ptrs = this.Ptrs
-            let hostPtrs = new CudaPageLockedHostMemory<nativeint> (SizeT ptrs.Length)
-            Marshal.Copy (ptrs, 0, hostPtrs.PinnedHostPointer, ptrs.Length)
-            let devPtrs = new CudaDeviceVariable<CUdeviceptr> (SizeT ptrs.Length)
-            hostPtrs.AsyncCopyToDevice (devPtrs.DevicePointer, stream)           
-            let disposeFn() =
-                Cuda.callback stream (fun () ->
-                    devPtrs.Dispose()
-                    hostPtrs.Dispose())
-            devPtrs, disposeFn           
-        member this.CRows = int this.Rows
-        member this.COpRows = int this.OpRows
-        member this.CCols = int this.Cols
-        member this.COpCols = int this.OpCols
-        member this.CLd = int this.Ld
-        member this.CBatchSize = int this.BatchSize
-
-    type Tensor.Backend.BLAS.VectorInfo with
-        member this.CPtr<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> (?elems: int64) =
-            let elems = defaultArg elems 1L
-            let ptr = this.Ptr |> SizeT |> CUdeviceptr
-            new CudaDeviceVariable<'T> (ptr, false, SizeT (sizeof64<'T> * elems))
-        member this.CInc = int this.Inc
-
-    type Tensor.Backend.BLAS.ScalarInfo with
-        member this.CPtr<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> () =
-            let ptr = this.Ptr |> SizeT |> CUdeviceptr
-            new CudaDeviceVariable<'T> (ptr, false, SizeT 4)    
-
-    type CUBLAS =
-        static member Invoke<'T, 'R> (stream, ?singleFn, ?doubleFn, ?int32Fn, ?int64Fn)  =
-            lock Cuda.blas (fun () ->
-                Cuda.blas.Stream <- stream
-                BLAS.Invoke<'T,'R>
-                    (?singleFn=singleFn, ?doubleFn=doubleFn, ?int32Fn=int32Fn, ?int64Fn=int64Fn)
-            )
-
-open CudaBLASExtensions
 
 /// type neutral interface to a CudaStorageT
 type ITensorCudaStorage =
@@ -255,15 +41,19 @@ type ITensorCudaStorage =
     abstract DataSizeInBytes: int64
 
 
+
 /// Tensor storage on a CUDA device.
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (data: CudaDeviceVariable<'T>) =
 
     new (nElems: int64) =
-        CudaHelpers.initContext ()
+        // We check that CUDA context access is possible before calling other CUDA functions to avoid
+        // exceptions being thrown from static initializers.
+        CudaContext.check ()
+
         // CUDA cannot allocate memory of size zero
         let nElems = if nElems > 0L then nElems else 1L
-        TensorCudaStorage<'T> (CudaHelpers.newDevVar nElems)
+        TensorCudaStorage<'T> (Cuda.newDevVar nElems)
      
     /// data device variable
     member this.Data = data
@@ -316,9 +106,13 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             let d = { new IDisposable with member this.Dispose() = () }
             d, Cuda.getIntPtr this.Data.DevicePointer
 
+
+
 /// type-neutral interface to CUDA backend for tensors
 and ITensorCudaBackend =
     abstract NativeTensor: NativeTensor
+
+
 
 /// CUDA backend for tensors.
 and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
@@ -714,6 +508,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.TrueIndices(trgt, src) = unsup "TrueIndices"
 
 
+
 /// Creates Tensors on a CUDA device.
 and TensorCudaDevice private () =
     inherit BaseTensorDevice()
@@ -725,50 +520,4 @@ and TensorCudaDevice private () =
         let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
         Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
     override this.Zeroed = false
-
-
-/// Tensor stored on CUDA device.
-module CudaTensor =
-
-    /// Tensor stored on CUDA device.
-    let Dev = TensorCudaDevice.Instance :> ITensorDevice
-
-    let transfer x = Tensor.transfer Dev x
-
-    let empty<'T> = Tensor.empty<'T> Dev
-
-    let zeros<'T> = Tensor.zeros<'T> Dev 
-
-    let ones<'T> = Tensor.ones<'T> Dev
-
-    let falses = Tensor.falses Dev
-
-    let trues = Tensor.trues Dev
-
-    let scalar<'T> = Tensor.scalar<'T> Dev
-
-    let init<'T> = Tensor.init<'T> Dev
-
-    let filled<'T> = Tensor.filled<'T> Dev
-
-    let identity<'T> = Tensor.identity<'T> Dev
-
-    let counting = Tensor.counting Dev
-
-    let inline arange start incr stop = 
-        Tensor.arange Dev start incr stop
-
-    let inline linspace start stop nElems = 
-        Tensor.linspace Dev start stop nElems
-
-    /// Creates a ITensor for the given pointer, allocation size in bytes, type and layout.
-    let usingPtrAndType (ptr: CUdeviceptr) (sizeInBytes: SizeT) (typ: Type) (layout: TensorLayout) = 
-        let devVarType = typedefof<CudaDeviceVariable<_>>.MakeGenericType [|typ|]
-        let devVar = Activator.CreateInstance (devVarType, [|box ptr; box sizeInBytes|])
-
-        let devStorType = typedefof<TensorCudaStorage<_>>.MakeGenericType [|typ|]
-        let devStor = Activator.CreateInstance (devStorType, [|devVar|])
-
-        let tensorType = typedefof<Tensor<_>>.MakeGenericType [|typ|]
-        Activator.CreateInstance (tensorType, [|box layout; devStor|]) :?> ITensor
 
