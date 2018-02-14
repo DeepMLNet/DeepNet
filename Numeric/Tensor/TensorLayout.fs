@@ -1,109 +1,39 @@
 ﻿namespace Tensor
 
-open Tensor.Utils
 open System
+
+open Tensor.Utils
+
+
 
 /// cannot broadcast to same shape
 exception CannotBroadcast of msg:string with override __.Message = __.msg
 
-/// invalid tensor range specification
-exception InvalidTensorRng of msg:string with override __.Message = __.msg
-
 /// invalid tensor layout specification
 exception InvalidTensorLayout of msg:string with override __.Message = __.msg
-
-/// specified tensor index is out of range
-exception IndexOutOfRange of msg:string with override __.Message = __.msg
 
 /// the layout of this tensor makes this operation impossible without copying it
 exception ImpossibleWithoutCopy of msg:string with override __.Message = __.msg
 
 
-/// Most commonly used types for working with tensors.
-[<AutoOpen>]
-module TensorLayoutTypes =
-    // layout (shape, offset, stride) of a Tensor
-    type TensorLayout = {
-        /// shape
-        Shape:  int64 list
-        /// offset in elements
-        Offset: int64
-        /// stride in elements
-        Stride: int64 list
-    } with
-        /// number of dimensions
-        member this.NDims = List.length this.Shape
-        /// number of elements
-        member this.NElems = List.fold (*) 1L this.Shape
 
-    /// For slicing: inserts a new axis of size one.
-    let NewAxis = Int64.MinValue + 1L
-
-    /// For slicing: fills all remaining axes with size one. 
-    /// Cannot be used together with NewAxis.
-    let Fill = Int64.MinValue + 2L
-
-    /// For reshape: remainder, so that number of elements stays constant.
-    let Remainder = Int64.MinValue + 3L
-    
-    /// For search: value was not found.
-    let NotFound = Int64.MinValue + 4L
-
-    /// range specification
-    [<StructuredFormatDisplay("{Pretty}")>]
-    type TensorRng = 
-        /// single element
-        | RngElem of int64
-        /// range from / to (including)
-        | Rng of (int64 option) * (int64 option)
-        /// insert broadcastable axis of size 1
-        | RngNewAxis
-        /// fill (...)
-        | RngAllFill
-
-        /// pretty string
-        member this.Pretty =
-            match this with
-            | RngElem e -> sprintf "%d" e
-            | Rng (Some first, Some last) -> sprintf "%d..%d" first last
-            | Rng (Some first, None) -> sprintf "%d.." first 
-            | Rng (None, Some last) -> sprintf "0..%d" last
-            | Rng (None, None) -> "*"
-            | RngNewAxis -> "NewAxis"
-            | RngAllFill -> "Fill"
-
-    /// all elements
-    let RngAll = Rng (None, None)
+/// Layout (shape, offset, stride) of a Tensor.
+type TensorLayout = {
+    /// Shape.
+    Shape:  int64 list
+    /// Offset (to first element) in elements.
+    Offset: int64
+    /// Stride in elements.
+    Stride: int64 list
+} with
+    /// Number of dimensions.
+    member this.NDims = List.length this.Shape
+    /// Number of elements.
+    member this.NElems = List.fold (*) 1L this.Shape
 
 
 
-/// Range specification functions.
-module TensorRng =
-
-    /// converts arguments to a .NET Item property or GetSlice, SetSlice method to a TensorRng list
-    let ofItemOrSliceArgs (allArgs: obj[]) =
-        let invalid () =
-            raise (InvalidTensorRng (sprintf "specified items/slices are invalid: %A" allArgs))
-        let rec toRng (args: obj list) =
-            match args with            
-            | [:? (TensorRng list) as rngs] ->             // direct range specification
-                rngs
-            | (:? (int64 option) as so) :: (:? (int64 option) as fo) :: rest -> // slice
-                if so |> Option.contains NewAxis || so |> Option.contains Fill ||
-                   fo |> Option.contains NewAxis || fo |> Option.contains Fill then
-                    invalid ()
-                Rng (so, fo) :: toRng rest
-            | (:? int64 as i) :: rest when i = NewAxis ->  // new axis
-                RngNewAxis :: toRng rest
-            | (:? int64 as i) :: rest when i = Fill ->     // fill
-                RngAllFill :: toRng rest
-            | (:? int64 as i) :: rest ->                   // single item
-                RngElem i  :: toRng rest
-            | [] -> []
-            | _  -> invalid ()
-        allArgs |> Array.toList |> toRng
-
-
+/// Functions for working with TensorLayout.
 module TensorLayout =
 
     /// checks that the layout is valid
@@ -561,7 +491,6 @@ module TensorLayout =
             | [] -> yield [], []
         } 
         generate (shape a) dim  
-
 
     /// Creates a layout that extracts the diagonal along the given axes.
     /// The first axis is replaced with the diagonal and the second axis is removed.

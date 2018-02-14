@@ -33,6 +33,7 @@ exception UnsupportedTransfer of msg:string with override __.Message = __.msg
 exception ValueNotFound of msg:string with override __.Message = __.msg
  
 
+
 /// memory ordering of tensor
 type TensorOrder =
     /// row-major (C) order
@@ -43,12 +44,14 @@ type TensorOrder =
     | CustomOrder of int list
 
 
+
 /// part of a matrix
 type MatrixPart =
     /// upper triangular part of the matrix
     | UpperPart
     /// lower triangular part of the matrix
     | LowerPart
+
 
 
 /// Type-neutral interface to Tensor<'T> of any type 'T.
@@ -162,12 +165,28 @@ type ITensor =
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
+
+
 type ITensorStorage =
     abstract Dev:               ITensorDevice
+
+
 
 type ITensorStorage<'T> =
     inherit ITensorStorage
     abstract Backend:           TensorLayout -> ITensorBackend<'T>
+
+
+
+type ITensorDevice =
+    inherit IComparable
+    inherit IComparable<ITensorDevice>
+    inherit IEquatable<ITensorDevice>
+    abstract Id:                string
+    abstract Create:            nElems:int64 -> ITensorStorage<'T>
+    abstract Zeroed:            bool
+
+
 
 type ITensorBackend<'T> =
     inherit IEnumerable<'T>
@@ -272,13 +291,6 @@ type ITensorBackend<'T> =
     abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * 
                                           src:Tensor<'T> -> unit
 
-type ITensorDevice =
-    inherit IComparable
-    inherit IComparable<ITensorDevice>
-    inherit IEquatable<ITensorDevice>
-    abstract Id:                string
-    abstract Create:            nElems:int64 -> ITensorStorage<'T>
-    abstract Zeroed:            bool
 
 
 [<AbstractClass>]
@@ -313,6 +325,7 @@ type BaseTensorDevice() =
     override this.GetHashCode () =
         hash (this :> ITensorDevice).Id
     override this.ToString () = this.Id
+
 
 
 /// An N-dimensional array with elements of type 'T.
@@ -2750,9 +2763,10 @@ module Tensor =
             trgt
 
 
-/// Most commonly used types for working with tensors.
+
+/// Special values that can be passed instead of masks.
 [<AutoOpen>]
-module TensorTypes =
+module SpecialMask =
 
     /// Indicates that the dimension is unmasked, i.e. equals specifying a tensor filled with trues. 
     let NoMask : Tensor<bool> = Unchecked.defaultof<_> // = null

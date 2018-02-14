@@ -48,6 +48,7 @@
     <Compile Include="DiskMap.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
+    <Compile Include="TensorRng.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="BlasSupport.fs" />
@@ -69,13 +70,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Cuda/Kernels/*.cuh" />
-    <!--<EmbeddedResource Include="Cuda/Idxs.cuh" />
-    <EmbeddedResource Include="Cuda/Tensor.cuh" />
-    <EmbeddedResource Include="Cuda/Work.cuh" />
-    <EmbeddedResource Include="Cuda/Elemwise.cuh" />
-    <EmbeddedResource Include="Cuda/Reduction.cuh" />
-    <EmbeddedResource Include="Cuda/GatherScatter.cuh" />
-    <EmbeddedResource Include="Cuda/BlasSupport.cuh" /> //-->
   </ItemGroup>
   <ItemGroup>
     <Content Include="Tensor.targets" PackagePath="build" />
