@@ -39,7 +39,7 @@ module Decomposition =
             // compute covariance matrix and its eigen decomposition
             let n = HostTensor.scalar (conv<'T> data.Shape.[0])
             let cov = (Tensor.transpose centered .* centered) / n 
-            let variances, axes = Tensor.symmetricEigenDecomposition UpperPart cov 
+            let variances, axes = Tensor.symmetricEigenDecomposition MatrixPart.Upper cov 
 
             // sort axes by their variances in descending order
             let sortIdx = 

@@ -6,6 +6,7 @@ open System.IO.Compression
 open System.Text.RegularExpressions
 
 open Tensor.Utils
+open Tensor.Backend
 open Tensor.Host
 
 

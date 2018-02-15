@@ -80,3 +80,24 @@ module SpecialRng =
     /// All elements.
     let RngAll = Rng (None, None)
 
+
+
+/// memory ordering of tensor
+type TensorOrder =
+    /// row-major (C) order
+    | RowMajor
+    /// column-major (Fortran) order
+    | ColumnMajor
+    /// custom ordering of strides
+    | CustomOrder of int list
+
+
+
+/// Upper or lower trianguler part of a matrix.
+[<RequireQualifiedAccess>]
+type MatrixPart =
+    /// Upper triangular part of the matrix.
+    | Upper
+    /// Lower triangular part of the matrix.
+    | Lower
+    

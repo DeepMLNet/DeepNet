@@ -635,8 +635,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             let size = src.Shape.[0]
             let part = 
                 match part with
-                | UpperPart -> 'U'
-                | LowerPart -> 'L'
+                | MatrixPart.Upper -> 'U'
+                | MatrixPart.Lower -> 'L'
             if not (eigVecs = src) then
                 (this :> ITensorBackend<_>).Copy (eigVecs, src)
 

@@ -1,29 +1,11 @@
-﻿namespace Tensor
+﻿namespace Tensor.Backend
 
 open System
 
+open Tensor
 open Tensor.Utils
 
 
-
-/// memory ordering of tensor
-type TensorOrder =
-    /// row-major (C) order
-    | RowMajor
-    /// column-major (Fortran) order
-    | ColumnMajor
-    /// custom ordering of strides
-    | CustomOrder of int list
-
-
-
-/// part of a matrix
-type MatrixPart =
-    /// upper triangular part of the matrix
-    | UpperPart
-    /// lower triangular part of the matrix
-    | LowerPart
-    
 
 
 /// Layout (shape, offset, stride) of a Tensor.
