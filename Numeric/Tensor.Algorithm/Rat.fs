@@ -1,4 +1,4 @@
-﻿namespace Tensor.Algorithms
+﻿namespace Tensor.Algorithm
 
 open System
 open System.Numerics

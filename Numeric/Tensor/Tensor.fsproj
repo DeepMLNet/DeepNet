@@ -29,7 +29,7 @@
         - Linux or Windows on x64 only
         - for GPU support: CUDA 8.0 libraries installed and in PATH (Windows) or LD_LIBRARY_PATH (Linux)
 
-      Additional algorithms are provided in the Tensor.Algorithms package.
+      Additional algorithms are provided in the Tensor.Algorithm package.
     </description>
     <PackageTags>Tensor ndarray array MKL SIMD BLAS CUDA CUBLAS HDF5</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>

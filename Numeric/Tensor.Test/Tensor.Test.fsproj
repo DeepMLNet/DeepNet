@@ -26,7 +26,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj" />
-    <ProjectReference Include="..\Tensor.Algorithms\Tensor.Algorithms.fsproj" />    
+    <ProjectReference Include="..\Tensor.Algorithm\Tensor.Algorithm.fsproj" />    
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FsUnit.Xunit" Version="3.0.0" />

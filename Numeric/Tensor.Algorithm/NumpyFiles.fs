@@ -1,10 +1,11 @@
-﻿namespace Tensor
+﻿namespace Tensor.Algorithm
 
 open System
 open System.IO
 open System.IO.Compression
 open System.Text.RegularExpressions
 
+open Tensor
 open Tensor.Utils
 open Tensor.Backend
 open Tensor.Host

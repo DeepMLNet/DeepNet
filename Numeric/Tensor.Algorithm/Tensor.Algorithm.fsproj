@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="../../Common.targets" />
   <PropertyGroup>
-    <PackageId>Tensor.Algorithms</PackageId>
+    <PackageId>Tensor.Algorithm</PackageId>
     <title>Algorithms building on Tensor</title>
     <summary></summary>
     <description>

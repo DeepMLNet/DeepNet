@@ -4,8 +4,9 @@ open Xunit
 open Xunit.Abstractions
 open FsUnit.Xunit
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open Tensor.Algorithm
 
 
 type NumpyFilesTests (output: ITestOutputHelper) =

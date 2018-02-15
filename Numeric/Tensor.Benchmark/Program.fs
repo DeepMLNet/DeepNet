@@ -157,7 +157,7 @@ let main argv =
     let collect () =
         ()
 
-    printfn "On device %A" dev
+    printfn "On device %A" dev 
     printfn "Shape: %A" shape
 
     let a : Tensor<single> = Tensor.zeros dev shape

@@ -6,7 +6,7 @@ open FsUnit.Xunit
 
 open Tensor.Utils
 open Tensor
-open Tensor.Algorithms
+open Tensor.Algorithm
 
 
 type RatTests (output: ITestOutputHelper) =

@@ -1,4 +1,4 @@
-﻿namespace Tensor.Algorithms
+﻿namespace Tensor.Algorithm
 
 open Tensor
 open Tensor.Utils
