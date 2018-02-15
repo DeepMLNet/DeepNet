@@ -6,13 +6,6 @@ open Tensor.Utils
 
 
 
-/// invalid tensor range specification
-exception InvalidTensorRng of msg:string with override __.Message = __.msg
-
-/// specified tensor index is out of range
-exception IndexOutOfRange of msg:string with override __.Message = __.msg
-
-
 /// Special constants that can be passed or returned instead of indices.
 [<AutoOpen>]
 module SpecialIdx =
@@ -58,7 +51,7 @@ type TensorRng =
     /// Converts arguments to a .NET Item property or GetSlice, SetSlice method to a TensorRng list.
     static member internal ofItemOrSliceArgs (allArgs: obj[]) =
         let invalid () =
-            raise (InvalidTensorRng (sprintf "specified items/slices are invalid: %A" allArgs))
+            invalidArg "item" "Specified items/slices are invalid: %A." allArgs
         let rec toRng (args: obj list) =
             match args with            
             | [:? (TensorRng list) as rngs] ->             // direct range specification

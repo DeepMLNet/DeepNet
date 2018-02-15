@@ -361,3 +361,21 @@ module internal Util =
             failwith "the type must be instantiated with explicit generic parameters"
 
 
+
+/// Exception helpers
+[<AutoOpen>]
+module internal Exception =
+
+    /// Raises an InvalidOperationException
+    let inline invalidOp fmt =
+        Printf.kprintf (fun msg -> raise (InvalidOperationException msg)) fmt
+
+    /// Raises an InvalidArgumentException
+    let inline invalidArg arg fmt =
+        Printf.kprintf (fun msg -> invalidArg arg msg) fmt
+
+    /// Raises an IndexOutOfRangeException.
+    let inline indexOutOfRange fmt =
+        Printf.kprintf (fun msg -> raise (IndexOutOfRangeException msg)) fmt
+
+

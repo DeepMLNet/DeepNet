@@ -588,7 +588,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                         (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)),
                             doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
+                if info > 0L then raise (SingularMatrixException "cannot invert singular matrix")
 
                 // compute matrix inverse
                 let info =
@@ -596,7 +596,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                         (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)),
                             doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
-                if info > 0L then raise (SingularMatrixError "cannot invert singular matrix")
+                if info > 0L then raise (SingularMatrixException "cannot invert singular matrix")
             a.FetchResult()
 
         member this.BatchedSVD (trgtS, trgtUV, src) =
@@ -647,7 +647,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                     (singleFn=(fun () -> BLAS.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)),
                      doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)))
             if info < 0L then failwithf "LAPACK argument error %d" info
-            if info > 0L then raise (SingularMatrixError "cannot compute eigen decomposition of singular matrix")
+            if info > 0L then raise (SingularMatrixException "cannot compute eigen decomposition of singular matrix")
             a.FetchResult()
             w.FetchResult()
 

@@ -9,30 +9,8 @@ open Tensor.Utils
 open Tensor.Backend
 
 
-/// singular matrix encountered
-exception SingularMatrixError of msg:string with override __.Message = __.msg
-
-/// operation requires tensors of same storage, but specified tensors had different storages
-exception StorageMismatch of msg:string with override __.Message = __.msg
-
-/// operation requires tensors of same shape, but specified tensor had different shapes
-exception ShapeMismatch of msg:string with override __.Message = __.msg
-
-/// operation requires tensors of same data types, but specified tensor had different data types
-exception DataTypeMismatch of msg:string with override __.Message = __.msg
-
-/// operation requires tensor with a specific stride configuration, which is not fulfilled
-exception StrideMismatch of msg:string with override __.Message = __.msg
-
-/// sequence too short to fill tensor
-exception SeqTooShort of msg:string with override __.Message = __.msg
-
-/// transfer between used storages is not possible
-exception UnsupportedTransfer of msg:string with override __.Message = __.msg
-
-/// specified value was not found
-exception ValueNotFound of msg:string with override __.Message = __.msg
- 
+/// A singular matrix was encountered during an operation that does not allow singular matrices.
+exception SingularMatrixException of msg:string with override __.Message = __.msg
 
 
 /// Type-neutral interface to Tensor<'T> of any type 'T.
@@ -374,7 +352,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             let msg =
                 sprintf "cannot reshape tensor of shape %A and strides %A without copying"
                     (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
-            raise (ImpossibleWithoutCopy msg)
+            raise (InvalidOperationException msg)
 
     /// Returns true if the tensor can be reshaped without copying.
     static member canReshapeView shp a =
@@ -468,10 +446,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         else
             if not (trgt.Backend.Transfer (trgt=trgt, src=src) ||
                     src.Backend.Transfer (trgt=trgt, src=src)) then
-                let msg =
-                    sprintf "cannot transfer from storage %s to storage %s"
-                            src.Dev.Id trgt.Dev.Id
-                raise (UnsupportedTransfer msg)
+                invalidOp "Cannot transfer from storage %s to storage %s." src.Dev.Id trgt.Dev.Id
 
     /// Transfers this tensor to the specifed device.
     member src.Transfer (dev: ITensorDevice) =
@@ -488,20 +463,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         if this.DataType = typeof<bool> then
             this |> box :?> Tensor<bool>
         else
-            let msg =
-                sprintf "the operation requires a Tensor<bool> but the data type of
-                         the specified tensor is %s" this.DataType.Name
-            raise (DataTypeMismatch msg)
+            invalidOp "The operation requires a Tensor<bool> but the data type of the specified tensor is %s." 
+                      this.DataType.Name
 
     /// this tensor as Tensor<int64>
     member internal this.AsInt64 : Tensor<int64> =
         if this.DataType = typeof<int64> then
             this |> box :?> Tensor<int64>
         else
-            let msg =
-                sprintf "the operation requires a Tensor<int64> but the data type of
-                         the specified tensor is %s" this.DataType.Name
-            raise (DataTypeMismatch msg)
+            invalidOp "The operation requires a Tensor<int64> but the data type of the specified tensor is %s." 
+                      this.DataType.Name
 
     /// Fills the tensor with the values returned by the function.
     member trgt.Fill (fn: unit -> 'T)  =
@@ -532,7 +503,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Fills the one-dimensional tensor with a sequence starting at the specified start value
     /// and using the specified increment.
     member trgt.FillIncrementing (start: 'T, incr: 'T) =
-        if trgt.NDims <> 1 then raise (ShapeMismatch "FillIncrementing requires a vector")
+        if trgt.NDims <> 1 then invalidOp "FillIncrementing requires a vector."
         trgt.Backend.FillIncrementing (start=start, incr=incr, trgt=trgt)
 
     /// Fills the tensor with the values returned by the given sequence.
@@ -540,11 +511,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         use enumerator = data.GetEnumerator()
         trgt.Fill (fun () -> 
             if enumerator.MoveNext() then enumerator.Current
-            else 
-                let msg = 
-                    sprintf "sequence ended before tensor of shape %A was filled"
-                            trgt.Shape
-                raise (SeqTooShort msg))
+            else invalidArg "data" "Sequence ended before tensor of shape %A was filled." trgt.Shape)
 
     /// maps all elements using the specified function into this tensor
     member trgt.FillMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
@@ -1372,9 +1339,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member find (value: 'T) (a: Tensor<'T>) =
         match Tensor<_>.tryFind value a with
         | Some pos -> pos
-        | None -> 
-            let msg = sprintf "value %A was not found in specifed tensor" value
-            raise (ValueNotFound msg)             
+        | None -> invalidOp "Value %A was not found in specifed tensor." value
 
     /// false if there is at least one false element in given axis, using this tensor as target
     member trgt.FillAllAxis (ax: int) (src: Tensor<bool>) =
@@ -1435,10 +1400,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             let b = b |> Tensor.broadcastTo (trgt.Shape.[0 .. na-3] @ b.Shape.[na-2 ..])
             trgt.Backend.BatchedMatMatDot (trgt, a, b)
         | _ -> 
-            let msg =
-                sprintf "cannot compute dot product between tensors of shapes %A and %A 
-                            into tensor of shape %A" a.Shape b.Shape trgt.Shape
-            raise (ShapeMismatch msg)
+            invalidOp "Cannot compute dot product between tensors of shapes %A and %A 
+                       into tensor of shape %A." a.Shape b.Shape trgt.Shape
 
     /// Dot product of two tensors:
     /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
@@ -1469,10 +1432,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             let resPad = a .* bPad
             resPad.[Fill, 0L]
         | _ -> 
-            let msg =
-                sprintf "cannot compute dot product between tensors of shapes %A and %A" 
-                        a.Shape b.Shape 
-            raise (ShapeMismatch msg)
+            invalidOp "Cannot compute dot product between tensors of shapes %A and %A." a.Shape b.Shape 
 
     /// Dot product of two tensors:
     /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
@@ -1487,8 +1447,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillInvert (a: Tensor<'T>)  = 
         Tensor.CheckSameStorage [trgt; a]
         if a.NDims < 2 then
-            invalidArg "a" 
-                (sprintf "need at least a matrix to invert but got shape %A" a.Shape)
+            invalidArg "a" "Need at least a matrix to invert but got shape %A." a.Shape
         let a = a |> Tensor.broadcastTo trgt.Shape
         trgt.Backend.BatchedInvert (trgt, a)
 
@@ -1503,8 +1462,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Helper function to compute SVD sizes.
     static member internal SVDSizes (a: ITensorFrontend<'T>) =
         if a.NDims < 2 then
-            invalidArg "a" 
-                (sprintf "need at least a matrix to SVD but got shape %A" a.Shape)
+            invalidArg "a" "Need at least a matrix to SVD but got shape %A." a.Shape
         let batchShp = a.Shape.[0 .. a.NDims-3]
         let M, N = a.Shape.[a.NDims-2], a.Shape.[a.NDims-1]
         let K = min M N
@@ -1515,20 +1473,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let batchShp, M, N, K = Tensor.SVDSizes a
         Tensor.CheckSameStorage [trgtS; a]
         if trgtS.Shape <> batchShp @ [K] then
-            invalidArg "trgtS"
-                (sprintf "need a tensor of shape %A for SVD singular values but got shape %A"
-                         (batchShp @ [K]) trgtS.Shape)
+            invalidArg "trgtS" "Need a tensor of shape %A for SVD singular values but got shape %A."
+                               (batchShp @ [K]) trgtS.Shape
         match trgtUV with
         | Some (trgtU, trgtV) -> 
             Tensor.CheckSameStorage [trgtS; a; trgtU; trgtV]
             if trgtU.Shape <> batchShp @ [M; M] then
-                invalidArg "trgtUV"
-                    (sprintf "need a tensor of shape %A for SVD left unitary matrices but got shape %A"
-                             (batchShp @ [M; M]) trgtU.Shape)
+                invalidArg "trgtUV" "Need a tensor of shape %A for SVD left unitary matrices but got shape %A."
+                                    (batchShp @ [M; M]) trgtU.Shape
             if trgtV.Shape <> batchShp @ [N; N] then
-                invalidArg "trgtUV"
-                    (sprintf "need a tensor of shape %A for SVD right unitary matrices but got shape %A"
-                             (batchShp @ [N; N]) trgtV.Shape)            
+                invalidArg "trgtUV" "Need a tensor of shape %A for SVD right unitary matrices but got shape %A."
+                                    (batchShp @ [N; N]) trgtV.Shape
         | None -> ()
         let trgtUV = trgtUV |> Option.map (fun (trgtU, trgtV) -> trgtU :> ITensorFrontend<_>, 
                                                                  trgtV :> ITensorFrontend<_>)
@@ -1557,8 +1512,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let rCond = defaultArg rCond (conv<'T> 1e-15)
         Tensor.CheckSameStorage [trgt; a]
         if a.NDims < 2 then
-            invalidArg "a" 
-                (sprintf "need at least a matrix to pseudo invert but got shape %A" a.Shape)
+            invalidArg "a" "Need at least a matrix to pseudo invert but got shape %A." a.Shape
         let a = a |> Tensor.broadcastTo trgt.Shape
 
         let u, s, v = Tensor.SVD a
@@ -1583,17 +1537,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             (trgtEigVals: Tensor<'T>) (trgtEigVecs: Tensor<'T>) (a: Tensor<'T>) =
         Tensor.CheckSameStorage [trgtEigVals; trgtEigVecs; a]
         if a.NDims <> 2 || a.Shape.[0] <> a.Shape.[1] then 
-            invalidArg "a"
-                (sprintf "require a square matrix for symmetric eigen-decomposition 
-                          but got %A" a.Shape)
+            invalidArg "a" "Require a square matrix for symmetric eigen-decomposition but got %A." a.Shape
         if trgtEigVecs.Shape <> a.Shape then
-            invalidArg "trgtEigVecs"
-                (sprintf "trgtEigVecs and src must have the same shapes but got
-                          %A and %A" trgtEigVecs.Shape a.Shape)
+            invalidArg "trgtEigVecs" "trgtEigVecs and src must have the same shapes but got %A and %A." 
+                                     trgtEigVecs.Shape a.Shape
         if trgtEigVals.NDims <> 1 || trgtEigVals.Shape.[0] <> a.Shape.[0] then
-            invalidArg "trgtEigVals"
-                (sprintf "trgtEigVals must be a vector of length %d but it has shape %A"
-                         a.Shape.[0] trgtEigVals.Shape)                        
+            invalidArg "trgtEigVals" "trgtEigVals must be a vector of length %d but it has shape %A."
+                                     a.Shape.[0] trgtEigVals.Shape
         trgtEigVals.Backend.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVecs, a)
 
     /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
@@ -1626,10 +1576,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         match value with
         | :? Tensor<'T> as value -> this.SetRng rngArgs value
         | _ ->
-            let msg = 
-                sprintf "cannot assign data type %s to tensor of data type %s"
-                        value.DataType.Name this.DataType.Name
-            raise (DataTypeMismatch msg)
+            invalidOp "Cannot assign data type %s to tensor of data type %s." value.DataType.Name this.DataType.Name
     member inline internal this.SetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         let allArgs = Array.concat [rngArgs; restArgs]
         let value = Array.last allArgs :?> Tensor<'T>
@@ -1648,20 +1595,18 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             // non-specified mask consumes one dimension of tensor
             match List.tryHead shape with
             | Some s -> (s, s) :: Tensor<_>.MaskShapes rMasks (List.tail shape)
-            | None -> invalidArg "masks" "dimension mismatch between masks and tensor shape"
+            | None -> invalidArg "masks" "Dimension mismatch between masks and tensor shape."
         | Some mask :: rMasks ->
             // specified mask consumes as many dimensions as it has
             if mask.NDims > List.length shape then 
-                invalidArg "masks" "dimension mismatch between masks and tensor shape"
+                invalidArg "masks" "Dimension mismatch between masks and tensor shape."
             let s, rShape = shape.[..mask.NDims-1], shape.[mask.NDims..]
             if mask.Shape <> s then
-                let msg = sprintf "shape of mask %A does not match part %A of tensor shape it applies to" 
-                                  mask.Shape s
-                raise (ShapeMismatch msg)                 
+                invalidArg "masks" "Shape of mask %A does not match part %A of tensor shape it applies to." mask.Shape s
             (Tensor<_>.countTrue mask, mask.NElems) :: Tensor<_>.MaskShapes rMasks rShape
         | [] ->
             if not (List.isEmpty shape) then
-                invalidArg "masks" "dimension mismatch between masks and tensor shape"
+                invalidArg "masks" "Dimension mismatch between masks and tensor shape."
             []
 
     /// Converts a list of masks (which may be null) to a list of mask options.
@@ -1703,10 +1648,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         match value with
         | :? Tensor<'T> as value -> this.MaskedSet masks value
         | _ ->
-            let msg = 
-                sprintf "cannot assign data type %s to tensor of data type %s"
-                        value.DataType.Name this.DataType.Name
-            raise (DataTypeMismatch msg)                             
+            invalidOp "Cannot assign data type %s to tensor of data type %s." value.DataType.Name this.DataType.Name
 
     /// access to a single item using an array of indices
     member this.Item
@@ -1831,9 +1773,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// checks that this Tensor is a scalar tensor
     member inline internal this.CheckScalar () =
         if this.NDims <> 0 then 
-            let msg = sprintf "this operation requires a scalar (0-dimensional) tensor, 
-                               but its shape is %A" this.Shape
-            raise (IndexOutOfRange msg)
+            indexOutOfRange "This operation requires a scalar (0-dimensional) tensor, but its shape is %A." this.Shape
 
     /// value of scalar (0-dimensional) tensor
     member this.Value 
@@ -2057,15 +1997,13 @@ type Tensor =
         match xs with
         | x::rs when rs |> List.exists (fun r -> x.Dev <> r.Dev) ->
             let storages = xs |> List.map (fun x -> x.Dev.Id)
-            raise (StorageMismatch (sprintf "Storages must be equal for this operation, 
-                                             but they are %A." storages))
+            invalidOp "Storage devices must be equal for this operation, but they are %A." storages
         | _ -> ()            
 
     /// checks that two tensors have the same shape
     static member internal CheckSameShape (a: ITensor) (b: ITensor) =
         if a.Shape <> b.Shape then
-            raise (ShapeMismatch (sprintf "Tensors of shapes %A and %A were expected 
-                                           to have same shape" a.Shape b.Shape))    
+            invalidArg "b" "Tensors of shapes %A and %A were expected to have same shape" a.Shape b.Shape
 
     /// prepares the sources of an elementwise operation by broadcasting them to the target shape
     static member internal PrepareElemwiseSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
@@ -2099,8 +2037,8 @@ type Tensor =
         a.CheckAxis axis
         let redShp = a.Shape |> List.without axis
         if trgt.Shape <> redShp then
-            raise (ShapeMismatch (sprintf "Reduction of tensor %A along axis %d gives shape %A but
-                                           target has shape %A" a.Shape axis redShp trgt.Shape))
+            invalidOp "Reduction of tensor %A along axis %d gives shape %A but target has shape %A." 
+                      a.Shape axis redShp trgt.Shape
         let initial =
             match initial with
             | Some initial -> 
@@ -2114,7 +2052,7 @@ type Tensor =
         ]
         let a = a |> Tensor<_>.permuteAxes axisToLast
         if not (trgt.Shape = a.Shape.[0 .. a.NDims-2]) then
-            failwith "axis reduce shape computation error"
+            failwith "Internal axis reduce shape computation error."
         a, initial
 
     /// prepares an axis reduce operation by allocating a target of appropriate size and storage
@@ -2235,7 +2173,7 @@ type Tensor =
     /// Creates a one-dimensional tensor filled with equaly spaced values from start 
     /// to (including) stop.
     static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
-        if nElems < 2L then raise (ShapeMismatch "linspace requires at least two elements")
+        if nElems < 2L then invalidArg "nElems" "linspace requires at least two elements."
         let incr = (stop - start) / conv<'V> (nElems - 1L)      
         let x = Tensor<'V> ([nElems], dev)
         x.FillIncrementing(start, incr)
@@ -2366,8 +2304,7 @@ type Tensor =
     /// along the last two dimensions are returned.
     static member diag (a: Tensor<'T>) =
         if a.NDims < 2 then
-            invalidArg "a"
-                (sprintf "need at least a two dimensional array for diagonal but got shape %A" a.Shape)
+            invalidArg "a" "Need at least a two dimensional array for diagonal but got shape %A." a.Shape
         Tensor.diagAxis (a.NDims-2) (a.NDims-1) a
 
     /// Creates a new tensor of same shape but with ax2 inserted.
@@ -2379,8 +2316,7 @@ type Tensor =
         let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
         a.CheckAxis ax1
         if not (0 <= ax2 && ax2 <= a.NDims) then
-            invalidArg "ax2"
-                (sprintf "cannot insert axis at position %d into array of shape %A" ax2 a.Shape)
+            invalidArg "ax2" "Cannot insert axis at position %d into array of shape %A." ax2 a.Shape
         let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
         let d = Tensor.zeros a.Dev dShp
         let dDiag = Tensor.diagAxis ax1 ax2 d
@@ -2406,8 +2342,7 @@ type Tensor =
     /// along the last two dimensions are returned.
     static member trace (a: Tensor<'T>) =
         if a.NDims < 2 then
-            invalidArg "a" 
-                (sprintf "need at least a two dimensional array for trace but got shape %A" a.Shape)
+            invalidArg "a" "Need at least a two dimensional array for trace but got shape %A." a.Shape
         Tensor.traceAxis (a.NDims-2) (a.NDims-1) a
 
     /// N-dimensional tensor constructed of subtensors using a BlockTensor specification.
@@ -2418,8 +2353,8 @@ type Tensor =
             | shp::rShps ->
                 let commonShp = commonShape joinDim [shp]
                 if commonShp <> commonShape joinDim rShps then
-                    invalidArg "bs" "block tensor blocks must have same number of dimensions and be 
-                                     identical in all but the join dimension"
+                    invalidArg "bs" "Block tensor blocks must have same number of dimensions and be 
+                                     identical in all but the join dimension."
                 commonShp
             | [] -> []
 
@@ -2492,20 +2427,17 @@ type Tensor =
     static member concat (ax: int) (ts: Tensor<'T> seq) =
         let ts = List.ofSeq ts
         if List.isEmpty ts then
-            invalidArg "ts" "cannot concatenate empty sequence of tensors"
+            invalidArg "ts" "Cannot concatenate empty sequence of tensors."
 
         // check for compatibility
         let shp = ts.Head.Shape
         if not (0 <= ax && ax < shp.Length) then
-            invalidArg "ax" 
-                (sprintf "concatenation axis %d is out of range for shape %A" ax shp)
+            invalidArg "ax" "Concatenation axis %d is out of range for shape %A." ax shp
         for aryIdx, ary in List.indexed ts do
             if List.without ax ary.Shape <> List.without ax shp then
-                let msg =
-                    sprintf "concatentation element with index %d with shape %A must 
-                             be equal to shape %A of the first element, except in the concatenation axis %d" 
-                             aryIdx ary.Shape shp ax
-                raise (ShapeMismatch msg)
+                invalidArg "ts" "Concatentation element with index %d with shape %A must 
+                                 be equal to shape %A of the first element, except in the concatenation axis %d" 
+                                 aryIdx ary.Shape shp ax
 
         // calculate shape of concatenated tensors
         let totalSize = ts |> List.sumBy (fun ary -> ary.Shape.[ax])

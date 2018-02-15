@@ -35,9 +35,7 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
                 (supTypes |> List.contains dataType) && 
                     not (unsupTypes |> List.contains dataType) 
         if supported then this.GetKernel name argTypes
-        else (fun _ -> 
-            sprintf "the operation %s is unsupported for tensor data type %A" name dataType
-            |> invalidOp)
+        else (fun _ -> invalidOp "the operation %s is unsupported for tensor data type %A" name dataType)
 
     let fullTensor = ArgTypeTensor {DataType=dataType; NDims=nDims}
     let reductionSrcTensor = ArgTypeTensor {DataType=dataType; NDims=nDims+1}        

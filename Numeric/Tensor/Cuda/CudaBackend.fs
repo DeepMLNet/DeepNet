@@ -473,7 +473,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                  singleFn=(fun () -> Cuda.blas.GetrfBatchedS (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)),
                  doubleFn=(fun () -> Cuda.blas.GetrfBatchedD (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)))
             if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
-                raise (SingularMatrixError "cannot invert singular matrix")
+                raise (SingularMatrixException "cannot invert singular matrix")
 
             // compute matrix inverse
             CUBLAS.Invoke<'T, unit> 
@@ -481,7 +481,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                  singleFn=(fun () -> Cuda.blas.GetriBatchedS (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)),
                  doubleFn=(fun () -> Cuda.blas.GetriBatchedD (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)))
             if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
-                raise (SingularMatrixError "cannot invert singular matrix")
+                raise (SingularMatrixException "cannot invert singular matrix")
 
             aDispose()
             cDispose()

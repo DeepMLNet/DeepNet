@@ -18,8 +18,7 @@ module internal HostTensorHelpers =
 
     let ensureCAndOffsetFree (x: Tensor<'T>) =
         if x.Dev <> (TensorHostDevice.Instance :> ITensorDevice) then
-            let msg = sprintf "require a Host tensor but got a %s tensor" x.Dev.Id
-            raise (StorageMismatch msg)
+            invalidOp "Require a tensor stored on host device, but got a %s tensor." x.Dev.Id
         if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
         else Tensor.copy (x, order=RowMajor)
 

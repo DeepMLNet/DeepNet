@@ -50,20 +50,14 @@ type internal FastLayout32 =
 
     member inline this.Addr (pos: int64[]) =
         if pos.Length <> this.NDims then
-            let msg = 
-                sprintf "position %A has wrong dimensionality for tensor of shape %A"
-                        pos this.Shape
-            raise (IndexOutOfRange msg)                
+            indexOutOfRange "Position %A has wrong dimensionality for tensor of shape %A." pos this.Shape
         let mutable addr = this.Offset           
         for d=0 to this.NDims-1 do
             let p = int pos.[d]
             if (0 <= p && p < this.Shape.[d]) then
                 addr <- addr + p * this.Stride.[d]
             else
-                let msg = 
-                    sprintf "position %A is out of range for tensor of shape %A"
-                            pos this.Shape
-                raise (IndexOutOfRange msg)
+                indexOutOfRange "Position %A is out of range for tensor of shape %A." pos this.Shape
         addr
 
 
