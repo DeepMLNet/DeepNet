@@ -17,8 +17,8 @@ open Tensor.Utils
 open Tensor.Host
 
 
-/// cannot register host memory with CUDA, maybe because it is not properly aligned
-exception CannotCudaRegisterMemory of msg:string with override __.Message = __.msg
+/// Cannot register host memory with CUDA, maybe because it is not properly aligned.
+exception CannotCudaRegisterMemoryException of msg:string with override __.Message = __.msg
 
 
 
@@ -135,7 +135,7 @@ module CudaRegMem =
                 with :? CudaException as ex ->
                     if ex.CudaError = CUResult.ErrorInvalidValue then
                         // probably memory is not properly aligned
-                        raise (CannotCudaRegisterMemory ex.Message)
+                        raise (CannotCudaRegisterMemoryException ex.Message)
                     else reraise ()
 
                 // create handle object

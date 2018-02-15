@@ -30,7 +30,7 @@ module private CudaContext =
             try context <- Some (new CudaContext(createNew=false))
             with e ->
                 let msg = sprintf "Cannot create CUDA context: %s" e.Message
-                raise (CudaError msg)
+                raise (CudaException msg)
 
 
 
@@ -217,7 +217,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 try
                     let h = CudaRegMem.register storage
                     h :> IDisposable, h.Ptr
-                with CannotCudaRegisterMemory _ -> 
+                with CannotCudaRegisterMemoryException _ -> 
                     let h = storage.Pin()
                     h :> IDisposable, h.Ptr
 

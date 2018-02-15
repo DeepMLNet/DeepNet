@@ -11,11 +11,8 @@ open ManagedCuda.BasicTypes
 open Tensor.Utils
 
 
-/// out of CUDA memory
-exception OutOfCudaMemory of msg:string with override __.Message = __.msg
-
-/// generic CUDA error
-exception CudaError of msg:string with override __.Message = __.msg
+/// Out of CUDA memory.
+exception OutOfCudaMemoryException of msg:string with override __.Message = __.msg
 
 
 /// Cuda support types functions
@@ -46,7 +43,7 @@ module internal Cuda =
         try new CudaContext(createNew=false)
         with e ->
             let msg = sprintf "Cannot create CUDA context: %s" e.Message
-            raise (CudaError msg)        
+            raise (CudaException msg)        
 
     // CUDA BLAS handle
     let blas =
@@ -205,8 +202,8 @@ module internal Cuda =
         with :? CudaException as e when e.CudaError = CUResult.ErrorOutOfMemory 
                                      || e.CudaError = CUResult.ErrorUnknown ->
             let msg = 
-                sprintf "CUDA memory allocation of %d MB failed (%A)" 
+                sprintf "CUDA memory allocation of %d MB failed (%A)." 
                         (sizeInBytes / pown 2L 20) e.CudaError
-            raise (OutOfCudaMemory msg)
+            raise (OutOfCudaMemoryException msg)
 
 
