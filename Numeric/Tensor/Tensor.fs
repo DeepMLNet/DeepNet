@@ -2538,8 +2538,9 @@ module Tensor =
 
 /// Special values that can be passed instead of masks.
 [<AutoOpen>]
-module SpecialMask =
+module internal SpecialMask =
 
     /// Indicates that the dimension is unmasked, i.e. equals specifying a tensor filled with trues. 
     let NoMask : Tensor<bool> = Unchecked.defaultof<_> // = null
+        
         

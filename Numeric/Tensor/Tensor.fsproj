@@ -52,6 +52,7 @@
     <Compile Include="TensorLayout.fs" />
     <Compile Include="TensorBackend.fs" />
     <Compile Include="Tensor.fs" />
+    <Compile Include="TensorVal.fs" />
     <Compile Include="BlasSupport.fs" />
     <Compile Include="Host/HostBLAS.fs" />
     <Compile Include="Host/FastAccess.fs" />

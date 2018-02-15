@@ -8,7 +8,7 @@ open Tensor.Utils
 
 /// Special constants that can be passed or returned instead of indices.
 [<AutoOpen>]
-module SpecialIdx =
+module internal SpecialIdx =
 
     /// For slicing: inserts a new axis of size one.
     let NewAxis = Int64.MinValue + 1L
@@ -75,20 +75,20 @@ type TensorRng =
 
 /// Special constants that can be passed or returned instead of tensor ranges.
 [<AutoOpen>]
-module SpecialRng =
+module internal SpecialRng =
 
     /// All elements.
     let RngAll = Rng (None, None)
 
 
 
-/// memory ordering of tensor
+/// Memory ordering of a tensor.
 type TensorOrder =
-    /// row-major (C) order
+    /// Row-major (C) memory order.
     | RowMajor
-    /// column-major (Fortran) order
+    /// Column-major (Fortran) memory order.
     | ColumnMajor
-    /// custom ordering of strides
+    /// The specified custom memory ordering of dimensions.
     | CustomOrder of int list
 
 
