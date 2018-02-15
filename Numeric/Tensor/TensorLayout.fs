@@ -381,21 +381,21 @@ module TensorLayout =
 
         let rec recView ranges a =
             match ranges, a.Shape, a.Stride with
-            | RngAllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
-                recView (RngAll::RngAllFill::rRanges) a
-            | RngAllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
-                recView (RngAll::rRanges) a
-            | RngAllFill::rRanges, _, _ ->
+            | Rng.AllFill::rRanges, _::rShps, _ when List.length rShps > List.length rRanges ->
+                recView (Rng.All::Rng.AllFill::rRanges) a
+            | Rng.AllFill::rRanges, _::rShps, _ when List.length rShps = List.length rRanges ->
+                recView (Rng.All::rRanges) a
+            | Rng.AllFill::rRanges, _, _ ->
                 recView rRanges a
-            | (RngElem _ | Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
+            | (Rng.Elem _ | Rng.Rng _ as idx)::rRanges, shp::rShps, str::rStrs ->
                 let ra = recView rRanges {a with Shape=rShps; Stride=rStrs} 
                 match idx with 
-                | RngElem i -> 
+                | Rng.Elem i -> 
                     checkElementRange false shp i
                     {ra with Offset = ra.Offset + i*str;
                              Stride = ra.Stride;
                              Shape = ra.Shape} 
-                | Rng(start, stop) ->
+                | Rng.Rng (start, stop) ->
                     let start = defaultArg start 0L
                     let stop = defaultArg stop (shp - 1L)
                     if stop >= start then
@@ -411,8 +411,8 @@ module TensorLayout =
                         {ra with Offset = ra.Offset;
                                   Shape = 0L::ra.Shape;
                                  Stride = str::ra.Stride} 
-                | RngAllFill | RngNewAxis -> failwith "impossible"
-            | RngNewAxis::rRanges, _, _ ->
+                | Rng.AllFill | Rng.NewAxis -> failwith "impossible"
+            | Rng.NewAxis::rRanges, _, _ ->
                 let ra = recView rRanges a
                 {ra with Shape = 1L::ra.Shape; 
                          Stride = 0L::ra.Stride}
@@ -431,11 +431,11 @@ module TensorLayout =
                 let rest = generate ls (dim-1)
                 if dim = 0 then
                     for is, ws in rest do
-                        yield RngAll::is, ws
+                        yield Rng.All::is, ws
                 else
                     for i=0L to l - 1L do
                         for is, ws in rest do
-                            yield RngElem i::is, i::ws
+                            yield Rng.Elem i::is, i::ws
             | [] -> yield [], []
         } 
         generate (shape a) dim  

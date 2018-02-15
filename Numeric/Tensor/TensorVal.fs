@@ -18,9 +18,6 @@ module TensorVal =
     /// For search: value was not found.
     let NotFound = SpecialIdx.NotFound
 
-    /// All elements.
-    let RngAll = SpecialRng.RngAll
-
     /// Indicates that the dimension is unmasked, i.e. equals specifying a tensor filled with trues. 
     let NoMask = SpecialMask.NoMask
 

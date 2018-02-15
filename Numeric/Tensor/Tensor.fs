@@ -61,10 +61,10 @@ type ITensor =
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
     abstract M : masks:Tensor<bool> list -> ITensor with get, set
 
-    /// n-dimensional slicing using a list of TensorRngs
-    abstract Item : rng:TensorRng list -> ITensor with get
-    /// n-dimensional slicing using a list of TensorRngs
-    abstract Item : rng:TensorRng list -> ITensor with set
+    /// n-dimensional slicing using a list of Rngs
+    abstract Item : rng:Rng list -> ITensor with get
+    /// n-dimensional slicing using a list of Rngs
+    abstract Item : rng:Rng list -> ITensor with set
 
     // type-neutral slicing 
     abstract Item : i0:int64 -> ITensor with get
@@ -204,11 +204,11 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         a.Relayout newLayout :?> 'A
 
     /// a view of this tensor over the given range 
-    member internal this.Range (rng: TensorRng list) =
+    member internal this.Range (rng: Rng list) =
         this.Relayout (this.Layout |> TensorLayout.view rng)
 
     /// a view of the specified tensor over the given range 
-    static member range (rng: TensorRng list) (a: 'A when 'A :> ITensor) : 'A =
+    static member range (rng: Rng list) (a: 'A when 'A :> ITensor) : 'A =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.view rng)
    
     /// checks that the given axis is valid
@@ -1559,7 +1559,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         
     /// a view of this tensor with the given .NET range
     member inline internal this.GetRng (rngArgs: obj[]) =
-        this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
+        this.Range (Rng.ofItemOrSliceArgs rngArgs) 
     member inline internal this.IGetRng (rngArgs: obj[]) =
         this.GetRng rngArgs :> ITensor
     member inline internal this.GetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
@@ -1570,7 +1570,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// write into the view of this tensor with the given .NET range
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
         Tensor.CheckSameStorage [this; value]
-        let trgt = this.Range (TensorRng.ofItemOrSliceArgs rngArgs) 
+        let trgt = this.Range (Rng.ofItemOrSliceArgs rngArgs) 
         value |> Tensor<_>.broadcastTo trgt.Shape |> trgt.CopyFrom
     member inline internal this.ISetRng (rngArgs: obj[]) (value: ITensor) =
         match value with
@@ -1693,8 +1693,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
 
     /// n-dimensional slicing using a list of TensorRngs
     member this.Item
-        with get (rng: TensorRng list) = this.GetRng [|rng|]
-        and set (rng: TensorRng list) (value: Tensor<'T>) = this.SetRng [|rng|] value
+        with get (rng: Rng list) = this.GetRng [|rng|]
+        and set (rng: Rng list) (value: Tensor<'T>) = this.SetRng [|rng|] value
 
     /// one-dimensional slicing using indices and special axes
     member this.Item
@@ -1876,8 +1876,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Full = this.Full
 
         member this.Item
-            with get (rng: TensorRng list) = this.IGetRng [|rng|]
-            and set (rng: TensorRng list) (value: ITensor) = this.ISetRng [|rng|] value
+            with get (rng: Rng list) = this.IGetRng [|rng|]
+            and set (rng: Rng list) (value: ITensor) = this.ISetRng [|rng|] value
 
         member this.M
             with get (m0: Tensor<bool>) = this.IMaskedGet [m0]
@@ -2393,7 +2393,7 @@ type Tensor =
         let startPos = List.replicate (List.length joinedShape) 0L
 
         for pos, ary in blockPosAndContents 0 startPos bs do
-            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng (Some p, Some (p + s - 1L))) 
+            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng.Rng (Some p, Some (p + s - 1L))) 
             joined.[slice] <- ary
         joined
 
@@ -2415,7 +2415,7 @@ type Tensor =
         let rec generate (pos: int64 list) = 
             match List.length pos with
             | dim when dim = a.NDims ->
-                let slice = pos |> List.map RngElem
+                let slice = pos |> List.map Rng.Elem
                 Block (a.[slice] * b)
             | dim ->
                 seq {for p in 0L .. a.Shape.[dim] - 1L -> generate (pos @ [p])}
@@ -2451,8 +2451,8 @@ type Tensor =
             if aryLen > 0L then
                 let ccRng = 
                     List.init shp.Length (fun idx ->
-                        if idx = ax then Rng (Some pos, Some (pos + aryLen - 1L))
-                        else RngAll)
+                        if idx = ax then Rng.Rng (Some pos, Some (pos + aryLen - 1L))
+                        else Rng.All)
                 cc.[ccRng] <- ary
                 pos <- pos + aryLen
         cc
@@ -2476,12 +2476,12 @@ type Tensor =
         a.CheckAxis ax 
         let shftRng = 
             [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (Some 1L, None)
-                else yield RngAll]
+                if d = ax then yield Rng.Rng (Some 1L, None)
+                else yield Rng.All]
         let cutRng = 
             [for d=0 to a.NDims-1 do
-                if d = ax then yield Rng (None, Some (a.Shape.[d] - 2L))
-                else yield RngAll]
+                if d = ax then yield Rng.Rng (None, Some (a.Shape.[d] - 2L))
+                else yield Rng.All]
         a.[shftRng] - a.[cutRng]
 
     /// calculates the pairwise differences along the last axis
@@ -2495,41 +2495,41 @@ type Tensor =
 /// An N-dimensional array with elements of type 'T.
 module Tensor =
 
-    /// multi-threaded tensor operations
-    module Parallel = 
+    /// Multi-threaded tensor operations.
+    type Parallel = 
 
-        /// creates a new tensor with the values returned by the function.
-        let init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+        /// Creates a new tensor with the values returned by the function.
+        static member init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
             let x = Tensor<'T> (shape, dev)
             x.FillParallelIndexed fn
             x          
 
-        /// maps all elements using the specified function into a new tensor
-        let map (fn: 'T -> 'R) (a: Tensor<'T>) =
+        /// Maps all elements using the specified function into a new tensor.
+        static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
             trgt.FillParallelMap fn a
             trgt       
 
-        /// maps all elements using the specified indexed function into a new tensor
-        let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
+        /// Maps all elements using the specified indexed function into a new tensor.
+        static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
             trgt.FillParallelMapIndexed fn a
             trgt      
 
-        /// maps all elements using the specified function into a new tensor
-        let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        /// Maps all elements using the specified function into a new tensor.
+        static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
             trgt.FillParallelMap2 fn a b
             trgt           
 
-        /// maps all elements using the specified indexed function into a new tensor
-        let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
+        /// Maps all elements using the specified indexed function into a new tensor.
+        static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
             trgt.FillParallelMapIndexed2 fn a b
             trgt            
 
-        /// folds the function over the given axis
-        let foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
+        /// Folds the function over the given axis.
+        static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
             let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
             trgt.FillParallelFoldAxis fn initial axis a
             trgt
