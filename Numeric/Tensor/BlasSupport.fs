@@ -98,14 +98,14 @@ type internal BLAS =
 
     /// Returns a Blas.ScalarInfo that exposes the specfied scalar to BLAS
     /// as a source and/or target. 
-    static member GetScalar (scalar: Tensor<'T>) =
+    static member GetScalar (scalar: ITensorFrontend<'T>) =
         if scalar.NDims <> 0 then 
             failwithf "BLAS operation requires a scalar but got tensor of shape %A" scalar.Shape
         let storage = scalar.Storage :?> IBLASStorage
         new ScalarInfo (storage, nativeint (sizeof64<'T> * scalar.Layout.Offset))
             
     /// Internal function for GetBlasVector.
-    static member private GetVectorInfo (vec: Tensor<'T>, reqLinear: bool, ?fetchFn) =
+    static member private GetVectorInfo (vec: ITensorFrontend<'T>, reqLinear: bool, ?fetchFn) =
         let fetchFn = defaultArg fetchFn id
         if vec.NDims < 1 then 
             failwithf "BLAS operation requires a vector but got tensor of shape %A" vec.Shape
@@ -116,7 +116,7 @@ type internal BLAS =
                 let idx = batchIdx @ [0L]
                 sizeof64<'T> * TensorLayout.addr idx vec.Layout |> nativeint)
             |> Array.ofSeq
-        match vec.Layout.Stride.[vec.NDims-1] , vec.Layout.Shape.[vec.NDims-1] with
+        match vec.Layout.Stride.[vec.NDims-1], vec.Layout.Shape.[vec.NDims-1] with
         | m, ms when (if reqLinear then m = 1L else m <> 0L) ->   
             new VectorInfo (storage, offsets, ms, m, fetchFn) |> Some
         | _  -> None                  // not acceptable BLAS layout
@@ -129,15 +129,15 @@ type internal BLAS =
     ///   the returned BlasMatrixInfo is disposed.
     /// When reqLinear is true, it ensures that the resulting vector is
     /// densely packed, i.e. has increment one.
-    static member GetVector (vec: Tensor<'T>, isSource: bool, isTarget: bool, 
+    static member GetVector (vec: ITensorFrontend<'T>, isSource: bool, isTarget: bool, 
                              ?allowCopy: bool, ?reqLinear: bool) =
         let allowCopy = defaultArg allowCopy true                        
         let reqLinear = defaultArg reqLinear false
         match BLAS.GetVectorInfo (vec, reqLinear) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T>(vec.Shape, vec.Dev, order=RowMajor)
-            if isSource then tmp.CopyFrom vec
+            let tmp = Tensor<'T>(vec.Shape, vec.Dev, order=RowMajor) :> ITensorFrontend<_>
+            if isSource then tmp.CopyFrom vec 
             let fetchFn () = if isTarget then vec.CopyFrom tmp
             BLAS.GetVectorInfo (tmp, reqLinear, fetchFn=fetchFn) |> Option.get
         | None ->
@@ -145,7 +145,7 @@ type internal BLAS =
                       vec.Shape vec.Layout.Stride
 
     /// Internal function for GetBlasMatrix.
-    static member private GetMatrixInfo (mat: Tensor<'T>, canTranspose, ?fetchFn) =
+    static member private GetMatrixInfo (mat: ITensorFrontend<'T>, canTranspose, ?fetchFn) =
         let fetchFn = defaultArg fetchFn id
         if mat.NDims < 2 then 
             failwithf "BLAS operation requires a matrix but got tensor of shape %A" mat.Shape
@@ -170,14 +170,14 @@ type internal BLAS =
     /// - the source might be copied into a temporary tensor,
     /// - the result might be copied from a temporary tensor into the target, when
     ///   the returned BlasMatrixInfo is disposed.
-    static member GetMatrix (mat: Tensor<'T>, isSource: bool, isTarget: bool,
+    static member GetMatrix (mat: ITensorFrontend<'T>, isSource: bool, isTarget: bool,
                              canTranspose: bool, ?allowCopy: bool) =
         let allowCopy = defaultArg allowCopy true                        
         match BLAS.GetMatrixInfo (mat, canTranspose=canTranspose) with
         | Some bi -> bi
         | None when allowCopy ->
-            let tmp = Tensor<'T> (mat.Shape, mat.Dev, order=BLAS.MatrixOrder mat.NDims)
-            if isSource then tmp.CopyFrom mat
+            let tmp = Tensor<'T> (mat.Shape, mat.Dev, order=BLAS.MatrixOrder mat.NDims) :> ITensorFrontend<_>
+            if isSource then tmp.CopyFrom mat 
             let fetchFn () = if isTarget then mat.CopyFrom tmp
             BLAS.GetMatrixInfo (tmp, canTranspose=canTranspose, fetchFn=fetchFn) 
             |> Option.get

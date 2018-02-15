@@ -11,6 +11,7 @@ open ManagedCuda.BasicTypes
 open Tensor
 open Tensor.Utils
 open Tensor.Cuda
+open Tensor.Backend
 
 
 

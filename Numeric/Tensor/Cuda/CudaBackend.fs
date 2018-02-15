@@ -159,35 +159,35 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.NativeTensor = this.NativeTensor
 
     /// gets NativeTensors for specified tensors
-    static member internal GetNativeTensor (t: Tensor<'T>) =
+    static member internal GetNativeTensor (t: ITensorFrontend<'T>) =
         (t.Backend :?> TensorCudaBackend<'T>).NativeTensor
 
     /// gets NativeTensors for specified tensors
-    static member internal GetNativeTensor (t: Tensor<'T>, a: Tensor<'TA>) =
+    static member internal GetNativeTensor (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>) =
         (t.Backend :?> TensorCudaBackend<'T>).NativeTensor, 
         (a.Backend :?> TensorCudaBackend<'TA>).NativeTensor 
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
-    static member internal ElemwiseNativeTensor<'T> (t: Tensor<'T>) 
+    static member internal ElemwiseNativeTensor<'T> (t: ITensorFrontend<'T>) 
             : NativeTensor =
         (t.Backend :?> ITensorCudaBackend).NativeTensor
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
     static member internal ElemwiseNativeTensor<'T, 'TA> 
-            (t: Tensor<'T>, a: Tensor<'TA>) : NativeTensor * NativeTensor =
+            (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>) : NativeTensor * NativeTensor =
         (t.Backend :?> ITensorCudaBackend).NativeTensor, 
         (a.Backend :?> ITensorCudaBackend).NativeTensor 
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
     static member internal ElemwiseNativeTensor<'T, 'TA, 'TB>  
-            (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) : NativeTensor * NativeTensor * NativeTensor =
+            (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>, b: ITensorFrontend<'TB>) : NativeTensor * NativeTensor * NativeTensor =
         (t.Backend :?> ITensorCudaBackend).NativeTensor, 
         (a.Backend :?> ITensorCudaBackend).NativeTensor,
         (b.Backend :?> ITensorCudaBackend).NativeTensor
 
     /// gets NativeTensors for specified tensors, optimized for elment-wise operations
     static member internal ElemwiseNativeTensor<'T, 'TA, 'TB, 'TC>  
-            (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
+            (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>, b: ITensorFrontend<'TB>, c: ITensorFrontend<'TC>) 
             : NativeTensor * NativeTensor * NativeTensor * NativeTensor =
         (t.Backend :?> ITensorCudaBackend).NativeTensor, 
         (a.Backend :?> ITensorCudaBackend).NativeTensor,
@@ -221,7 +221,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     let h = storage.Pin()
                     h :> IDisposable, h.Ptr
 
-            let doTransfer (trgt: Tensor<'T>) (src: Tensor<'T>) = 
+            let doTransfer (trgt: ITensorFrontend<'T>) (src: ITensorFrontend<'T>) = 
                 match trgt.Storage, src.Storage with
                 // transfer from host to CUDA
                 | (:? TensorCudaStorage<'T> as trgtStorage), (:? TensorHostStorage<'T> as srcStorage) ->
@@ -263,7 +263,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             // ensure that source is in row-major order
             let src =
                 if TensorLayout.isC src.Layout then src
-                else Tensor.copy (src, order=RowMajor)
+                else src.Copy(order=RowMajor)
                
             if TensorLayout.isC trgt.Layout then
                 // target is in row-major order, do direct transfer
@@ -306,7 +306,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                 kernels.Copy(Cfg.Stream, trgt, src)
                 Cuda.keepAliveMany Cfg.Stream [trgt; src]
 
-        member this.Convert(trgt: Tensor<'T>, src: Tensor<'S>) =
+        member this.Convert(trgt: ITensorFrontend<'T>, src: ITensorFrontend<'S>) =
             let convKernels = TensorConvertKernels.Get (typeof<'T>, typeof<'S>, trgt.NDims)
             callUnary convKernels.Convert trgt src
 
@@ -459,7 +459,7 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.BatchedInvert (trgt, src) =
             let size = trgt.Shape.[trgt.NDims-2]
 
-            let lu = Tensor.copy (src, order=BLAS.MatrixOrder trgt.NDims)
+            let lu = src.Copy(order=BLAS.MatrixOrder trgt.NDims)
             use a = BLAS.GetMatrix (lu, isSource=true, isTarget=false, canTranspose=false)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
             let aPtrs, aDispose = a.CPtrs Cfg.Stream

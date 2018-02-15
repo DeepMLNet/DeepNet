@@ -1,11 +1,12 @@
 namespace rec Tensor
 
+open System
 open System.Collections
 open System.Collections.Generic
 open System.Diagnostics
 
 open Tensor.Utils
-open System
+open Tensor.Backend
 
 
 /// singular matrix encountered
@@ -34,28 +35,9 @@ exception ValueNotFound of msg:string with override __.Message = __.msg
  
 
 
-/// memory ordering of tensor
-type TensorOrder =
-    /// row-major (C) order
-    | RowMajor
-    /// column-major (Fortran) order
-    | ColumnMajor
-    /// custom ordering of strides
-    | CustomOrder of int list
-
-
-
-/// part of a matrix
-type MatrixPart =
-    /// upper triangular part of the matrix
-    | UpperPart
-    /// lower triangular part of the matrix
-    | LowerPart
-
-
-
 /// Type-neutral interface to Tensor<'T> of any type 'T.
 type ITensor =
+
     /// layout of this tensor (shape, offset and strides)
     abstract Layout:            TensorLayout
     /// storage of this tensor
@@ -167,171 +149,10 @@ type ITensor =
 
 
 
-type ITensorStorage =
-    abstract Dev:               ITensorDevice
-
-
-
-type ITensorStorage<'T> =
-    inherit ITensorStorage
-    abstract Backend:           TensorLayout -> ITensorBackend<'T>
-
-
-
-type ITensorDevice =
-    inherit IComparable
-    inherit IComparable<ITensorDevice>
-    inherit IEquatable<ITensorDevice>
-    abstract Id:                string
-    abstract Create:            nElems:int64 -> ITensorStorage<'T>
-    abstract Zeroed:            bool
-
-
-
-type ITensorBackend<'T> =
-    inherit IEnumerable<'T>
-
-    abstract Item:              int64[] -> 'T with get, set
-
-    abstract Copy:              trgt:Tensor<'T> * src:Tensor<'T> -> unit
-    abstract Transfer:          trgt:Tensor<'T> * src:Tensor<'T> -> bool
-    abstract Convert:           trgt:Tensor<'T> * src:Tensor<'T1> -> unit
-
-    abstract Fill:              fn:(unit -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
-    abstract FillIndexed:       fn:(int64[] -> 'T) * trgt:Tensor<'T> * useThreads:bool -> unit
-    abstract FillConst:         value:'T * trgt:Tensor<'T> -> unit
-    abstract FillIncrementing:  start:'T * incr:'T * trgt:Tensor<'T> -> unit
-    
-    abstract Map:               fn:('T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
-                                useThreads:bool -> unit
-    abstract MapIndexed:        fn:(int64[] -> 'T1 -> 'T) * trgt:Tensor<'T> * src:Tensor<'T1> *
-                                useThreads:bool -> unit
-    abstract Map2:              fn:('T1 -> 'T2 -> 'T) * 
-                                trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> * 
-                                useThreads:bool -> unit
-    abstract MapIndexed2:       fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
-                                trgt:Tensor<'T> * src1:Tensor<'T1> * src2:Tensor<'T2> *
-                                useThreads:bool -> unit
-    abstract FoldLastAxis:      fn:('T -> 'T1 -> 'T) * initial:Tensor<'T> *
-                                trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
-    abstract FoldLastAxisIndexed: fn:(int64[] -> 'T -> 'T1 -> 'T) * initial:Tensor<'T> *
-                                trgt:Tensor<'T> * src:Tensor<'T1> * useThreads:bool -> unit
-
-    abstract UnaryPlus:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract UnaryMinus:        trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Abs:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sgn:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Log:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Log10:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Exp:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sin:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Cos:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Tan:               trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Asin:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Acos:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Atan:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sinh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Cosh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Tanh:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Sqrt:              trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Ceiling:           trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Floor:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Round:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract Truncate:          trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract IsFinite:          trgt:Tensor<bool> * src1:Tensor<'T> -> unit
-
-    abstract Add:               trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Subtract:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Multiply:          trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Divide:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Modulo:            trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Power:             trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract MaxElemwise:       trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract MinElemwise:       trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-
-    abstract Equal:             trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract NotEqual:          trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Less:              trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract LessOrEqual:       trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract Greater:           trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract GreaterOrEqual:    trgt:Tensor<bool> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-
-    abstract Negate:            trgt:Tensor<bool> * src1:Tensor<bool> -> unit
-    abstract And:               trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
-    abstract Or:                trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
-    abstract Xor:               trgt:Tensor<bool> * src1:Tensor<bool> * src2:Tensor<bool> -> unit
-
-    abstract IfThenElse:        trgt:Tensor<'T> * cond:Tensor<bool> * ifTrue:Tensor<'T> * ifFalse:Tensor<'T> -> unit  
-    abstract Gather:            trgt:Tensor<'T> * srcIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
-    abstract Scatter:           trgt:Tensor<'T> * trgtIdxs:Tensor<int64> option list * src:Tensor<'T> -> unit
-    abstract MaskedGet:         trgt:Tensor<'T> * src:Tensor<'T> * masks:Tensor<bool> option [] -> unit
-    abstract MaskedSet:         trgt:Tensor<'T> * masks:Tensor<bool> option [] * src:Tensor<'T> -> unit
-    abstract TrueIndices:       trgt:Tensor<int64> * src1:Tensor<bool> -> unit
-
-    abstract SumLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract ProductLastAxis:   trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract MinLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract MaxLastAxis:       trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract AllLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
-    abstract AnyLastAxis:       trgt:Tensor<bool> * src1:Tensor<bool> -> unit
-    abstract CountTrueLastAxis: trgt:Tensor<int64> * src1:Tensor<bool> -> unit
-
-    abstract ArgMinLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
-    abstract ArgMaxLastAxis:    trgt:Tensor<int64> * src1:Tensor<'T> -> unit
-    abstract FindLastAxis:      value:'T * trgt:Tensor<int64> * src1:Tensor<'T> -> unit
-
-    abstract VecVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract MatVecDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract MatMatDot:         trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-    abstract BatchedMatMatDot:  trgt:Tensor<'T> * src1:Tensor<'T> * src2:Tensor<'T> -> unit
-
-    //abstract BatchedLU:             trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract BatchedSVD:            trgtS:Tensor<'T> * trgtUV:(Tensor<'T> * Tensor<'T>) option * src1:Tensor<'T> -> unit
-    abstract BatchedInvert:         trgt:Tensor<'T> * src1:Tensor<'T> -> unit
-    abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:Tensor<'T> * trgtEigVecs:Tensor<'T> * 
-                                          src:Tensor<'T> -> unit
-
-
-
-[<AbstractClass>]
-[<StructuredFormatDisplay("{Id}")>]
-type BaseTensorDevice() =   
-    abstract Id: string
-    abstract Create: nElems:int64 -> ITensorStorage<'T>
-    abstract Zeroed: bool
-
-    interface ITensorDevice with
-        member this.Id = this.Id
-        member this.Create nElems = this.Create nElems
-        member this.Zeroed = this.Zeroed
-
-    interface IComparable<ITensorDevice> with
-        member this.CompareTo other =
-            compare (this :> ITensorDevice).Id other.Id
-    interface IComparable with
-        member this.CompareTo other =
-            match other with
-            | :? ITensorDevice as other -> 
-                (this :> IComparable<ITensorDevice>).CompareTo other
-            | _ -> failwithf "cannot compare to %A" (other.GetType())
-    interface IEquatable<ITensorDevice> with
-        member this.Equals other =
-            (this :> ITensorDevice).Id = other.Id
-    override this.Equals other =
-        match other with
-        | :? ITensorDevice as other ->
-            (this :> IEquatable<ITensorDevice>).Equals other
-        | _ -> false
-    override this.GetHashCode () =
-        hash (this :> ITensorDevice).Id
-    override this.ToString () = this.Id
-
-
 
 /// An N-dimensional array with elements of type 'T.
-type [<StructuredFormatDisplay("{Pretty}");
-       DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
-    Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
+type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
+        Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
 
     do TensorLayout.check layout
     let backend = storage.Backend layout
@@ -1305,7 +1126,7 @@ type [<StructuredFormatDisplay("{Pretty}");
             invalidArg "indices" "for each dimension of src an index tensor must be specified"        
         if indices |> List.skip trgt.NDims |> List.exists Option.isNone then
             invalidArg "indices" "index dimensions beyond the number of target dimensions must not be None"
-        let indices = indices |> List.map (Option.map (Tensor<_>.broadcastTo trgt.Shape))
+        let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo trgt.Shape :> ITensorFrontend<_>))
         trgt.Backend.Gather (trgt=trgt, srcIdxs=indices, src=src)
 
     /// Creates a new tensor by selecting elements from src according to the specified indices.
@@ -1342,7 +1163,7 @@ type [<StructuredFormatDisplay("{Pretty}");
             invalidArg "indices" "for each dimension of the target an index tensor must be specified"        
         if indices |> List.skip src.NDims |> List.exists Option.isNone then
             invalidArg "indices" "index dimensions beyond the number of source dimensions must not be None"
-        let indices = indices |> List.map (Option.map (Tensor<_>.broadcastTo src.Shape))
+        let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo src.Shape :> ITensorFrontend<_>))
         trgt.Backend.FillConst (trgt=trgt, value=Tensor<'T>.Zero)
         trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)
 
@@ -1680,7 +1501,7 @@ type [<StructuredFormatDisplay("{Pretty}");
         trgt
 
     /// Helper function to compute SVD sizes.
-    static member internal SVDSizes (a: Tensor<'T>) =
+    static member internal SVDSizes (a: ITensorFrontend<'T>) =
         if a.NDims < 2 then
             invalidArg "a" 
                 (sprintf "need at least a matrix to SVD but got shape %A" a.Shape)
@@ -1709,6 +1530,8 @@ type [<StructuredFormatDisplay("{Pretty}");
                     (sprintf "need a tensor of shape %A for SVD right unitary matrices but got shape %A"
                              (batchShp @ [N; N]) trgtV.Shape)            
         | None -> ()
+        let trgtUV = trgtUV |> Option.map (fun (trgtU, trgtV) -> trgtU :> ITensorFrontend<_>, 
+                                                                 trgtV :> ITensorFrontend<_>)
         trgtS.Backend.BatchedSVD (trgtS, trgtUV, a)                
 
     /// Singular value decomposition returning (U, S, V) so that a = U .* diagMat(S) .* V.T.    
@@ -1854,7 +1677,7 @@ type [<StructuredFormatDisplay("{Pretty}");
         let trgtShp, srcShp = Tensor<_>.MaskShapes masks this.Shape |> List.unzip
         let trgt = Tensor<'T> (trgtShp, this.Dev)
         let src = this |> Tensor.reshape srcShp
-        let masks = masks |> List.map (Option.map Tensor<_>.flatten) |> List.toArray
+        let masks = masks |> List.map (Option.map (fun t -> t |> Tensor<_>.flatten :> ITensorFrontend<_>)) |> List.toArray
         backend.MaskedGet (trgt=trgt, src=src, masks=masks) 
         trgt    
         
@@ -1867,7 +1690,7 @@ type [<StructuredFormatDisplay("{Pretty}");
         Tensor.CheckSameStorage [this; value]
         masks |> List.iter (Option.iter (fun m -> Tensor.CheckSameStorage [this; m]))       
         let valueShp, trgtShp = Tensor<_>.MaskShapes masks this.Shape |> List.unzip        
-        let masks = masks |> List.map (Option.map Tensor<_>.flatten) |> List.toArray
+        let masks = masks |> List.map (Option.map (fun t -> t |> Tensor<_>.flatten :> ITensorFrontend<_>)) |> List.toArray
         let value = value |> Tensor<_>.broadcastTo valueShp        
         match this |> Tensor.tryReshapeView trgtShp with
         | Some trgtView -> backend.MaskedSet (trgt=trgtView, masks=masks, src=value)
@@ -2077,6 +1900,23 @@ type [<StructuredFormatDisplay("{Pretty}");
     /// full contents string
     member this.Full = this.ToString (maxElems=Int64.MaxValue)
                                
+    // interface for access from backend                             
+    interface ITensorFrontend<'T> with
+        member this.Storage = this.Storage
+        member this.Dev = this.Dev
+        member this.Backend = this.Backend
+        member this.Layout = this.Layout
+        member this.Shape = this.Shape
+        member this.Stride = this.Stride
+        member this.Offset = this.Offset
+        member this.NDims = this.NDims
+        member this.NElems = this.NElems
+        member this.Relayout layout = this.Relayout layout :> ITensorFrontend<'T>
+        member this.Copy (?order) = this.Copy (?order=order) :> ITensorFrontend<'T>
+        member this.CopyFrom (src) = this.CopyFrom (src :?> Tensor<'T>)
+        member this.Transfer (dev) = this.Transfer (dev) :> ITensorFrontend<'T>
+        member this.T = this.T :> ITensorFrontend<'T>
+
     // type-neural interface
     interface ITensor with
         member this.Layout = this.Layout

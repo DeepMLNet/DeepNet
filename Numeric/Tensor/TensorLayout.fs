@@ -17,6 +17,26 @@ exception ImpossibleWithoutCopy of msg:string with override __.Message = __.msg
 
 
 
+/// memory ordering of tensor
+type TensorOrder =
+    /// row-major (C) order
+    | RowMajor
+    /// column-major (Fortran) order
+    | ColumnMajor
+    /// custom ordering of strides
+    | CustomOrder of int list
+
+
+
+/// part of a matrix
+type MatrixPart =
+    /// upper triangular part of the matrix
+    | UpperPart
+    /// lower triangular part of the matrix
+    | LowerPart
+    
+
+
 /// Layout (shape, offset, stride) of a Tensor.
 type TensorLayout = {
     /// Shape.

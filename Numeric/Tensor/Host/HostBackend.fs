@@ -98,6 +98,7 @@ type TensorHostStorage<'T> (data: 'T []) =
         RuntimeHelpers.GetHashCode data
         
 
+
 /// Backend for host tensors.
 and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>) =
 
@@ -120,16 +121,16 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         {Data=this.Data; FastLayout=this.FastLayout}
               
     /// gets DataAndLayout for specified tensors
-    static member internal GetDataAndLayout (t: Tensor<'T>) =
+    static member internal GetDataAndLayout (t: ITensorFrontend<'T>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout
 
     /// gets DataAndLayout for specified tensors
-    static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
+    static member internal GetDataAndLayout (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout 
 
     /// gets DataAndLayout for specified tensors
-    static member internal GetDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
+    static member internal GetDataAndLayout (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>, b: ITensorFrontend<'TB>) =
         (t.Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Backend :?> TensorHostBackend<'TA>).DataAndLayout,
         (b.Backend :?> TensorHostBackend<'TB>).DataAndLayout 
@@ -152,25 +153,25 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             trgt, srcs
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
-    static member internal ElemwiseDataAndLayout (t: Tensor<'T>) =        
+    static member internal ElemwiseDataAndLayout (t: ITensorFrontend<'T>) =        
         let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [])
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout        
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
-    static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>) =
+    static member internal ElemwiseDataAndLayout (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>) =
         let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout])
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout 
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
-    static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>) =
+    static member internal ElemwiseDataAndLayout (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>, b: ITensorFrontend<'TB>) =
         let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout; b.Layout])
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout,
         (b.Relayout(ls.[1]).Backend :?> TensorHostBackend<'TB>).DataAndLayout 
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
-    static member internal ElemwiseDataAndLayout (t: Tensor<'T>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) =
+    static member internal ElemwiseDataAndLayout (t: ITensorFrontend<'T>, a: ITensorFrontend<'TA>, b: ITensorFrontend<'TB>, c: ITensorFrontend<'TC>) =
         let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [a.Layout; b.Layout; c.Layout])
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout,
@@ -507,7 +508,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                         let trgt = trgt |> box :?> Tensor<double>
                         trgt.Value <- BLAS.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
             else
-                trgt.FillSumAxis 0 (a * b)
+                (trgt :?> Tensor<'T>).FillSumAxis 0 ((a :?> Tensor<'T>) * (b :?> Tensor<'T>))
 
         member this.MatVecDot (trgt, a, b) =
             if isBlasSupported then
@@ -525,7 +526,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                            0.0, y.Ptr, y.Inc)))  
                 y.FetchResult()
             else
-                trgt.FillSumAxis 1 (a * Tensor.padLeft b)
+                (trgt :?> Tensor<'T>).FillSumAxis 1 ((a :?> Tensor<'T>) * Tensor.padLeft (b :?> Tensor<'T>))
 
         member this.MatMatDot (trgt, a, b) =
             if isBlasSupported then
@@ -543,7 +544,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                            0.0, c.Ptr, c.Ld)))              
                 c.FetchResult()
             else
-                trgt.FillSumAxis 1 (Tensor.padRight a * Tensor.padLeft b)
+                (trgt :?> Tensor<'T>).FillSumAxis 1 (Tensor.padRight (a :?> Tensor<'T>) * Tensor.padLeft (b :?> Tensor<'T>))
 
         member this.BatchedMatMatDot (trgt, a, b) =
             if isBlasSupported then
@@ -565,7 +566,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                                                                  1L, [|a.BatchSize|])))
                 c.FetchResult()
             else
-                trgt.FillSumAxis 2 (a.[*, *, *, NewAxis] * b.[*, NewAxis, *, *])
+                (trgt :?> Tensor<'T>).FillSumAxis 2 ((a :?> Tensor<'T>).[*, *, *, NewAxis] * (b :?> Tensor<'T>).[*, NewAxis, *, *])
 
         member this.BatchedInvert (trgt, src) =
             if not isBlasSupported then
