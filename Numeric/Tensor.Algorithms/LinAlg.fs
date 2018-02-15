@@ -109,7 +109,7 @@ module LinAlg =
 
         // extract unnormalized columns from row echelon form E
         let U = 
-            if List.isEmpty unCols then Tensor.zeros<'T> L.Dev [rows; 0L]
+            if List.isEmpty unCols then Tensor<'T>.zeros L.Dev [rows; 0L]
             else
                 unCols
                 |> List.map (fun c -> E.[*, c..c])

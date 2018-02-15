@@ -44,23 +44,23 @@ module HostTensor =
 
     let transfer x = Tensor.transfer Dev x
 
-    let empty<'T> = Tensor.empty<'T> Dev
+    let empty<'T> = Tensor<'T>.empty Dev
 
-    let zeros<'T> = Tensor.zeros<'T> Dev 
+    let zeros<'T> = Tensor<'T>.zeros Dev 
 
-    let ones<'T> = Tensor.ones<'T> Dev
+    let ones<'T> = Tensor<'T>.ones Dev
 
     let falses = Tensor.falses Dev
 
     let trues = Tensor.trues Dev
 
-    let scalar<'T> = Tensor.scalar<'T> Dev
+    let scalar<'T> = Tensor<'T>.scalar Dev
 
-    let init<'T> = Tensor.init<'T> Dev
+    let init<'T> = Tensor<'T>.init Dev
 
-    let filled<'T> = Tensor.filled<'T> Dev
+    let filled<'T> = Tensor<'T>.filled Dev
 
-    let identity<'T> = Tensor.identity<'T> Dev
+    let identity<'T> = Tensor<'T>.identity Dev
 
     let counting = Tensor.counting Dev
 

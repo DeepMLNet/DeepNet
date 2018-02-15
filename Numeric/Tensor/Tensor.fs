@@ -1988,135 +1988,35 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     override this.GetHashCode () =
         hash (this.Storage, this.Layout)
 
-
-
-
-/// An N-dimensional array with elements of type 'T.
-type Tensor = 
-
-    /// checks that all tensors have the same storage
-    static member internal CheckSameStorage (xs: ITensor list) =
-        match xs with
-        | x::rs when rs |> List.exists (fun r -> x.Dev <> r.Dev) ->
-            let storages = xs |> List.map (fun x -> x.Dev.Id)
-            invalidOp "Storage devices must be equal for this operation, but they are %A." storages
-        | _ -> ()            
-
-    /// checks that two tensors have the same shape
-    static member internal CheckSameShape (a: ITensor) (b: ITensor) =
-        if a.Shape <> b.Shape then
-            invalidArg "b" "Tensors of shapes %A and %A were expected to have same shape" a.Shape b.Shape
-
-    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareElemwiseSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
-        Tensor.CheckSameStorage [trgt; a]
-        let a = a |> Tensor<_>.broadcastTo trgt.Shape
-        a
-
-    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>) 
-            : (Tensor<'TA> * Tensor<'TB>) =
-        Tensor.CheckSameStorage [trgt; a; b]
-        let a = a |> Tensor<_>.broadcastTo trgt.Shape
-        let b = b |> Tensor<_>.broadcastTo trgt.Shape
-        a, b
-
-    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
-    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB, 'TC> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
-            : (Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
-        Tensor.CheckSameStorage [trgt; a; b; c]
-        let a = a |> Tensor<_>.broadcastTo trgt.Shape
-        let b = b |> Tensor<_>.broadcastTo trgt.Shape
-        let c = c |> Tensor<_>.broadcastTo trgt.Shape
-        a, b, c
-
-    /// Prepares the sources of an axis reduce operation (e.g. sum over axis),
-    /// by moving the reduction axis to be the last axis in the source.
-    static member internal PrepareAxisReduceSources<'TR, 'TA> 
-            (trgt: Tensor<'TR>, axis: int, a: Tensor<'TA>,
-             initial: Tensor<'TR> option) : (Tensor<'TA> * Tensor<'TR> option) =
-        Tensor.CheckSameStorage [trgt; a]
-        a.CheckAxis axis
-        let redShp = a.Shape |> List.without axis
-        if trgt.Shape <> redShp then
-            invalidOp "Reduction of tensor %A along axis %d gives shape %A but target has shape %A." 
-                      a.Shape axis redShp trgt.Shape
-        let initial =
-            match initial with
-            | Some initial -> 
-                Tensor.CheckSameStorage [trgt; initial]
-                initial |> Tensor.broadcastTo redShp |> Some  
-            | None -> None                                       
-        let axisToLast = [
-            for d in 0 .. axis-1 do yield d
-            yield a.NDims-1
-            for d in axis+1 .. a.NDims-1 do yield d-1
-        ]
-        let a = a |> Tensor<_>.permuteAxes axisToLast
-        if not (trgt.Shape = a.Shape.[0 .. a.NDims-2]) then
-            failwith "Internal axis reduce shape computation error."
-        a, initial
-
-    /// prepares an axis reduce operation by allocating a target of appropriate size and storage
-    static member internal PrepareAxisReduceTarget<'TR, 'TA> (axis: int, a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
-        a.CheckAxis axis
-        let redShp = a.Shape |> List.without axis        
-        let trgt = Tensor<'TR> (redShp, a.Storage.Dev, ?order=order)
-        trgt, a
-
-    /// prepares an elementwise operation by allocating a target of same size and storage
-    static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
-        trgt, a
-
-    /// prepares an elementwise operation by broadcasting both tensors to the same size
-    /// and allocating a target of same size and storage
-    static member internal PrepareElemwise<'TR, 'TA, 'TB> (a: Tensor<'TA>, b: Tensor<'TB>, ?order: TensorOrder) 
-            : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB>) =
-        Tensor.CheckSameStorage [a; b]
-        let a, b = Tensor<_>.broadcastToSame (a, b)
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
-        trgt, a, b
-
-    /// prepares an elementwise operation by broadcasting all three tensors to the same size
-    /// and allocating a target of same size and storage
-    static member internal PrepareElemwise<'TR, 'TA, 'TB, 'TC> (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>, ?order: TensorOrder) 
-            : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
-        Tensor.CheckSameStorage [a; b; c]
-        let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
-        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
-        trgt, a, b, c
-
     /// Creates a new tensor of the given shape and data type.
     static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
         Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor
 
     /// Creates a new empty tensor with the given number of dimensions.
-    static member empty<'T> (dev: ITensorDevice) (nDims: int) : Tensor<'T> =
+    static member empty (dev: ITensorDevice) (nDims: int) : Tensor<'T> =
         Tensor<'T> (List.init nDims (fun _ -> 0L), dev)
 
     /// Creates a new tensor of given shape filled with zeros.
-    static member zeros<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
+    static member zeros (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
-        //x.FillConst Tensor<'T>.Zero
         if not dev.Zeroed then 
             x.FillConst Tensor<'T>.Zero
         x
    
     /// Tensor of same shape as specifed tensor and filled with zeros.
-    static member zerosLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.zeros<'T> tmpl.Storage.Dev tmpl.Shape
+    static member zerosLike (tmpl: Tensor<'T>) : Tensor<'T> =
+        Tensor<'T>.zeros tmpl.Storage.Dev tmpl.Shape
 
     /// Creates a new tensor of given shape filled with ones.
-    static member ones<'T> (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
+    static member ones (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst Tensor<'T>.One
         x
         
     /// Tensor of same shape as specifed tensor and filled with ones.
-    static member onesLike<'T> (tmpl: Tensor<'T>) : Tensor<'T> =
-        Tensor.ones<'T> tmpl.Storage.Dev tmpl.Shape 
+    static member onesLike (tmpl: Tensor<'T>) : Tensor<'T> =
+        Tensor<'T>.ones tmpl.Storage.Dev tmpl.Shape 
 
     /// Creates a new boolean tensor of given shape filled with false.
     static member falses (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
@@ -2131,31 +2031,31 @@ type Tensor =
         x   
 
     /// Creates a new tensor of scalar shape with the given value and storage.
-    static member scalar<'T> (dev: ITensorDevice) (value: 'T) : Tensor<'T> =
+    static member scalar (dev: ITensorDevice) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> ([], dev)
         x.Value <- value
         x
 
     /// Creates a new tensor of scalar shape with the given value and 
     /// same storage as the specified tensor.
-    static member scalarLike<'T> (tmpl: ITensor) (value: 'T) : Tensor<'T> =
-        Tensor.scalar<'T> tmpl.Storage.Dev value 
+    static member scalarLike (tmpl: ITensor) (value: 'T) : Tensor<'T> =
+        Tensor<'T>.scalar tmpl.Storage.Dev value 
 
     /// Creates a tensor with the values returned by the function.
-    static member init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+    static member init (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillIndexed fn
         x           
 
     /// Creates a tensor filled with the specified value.
-    static member filled<'T> (dev: ITensorDevice) (shape: int64 list) (value: 'T) : Tensor<'T> =
+    static member filled (dev: ITensorDevice) (shape: int64 list) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst value
         x           
 
     /// Identity matrix of given size.
-    static member identity<'T> (dev: ITensorDevice) (size: int64) : Tensor<'T> =
-        let x = Tensor.zeros<'T> dev [size; size]
+    static member identity (dev: ITensorDevice) (size: int64) : Tensor<'T> =
+        let x = Tensor<'T>.zeros dev [size; size]
         let d : Tensor<'T> = Tensor.diag x
         d.FillConst Tensor<'T>.One
         x           
@@ -2492,7 +2392,105 @@ type Tensor =
         
 
 
-/// Container for Tensor.Parallel.
+/// See Tensor<'T>.
+type Tensor = 
+
+    /// checks that all tensors have the same storage
+    static member internal CheckSameStorage (xs: ITensor list) =
+        match xs with
+        | x::rs when rs |> List.exists (fun r -> x.Dev <> r.Dev) ->
+            let storages = xs |> List.map (fun x -> x.Dev.Id)
+            invalidOp "Storage devices must be equal for this operation, but they are %A." storages
+        | _ -> ()            
+
+    /// checks that two tensors have the same shape
+    static member internal CheckSameShape (a: ITensor) (b: ITensor) =
+        if a.Shape <> b.Shape then
+            invalidArg "b" "Tensors of shapes %A and %A were expected to have same shape" a.Shape b.Shape
+
+    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
+    static member internal PrepareElemwiseSources<'TR, 'TA> (trgt: Tensor<'TR>, a: Tensor<'TA>) : Tensor<'TA> =
+        Tensor.CheckSameStorage [trgt; a]
+        let a = a |> Tensor<_>.broadcastTo trgt.Shape
+        a
+
+    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
+    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>) 
+            : (Tensor<'TA> * Tensor<'TB>) =
+        Tensor.CheckSameStorage [trgt; a; b]
+        let a = a |> Tensor<_>.broadcastTo trgt.Shape
+        let b = b |> Tensor<_>.broadcastTo trgt.Shape
+        a, b
+
+    /// prepares the sources of an elementwise operation by broadcasting them to the target shape
+    static member internal PrepareElemwiseSources<'TR, 'TA, 'TB, 'TC> (trgt: Tensor<'TR>, a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>) 
+            : (Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
+        Tensor.CheckSameStorage [trgt; a; b; c]
+        let a = a |> Tensor<_>.broadcastTo trgt.Shape
+        let b = b |> Tensor<_>.broadcastTo trgt.Shape
+        let c = c |> Tensor<_>.broadcastTo trgt.Shape
+        a, b, c
+
+    /// Prepares the sources of an axis reduce operation (e.g. sum over axis),
+    /// by moving the reduction axis to be the last axis in the source.
+    static member internal PrepareAxisReduceSources<'TR, 'TA> 
+            (trgt: Tensor<'TR>, axis: int, a: Tensor<'TA>,
+             initial: Tensor<'TR> option) : (Tensor<'TA> * Tensor<'TR> option) =
+        Tensor.CheckSameStorage [trgt; a]
+        a.CheckAxis axis
+        let redShp = a.Shape |> List.without axis
+        if trgt.Shape <> redShp then
+            invalidOp "Reduction of tensor %A along axis %d gives shape %A but target has shape %A." 
+                      a.Shape axis redShp trgt.Shape
+        let initial =
+            match initial with
+            | Some initial -> 
+                Tensor.CheckSameStorage [trgt; initial]
+                initial |> Tensor.broadcastTo redShp |> Some  
+            | None -> None                                       
+        let axisToLast = [
+            for d in 0 .. axis-1 do yield d
+            yield a.NDims-1
+            for d in axis+1 .. a.NDims-1 do yield d-1
+        ]
+        let a = a |> Tensor<_>.permuteAxes axisToLast
+        if not (trgt.Shape = a.Shape.[0 .. a.NDims-2]) then
+            failwith "Internal axis reduce shape computation error."
+        a, initial
+
+    /// prepares an axis reduce operation by allocating a target of appropriate size and storage
+    static member internal PrepareAxisReduceTarget<'TR, 'TA> (axis: int, a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
+        a.CheckAxis axis
+        let redShp = a.Shape |> List.without axis        
+        let trgt = Tensor<'TR> (redShp, a.Storage.Dev, ?order=order)
+        trgt, a
+
+    /// prepares an elementwise operation by allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA> (a: Tensor<'TA>, ?order: TensorOrder) : (Tensor<'TR> * Tensor<'TA>) =
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
+        trgt, a
+
+    /// prepares an elementwise operation by broadcasting both tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA, 'TB> (a: Tensor<'TA>, b: Tensor<'TB>, ?order: TensorOrder) 
+            : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB>) =
+        Tensor.CheckSameStorage [a; b]
+        let a, b = Tensor<_>.broadcastToSame (a, b)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
+        trgt, a, b
+
+    /// prepares an elementwise operation by broadcasting all three tensors to the same size
+    /// and allocating a target of same size and storage
+    static member internal PrepareElemwise<'TR, 'TA, 'TB, 'TC> (a: Tensor<'TA>, b: Tensor<'TB>, c: Tensor<'TC>, ?order: TensorOrder) 
+            : (Tensor<'TR> * Tensor<'TA> * Tensor<'TB> * Tensor<'TC>) =
+        Tensor.CheckSameStorage [a; b; c]
+        let a, b, c = Tensor<_>.broadcastToSame (a, b, c)
+        let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
+        trgt, a, b, c
+
+
+
+/// See Tensor.Parallel.
 module Tensor =
 
     /// Multi-threaded operations of Tensor<'T>.
