@@ -127,6 +127,14 @@ type ITensor =
 
 
 
+/// Block tensor specification.
+type BlockTensor<'T> =
+    /// A block consisting of multiple sub-blocks.
+    | SubBlocks of BlockTensor<'T> list
+    /// A block consisting of a single tensor.
+    | Block of Tensor<'T>
+
+
 
 /// An N-dimensional array with elements of type 'T.
 type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
@@ -1981,12 +1989,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         hash (this.Storage, this.Layout)
 
 
-/// block tensor specification
-type BlockTensor<'T> =
-    /// a block consisting of multiple sub-blocks
-    | SubBlocks of BlockTensor<'T> list
-    /// a block consisting of a tensor
-    | Block of Tensor<'T>
 
 
 /// An N-dimensional array with elements of type 'T.
@@ -2460,8 +2462,7 @@ type Tensor =
     /// Replicates the tensor the given number of repetitions along the given axis.
     static member replicate (ax: int) (reps: int64) (a: Tensor<'T>) =
         a.CheckAxis ax
-        if reps < 0L then
-            invalidArg "reps" "number of repetitions cannot be negative"
+        if reps < 0L then invalidArg "reps" "Number of repetitions cannot be negative."
 
         // 1. insert axis of size one left to repetition axis
         // 2. broadcast along the new axis to number of repetitions
@@ -2486,16 +2487,15 @@ type Tensor =
 
     /// calculates the pairwise differences along the last axis
     static member diff (a: Tensor<'T>) =
-        if a.NDims < 1 then
-            invalidArg "a" "need at least a vector to calculate diff"
+        if a.NDims < 1 then invalidArg "a" "Need at least a vector to calculate diff."
         Tensor.diffAxis (a.NDims-1) a
         
 
 
-/// An N-dimensional array with elements of type 'T.
+/// Container for Tensor.Parallel.
 module Tensor =
 
-    /// Multi-threaded tensor operations.
+    /// Multi-threaded operations of Tensor<'T>.
     type Parallel = 
 
         /// Creates a new tensor with the values returned by the function.
