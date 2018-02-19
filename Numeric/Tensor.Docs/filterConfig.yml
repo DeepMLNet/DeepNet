@@ -1,0 +1,17 @@
+apiRules:
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Item
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.GetSlice
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.SetSlice
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Tensor.ITensor
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Tensor\.Backend\.ITensorFrontend`1  
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.System\.Collections\.Generic\.IEnumerable`1
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.System\.Collections\.IEnumerable
+- exclude:
+    uidRegex: ^Tensor\.Util
