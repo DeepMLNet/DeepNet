@@ -6,6 +6,8 @@ apiRules:
 - exclude:
     uidRegex: ^Tensor\.ITensor\.SetSlice
 - exclude:
+    uidRegex: ^Tensor\.Tensor$
+- exclude:
     uidRegex: ^Tensor\.Tensor`1\.Item
 - exclude:
     uidRegex: ^Tensor\.Tensor`1\.GetSlice
