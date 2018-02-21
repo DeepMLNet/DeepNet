@@ -1,6 +1,4 @@
-﻿// Learn more about F# at http://fsharp.org
-
-open System
+﻿open System
 open System.IO
 open System.Text.RegularExpressions
 
@@ -12,6 +10,19 @@ type Member = {
     Name: string
     Summary: string
 }
+
+// Okay, what to do here?
+// first, we definitely need links
+// seconds the element-wise functions are a bit sucky, because they should not be called directly
+// thirdly, we need operators, especially the comparison thingies
+// big problem is how to document the operators...
+// actually, it does not even make sense to link to the member functions, does it???
+// Well it is actually okay, when in the sample we call them directly
+// Problem with overrides is that documentation then becomes solely docfx accessible which might be undesired.
+// so best keep documentation in source as much as possible.
+// Put in source for now.
+// Try writing exemplary documentation for Abs.
+
 
 let sections = [
     "Elementwise functions", 

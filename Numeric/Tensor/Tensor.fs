@@ -618,12 +618,28 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.FillUnaryMinus (a)
         trgt
 
-    /// element-wise absolute value  using this tensor as target
+    /// <summary>Fills this tensor with the element-wise absolute value of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-2; -1; 1]
+    /// a.FillAbs a // a = [2; 1; 1]
+    /// </code></example>
+    /// <remarks>Computes the absolute value of each element of the specified tensor and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
     member trgt.FillAbs (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Abs (trgt=trgt, src1=a)
 
-    /// element-wise absolute value
+    /// <summary>Element-wise absolute value.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-2; -1; 1]
+    /// let b = abs b // b = [2; 1; 1]
+    /// </code></example>
+    /// <remarks>Computes the absolute value of each element of the specified tensor and returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>abs</c> function.</remarks>
+    /// <seealso cref="M:Tensor.Tensor`1.FillAbs(Tensor.Tensor<'T>)"/>
     static member Abs (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillAbs (a)
