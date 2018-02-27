@@ -636,7 +636,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <returns>A new tensor containing the result of this operation.</returns>
     /// <example><code language="fsharp">
     /// let a = HostTensor.ofList [-2; -1; 1]
-    /// let b = abs b // b = [2; 1; 1]
+    /// let b = abs a // b = [2; 1; 1]
     /// </code></example>
     /// <remarks>Computes the absolute value of each element of the specified tensor and returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>abs</c> function.</remarks>
@@ -646,199 +646,534 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.FillAbs (a)
         trgt
 
-    /// element-wise sign (keeping type) using this tensor as target
+    /// <summary>Fills this tensor with the element-wise sign of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-2; -1; 0; 2]
+    /// a.FillSgn a // a = [-1; -1; 0; 1]
+    /// </code></example>
+    /// <remarks>Computes the sign of each element of the specified tensor and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Sgn"/>
     member trgt.FillSgn (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sgn (trgt=trgt, src1=a)
 
-    /// element-wise sign (keeping type)
+    /// <summary>Element-wise sign.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-2; -1; 0; 2]
+    /// let b = sgn a // b = [-1; -1; 0; 1]
+    /// </code></example>
+    /// <remarks>Computes the sign of each element of the specified tensor and returns them as a new tensor.
+    /// The type of the returned tensor matches the type of the argument tensor.
+    /// Do not call this function directly; instead use the F# <c>sgn</c> function.</remarks>
+    /// <seealso cref="FillSgn"/>
     static member Sgn (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillSgn (a)
         trgt
 
-    /// element-wise logarithm to base e using this tensor as target
+    /// <summary>Fills this tensor with the element-wise natural logarithm of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 2.71828; 4.0]
+    /// a.FillLog a // a = [0.0; 1.0; 1.38529]
+    /// </code></example>
+    /// <remarks>Computes the natural logarithm of each element of the specified tensor and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Log"/>
     member trgt.FillLog (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log (trgt=trgt, src1=a)
 
-    /// element-wise logarithm to base e
+    /// <summary>Element-wise natural logarithm.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 2.71828; 4.0]
+    /// let b = log a // b = [0.0; 1.0; 1.38529]
+    /// </code></example>
+    /// <remarks>Computes the natural logarithm of each element of the specified tensor and returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>log</c> function.</remarks>
+    /// <seealso cref="FillLog"/><seealso cref="Log10"/><seealso cref="Exp"/>
     static member Log (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillLog (a)
         trgt
 
-    /// element-wise logarithm to base 10 using this tensor as target
+    /// <summary>Fills this tensor with the element-wise common logarithm of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 10.0; 100.0]
+    /// a.FillLog a // a = [0.0; 1.0; 2.0]
+    /// </code></example>
+    /// <remarks>Computes the common logarithm (to base 10) of each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Log10"/>
     member trgt.FillLog10 (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log10 (trgt=trgt, src1=a)
 
-    /// element-wise logarithm to base 10
+    /// <summary>Element-wise common logarithm.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 10.0; 100.0]
+    /// let b = log10 a // b = [0.0; 1.0; 2.0]
+    /// </code></example>
+    /// <remarks>Computes the common logarithm (to base 10) of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>log10</c> function.</remarks>
+    /// <seealso cref="FillLog10"/><seealso cref="Log"/>
     static member Log10 (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillLog10 (a)
         trgt
 
-    /// element-wise exponential function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise exponential function of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0; 10.0]
+    /// a.FillExp a // a = [0.36787; 1.0; 2.71828; 22026.4657]
+    /// </code></example>
+    /// <remarks>Computes the exponential function of each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Exp"/>
     member trgt.FillExp (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Exp (trgt=trgt, src1=a)
 
-    /// element-wise exponential function
+    /// <summary>Element-wise exponential function.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0; 10.0]
+    /// let b = exp a // b = [0.36787; 1.0; 2.71828; 22026.4657]
+    /// </code></example>
+    /// <remarks>Computes the exponential function of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>exp</c> function.</remarks>
+    /// <seealso cref="FillExp"/><seealso cref="Log"/>
     static member Exp (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillExp (a)
         trgt
 
-    /// element-wise sinus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise sine of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillSin a // a = [-1.0; 0.0; 1.0]
+    /// </code></example>
+    /// <remarks>Computes the sine each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Sin"/>
     member trgt.FillSin (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sin (trgt=trgt, src1=a)
 
-    /// element-wise sinus function
+    /// <summary>Element-wise sine.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = sin a // b = [-1.0; 0.0; 1.0]
+    /// </code></example>
+    /// <remarks>Computes the sine of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>sin</c> function.</remarks>
+    /// <seealso cref="FillSin"/><seealso cref="Asin"/>
     static member Sin (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillSin (a)
         trgt
 
-    /// element-wise cosinus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise cosine of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillCos a // a = [0.0; 1.0; 0.0]
+    /// </code></example>
+    /// <remarks>Computes the cosine each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Cos"/>
     member trgt.FillCos (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cos (trgt=trgt, src1=a)
 
-    /// element-wise cosinus function
+    /// <summary>Element-wise cosine.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = cos a // b = [0.0; 1.0; 0.0]
+    /// </code></example>
+    /// <remarks>Computes the cosine of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>cos</c> function.</remarks>
+    /// <seealso cref="FillCos"/><seealso cref="Acos"/>
     static member Cos (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillCos (a)
         trgt
 
-    /// element-wise tangens function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise tangent of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillTan a // a = [-158057.9134; 0.0; 158057.9134]
+    /// </code></example>
+    /// <remarks>Computes the tangent of each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Tan"/>
     member trgt.FillTan (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tan (trgt=trgt, src1=a)
 
-    /// element-wise tangens function
+    /// <summary>Element-wise tangent.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = tan a // b = [-158057.9134; 0.0; 158057.9134]
+    /// </code></example>
+    /// <remarks>Computes the tangent of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>tan</c> function.</remarks>
+    /// <seealso cref="FillTan"/><seealso cref="Atan"/>
     static member Tan (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillTan (a)
         trgt
 
-    /// element-wise arcus sinus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise arcsine (inverse sine) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// a.FillAsin a // a = [-1.57079; 0.0; 1.57079]
+    /// </code></example>
+    /// <remarks>Computes the arcsine (inverse sine) each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Asin"/>
     member trgt.FillAsin (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Asin (trgt=trgt, src1=a)
 
-    /// element-wise arcus sinus function
+    /// <summary>Element-wise arcsine (inverse sine).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// let b = asin a // b = [-1.57079; 0.0; 1.57079]
+    /// </code></example>
+    /// <remarks>Computes the arcsine (inverse sine) of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>asin</c> function.</remarks>
+    /// <seealso cref="FillAsin"/><seealso cref="Sin"/>
     static member Asin (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillAsin (a)
         trgt
 
-    /// element-wise arcus cosinus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise arccosine (inverse cosine) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// a.FillAcos a // a = [3.15159; 1.57079; 0.0]
+    /// </code></example>
+    /// <remarks>Computes the arccosine (inverse cosine) each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Acos"/>
     member trgt.FillAcos (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Acos (trgt=trgt, src1=a)
 
-    /// element-wise arcus cosinus function
+    /// <summary>Element-wise arccosine (inverse cosine).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// let b = acos a // b = [3.15159; 1.57079; 0.0]
+    /// </code></example>
+    /// <remarks>Computes the arccosine (inverse cosine) of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>acos</c> function.</remarks>
+    /// <seealso cref="FillAcos"/><seealso cref="Cos"/>
     static member Acos (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillAcos (a)
         trgt
 
-    /// element-wise arcus tangens function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise arctanget (inverse tangent) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// a.FillAtan a // a = [-0.78539; 0.0; 0.78539]
+    /// </code></example>
+    /// <remarks>Computes the arctanget (inverse tangent) each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Atan"/>
     member trgt.FillAtan (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Atan (trgt=trgt, src1=a)
 
-    /// element-wise arcus tangens function
+    /// <summary>Element-wise arctanget (inverse tangent).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.0; 0.0; 1.0]
+    /// let b = atan a // b = [-0.78539; 0.0; 0.78539]
+    /// </code></example>
+    /// <remarks>Computes the arctanget (inverse tangent) of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>atan</c> function.</remarks>
+    /// <seealso cref="FillAcos"/><seealso cref="Tan"/>
     static member Atan (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillAtan (a)
         trgt
 
-    /// element-wise sinus hyperbolicus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise hyperbolic sine of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillSinh a // a = [-2.30128; 0.0; 2.30128]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic sine each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Sinh"/>
     member trgt.FillSinh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sinh (trgt=trgt, src1=a)
 
-    /// element-wise sinus hyperbolicus function
+    /// <summary>Element-wise hyperbolic sine.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = sinh a // b = [-2.30128; 0.0; 2.30128]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic sine of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>sinh</c> function.</remarks>
+    /// <seealso cref="FillSinh"/>
     static member Sinh (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillSinh (a)
         trgt
 
-    /// element-wise cosinus hyperbolicus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise hyperbolic cosine of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillCosh a // a = [2.50916; 1.0; 2.50916]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic cosine each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Cosh"/>
     member trgt.FillCosh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cosh (trgt=trgt, src1=a)
 
-    /// element-wise cosinus hyperbolicus function
+    /// <summary>Element-wise hyperbolic cosine.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = cosh a // b = [2.50916; 1.0; 2.50916]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic cosine of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>cosh</c> function.</remarks>
+    /// <seealso cref="FillCosh"/>
     static member Cosh (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillCosh (a)
         trgt
 
-    /// element-wise tangens hyperbolicus function using this tensor as target
+    /// <summary>Fills this tensor with the element-wise hyperbolic tangent of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// a.FillTanh a // a = [-0.91715; 0.0; 0.91715]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic tangent of each element of the specified tensor and writes them 
+    /// into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Tanh"/>
     member trgt.FillTanh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tanh (trgt=trgt, src1=a)
 
-    /// element-wise tangens hyperbolicus function
+    /// <summary>Element-wise hyperbolic tangent.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-1.57079; 0.0; 1.57079]
+    /// let b = tanh a // b = [-0.91715; 0.0; 0.91715]
+    /// </code></example>
+    /// <remarks>Computes the hyperbolic tangent of each element of the specified tensor and returns them 
+    /// as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>tanh</c> function.</remarks>
+    /// <seealso cref="FillTanh"/>
     static member Tanh (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillTanh (a)
         trgt
 
-    /// element-wise square root using this tensor as target
+    /// <summary>Fills this tensor with the element-wise square root of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 4.0; 16.0]
+    /// a.FillSqrt a // a = [1.0; 2.0; 4.0]
+    /// </code></example>
+    /// <remarks>Computes the square root of each element of the specified tensor and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Sqrt"/>
     member trgt.FillSqrt (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sqrt (trgt=trgt, src1=a)
 
-    /// element-wise square root 
+    /// <summary>Element-wise square root.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1.0; 4.0; 16.0]
+    /// let b = sqrt a // b = [1.0; 2.0; 4.0]
+    /// </code></example>
+    /// <remarks>Computes the square root of each element of the specified tensor and returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>sqrt</c> function.</remarks>
+    /// <seealso cref="FillSqrt"/>
     static member Sqrt (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillSqrt (a)
         trgt
 
-    /// element-wise ceiling using this tensor as target
+    /// <summary>Fills this tensor with the element-wise ceiling (round towards positive infinity) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// a.FillCeiling a // a = [-3.0; -2.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the ceiling (round towards positive infinity) of each element of the specified tensor 
+    /// and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Ceiling"/>
     member trgt.FillCeiling (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Ceiling (trgt=trgt, src1=a)
 
-    /// element-wise ceiling
+    /// <summary>Element-wise ceiling (round towards positive infinity).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// let b = ceil a // b = [-3.0; -2.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the ceiling (round towards positive infinity) of each element of the specified tensor and 
+    /// returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>ceil</c> function.</remarks>
+    /// <seealso cref="FillCeiling"/>
     static member Ceiling (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillCeiling (a)
         trgt
 
-    /// element-wise floor using this tensor as target
+    /// <summary>Fills this tensor with the element-wise floor (round towards negative infinity) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// a.FillCeiling a // a = [-3.0; -3.0; 2.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the ceiling (round towards negative infinity) of each element of the specified tensor 
+    /// and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Floor"/>
     member trgt.FillFloor (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Floor (trgt=trgt, src1=a)
 
-    /// element-wise floor
+    /// <summary>Element-wise floor (round towards negative infinity).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// let b = floor a // b = [-3.0; -3.0; 2.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the floor (round towards negative infinity) of each element of the specified tensor and 
+    /// returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>floor</c> function.</remarks>
+    /// <seealso cref="FillFloor"/>
     static member Floor (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillFloor (a)
         trgt
 
-    /// element-wise rounding using this tensor as target
+    /// <summary>Fills this tensor with the element-wise rounding of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// a.FillRound a // a = [-3.0; -3.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the rounding of each element of the specified tensor and writes them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Round"/>
     member trgt.FillRound (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Round (trgt=trgt, src1=a)
 
-    /// element-wise rounding
+    /// <summary>Element-wise rounding.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// let b = round a // b = [-3.0; -3.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the rounding of each element of the specified tensor and returns them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>round</c> function.</remarks>
+    /// <seealso cref="FillRound"/>
     static member Round (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillRound (a)
         trgt
 
-    /// element-wise truncation using this tensor as target
+    /// <summary>Fills this tensor with the element-wise truncation (rounding towards zero) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// a.FillTruncate a // a = [-3.0; -2.0; 2.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the truncation (rounding towards zero) of each element of the specified tensor and writes 
+    /// them into this tensor.
+    /// This tensor and <paramref name="a"/> must have the same shape, type and storage.</remarks>
+    /// <seealso cref="Truncate"/>
     member trgt.FillTruncate (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Truncate (trgt=trgt, src1=a)
 
-    /// element-wise truncation
+    /// <summary>Element-wise truncation (rounding towards zero).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-3.0; -2.7; 2.7; 3.0]
+    /// let b = truncate a // b = [-3.0; -2.0; 2.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the truncation (rounding towards zero) of each element of the specified tensor and returns
+    /// them as a new tensor.
+    /// Do not call this function directly; instead use the F# <c>truncate</c> function.</remarks>
+    /// <seealso cref="FillTruncate"/>
     static member Truncate (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillTruncate (a)
