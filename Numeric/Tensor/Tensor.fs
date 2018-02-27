@@ -1179,106 +1179,482 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.FillTruncate (a)
         trgt
 
-    /// element-wise check if elements are finite (not -Inf, Inf or NaN) using this tensor as target
+    /// <summary>Fills this tensor with the element-wise finity check (not -Inf, Inf or NaN) of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-infinity; -3.0; nan; 3.0; infinity]
+    /// a.FillIsFinite a // a = [false; true; false; true; false]
+    /// </code></example>
+    /// <remarks>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN) and writes 
+    /// them into this tensor.
+    /// This tensor must be of type <c>bool</c>.
+    /// This tensor and <paramref name="a"/> must have the same shape and storage.</remarks>
+    /// <seealso cref="isFinite"/>
     member trgt.FillIsFinite (a: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         a.Backend.IsFinite (trgt=trgt, src1=a)
 
-    /// element-wise check if elements are finite (not -Inf, Inf or NaN)
+    /// <summary>Element-wise finity check (not -Inf, Inf or NaN).</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [-infinity; -3.0; nan; 3.0; infinity]
+    /// let b = isFinite a // b = [false; true; false; true; false]
+    /// </code></example>
+    /// <remarks>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN) and returns
+    /// the results as a new tensor of type <c>bool</c>.
+    /// <seealso cref="FillIsFinite"/>
     static member isFinite (a: Tensor<'T>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillIsFinite (a)
         trgt
 
-    /// element-wise logical negation using this tensor as target
+    /// <summary>Fills this tensor with the element-wise logical negation of the argument.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; false]
+    /// a.FillNegate a // a = [false; true]
+    /// </code></example>
+    /// <remarks>Logically negates each element of the specified tensor and writes the result into this tensor.
+    /// This tensor and <paramref name="a"/> must be of type <c>bool</c>.
+    /// This tensor and <paramref name="a"/> must have the same shape and storage.</remarks>
+    /// <seealso cref="~~~~"/>
     member trgt.FillNegate (a: Tensor<bool>) = 
         let trgt = trgt.AsBool
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Negate (trgt=trgt, src1=a)
 
-    /// element-wise logical negation
+    /// <summary>Element-wise logical negation.</summary>
+    /// <param name="a">The tensor to apply this operation to.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; false]
+    /// let b = ~~~~a // b = [false; true]
+    /// </code></example>
+    /// <remarks>Logically negates each element of the specified tensor and returns the results as a new tensor.
+    /// </remarks>
+    /// <seealso cref="FillNegate"/>
     static member (~~~~) (a: Tensor<bool>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillNegate (a)
         trgt
 
-    /// element-wise addition of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise addition of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillAdd a b // b = [7.0; 9.0; 11.0]
+    /// </code></example>
+    /// <remarks>Adds each element of tensor <paramref name="a"/> to the corresponding element of tensor <paramref name="b"/>
+    /// and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="+"/>
     member trgt.FillAdd (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
    
-    /// element-wise addition of two tensors
+    /// <summary>Element-wise addition.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a + b // c = [7.0; 9.0; 11.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Adds each element of tensor <paramref name="a"/> to the corresponding element of tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillAdd"/>
     static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillAdd a b
         trgt
+
+    /// <summary>Element-wise addition with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a + b // c = [7.0; 8.0; 9.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Adds each element of tensor <paramref name="a"/> to the scalar <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>
     static member (+) (a: Tensor<'T>, b: 'T) = a + Tensor.scalarLike a b
+
+    /// <summary>Element-wise addition with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a + b // c = [7.0; 8.0; 9.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Adds the scalar <paramref name="a"/> to each element of the tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>
     static member (+) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a + b
 
-    /// element-wise subtraction of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise substraction of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillSubstract a b // b = [3.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>Substracts each element of tensor <paramref name="b"/> from the corresponding element of tensor <paramref name="a"/>
+    /// and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="-"/>
     member trgt.FillSubtract (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise subtraction of two tensors
+    /// <summary>Element-wise substraction.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a - b // c = [3.0; 3.0; 3.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Substracts each element of tensor <paramref name="b"/> from the corresponding element of tensor <paramref name="a"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillSubtract"/>
     static member (-) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillSubtract a b
         trgt
+
+    /// <summary>Element-wise substraction with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a - b // c = [3.0; 4.0; 5.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Substracts the scalar <paramref name="b"/> from each element of the tensor <paramref name="a"/> 
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>        
     static member (-) (a: Tensor<'T>, b: 'T) = a - Tensor.scalarLike a b
+
+    /// <summary>Element-wise substraction with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a - b // c = [-3.0; -4.0; -5.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Substracts each element of the tensor <paramref name="b"/> from the scalar <paramref name="a"/> 
+    /// and returns the results as a new tensor.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>    
     static member (-) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a - b
 
-    /// element-wise multiplication of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise multiplication of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillMultiply a b // b = [10.0; 18.0; 28.0]
+    /// </code></example>
+    /// <remarks>Multiplies each element of tensor <paramref name="a"/> to the corresponding element of tensor <paramref name="b"/>
+    /// and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="*"/>
     member trgt.FillMultiply (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise multiplication of two tensor
+    /// <summary>Element-wise multiplication.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a * b // c = [10.0; 18.0; 28.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Multiplies each element of tensor <paramref name="a"/> with the corresponding element of tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillMultiply"/>
     static member (*) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillMultiply a b
         trgt
+
+    /// <summary>Element-wise multiplication with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a * b // c = [10.0; 12.0; 14.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Multiplies each element of tensor <paramref name="a"/> with the scalar <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>        
     static member (*) (a: Tensor<'T>, b: 'T) = a * Tensor.scalarLike a b
+
+    /// <summary>Element-wise multiplication with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a * b // c = [10.0; 12.0; 14.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Multiplies the scalar <paramref name="a"/> with each element of the tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>    
     static member (*) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a * b
 
-    /// element-wise division of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise division of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillDivide a b // b = [2.5; 2.0; 1.75]
+    /// </code></example>
+    /// <remarks>Divides each element of tensor <paramref name="a"/> by the corresponding element of tensor <paramref name="b"/>
+    /// and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="/"/>
     member trgt.FillDivide (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise division of two tensors
+    /// <summary>Element-wise division.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a / b // c = [2.5; 2.0; 1.75]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Divides each element of tensor <paramref name="a"/> by the corresponding element of tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillDivide"/>
     static member (/) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillDivide a b
         trgt
+
+    /// <summary>Element-wise division with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a / b // c = [2.5; 3.0; 3.5]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Divides each element of tensor <paramref name="a"/> by the scalar <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>        
     static member (/) (a: Tensor<'T>, b: 'T) = a / Tensor.scalarLike a b
+
+    /// <summary>Element-wise division with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a / b // c = [0.4; 0.333; 0.286]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Divides the scalar <paramref name="a"/> by each element of the tensor <paramref name="b"/>
+    /// and returns the results as a new tensor.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>    
     static member (/) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a / b
 
-    /// element-wise modulo of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise remainder of the division of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillModulo a b // b = [1.0; 0.0; 3.0]
+    /// </code></example>
+    /// <remarks>Computes the remainder of dividing each element of tensor <paramref name="a"/> by the 
+    /// corresponding element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="%"/>
     member trgt.FillModulo (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise modulo of two tensors
+    /// <summary>Element-wise remainder of division.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a % b // c = [1.0; 0.0; 3.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the remainder of dividing each element of tensor <paramref name="a"/> by the corresponding 
+    /// element of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillModulo"/>
     static member (%) (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillModulo a b
         trgt
+
+    /// <summary>Element-wise remainder of division with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a % b // c = [1.0; 0.0; 1.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the remainder of dividing each element of tensor <paramref name="a"/> by the 
+    /// scalar <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>                
     static member (%) (a: Tensor<'T>, b: 'T) = a % Tensor.scalarLike a b
+
+    /// <summary>Element-wise division with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a % b // c = [2.0; 2.0; 2.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the remainder of dividing the scalar <paramref name="a"/> by each element of the 
+    /// tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>        
     static member (%) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a % b
 
-    /// element-wise power of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise exponentiation.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillPower a b // b = [25.0; 216.0; 2401.0]
+    /// </code></example>
+    /// <remarks>Computes the exponentiation of each element of tensor <paramref name="a"/> to the power given by the
+    /// corresponding element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="Pow"/>
     member trgt.FillPower (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise power of two tensors
+    /// <summary>Element-wise exponentiation.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a ** b // c = [25.0; 216.0; 2401.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the exponentiation of each element of tensor <paramref name="a"/> to the power given by the
+    /// corresponding element of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>Do not call this function directly; instead use the F# <c>**</c> operator.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillPower"/>
     static member Pow (a: Tensor<'T>, b: Tensor<'T>) = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillPower a b
         trgt
+
+    /// <summary>Element-wise exponentiation with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = 2.0
+    /// let c = a ** b // c = [25.0; 36.0; 49.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the exponentiation of each element of tensor <paramref name="a"/> to the power given by the
+    /// scalar <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>Do not call this function directly; instead use the F# <c>**</c> operator.</para>
+    /// <para>The tensor <paramref name="a"/> and scalar <paramref name="b"/> must have the same type.</para>
+    /// </remarks>
     static member Pow (a: Tensor<'T>, b: 'T) = a ** Tensor.scalarLike a b
+
+    /// <summary>Element-wise exponentiation with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 2.0
+    /// let b = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = a ** b // c = [32.0; 64.0; 128.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the exponentiation of the scalar <paramref name="a"/> to the power given by the
+    /// each element of the tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>Do not call this function directly; instead use the F# <c>**</c> operator.</para>
+    /// <para>The scalar <paramref name="a"/> and tensor <paramref name="b"/> must have the same type.</para>
+    /// </remarks>
     static member Pow (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a ** b
 
     /// element-wise logical "and" of two tensors using this tensor as target
