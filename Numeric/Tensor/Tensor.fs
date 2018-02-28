@@ -1203,8 +1203,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = isFinite a // b = [false; true; false; true; false]
     /// </code></example>
     /// <remarks>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN) and returns
-    /// the results as a new tensor of type <c>bool</c>.
-    /// <seealso cref="FillIsFinite"/>
+    /// the results as a new tensor of type <c>bool</c>.</remarks>
+    /// <seealso cref="FillIsFinite``1"/>
     static member isFinite (a: Tensor<'T>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillIsFinite (a)
@@ -1219,7 +1219,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Logically negates each element of the specified tensor and writes the result into this tensor.
     /// This tensor and <paramref name="a"/> must be of type <c>bool</c>.
     /// This tensor and <paramref name="a"/> must have the same shape and storage.</remarks>
-    /// <seealso cref="~~~~"/>
+    /// <seealso cref="op_TwiddleTwiddleTwiddleTwiddle"/>
     member trgt.FillNegate (a: Tensor<bool>) = 
         let trgt = trgt.AsBool
         let a = Tensor.PrepareElemwiseSources (trgt, a)
@@ -1251,7 +1251,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Adds each element of tensor <paramref name="a"/> to the corresponding element of tensor <paramref name="b"/>
     /// and writes the result into this tensor.
     /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
-    /// <seealso cref="+"/>
+    /// <seealso cref="op_Addition"/>
     member trgt.FillAdd (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
@@ -1320,7 +1320,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Substracts each element of tensor <paramref name="b"/> from the corresponding element of tensor <paramref name="a"/>
     /// and writes the result into this tensor.
     /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
-    /// <seealso cref="-"/>
+    /// <seealso cref="op_Subtraction"/>
     member trgt.FillSubtract (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
@@ -1389,7 +1389,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Multiplies each element of tensor <paramref name="a"/> to the corresponding element of tensor <paramref name="b"/>
     /// and writes the result into this tensor.
     /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
-    /// <seealso cref="*"/>
+    /// <seealso cref="op_Multiply"/>
     member trgt.FillMultiply (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
@@ -1458,7 +1458,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Divides each element of tensor <paramref name="a"/> by the corresponding element of tensor <paramref name="b"/>
     /// and writes the result into this tensor.
     /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
-    /// <seealso cref="/"/>
+    /// <seealso cref="op_Division"/>
     member trgt.FillDivide (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
@@ -1527,7 +1527,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Computes the remainder of dividing each element of tensor <paramref name="a"/> by the 
     /// corresponding element of tensor <paramref name="b"/> and writes the result into this tensor.
     /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
-    /// <seealso cref="%"/>
+    /// <seealso cref="op_Modulus"/>
     member trgt.FillModulo (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
@@ -1657,171 +1657,763 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     static member Pow (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a ** b
 
-    /// element-wise logical "and" of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise logical and of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// b.FillAnd a b // b = [true; false; false; false]
+    /// </code></example>
+    /// <remarks>Computes the logical and of each element of tensor <paramref name="a"/> with the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.</remarks>
+    /// <seealso cref="op_AmpAmpAmpAmp"/>
     member trgt.FillAnd (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.And (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise logical "and"
+    /// <summary>Element-wise loigcal and.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// let c = a &amp;&amp;&amp;&amp; b // c = [true; false; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical and of each element of tensor <paramref name="a"/> with the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillAnd"/>
     static member (&&&&) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillAnd a b
         trgt
+
+    /// <summary>Element-wise loigcal and with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = true
+    /// let c = a &amp;&amp;&amp;&amp; b // c = [true; true; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical and of each element of tensor <paramref name="a"/> with the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>
     static member (&&&&) (a: Tensor<bool>, b: bool) = a &&&& Tensor.scalarLike a b
+
+    /// <summary>Element-wise loigcal and with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = true
+    /// let b = HostTensor.ofList [true; true; false; false]
+    /// let c = a &amp;&amp;&amp;&amp; b // c = [true; true; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical and of the scalar <paramref name="a"/> with each element of tensor <paramref name="b"/> 
+    /// and returns the results as a new tensor.</para>
+    /// </remarks>
     static member (&&&&) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a &&&& b
     
-    /// element-wise logical "or" of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise logical or of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// b.FillOr a b // b = [true; true; true; false]
+    /// </code></example>
+    /// <remarks>Computes the logical or of each element of tensor <paramref name="a"/> with the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.</remarks>
+    /// <seealso cref="op_BarBarBarBar"/>
     member trgt.FillOr (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.Or (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise logical "or"
+    /// <summary>Element-wise loigcal or.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// let c = a |||| b // c = [true; true; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical or of each element of tensor <paramref name="a"/> with the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillOr"/>
     static member (||||) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillOr a b
         trgt
+
+    /// <summary>Element-wise loigcal or with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = true
+    /// let c = a |||| b // c = [true; true; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical or of each element of tensor <paramref name="a"/> with the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>        
     static member (||||) (a: Tensor<bool>, b: bool) = a |||| Tensor.scalarLike a b
+
+    /// <summary>Element-wise loigcal or with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = true
+    /// let b = HostTensor.ofList [true; true; false; false]
+    /// let c = a |||| b // c = [true; true; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical or of the scalar <paramref name="a"/> with each element of tensor <paramref name="b"/> 
+    /// and returns the results as a new tensor.</para>
+    /// </remarks>
     static member (||||) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a |||| b
 
-    /// element-wise logical "xor" of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise logical xor of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// b.FillXor a b // b = [false; true; true; false]
+    /// </code></example>
+    /// <remarks>Computes the logical xor of each element of tensor <paramref name="a"/> with the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.</remarks>
+    /// <seealso cref="op_HatHatHatHat"/>
     member trgt.FillXor (a: Tensor<bool>) (b: Tensor<bool>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         trgt.Backend.Xor (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise logical "xor"
+    /// <summary>Element-wise loigcal xor.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = HostTensor.ofList [true; false; true; false]
+    /// let c = a ^^^^ b // c = [false; true; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical xor of each element of tensor <paramref name="a"/> with the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillXor"/>
     static member (^^^^) (a: Tensor<bool>, b: Tensor<bool>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillXor a b
         trgt
+
+    /// <summary>Element-wise loigcal xor with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [true; true; false; false]
+    /// let b = true
+    /// let c = a ^^^^ b // c = [false; false; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical xor of each element of tensor <paramref name="a"/> with the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                
     static member (^^^^) (a: Tensor<bool>, b: bool) = a ^^^^ Tensor.scalarLike a b
+
+    /// <summary>Element-wise loigcal xor with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = true
+    /// let b = HostTensor.ofList [true; true; false; false]
+    /// let c = a ^^^^ b // c = [false; false; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Computes the logical xor of the scalar <paramref name="a"/> with each element of tensor <paramref name="b"/> 
+    /// and returns the results as a new tensor.</para>
+    /// </remarks>
     static member (^^^^) (a: bool, b: Tensor<bool>) = Tensor.scalarLike b a ^^^^ b
 
-    /// element-wise equal of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise equality test of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillEqual a b // c = [false; true; false]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being equal to the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_EqualsEqualsEqualsEquals"/>
     member trgt.FillEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Equal (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise equal
+    /// <summary>Element-wise equality test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a ==== b // c = [false; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being equal to the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillEqual``1"/>
     static member (====) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillEqual a b
         trgt
+
+    /// <summary>Element-wise equality test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a ==== b // c = [false; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being equal to the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                
     static member (====) (a: Tensor<'T>, b: 'T) = a ==== Tensor.scalarLike a b
+
+    /// <summary>Element-wise equality test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a ==== b // c = [false; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being equal to each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>        
     static member (====) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a ==== b
 
-    /// element-wise not equal of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise not-equality test or of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillNotEqual a b // c = [true; false; true]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being not equal to the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_LessLessGreaterGreater"/>
     member trgt.FillNotEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.NotEqual (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise not equal
+    /// <summary>Element-wise not-equality test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a &lt;&lt;>> b // c = [true; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being not equal to the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillNotEqual``1"/>
     static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillNotEqual a b
         trgt
+
+    /// <summary>Element-wise not-equality test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a &lt;&lt;>> b // c = [true; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being not equal to the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                    
     static member (<<>>) (a: Tensor<'T>, b: 'T) = a <<>> Tensor.scalarLike a b
+
+    /// <summary>Element-wise not-equality test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a &lt;&lt;>> b // c = [true; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being not equal to each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>            
     static member (<<>>) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<>> b
 
-    /// element-wise less than of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise less-than test of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillLess a b // c = [false; false; true]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being less than the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_LessLessLessLess"/>
     member trgt.FillLess (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Less (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise less than
+    /// <summary>Element-wise less-than test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a &lt;&lt;&lt;&lt; b // c = [false; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being less than the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillLess``1"/>
     static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLess a b
         trgt
+
+    /// <summary>Element-wise less-than test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a &lt;&lt;&lt;&lt; b // c = [true; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being less than the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                        
     static member (<<<<) (a: Tensor<'T>, b: 'T) = a <<<< Tensor.scalarLike a b
+
+    /// <summary>Element-wise less-than test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a &lt;&lt;&lt;&lt; b // c = [false; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being less than each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>            
     static member (<<<<) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<<< b
 
-    /// element-wise less than of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise less-than-or-equal test of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillLessOrEqual a b // c = [false; true; true]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being less than or equal to the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_LessLessEqualsEquals"/>
     member trgt.FillLessOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.LessOrEqual (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise less than or equal to
+    /// <summary>Element-wise less-than-or-equal test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a &lt;&lt;== b // c = [false; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being less than or equal to the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillLessOrEqual``1"/>
     static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillLessOrEqual a b
         trgt
+
+    /// <summary>Element-wise less-than-or-equal test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a &lt;&lt;== b // c = [true; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being less than or equal to the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                  
     static member (<<==) (a: Tensor<'T>, b: 'T) = a <<== Tensor.scalarLike a b
+
+    /// <summary>Element-wise less-than-or-equal test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a &lt;&lt;== b // c = [false; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being less than or equal to each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                
     static member (<<==) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a <<== b
 
-    /// element-wise greater than of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise greater-than test of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillGreater a b // c = [true; false; false]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being greater than the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_GreaterGreaterGreaterGreater"/>
     member trgt.FillGreater (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Greater (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise greater than
+    /// <summary>Element-wise greater-than test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a >>>> b // c = [true; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being greater than the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillGreater``1"/>
     static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreater a b
         trgt
+
+    /// <summary>Element-wise greater-than test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a >>>> b // c = [false; false; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being greater than the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                                 
     static member (>>>>) (a: Tensor<'T>, b: 'T) = a >>>> Tensor.scalarLike a b
+
+    /// <summary>Element-wise greater-than test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a >>>> b // c = [true; false; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being greater than each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                
     static member (>>>>) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a >>>> b
 
-    /// element-wise greater than or equal to of two tensors using this tensor as target
+    /// <summary>Fills this tensor with the element-wise greater-than-or-equal test of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = HostTensor.falses [3L]
+    /// c.FillGreaterOrEqual a b // c = [true; true; false]
+    /// </code></example>
+    /// <remarks>Tests each element of tensor <paramref name="a"/> for being greater than or equal to the corresponding 
+    /// element of tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same storage.
+    /// This tensor must be of type <c>bool</c>.</remarks>
+    /// <seealso cref="op_GreaterGreaterEqualsEquals"/>
     member trgt.FillGreaterOrEqual (a: Tensor<'R>) (b: Tensor<'R>) = 
         let trgt = trgt.AsBool
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.GreaterOrEqual (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise greater than or equal to
+    /// <summary>Element-wise greater-than-or-equal test.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = HostTensor.ofList [1.0; 4.0; 7.0]
+    /// let c = a >>== b // c = [true; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being greater than or equal to the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para> 
+    /// </remarks>
+    /// <seealso cref="FillGreaterOrEqual``1"/>
     static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillGreaterOrEqual a b
         trgt
+
+    /// <summary>Element-wise greater-than-or-equal test with scalar.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The scalar on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let b = 4.0
+    /// let c = a >>== b // c = [false; true; true]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests each element of tensor <paramref name="a"/> for being greater than or equal to the scalar
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                          
     static member (>>==) (a: Tensor<'T>, b: 'T) = a >>== Tensor.scalarLike a b
+
+    /// <summary>Element-wise greater-than-or-equal test with scalar.</summary>
+    /// <param name="a">The scalar on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = 4.0
+    /// let b = HostTensor.ofList [2.0; 4.0; 6.0]
+    /// let c = a >>== b // c = [true; true; false]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Tests the scalar <paramref name="a"/> for being greater than or equal to each element of the tensor
+    /// <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// </remarks>                    
     static member (>>==) (a: 'T, b: Tensor<'T>) = Tensor.scalarLike b a >>== b
 
-    /// element-wise picks the maximum of a or b using this tensor as target
+    /// <summary>Fills this tensor with the element-wise maximum of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillMaxElemwise a b // b = [5.0; 6.0; 7.0]
+    /// </code></example>
+    /// <remarks>Finds the maximum of each element of tensor <paramref name="a"/> and the corresponding element of 
+    /// tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="maxElemwise"/>
     member trgt.FillMaxElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MaxElemwise (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise picks the maximum of a or b
+    /// <summary>Element-wise maximum.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = Tensor.maxElemwise a b // c = [5.0; 6.0; 7.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Finds the maximum of each element of tensor <paramref name="a"/> and the corresponding element of 
+    /// tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillMaxElemwise"/>
     static member maxElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillMaxElemwise a b
         trgt
 
-    /// element-wise picks the minimum of a or b using this tensor as target
+    /// <summary>Fills this tensor with the element-wise minimum of the arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// b.FillMinElemwise a b // b = [2.0; 3.0; 4.0]
+    /// </code></example>
+    /// <remarks>Finds the minimum of each element of tensor <paramref name="a"/> and the corresponding element of 
+    /// tensor <paramref name="b"/> and writes the result into this tensor.
+    /// This tensor, <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.</remarks>
+    /// <seealso cref="minElemwise"/>
     member trgt.FillMinElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MinElemwise (trgt=trgt, src1=a, src2=b)
 
-    /// element-wise picks the minimum of a or b
+    /// <summary>Element-wise minimum.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = Tensor.minElemwise a b // c = [2.0; 3.0; 4.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Finds the minimum of each element of tensor <paramref name="a"/> and the corresponding element of 
+    /// tensor <paramref name="b"/> and returns the results as a new tensor.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same type and storage.
+    /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillMinElemwise"/>
     static member minElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         trgt.FillMinElemwise a b
         trgt
 
-    /// Elementwise writes elements from ifTrue if cond is true in this tensor, 
-    /// otherwise elements from ifFalse.
+    /// <summary>Fills this tensor with an element-wise choice between two sources depending on a condition.</summary>
+    /// <param name="cond">The condition tensor.</param>
+    /// <param name="ifTrue">The tensor containing the values to use for when an element of the condition is true.</param>
+    /// <param name="ifFalse">The tensor containing the values to use for when an element of the condition is false.</param>    
+    /// <example><code language="fsharp">
+    /// let cond = HostTensor.ofList [true; false; false]
+    /// let ifTrue = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let ifFalse = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let target = HostTensor.zeros [3L]
+    /// target.FillIfThenElse cond ifTrue ifFalse // target = [2.0; 6.0; 7.0]
+    /// </code></example>
+    /// <remarks>Evaluates each element of tensor <paramref name="cond"/>. If it evaluates to true, the corresponding
+    /// element of tensor <paramref name="ifTrue"/> is written into this tensor. Otherwise, the corresponding element
+    /// of tensor <paramref name="ifFalse"/> is written in to this tensor.
+    /// This tensor, <paramref name="ifTrue"/> and <paramref name="ifFalse"/> must have the same type and storage.</remarks>
+    /// <seealso cref="ifThenElse"/>
     member trgt.FillIfThenElse (cond: Tensor<bool>) (ifTrue: Tensor<'T>) (ifFalse: Tensor<'T>) = 
         let cond, ifTrue, ifFalse = Tensor.PrepareElemwiseSources (trgt, cond, ifTrue, ifFalse)
         trgt.Backend.IfThenElse (trgt=trgt, cond=cond, ifTrue=ifTrue, ifFalse=ifFalse)
 
-    /// Elementwise takes elements from ifTrue if cond is true, 
-    /// otherwise elements from ifFalse.
+    /// <summary>Element-wise choice between two sources depending on a condition.</summary>
+    /// <param name="cond">The condition tensor.</param>
+    /// <param name="ifTrue">The tensor containing the values to use for when an element of the condition is true.</param>
+    /// <param name="ifFalse">The tensor containing the values to use for when an element of the condition is false.</param>    
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let cond = HostTensor.ofList [true; false; false]
+    /// let ifTrue = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let ifFalse = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let target = Tensor.ifThenElse cond ifTrue ifFalse // target = [2.0; 6.0; 7.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Evaluates each element of tensor <paramref name="cond"/>. If it evaluates to true, the corresponding
+    /// element of tensor <paramref name="ifTrue"/> is written into the result. Otherwise, the corresponding element
+    /// of tensor <paramref name="ifFalse"/> is written into the result.</para>
+    /// <para>The tensors <paramref name="cond"/>, <paramref name="ifTrue"/> and <paramref name="ifFalse"/> must have 
+    /// the same storage.
+    /// Broadcasting rules apply if <paramref name="cond"/>, <paramref name="ifTrue"/> and <paramref name="ifFalse"/> 
+    /// have different shapes.</para>
+    /// </remarks>
+    /// <seealso cref="FillIfThenElse"/>
     static member ifThenElse (cond: Tensor<bool>) (ifTrue: Tensor<'T>) (ifFalse: Tensor<'T>) =
         let trgt, cond, ifTrue, ifFalse = Tensor.PrepareElemwise(cond, ifTrue, ifFalse)
         trgt.FillIfThenElse cond ifTrue ifFalse
         trgt
 
-    /// Selects elements from src according to the specified indices.
-    /// Indices must be a list of Tensor<int64> options, one per dimension of src. 
-    /// If None is specified in an dimension, the source index will match the 
-    /// target index in that dimension.
+    /// <summary>Selects elements from a tensor according to specified indices.</summary>
+    /// <param name="indices">A list of tensors, one per dimension of <paramref name="src"/>, containing the indicies
+    /// to pick from <paramref name="src"/> for each output element.</param>
+    /// <param name="src">The tensor containing the source values.</param>    
+    /// <example><code language="fsharp">
+    /// </code></example>
+    /// <remarks>
+    /// <para>The output element with indices <c>[i_0; i_1; i_2; ...]</c> is given by the source element with indices 
+    /// <c>[j_0; j_1; j_2; ...]</c>, where each index <c>j_k</c> is given by <c>j_k = indices.[k].[i_0; i_1; i_2; ...]</c>.
+    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.</para>
+    /// <para>This tensor, <paramref name="indices"/> and <paramref name="src"/> must have the same storage.</para>
+    /// </remarks>
+    /// <seealso cref="gather"/>
     member trgt.FillGather (indices: Tensor<int64> option list) (src: Tensor<'T>) =
         Tensor.CheckSameStorage ([src :> ITensor] @ 
             List.choose (Option.map (fun t -> t :> ITensor)) indices)
@@ -1832,11 +2424,21 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo trgt.Shape :> ITensorFrontend<_>))
         trgt.Backend.Gather (trgt=trgt, srcIdxs=indices, src=src)
 
-    /// Creates a new tensor by selecting elements from src according to the specified indices.
-    /// Indices must be a list of Tensor<int64> options, one per dimension of src. 
-    /// If None is specified in an dimension, the source index will match the 
-    /// target index in that dimension.
-    /// The result will have the shape of the (broadcasted) index tensors.
+    /// <summary>Selects elements from a tensor according to specified indices.</summary>
+    /// <param name="indices">A list of tensors, one per dimension of <paramref name="src"/>, containing the indicies
+    /// to pick from <paramref name="src"/> for each output element.</param>
+    /// <param name="src">The tensor containing the source values.</param>    
+    /// <returns>Result with the shape of the (broadcasted) tensors specified in <paramref name="indices"/>.</returns>
+    /// <example><code language="fsharp">
+    /// </code></example>
+    /// <remarks>
+    /// <para>The output element with indices <c>[i_0; i_1; i_2; ...]</c> is given by the source element with indices 
+    /// <c>[j_0; j_1; j_2; ...]</c>, where each index <c>j_k</c> is given by <c>j_k = indices.[k].[i_0; i_1; i_2; ...]</c>.
+    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.</para>
+    /// <para>The tensors <paramref name="indices"/> and <paramref name="src"/> must have the same storage.
+    /// All index tensors are broadcasted to the same size.</para>
+    /// </remarks>
+    /// <seealso cref="FillGather"/><seealso cref="scatter"/>
     static member gather (indices: Tensor<int64> option list) (src: Tensor<'T>) =
         // broadcast specified indices to same shape
         let specIndices = indices |> List.choose id
@@ -1856,9 +2458,21 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.FillGather bcIndices src
         trgt        
 
-    /// Sets the values of this tensor by summing elements from the source tensor into the elements
-    /// of this tensor specified by the indices.
-    /// If an index tensor is set to None then the target index is used as the source index.
+    /// <summary>Disperses elements from a source tensor to this tensor according to the specified indices.</summary>
+    /// <param name="indices">A list of tensors, one per dimension of this tensor, containing the target indicies
+    /// for each element of <paramref name="src"/>.</param>
+    /// <param name="src">The tensor containing the source values.</param>    
+    /// <example><code language="fsharp">
+    /// </code></example>
+    /// <remarks>
+    /// <para>The source element with indices <c>[i_0; i_1; i_2; ...]</c> is written to the target element with indices 
+    /// <c>[j_0; j_1; j_2; ...]</c>, where each index <c>j_k</c> is given by <c>j_k = indices.[k].[i_0; i_1; i_2; ...]</c>.
+    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.</para>
+    /// <para>If a target index occurs multiple times, the corresponding source values are summed.
+    /// If a target element is not referenced by any index, it is set to zero.</para>
+    /// <para>This tensor, <paramref name="indices"/> and <paramref name="src"/> must have the same storage.</para>
+    /// </remarks>
+    /// <seealso cref="scatter"/>
     member trgt.FillScatter (indices: Tensor<int64> option list) (src: Tensor<'T>) =
         Tensor.CheckSameStorage ([src :> ITensor] @ 
             List.choose (Option.map (fun t -> t :> ITensor)) indices)
@@ -1870,14 +2484,23 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.Backend.FillConst (trgt=trgt, value=Tensor<'T>.Zero)
         trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)
 
-    /// Creates a new tensor of shape trgtShp by dispersing elements from src according to 
-    /// the specified target indices.
-    /// If an index occurs multiple times the corresponding values are summed.
-    /// Target elements that do not occur, are set to zero.
-    /// Indices must be a list of Tensor<int64> options, one per dimension of trgt and of the same shape
-    /// (or broadcastable to) as src.
-    /// If None is specified instead of a tensor in an dimension, the source index will match the 
-    /// target index in that dimension.
+    /// <summary>Disperses elements from a source tensor to a new tensor according to the specified indices.</summary>
+    /// <param name="indices">A list of tensors, one per dimension of this tensor, containing the target indicies
+    /// for each element of <paramref name="src"/>.</param>
+    /// <param name="trgtShp">The shape of the resulting tensor.</param>    
+    /// <param name="src">The tensor containing the source values.</param>    
+    /// <returns>Result with the shape specified in <paramref name="trgtShp"/>.</returns>
+    /// <example><code language="fsharp">
+    /// </code></example>
+    /// <remarks>
+    /// <para>The source element with indices <c>[i_0; i_1; i_2; ...]</c> is written to the target element with indices 
+    /// <c>[j_0; j_1; j_2; ...]</c>, where each index <c>j_k</c> is given by <c>j_k = indices.[k].[i_0; i_1; i_2; ...]</c>.
+    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.</para>
+    /// <para>If a target index occurs multiple times, the corresponding source values are summed.
+    /// If a target element is not referenced by any index, it is set to zero.</para>
+    /// <para>The tensors <paramref name="indices"/> and <paramref name="src"/> must have the same storage.</para>
+    /// </remarks>
+    /// <seealso cref="FillScatter"/><seealso cref="gather"/>
     static member scatter (indices: Tensor<int64> option list) (trgtShp: int64 list) (src: Tensor<'T>) =
         let trgt = Tensor<'T> (trgtShp, src.Dev)
         trgt.FillScatter indices src
