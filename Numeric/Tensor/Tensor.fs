@@ -2214,8 +2214,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.argMinAxis 1 a // b = [0L; 0L]
     /// </code></example>
     /// <remarks>The index of the minimum is calculated along the specified axis. 
-    /// An empty tensor gives <see cref="TensorVal.NotFound"/>.</remarks>
-    /// <seealso cref="FillArgMinAxis"/><seealso cref="argMin"/>
+    /// An empty tensor gives <see cref="Tensor.NotFound"/>.</remarks>
+    /// <seealso cref="FillArgMinAxis``1"/><seealso cref="argMin"/>
     static member argMinAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillArgMinAxis ax src
@@ -2240,8 +2240,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.argMaxAxis 1 a // b = [3L; 3L]
     /// </code></example>
     /// <remarks>The index of the maximum is calculated along the specified axis. 
-    /// An empty tensor gives <see cref="TensorVal.NotFound"/>.</remarks>
-    /// <seealso cref="FillArgMaxAxis"/><seealso cref="argMax"/>
+    /// An empty tensor gives <see cref="Tensor.NotFound"/>.</remarks>
+    /// <seealso cref="FillArgMaxAxis``1"/><seealso cref="argMax"/>
     static member argMaxAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillArgMaxAxis ax src
@@ -2304,8 +2304,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.findAxis 3.0 1 a // b = [2L; 3L]
     /// </code></example>
     /// <remarks>The values is searched for an the index of the first occurence is returned.
-    /// If the value is not found <see cref="TensorVal.NotFound"/> is returned instead.</remarks>
-    /// <seealso cref="FillFindAxis"/>
+    /// If the value is not found <see cref="Tensor.NotFound"/> is returned instead.</remarks>
+    /// <seealso cref="FillFindAxis``1"/>
     static member findAxis (value: 'T) (ax: int) (src: Tensor<'T>) : Tensor<int64> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillFindAxis value ax src
@@ -2375,7 +2375,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If so, true is returned; otherwise false is returned.</para>
     /// <para>If the tensor is empty true is returned.</para>
     /// </remarks>
-    /// <seealso cref="FillAllAxis"/>
+    /// <seealso cref="FillAllAxis"/><seealso cref="all"/>
     static member allAxis (ax: int) (src: Tensor<bool>) : Tensor<bool> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillAllAxis ax src
@@ -2401,7 +2401,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If so, true is returned; otherwise false is returned.</para>
     /// <para>If the tensor is empty true is returned.</para>
     /// </remarks>
-    /// <seealso cref="allTensor"/>
+    /// <seealso cref="allTensor"/><seealso cref="allAxis"/>
     static member all (src: Tensor<bool>) =
         src |> Tensor.allTensor |> Tensor.value
 
@@ -2428,7 +2428,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If so, true is returned; otherwise false is returned.</para>
     /// <para>If the tensor is empty false is returned.</para>
     /// </remarks>
-    /// <seealso cref="FillAnyAxis"/>
+    /// <seealso cref="FillAnyAxis"/><seealso cref="any"/>
     static member anyAxis (ax: int) (src: Tensor<bool>) : Tensor<bool> =
         let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
         trgt.FillAnyAxis ax src
@@ -2454,12 +2454,15 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If so, true is returned; otherwise false is returned.</para>
     /// <para>If the tensor is empty false is returned.</para>
     /// </remarks>
-    /// <seealso cref="anyTensor"/>
+    /// <seealso cref="anyTensor"/><seealso cref="anyAxis"/>
     static member any (src: Tensor<bool>) =
         src |> Tensor.anyTensor |> Tensor.value
 
-    /// Dot product of two tensors using this tensor as target:
-    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat).
+    /// <summary>Fill this tensor with the (batched) matrix product, matrix-vector product or scalar product of the 
+    /// arguments.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <seealso cref="op_DotMultiply"/>    
     member trgt.FillDot (a: Tensor<'T>) (b: Tensor<'T>) = 
         Tensor.CheckSameStorage [trgt; a; b]
         match trgt.NDims, a.NDims, b.NDims with
@@ -2478,10 +2481,46 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidOp "Cannot compute dot product between tensors of shapes %A and %A 
                        into tensor of shape %A." a.Shape b.Shape trgt.Shape
 
-    /// Dot product of two tensors:
-    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
-    /// (batched mat)*(batched vec)=>(batched vec).
-    /// Broadcasting is applied over batch dimensions.
+    /// <summary>Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// // Scalar product
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a .* b // c = [56.0]
+    ///
+    /// // Matrix-vector product
+    /// let a = HostTensor.ofList2D [[5.0; 6.0; 7.0]
+    ///                              [8.0; 9.0; 0.0]]
+    /// let b = HostTensor.ofList [2.0; 3.0; 4.0]
+    /// let c = a .* b // c = [56.0; 43.0]
+    ///
+    /// // Matrix product
+    /// let a = HostTensor.ofList2D [[5.0; 6.0; 7.0]
+    ///                              [8.0; 9.0; 0.0]]
+    /// let b = HostTensor.ofList2D [[2.0; 1.0] 
+    ///                              [3.0; 1.0]
+    ///                              [4.0; 1.0]]
+    /// let c = a .* b // c = [[56.0; 18.0] 
+    ///                //      [43.0; 17.0]]
+    /// </code></example>
+    /// <remarks>
+    /// <para>If <paramref name="a"/> and <paramref name="b"/> are vectors of the same length, then the scalar
+    /// product is computed. The result is a scalar.</para>
+    /// <para>If <paramref name="a"/> is a matrix and <paramref name="b"/> is a vector of compatible shape, then 
+    /// the matrix-vector product is computed. The result is a vector.</para>
+    /// <para>If both <paramref name="a"/> and <paramref name="b"/> are matrices of compatibles shapes, then
+    /// the matrix product is computed. The result is a matrix.</para>
+    /// <para>If <paramref name="a"/> is a tensor of shape <c>[b_1; ...; b_n; i; j]</c> and <paramref name="b"/> 
+    /// is a tensor of shape <c>[b_1; ...; b_n; j]</c>, then the batched matrix-vector product is computed resulting in
+    /// a tensor of shape <c>[b_1; ...; b_n; i]</c>. Broadcasting rules apply for the batch dimensions.</para>
+    /// <para>If <paramref name="a"/> is a tensor of shape <c>[b_1; ...; b_n; i; j]</c> and <paramref name="b"/> 
+    /// is a tensor of shape <c>[b_1; ...; b_n; j; k]</c>, then the batched matrix product is computed resulting in
+    /// a tensor of shape <c>[b_1; ...; b_n; i; k]</c>. Broadcasting rules apply for the batch dimensions.</para>
+    /// </remarks>
+    /// <seealso cref="FillDot"/>
     static member (.*) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<'T> = 
         Tensor.CheckSameStorage [a; b]
         match a.NDims, b.NDims with
@@ -2509,16 +2548,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         | _ -> 
             invalidOp "Cannot compute dot product between tensors of shapes %A and %A." a.Shape b.Shape 
 
-    /// Dot product of two tensors:
-    /// vec*vec=>scalar, mat*vec=>vec, mat*mat=>mat, (batched mat)*(batched mat)=>(batched mat),
-    /// (batched mat)*(batched vec)=>(batched vec).
-    /// Broadcasting is applied over batch dimensions.
+    /// <summary>Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>    
+    /// <seealso cref="op_DotMultiply"/>        
     static member dot (a: Tensor<'T>) (b: Tensor<'T>) =
         a .* b        
 
-    /// Matrix inversion using this tensor as target.
-    /// If the specified tensor has more than two dimensions, the matrices
-    /// consisting of the last two dimensions are inverted.
+    /// <summary>Fills this tensor with the (batch) inverse of a matrix.</summary>
+    /// <param name="a">The input to this operation.</param>
+    /// <seealso cref="invert"/>        
     member trgt.FillInvert (a: Tensor<'T>)  = 
         Tensor.CheckSameStorage [trgt; a]
         if a.NDims < 2 then
@@ -2526,15 +2566,31 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a = a |> Tensor.broadcastTo trgt.Shape
         trgt.Backend.BatchedInvert (trgt, a)
 
-    /// Matrix inversion.
-    /// If the specified tensor has more than two dimensions, the matrices
-    /// consisting of the last two dimensions are inverted.
+    /// <summary>(Batch) inverts a matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <returns>A new matrix or tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0]
+    ///                            [3.0; 4.0]]
+    /// let c = Tensor.invert a // c = [[-2.0; 1.0]    
+    ///                         //      [1.5; -0.5]]
+    /// </code></example>
+    /// <remarks>
+    /// <para>If <paramref name="a"/> is a square matrix, its inverse is computed. The result is a matrix.</para>
+    /// <para>If <paramref name="a"/> is a tensor of shape <c>[b_1; ...; b_n; i; i]</c>, the inverse
+    /// of all square matrices consisting of the last two dimensions of the tensor are computed. 
+    /// The result is a tensor of same shape.</para>
+    /// <para>If the matrix is not invertible a <see cref="Tensor.SingularMatrixException"/> is raised.
+    /// Use <see cref="pseudoInvert"/> for such matrices instead.</para>
+    /// </remarks>
+    /// <exception cref="Tensor.SingularMatrixException">Raised when the matrix is not invertible.</exception>
+    /// <seealso cref="FillInvert"/><seealso cref="pseudoInvert"/>         
     static member invert (a: Tensor<'T>) = 
         let trgt = Tensor<'T> (a.Shape, a.Dev)
         trgt.FillInvert a
         trgt
 
-    /// Helper function to compute SVD sizes.
+    /// Computes the sizes of an SVD decomposition.
     static member internal SVDSizes (a: ITensorFrontend<'T>) =
         if a.NDims < 2 then
             invalidArg "a" "Need at least a matrix to SVD but got shape %A." a.Shape
@@ -2543,7 +2599,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let K = min M N
         batchShp, M, N, K
 
-    /// Singular value decomposition so that a = U .* S .* V.T with trgtUV=(U,V).
+    /// <summary>Fills this tensor with the (batched) singular values of the specified matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <param name="trgtUV">The optional target tensors for the transformation matrices.</param>
+    /// <remarks>
+    /// <para>The singular values are stored in this vector.</para>
+    /// </remarks>
+    /// <seealso cref="SVD"/><seealso cref="SVDWithoutUV"/>
     member trgtS.FillSVD (a: Tensor<'T>, ?trgtUV: Tensor<'T> * Tensor<'T>) =
         let batchShp, M, N, K = Tensor.SVDSizes a
         Tensor.CheckSameStorage [trgtS; a]
@@ -2564,7 +2626,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                                                                  trgtV :> ITensorFrontend<_>)
         trgtS.Backend.BatchedSVD (trgtS, trgtUV, a)                
 
-    /// Singular value decomposition returning (U, S, V) so that a = U .* diagMat(S) .* V.T.    
+    /// <summary>Computes the (batched) singular value decomposition (SVD) of the specified matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <returns>A tuple consisting of <c>(U, S, V)</c> where <c>S</c> is a vector consisting of the singular values and
+    /// <c>U</c>, <c>V</c> are the transformation matrices.</returns>
+    /// <remarks>
+    /// <para>The singular value decomposition of matrix <paramref name="a"/> is computed.
+    /// It is defined by the property that <c>a = U .* Tensor.diagMat(S) .* V.T</c>.</para>
+    /// <para>If <paramref name="a"/> is a tensor, the operation is batched over the matrices consisting
+    /// of the last two dimensions.</para>
+    /// </remarks>    
+    /// <seealso cref="FillSVD"/><seealso cref="SVDWithoutUV"/>
     static member SVD (a: Tensor<'T>) =
         let batchShp, M, N, K = Tensor.SVDSizes a
         let U = Tensor<'T> (batchShp @ [M;M], a.Dev, order=ColumnMajor)
@@ -2573,16 +2645,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         S.FillSVD(a, trgtUV=(U, V))
         U, S, V
 
-    /// Singular value decomposition returning S so that a = U .* diagMat(S) .* V.T.
+    /// <summary>Computes the (batched) singular values of the specified matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <returns>A vector consisting of the singular values.</returns>
+    /// <seealso cref="SVD"/>
     static member SVDWithoutUV (a: Tensor<'T>) =
         let batchShp, M, N, K = Tensor.SVDSizes a
         let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
         S.FillSVD(a)
         S
 
-    /// Matrix pseudo inversion using this tensor as target.
-    /// If the specified tensor has more than two dimensions, the matrices
-    /// consisting of the last two dimensions are inverted.
+    /// <summary>Fills this tensor with the (batched) Moore-Penrose pseudo-inverse of the specified matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <param name="rCond">The cut-off value for the singular values. (default: 1e-15)</param>
+    /// <seealso cref="pseudoInvert"/>
     member trgt.FillPseudoInvert (a: Tensor<'T>, ?rCond: 'T)  = 
         let rCond = defaultArg rCond (conv<'T> 1e-15)
         Tensor.CheckSameStorage [trgt; a]
@@ -2597,17 +2673,29 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         s.FillIfThenElse (s >>== rCond) (one / s) (zero)
         trgt.FillDot (v) (Tensor.padRight s * u.T)
 
-    /// Matrix pseudo inversion.
-    /// If the specified tensor has more than two dimensions, the matrices
-    /// consisting of the last two dimensions are inverted.
+    /// <summary>Computes the (batched) Moore-Penrose pseudo-inverse of the specified matrix.</summary>
+    /// <param name="a">The input matrix or tensor to this operation.</param>
+    /// <param name="rCond">The cut-off value for the singular values. (default: 1e-15)</param>
+    /// <returns>A new matrix or tensor containing the result of this operation.</returns>
+    /// <remarks>    
+    /// <para>If <paramref name="a"/> is a matrix, its pseudo-inverse is computed. The result is a matrix.</para>
+    /// <para>If <paramref name="a"/> is a tensor of shape <c>[b_1; ...; b_n; i; j]</c>, the pseudo-inverse
+    /// of all matrices consisting of the last two dimensions of the tensor are computed. 
+    /// The result is a tensor of shape <c>[b_1; ...; b_n; j; i]</c>.</para>
+    /// </remarks>
+    /// <seealso cref="FillPseudoInvert"/><seealso cref="invert"/>   
     static member pseudoInvert (a: Tensor<'T>, ?rCond: 'T) = 
         let trgt = Tensor<'T> (a.Shape, a.Dev)
         trgt.FillPseudoInvert (a, ?rCond=rCond)
         trgt
 
-    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
-    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
-    /// corresponding eigenvalue in 'vals'.
+    /// <summary>Computes the (real) eigendecomposition of a symmetric matrix and writes it into the specified 
+    /// target tensors.</summary>
+    /// <param name="part">Specifies which part of the matrix should be used.</param>
+    /// <param name="trgtEigVals">The target vector that will receive the eigenvalues.</param>
+    /// <param name="trgtEigVecs">The target matrix that will receive the eigenvectors.</param>    
+    /// <param name="a">The input matrix to this operation.</param>
+    /// <seealso cref="symmetricEigenDecomposition"/>
     static member FillSymmetricEigenDecomposition (part: MatrixPart)
             (trgtEigVals: Tensor<'T>) (trgtEigVecs: Tensor<'T>) (a: Tensor<'T>) =
         Tensor.CheckSameStorage [trgtEigVals; trgtEigVecs; a]
@@ -2621,9 +2709,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                                      a.Shape.[0] trgtEigVals.Shape
         trgtEigVals.Backend.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVecs, a)
 
-    /// Computes the (real) eigenvalues and eigenvectors of the symmetric matrix.
-    /// Returns (vals, vecs) where each column of 'vecs' is the eigenvector for the
-    /// corresponding eigenvalue in 'vals'.
+    /// <summary>Computes the (real) eigendecomposition of a symmetric matrix.</summary>
+    /// <param name="part">Specifies which part of the matrix should be used.</param>
+    /// <param name="a">The input matrix to this operation.</param>
+    /// <returns>A tuple consisting of <c>(vals, vecs)</c> where each column of <c>vecs</c> is the eigenvector for the
+    /// corresponding eigenvalue in <c>vals</c>.</returns>
+    /// <remarks>
+    /// <para>The eigendecomposition of a symmetric matrix is real.
+    /// Only the part of the matrix specified by <paramref name="part"/> is used. The other part is ignored and can
+    /// contain arbitrary values.</para>
+    /// </remarks>
+    /// <seealso cref="FillSymmetricEigenDecomposition"/>
     static member symmetricEigenDecomposition (part: MatrixPart) (a: Tensor<'T>) =
         if a.NDims <> 2 then
             invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
