@@ -143,12 +143,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     do TensorLayout.check layout
     let backend = storage.Backend layout
 
-    /// value zero of type 'T
-    static member Zero : 'T = zero<'T>
-
-    /// value one of type 'T
-    static member One = one<'T>
-
     /// layout of this tensor (shape, offset and strides)
     member val Layout = layout
 
@@ -164,7 +158,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// device where the specified tensor is stored
     static member inline dev (a: #ITensor) = a.Dev
 
-    /// backend
+    /// backend 
     member internal this.Backend = backend
 
     /// shape
@@ -1906,7 +1900,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         if indices |> List.skip src.NDims |> List.exists Option.isNone then
             invalidArg "indices" "index dimensions beyond the number of source dimensions must not be None"
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo src.Shape :> ITensorFrontend<_>))
-        trgt.Backend.FillConst (trgt=trgt, value=Tensor<'T>.Zero)
+        trgt.Backend.FillConst (trgt=trgt, value=zero<'T>)
         trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)
 
     /// <summary>Disperses elements from a source tensor to a new tensor according to the specified indices.</summary>
@@ -3175,7 +3169,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Dev = this.Dev
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
-        member this.FillZero () = this.FillConst Tensor<'T>.Zero
+        member this.FillZero () = this.FillConst zero<'T>
         member this.Pretty = this.Pretty
         member this.Full = this.Full
 
@@ -3334,7 +3328,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member zeros (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
-            x.FillConst Tensor<'T>.Zero
+            x.FillConst zero<'T>
         x
    
     /// <summary>Creates a new tensor filled with zeros using the specified tensor as template.</summary>
@@ -3357,7 +3351,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     static member ones (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
-        x.FillConst Tensor<'T>.One
+        x.FillConst one<'T>
         x
         
     /// <summary>Creates a new tensor filled with ones using the specified tensor as template.</summary>
@@ -3453,7 +3447,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member identity (dev: ITensorDevice) (size: int64) : Tensor<'T> =
         let x = Tensor<'T>.zeros dev [size; size]
         let d : Tensor<'T> = Tensor.diag x
-        d.FillConst Tensor<'T>.One
+        d.FillConst one<'T>
         x           
 
     /// <summary>Creates a new vector filled with the integers from zero to the specified maximum.</summary>

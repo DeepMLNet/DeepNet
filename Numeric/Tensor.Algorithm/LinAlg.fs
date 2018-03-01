@@ -118,7 +118,7 @@ module LinAlg =
         // zero unnormalized columns in row echelon form E
         // (setting undetermined values of solution to zero)
         for c in unCols do
-            E.[*, c] <- Tensor.scalar E.Dev Tensor.Zero
+            E.[*, c] <- Tensor.scalar E.Dev zero<'T>
         
         // calculate inverse of image
         let LI = (E.T .* I).[*, 0L .. rows-1L]
@@ -126,7 +126,7 @@ module LinAlg =
         // null space of L
         let N = -E.T .* U
         for c, r in List.indexed unCols do
-            N.[[r; int64 c]] <- Tensor.One
+            N.[[r; int64 c]] <- one<'T>
 
         // solvability constraint
         let S = I.[nzRows.., 0L .. rows-1L]
