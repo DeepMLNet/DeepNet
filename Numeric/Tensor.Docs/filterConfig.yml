@@ -1,10 +1,14 @@
 apiRules:
 - exclude:
-    uidRegex: ^Tensor\.ITensor\.Item
+    uidRegex: ^Tensor\.ITensor\.Item\(obj
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.Item\(int64 \*    
 - exclude:
     uidRegex: ^Tensor\.ITensor\.GetSlice
 - exclude:
     uidRegex: ^Tensor\.ITensor\.SetSlice
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.M\(Tensor\.Tensor<bool> \*    
 - exclude:
     uidRegex: ^Tensor\.Tensor$
 - exclude:
@@ -15,6 +19,8 @@ apiRules:
     uidRegex: ^Tensor\.Tensor`1\.GetSlice
 - exclude:
     uidRegex: ^Tensor\.Tensor`1\.SetSlice
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.M\(Tensor\.Tensor<bool> \*    
 - exclude:
     uidRegex: ^Tensor\.Tensor`1\.Tensor.ITensor
 - exclude:
@@ -29,4 +35,3 @@ apiRules:
 attributeRules:
 - exclude:
     uidRegex: StructuredFormatDisplay
-    

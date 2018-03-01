@@ -3040,7 +3040,48 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="m0">A boolean mask tensors or <see cref="Tensor.NoMask"/>.</param>
+    /// <value>All elements from the tensor for which the mask is true.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 3.0]
+    ///                            [4.0; 5.0; 6.0]]
+    ///
+    /// // masked get with one mask for the whole tensor
+    /// let m = HostTensor.ofList [[true;  true;  false]
+    ///                            [false; false; true ]]
+    /// let b = a.M(m) // b = [1.0; 2.0; 6.0]
+    ///
+    /// // an element-wise comparison operator can be used to create the mask
+    /// let c = a.M(a >>>> 3.5) // c = [4.0; 5.0; 6.0]
+    ///
+    /// // masked get with one mask per dimension
+    /// let m0 = HostTensor.ofList [true; false]
+    /// let m1 = HostTensor.ofList [false; false; true]
+    /// let d = a.M(m0,m1) // d = [3.0]
+    ///
+    /// // masked get using only one dimension
+    /// let m0 = HostTensor.ofList [true; false]
+    /// let e = a.M(m0,NoMask) // e = [[1.0; 2.0; 3.0]]
+    ///
+    /// // masked set with one mask for the whole tensor
+    /// let m = HostTensor.ofList [[true;  true;  false]
+    ///                            [false; false; true ]]
+    /// a.M(m) &lt;- [8.0; 9.0; 0.0]  // a = [[8.0; 9.0; 3.0]
+    ///                                    [4.0; 5.0; 0.0]]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Masking picks elements from the tensor for which the corresponding element in the mask tensor is true.</para>
+    /// <para>The get operation returns a copy of the selected elements of the tensor.</para>
+    /// <para>The set operation replaces the selected elements with a copy of the specified value tensor.</para>
+    /// <para>If a dimension should not be masked, specify <see cref="Tensor.NoMask"/> instead of a mask tensor.</para>
+    /// <para>For clarity the documentation does not list all overloads of <c>M</c>.
+    /// However, this masking method can be used for up to 5 dimensions.
+    /// For programmatically generated ranges or for more than 5 dimensions, the mask specification variant 
+    /// <see cref="M(Microsoft.FSharp.Collections.FSharpList{Tensor.Tensor{System.Boolean}})"/> is available.</para>
+    /// </remarks>
+    /// <exception cref="System.InvalidArgumentException">Raised when the mask is incompatible with the tensor.</exception>
+    /// <seealso cref="M(Microsoft.FSharp.Collections.FSharpList{Tensor.Tensor{System.Boolean}})"/>
     member this.M
         with get (m0: Tensor<bool>) = this.MaskedGet [m0]
         and set (m0: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0] value                          
