@@ -2343,9 +2343,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.find 3.0 a // b = [0L; 2L]
     /// </code></example>
     /// <remarks>The values is searched for an the index of the first occurence is returned.
-    /// If the value is not found, an <c>InvalidOperationException</c> is raised.
+    /// If the value is not found, an <see cref="T:InvalidOperationException"/> is raised.
     /// Use <see cref="tryFind"/> instead, if the value might not be present.
     /// </remarks>
+    /// <exception cref="T:System.InvalidOperationException">Raised if value is not found.</exception>
     /// <seealso cref="tryFind"/><seealso cref="findAxis"/>
     static member find (value: 'T) (a: Tensor<'T>) =
         match Tensor<_>.tryFind value a with
@@ -2573,7 +2574,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let a = HostTensor.ofList [[1.0; 2.0]
     ///                            [3.0; 4.0]]
     /// let c = Tensor.invert a // c = [[-2.0; 1.0]    
-    ///                         //      [1.5; -0.5]]
+    ///                         //      [1.5; -0.5]]  
     /// </code></example>
     /// <remarks>
     /// <para>If <paramref name="a"/> is a square matrix, its inverse is computed. The result is a matrix.</para>
@@ -2728,7 +2729,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         Tensor.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs a
         trgtEigVals, trgtEigVecs
         
-    /// a view of this tensor with the given .NET range
+    // Helper functions for getting slices.
     member inline internal this.GetRng (rngArgs: obj[]) =
         this.Range (Rng.ofItemOrSliceArgs rngArgs) 
     member inline internal this.IGetRng (rngArgs: obj[]) =
@@ -2738,7 +2739,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member inline internal this.IGetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         Array.concat [rngArgs; restArgs] |> this.IGetRng
 
-    /// write into the view of this tensor with the given .NET range
+    /// Helper functions for setting slices.
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
         Tensor.CheckSameStorage [this; value]
         let trgt = this.Range (Rng.ofItemOrSliceArgs rngArgs) 
@@ -2796,10 +2797,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let masks = masks |> List.map (Option.map (fun t -> t |> Tensor<_>.flatten :> ITensorFrontend<_>)) |> List.toArray
         backend.MaskedGet (trgt=trgt, src=src, masks=masks) 
         trgt    
-        
     member inline internal this.IMaskedGet (masks: Tensor<bool> list) = 
-        this.MaskedGet masks :> ITensor     
-        
+        this.MaskedGet masks :> ITensor    
+
     /// Set all elements of this tensor where mask is true to the specfied values.
     member internal this.MaskedSet (masks: Tensor<bool> list) (value: Tensor<'T>) =
         let masks = Tensor<_>.MaskOptions masks
@@ -2813,21 +2813,50 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         | None ->
             let trgt = this |> Tensor.reshape trgtShp
             backend.MaskedSet (trgt=trgt, masks=masks, src=value)
-            this.CopyFrom (trgt |> Tensor.reshape this.Shape)
-             
+            this.CopyFrom (trgt |> Tensor.reshape this.Shape)       
     member inline internal this.IMaskedSet (masks: Tensor<bool> list) (value: ITensor) = 
         match value with
         | :? Tensor<'T> as value -> this.MaskedSet masks value
         | _ ->
             invalidOp "Cannot assign data type %s to tensor of data type %s." value.DataType.Name this.DataType.Name
 
-    /// access to a single item using an array of indices
+    /// <summary>Accesses a single element within the tensor.</summary>
+    /// <param name="idx">An array consisting of the indicies of the element to access. The arry must have one entry
+    /// per dimension of this tensor.</param>
+    /// <value>The value of the selected element.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0]
+    ///                            [3.0; 4.0]]
+    /// let b = a.[[|1L; 1L|]] // b = 4.0
+    /// a.[[|1L; 0L|]] &lt;- 6.0 // a = [[1.0; 2.0]
+    ///                       //      [6.0; 4.0]]                        
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Indexing is zero-based.</para>
+    /// </remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the specified indicies are out of range.</exception>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
     member this.Item
         with get (idx: int64[]) : 'T = backend.[idx]
         and set (idx: int64[]) (value: 'T) = backend.[idx] <- value
           
-    /// access to a single item using a list of indices 
-    /// (use array of indices for faster access)
+    /// <summary>Accesses a single element within the tensor.</summary>
+    /// <param name="idx">A list consisting of the indicies of the element to access. The list must have one entry
+    /// per dimension of this tensor.</param>
+    /// <value>The value of the selected element.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0]
+    ///                            [3.0; 4.0]]
+    /// let b = a.[[1L; 1L]] // b = 4.0
+    /// a.[[1L; 0L]] &lt;- 6.0 // a = [[1.0; 2.0]
+    ///                     //      [6.0; 4.0]]                        
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Indexing is zero-based.</para>
+    /// <para>Use <see cref="Item(System.Int64[])"/> for faster element access.</para>
+    /// </remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the specified indicies are out of range.</exception>
+    /// <seealso cref="Item(System.Int64[])"/>
     member this.Item
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
@@ -2862,19 +2891,88 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         with get (masks: Tensor<bool> list) = this.MaskedGet masks
         and set (masks: Tensor<bool> list) (value: Tensor<'T>) = this.MaskedSet masks value                          
 
-    /// n-dimensional slicing using a list of TensorRngs
+    /// <summary>Accesses a slice (part) of the tensor.</summary>
+    /// <param name="rng">The range of the tensor to select.</param>
+    /// <value>A view of the selected part of the tensor.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 3.0]
+    ///                            [4.0; 5.0; 6.0]]
+    ///
+    /// // get view
+    /// let b = a.[[Rng.Elem 0L; Rng.Elem 1L]] // b = 2.0
+    /// let c = a.[[Rng.Elem 0L; Rng.All]] // b = [1.0; 2.0; 3.0]
+    /// let d = a.[[Rng.Elem 1L; Rng.Rng (Some 0L, Some 1L)]] // b = [4.0; 5.0]
+    /// let e = a.[[Rng.Rng (Some 1L, Some 1L); Rng (Some 0L, Some 1L)]] // b = [[4.0; 5.0]]
+    ///
+    /// // set view
+    /// a.[[Rng.Elem 0L; Rng.All]] &lt;- HostTensor.ofList [7.0; 8.0; 9.0] // a = [[7.0; 8.0; 9.0]
+    ///                                                                 //      [4.0; 5.0; 6.0]]
+    ///
+    /// // modifiying view affects original tensor
+    /// d.[[1L]] &lt;- 0.0 // a = [[7.0; 8.0; 9.0]
+    ///                 //      [4.0; 0.0; 6.0]]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>This range specification variant is intended for programmatically generated ranges. For most use cases
+    /// the variant <seealso cref="Item(System.Int64)"/> allows vastly simpler range specifications and is the 
+    /// recommended method.</para>
+    /// <para>Indexing is zero-based.</para>
+    /// <para>This indexing options allows to select a part (called slice) of the tensor.</para>
+    /// <para>The get operation returns a view of the specified part of the tensor. Modifications done to that
+    /// view will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// <para>See <see cref="Tensor.Rng"/> for available range specifications.</para>
+    /// </remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the specified range is out of range.</exception>
+    /// <seealso cref="Item(System.Int64)"/>
     member this.Item
         with get (rng: Rng list) = this.GetRng [|rng|]
         and set (rng: Rng list) (value: Tensor<'T>) = this.SetRng [|rng|] value
 
-    /// one-dimensional slicing using indices and special axes
+    /// <summary>Accesses a slice (part) of the tensor.</summary>
+    /// <param name="i0">The range of the tensor to select.</param>
+    /// <value>A view of the selected part of the tensor.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 3.0]
+    ///                            [4.0; 5.0; 6.0]]
+    ///
+    /// // get view
+    /// let b = a.[0L, 1L] // b = 2.0
+    /// let c = a.[0L, *] // b = [1.0; 2.0; 3.0]
+    /// let d = a.[1L, 0L..1L] // b = [4.0; 5.0]
+    /// let e = a.[1L..1L, 0L..1L] // b = [[4.0; 5.0]]
+    ///
+    /// // set view
+    /// a.[0L, *] &lt;- HostTensor.ofList [7.0; 8.0; 9.0] // a = [[7.0; 8.0; 9.0]
+    ///                                                //      [4.0; 5.0; 6.0]]
+    ///
+    /// // modifiying view affects original tensor
+    /// d.[[1L]] &lt;- 0.0 // a = [[7.0; 8.0; 9.0]
+    ///                 //      [4.0; 0.0; 6.0]]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Indexing is zero-based.</para>
+    /// <para>This indexing options allows to select a part (called slice) of the tensor.</para>
+    /// <para>The get operation returns a view of the specified part of the tensor. Modifications done to that
+    /// view will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// <para>The slicing specifications follows standard F# practice. 
+    /// Specifying an integer for the index of a dimension, selects that index for the dimension.
+    /// Specifying <c>*</c> for a dimension, selects all indices of the dimension.
+    /// Specifying <c>f..l</c> for a dimension, select all indices from <c>f</c> to (including) <c>l</c> for the dimension.
+    /// </para>
+    /// <para>For clarity the documentation does not list all overloads of the Item property and GetSlice, 
+    /// SetSlice methods. However, this slicing method can be used for up to 5 dimensions.
+    /// For programmatically generated ranges or for more than 5 dimensions, the range specification variant 
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{Tensor.Rng})"/> is available.</para>
+    /// </remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the specified range is out of range.</exception>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{Tensor.Rng})"/>
     member this.Item
         with get (i0: int64) = this.GetRng [|i0|]
         and set (i0: int64) (value: Tensor<'T>) = this.SetRng [|i0|] value
     member this.GetSlice (i0s: int64 option, i0f: int64 option) = this.GetRng [|i0s; i0f|]
     member this.SetSlice (i0s: int64 option, i0f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f|] value
 
-    /// two-dimensional slicing using indices and special axes
+    // two-dimensional slicing using indices and special axes
     member this.Item
         with get (i0: int64, i1: int64) = this.GetRng [|i0; i1|]
         and set (i0: int64, i1: int64) (value: Tensor<'T>) = this.SetRng [|i0; i1|] value
@@ -2885,7 +2983,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option) = this.GetRng [|i0s; i0f; i1s; i1f|]
     member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f|] value
 
-    /// three-dimensional slicing using indices and special axes
+    // three-dimensional slicing using indices and special axes
     member this.Item
         with get (i0: int64, i1: int64, i2: int64) = this.GetRng [|i0; i1; i2|]
         and set (i0: int64, i1: int64, i2: int64) (value: Tensor<'T>) = this.SetRng [|i0; i1; i2|] value
@@ -2906,7 +3004,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option) = this.GetRng [|i0s; i0f; i1s; i1f; i2s; i2f|]
     member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, value: Tensor<'T>) = this.SetRng [|i0s; i0f; i1s; i1f; i2s; i2f|] value
 
-    /// four- and more-dimensional slicing using indices and special axes
+    // four- and more-dimensional slicing using indices and special axes
     member this.Item
         with get (o0: obj, o1: obj, o2: obj, o3: obj, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|o0; o1; o2; o3|] r
         and set (o0: obj, o1: obj, o2: obj, o3: obj) (value: Tensor<'T>) = this.SetRng [|o0; o1; o2; o3|] value
@@ -2933,20 +3031,41 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.GetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
     member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.SetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
-    /// get element value
+    /// <summary>Gets the value of a single element of the tensor.</summary>
+    /// <param name="a">The tensor to read from.</param>
+    /// <param name="pos">A list consisting of the indicies of the element to access. The list must have one entry
+    /// per dimension of this tensor.</param>
+    /// <returns>The value of the selected element.</returns>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
     static member inline get (a: Tensor<_>) (pos: int64 list) = 
         a.[pos]
     
-    /// set element value
+    /// <summary>Sets the value of a single element of the tensor.</summary>
+    /// <param name="a">The tensor to write to.</param>
+    /// <param name="pos">A list consisting of the indicies of the element to access. The list must have one entry
+    /// per dimension of this tensor.</param>
+    /// <param name="value">The new value of the element.</param>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
     static member inline set (a: Tensor<_>) (pos: int64 list) value = 
         a.[pos] <- value
 
-    /// checks that this Tensor is a scalar tensor
+    /// Checks that this Tensor is a scalar tensor.
     member inline internal this.CheckScalar () =
         if this.NDims <> 0 then 
             indexOutOfRange "This operation requires a scalar (0-dimensional) tensor, but its shape is %A." this.Shape
 
-    /// value of scalar (0-dimensional) tensor
+    /// <summary>Accesses the value of a zero-dimensional (scalar) tensor.</summary>
+    /// <value>The scalar value of the tensor.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.sclar 2.0
+    /// let b = a.Value // 2.0
+    /// a.Value &lt;- 3.0 // a = 3.0
+    /// </code></example>
+    /// <remarks>
+    /// <para>Gets or sets the value of a scalar tensor.</para>
+    /// <para>The tensor must have zero dimensions.</para>
+    /// </remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the tensor is not zero-dimensional.</exception>
     member this.Value 
         with get () = 
             this.CheckScalar()
@@ -2955,11 +3074,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             this.CheckScalar()
             this.[[||]] <- value
 
-    /// value of scalar (0-dimensional) tensor
+    /// <summary>Gets the value of a zero-dimensional (scalar) tensor.</summary>
+    /// <param name="a">The zero-dimensional tensor to read from.</param>    
+    /// <returns>The scalar value of the tensor.</returns>
+    /// <seealso cref="Value"/>
     static member value (a: Tensor<'T>) : 'T =
         a.Value
 
-    /// Pretty string containing maxElems elements per dimension.
+    /// <summary>String representation of the tensor limited to a specific number of elements per dimension.</summary>
+    /// <param name="maxElems">Maximum number of element per dimension to include in string representation.</param>
+    /// <returns>A (shortened) string representation of this tensor</returns>
+    /// <seealso cref="Full"/><seealso cref="Pretty"/>
     member this.ToString (maxElems) =
         let rec prettyDim lineSpace (a: Tensor<'T>) =
             let ls () = a.Shape.[0]
@@ -3004,11 +3129,19 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             | _ -> "[" + (String.concat ("\n" + lineSpace) (subStrs ())) + "]"
         prettyDim " " this                       
 
-    /// pretty contents string
+    /// <summary>String representation of the tensor limited to 10 elements per dimension.</summary>
+    /// <value>A (shortened) string representation of this tensor</value>
+    /// <seealso cref="ToString(System.Int64)"/><seealso cref="Full"/>
     member this.Pretty = this.ToString (maxElems=10L)
+
+    /// <summary>String representation of the tensor limited to 10 elements per dimension.</summary>
+    /// <returns>A (shortened) string representation of this tensor</returns>
+    /// <seealso cref="ToString(System.Int64)"/><seealso cref="Pretty"/><seealso cref="Full"/>   
     override this.ToString() = this.Pretty
 
-    /// full contents string
+    /// <summary>Unabreviated string representation of the tensor.</summary>
+    /// <value>An unabreviated string representation of this tensor</value>
+    /// <seealso cref="ToString(System.Int64)"/><seealso cref="Pretty"/>
     member this.Full = this.ToString (maxElems=Int64.MaxValue)
                                
     // interface for access from backend                             
@@ -3141,89 +3274,196 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = this.Backend.GetEnumerator()
         member this.GetEnumerator() : System.Collections.IEnumerator = (this.Backend :> IEnumerable).GetEnumerator()
 
-    /// two tensors are equal if they have the same underlying memory and layout
+    /// <summary>Tests for equality to another object.</summary>
+    /// <param name="other">The other object.</param>
+    /// <returns>true if the objects are equal. Otherwise false.</returns>
+    /// <remarks>
+    /// <para>Two tensors are equal if they have the same storage and same layout.
+    /// In this case, changing one tensor will have the exact same effect on the other tensor.</para>
+    /// <para>Two tensors can overlap, i.e. one can partially or fully affect the other, without being equal.</para>
+    /// </remarks>
     override this.Equals other =
         match other with
         | :? Tensor<'T> as ot ->
             this.Storage = ot.Storage && this.Layout = ot.Layout 
         | _ -> false
 
+    /// <summary>Calculates the hash code of the tensor.</summary>
+    /// <returns>The hash code.</returns>
+    /// <remarks>
+    /// <para>The hash code is calculated from the storage and layout of the tensor.
+    /// If two tensors are equal, they will have the same hash code.</para>
+    /// </remarks>
+    /// <seealso cref="Equals"/>
     override this.GetHashCode () =
         hash (this.Storage, this.Layout)
 
-    /// Creates a new tensor of the given shape and data type.
+    /// <summary>Type-neutral function for creating a new, uninitialized tensor.</summary>
+    /// <param name="shape">The shape of the tensor to create.</param>
+    /// <param name="dataType">The data type of the tensor to create.</param>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="order">The memory layout to use for the new tensor.</param>
+    /// <returns>The new, uninitialized tensor.</returns>
+    /// <remarks>
+    /// <para>The contents of the new tensor are undefined.</para>
+    /// <para>Use this function only if you require a type-neutral function.
+    /// The recommended way is to use <see cref="zeros"/> to create a typed tensor.</para>
+    /// </remarks>
     static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
         Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor
 
-    /// Creates a new empty tensor with the given number of dimensions.
+    /// <summary>Creates a new, empty tensor with the given number of dimensions.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="nDims">The number of dimensions of the new, empty tensor.</param>
+    /// <returns>The new, empty tensor.</returns>
+    /// <remarks>
+    /// <para>The shape of the tensor is <c>[0L; ...; 0L]</c>. It contains no elements.</para>
+    /// </remarks>
     static member empty (dev: ITensorDevice) (nDims: int) : Tensor<'T> =
         Tensor<'T> (List.init nDims (fun _ -> 0L), dev)
 
-    /// Creates a new tensor of given shape filled with zeros.
+    /// <summary>Creates a new tensor filled with zeros (0).</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="shape">The shape of the new tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of the specified shape is created on the specified device.</para>
+    /// <para>The tensor is filled with zeros.</para>
+    /// </remarks>
     static member zeros (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
             x.FillConst Tensor<'T>.Zero
         x
    
-    /// Tensor of same shape as specifed tensor and filled with zeros.
+    /// <summary>Creates a new tensor filled with zeros using the specified tensor as template.</summary>
+    /// <param name="tmpl">The template tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor is created with the same shape and on the same device as <paramref name="tmpl"/>.</para>
+    /// <para>The tensor is filled with zeros.</para>
+    /// </remarks>
     static member zerosLike (tmpl: Tensor<'T>) : Tensor<'T> =
         Tensor<'T>.zeros tmpl.Storage.Dev tmpl.Shape
 
-    /// Creates a new tensor of given shape filled with ones.
+    /// <summary>Creates a new tensor filled with ones (1).</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="shape">The shape of the new tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of the specified shape is created on the specified device.</para>
+    /// <para>The tensor is filled with ones.</para>
+    /// </remarks>
     static member ones (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst Tensor<'T>.One
         x
         
-    /// Tensor of same shape as specifed tensor and filled with ones.
+    /// <summary>Creates a new tensor filled with ones using the specified tensor as template.</summary>
+    /// <param name="tmpl">The template tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor is created with the same shape and on the same device as <paramref name="tmpl"/>.</para>
+    /// <para>The tensor is filled with ones.</para>
+    /// </remarks>
     static member onesLike (tmpl: Tensor<'T>) : Tensor<'T> =
         Tensor<'T>.ones tmpl.Storage.Dev tmpl.Shape 
 
-    /// Creates a new boolean tensor of given shape filled with false.
+    /// <summary>Creates a new boolean tensor filled with falses.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="shape">The shape of the new tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of the specified shape is created on the specified device.</para>
+    /// <para>The tensor is filled with falses.</para>
+    /// </remarks>
     static member falses (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst false
         x
 
-    /// Creates a new boolean tensor of given shape filled with true.
+    /// <summary>Creates a new boolean tensor filled with trues.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="shape">The shape of the new tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of the specified shape is created on the specified device.</para>
+    /// <para>The tensor is filled with trues.</para>
+    /// </remarks>
     static member trues (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst true
         x   
 
-    /// Creates a new tensor of scalar shape with the given value and storage.
+    /// <summary>Creates a new zero-dimensional (scalar) tensor with the specified value.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="value">The value of the new, scalar tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of zero-dimensional shape is created on the specified device.</para>
+    /// <para>The values of the tensor is set to the specified value.</para>
+    /// </remarks>
     static member scalar (dev: ITensorDevice) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> ([], dev)
         x.Value <- value
         x
 
-    /// Creates a new tensor of scalar shape with the given value and 
-    /// same storage as the specified tensor.
+    /// <summary>Creates a new zero-dimensional (scalar) tensor using the specified tensor as template and with 
+    /// the specified value.</summary>
+    /// <param name="tmpl">The template tensor.</param>
+    /// <param name="value">The value of the new, scalar tensor.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of zero-dimensional shape is created on the same device as <paramref name="tmpl"/>.</para>
+    /// <para>The values of the tensor is set to the specified value.</para>
+    /// </remarks>
     static member scalarLike (tmpl: ITensor) (value: 'T) : Tensor<'T> =
         Tensor<'T>.scalar tmpl.Storage.Dev value 
 
+    /// TODO: move to HostTensor
     /// Creates a tensor with the values returned by the function.
     static member init (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillIndexed fn
         x           
 
-    /// Creates a tensor filled with the specified value.
+    /// <summary>Creates a new tensor filled with the specified value.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="shape">The shape of the new tensor.</param>
+    /// <param name="value">The value to fill the new tensor with.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new tensor of the specified shape is created on the specified device.</para>
+    /// <para>The tensor is filled with the specified value.</para>
+    /// </remarks>
     static member filled (dev: ITensorDevice) (shape: int64 list) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst value
         x           
 
-    /// Identity matrix of given size.
+    /// <summary>Creates a new identity matrix.</summary>
+    /// <param name="dev">The device to create the matrix on.</param>
+    /// <param name="size">The size of the square identity matrix.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new square matrix of the specified size is created on the specified device.</para>
+    /// <para>The tensor is filled with ones on the diagonal and zeros elsewhere.</para>
+    /// </remarks>
     static member identity (dev: ITensorDevice) (size: int64) : Tensor<'T> =
         let x = Tensor<'T>.zeros dev [size; size]
         let d : Tensor<'T> = Tensor.diag x
         d.FillConst Tensor<'T>.One
         x           
 
-    /// Int64 vector containing the numbers [0L; 1L; ...; nElems-1L].
+    /// <summary>Creates a new vector filled with the integers from zero to the specified maximum.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="nElems">The number of elements of the new vector.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new vector with the specified number of elements is created on the specified device.</para>
+    /// <para>The tensor is filled with <c>[0L; 1L; 2L; ...; nElems-1L]</c>. </para>
+    /// </remarks>
     static member counting (dev: ITensorDevice) (nElems: int64) =
         Tensor.init dev [nElems] (fun idx -> idx.[0])        
 

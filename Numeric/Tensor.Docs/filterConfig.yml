@@ -8,7 +8,9 @@ apiRules:
 - exclude:
     uidRegex: ^Tensor\.Tensor$
 - exclude:
-    uidRegex: ^Tensor\.Tensor`1\.Item
+    uidRegex: ^Tensor\.Tensor`1\.Item\(obj
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Item\(int64 \*    
 - exclude:
     uidRegex: ^Tensor\.Tensor`1\.GetSlice
 - exclude:
