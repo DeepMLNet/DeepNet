@@ -3459,7 +3459,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Two tensors are equal if they have the same storage and same layout.
     /// In this case, changing one tensor will have the exact same effect on the other tensor.</para>
     /// <para>Two tensors can overlap, i.e. one can partially or fully affect the other, without being equal.</para>
+    /// <para>The elements of a tensor do not affect equality, i.e. two tensors can contain exactly the same values 
+    /// without being equal.</para>
     /// </remarks>
+    /// <seealso cref="op_EqualsEqualsEqualsEquals"/><seealso cref="almostEqual"/>
     override this.Equals other =
         match other with
         | :? Tensor<'T> as ot ->
