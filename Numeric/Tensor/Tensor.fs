@@ -132,7 +132,20 @@ type BlockTensor<'T> =
 
 
 
-/// An N-dimensional array with elements of type 'T.
+/// <summary>An N-dimensional array with elements of type 'T.</summary>
+/// <typeparam name="'T">The type of the data stored within the tensor.</typeparam>
+/// <param name="layout">The memory layout to use.</param>
+/// <param name="storage">The storage to use.</param>
+/// <returns>A tensor using the specified memory layout and storage.</returns>
+/// <remarks>
+/// <para>The data of a tensor can be stored on different devices. Currently supported devices are host memory
+/// and CUDA GPU memory.</para>
+/// <para>Different tensors can share the whole or parts of the underlying data.</para>
+/// <para>The recommended way to create a new tensor is to use <see cref="zeros"/>.
+/// The implicit constructor creates a view into the specified storage using the specified memory layout.
+/// In most cases, it is not necessary to use the implicit constructor.</para>
+/// </remarks> 
+/// <seealso cref="ITensor"/> 
 type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
         Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
 
@@ -257,7 +270,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member internal this.Relayout (newLayout: TensorLayout) =
         Tensor<'T> (newLayout, storage)
 
-    /// a tensor with the same storage but new layout
+    /// <summary>Creates a tensor with the specified layout sharing its storage with the original tensor.</summary>
+    /// <param name="newLayout">The new tensor memory layout.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
     static member relayout newLayout (a: 'A when 'A :> ITensor) : 'A =
         a.Relayout newLayout :?> 'A
 
@@ -265,48 +281,149 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member internal this.Range (rng: Rng list) =
         this.Relayout (this.Layout |> TensorLayout.view rng)
 
-    /// a view of the specified tensor over the given range 
+    /// <summary>Get a slice (part) of the tensor.</summary>
+    /// <param name="rng">The range of the tensor to select.</param>    
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{Tensor.Rng})"/>
     static member range (rng: Rng list) (a: 'A when 'A :> ITensor) : 'A =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.view rng)
    
-    /// checks that the given axis is valid
+    /// <summary>Checks the the specified axis is valid for this tensor.</summary>   
+    /// <param name="ax">The axis number to check.</param>
+    /// <remarks>If the axis is valid, this function does nothing.</remarks>
+    /// <exception cref="System.IndexOutOfRangeException">Raised when the axis is invalid.</exception>
     member inline this.CheckAxis ax = this.Layout |> TensorLayout.checkAxis ax
 
-    /// sequence of all indices 
+    /// <summary>Gets a sequence of all indices to enumerate all elements within the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Sequence of indicies.</returns>
+    /// <remarks>The sequence sequentially enumerates the indices of all elements of the tensor.</remarks>
+    /// <seealso cref="allIdxOfDim``1"/><seealso cref="allElems"/>
     static member allIdx (a: #ITensor) = a.Layout |> TensorLayout.allIdx
 
-    /// all indices of the given dimension
+    /// <summary>Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.</summary>
+    /// <param name="dim">The dimension to enumerate.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Sequence of indicies.</returns>
+    /// <remarks>The sequence sequentially enumerates the indices of the elements of the specified dimension.</remarks>
+    /// <seealso cref="allIdx``1"/>
     static member allIdxOfDim dim (a: #ITensor) = a.Layout |> TensorLayout.allIdxOfDim dim 
             
-    /// sequence of all elements stored in the tensor
+    /// <summary>Gets a sequence of all all elements within the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Sequence of elements.</returns>
+    /// <remarks>The sequence sequentially enumerates all elements of the tensor.</remarks>
+    /// <seealso cref="allIdx``1"/>
     static member allElems (a: Tensor<'T>) = a |> Tensor<_>.allIdx |> Seq.map (fun idx -> a.[idx])
     
-    /// inserts a broadcastable dimension of size one as first dimension
+    /// <summary>Insert a dimension of size one as the first dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 4L; 5L]
+    /// let b = Tensor.padLeft a // b.Shape = [1L; 3L; 4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="padRight``1"/><seealso cref="insertAxis``1"/>
     static member padLeft a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padLeft)
 
-    /// appends a broadcastable dimension of size one as last dimension
+    /// <summary>Append a dimension of size one after the last dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 4L; 5L]
+    /// let b = Tensor.padRight a // b.Shape = [3L; 4L; 5L; 1L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="padLeft``1"/><seealso cref="insertAxis``1"/>
     static member padRight a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padRight)
 
-    /// Inserts an axis of size 1 before the specified position.
+    /// <summary>Insert a dimension of size one before the specifed dimension.</summary>
+    /// <param name="ax">The dimension to insert before.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 4L; 5L]
+    /// let b = Tensor.insertAxis 1 a // b.Shape = [3L; 1L 4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="padLeft``1"/><seealso cref="padRight``1"/>
     static member insertAxis ax a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.insertAxis ax)
 
-    /// removes the first dimension from the tensor
+    /// <summary>Removes the first dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 4L; 5L]
+    /// let b = Tensor.cutLeft a // b.Shape = [4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="cutRight``1"/>
     static member cutLeft a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutLeft)
       
-    /// removes the last dimension from the tensor
+    /// <summary>Removes the last dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 4L; 5L]
+    /// let b = Tensor.cutRight a // b.Shape = [3L; 4L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="cutLeft``1"/>
     static member cutRight a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutRight)
 
-    /// broadcast the given dimension to the given size
+    /// <summary>Broadcast a dimension to a specified size.</summary>
+    /// <param name="dim">The size-one dimension to broadcast.</param>
+    /// <param name="size">The size to broadcast to.</param>    
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 1L; 5L]
+    /// let b = Tensor.broadCastDim 1 9L a // b.Shape = [3L; 9L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The broadcasted dimension must be of size one. The tensor is repeated <paramref name="size"/> times along
+    /// the axis <paramref name="dim"/>.</para>
+    /// <para>Broadcasting is usually performed automatically when the shapes allow for it. See broadcasting rules
+    /// for details.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="insertAxis``1"/>
     static member broadcastDim dim size a =
         a |> Tensor<_>.relayout (a.Layout |> TensorLayout.broadcastDim dim size)       
 
-    /// Creates a new tensor of specifed shape with newly allocated storage using 
-    /// the specified storage device.
+    /// <summary>Creates a new, uninitialized tensor with a new storage.</summary>
+    /// <param name="shape">The shape of the tensor to create.</param>
+    /// <param name="dev">The device to store the data of the tensor on.</param>
+    /// <param name="order">The memory layout to use for the new tensor. (default: row-major)</param>
+    /// <returns>The new, uninitialized tensor.</returns>
+    /// <remarks>
+    /// <para>The contents of the new tensor are undefined. The default memory layout is row-major.</para>
+    /// <para>The recommended way to create a new tensor is to use <see cref="zeros"/>.</para>
+    /// </remarks>
+    /// <seealso cref="NewOfType"/><seealso cref="zeros"/>
     new (shape: int64 list, dev: ITensorDevice, ?order: TensorOrder) =
         let order = defaultArg order RowMajor
         let layout = 
@@ -438,8 +555,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member swapDim ax1 ax2 a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.swapDim ax1 ax2)
 
-    /// Transposes the given matrix.
-    /// If the given tensor has more then two dimensions, the last two axes are swapped.
+    /// <summary>Transpose of a matrix.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The result of this operation.</returns>
+    /// <seealso cref="T"/>
     static member transpose a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.transpose)
 
@@ -473,8 +592,18 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If not, it is padded with size one dimensions from the left.
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
 
-    /// Transposes the given matrix.
-    /// If the given tensor has more then two dimensions, the last two axes are swapped.
+    /// <summary>Transpose of a matrix.</summary>
+    /// <value>The transposed matrx.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 5L]
+    /// let b = a.T // b.Shape = [5L; 3L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>If the given tensor has more then two dimensions, the last two axes are swapped.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="permuteAxes``1"/><seealso cref="swapDim``1"/>    
     member inline this.T = 
         Tensor<_>.transpose this
 
@@ -2393,10 +2522,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.find 3.0 a // b = [0L; 2L]
     /// </code></example>
     /// <remarks>The values is searched for an the index of the first occurence is returned.
-    /// If the value is not found, an <see cref="T:InvalidOperationException"/> is raised.
+    /// If the value is not found, an <see cref="System.InvalidOperationException"/> is raised.
     /// Use <see cref="tryFind"/> instead, if the value might not be present.
     /// </remarks>
-    /// <exception cref="T:System.InvalidOperationException">Raised if value is not found.</exception>
+    /// <exception cref="System.InvalidOperationException">Raised if value is not found.</exception>
     /// <seealso cref="tryFind"/><seealso cref="findAxis"/>
     static member find (value: 'T) (a: Tensor<'T>) =
         match Tensor<_>.tryFind value a with
@@ -3347,10 +3476,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     override this.GetHashCode () =
         hash (this.Storage, this.Layout)
 
-    /// <summary>Type-neutral function for creating a new, uninitialized tensor.</summary>
+    /// <summary>Type-neutral function for creating a new, uninitialized tensor with a new storage.</summary>
     /// <param name="shape">The shape of the tensor to create.</param>
     /// <param name="dataType">The data type of the tensor to create.</param>
-    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="dev">The device to store the data of the tensor on.</param>
     /// <param name="order">The memory layout to use for the new tensor.</param>
     /// <returns>The new, uninitialized tensor.</returns>
     /// <remarks>
@@ -3358,6 +3487,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Use this function only if you require a type-neutral function.
     /// The recommended way is to use <see cref="zeros"/> to create a typed tensor.</para>
     /// </remarks>
+    /// <seealso cref="#ctor"/>
     static member NewOfType (shape: int64 list, dataType: Type, dev: ITensorDevice, ?order: TensorOrder) =
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
         Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor

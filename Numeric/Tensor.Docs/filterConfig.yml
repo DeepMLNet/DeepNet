@@ -25,3 +25,8 @@ apiRules:
     uidRegex: ^Tensor\.Tensor`1\.System\.Collections\.IEnumerable
 - exclude:
     uidRegex: ^Tensor\.Util
+
+attributeRules:
+- exclude:
+    uidRegex: StructuredFormatDisplay
+    
