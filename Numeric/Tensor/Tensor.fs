@@ -143,40 +143,105 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     do TensorLayout.check layout
     let backend = storage.Backend layout
 
-    /// layout of this tensor (shape, offset and strides)
+    /// <summary>Memory layout of this tensor.</summary>
+    /// <value>Memory layout.</value>
+    /// <remarks>Provides information of how the data is stored within this tensor.</remarks>
+    /// <seealso cref="Storage"/><seealso cref="Shape"/>
     member val Layout = layout
 
-    /// layout
+    /// <summary>Memory layout of the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Memory layout.</returns>
+    /// <seealso cref="Layout"/>
     static member inline layout (a: #ITensor) = a.Layout
 
-    /// storage of this tensor
+    /// <summary>The storage object that holds the data of this tensor.</summary>
+    /// <value>Storage object.</value>
+    /// <remarks>
+    /// <para>The storage object holds the actual data of the tensor.
+    /// A storage object can be associated with one or more tensors, i.e. it can be shared between multiple tensors.
+    /// Sharing occurs, for example, when a view into an existing tensor is created or the tensor is reshapred.</para>
+    /// <para>The actual type of the storage object depends on the device the data of the tensor is stored on.</para>
+    /// <para>For tensors stored in host memory the storage object type is <see cref="Tensor.Host.TensorHostStorage`1"/>.</para>
+    /// <para>For tensors stored on a CUDA GPU the storage object type is <see cref="Tensor.Cuda.TensorCudaStorage`1"/>.</para>
+    /// </remarks>
+    /// <seealso cref="Dev"/><seealso cref="Layout"/>
     member val Storage = storage
 
-    /// device this tensor is stored on
+    /// <summary>Device the data of tensor is stored on.</summary>
+    /// <value>Data storage device.</value>
+    /// <remarks>
+    /// <para>For tensors stored in host memory the value of this property is <see cref="HostTensor.Dev"/>.</para>
+    /// <para>For tensors stored on a CUDA GPU the value of this property is <see cref="CudaTensor.Dev"/>.</para>
+    /// </remarks>
+    /// <seealso cref="Storage"/>
     member inline this.Dev = this.Storage.Dev
 
-    /// device where the specified tensor is stored
+    /// <summary>Device the data of tensor is stored on.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Data storage device.</returns>
+    /// <seealso cref="Dev"/>
     static member inline dev (a: #ITensor) = a.Dev
 
     /// backend 
     member internal this.Backend = backend
 
-    /// shape
+    /// <summary>Shape of this tensor.</summary>
+    /// <value>Shape.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 5.0]
+    ///                            [3.0; 4.0; 6.0]]
+    /// let c = a.Shape // [2L; 3L]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Provides the shape of this tensor.</para>
+    /// <para>A tensor is empty of any dimension has size zero.</para>
+    /// <para>A zero-dimensional tensor has an empty shape and contains one element.</para>
+    /// </remarks>
     member inline this.Shape = this.Layout.Shape
 
-    /// shape 
+    /// <summary>Shape of the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Shape.</returns>
+    /// <seealso cref="Shape"/>
     static member inline shape (a: #ITensor) = a.Shape
 
-    /// number of dimensions
+    /// <summary>Dimensionality of this tensor.</summary>
+    /// <value>Number of dimensions.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 5.0]
+    ///                            [3.0; 4.0; 6.0]]
+    /// let c = a.NDims // 2
+    /// </code></example>
+    /// <remarks>
+    /// <para>Provides the number of dimensions of this tensor.</para>
+    /// <para>A zero-dimensional tensor contains one element, i.e. it is a scalar.</para>
+    /// </remarks>
     member inline this.NDims = this.Layout.NDims
 
-    /// number of dimensions
+    /// <summary>Dimensionality of the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Number of dimensions.</returns>
+    /// <seealso cref="NDims"/>
     static member inline nDims (a: #ITensor) = a.NDims
 
-    /// number of elements
+    /// <summary>Total number of elements within this tensor.</summary>
+    /// <value>Number of elements.</value>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [[1.0; 2.0; 5.0]
+    ///                            [3.0; 4.0; 6.0]]
+    /// let c = a.NElems // 6L
+    /// </code></example>
+    /// <remarks>
+    /// <para>Counts the total number of elements of this tensor.</para>
+    /// <para>A zero-dimensional tensor contains one element, i.e. it is a scalar.</para>
+    /// </remarks>
     member inline this.NElems = this.Layout.NElems
 
-    /// number of elements 
+    /// <summary>Total number of elements within the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Number of elements.</returns>
+    /// <seealso cref="NElems"/>
     static member inline nElems (a: #ITensor) = a.NElems
 
     /// strides
