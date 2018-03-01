@@ -24,10 +24,6 @@ type ITensor =
     abstract Dev:               ITensorDevice
     /// shape
     abstract Shape:             int64 list
-    /// stride
-    abstract Stride:            int64 list
-    /// stride
-    abstract Offset:            int64 
     /// number of dimensions
     abstract NDims:             int
     /// number of elements
@@ -244,22 +240,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="NElems"/>
     static member inline nElems (a: #ITensor) = a.NElems
 
-    /// strides
-    member inline this.Stride = this.Layout.Stride
-
-    /// strides
-    static member inline stride (a: #ITensor) = a.Stride
-
-    /// offset
-    member inline this.Offset = this.Layout.Offset
-
-    /// offset
-    static member inline offset (a: #ITensor) = a.Offset
-
-    /// type of data stored in this tensor
+    /// <summary>Type of data stored within this tensor.</summary>
+    /// <value>Data type.</value>
+    /// <remarks>
+    /// <para>The data type is <c>typeof&lt;'T&gt;</c>.</para>
+    /// </remarks>
     member inline this.DataType = typeof<'T>
 
-    /// type of data stored in the specified tensor
+    /// <summary>Type of data stored within the tensor.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Data type.</returns>
+    /// <seealso cref="DataType"/>
     static member inline dataType (a: #ITensor) = a.DataType
 
     /// a tensor with the same storage but new layout
@@ -2915,7 +2906,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Use <see cref="Item(System.Int64[])"/> for faster element access.</para>
     /// </remarks>
     /// <exception cref="System.IndexOutOfRangeException">Raised when the specified indicies are out of range.</exception>
-    /// <seealso cref="Item(System.Int64[])"/>
+    /// <seealso cref="Item(System.Int64[])"/><seealso cref="Value"/>
     member this.Item
         with get (idx: int64 list) : 'T = backend.[Array.ofList idx]
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
@@ -3125,6 +3116,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The tensor must have zero dimensions.</para>
     /// </remarks>
     /// <exception cref="System.IndexOutOfRangeException">Raised when the tensor is not zero-dimensional.</exception>
+    /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
     member this.Value 
         with get () = 
             this.CheckScalar()
@@ -3210,8 +3202,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Backend = this.Backend
         member this.Layout = this.Layout
         member this.Shape = this.Shape
-        member this.Stride = this.Stride
-        member this.Offset = this.Offset
+        member this.Stride = this.Layout.Stride
+        member this.Offset = this.Layout.Offset
         member this.NDims = this.NDims
         member this.NElems = this.NElems
         member this.Relayout layout = this.Relayout layout :> ITensorFrontend<'T>
@@ -3225,8 +3217,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Layout = this.Layout
         member this.Relayout layout = this.Relayout layout :> ITensor
         member this.Shape = this.Shape
-        member this.Stride = this.Stride
-        member this.Offset = this.Offset
         member this.NDims = this.NDims
         member this.NElems = this.NElems
         member this.DataType = this.DataType
