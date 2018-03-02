@@ -817,13 +817,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A new tensor is created with the specified memory layout on the same device as the orignal tensor.</para>
     /// <para>The elements of the original tensor are copied into the new tensor.</para>
     /// </remarks>    
-    /// <seealso cref="CopyForm"/><seealso cref="transfer"/>
+    /// <seealso cref="CopyFrom"/><seealso cref="transfer``1"/>
     static member copy (a: 'A when 'A :> ITensor, ?order) =
         a.Copy (?order=order) :?> 'A
 
     /// <summary>Fills this tensor with a copy of the specified tensor.</summary>
     /// <param name="src">The tensor to copy from.</param>
-    /// <seealso cref="Copy"/>
+    /// <remarks>
+    /// <para>The source tensor must have the same shape and be stored on the same device as this tensor.</para>
+    /// </remarks>
+    /// <seealso cref="copy``1"/><seealso cref="FillFrom"/>
     member trgt.CopyFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
         Tensor.CheckSameStorage [trgt; src]
@@ -836,7 +839,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Both tensors must have same shape and type.</para>
     /// <para>If both tensors are located on the same device, a copy is performed.</para>
     /// </remarks>    
-    /// <see cref="Transfer"/>
+    /// <see cref="transfer``1"/>
     member trgt.TransferFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
         if trgt.Dev = src.Dev then
@@ -856,12 +859,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The target device.</param>
     /// <param name="a">The tensor to transfer.</param>
     /// <returns>A tensor on the target device.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 5L] // a.Dev = HostTensor.Dev
+    /// let b = Tensor.transfer CudaTensor.Dev a // b.Dev = CudaTensor.Dev
+    /// </code></example>       
     /// <remarks>    
     /// <para>A new tensor is created on the specified device.</para>
     /// <para>The elements of the original tensor are copied into the new tensor.</para>
     /// <para>If the target device matches the current device of the tensor, a copy is performed.</para>
     /// </remarks>    
-    /// <seealso cref="TransferFrom"/><seealso cref="Dev"/><seealso cref="copy"/>
+    /// <seealso cref="TransferFrom"/><seealso cref="Dev"/><seealso cref="copy``1"/>
     static member transfer (dev: ITensorDevice) (src: 'A when 'A :> ITensor) =
         src.Transfer (dev) :?> 'A
 
@@ -897,18 +904,30 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillParallelIndexed (fn: int64[] -> 'T) =
         trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=true)
 
-    /// Copy source tensor into this tensor.
-    /// The source tensor is broadcasted to the size of this tensor, if possible.
+    /// <summary>Fills this tensor with a copy of the specified tensor.</summary>
+    /// <param name="src">The tensor to copy from.</param>
+    /// <remarks>
+    /// <para>The source tensor is broadcasted to the size of this tensor.</para>
+    /// <para>The source tensor must be stored on the same device as this tensor.</para>
+    /// </remarks>
+    /// <seealso cref="CopyFrom"/>
     member trgt.FillFrom (src: Tensor<'T>) = 
         let src = Tensor.PrepareElemwiseSources (trgt, src)
         trgt.CopyFrom src
 
-    /// Fills the tensor with the specified constant.
+    /// <summary>Fills this tensor with the specified constant value.</summary>
+    /// <param name="value">The value to use.</param>
+    /// <seealso cref="filled"/>
     member trgt.FillConst (value: 'T) =
         trgt.Backend.FillConst (value=value, trgt=trgt)
 
-    /// Fills the one-dimensional tensor with a sequence starting at the specified start value
-    /// and using the specified increment.
+    /// <summary>Fills this vector with an equispaced sequence of elements.</summary>
+    /// <param name="start">The starting value to use.</param>
+    /// <param name="incr">The increment between successive element.</param>    
+    /// <remarks>
+    /// <para>This tensor must be one dimensional.</para>
+    /// </remarks>
+    /// <seealso cref="arange``3"/>
     member trgt.FillIncrementing (start: 'T, incr: 'T) =
         if trgt.NDims <> 1 then invalidOp "FillIncrementing requires a vector."
         trgt.Backend.FillIncrementing (start=start, incr=incr, trgt=trgt)
@@ -984,34 +1003,78 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.FillMapIndexed2 fn a b
         trgt       
 
-    /// copies all elements into this tensor and converts their data type appropriately
+    /// <summary>Copies elements from a tensor of different data type into this tensor and converts their type.</summary>
+    /// <typeparam name="'TA">The data type to convert from.</typeparam>
+    /// <param name="a">The tensor to copy from.</param>    
+    /// <seealso cref="convert``1"/>
     member trgt.FillConvert (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Convert (trgt=trgt, src=a)
 
-    /// converts all elements to the specified type
+    /// <summary>Convert the elements of a tensor to the specifed type.</summary>
+    /// <typeparam name="'C">The data type to convert to.</typeparam>
+    /// <param name="a">The tensor to convert.</param>
+    /// <returns>A tensor of the new data type.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [1; 2; 3] 
+    /// let b = Tensor.convert&lt;float> a // b = [1.0; 2.0; 3.0]
+    /// </code></example>       
+    /// <remarks>    
+    /// <para>The elements of the original tensor are copied into the new tensor and their type is converted
+    /// during the copy.</para>
+    /// <para>For tensors that contain data of non-primitive types and are stored on the host, 
+    /// the <c>op_Explicit</c> or <c>op_Implicit</c> methods of the source or destination type are used to perform
+    /// the conversion.</para>
+    /// </remarks>    
+    /// <seealso cref="FillConvert``1"/>
     static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillConvert (a)
         trgt
 
-    /// element-wise unary (prefix) plus using this tensor as target
+    /// <summary>Fills this tensor with the element-wise prefix plus of the argument.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <seealso cref="op_UnaryPlus"/>
     member trgt.FillUnaryPlus (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.UnaryPlus (trgt=trgt, src1=a)
 
-    /// element-wise unary (prefix) plus
+    /// <summary>Element-wise prefix plus.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = +a  // c = [5.0; 6.0; 7.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Applies the unary plus operator to each element of tensor <paramref name="a"/> and returns the result 
+    /// as a new tensor.</para>
+    /// <para>For most data types, this operation does not change the value.</para>
+    /// </remarks>
+    /// <seealso cref="FillUnaryPlus"/>
     static member (~+) (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillUnaryPlus (a)
         trgt
 
-    /// element-wise unary (prefix) minus using this tensor as target
+    /// <summary>Fills this tensor with the element-wise negation of the argument.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <seealso cref="op_UnaryNegation"/>
     member trgt.FillUnaryMinus (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.UnaryMinus (trgt=trgt, src1=a)
 
-    /// element-wise unary (prefix) minus
+    /// <summary>Element-wise negation.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [5.0; 6.0; 7.0]
+    /// let c = -a  // c = [-5.0; -6.0; -7.0]
+    /// </code></example>
+    /// <remarks>
+    /// <para>Negates each element of tensor <paramref name="a"/> and returns the result as a new tensor.</para>
+    /// </remarks>
+    /// <seealso cref="FillNegate"/>
     static member (~-) (a: Tensor<'T>) = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillUnaryMinus (a)
