@@ -599,32 +599,36 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member isBroadcasted a =
         a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
 
-    /// <summary>Checks if the specified tensor is in row-major memory layout.</summary>
+    /// <summary>Tries to create a reshaped view of the tensor (without copying).</summary>
+    /// <param name="shp">The tensor to operate on.</param>
     /// <param name="a">The tensor to operate on.</param>
-    /// <returns>true if the tensor is in row-major memory layout, otherwise false.</returns>
+    /// <returns>The reshaped tensor, if reshaping without copying is possible. Otherwise <c>None</c>.</returns>
     /// <remarks>
-    /// <para>If any stride is zero, it is assumed that the tensor is broadcasted.
-    /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
+    /// <para>Tries to change the shape of the tensor to the specified shape.
+    /// The total number of elements must not change.</para>
+    /// <para>If a reshape is not possible without copying the data of the tensor, <c>None</c> is returned.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="isColumnMajor"/><seealso cref="``2"/>
-    static member isRowMajor a =
-        a |> Tensor<_>.layout |> TensorLayout.isC
-
-    /// returns true if tensor is stored in column-major order
-    static member isColumnMajor a =
-        a |> Tensor<_>.layout |> TensorLayout.isF
-
-    /// Tries to reshape the tensor without copying.
-    /// For this to succeed, the tensor must have row-major layout.
-    /// If this a reshape without copying is impossible, None is returned.
+    /// <seealso cref="reshapeView``1"/><seealso cref="reshape``1"/>
     static member tryReshapeView shp a =
         match a |> Tensor<_>.layout |> TensorLayout.tryReshape shp with
         | Some newLayout -> a |> Tensor<_>.relayout newLayout |> Some
         | None -> None
 
-    /// Tries to reshape the tensor without copying.
-    /// For this to succeed, the tensor must have row-major layout.
-    /// If this a reshape without copying is impossible, an error is raised.
+    /// <summary>Creates a reshaped view of the tensor (without copying).</summary>
+    /// <param name="shp">The tensor to operate on.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A reshaped view of the original tensor.</returns>
+    /// <remarks>
+    /// <para>Tries to change the shape of the tensor to the specified shape.
+    /// The total number of elements must not change.</para>
+    /// <para>If a reshape is not possible without copying the data of the tensor, an exception is raised.
+    /// To avoid this, use <see cref="tryReshapeView``1"/> instead.
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="trReshapeView``1"/><seealso cref="reshape``1"/>
     static member reshapeView shp a =
         match Tensor<_>.tryReshapeView shp a with
         | Some res -> res
