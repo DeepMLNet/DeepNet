@@ -1536,7 +1536,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </code></example>
     /// <remarks>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN) and returns
     /// the results as a new tensor of type <c>bool</c>.</remarks>
-    /// <seealso cref="FillIsFinite``1"/>
+    /// <seealso cref="FillIsFinite``1"/><seealso crf="allFinite``1"/>
     static member isFinite (a: Tensor<'T>) : Tensor<bool> = 
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillIsFinite (a)
@@ -4045,9 +4045,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         x.FillIncrementing(start, incr)
         x
 
-    /// Element-wise check if two tensors have same (within machine precision) values.
-    /// Checks for exact equality for non-floating-point types.
-    static member isCloseWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
+    /// <summary>Element-wise check if two tensors have same (within machine precision) values.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <param name="absTol">The absolute tolerance. (default 1e-8)</param>
+    /// <param name="relTol">The relative tolerance. (default 1e-5)</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being almost equal to the corresponding element 
+    /// of tensor <paramref name="b"/> and returns the results as a new tensor. For integer data types the check
+    /// is exact.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.</para>
+    /// </remarks>
+    /// <seealso crf="almostEqual``1"/>
+    static member isClose (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
         match typeof<'T> with
         | t when t=typeof<single> || t=typeof<double> ->
             let absTol = defaultArg absTol (conv<'T> 1e-8) |> Tensor.scalarLike a
@@ -4055,35 +4066,78 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             abs (a - b) <<== absTol + relTol * abs b
         | _ -> a ==== b
 
-    /// Element-wise check if two tensors have same (within machine precision) values.
-    /// Checks for exact equality for non-floating-point types.
-    static member isClose a b = Tensor.isCloseWithTol (a, b)
-
-    /// Returns true if two tensors have same (within specified precision) values in all elements.
-    /// If tensors have different shape, then false is returned.
-    static member almostEqualWithTol (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
+    /// <summary>Checks if two tensors have the same (within machine precision) values in all elements.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <param name="absTol">The absolute tolerance. (default 1e-8)</param>
+    /// <param name="relTol">The relative tolerance. (default 1e-5)</param>
+    /// <returns>true if two tensors have same (within specified precision) values in all elements, otherwise false.</returns>
+    /// <remarks>
+    /// <para>Test each element of tensor <paramref name="a"/> for being almost equal to the corresponding element 
+    /// of tensor <paramref name="b"/>. For integer data types the check is exact.</para>
+    /// <para>If tensors have different shape, then false is returned.</para>
+    /// <para>The tensors <paramref name="a"/> and <paramref name="b"/> must have the same storage and type.</para>
+    /// </remarks>
+    /// <seealso crf="isClose``1"/>
+    static member almostEqual (a: Tensor<'T>, b: Tensor<'T>, ?absTol: 'T, ?relTol: 'T) =
         if a.Shape = b.Shape then
-            Tensor.isCloseWithTol (a, b, ?absTol=absTol, ?relTol=relTol) |> Tensor.all
+            Tensor.isClose (a, b, ?absTol=absTol, ?relTol=relTol) |> Tensor.all
         else false
 
-    /// Returns true if two tensors have same (within machine precision) values in all elements.
-    /// If tensors have different shape, then false is returned.
-    static member almostEqual (a: Tensor<'T>) (b: Tensor<'T>) =
-        Tensor.almostEqualWithTol (a, b)
-
-    /// Returns true if all values in the tensor are finite (not NaN and not infinite).
+    /// <summary>Checks that all elements of the tensor are finite.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>true if all elements are finite, otherwise false.</returns>
+    /// <remarks>
+    /// <para>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN).</para>
+    /// </remarks>
+    /// <seealso crf="isFinite``1"/>
     static member allFinite (a: Tensor<'T>) =
         a |> Tensor.isFinite |> Tensor.all
 
-    /// mean over given axis
+    /// <summary>Calculates the mean of the elements along the specified axis.</summary>
+    /// <param name="ax">The axis to operate along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.meanAxis 1 a // b = [2.5; 6.5]
+    /// </code></example>
+    /// <remarks>The mean is calculated along the specified axis.</remarks>
+    /// <seealso cref="mean``1"/><seealso cref="varAxis``1"/><seealso cref="stdAxis``1"/>
     static member meanAxis axis (a: Tensor<'T>) = 
         Tensor.sumAxis axis a / Tensor.scalarLike a (conv<'T> a.Shape.[axis])
 
-    /// mean 
+    /// <summary>Calculates the mean of the tensor.</summary>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>The mean estimate.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.mean a // b = 4.5
+    /// </code></example>
+    /// <remarks>The mean is calculated over all elements of the tensor.</remarks>
+    /// <seealso cref="meanAxis``1"/><seealso cref="var``1"/><seealso cref="std``1"/>
     static member mean a =
         a |> Tensor.flatten |> Tensor.meanAxis 0 |> Tensor.value
 
-    /// variance over given axis
+    /// <summary>Calculates the variance of the elements along the specified axis.</summary>
+    /// <param name="ax">The axis to operate along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <param name="ddof">The delta degrees of freedom. (default: 0L)</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.varAxis (1, a, ddof=1L) 
+    /// </code></example>
+    /// <remarks>
+    /// <para>The variance is calculated along the specified axis.</para>
+    /// <para>The parameter <paramref name="ddof"/> specifies the difference between the number of elements and the
+    /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
+    /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
+    /// </remarks>
+    /// <seealso cref="var``1"/><seealso cref="meanAxis``1"/><seealso cref="stdAxis``1"/>
     static member varAxis (axis, a: Tensor<'T>, ?ddof) =
         let ddof = defaultArg ddof 0L
         let m = Tensor.meanAxis axis a |> Tensor.insertAxis axis
@@ -4091,7 +4145,21 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let n = a.Shape.[axis] - ddof
         Tensor.sumAxis axis (v * v) / Tensor.scalarLike a (conv<'T> n)
 
-    /// variances
+    /// <summary>Calculates the variance of the tensor.</summary>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>The variance estimate.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.var a 
+    /// </code></example>
+    /// <remarks>
+    /// <para>The variance is calculated over all elements of the tensor.</para>
+    /// <para>The parameter <paramref name="ddof"/> specifies the difference between the number of elements and the
+    /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
+    /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
+    /// </remarks>
+    /// <seealso cref="varAxis``1"/><seealso cref="mean``1"/><seealso cref="std``1"/>
     static member var (a, ?ddof) =
         Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof) |> Tensor.value
 

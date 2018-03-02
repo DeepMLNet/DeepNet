@@ -32,7 +32,7 @@ type CudaTests (output: ITestOutputHelper) =
         printfn "data:\n%A" data
         printfn "back:\n%A" back
 
-        Tensor.almostEqual data back |> should equal true
+        Tensor.almostEqual (data, back) |> should equal true
 
 
     [<CudaFact>]
@@ -47,7 +47,7 @@ type CudaTests (output: ITestOutputHelper) =
         printfn "data:\n%A" data
         printfn "back:\n%A" back
 
-        Tensor.almostEqual data back |> should equal true
+        Tensor.almostEqual (data, back)  |> should equal true
 
 
     [<CudaFact>]

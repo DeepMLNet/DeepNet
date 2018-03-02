@@ -83,15 +83,15 @@ type RatTests (output: ITestOutputHelper) =
 
         let C1 = Tensor<float>.convert (A .* B)
         let C2 = Tensor<float>.convert A .* Tensor<float>.convert B
-        Tensor.almostEqual C1 C2 |> should equal true
+        Tensor.almostEqual (C1, C2) |> should equal true
 
         let C1 = Tensor<float>.convert (A .* B.[0L, *])
         let C2 = Tensor<float>.convert A .* Tensor<float>.convert B.[0L, *]
-        Tensor.almostEqual C1 C2 |> should equal true
+        Tensor.almostEqual (C1, C2) |> should equal true
 
         let C1 = Tensor<float>.convert (Tensor.padLeft A .* Tensor.padLeft B)
         let C2 = Tensor<float>.convert (Tensor.padLeft A) .* Tensor<float>.convert (Tensor.padLeft B)
-        Tensor.almostEqual C1 C2 |> should equal true
+        Tensor.almostEqual (C1, C2) |> should equal true
 
     [<Fact>]
     let ``Rat Conversions`` () =

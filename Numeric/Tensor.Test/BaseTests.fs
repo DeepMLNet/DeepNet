@@ -93,7 +93,7 @@ type BaseTests (output: ITestOutputHelper) =
         for n in 0L .. N-1L do
             for m in 0L .. M-1L do
                 cr.[n, m, Fill] <- a.[n, m, Fill] .* b.[n, m, Fill]
-        Tensor.almostEqual c cr |> Assert.True
+        Tensor.almostEqual (c, cr) |> Assert.True
         
     [<Fact>]
     let ``Batched matrix-vector dot product`` () =
@@ -111,7 +111,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "c=\n%A" c
         printfn "cr=\n%A" cr
 
-        Tensor.almostEqual c cr |> Assert.True
+        Tensor.almostEqual (c, cr) |> Assert.True
         
 
     [<Fact>]
@@ -125,7 +125,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "diag(v)=\n%A" dm
 
         let vv = Tensor.diag dm
-        Tensor.almostEqual v vv |> Assert.True
+        Tensor.almostEqual (v, vv) |> Assert.True
 
 
     [<Fact>]
@@ -140,7 +140,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "diag(v)=\n%A" dm
 
         let vv = Tensor.diag dm
-        Tensor.almostEqual v vv |> Assert.True
+        Tensor.almostEqual (v, vv) |> Assert.True
 
 
     [<Fact>]
@@ -155,7 +155,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "trace(diag(v))=%A" tr
         printfn "sum(v)=%A" trv
 
-        Tensor.almostEqual tr trv |> Assert.True
+        Tensor.almostEqual (tr, trv) |> Assert.True
 
 
 
@@ -171,7 +171,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "dm^-1=\n%A" dmInv
         printfn "dm^-1^-1=\n%A" dmInvInv
 
-        Tensor.almostEqual dm dmInvInv |> Assert.True
+        Tensor.almostEqual (dm, dmInvInv) |> Assert.True
 
     [<Fact>]
     let ``Invert random matrix`` () =
@@ -185,7 +185,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "dm^-1=\n%A" dmInv
         printfn "dm^-1^-1=\n%A" dmInvInv
 
-        Tensor.almostEqual dm dmInvInv |> Assert.True
+        Tensor.almostEqual (dm, dmInvInv) |> Assert.True
 
     [<Fact>]
     let ``Batch invert random matrices`` () =
@@ -199,7 +199,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "dm^-1=\n%A" dmInv
         printfn "dm^-1^-1=\n%A" dmInvInv
 
-        Tensor.almostEqual dm dmInvInv |> Assert.True
+        Tensor.almostEqual (dm, dmInvInv) |> Assert.True
 
 
     [<Fact>]
@@ -230,7 +230,7 @@ type BaseTests (output: ITestOutputHelper) =
 
         let diff = id - ids
         printfn "maxdiff: %f" (Tensor.max diff)
-        Tensor.almostEqualWithTol (id, ids, absTol=1e-5f, relTol=1e-5f)  |> Assert.True
+        Tensor.almostEqual (id, ids, absTol=1e-5f, relTol=1e-5f)  |> Assert.True
 
     [<Fact>]
     let ``Pseudo Invert random matrix`` () =
@@ -244,7 +244,7 @@ type BaseTests (output: ITestOutputHelper) =
         printfn "dm^-1=\n%A" dmInv
         printfn "dm^-1^-1=\n%A" dmInvInv 
 
-        Tensor.almostEqual dm dmInvInv |> Assert.True
+        Tensor.almostEqual (dm, dmInvInv) |> Assert.True
 
     [<Fact>]
     let ``Pseudo Invert singular matrix`` () =
