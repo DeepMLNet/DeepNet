@@ -457,51 +457,156 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let layouts = fn (xs |> List.map Tensor<_>.layout)
         (layouts, xs) ||> List.map2 Tensor<_>.relayout
 
-    /// pads the shapes of all tensors from the left until they have same rank
+    /// <summary>Pads all specified tensors from the left with dimensions of size one until they have the 
+    /// same dimensionality.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same dimensionality.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 5L]
+    /// let b = HostTensor.zeros [3L; 4L; 5L]
+    /// let pa, pb = Tensor.padToSame (a, b) // pa.Shape = [1L; 4L; 5L]; pb.Shape = [3L; 4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Size one dimensions are added from the left to each tensor until all of them have the same 
+    /// dimensionality.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <seealso cref="padLeft``1"/><seealso cref="broadcastToSame``1"/>
     static member padToSame (a, b) = 
         Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, a, b)
 
-    /// pads the shapes of all tensors from the left until they have same rank
+    /// <summary>Pads all specified tensors from the left with dimensions of size one until they have the 
+    /// same dimensionality.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <param name="c">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same dimensionality.</returns>
+    /// <seealso cref="padToSame``2"/>
     static member padToSame (a, b, c) = 
         Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, a, b, c)
 
-    /// pads the shapes of all tensors from the left until they have same rank
+    /// <summary>Pads all specified tensors from the left with dimensions of size one until they have the 
+    /// same dimensionality.</summary>
+    /// <param name="xs">A list of tensors to operate on.</param>
+    /// <returns>A list of the resulting tensors, all having the same dimensionality.</returns>
+    /// <seealso cref="padToSame``2"/>
     static member padToSame (xs) = 
         Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, xs)
 
-    /// broadcasts all tensors to the same shape 
+    /// <summary>Broadcasts all specified tensors to have the same shape.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same shape.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 5L]
+    /// let b = HostTensor.zeros [3L; 4L; 5L]
+    /// let pa, pb = Tensor.broadcastToSame (a, b) // pa.Shape = [3L; 4L; 5L]; pb.Shape = [3L; 4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>First, size one dimensions are added from the left to each tensor until all of them have the same 
+    /// dimensionality. Then, size one dimensions are broadcasted to match the size of non-size-one dimensions.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">Raised when broadcasting to a common shape is impossible.</exception>
+    /// <seealso cref="padToSame``2"/><seealso cref="broadcastToSameInDims``2"/><seealso cref="broadcastTo``1"/>
     static member broadcastToSame (a, b) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, a, b)
 
-    /// broadcasts all tensors to the same shape if possible
+    /// <summary>Broadcasts all specified tensors to have the same shape.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <param name="c">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same shape.</returns>
+    /// <seealso cref="broadcastToSame``2"/>
     static member broadcastToSame (a, b, c) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, a, b, c)
 
-    /// broadcasts all tensors to the same shape if possible
+    /// <summary>Broadcasts all specified tensors to have the same shape.</summary>
+    /// <param name="xs">A list of tensors to operate on.</param>    
+    /// <returns>A list of the resulting tensors, all having the same shape.</returns>
+    /// <seealso cref="broadcastToSame``2"/>
     static member broadcastToSame (xs) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, xs)
 
-    /// broadcasts all tensors to the same sizes in the given dimensions
+    /// <summary>Broadcasts all specified tensors to have the same size in the specified dimensions.</summary>
+    /// <param name="dims">A list of dimensions that should be broadcasted to have the same size.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same size in the specified dimensions.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [1L; 7L; 1L]
+    /// let b = HostTensor.zeros [3L; 4L; 5L]
+    /// let pa, pb = Tensor.broadcastToSameInDims ([0; 2], a, b) // pa.Shape = [3L; 7L; 5L]; pb.Shape = [3L; 4L; 5L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>The specified dimensions are broadcasted to match the size of non-size-one dimensions.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">Raised when broadcasting to a common shape is impossible.</exception>
+    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``1"/>
     static member broadcastToSameInDims (dims, a, b) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, a, b)
 
-    /// broadcasts all tensors to the same sizes in the given dimensions
+    /// <summary>Broadcasts all specified tensors to have the same size in the specified dimensions.</summary>
+    /// <param name="dims">A list of dimensions that should be broadcasted to have the same size.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <param name="b">The tensor to operate on.</param>    
+    /// <param name="c">The tensor to operate on.</param>    
+    /// <returns>A tuple of the resulting tensors, all having the same size in the specified dimensions.</returns>
+    /// <seealso cref="broadcastToSameInDims``2"/>
     static member broadcastToSameInDims (dims, a, b, c) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, a, b, c)
 
-    /// broadcasts all tensors to the same sizes in the given dimensions
+    /// <summary>Broadcasts all specified tensors to have the same size in the specified dimensions.</summary>
+    /// <param name="dims">A list of dimensions that should be broadcasted to have the same size.</param>
+    /// <param name="xs">A list of tensors to operate on.</param>
+    /// <returns>A list of the resulting tensors, all having the same size in the specified dimensions.</returns>
+    /// <seealso cref="broadcastToSameInDims``2"/>
     static member broadcastToSameInDims (dims, xs) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, xs)
 
-    /// broadcasts the tensor to the given shape
+    /// <summary>Broadcasts the specified tensor to the specified shape.</summary>
+    /// <param name="shp">The target shape.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>Tensor of shape <paramref name="shp"/>.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [1L; 7L; 1L]
+    /// let pa = Tensor.broadcastTo [2L; 7L; 3L] a // pa.Shape = [2L; 7L; 3L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Size one dimensions are broadcasted to match the corresponding dimension of the target shape 
+    /// <paramref name="shp"/>. Non-size-one dimensions must match the target shape.</para>
+    /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
+    /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">Raised when broadcasting to the specified shape is impossible.</exception>
+    /// <seealso cref="broadcastToSame``2"/>
     static member broadcastTo shp a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.broadcastToShape shp)
 
-    /// returns true if at least one dimension is broadcasted
+    /// <summary>Checks if the specified tensor is broadcasted in at least one dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>true if at least one dimension is broadcasted, otherwise false.</returns>
+    /// <remarks>
+    /// <para>If any stride is zero, it is assumed that the tensor is broadcasted.
+    /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
+    /// </remarks>
+    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``2"/>
     static member isBroadcasted a =
         a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
 
-    /// returns true if tensor is stored in row-major order
+    /// <summary>Checks if the specified tensor is in row-major memory layout.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>true if the tensor is in row-major memory layout, otherwise false.</returns>
+    /// <remarks>
+    /// <para>If any stride is zero, it is assumed that the tensor is broadcasted.
+    /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
+    /// </remarks>
+    /// <seealso cref="isColumnMajor"/><seealso cref="``2"/>
     static member isRowMajor a =
         a |> Tensor<_>.layout |> TensorLayout.isC
 
@@ -3041,7 +3146,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         and set (idx: int64 list) (value: 'T) = backend.[Array.ofList idx] <- value
 
     /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
-    /// <param name="m0">A boolean mask tensors or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m0">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
     /// <value>All elements from the tensor for which the mask is true.</value>
     /// <example><code language="fsharp">
     /// let a = HostTensor.ofList [[1.0; 2.0; 3.0]
@@ -3058,27 +3163,30 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// // masked get with one mask per dimension
     /// let m0 = HostTensor.ofList [true; false]
     /// let m1 = HostTensor.ofList [false; false; true]
-    /// let d = a.M(m0,m1) // d = [3.0]
+    /// let d = a.M(m0, m1) // d = [3.0]
     ///
     /// // masked get using only one dimension
     /// let m0 = HostTensor.ofList [true; false]
-    /// let e = a.M(m0,NoMask) // e = [[1.0; 2.0; 3.0]]
+    /// let e = a.M(m0, NoMask) // e = [[1.0; 2.0; 3.0]]
     ///
     /// // masked set with one mask for the whole tensor
     /// let m = HostTensor.ofList [[true;  true;  false]
     ///                            [false; false; true ]]
     /// a.M(m) &lt;- [8.0; 9.0; 0.0]  // a = [[8.0; 9.0; 3.0]
-    ///                                    [4.0; 5.0; 0.0]]
+    ///                            //      [4.0; 5.0; 0.0]]
     /// </code></example>    
     /// <remarks>
-    /// <para>Masking picks elements from the tensor for which the corresponding element in the mask tensor is true.</para>
+    /// <para>Masking picks elements from the tensor for which the corresponding element in the mask tensor is true.
+    /// The mask can, for example, be generated by one or more element-wise comparison operation.</para>
     /// <para>The get operation returns a copy of the selected elements of the tensor.</para>
-    /// <para>The set operation replaces the selected elements with a copy of the specified value tensor.</para>
+    /// <para>The set operation replaces the selected elements with a copy of the specified tensor.</para>
     /// <para>If a dimension should not be masked, specify <see cref="Tensor.NoMask"/> instead of a mask tensor.</para>
     /// <para>For clarity the documentation does not list all overloads of <c>M</c>.
-    /// However, this masking method can be used for up to 5 dimensions.
+    /// However, this masking method can be used for up to 5 dimensions, as shown in the example.
     /// For programmatically generated ranges or for more than 5 dimensions, the mask specification variant 
     /// <see cref="M(Microsoft.FSharp.Collections.FSharpList{Tensor.Tensor{System.Boolean}})"/> is available.</para>
+    /// <para>Currently this operation is only supported for tensors stored on the host. Support for CUDA tensors is
+    /// planned in the future.</para>
     /// </remarks>
     /// <exception cref="System.InvalidArgumentException">Raised when the mask is incompatible with the tensor.</exception>
     /// <seealso cref="M(Microsoft.FSharp.Collections.FSharpList{Tensor.Tensor{System.Boolean}})"/>
@@ -3086,27 +3194,55 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         with get (m0: Tensor<bool>) = this.MaskedGet [m0]
         and set (m0: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0] value                          
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="m0">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m1">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
     member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>) = this.MaskedGet [m0; m1]
         and set (m0: Tensor<bool>, m1: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1] value                          
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="m0">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m1">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m2">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>    
     member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) = this.MaskedGet [m0; m1; m2]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2] value                          
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="m0">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m1">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m2">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m3">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>    
     member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3] value                          
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="m0">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m1">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m2">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>
+    /// <param name="m3">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>    
+    /// <param name="m4">A boolean mask tensor or <see cref="Tensor.NoMask"/>.</param>    
     member this.M
         with get (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) = this.MaskedGet [m0; m1; m2; m3; m4]
         and set (m0: Tensor<bool>, m1: Tensor<bool>, m2: Tensor<bool>, m3: Tensor<bool>, m4: Tensor<bool>) (value: Tensor<'T>) = this.MaskedSet [m0; m1; m2; m3; m4] value                          
 
-    /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.
+    /// <summary>Picks elements from a tensor using one or more boolean mask tensors.</summary>
+    /// <param name="masks">A list of boolean mask tensors or <see cref="Tensor.NoMask"/>.</param>
+    /// <value>All elements from the tensor for which the mask is true.</value>
+    /// <remarks>
+    /// <para>Masking picks elements from the tensor for which the corresponding element in the mask tensor is true.
+    /// The mask can, for example, be generated by one or more element-wise comparison operation.</para>
+    /// <para>The get operation returns a copy of the selected elements of the tensor.</para>
+    /// <para>The set operation replaces the selected elements with a copy of the specified tensor.</para>
+    /// <para>If a dimension should not be masked, specify <see cref="Tensor.NoMask"/> instead of a mask tensor.</para>
+    /// <para>This mask specification variant is intended for programmatically generated ranges. For most use cases
+    /// the variant <seealso cref="M(Tensor.Tensor{System.Boolean})"/> is more succinct and thus the 
+    /// recommended method.</para>    
+    /// </remarks>
+    /// <exception cref="System.InvalidArgumentException">Raised when the mask is incompatible with the tensor.</exception>
+    /// <seealso cref="M(Tensor.Tensor{System.Boolean})"/>
     member this.M
         with get (masks: Tensor<bool> list) = this.MaskedGet masks
         and set (masks: Tensor<bool> list) (value: Tensor<'T>) = this.MaskedSet masks value                          
@@ -3180,7 +3316,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Specifying <c>f..l</c> for a dimension, select all indices from <c>f</c> to (including) <c>l</c> for the dimension.
     /// </para>
     /// <para>For clarity the documentation does not list all overloads of the Item property and GetSlice, 
-    /// SetSlice methods. However, this slicing method can be used for up to 5 dimensions.
+    /// SetSlice methods. However, this slicing method can be used for up to 5 dimensions, as shown in the example.
     /// For programmatically generated ranges or for more than 5 dimensions, the range specification variant 
     /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{Tensor.Rng})"/> is available.</para>
     /// </remarks>
