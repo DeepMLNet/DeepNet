@@ -638,12 +638,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                     (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
             raise (InvalidOperationException msg)
 
-    /// Returns true if the tensor can be reshaped without copying.
-    static member canReshapeView shp a =
-        match Tensor<_>.tryReshapeView shp a with
-        | Some _ -> true
-        | None -> false
-
     /// Reshape array assuming a row-major order.
     /// If the array is currently not in row-major order, a reshaped copy is returned.
     /// Otherwise, a reshaped view of the same tensor is returned.
