@@ -38,7 +38,7 @@ type CudaTests (output: ITestOutputHelper) =
     [<CudaFact>]
     let ``Tensor transfer to Cuda 2``() =    
         let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
-        let data = data.Copy (order=CustomOrder [1; 0; 2])
+        let data = Tensor.copy (data, order=CustomOrder [1; 0; 2])
         printfn "data layout:%A" data.Layout
 
         let cuda = CudaTensor.transfer data

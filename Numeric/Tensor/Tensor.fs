@@ -803,25 +803,40 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member inline this.T = 
         Tensor<_>.transpose this
 
-    /// returns a copy of the tensor
-    member this.Copy (?order) =
+    /// Returns a copy of the tensor.
+    member internal this.Copy (?order) =
         let trgt, src = Tensor.PrepareElemwise (this, ?order=order)
         trgt.Backend.Copy (trgt=trgt, src=src)
         trgt      
         
-    /// returns a copy of the tensor
+    /// <summary>Returns a copy of the tensor.</summary>
+    /// <param name="a">The tensor to copy.</param>
+    /// <param name="order">The memory layout of the copy. (default: row-major)</param>
+    /// <returns>A copy of the tensor.</returns>
+    /// <remarks>    
+    /// <para>A new tensor is created with the specified memory layout on the same device as the orignal tensor.</para>
+    /// <para>The elements of the original tensor are copied into the new tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="CopyForm"/><seealso cref="transfer"/>
     static member copy (a: 'A when 'A :> ITensor, ?order) =
         a.Copy (?order=order) :?> 'A
 
-    /// Copies the specifed tensor into this tensor.
-    /// Both tensors must have same shape and storage.
+    /// <summary>Fills this tensor with a copy of the specified tensor.</summary>
+    /// <param name="src">The tensor to copy from.</param>
+    /// <seealso cref="Copy"/>
     member trgt.CopyFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
         Tensor.CheckSameStorage [trgt; src]
         trgt.Backend.Copy (trgt=trgt, src=src)
 
-    /// Transfers the specified tensor located on another device into this tensor.
-    /// Both tensors must have the same shape.
+    /// <summary>Transfers the specified tensor located on another device into this tensor.</summary>
+    /// <param name="src">The tensor to transfer from.</param>
+    /// <remarks>    
+    /// <para>The elements of the original tensor are copied into the new tensor.</para>
+    /// <para>Both tensors must have same shape and type.</para>
+    /// <para>If both tensors are located on the same device, a copy is performed.</para>
+    /// </remarks>    
+    /// <see cref="Transfer"/>
     member trgt.TransferFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
         if trgt.Dev = src.Dev then
@@ -832,12 +847,21 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                 invalidOp "Cannot transfer from storage %s to storage %s." src.Dev.Id trgt.Dev.Id
 
     /// Transfers this tensor to the specifed device.
-    member src.Transfer (dev: ITensorDevice) =
+    member internal src.Transfer (dev: ITensorDevice) =
         let trgt = Tensor<'T> (src.Shape, dev)
         trgt.TransferFrom src
         trgt
 
-    /// Transfers the specified tensor to the specifed device.
+    /// <summary>Transfers a tensor to the specifed device.</summary>
+    /// <param name="dev">The target device.</param>
+    /// <param name="a">The tensor to transfer.</param>
+    /// <returns>A tensor on the target device.</returns>
+    /// <remarks>    
+    /// <para>A new tensor is created on the specified device.</para>
+    /// <para>The elements of the original tensor are copied into the new tensor.</para>
+    /// <para>If the target device matches the current device of the tensor, a copy is performed.</para>
+    /// </remarks>    
+    /// <seealso cref="TransferFrom"/><seealso cref="Dev"/><seealso cref="copy"/>
     static member transfer (dev: ITensorDevice) (src: 'A when 'A :> ITensor) =
         src.Transfer (dev) :?> 'A
 
