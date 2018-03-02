@@ -189,7 +189,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <summary>Device the data of tensor is stored on.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Data storage device.</returns>
-    /// <seealso cref="Dev"/>
+    /// <seealso cref="Dev"/><seealso cref="transfer``1"/>
     static member inline dev (a: #ITensor) = a.Dev
 
     /// backend 
@@ -207,6 +207,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A tensor is empty of any dimension has size zero.</para>
     /// <para>A zero-dimensional tensor has an empty shape and contains one element.</para>
     /// </remarks>
+    /// <seealso cref="reshape``1"/><seealso cref="NDims"/><seealso cref="NElems"/>
     member inline this.Shape = this.Layout.Shape
 
     /// <summary>Shape of the tensor.</summary>
@@ -226,6 +227,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Provides the number of dimensions of this tensor.</para>
     /// <para>A zero-dimensional tensor contains one element, i.e. it is a scalar.</para>
     /// </remarks>
+    /// <seealso cref="Shape"/>
     member inline this.NDims = this.Layout.NDims
 
     /// <summary>Dimensionality of the tensor.</summary>
@@ -245,6 +247,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>Counts the total number of elements of this tensor.</para>
     /// <para>A zero-dimensional tensor contains one element, i.e. it is a scalar.</para>
     /// </remarks>
+    /// <seealso cref="Shape"/>
     member inline this.NElems = this.Layout.NElems
 
     /// <summary>Total number of elements within the tensor.</summary>
@@ -258,6 +261,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>
     /// <para>The data type is <c>typeof&lt;'T&gt;</c>.</para>
     /// </remarks>
+    /// <seealso cref="convert``1"/>
     member inline this.DataType = typeof<'T>
 
     /// <summary>Type of data stored within the tensor.</summary>
@@ -595,17 +599,19 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>If any stride is zero, it is assumed that the tensor is broadcasted.
     /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
     /// </remarks>
-    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``2"/>
+    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``1"/>
     static member isBroadcasted a =
         a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
 
     /// <summary>Tries to create a reshaped view of the tensor (without copying).</summary>
-    /// <param name="shp">The tensor to operate on.</param>
+    /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The reshaped tensor, if reshaping without copying is possible. Otherwise <c>None</c>.</returns>
     /// <remarks>
-    /// <para>Tries to change the shape of the tensor to the specified shape.
-    /// The total number of elements must not change.</para>
+    /// <para>Changes the shape of the tensor to the specified shape.
+    /// The total number of elements must not change.
+    /// One dimension of the <paramref name="shp"/> can be specified as <see cref="Tensor.Remainder"/>, 
+    /// in which case the size of that dimension is inferred automatically.</para>
     /// <para>If a reshape is not possible without copying the data of the tensor, <c>None</c> is returned.</para>
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
@@ -617,18 +623,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         | None -> None
 
     /// <summary>Creates a reshaped view of the tensor (without copying).</summary>
-    /// <param name="shp">The tensor to operate on.</param>
+    /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A reshaped view of the original tensor.</returns>
     /// <remarks>
-    /// <para>Tries to change the shape of the tensor to the specified shape.
-    /// The total number of elements must not change.</para>
+    /// <para>Changes the shape of the tensor to the specified shape.
+    /// The total number of elements must not change.
+    /// One dimension of the <paramref name="shp"/> can be specified as <see cref="Tensor.Remainder"/>, 
+    /// in which case the size of that dimension is inferred automatically.</para>
     /// <para>If a reshape is not possible without copying the data of the tensor, an exception is raised.
-    /// To avoid this, use <see cref="tryReshapeView``1"/> instead.
+    /// To avoid this, use <see cref="tryReshapeView``1"/> instead.</para>
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="trReshapeView``1"/><seealso cref="reshape``1"/>
+    /// <seealso cref="tryReshapeView``1"/><seealso cref="reshape``1"/>
     static member reshapeView shp a =
         match Tensor<_>.tryReshapeView shp a with
         | Some res -> res
@@ -638,23 +646,63 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                     (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
             raise (InvalidOperationException msg)
 
-    /// Reshape array assuming a row-major order.
-    /// If the array is currently not in row-major order, a reshaped copy is returned.
-    /// Otherwise, a reshaped view of the same tensor is returned.
-    /// The number of elements must not change.
-    /// One element can be 'Remainder', in which case the size of that element is
-    /// inferred automatically.
+    /// <summary>Changes the shape of a tensor.</summary>
+    /// <param name="shp">The target shape.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A tensor of the specified shape.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [2L; 3L; 4L]
+    /// let b = Tensor.reshape [6L; 4L] a // b.Shape = [6L; 4L]
+    /// let c = Tensor.reshape [2L; Remainder; 1L] a // c.Shape = [2L; 12L; 1L]
+    /// </code></example>    
+    /// <remarks>
+    /// <para>Changes the shape of the tensor to the specified shape.
+    /// The total number of elements must not change.
+    /// One dimension of the <paramref name="shp"/> can be specified as <see cref="Tensor.Remainder"/>, 
+    /// in which case the size of that dimension is inferred automatically.</para>
+    /// <para>If a reshape is possible without copying the data of the tensor, a view of the original tensor is returned
+    /// and the storage is shared. In this case, modifications done to the returned tensor will affect the original 
+    /// tensor.</para>
+    /// <para>If a reshape is not possible without copying the data of the tensor, a new tensor of the specified shape
+    /// and a new storage is allocated and the data is copied into the new tensor.</para>
+    /// </remarks>
+    /// <seealso cref="tryReshapeView``1"/><seealso cref="reshapeView``1"/><seealso cref="flatten``1"/><seealso cref="Shape"/>
     static member reshape shp a =
         match a |> Tensor<_>.tryReshapeView shp with
         | Some res -> res
         | None ->
             a |> Tensor<_>.copy |> Tensor<_>.reshapeView shp
 
-    /// Flattens the tensor into a (one-dimensional) vector.
+    /// <summary>Flattens the tensor into a (one-dimensional) vector.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A vector.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [2L; 3L; 4L]
+    /// let b = Tensor.flatten a // b.Shape = [24L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>If a reshape is possible without copying the data of the tensor, a view of the original tensor is returned
+    /// and the storage is shared. In this case, modifications done to the returned tensor will affect the original 
+    /// tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="reshape``1"/>
     static member flatten a =
         Tensor<_>.reshape [Remainder] a
 
-    /// swaps the given dimensions
+    /// <summary>Swaps the specified dimensions of the tensor.</summary>
+    /// <param name="ax1">The dimension to swap.</param>
+    /// <param name="ax2">The dimension to swap with.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The tensor with the dimensions swapped.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [2L; 3L; 4L]
+    /// let b = Tensor.swapDim 0 2 a // b.Shape = [4L; 3L; 2L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="permuteAxes``1"/><seealso cref="T"/>
     static member swapDim ax1 ax2 a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.swapDim ax1 ax2)
 
@@ -665,18 +713,56 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member transpose a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.transpose)
 
-    /// Permutes the axes as specified.
-    /// Each entry in the specified permutation specifies the new position of 
-    /// the corresponding axis, i.e. to which position the axis should move.
+    /// <summary>Permutes the axes as specified.</summary>
+    /// <param name="permut">The permutation to apply to the dimensions of tensor.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The tensor with the dimensions permuted.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [0L; 11L; 22L; 33L; 44L]
+    /// let b = Tensor.permuteAxes [3; 2; 4; 1; 0] a // b.Shape = [44L; 33L; 11L; 0L; 22L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>Each entry in the specified permutation specifies the new position of the corresponding axis, i.e. to 
+    /// which position the axis moves.</para>
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="swapDim``1"/><seealso cref="T"/>
     static member permuteAxes (permut: int list) a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.permuteAxes permut)
 
-    /// Reverses the elements in the specified dimension.
+    /// <summary>Reverses the elements in the specified dimension.</summary>
+    /// <param name="ax">The axis to reverse.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>The tensor with the dimensions permuted.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList [0; 1; 2; 3]
+    /// let b = Tensor.reverseAxis 0 a // b = [3; 2; 1; 0]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The elements along the specified axis are reversed.</para>
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
     static member reverseAxis ax a =
         a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.reverseAxis ax)        
 
-    /// Ensures that the tensor has at least minDims dimensions.
-    /// If not, it is padded with size one dimensions from the left.
+    /// <summary>Pads the tensor from the left with size-one dimensions until it has at least the specified number of
+    /// dimensions.</summary>
+    /// <param name="minDims">The minimum number of dimensions.</param>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A tensor with at least <paramref name="minDims"/> dimensions.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [2L; 3L]
+    /// let b = Tensor.atLeastND 5 a // b.Shape = [1L; 1L; 1L; 2L; 3L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>Size-one dimensions are inserted at the front until the tensor has at least the specified number of 
+    /// dimensions. If it already has the specified number of dimensions or more, it is returned unchanged.</para>
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="padLeft``1"/><seealso cref="reshape``1"/>    
     static member atLeastND minDims a =
         let nd = Tensor<_>.nDims a
         if nd >= minDims then a
@@ -684,15 +770,22 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             let newShp = List.init (minDims - nd) (fun _ -> 1L)
             a |> Tensor<_>.reshape newShp
 
-    /// Ensures that the tensor has at least one dimension.
+    /// <summary>Pads the tensor from the left with size-one dimensions until it has at least one dimension.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A tensor with at least one dimensions.</returns>
+    /// <seealso cref="atLeastND``1"/>
     static member atLeast1D a = a |> Tensor<_>.atLeastND 1
 
-    /// Ensures that the tensor has at least two dimensions.
-    /// If not, it is padded with size one dimensions from the left.
+    /// <summary>Pads the tensor from the left with size-one dimensions until it has at least two dimensions.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A tensor with at least two dimensions.</returns>
+    /// <seealso cref="atLeastND``1"/>
     static member atLeast2D a = a |> Tensor<_>.atLeastND 2
 
-    /// Ensures that the tensor has at least three dimensions.
-    /// If not, it is padded with size one dimensions from the left.
+    /// <summary>Pads the tensor from the left with size-one dimensions until it has at least three dimensions.</summary>
+    /// <param name="a">The tensor to operate on.</param>
+    /// <returns>A tensor with at least three dimensions.</returns>
+    /// <seealso cref="atLeastND``1"/>
     static member atLeast3D a = a |> Tensor<_>.atLeastND 3
 
     /// <summary>Transpose of a matrix.</summary>
