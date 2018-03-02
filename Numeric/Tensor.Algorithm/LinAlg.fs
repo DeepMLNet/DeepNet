@@ -297,7 +297,7 @@ module LinAlg =
         // The diagonal of S has 'rank' non-zero entries and all zero entries are at the lower right.
         
         // For a non-zero entry S_ii <> 0, we must have x'_i = y'_i / S_ii.
-        let toRat = Tensor.convert<Rat>        
+        let toRat = Tensor<Rat>.convert
         let nzS = S.[..rank-1L, ..rank-1L] |> Tensor.diag 
         let nzU = U.[..rank-1L, *]
         let nzV = V.[*, ..rank-1L]         

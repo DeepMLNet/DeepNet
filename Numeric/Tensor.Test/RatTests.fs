@@ -79,18 +79,18 @@ type RatTests (output: ITestOutputHelper) =
         printfn "A=\n%A" A
         printfn "B=\n%A" B
         printfn "A.*B=\n%A" (A .* B)
-        printfn "A.*B (float)=\n%A" (Tensor.convert<float> A .* Tensor.convert<float> B)
+        printfn "A.*B (float)=\n%A" (Tensor<float>.convert A .* Tensor<float>.convert B)
 
-        let C1 = Tensor.convert<float> (A .* B)
-        let C2 = Tensor.convert<float> A .* Tensor.convert<float> B
+        let C1 = Tensor<float>.convert (A .* B)
+        let C2 = Tensor<float>.convert A .* Tensor<float>.convert B
         Tensor.almostEqual C1 C2 |> should equal true
 
-        let C1 = Tensor.convert<float> (A .* B.[0L, *])
-        let C2 = Tensor.convert<float> A .* Tensor.convert<float> B.[0L, *]
+        let C1 = Tensor<float>.convert (A .* B.[0L, *])
+        let C2 = Tensor<float>.convert A .* Tensor<float>.convert B.[0L, *]
         Tensor.almostEqual C1 C2 |> should equal true
 
-        let C1 = Tensor.convert<float> (Tensor.padLeft A .* Tensor.padLeft B)
-        let C2 = Tensor.convert<float> (Tensor.padLeft A) .* Tensor.convert<float> (Tensor.padLeft B)
+        let C1 = Tensor<float>.convert (Tensor.padLeft A .* Tensor.padLeft B)
+        let C2 = Tensor<float>.convert (Tensor.padLeft A) .* Tensor<float>.convert (Tensor.padLeft B)
         Tensor.almostEqual C1 C2 |> should equal true
 
     [<Fact>]
@@ -125,8 +125,8 @@ type RatTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Rat Tensor Conversions`` () =
         let A = HostTensor.arange 1 2 10
-        let B = A |> Tensor.convert<Rat>
-        let C = B |> Tensor.convert<int32>
+        let B = A |> Tensor<Rat>.convert
+        let C = B |> Tensor<int32>.convert
         printfn "A=\n%A" A
         printfn "B=\n%A" B
         printfn "C=\n%A" C

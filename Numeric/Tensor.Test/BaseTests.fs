@@ -261,7 +261,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Select`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let i0 = [1L; 2L; 0L; 3L] |> HostTensor.ofList |> Tensor.padRight |> Tensor.broadcastDim 1 2L
         let idxs = [Some i0; None]
 
@@ -274,7 +274,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Select 2`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let i0 = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
         let idxs = [Some i0; None]
 
@@ -287,7 +287,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Select 3`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let i0 = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
         let i1 = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
         let idxs = [Some i0; Some i1]
@@ -302,7 +302,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Disperse 1`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let i0 = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
         let i1 = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
         let idxs = [Some i0; Some i1]
@@ -319,7 +319,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Disperse 2`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let i0 = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
         let idxs = [Some i0; None]
         let shp = [3L; 3L]
@@ -335,7 +335,7 @@ type BaseTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Disperse 3`` () =
 
-        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor.float
+        let a = Seq.counting |> HostTensor.ofSeqWithShape [4L; 3L] |> Tensor<float>.convert
         let idxs = [None; None]
         let shp = [5L; 3L]
 

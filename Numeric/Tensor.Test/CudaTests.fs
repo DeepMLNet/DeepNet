@@ -25,7 +25,7 @@ type CudaTests (output: ITestOutputHelper) =
 
     [<CudaFact>]
     let ``Tensor transfer to Cuda``() =   
-        let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 10L]
+        let data = HostTensor.counting 30L |> Tensor<float>.convert |> Tensor.reshape [3L; 10L]
         let cuda = CudaTensor.transfer data
         let back = HostTensor.transfer cuda
 
@@ -37,7 +37,7 @@ type CudaTests (output: ITestOutputHelper) =
 
     [<CudaFact>]
     let ``Tensor transfer to Cuda 2``() =    
-        let data = HostTensor.counting 30L |> Tensor.float |> Tensor.reshape [3L; 2L; 5L]
+        let data = HostTensor.counting 30L |> Tensor<float>.convert |> Tensor.reshape [3L; 2L; 5L]
         let data = Tensor.copy (data, order=CustomOrder [1; 0; 2])
         printfn "data layout:%A" data.Layout
 
@@ -107,7 +107,7 @@ type CudaTests (output: ITestOutputHelper) =
         printfn "cj=\n%A" cj
 
         printfn "cuda convert to int..."
-        let cgInt = Tensor.convert<int> cg
+        let cgInt = Tensor<int>.convert cg
         printfn "cgInt=\n%A" cgInt
 
         printfn "cuda ca <<== cb..."

@@ -9,8 +9,14 @@ open Tensor.Utils
 open Tensor.Backend
 
 
-/// A singular matrix was encountered during an operation that does not allow singular matrices.
-exception SingularMatrixException of msg:string with override __.Message = __.msg
+/// <summary>A singular matrix was encountered during an operation that does not allow singular matrices.</summary>
+/// <param name="msg">Detailed error message.</param>
+/// <remarks>
+/// See the documentation of the method that raised this exception for a detailed description of the error conditions.
+/// </remarks>
+exception SingularMatrixException of msg:string with 
+    /// <summary>Detailed error message.</summary>    
+    override __.Message = __.msg
 
 
 /// Type-neutral interface to Tensor<'T> of any type 'T.
@@ -922,8 +928,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt.Backend.FillConst (value=value, trgt=trgt)
 
     /// <summary>Fills this vector with an equispaced sequence of elements.</summary>
-    /// <param name="start">The starting value to use.</param>
-    /// <param name="incr">The increment between successive element.</param>    
+    /// <param name="start">The starting value.</param>
+    /// <param name="incr">The increment between successive elements.</param>    
     /// <remarks>
     /// <para>This tensor must be one dimensional.</para>
     /// </remarks>
@@ -1004,20 +1010,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         trgt       
 
     /// <summary>Copies elements from a tensor of different data type into this tensor and converts their type.</summary>
-    /// <typeparam name="'TA">The data type to convert from.</typeparam>
+    /// <typeparam name="'C">The data type to convert from.</typeparam>
     /// <param name="a">The tensor to copy from.</param>    
     /// <seealso cref="convert``1"/>
-    member trgt.FillConvert (a: Tensor<'TA>) = 
+    member trgt.FillConvert (a: Tensor<'C>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Convert (trgt=trgt, src=a)
 
     /// <summary>Convert the elements of a tensor to the specifed type.</summary>
-    /// <typeparam name="'C">The data type to convert to.</typeparam>
+    /// <typeparam name="'C">The data type to convert from.</typeparam>
     /// <param name="a">The tensor to convert.</param>
     /// <returns>A tensor of the new data type.</returns>
     /// <example><code language="fsharp">
     /// let a = HostTensor.ofList [1; 2; 3] 
-    /// let b = Tensor.convert&lt;float> a // b = [1.0; 2.0; 3.0]
+    /// let b = Tensor&lt;float>.convert a // b = [1.0; 2.0; 3.0]
     /// </code></example>       
     /// <remarks>    
     /// <para>The elements of the original tensor are copied into the new tensor and their type is converted
@@ -1027,10 +1033,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// the conversion.</para>
     /// </remarks>    
     /// <seealso cref="FillConvert``1"/>
-    static member convert<'C> (a: Tensor<'T>) : Tensor<'C> =
+    static member convert (a: Tensor<'C>) : Tensor<'T> =
         let trgt, a = Tensor.PrepareElemwise (a)
         trgt.FillConvert (a)
-        trgt
+        trgt   
 
     /// <summary>Fills this tensor with the element-wise prefix plus of the argument.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -3201,7 +3207,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member inline internal this.IGetRngWithRest (rngArgs: obj[]) (restArgs: obj[]) =
         Array.concat [rngArgs; restArgs] |> this.IGetRng
 
-    /// Helper functions for setting slices.
+    // Helper functions for setting slices.
     member inline internal this.SetRng (rngArgs: obj[]) (value: Tensor<'T>) =
         Tensor.CheckSameStorage [this; value]
         let trgt = this.Range (Rng.ofItemOrSliceArgs rngArgs) 
@@ -4004,67 +4010,40 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member counting (dev: ITensorDevice) (nElems: int64) =
         Tensor.init dev [nElems] (fun idx -> idx.[0])        
 
-    /// Creates a one-dimensiona tensor filled with equaly spaced values from start 
-    /// to (excluding) stop using the given increment.
+    /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="start">The starting value.</param>
+    /// <param name="incr">The increment between successive element.</param>   
+    /// <param name="stop">The end value, which is not included.</param>
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new vector with <c>floor ((stop - start) / incr)</c> elements is created on the specified device.</para>
+    /// <para>The vector is filled with <c>[start; start+1*incr; start+2*incr; ...]</c>.</para>
+    /// <para>If stop is smaller or equal to start, an empty vector is returned.</para>
+    /// </remarks>
     static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
         let nElems = max 0L ((stop - start) / incr |> int64)
         let x = Tensor<'V> ([nElems], dev)
         x.FillIncrementing(start, incr)
         x
 
-    /// Creates a one-dimensional tensor filled with equaly spaced values from start 
-    /// to (including) stop.
+    /// <summary>Creates a new vector of given size filled with equaly spaced values.</summary>
+    /// <param name="dev">The device to create the tensor on.</param>
+    /// <param name="start">The starting value.</param>
+    /// <param name="stop">The end value, which is not included.</param>
+    /// <param name="nElems">The size of the vector.</param>   
+    /// <returns>The new tensor.</returns>
+    /// <remarks>
+    /// <para>A new vector with <paramref name="nElems"/> elements is created on the specified device.</para>
+    /// <para>The vector is filled with <c>[start; start+1*incr; start+2*incr; ...; stop]</c> where
+    /// <c>incr = (stop - start) / (nElems - 1)</c>.</para>
+    /// </remarks>
     static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
         if nElems < 2L then invalidArg "nElems" "linspace requires at least two elements."
         let incr = (stop - start) / conv<'V> (nElems - 1L)      
         let x = Tensor<'V> ([nElems], dev)
         x.FillIncrementing(start, incr)
         x
-
-    /// convert tensor data type to bool
-    static member bool a : Tensor<bool> = Tensor<_>.convert a
-
-    /// convert tensor data type to byte
-    static member byte a : Tensor<byte> = Tensor<_>.convert a
-
-    /// convert tensor data type to sbyte
-    static member sbyte a : Tensor<sbyte> = Tensor<_>.convert a
-
-    /// convert tensor data type to int16
-    static member int16 a : Tensor<int16> = Tensor<_>.convert a
-
-    /// convert tensor data type to uint16
-    static member uint16 a : Tensor<uint16> = Tensor<_>.convert a
-
-    /// convert tensor data type to int32
-    static member int32 a : Tensor<int32> = Tensor<_>.convert a
-
-    /// convert tensor data type to uint32
-    static member uint32 a : Tensor<uint32> = Tensor<_>.convert a
-
-    /// convert tensor data type to int64
-    static member int64 a : Tensor<int64> = Tensor<_>.convert a
-
-    /// convert tensor data type to uint64
-    static member uint64 a : Tensor<uint64> = Tensor<_>.convert a
-
-    /// convert tensor data type to int
-    static member int a : Tensor<int> = Tensor<_>.convert a
-
-    /// convert tensor data type to nativeint
-    static member nativeint a : Tensor<nativeint> = Tensor<_>.convert a
-
-    /// convert tensor data type to single
-    static member single a : Tensor<single> = Tensor<_>.convert a
-
-    /// convert tensor data type to double
-    static member double a : Tensor<double> = Tensor<_>.convert a
-
-    /// convert tensor data type to float
-    static member float a : Tensor<float> = Tensor<_>.convert a
-
-    /// convert tensor data type to float32
-    static member float32 a : Tensor<float32> = Tensor<_>.convert a
 
     /// Element-wise check if two tensors have same (within machine precision) values.
     /// Checks for exact equality for non-floating-point types.
