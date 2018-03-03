@@ -2645,7 +2645,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <summary>Calculates the maximum all elements returning a Tensor.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>A new scalar tensor containing the result of this operation.</returns>
-    /// <seealso cref="max"/>
+    /// <seealso cref="max"/> 
     static member maxTensor (src: Tensor<'T>) =
         src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
 
@@ -4118,7 +4118,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </code></example>
     /// <remarks>The mean is calculated over all elements of the tensor.</remarks>
     /// <seealso cref="meanAxis"/><seealso cref="var"/><seealso cref="std"/>
-    static member mean a =
+    static member mean (a: Tensor<'T>) =
         a |> Tensor.flatten |> Tensor.meanAxis 0 |> Tensor.value
 
     /// <summary>Calculates the variance of the elements along the specified axis.</summary>
@@ -4160,7 +4160,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
     /// </remarks>
     /// <seealso cref="varAxis"/><seealso cref="mean"/><seealso cref="std"/>
-    static member var (a, ?ddof) =
+    static member var (a: Tensor<'T>, ?ddof) =
         Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof) |> Tensor.value
 
     /// <summary>Calculates the standard deviation of the elements along the specified axis.</summary>
@@ -4180,11 +4180,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
     /// </remarks>
     /// <seealso cref="std"/><seealso cref="meanAxis"/><seealso cref="varAxis"/>
-    static member stdAxis (ax, a, ?ddof) =
+    static member stdAxis (ax, a: Tensor<'T>, ?ddof) =
         Tensor.varAxis (ax, a, ?ddof=ddof) |> sqrt
 
     /// <summary>Calculates the standard deviation of the tensor.</summary>
     /// <param name="a">The tensor containing the source values.</param>    
+    /// <param name="ddof">The delta degrees of freedom. (default: 0L)</param>
     /// <returns>The standard deviation estimate.</returns>
     /// <example><code language="fsharp">
     /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
@@ -4198,8 +4199,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
     /// </remarks>
     /// <seealso cref="stdAxis"/><seealso cref="mean"/><seealso cref="var"/>
-    static member std (a, ?ddof) =
-        Tensor.var (a, ?ddof=ddof) |> sqrt
+    static member std (a: Tensor<'T>, ?ddof) =
+        Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof) |> sqrt |> Tensor.value
 
     /// <summary>Calculates the norm along the specified axis.</summary>
     /// <param name="axis">The axis to operate along.</param>
@@ -4215,7 +4216,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The norm is calculated along the specified axis.</para>
     /// <para>It is defined by <c>sqrt (sum_i (x_i**ord))</c>.</para>
     /// </remarks>
-    /// <seealso cref="norm``1"/>
+    /// <seealso cref="norm"/>
     static member normAxis (axis, a: Tensor<'T>, ?ord: 'T) =
         let ord = defaultArg ord (conv<'T> 2)
         let tOrd = Tensor.scalarLike a ord
@@ -4236,7 +4237,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The norm is calculated over all elements of the tensor.</para>
     /// <para>It is defined by <c>sqrt (sum_i (x_i**ord))</c>.</para>
     /// </remarks>
-    /// <seealso cref="normAxis``1"/>
+    /// <seealso cref="normAxis"/>
     static member norm (a: Tensor<'T>, ?ord: 'T) =
         Tensor.normAxis (0, Tensor.flatten a, ?ord=ord) |> Tensor.value
 
@@ -4255,7 +4256,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
-    /// <seealso cref="diag``1"/><seealso cref="diagMatAxis``1"/>
+    /// <seealso cref="diag"/><seealso cref="diagMatAxis"/>
     static member diagAxis ax1 ax2 (a: Tensor<'T>) =
         a |> Tensor.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
 
@@ -4343,7 +4344,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// diagonal.</para>
     /// <para>The tensor must have the same size in dimensions <paramref name="ax1"/> and <paramref name="ax2"/>.</para>
     /// </remarks>
-    /// <seealso cref="trace/>
+    /// <seealso cref="trace"/>
     static member traceAxis ax1 ax2 (a: Tensor<'T>) =
         let tax = if ax1 < ax2 then ax1 else ax1 - 1
         a |> Tensor.diagAxis ax1 ax2 |> Tensor.sumAxis tax
@@ -4401,7 +4402,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The contents of a sub-block must have equal sizes in all dimensions except for the 
     /// concatenation dimensions.</para>
     /// </remarks>    
-    /// <seealso cref="concat``1"/>
+    /// <seealso cref="concat"/>
     static member ofBlocks (bs: BlockTensor<'T>) =
         let rec commonShape joinDim shps =               
             match shps with
@@ -4623,7 +4624,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>
     /// <para>The resulting tensor has one element less in the differentiation dimension than the original tensor.</para>
     /// </remarks>
-    /// <seealso cref="diff``1"/>
+    /// <seealso cref="diff"/>
     static member diffAxis (ax: int) (a: Tensor<'T>) =
         a.CheckAxis ax 
         let shftRng = 
@@ -4649,7 +4650,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>If the input tensor has more than one dimension, this operation is applied batch-wise on the last
     /// dimension.</para>
     /// </remarks>
-    /// <seealso cref="diffAxis``1"/>
+    /// <seealso cref="diffAxis"/>
     static member diff (a: Tensor<'T>) =
         if a.NDims < 1 then invalidArg "a" "Need at least a vector to calculate diff."
         Tensor.diffAxis (a.NDims-1) a
