@@ -129,12 +129,15 @@ type ITensor =
 
 
 
-/// Block tensor specification.
+/// <summary>Block tensor specification.</summary>
+/// <typeparam name="'T">The type of the data stored within the tensor.</typeparam>
+/// <remarks>See <see cref="Tensor`1.ofBlocks"/> for usage information.</remarks>
+/// <seealso cref="Tensor`1.ofBlocks"/>
 type BlockTensor<'T> =
     /// A block consisting of multiple sub-blocks.
     | SubBlocks of BlockTensor<'T> list
     /// A block consisting of a single tensor.
-    | Block of Tensor<'T>
+    | Block of Tensor<'T> 
 
 
 
@@ -4366,7 +4369,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member trace (a: Tensor<'T>) =
         if a.NDims < 2 then
             invalidArg "a" "Need at least a two dimensional array for trace but got shape %A." a.Shape
-        Tensor.traceAxis (a.NDims-2) (a.NDims-1) a
+        Tensor.traceAxis (a.NDims-2) (a.NDims-1) a 
 
     /// <summary>Builds a tensor out of tensor blocks.</summary>
     /// <param name="bs">The block tensor specification.</param>    
