@@ -4104,7 +4104,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.meanAxis 1 a // b = [2.5; 6.5]
     /// </code></example>
     /// <remarks>The mean is calculated along the specified axis.</remarks>
-    /// <seealso cref="mean``1"/><seealso cref="varAxis``1"/><seealso cref="stdAxis``1"/>
+    /// <seealso cref="mean"/><seealso cref="varAxis"/><seealso cref="stdAxis"/>
     static member meanAxis axis (a: Tensor<'T>) = 
         Tensor.sumAxis axis a / Tensor.scalarLike a (conv<'T> a.Shape.[axis])
 
@@ -4117,7 +4117,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// let b = Tensor.mean a // b = 4.5
     /// </code></example>
     /// <remarks>The mean is calculated over all elements of the tensor.</remarks>
-    /// <seealso cref="meanAxis``1"/><seealso cref="var``1"/><seealso cref="std``1"/>
+    /// <seealso cref="meanAxis"/><seealso cref="var"/><seealso cref="std"/>
     static member mean a =
         a |> Tensor.flatten |> Tensor.meanAxis 0 |> Tensor.value
 
@@ -4137,7 +4137,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
     /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
     /// </remarks>
-    /// <seealso cref="var``1"/><seealso cref="meanAxis``1"/><seealso cref="stdAxis``1"/>
+    /// <seealso cref="var"/><seealso cref="meanAxis"/><seealso cref="stdAxis"/>
     static member varAxis (axis, a: Tensor<'T>, ?ddof) =
         let ddof = defaultArg ddof 0L
         let m = Tensor.meanAxis axis a |> Tensor.insertAxis axis
@@ -4159,19 +4159,63 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
     /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
     /// </remarks>
-    /// <seealso cref="varAxis``1"/><seealso cref="mean``1"/><seealso cref="std``1"/>
+    /// <seealso cref="varAxis"/><seealso cref="mean"/><seealso cref="std"/>
     static member var (a, ?ddof) =
         Tensor.varAxis (0, Tensor.flatten a, ?ddof=ddof) |> Tensor.value
 
-    /// standard deviation over given axis
+    /// <summary>Calculates the standard deviation of the elements along the specified axis.</summary>
+    /// <param name="ax">The axis to operate along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <param name="ddof">The delta degrees of freedom. (default: 0L)</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.stdAxis (1, a, ddof=1L) 
+    /// </code></example>
+    /// <remarks>
+    /// <para>The standard deviation is calculated along the specified axis.</para>
+    /// <para>The parameter <paramref name="ddof"/> specifies the difference between the number of elements and the
+    /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
+    /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
+    /// </remarks>
+    /// <seealso cref="std"/><seealso cref="meanAxis"/><seealso cref="varAxis"/>
     static member stdAxis (ax, a, ?ddof) =
         Tensor.varAxis (ax, a, ?ddof=ddof) |> sqrt
 
-    /// standard deviation 
+    /// <summary>Calculates the standard deviation of the tensor.</summary>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>The standard deviation estimate.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.std a 
+    /// </code></example>
+    /// <remarks>
+    /// <para>The standard deviation is calculated over all elements of the tensor.</para>
+    /// <para>The parameter <paramref name="ddof"/> specifies the difference between the number of elements and the
+    /// degrees of freedom for the computation of the variance. Use <c>ddof=1</c> to obtain an unbiased estimate and
+    /// <c>ddof=0</c> for a maximum-likelihood estimate.</para>
+    /// </remarks>
+    /// <seealso cref="stdAxis"/><seealso cref="mean"/><seealso cref="var"/>
     static member std (a, ?ddof) =
         Tensor.var (a, ?ddof=ddof) |> sqrt
 
-    /// tensor, matrix or vector norm of given order over given axis
+    /// <summary>Calculates the norm along the specified axis.</summary>
+    /// <param name="axis">The axis to operate along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <param name="ord">The order (power) of the norm. (default: 2)</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.normAxis (1, a) // [5.477; 13.191]
+    /// </code></example>
+    /// <remarks>
+    /// <para>The norm is calculated along the specified axis.</para>
+    /// <para>It is defined by <c>sqrt (sum_i (x_i**ord))</c>.</para>
+    /// </remarks>
+    /// <seealso cref="norm``1"/>
     static member normAxis (axis, a: Tensor<'T>, ?ord: 'T) =
         let ord = defaultArg ord (conv<'T> 2)
         let tOrd = Tensor.scalarLike a ord
@@ -4179,26 +4223,79 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let s = a ** tOrd |> Tensor.sumAxis axis
         s ** tOrdRep 
 
-    /// tensor, matrix or vector norm of given order
+    /// <summary>Calculates the norm of the (flattened) tensor.</summary>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <param name="ord">The order (power) of the norm. (default: 2)</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.ofList2D [[1.0; 2.0; 3.0; 4.0]
+    ///                              [5.0; 6.0; 7.0; 8.0]]
+    /// let b = Tensor.norm a // 14.283
+    /// </code></example>
+    /// <remarks>
+    /// <para>The norm is calculated over all elements of the tensor.</para>
+    /// <para>It is defined by <c>sqrt (sum_i (x_i**ord))</c>.</para>
+    /// </remarks>
+    /// <seealso cref="normAxis``1"/>
     static member norm (a: Tensor<'T>, ?ord: 'T) =
         Tensor.normAxis (0, Tensor.flatten a, ?ord=ord) |> Tensor.value
 
-    /// Returns a view of the diagonal along the given axes.
-    /// The diagonal replaces the first axis and the second axis is removed.
+    /// <summary>Returns a view of the diagonal along the given axes.</summary>
+    /// <param name="ax1">The first dimension of the diagonal.</param>
+    /// <param name="ax2">The seconds dimension of the diagonal.</param>
+    /// <param name="a">The tensor to operate on.</param>    
+    /// <returns>A tensor where dimension <paramref name="ax1"/> is the diagonal and dimension
+    /// <paramref name="ax2"/> is removed.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 3L; 3L; 5L]
+    /// let b = Tensor.diagAxis 1 2 a // b.Shape = [4L; 3L; 5L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The dimensions specified by <paramref name="ax1"/> and <paramref name="ax2"/> must have the same size.</para>
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="diag``1"/><seealso cref="diagMatAxis``1"/>
     static member diagAxis ax1 ax2 (a: Tensor<'T>) =
         a |> Tensor.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
 
-    /// Returns a view of the diagonal of a matrix as a vector.
-    /// If the specified tensor has more than two dimensions, the diagonals
-    /// along the last two dimensions are returned.
+    /// <summary>Returns a view of the diagonal of the matrix.</summary>
+    /// <param name="a">A square matrix.</param>    
+    /// <returns>The diagonal vector.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 3L]
+    /// let b = Tensor.diag a // b.Shape = [3L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The matrix must be square.</para>
+    /// <para>If the specified tensor has more than two dimensions, the diagonals along the last two dimensions 
+    /// are returned as a tensor.</para>
+    /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
+    /// tensor will affect the original tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="diagAxis"/><seealso cref="diagMat"/>
     static member diag (a: Tensor<'T>) =
         if a.NDims < 2 then
             invalidArg "a" "Need at least a two dimensional array for diagonal but got shape %A." a.Shape
         Tensor.diagAxis (a.NDims-2) (a.NDims-1) a
 
-    /// Creates a new tensor of same shape but with ax2 inserted.
-    /// The diagonal over ax1 and ax2 is filled with the elements of the original ax1.
-    /// The other elements are set to zero.
+    /// <summary>Creates a tensor with the specified diagonal along the given axes.</summary>
+    /// <param name="ax1">The first dimension of the diagonal.</param>
+    /// <param name="ax2">The seconds dimension of the diagonal.</param>
+    /// <param name="a">The values for the diagonal.</param>    
+    /// <returns>A tensor having the values <paramref name="a"/> on the diagonal specified by the axes 
+    /// <paramref name="ax1"/> and <paramref name="ax2"/>.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 3L]
+    /// let b = Tensor.diagMatAxis 0 1 a // b.Shape = [4L; 4L; 3L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>A new tensor with the same shape as <paramref name="a"/> but with axis <paramref name="ax2"/> inserted
+    /// is created. The size of axis <paramref name="ax2"/> is set to the size of axis <paramref name="ax1"/>.</para>
+    /// <para>The diagonal over axes <paramref name="ax1"/> and <paramref name="ax2"/> is filled with the elements of 
+    /// tensor <paramref name="a"/>. The other elements are set to zero.</para>
+    /// </remarks>    
+    /// <seealso cref="diagMat"/><seealso cref="diagAxis"/>
     static member diagMatAxis ax1 ax2 (a: Tensor<'T>) =
         if ax1 = ax2 then 
             invalidArg "ax1" "axes to use for diagonal must be different"
@@ -4212,29 +4309,99 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         dDiag.FillFrom a
         d
 
-    /// Creates a new matrix that has the specified diagonal.
-    /// All other elements are zero.
-    /// If the specified array has more than one dimension, the operation is
-    /// performed batch-wise on the last dimension.
+    /// <summary>Creates a matrix with the specified diagonal.</summary>
+    /// <param name="a">The vector containing the values for the diagonal.</param>    
+    /// <returns>A matrix having the values <paramref name="a"/> on its diagonal.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [5L]
+    /// let b = Tensor.diag a // b.Shape = [5L; 5L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>A square matrix with the same size as <paramref name="a"/> is created.</para>
+    /// <para>The diagonal is filled with the elements of vector <paramref name="a"/>. 
+    /// The other elements are set to zero.</para>
+    /// <para>If the specified tensor has more than one dimension, the operation is
+    /// performed batch-wise on the last dimension.</para>
+    /// </remarks>    
+    /// <seealso cref="diagMatAxis"/><seealso cref="diag"/>
     static member diagMat (a: Tensor<'T>) =
         if a.NDims < 1 then
             invalidArg "a" "need at leat a one-dimensional array to create a diagonal matrix"
         Tensor.diagMatAxis (a.NDims-1) a.NDims a
 
-    /// Computes the traces along the given axes.
+    /// <summary>Calculates the trace along the specified axes.</summary>
+    /// <param name="ax1">The first axis of the diagonal to compute the trace along.</param>
+    /// <param name="ax2">The second axis of the diagonal to compute the trace along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>A new tensor containing the result of this operation.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [2L; 3L; 4L; 3L]
+    /// let b = Tensor.traceAxis 1 3 a // b.Shape = [2L; 4L]
+    /// </code></example>
+    /// <remarks>
+    /// <para>The trace is calculated along the specified axes. It is defined by the sum of the elements on the
+    /// diagonal.</para>
+    /// <para>The tensor must have the same size in dimensions <paramref name="ax1"/> and <paramref name="ax2"/>.</para>
+    /// </remarks>
+    /// <seealso cref="trace/>
     static member traceAxis ax1 ax2 (a: Tensor<'T>) =
         let tax = if ax1 < ax2 then ax1 else ax1 - 1
         a |> Tensor.diagAxis ax1 ax2 |> Tensor.sumAxis tax
 
-    /// Computes the trace of a matrix.
-    /// If the specified tensor has more than two dimensions, the traces
-    /// along the last two dimensions are returned.
+    /// <summary>Calculates the trace of the matrix.</summary>
+    /// <param name="a">A square matrix.</param>    
+    /// <returns>The trace of the matrix.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [3L; 3L]
+    /// let b = Tensor.trace a 
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The trace is is defined by the sum of the elements on the diagonal.</para>
+    /// <para>The matrix must be square.</para>
+    /// <para>If the specified tensor has more than two dimensions, the traces along the last two dimensions 
+    /// are returned as a tensor.</para>
+    /// </remarks>    
+    /// <seealso cref="traceAxis"/><seealso cref="diag"/>
     static member trace (a: Tensor<'T>) =
         if a.NDims < 2 then
             invalidArg "a" "Need at least a two dimensional array for trace but got shape %A." a.Shape
         Tensor.traceAxis (a.NDims-2) (a.NDims-1) a
 
-    /// N-dimensional tensor constructed of subtensors using a BlockTensor specification.
+    /// <summary>Builds a tensor out of tensor blocks.</summary>
+    /// <param name="bs">The block tensor specification.</param>    
+    /// <returns>The resulting tensor.</returns>
+    /// <example><code language="fsharp">
+    /// // Consider a block matrix of the follow structure.
+    /// // +-----------------------------+---------------+
+    /// // |                             |               |
+    /// // |                             |               |
+    /// // |            b1               |      b2       |        
+    /// // |         (5 x 28)            |   (5 x 15)    |
+    /// // |                             |               |
+    /// // +---------------------+-------+-------+-------+        
+    /// // |                     |               |       |
+    /// // |       b3            |      b4       |  b5   |
+    /// // |    (3 x 22)         |    (3 x 14)   |(3 x 7)|
+    /// // +---------------------+---------------+-------+        
+    /// //
+    /// // It can be specified as follows.
+    /// let b1 = HostTensor.zeros [5L; 28L]
+    /// let b2 = HostTensor.zeros [5L; 15L]
+    /// let b3 = HostTensor.zeros [3L; 22L]
+    /// let b4 = HostTensor.zeros [3L; 14L]
+    /// let b5 = HostTensor.zeros [3L; 7L]
+    /// let r1 = SubBlocks [Block b1; Block b2]
+    /// let r2 = SubBlocks [Block b3; Block b4; Block b5]
+    /// let a = Tensor.ofBlocks (SubBlocks [r1; r2])
+    /// // a.Shape = [8L; 43L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The contents of a sub-block are jointed along the dimension determined by its nesting level, i.e. 
+    /// a sub-block nested <c>n</c> levels within other sub-blocks will be concatenated along dimension <c>n</c>.</para>
+    /// <para>The contents of a sub-block must have equal sizes in all dimensions except for the 
+    /// concatenation dimensions.</para>
+    /// </remarks>    
+    /// <seealso cref="concat``1"/>
     static member ofBlocks (bs: BlockTensor<'T>) =
         let rec commonShape joinDim shps =               
             match shps with
@@ -4286,15 +4453,76 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             joined.[slice] <- ary
         joined
 
-    /// 1d vector constructed of blocks 
+    /// <summary>Builds a vector out of vectors blocks.</summary>
+    /// <param name="bs">The block vector specification.</param>    
+    /// <returns>The resulting vector.</returns>
+    /// <example><code language="fsharp">
+    /// // Consider a block vector of the follow structure.
+    /// // +-----------------------------+---------------+
+    /// // |          b1 (28)            |    b2 (15)    |
+    /// // +-----------------------------+---------------+        
+    /// //
+    /// // It can be specified as follows.
+    /// let b1 = HostTensor.zeros [28L]
+    /// let b2 = HostTensor.zeros [15L]
+    /// let a = Tensor.ofBlocks [b1; b2]
+    /// // a.Shape = [43L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The contents of a the vectors are concatenated.</para>
+    /// </remarks>    
     static member ofBlocks (bs: Tensor<'T> list) =
         bs |> List.map Block |> SubBlocks |> Tensor.ofBlocks
 
-    /// 2d matrix constructed of blocks 
+    /// <summary>Builds a matrix out of matrix blocks.</summary>
+    /// <param name="bs">The matrix blocks.</param>    
+    /// <returns>The resulting matrix.</returns>
+    /// <example><code language="fsharp">
+    /// // Consider a block matrix of the follow structure.
+    /// // +-----------------------------+---------------+
+    /// // |                             |               |
+    /// // |                             |               |
+    /// // |            b1               |      b2       |        
+    /// // |         (5 x 28)            |   (5 x 15)    |
+    /// // |                             |               |
+    /// // +---------------------+-------+-------+-------+        
+    /// // |                     |               |       |
+    /// // |       b3            |      b4       |  b5   |
+    /// // |    (3 x 22)         |    (3 x 14)   |(3 x 7)|
+    /// // +---------------------+---------------+-------+        
+    /// //
+    /// // It can be specified as follows.
+    /// let b1 = HostTensor.zeros [5L; 28L]
+    /// let b2 = HostTensor.zeros [5L; 15L]
+    /// let b3 = HostTensor.zeros [3L; 22L]
+    /// let b4 = HostTensor.zeros [3L; 14L]
+    /// let b5 = HostTensor.zeros [3L; 7L]
+    /// let bs = [[b1;   b2  ]
+    ///           [b3; b4; b5]]
+    /// let a = Tensor.ofBlocks bs
+    /// // a.Shape = [8L; 43L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The contents of each list are jointed along the dimension determined by its nesting level, i.e. 
+    /// the elements of the outer lists are concatenated along dimension zero (rows) and the elements of the inner lists
+    /// are concatenated along dimension one (columns).</para>
+    /// <para>The contents of a list must have equal sizes in all dimensions except for the 
+    /// concatenation dimensions.</para>
+    /// </remarks>    
     static member ofBlocks (bs: Tensor<'T> list list) =
         bs |> List.map (List.map Block >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
-    /// 3d tensor constructed of blocks
+    /// <summary>Builds a three dimensional tensor out of tensor blocks.</summary>
+    /// <param name="bs">The tensor blocks.</param>    
+    /// <returns>The resulting tensor.</returns>
+    /// <remarks>    
+    /// <para>The contents of each list are jointed along the dimension determined by its nesting level, i.e. 
+    /// the elements of the outer-most lists are concatenated along dimension zero and the elements of the middle lists
+    /// are concatenated along dimension one and the elements of the inner-most lists are concatenated along dimension
+    /// two.</para>
+    /// <para>The contents of a list must have equal sizes in all dimensions except for the 
+    /// concatenation dimensions.</para>
+    /// </remarks>    
     static member ofBlocks (bs: Tensor<'T> list list list) =
         bs |> List.map (List.map (List.map Block >> SubBlocks) >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
@@ -4311,8 +4539,21 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                 |> Seq.toList |> SubBlocks
         generate [] |> Tensor.ofBlocks
 
-    /// Concatenates the sequence of tensors along the given axis.
-    /// The source tensors are copied.
+    /// <summary>Concatenates tensors along an axis.</summary>
+    /// <param name="ax">The concatenation axis.</param>        
+    /// <param name="ts">Sequence of tensors to concatenate.</param>    
+    /// <returns>The concatenated tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 28L]
+    /// let b = HostTensor.zeros [4L; 15L]
+    /// let c = HostTensor.zeros [4L; 10L]
+    /// let d = Tensor.concat 1 [a; b; c] // d.Shape = [4L; 53L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The contents of a the tensors are concatenated in the specifed dimension.</para>
+    /// <para>The sizes of the tensors in all other dimensions must be equal.</para>
+    /// </remarks>    
+    /// <seealso cref="ofBlocks"/>
     static member concat (ax: int) (ts: Tensor<'T> seq) =
         let ts = List.ofSeq ts
         if List.isEmpty ts then
@@ -4346,7 +4587,18 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                 pos <- pos + aryLen
         cc
 
-    /// Replicates the tensor the given number of repetitions along the given axis.
+    /// <summary>Repeats the tensor along an axis.</summary>
+    /// <param name="ax">The axis to repeat along.</param>        
+    /// <param name="reps">The number of repetitions.</param>
+    /// <param name="a">The tensor to repeat.</param>    
+    /// <returns>The repeated tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [4L; 28L]
+    /// let b = Tensor.replicate 0 10L a // b.Shape = [40L; 28L]
+    /// </code></example>    
+    /// <remarks>    
+    /// <para>The contents of a the tensors are replicated <paramref name="reps"/> times in the specifed dimension.</para>
+    /// </remarks>    
     static member replicate (ax: int) (reps: int64) (a: Tensor<'T>) =
         a.CheckAxis ax
         if reps < 0L then invalidArg "reps" "Number of repetitions cannot be negative."
@@ -4359,7 +4611,19 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         |> Tensor.broadcastDim ax reps
         |> Tensor.reshape (a.Shape |> List.set ax (reps * a.Shape.[ax]))
 
-    /// calculates the pairwise differences along the given axis
+    /// <summary>Calculates the difference between adjoining elements along the specified axes.</summary>
+    /// <param name="ax">The axis to operate along.</param>
+    /// <param name="a">The tensor containing the source values.</param>    
+    /// <returns>The differences tensor. It has one element less in dimension <paramref name="ax"/> 
+    /// as the input tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [10L; 5L]
+    /// let b = Tensor.diffAxis 0 a // b.Shape = [9L; 5L]
+    /// </code></example>
+    /// <remarks>
+    /// <para>The resulting tensor has one element less in the differentiation dimension than the original tensor.</para>
+    /// </remarks>
+    /// <seealso cref="diff``1"/>
     static member diffAxis (ax: int) (a: Tensor<'T>) =
         a.CheckAxis ax 
         let shftRng = 
@@ -4372,7 +4636,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                 else yield Rng.All]
         a.[shftRng] - a.[cutRng]
 
-    /// calculates the pairwise differences along the last axis
+    /// <summary>Calculates the difference between adjoining elements of the vector.</summary>
+    /// <param name="a">The vector containing the source values.</param>    
+    /// <returns>The differences vector. It has one element less than the input tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = HostTensor.zeros [5L]
+    /// let b = Tensor.diff a // b.Shape = [4L]
+    /// </code></example>
+    /// <remarks>
+    /// <para>The value of output element <c>i</c> is given by <c>d_i = a_(i+1) - a_i</c>.</para>
+    /// <para>The resulting vector has one element less in the last dimension than the original vector.</para>
+    /// <para>If the input tensor has more than one dimension, this operation is applied batch-wise on the last
+    /// dimension.</para>
+    /// </remarks>
+    /// <seealso cref="diffAxis``1"/>
     static member diff (a: Tensor<'T>) =
         if a.NDims < 1 then invalidArg "a" "Need at least a vector to calculate diff."
         Tensor.diffAxis (a.NDims-1) a
