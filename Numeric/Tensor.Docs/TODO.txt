@@ -12,6 +12,7 @@ shape
 nDims
 nElems
 dataType
+
 newLayout
 range
 allIdx
@@ -40,4 +41,3 @@ atLeast3D
 copy
 transfer
 
-transfer

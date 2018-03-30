@@ -171,7 +171,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Memory layout.</returns>
     /// <seealso cref="Layout"/>
-    static member inline layout (a: Tensor<'T>) = a.Layout
+    static member inline layout (a: ITensor) = a.Layout
 
     /// <summary>The storage object that holds the data of this tensor.</summary>
     /// <value>Storage object.</value>
@@ -199,7 +199,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Data storage device.</returns>
     /// <seealso cref="Dev"/><seealso cref="transfer``1"/>
-    static member inline dev (a: Tensor<'T>) = a.Dev
+    static member inline dev (a: ITensor) = a.Dev
 
     /// backend 
     member internal this.Backend = backend
@@ -223,7 +223,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Shape.</returns>
     /// <seealso cref="Shape"/>
-    static member inline shape (a: Tensor<'T>) = a.Shape
+    static member inline shape (a: ITensor) = a.Shape
 
     /// <summary>Dimensionality of this tensor.</summary>
     /// <value>Number of dimensions.</value>
@@ -243,7 +243,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Number of dimensions.</returns>
     /// <seealso cref="NDims"/>
-    static member inline nDims (a: Tensor<'T>) = a.NDims
+    static member inline nDims (a: ITensor) = a.NDims
 
     /// <summary>Total number of elements within this tensor.</summary>
     /// <value>Number of elements.</value>
@@ -263,7 +263,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Number of elements.</returns>
     /// <seealso cref="NElems"/>
-    static member inline nElems (a: Tensor<'T>) = a.NElems
+    static member inline nElems (a: ITensor) = a.NElems
 
     /// <summary>Type of data stored within this tensor.</summary>
     /// <value>Data type.</value>
@@ -277,7 +277,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Data type.</returns>
     /// <seealso cref="DataType"/>
-    static member inline dataType (a: Tensor<'T>) = a.DataType
+    static member inline dataType (a: ITensor) = a.DataType
 
     /// a tensor with the same storage but new layout
     member internal this.Relayout (newLayout: TensorLayout) =
@@ -4799,6 +4799,26 @@ module Tensor =
             let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
             trgt.FillParallelFoldAxis fn initial axis a
             trgt
+
+
+module ITensor =
+    let layout (a: ITensor) = a.Layout
+
+    let dev (a: ITensor) = a.Dev
+
+    let shape (a: ITensor) = a.Shape
+
+    let nDims (a: ITensor) = a.Layout.NDims
+
+    let nElems (a: ITensor) = a.Layout.NElems
+
+    let dataType (a: ITensor) = a.DataType
+
+    let relayout newLayout (a: ITensor) =
+        a.Relayout newLayout 
+
+    let range (rng: Rng list) (a: ITensor) =
+        a |> ITensor.relayout (a |> ITensor.layout |> TensorLayout.view rng)
 
 
 
