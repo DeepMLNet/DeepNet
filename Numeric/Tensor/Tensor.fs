@@ -129,6 +129,112 @@ type ITensor =
 
 
 
+module ITensor =
+    let layout (a: ITensor) = a.Layout
+
+    let dev (a: ITensor) = a.Dev
+
+    let shape (a: ITensor) = a.Shape
+
+    let nDims (a: ITensor) = a.Layout.NDims
+
+    let nElems (a: ITensor) = a.Layout.NElems
+
+    let dataType (a: ITensor) = a.DataType
+
+    let relayout newLayout (a: ITensor) =
+        a.Relayout newLayout 
+
+    let range (rng: Rng list) (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.view rng)
+
+    let padLeft (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.padLeft)
+
+    let padRight (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.padRight)
+
+    let insertAxis ax (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.insertAxis ax)
+
+    let cutLeft (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.cutLeft)
+
+    let cutRight (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.cutRight)
+
+    let private ApplyLayoutFn (fn, xs: ITensor list) = 
+        let layouts = fn (xs |> List.map layout)
+        (layouts, xs) ||> List.map2 relayout        
+
+    let padToSame (xs: ITensor list) = 
+        ApplyLayoutFn (TensorLayout.padToSameMany, xs)
+
+    let broadcastToSame (xs: ITensor list) =
+        ApplyLayoutFn (TensorLayout.broadcastToSameMany, xs)
+
+    let broadcastToSameInDims (dims, xs: ITensor list) =
+        ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, xs)
+
+    let broadcastTo shp (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.broadcastToShape shp)
+
+    let isBroadcasted (a: ITensor) =
+        a.Layout |> TensorLayout.isBroadcasted 
+
+    let tryReshapeView shp (a: ITensor) =
+        match a.Layout |> TensorLayout.tryReshape shp with
+        | Some newLayout -> a.Relayout newLayout |> Some
+        | None -> None
+
+    let reshapeView shp (a: ITensor) =
+        match tryReshapeView shp a with
+        | Some res -> res
+        | None -> 
+            let msg =
+                sprintf "Cannot reshape tensor of shape %A and strides %A without copying."
+                    a.Shape a.Layout.Stride
+            raise (InvalidOperationException msg)
+
+    let reshape shp (a: ITensor) =
+        match a |> tryReshapeView shp with
+        | Some res -> res
+        | None -> a.Copy() |> reshapeView shp
+
+    let flatten (a: ITensor) =
+        reshape [Remainder] a    
+
+    let swapDim ax1 ax2 (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.swapDim ax1 ax2)
+
+    let transpose (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.transpose)
+
+    let permuteAxes (permut: int list) (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.permuteAxes permut)
+
+    let reverseAxis ax (a: ITensor) =
+        a.Relayout (a.Layout |> TensorLayout.reverseAxis ax)        
+
+    let atLeastND minDims (a: ITensor) =
+        if a.NDims >= minDims then a
+        else
+            let newShp = List.init (minDims - a.NDims) (fun _ -> 1L)
+            a |> reshape newShp
+
+    let atLeast1D (a: ITensor) = a |> atLeastND 1
+
+    let atLeast2D (a: ITensor) = a |> atLeastND 2
+
+    let atLeast3D (a: ITensor) = a |> atLeastND 3
+
+    let copy (a: ITensor) = a.Copy()
+
+    let transfer (dev: ITensorDevice) (src: ITensor) =
+        src.Transfer (dev)
+        
+
+
 /// <summary>Block tensor specification.</summary>
 /// <typeparam name="'T">The type of the data stored within the tensor.</typeparam>
 /// <remarks>See <see cref="Tensor`1.ofBlocks"/> for usage information.</remarks>
@@ -171,7 +277,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Memory layout.</returns>
     /// <seealso cref="Layout"/>
-    static member inline layout (a: ITensor) = a.Layout
+    static member inline layout (a: Tensor<'T>) = a.Layout
 
     /// <summary>The storage object that holds the data of this tensor.</summary>
     /// <value>Storage object.</value>
@@ -199,7 +305,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Data storage device.</returns>
     /// <seealso cref="Dev"/><seealso cref="transfer``1"/>
-    static member inline dev (a: ITensor) = a.Dev
+    static member inline dev (a: Tensor<'T>) = a.Dev
 
     /// backend 
     member internal this.Backend = backend
@@ -223,7 +329,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Shape.</returns>
     /// <seealso cref="Shape"/>
-    static member inline shape (a: ITensor) = a.Shape
+    static member inline shape (a: Tensor<'T>) = a.Shape
 
     /// <summary>Dimensionality of this tensor.</summary>
     /// <value>Number of dimensions.</value>
@@ -243,7 +349,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Number of dimensions.</returns>
     /// <seealso cref="NDims"/>
-    static member inline nDims (a: ITensor) = a.NDims
+    static member inline nDims (a: Tensor<'T>) = a.NDims
 
     /// <summary>Total number of elements within this tensor.</summary>
     /// <value>Number of elements.</value>
@@ -263,7 +369,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Number of elements.</returns>
     /// <seealso cref="NElems"/>
-    static member inline nElems (a: ITensor) = a.NElems
+    static member inline nElems (a: Tensor<'T>) = a.NElems
 
     /// <summary>Type of data stored within this tensor.</summary>
     /// <value>Data type.</value>
@@ -277,7 +383,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Data type.</returns>
     /// <seealso cref="DataType"/>
-    static member inline dataType (a: ITensor) = a.DataType
+    static member inline dataType (a: Tensor<'T>) = a.DataType
 
     /// a tensor with the same storage but new layout
     member internal this.Relayout (newLayout: TensorLayout) =
@@ -299,8 +405,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
     /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{Tensor.Rng})"/>
-    static member range (rng: Rng list) (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.view rng)
+    static member range (rng: Rng list) (a: Tensor<'T>) = ITensor.range rng a :?> Tensor<'T>
    
     /// <summary>Checks the the specified axis is valid for this tensor.</summary>   
     /// <param name="ax">The axis number to check.</param>
@@ -342,8 +447,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="padRight``1"/><seealso cref="insertAxis``1"/>
-    static member padLeft (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padLeft)
+    static member padLeft (a: Tensor<'T>) = ITensor.padLeft a :?> Tensor<'T>
 
     /// <summary>Append a dimension of size one after the last dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -357,8 +461,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="padLeft``1"/><seealso cref="insertAxis``1"/>
-    static member padRight (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.padRight)
+    static member padRight (a: Tensor<'T>) = ITensor.padRight a :?> Tensor<'T>
 
     /// <summary>Insert a dimension of size one before the specifed dimension.</summary>
     /// <param name="ax">The dimension to insert before.</param>
@@ -373,8 +476,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="padLeft``1"/><seealso cref="padRight``1"/>
-    static member insertAxis ax (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.insertAxis ax)
+    static member insertAxis ax (a: Tensor<'T>) = ITensor.insertAxis ax a :?> Tensor<'T>
 
     /// <summary>Removes the first dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -388,8 +490,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="cutRight``1"/>
-    static member cutLeft (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutLeft)
+    static member cutLeft (a: Tensor<'T>) = ITensor.cutLeft a :?> Tensor<'T>
       
     /// <summary>Removes the last dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -403,8 +504,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="cutLeft``1"/>
-    static member cutRight (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a.Layout |> TensorLayout.cutRight)
+    static member cutRight (a: Tensor<'T>) = ITensor.cutRight a :?> Tensor<'T>
 
     /// <summary>Broadcast a dimension to a specified size.</summary>
     /// <param name="dim">The size-one dimension to broadcast.</param>
@@ -598,8 +698,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <exception cref="System.InvalidOperationException">Raised when broadcasting to the specified shape is impossible.</exception>
     /// <seealso cref="broadcastToSame``2"/>
-    static member broadcastTo shp (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.broadcastToShape shp)
+    static member broadcastTo shp (a: Tensor<'T>) = ITensor.broadcastTo shp a :?> Tensor<'T>
 
     /// <summary>Checks if the specified tensor is broadcasted in at least one dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -609,8 +708,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
     /// </remarks>
     /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``1"/>
-    static member isBroadcasted (a: Tensor<'T>) =
-        a |> Tensor<_>.layout |> TensorLayout.isBroadcasted 
+    static member isBroadcasted (a: Tensor<'T>) = ITensor.isBroadcasted a
 
     /// <summary>Tries to create a reshaped view of the tensor (without copying).</summary>
     /// <param name="shp">The target shape.</param>
@@ -627,9 +725,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <seealso cref="reshapeView``1"/><seealso cref="reshape``1"/>
     static member tryReshapeView shp (a: Tensor<'T>) =
-        match a |> Tensor<_>.layout |> TensorLayout.tryReshape shp with
-        | Some newLayout -> a |> Tensor<_>.relayout newLayout |> Some
-        | None -> None
+        ITensor.tryReshapeView shp a |> Option.map (fun r -> r :?> Tensor<'T>)
 
     /// <summary>Creates a reshaped view of the tensor (without copying).</summary>
     /// <param name="shp">The target shape.</param>
@@ -646,14 +742,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <seealso cref="tryReshapeView``1"/><seealso cref="reshape``1"/>
-    static member reshapeView shp (a: Tensor<'T>) =
-        match Tensor<_>.tryReshapeView shp a with
-        | Some res -> res
-        | None -> 
-            let msg =
-                sprintf "cannot reshape tensor of shape %A and strides %A without copying"
-                    (Tensor<_>.layout a).Shape (Tensor<_>.layout a).Stride
-            raise (InvalidOperationException msg)
+    static member reshapeView shp (a: Tensor<'T>) = ITensor.reshapeView shp a :?> Tensor<'T>
 
     /// <summary>Changes the shape of a tensor.</summary>
     /// <param name="shp">The target shape.</param>
@@ -676,11 +765,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// and a new storage is allocated and the data is copied into the new tensor.</para>
     /// </remarks>
     /// <seealso cref="tryReshapeView``1"/><seealso cref="reshapeView``1"/><seealso cref="flatten``1"/><seealso cref="Shape"/>
-    static member reshape shp (a: Tensor<'T>) =
-        match a |> Tensor<_>.tryReshapeView shp with
-        | Some res -> res
-        | None ->
-            a |> Tensor<_>.copy |> Tensor<_>.reshapeView shp
+    static member reshape shp (a: Tensor<'T>) = ITensor.reshape shp a :?> Tensor<'T>
 
     /// <summary>Flattens the tensor into a (one-dimensional) vector.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -695,8 +780,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// tensor.</para>
     /// </remarks>    reshape
     /// <seealso cref="reshape``1"/>
-    static member flatten (a: Tensor<'T>) =
-        Tensor<_>.reshape [Remainder] a
+    static member flatten (a: Tensor<'T>) = ITensor.flatten a :?> Tensor<'T>
 
     /// <summary>Swaps the specified dimensions of the tensor.</summary>
     /// <param name="ax1">The dimension to swap.</param>
@@ -712,15 +796,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
     /// <seealso cref="permuteAxes``1"/><seealso cref="T"/>
-    static member swapDim ax1 ax2 (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.swapDim ax1 ax2)
+    static member swapDim ax1 ax2 (a: Tensor<'T>) = ITensor.swapDim ax1 ax2 a :?> Tensor<'T>
 
     /// <summary>Transpose of a matrix.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The result of this operation.</returns>
     /// <seealso cref="T"/>
-    static member transpose (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.transpose)
+    static member transpose (a: Tensor<'T>) = ITensor.transpose a :?> Tensor<'T>
 
     /// <summary>Permutes the axes as specified.</summary>
     /// <param name="permut">The permutation to apply to the dimensions of tensor.</param>
@@ -737,8 +819,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
     /// <seealso cref="swapDim``1"/><seealso cref="T"/>
-    static member permuteAxes (permut: int list) (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.permuteAxes permut)
+    static member permuteAxes (permut: int list) (a: Tensor<'T>) = ITensor.permuteAxes permut a :?> Tensor<'T>
 
     /// <summary>Reverses the elements in the specified dimension.</summary>
     /// <param name="ax">The axis to reverse.</param>
@@ -753,8 +834,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
-    static member reverseAxis ax (a: Tensor<'T>) =
-        a |> Tensor<_>.relayout (a |> Tensor<_>.layout |> TensorLayout.reverseAxis ax)        
+    static member reverseAxis ax (a: Tensor<'T>) = ITensor.reverseAxis ax a :?> Tensor<'T>
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least the specified number of
     /// dimensions.</summary>
@@ -772,12 +852,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
     /// <seealso cref="padLeft``1"/><seealso cref="reshape``1"/>    
-    static member atLeastND minDims (a: Tensor<'T>) =
-        let nd = Tensor<_>.nDims a
-        if nd >= minDims then a
-        else
-            let newShp = List.init (minDims - nd) (fun _ -> 1L)
-            a |> Tensor<_>.reshape newShp
+    static member atLeastND minDims (a: Tensor<'T>) = ITensor.atLeastND minDims a :?> Tensor<'T>
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least one dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
@@ -4799,27 +4874,6 @@ module Tensor =
             let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
             trgt.FillParallelFoldAxis fn initial axis a
             trgt
-
-
-module ITensor =
-    let layout (a: ITensor) = a.Layout
-
-    let dev (a: ITensor) = a.Dev
-
-    let shape (a: ITensor) = a.Shape
-
-    let nDims (a: ITensor) = a.Layout.NDims
-
-    let nElems (a: ITensor) = a.Layout.NElems
-
-    let dataType (a: ITensor) = a.DataType
-
-    let relayout newLayout (a: ITensor) =
-        a.Relayout newLayout 
-
-    let range (rng: Rng list) (a: ITensor) =
-        a |> ITensor.relayout (a |> ITensor.layout |> TensorLayout.view rng)
-
 
 
 /// Special values that can be passed instead of masks.

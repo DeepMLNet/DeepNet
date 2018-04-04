@@ -6,38 +6,38 @@ TODO:
 - Yes, would make the signature cleaner and also allow for simpler and better type inference for the user
 - drawback: Separate functions for ITensor with separate documentation and so on
 
-layout
-dev
-shape
-nDims
-nElems
-dataType
+layout.
+dev.
+shape.
+nDims.
+nElems.
+dataType.
 
 newLayout
-range
+range .
 allIdx
 allIdxOfDim
-padLeft
-padRight
-insertAxis
-cutLeft
-cutRight
-broadcastDim
-padToSame
-broadcastToSame
-broadcastTo
-tryReshapeView
-reshapeView
-reshape
-flatten
-swapDim
-transpose
-permuteAxes
-reverseAxis
-atLeastND
-atLeast1D
-atLeast2D
-atLeast3D
-copy
-transfer
+padLeft .
+padRight .
+insertAxis .
+cutLeft .
+cutRight .
+broadcastDim .
+padToSame .
+broadcastToSame .
+broadcastTo .
+tryReshapeView .
+reshapeView .
+reshape .
+flatten .
+swapDim .
+transpose .
+permuteAxes .
+reverseAxis .
+atLeastND .
+atLeast1D .
+atLeast2D .
+atLeast3D .
+copy .
+transfer .
 
