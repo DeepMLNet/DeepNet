@@ -757,22 +757,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidOp "The operation requires a Tensor<int64> but the data type of the specified tensor is %s." 
                       this.DataType.Name
 
-    /// Fills the tensor with the values returned by the function.
-    member trgt.Fill (fn: unit -> 'T)  =
-        trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=false)
-
-    /// Fills the tensor with the values returned by the function using multiple threads.
-    member trgt.FillParallel (fn: unit -> 'T)  =
-        trgt.Backend.Fill (fn=fn, trgt=trgt, useThreads=true)
-
-    /// Fills the tensor with the values returned by the function.
-    member trgt.FillIndexed (fn: int64[] -> 'T) =
-        trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=false)
-
-    /// Fills the tensor with the values returned by the function using multiple threads.
-    member trgt.FillParallelIndexed (fn: int64[] -> 'T) =
-        trgt.Backend.FillIndexed (fn=fn, trgt=trgt, useThreads=true)
-
     /// <summary>Fills this tensor with a copy of the specified tensor.</summary>
     /// <param name="src">The tensor to copy from.</param>
     /// <remarks>
@@ -800,77 +784,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillIncrementing (start: 'T, incr: 'T) =
         if trgt.NDims <> 1 then invalidOp "FillIncrementing requires a vector."
         trgt.Backend.FillIncrementing (start=start, incr=incr, trgt=trgt)
-
-    /// Fills the tensor with the values returned by the given sequence.
-    member trgt.FillSeq (data: 'T seq) =
-        use enumerator = data.GetEnumerator()
-        trgt.Fill (fun () -> 
-            if enumerator.MoveNext() then enumerator.Current
-            else invalidArg "data" "Sequence ended before tensor of shape %A was filled." trgt.Shape)
-
-    /// maps all elements using the specified function into this tensor
-    member trgt.FillMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareElemwiseSources (trgt, a)
-        trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
-
-    /// maps all elements using the specified function into this tensor using multiple threads
-    member trgt.FillParallelMap (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareElemwiseSources (trgt, a)
-        trgt.Backend.Map (fn=fn, trgt=trgt, src=a, useThreads=false)
-
-    /// maps all elements using the specified function into a new tensor
-    static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillMap fn a
-        trgt       
-
-    /// maps all elements using the specified indexed function into this tensor
-    member trgt.FillMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareElemwiseSources (trgt, a)
-        trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=false)
-
-    /// maps all elements using the specified indexed function into this tensor using multiple threads
-    member trgt.FillParallelMapIndexed (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
-        let a = Tensor.PrepareElemwiseSources (trgt, a)
-        trgt.Backend.MapIndexed (fn=fn, trgt=trgt, src=a, useThreads=true)
-
-    /// maps all elements using the specified indexed function into a new tensor
-    static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillMapIndexed fn a
-        trgt     
-
-    /// maps all elements using the specified function into this tensor
-    member trgt.FillMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
-        trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
-
-    /// maps all elements using the specified function into this tensor using multiple threads
-    member trgt.FillParallelMap2 (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
-        trgt.Backend.Map2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
-
-    /// maps all elements using the specified function into a new tensor
-    static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillMap2 fn a b
-        trgt       
-
-    /// maps all elements using the specified indexed function into this tensor
-    member trgt.FillMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
-        trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=false)
-
-    /// maps all elements using the specified indexed function into this tensor using multiple threads
-    member trgt.FillParallelMapIndexed2 (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
-        let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
-        trgt.Backend.MapIndexed2 (fn=fn, trgt=trgt, src1=a, src2=b, useThreads=true)
-
-    /// maps all elements using the specified indexed function into a new tensor
-    static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillMapIndexed2 fn a b
-        trgt       
 
     /// <summary>Copies elements from a tensor of different data type into this tensor and converts their type.</summary>
     /// <typeparam name="'C">The data type to convert from.</typeparam>
@@ -2260,25 +2173,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member scatter (indices: Tensor<int64> option list) (trgtShp: int64 list) (src: Tensor<'T>) =
         let trgt = Tensor<'T> (trgtShp, src.Dev)
         trgt.FillScatter indices src
-        trgt
-
-    /// TODO: change to Tensor folder function      
-    /// folds the function over the given axis, using this tensor as target 
-    member trgt.FillFoldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
-        let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
-        trgt.Backend.FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, src=a, useThreads=false)        
-
-    /// TODO: change to Tensor folder function
-    /// folds the function over the given axis, using this tensor as target and multiple threads
-    member trgt.FillParallelFoldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
-        let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
-        trgt.Backend.FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, src=a, useThreads=true) 
-
-    /// TODO: change to Tensor folder function
-    /// folds the function over the given axis
-    static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
-        let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
-        trgt.FillFoldAxis fn initial axis a
         trgt
         
     /// <summary>Counts the elements being true along the specified axis and writes the result into this tensor.</summary>
@@ -3833,13 +3727,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member scalarLike (tmpl: ITensor) (value: 'T) : Tensor<'T> =
         Tensor<'T>.scalar tmpl.Storage.Dev value 
 
-    /// TODO: move to HostTensor
-    /// Creates a tensor with the values returned by the function.
-    static member init (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
-        let x = Tensor<'T> (shape, dev)
-        x.FillIndexed fn
-        x           
-
     /// <summary>Creates a new tensor filled with the specified value.</summary>
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="shape">The shape of the new tensor.</param>
@@ -3877,7 +3764,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The tensor is filled with <c>[0L; 1L; 2L; ...; nElems-1L]</c>. </para>
     /// </remarks>
     static member counting (dev: ITensorDevice) (nElems: int64) =
-        Tensor.init dev [nElems] (fun idx -> idx.[0])        
+        let x = Tensor<int64> ([nElems], dev)
+        x.FillIncrementing (0L, 1L)
+        x
 
     /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
     /// <param name="dev">The device to create the tensor on.</param>
@@ -3893,7 +3782,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
         let nElems = max 0L ((stop - start) / incr |> int64)
         let x = Tensor<'V> ([nElems], dev)
-        x.FillIncrementing(start, incr)
+        x.FillIncrementing (start, incr)
         x
 
     /// <summary>Creates a new vector of given size filled with equaly spaced values.</summary>
@@ -4622,49 +4511,6 @@ type Tensor =
         let trgt = Tensor<'TR> (a.Shape, a.Storage.Dev, ?order=order)
         trgt, a, b, c
 
-
-
-/// See Tensor.Parallel.
-module Tensor =
-
-    /// Multi-threaded operations of Tensor<'T>.
-    type Parallel = 
-
-        /// Creates a new tensor with the values returned by the function.
-        static member init<'T> (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
-            let x = Tensor<'T> (shape, dev)
-            x.FillParallelIndexed fn
-            x          
-
-        /// Maps all elements using the specified function into a new tensor.
-        static member map (fn: 'T -> 'R) (a: Tensor<'T>) =
-            let trgt, a = Tensor.PrepareElemwise (a)
-            trgt.FillParallelMap fn a
-            trgt       
-
-        /// Maps all elements using the specified indexed function into a new tensor.
-        static member mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
-            let trgt, a = Tensor.PrepareElemwise (a)
-            trgt.FillParallelMapIndexed fn a
-            trgt      
-
-        /// Maps all elements using the specified function into a new tensor.
-        static member map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-            let trgt, a, b = Tensor.PrepareElemwise (a, b)
-            trgt.FillParallelMap2 fn a b
-            trgt           
-
-        /// Maps all elements using the specified indexed function into a new tensor.
-        static member mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
-            let trgt, a, b = Tensor.PrepareElemwise (a, b)
-            trgt.FillParallelMapIndexed2 fn a b
-            trgt            
-
-        /// Folds the function over the given axis.
-        static member foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
-            let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
-            trgt.FillParallelFoldAxis fn initial axis a
-            trgt
 
 
 /// Special values that can be passed instead of masks.

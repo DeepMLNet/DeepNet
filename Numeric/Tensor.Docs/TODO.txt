@@ -2,6 +2,14 @@ TODO:
 
 - TOC linking
 - fix broken links
+
 - move host only functions to HostTensor
 
+
+- How to design the move?
+- the static functions are easy, but what about the member functions?
+- it is not possible to do it as an extension because that would apply to all tensors
+- so the API become necesarily inconsistent
+- Yes, but this is probably not that bad...
+- let us first move the frontend and then see what to do about the backend stuff
 

@@ -213,33 +213,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.Convert (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Convert (trgt, a)
-
-        member this.Fill (fn, trgt, useThreads) = 
-            let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
-            let inline scalarOp idx = fn ()
-            ScalarOps.ApplyNoaryOp (scalarOp, trgt, isIndexed=false, useThreads=useThreads)
-
-        member this.FillIndexed (fn, trgt, useThreads) = 
-            let trgt = TensorHostBackend<_>.GetDataAndLayout (trgt)
-            ScalarOps.ApplyNoaryOp (fn, trgt, isIndexed=true, useThreads=useThreads)
-
-        member this.Map (fn, trgt, a, useThreads) = 
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            let inline scalarOp idx av = fn av
-            ScalarOps.ApplyUnaryOp (scalarOp, trgt, a, isIndexed=false, useThreads=useThreads)
-
-        member this.MapIndexed (fn, trgt, a, useThreads) = 
-            let trgt, a = TensorHostBackend<_>.GetDataAndLayout (trgt, a)
-            ScalarOps.ApplyUnaryOp (fn, trgt, a, isIndexed=true, useThreads=useThreads)
-
-        member this.Map2 (fn, trgt, a, b, useThreads) = 
-            let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            let inline scalarOp idx av bv = fn av bv
-            ScalarOps.ApplyBinaryOp (scalarOp, trgt, a, b, isIndexed=false, useThreads=useThreads)
-
-        member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
-            let trgt, a, b = TensorHostBackend<_>.GetDataAndLayout (trgt, a, b)
-            ScalarOps.ApplyBinaryOp (fn, trgt, a, b, isIndexed=true, useThreads=useThreads)
       
         member this.UnaryPlus (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -446,15 +419,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.TrueIndices (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
             ScalarOps.TrueIndices (trgt, src)    
-
-        member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
-            let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
-            let inline foldOp idx state xv = fn state xv
-            ScalarOps.ApplyAxisFold (foldOp, id, trgt, a, Choice2Of2 initial, isIndexed=false, useThreads=useThreads)
-
-        member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
-            let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
-            ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
 
         member this.CountTrueLastAxis (trgt, src) =
             let trgt, src = TensorHostBackend<_>.GetDataAndLayout (trgt, src)
@@ -663,6 +627,41 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         member this.GetEnumerator() : System.Collections.IEnumerator =
             (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
 
+    member this.Fill (fn, trgt, useThreads) = 
+        let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
+        let inline scalarOp idx = fn ()
+        ScalarOps.ApplyNoaryOp (scalarOp, trgt, isIndexed=false, useThreads=useThreads)
+
+    member this.FillIndexed (fn, trgt, useThreads) = 
+        let trgt = TensorHostBackend<_>.GetDataAndLayout (trgt)
+        ScalarOps.ApplyNoaryOp (fn, trgt, isIndexed=true, useThreads=useThreads)
+
+    member this.Map (fn, trgt, a, useThreads) = 
+        let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+        let inline scalarOp idx av = fn av
+        ScalarOps.ApplyUnaryOp (scalarOp, trgt, a, isIndexed=false, useThreads=useThreads)
+
+    member this.MapIndexed (fn, trgt, a, useThreads) = 
+        let trgt, a = TensorHostBackend<_>.GetDataAndLayout (trgt, a)
+        ScalarOps.ApplyUnaryOp (fn, trgt, a, isIndexed=true, useThreads=useThreads)
+
+    member this.Map2 (fn, trgt, a, b, useThreads) = 
+        let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
+        let inline scalarOp idx av bv = fn av bv
+        ScalarOps.ApplyBinaryOp (scalarOp, trgt, a, b, isIndexed=false, useThreads=useThreads)
+
+    member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
+        let trgt, a, b = TensorHostBackend<_>.GetDataAndLayout (trgt, a, b)
+        ScalarOps.ApplyBinaryOp (fn, trgt, a, b, isIndexed=true, useThreads=useThreads)
+
+    member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
+        let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
+        let inline foldOp idx state xv = fn state xv
+        ScalarOps.ApplyAxisFold (foldOp, id, trgt, a, Choice2Of2 initial, isIndexed=false, useThreads=useThreads)
+
+    member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
+        let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
+        ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
 
 
 /// Factory for host tensors.
