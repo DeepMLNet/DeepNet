@@ -201,16 +201,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
            
-        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = 
-            let s =
-                TensorLayout.allIdx layout 
-                |> Seq.map (fun idx -> (this :> ITensorBackend<'T>).[List.toArray idx])
-            s.GetEnumerator()
-
-        member this.GetEnumerator() : System.Collections.IEnumerator = 
-            (this :> System.Collections.Generic.IEnumerable<'T>).GetEnumerator() 
-            :> System.Collections.IEnumerator
-
         member this.Transfer (trgt, src) =
             /// gets CUDA registered or pinned memory
             let getMem (storage: TensorHostStorage<'T>) = 

@@ -615,18 +615,6 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             a.FetchResult()
             w.FetchResult()
 
-        member this.GetEnumerator() : IEnumerator<'T> = 
-            let s = seq {
-                let mutable pos = PosIter32 this.FastLayout
-                while pos.Active do
-                    yield this.Data.[pos.Addr]
-                    pos.MoveNext()
-            }
-            s.GetEnumerator()
-
-        member this.GetEnumerator() : System.Collections.IEnumerator =
-            (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
-
     member this.Fill (fn, trgt, useThreads) = 
         let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
         let inline scalarOp idx = fn ()
@@ -662,6 +650,20 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
         let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
         ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
+
+    interface System.Collections.Generic.IEnumerable<'T> with
+        member this.GetEnumerator() : IEnumerator<'T> = 
+            let s = seq {
+                let mutable pos = PosIter32 this.FastLayout
+                while pos.Active do
+                    yield this.Data.[pos.Addr]
+                    pos.MoveNext()
+            }
+            s.GetEnumerator()
+
+    interface System.Collections.IEnumerable with    
+        member this.GetEnumerator() : System.Collections.IEnumerator =
+            (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
 
 
 /// Factory for host tensors.

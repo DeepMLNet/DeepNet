@@ -3571,11 +3571,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
         member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
-    // enumerator interfaces
-    interface IEnumerable<'T> with
-        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = this.Backend.GetEnumerator()
-        member this.GetEnumerator() : System.Collections.IEnumerator = (this.Backend :> IEnumerable).GetEnumerator()
-
     /// <summary>Tests for equality to another object.</summary>
     /// <param name="other">The other object.</param>
     /// <returns>true if the objects are equal. Otherwise false.</returns>

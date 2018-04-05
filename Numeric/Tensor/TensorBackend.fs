@@ -62,8 +62,6 @@ and ITensorFrontend<'T> =
 
 /// Tensor backend.
 and ITensorBackend<'T> =
-    inherit IEnumerable<'T>
-
     abstract Item:              int64[] -> 'T with get, set
 
     abstract Copy:              trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T> -> unit
