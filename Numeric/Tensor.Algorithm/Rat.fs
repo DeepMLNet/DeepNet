@@ -23,7 +23,7 @@ type Rat =
     val private DnmMinusOne: bigint
 
     /// the denominator
-    member a.Dnm = a.DnmMinusOne + bigint.One
+    member a.Dnm : bigint = a.DnmMinusOne + bigint.One
 
     /// Constructs a fraction from numerator and denominator.
     new (num, dnm) = 
@@ -208,24 +208,23 @@ type Rat =
     override a.ToString() = a.Pretty
 
 
-/// A rational number, i.e. a fraction of arbitrary precision.
-module Rat =
     /// numerator
-    let num (a: Rat) = a.Num
+    static member num (a: Rat) = a.Num
     /// denominator
-    let dnm (a: Rat) = a.Dnm
+    static member dnm (a: Rat) = a.Dnm
     /// True if a is an integer, i.e. its denominator is one.
-    let isInteger (a: Rat) = a.IsInt
+    static member isInteger (a: Rat) = a.IsInt
     /// True if a is positive infinity.
-    let isPosInf (a: Rat) = a.IsPosInf
+    static member isPosInf (a: Rat) = a.IsPosInf
     /// True if a is negative infinity.
-    let isNegInf (a: Rat) = a.IsNegInf
+    static member isNegInf (a: Rat) = a.IsNegInf
     /// True if a is infinity.
-    let isInf (a: Rat) = a.IsInf
+    static member isInf (a: Rat) = a.IsInf
     /// True if a is not-a-number.
-    let isNaN (a: Rat) = a.IsNaN
+    static member isNaN (a: Rat) = a.IsNaN
     /// True if a is a finite number.
-    let isFinite (a: Rat) = a.IsFinite
+    static member isFinite (a: Rat) = a.IsFinite
+
 
 
 /// Active recognizers for rational numbers.

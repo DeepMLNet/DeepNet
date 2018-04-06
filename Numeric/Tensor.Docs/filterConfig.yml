@@ -1,0 +1,37 @@
+apiRules:
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.Item\(obj
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.Item\(int64 \*    
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.GetSlice
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.SetSlice
+- exclude:
+    uidRegex: ^Tensor\.ITensor\.M\(Tensor\.Tensor<bool> \*    
+- exclude:
+    uidRegex: ^Tensor\.Tensor$
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Item\(obj
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Item\(int64 \*    
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.GetSlice
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.SetSlice
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.M\(Tensor\.Tensor<bool> \*    
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Tensor.ITensor
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.Tensor\.Backend\.ITensorFrontend`1  
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.System\.Collections\.Generic\.IEnumerable`1
+- exclude:
+    uidRegex: ^Tensor\.Tensor`1\.System\.Collections\.IEnumerable
+- exclude:
+    uidRegex: ^Tensor\.Util
+
+attributeRules:
+- exclude:
+    uidRegex: StructuredFormatDisplay

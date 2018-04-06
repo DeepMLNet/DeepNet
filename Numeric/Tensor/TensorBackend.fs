@@ -62,34 +62,15 @@ and ITensorFrontend<'T> =
 
 /// Tensor backend.
 and ITensorBackend<'T> =
-    inherit IEnumerable<'T>
-
     abstract Item:              int64[] -> 'T with get, set
 
     abstract Copy:              trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T> -> unit
     abstract Transfer:          trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T> -> bool
     abstract Convert:           trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T1> -> unit
 
-    abstract Fill:              fn:(unit -> 'T) * trgt:ITensorFrontend<'T> * useThreads:bool -> unit
-    abstract FillIndexed:       fn:(int64[] -> 'T) * trgt:ITensorFrontend<'T> * useThreads:bool -> unit
     abstract FillConst:         value:'T * trgt:ITensorFrontend<'T> -> unit
     abstract FillIncrementing:  start:'T * incr:'T * trgt:ITensorFrontend<'T> -> unit
     
-    abstract Map:               fn:('T1 -> 'T) * trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T1> *
-                                useThreads:bool -> unit
-    abstract MapIndexed:        fn:(int64[] -> 'T1 -> 'T) * trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T1> *
-                                useThreads:bool -> unit
-    abstract Map2:              fn:('T1 -> 'T2 -> 'T) * 
-                                trgt:ITensorFrontend<'T> * src1:ITensorFrontend<'T1> * src2:ITensorFrontend<'T2> * 
-                                useThreads:bool -> unit
-    abstract MapIndexed2:       fn:(int64[] -> 'T1 -> 'T2 -> 'T) *
-                                trgt:ITensorFrontend<'T> * src1:ITensorFrontend<'T1> * src2:ITensorFrontend<'T2> *
-                                useThreads:bool -> unit
-    abstract FoldLastAxis:      fn:('T -> 'T1 -> 'T) * initial:ITensorFrontend<'T> *
-                                trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T1> * useThreads:bool -> unit
-    abstract FoldLastAxisIndexed: fn:(int64[] -> 'T -> 'T1 -> 'T) * initial:ITensorFrontend<'T> *
-                                trgt:ITensorFrontend<'T> * src:ITensorFrontend<'T1> * useThreads:bool -> unit
-
     abstract UnaryPlus:         trgt:ITensorFrontend<'T> * src1:ITensorFrontend<'T> -> unit
     abstract UnaryMinus:        trgt:ITensorFrontend<'T> * src1:ITensorFrontend<'T> -> unit
     abstract Abs:               trgt:ITensorFrontend<'T> * src1:ITensorFrontend<'T> -> unit

@@ -89,7 +89,7 @@ let testCuda () =
     printfn "cj=\n%A" cj
 
     printfn "cuda convert to int..."
-    let cgInt = Tensor.convert<int> cg
+    let cgInt = Tensor<int>.convert cg
     printfn "cgInt=\n%A" cgInt
 
     printfn "cuda ca <<== cb..."

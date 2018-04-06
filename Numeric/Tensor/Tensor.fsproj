@@ -51,6 +51,7 @@
     <Compile Include="TensorRng.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="TensorBackend.fs" />
+    <Compile Include="ITensor.fs" />
     <Compile Include="Tensor.fs" />
     <Compile Include="TensorVal.fs" />
     <Compile Include="BlasSupport.fs" />

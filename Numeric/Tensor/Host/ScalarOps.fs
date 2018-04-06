@@ -903,7 +903,7 @@ type internal ScalarOps =
         let inline op (srcIdx: int64[]) (maxPos, maxVal) (v: 'T) = 
             if p.Greater v maxVal then srcIdx.[nd-1], v
             else maxPos, maxVal
-        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (-1L, minValue<'T>), 
+        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (NotFound, minValue<'T>), 
                                  isIndexed=true, useThreads=true)     
 
     static member ArgMinLastAxis (trgt: DataAndLayout<int64>, src1: DataAndLayout<'T>) =
@@ -912,7 +912,7 @@ type internal ScalarOps =
         let inline op (srcIdx: int64[]) (minPos, minVal) (v: 'T) = 
             if p.Less v minVal then srcIdx.[nd-1], v
             else minPos, minVal
-        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (-1L, maxValue<'T>), 
+        ScalarOps.ApplyAxisFold (op, fst, trgt, src1, initial=Choice1Of2 (NotFound, maxValue<'T>), 
                                  isIndexed=true, useThreads=true)     
                                  
     static member FindLastAxis (value: 'T, trgt: DataAndLayout<int64>, src1: DataAndLayout<'T>) =

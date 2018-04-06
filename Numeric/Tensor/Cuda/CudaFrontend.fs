@@ -35,8 +35,6 @@ module CudaTensor =
 
     let scalar<'T> = Tensor<'T>.scalar Dev
 
-    let init<'T> = Tensor<'T>.init Dev
-
     let filled<'T> = Tensor<'T>.filled Dev
 
     let identity<'T> = Tensor<'T>.identity Dev

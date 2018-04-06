@@ -201,16 +201,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             with get idx = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)]
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
            
-        member this.GetEnumerator() : System.Collections.Generic.IEnumerator<'T> = 
-            let s =
-                TensorLayout.allIdx layout 
-                |> Seq.map (fun idx -> (this :> ITensorBackend<'T>).[List.toArray idx])
-            s.GetEnumerator()
-
-        member this.GetEnumerator() : System.Collections.IEnumerator = 
-            (this :> System.Collections.Generic.IEnumerable<'T>).GetEnumerator() 
-            :> System.Collections.IEnumerator
-
         member this.Transfer (trgt, src) =
             /// gets CUDA registered or pinned memory
             let getMem (storage: TensorHostStorage<'T>) = 
@@ -494,14 +484,6 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         // unsupported for now on CUDA
         member this.BatchedSVD (trgtS, trgtUV, src) = unsup "BatchedSVD"
         member this.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVec, src) = unsup "SymmetricEigenDecomposition"
-        member this.Fill(fn, trgt, useThreads) = unsup "Fill"
-        member this.FillIndexed(fn, trgt, useThreads) = unsup "FillIndexed"
-        member this.Map(fn, trgt, src, useThreads) = unsup "Map"
-        member this.Map2(fn, trgt, src1, src2, useThreads) = unsup "Map2"
-        member this.MapIndexed(fn, trgt, src, useThreads) = unsup "MapIndexed"
-        member this.MapIndexed2(fn, trgt, src1, src2, useThreads) = unsup "MapIndexed2"
-        member this.FoldLastAxis(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxis"
-        member this.FoldLastAxisIndexed(fn, initial, trgt, src, useThreads) = unsup "FoldLastAxisIndexed"
         member this.CountTrueLastAxis(trgt, src1) = unsup "CountTrueLastAxis"
         member this.MaskedGet(trgt, src, mask) = unsup "MaskedGet"
         member this.MaskedSet(trgt, mask, src) = unsup "MaskedSet"

@@ -11,7 +11,8 @@
         }
       ],
       "dest": "api",
-      "disableGitFeatures": false
+      "disableGitFeatures": false,
+      "filter": "filterConfig.yml"
     }
   ],
   "build": {
@@ -53,7 +54,8 @@
     "globalMetadataFiles": [],
     "fileMetadataFiles": [],
     "template": [
-      "default"
+      "default",
+      "../../../docfx_plugins/memberpage.2.31.0/content"
     ],
     "postProcessors": [],
     "noLangKeyword": false,
