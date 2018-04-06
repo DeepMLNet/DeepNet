@@ -108,7 +108,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A tensor is empty of any dimension has size zero.</para>
     /// <para>A zero-dimensional tensor has an empty shape and contains one element.</para>
     /// </remarks>
-    /// <seealso cref="reshape``1"/><seealso cref="NDims"/><seealso cref="NElems"/>
+    /// <seealso cref="reshape"/><seealso cref="NDims"/><seealso cref="NElems"/>
     member inline this.Shape = this.Layout.Shape
 
     /// <summary>Shape of the tensor.</summary>
@@ -203,7 +203,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of indicies.</returns>
     /// <remarks>The sequence sequentially enumerates the indices of all elements of the tensor.</remarks>
-    /// <seealso cref="allIdxOfDim``1"/><seealso cref="allElems"/>
+    /// <seealso cref="allIdxOfDim"/><seealso cref="allElems"/>
     static member allIdx (a: Tensor<'T>) = ITensor.allIdx a
 
     /// <summary>Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.</summary>
@@ -211,14 +211,14 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of indicies.</returns>
     /// <remarks>The sequence sequentially enumerates the indices of the elements of the specified dimension.</remarks>
-    /// <seealso cref="allIdx``1"/>
+    /// <seealso cref="allIdx"/>
     static member allIdxOfDim dim (a: Tensor<'T>) = ITensor.allIdxOfDim dim a
             
     /// <summary>Gets a sequence of all all elements within the tensor.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of elements.</returns>
     /// <remarks>The sequence sequentially enumerates all elements of the tensor.</remarks>
-    /// <seealso cref="allIdx``1"/>
+    /// <seealso cref="allIdx"/>
     static member allElems (a: Tensor<'T>) = a |> Tensor<_>.allIdx |> Seq.map (fun idx -> a.[idx])
     
     /// <summary>Insert a dimension of size one as the first dimension.</summary>
@@ -232,7 +232,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="padRight``1"/><seealso cref="insertAxis``1"/>
+    /// <seealso cref="padRight"/><seealso cref="insertAxis"/>
     static member padLeft (a: Tensor<'T>) = ITensor.padLeft a :?> Tensor<'T>
 
     /// <summary>Append a dimension of size one after the last dimension.</summary>
@@ -246,7 +246,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="padLeft``1"/><seealso cref="insertAxis``1"/>
+    /// <seealso cref="padLeft"/><seealso cref="insertAxis"/>
     static member padRight (a: Tensor<'T>) = ITensor.padRight a :?> Tensor<'T>
 
     /// <summary>Insert a dimension of size one before the specifed dimension.</summary>
@@ -261,7 +261,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="padLeft``1"/><seealso cref="padRight``1"/>
+    /// <seealso cref="padLeft"/><seealso cref="padRight"/>
     static member insertAxis ax (a: Tensor<'T>) = ITensor.insertAxis ax a :?> Tensor<'T>
 
     /// <summary>Removes the first dimension.</summary>
@@ -275,7 +275,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="cutRight``1"/>
+    /// <seealso cref="cutRight"/>
     static member cutLeft (a: Tensor<'T>) = ITensor.cutLeft a :?> Tensor<'T>
       
     /// <summary>Removes the last dimension.</summary>
@@ -289,7 +289,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="cutLeft``1"/>
+    /// <seealso cref="cutLeft"/>
     static member cutRight (a: Tensor<'T>) = ITensor.cutRight a :?> Tensor<'T>
 
     /// <summary>Broadcast a dimension to a specified size.</summary>
@@ -309,7 +309,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="insertAxis``1"/>
+    /// <seealso cref="insertAxis"/>
     static member broadcastDim dim size (a: Tensor<'T>) = ITensor.broadcastDim dim size a :?> Tensor<'T>
 
     /// <summary>Creates a new, uninitialized tensor with a new storage.</summary>
@@ -371,7 +371,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="padLeft``1"/><seealso cref="broadcastToSame``1"/>
+    /// <seealso cref="padLeft"/><seealso cref="broadcastToSame"/>
     static member padToSame (a: Tensor<'TA>, b: Tensor<'TB>) = 
         Tensor<_>.ApplyLayoutFn (TensorLayout.padToSameMany, a, b)
 
@@ -409,7 +409,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <exception cref="System.InvalidOperationException">Raised when broadcasting to a common shape is impossible.</exception>
-    /// <seealso cref="padToSame``2"/><seealso cref="broadcastToSameInDims``2"/><seealso cref="broadcastTo``1"/>
+    /// <seealso cref="padToSame``2"/><seealso cref="broadcastToSameInDims``2"/><seealso cref="broadcastTo"/>
     static member broadcastToSame (a: Tensor<'TA>, b: Tensor<'TB>) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameMany, a, b)
 
@@ -445,7 +445,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
     /// <exception cref="System.InvalidOperationException">Raised when broadcasting to a common shape is impossible.</exception>
-    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``1"/>
+    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo"/>
     static member broadcastToSameInDims (dims, a: Tensor<'TA>, b: Tensor<'TB>) =
         Tensor<_>.ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, a, b)
 
@@ -492,7 +492,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>If any stride is zero, it is assumed that the tensor is broadcasted.
     /// If this is the case, changing an element of the tensor may change other elements as well.</para>    
     /// </remarks>
-    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo``1"/>
+    /// <seealso cref="broadcastToSame``2"/><seealso cref="broadcastTo"/>
     static member isBroadcasted (a: Tensor<'T>) = ITensor.isBroadcasted a
 
     /// <summary>Tries to create a reshaped view of the tensor (without copying).</summary>
@@ -508,7 +508,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="reshapeView``1"/><seealso cref="reshape``1"/>
+    /// <seealso cref="reshapeView"/><seealso cref="reshape"/>
     static member tryReshapeView shp (a: Tensor<'T>) =
         ITensor.tryReshapeView shp a |> Option.map (fun r -> r :?> Tensor<'T>)
 
@@ -522,11 +522,11 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// One dimension of the <paramref name="shp"/> can be specified as <see cref="Tensor.Remainder"/>, 
     /// in which case the size of that dimension is inferred automatically.</para>
     /// <para>If a reshape is not possible without copying the data of the tensor, an exception is raised.
-    /// To avoid this, use <see cref="tryReshapeView``1"/> instead.</para>
+    /// To avoid this, use <see cref="tryReshapeView"/> instead.</para>
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="tryReshapeView``1"/><seealso cref="reshape``1"/>
+    /// <seealso cref="tryReshapeView"/><seealso cref="reshape"/>
     static member reshapeView shp (a: Tensor<'T>) = ITensor.reshapeView shp a :?> Tensor<'T>
 
     /// <summary>Changes the shape of a tensor.</summary>
@@ -549,7 +549,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>If a reshape is not possible without copying the data of the tensor, a new tensor of the specified shape
     /// and a new storage is allocated and the data is copied into the new tensor.</para>
     /// </remarks>
-    /// <seealso cref="tryReshapeView``1"/><seealso cref="reshapeView``1"/><seealso cref="flatten``1"/><seealso cref="Shape"/>
+    /// <seealso cref="tryReshapeView"/><seealso cref="reshapeView"/><seealso cref="flatten"/><seealso cref="Shape"/>
     static member reshape shp (a: Tensor<'T>) = ITensor.reshape shp a :?> Tensor<'T>
 
     /// <summary>Flattens the tensor into a (one-dimensional) vector.</summary>
@@ -564,7 +564,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// and the storage is shared. In this case, modifications done to the returned tensor will affect the original 
     /// tensor.</para>
     /// </remarks>    
-    /// <seealso cref="reshape``1"/>
+    /// <seealso cref="reshape"/>
     static member flatten (a: Tensor<'T>) = ITensor.flatten a :?> Tensor<'T>
 
     /// <summary>Swaps the specified dimensions of the tensor.</summary>
@@ -580,7 +580,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
-    /// <seealso cref="permuteAxes``1"/><seealso cref="T"/>
+    /// <seealso cref="permuteAxes"/><seealso cref="T"/>
     static member swapDim ax1 ax2 (a: Tensor<'T>) = ITensor.swapDim ax1 ax2 a :?> Tensor<'T>
 
     /// <summary>Transpose of a matrix.</summary>
@@ -603,7 +603,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
-    /// <seealso cref="swapDim``1"/><seealso cref="T"/>
+    /// <seealso cref="swapDim"/><seealso cref="T"/>
     static member permuteAxes (permut: int list) (a: Tensor<'T>) = ITensor.permuteAxes permut a :?> Tensor<'T>
 
     /// <summary>Reverses the elements in the specified dimension.</summary>
@@ -636,25 +636,25 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A view of the original tensor is returned and the storage is shared. Modifications done to the returned 
     /// tensor will affect the original tensor.</para>
     /// </remarks>    
-    /// <seealso cref="padLeft``1"/><seealso cref="reshape``1"/>    
+    /// <seealso cref="padLeft"/><seealso cref="reshape"/>    
     static member atLeastND minDims (a: Tensor<'T>) = ITensor.atLeastND minDims a :?> Tensor<'T>
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least one dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least one dimensions.</returns>
-    /// <seealso cref="atLeastND``1"/>
+    /// <seealso cref="atLeastND"/>
     static member atLeast1D (a: Tensor<'T>) = a |> Tensor<_>.atLeastND 1
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least two dimensions.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least two dimensions.</returns>
-    /// <seealso cref="atLeastND``1"/>
+    /// <seealso cref="atLeastND"/>
     static member atLeast2D (a: Tensor<'T>) = a |> Tensor<_>.atLeastND 2
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least three dimensions.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least three dimensions.</returns>
-    /// <seealso cref="atLeastND``1"/>
+    /// <seealso cref="atLeastND"/>
     static member atLeast3D (a: Tensor<'T>) = a |> Tensor<_>.atLeastND 3
 
     /// <summary>Transpose of a matrix.</summary>
@@ -668,7 +668,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The operation returns a view of the original tensor and shares its storage. Modifications done to the
     /// returned tensor will affect the original tensor. Also, modifying the orignal tensor will affect the view.</para>
     /// </remarks>
-    /// <seealso cref="permuteAxes``1"/><seealso cref="swapDim``1"/>    
+    /// <seealso cref="permuteAxes"/><seealso cref="swapDim"/>    
     member inline this.T = 
         Tensor<_>.transpose this
 
@@ -695,7 +695,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>
     /// <para>The source tensor must have the same shape and be stored on the same device as this tensor.</para>
     /// </remarks>
-    /// <seealso cref="copy``1"/><seealso cref="FillFrom"/>
+    /// <seealso cref="copy"/><seealso cref="FillFrom"/>
     member trgt.CopyFrom (src: Tensor<'T>) =
         Tensor.CheckSameShape trgt src
         Tensor.CheckSameStorage [trgt; src]
@@ -720,9 +720,11 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
 
     /// Transfers this tensor to the specifed device.
     member internal src.Transfer (dev: ITensorDevice) =
-        let trgt = Tensor<'T> (src.Shape, dev)
-        trgt.TransferFrom src
-        trgt
+        if src.Dev <> dev then
+            let trgt = Tensor<'T> (src.Shape, dev)
+            trgt.TransferFrom src
+            trgt
+        else src
 
     /// <summary>Transfers a tensor to the specifed device.</summary>
     /// <param name="dev">The target device.</param>
@@ -735,9 +737,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>    
     /// <para>A new tensor is created on the specified device.</para>
     /// <para>The elements of the original tensor are copied into the new tensor.</para>
-    /// <para>If the target device matches the current device of the tensor, a copy is performed.</para>
+    /// <para>If the target device matches the current device of the tensor, the original tensor is returned.</para>
     /// </remarks>    
-    /// <seealso cref="TransferFrom"/><seealso cref="Dev"/><seealso cref="copy``1"/>
+    /// <seealso cref="TransferFrom"/><seealso cref="Dev"/><seealso cref="copy"/>
     static member transfer (dev: ITensorDevice) (src: Tensor<'T>) =
         src.Transfer (dev) 
 
@@ -3764,6 +3766,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         x
 
     /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
+    /// <typeparam name="^V">The data type of the new tensor.</typeparam>
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive element.</param>   

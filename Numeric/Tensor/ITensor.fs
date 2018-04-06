@@ -168,7 +168,7 @@ module ITensor =
     /// <param name="newLayout">The new tensor memory layout.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.newLayout"/>
+    /// <seealso cref="Tensor`1.relayout"/>
     let relayout newLayout (a: ITensor) =
         a.Relayout newLayout 
 
@@ -188,7 +188,7 @@ module ITensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of indicies.</returns>
     /// <remarks>The sequence sequentially enumerates the indices of all elements of the tensor.</remarks>
-    /// <seealso cref="Tensor`1.allIdxOfDim``1"/>
+    /// <seealso cref="Tensor`1.allIdxOfDim"/>
     let allIdx (a: ITensor) = a.Layout |> TensorLayout.allIdx
 
     /// <summary>Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.</summary>
@@ -196,20 +196,20 @@ module ITensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of indicies.</returns>
     /// <remarks>The sequence sequentially enumerates the indices of the elements of the specified dimension.</remarks>
-    /// <seealso cref="Tensor`1.allIdx``1"/>
+    /// <seealso cref="Tensor`1.allIdx"/>
     let allIdxOfDim dim (a: ITensor) = a.Layout |> TensorLayout.allIdxOfDim dim 
 
     /// <summary>Insert a dimension of size one as the first dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.padLeft``1"/>
+    /// <seealso cref="Tensor`1.padLeft"/>
     let padLeft (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.padLeft)
 
     /// <summary>Append a dimension of size one after the last dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.padRight``1"/>
+    /// <seealso cref="Tensor`1.padRight"/>
     let padRight (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.padRight)
 
@@ -217,21 +217,21 @@ module ITensor =
     /// <param name="ax">The dimension to insert before.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.insertAxis``1"/>
+    /// <seealso cref="Tensor`1.insertAxis"/>
     let insertAxis ax (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.insertAxis ax)
 
     /// <summary>Removes the first dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.cutLeft``1"/>
+    /// <seealso cref="Tensor`1.cutLeft"/>
     let cutLeft (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.cutLeft)
 
     /// <summary>Removes the last dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.cutRight``1"/>
+    /// <seealso cref="Tensor`1.cutRight"/>
     let cutRight (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.cutRight)
 
@@ -240,7 +240,7 @@ module ITensor =
     /// <param name="size">The size to broadcast to.</param>    
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
-    /// <seealso cref="Tensor`1.broadcastDim``1"/>
+    /// <seealso cref="Tensor`1.broadcastDim"/>
     let broadcastDim dim size (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.broadcastDim dim size)       
 
@@ -248,14 +248,14 @@ module ITensor =
     /// same dimensionality.</summary>
     /// <param name="xs">A list of tensors to operate on.</param>
     /// <returns>A list of the resulting tensors, all having the same dimensionality.</returns>
-    /// <seealso cref="Tensor`1.padToSame``1"/>
+    /// <seealso cref="Tensor`1.padToSame"/>
     let padToSame (xs: ITensor list) = 
         ApplyLayoutFn (TensorLayout.padToSameMany, xs)
 
     /// <summary>Broadcasts all specified tensors to have the same shape.</summary>
     /// <param name="xs">A list of tensors to operate on.</param>    
     /// <returns>A list of the resulting tensors, all having the same shape.</returns>
-    /// <seealso cref="Tensor`1.broadcastToSame``1"/>
+    /// <seealso cref="Tensor`1.broadcastToSame"/>
     let broadcastToSame (xs: ITensor list) =
         ApplyLayoutFn (TensorLayout.broadcastToSameMany, xs)
 
@@ -263,7 +263,7 @@ module ITensor =
     /// <param name="dims">A list of dimensions that should be broadcasted to have the same size.</param>
     /// <param name="xs">A list of tensors to operate on.</param>
     /// <returns>A list of the resulting tensors, all having the same size in the specified dimensions.</returns>
-    /// <seealso cref="Tensor`1.broadcastToSameInDims``1"/>
+    /// <seealso cref="Tensor`1.broadcastToSameInDims"/>
     let broadcastToSameInDims (dims, xs: ITensor list) =
         ApplyLayoutFn (TensorLayout.broadcastToSameInDimsMany dims, xs)
 
@@ -271,14 +271,14 @@ module ITensor =
     /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Tensor of shape <paramref name="shp"/>.</returns>
-    /// <seealso cref="Tensor`1.broadcastTo``1"/>
+    /// <seealso cref="Tensor`1.broadcastTo"/>
     let broadcastTo shp (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.broadcastToShape shp)
 
     /// <summary>Checks if the specified tensor is broadcasted in at least one dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>true if at least one dimension is broadcasted, otherwise false.</returns>
-    /// <seealso cref="Tensor`1.isBroadcasted/>
+    /// <seealso cref="Tensor`1.isBroadcasted"/>
     let isBroadcasted (a: ITensor) =
         a.Layout |> TensorLayout.isBroadcasted 
 
@@ -286,7 +286,7 @@ module ITensor =
     /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The reshaped tensor, if reshaping without copying is possible. Otherwise <c>None</c>.</returns>
-    /// <seealso cref="Tensor`1.tryReshapeView``1"/>
+    /// <seealso cref="Tensor`1.tryReshapeView"/>
     let tryReshapeView shp (a: ITensor) =
         match a.Layout |> TensorLayout.tryReshape shp with
         | Some newLayout -> a.Relayout newLayout |> Some
@@ -296,7 +296,7 @@ module ITensor =
     /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A reshaped view of the original tensor.</returns>
-    /// <seealso cref="Tensor`1.reshapeView``1"/>
+    /// <seealso cref="Tensor`1.reshapeView"/>
     let reshapeView shp (a: ITensor) =
         match tryReshapeView shp a with
         | Some res -> res
@@ -310,7 +310,7 @@ module ITensor =
     /// <param name="shp">The target shape.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor of the specified shape.</returns>
-    /// <seealso cref="Tensor`1.reshape``1"/>
+    /// <seealso cref="Tensor`1.reshape"/>
     let reshape shp (a: ITensor) =
         match a |> tryReshapeView shp with
         | Some res -> res
@@ -319,7 +319,7 @@ module ITensor =
     /// <summary>Flattens the tensor into a (one-dimensional) vector.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A vector.</returns>
-    /// <seealso cref="Tensor`1.flatten``1"/>
+    /// <seealso cref="Tensor`1.flatten"/>
     let flatten (a: ITensor) =
         reshape [Remainder] a    
 
@@ -328,7 +328,7 @@ module ITensor =
     /// <param name="ax2">The dimension to swap with.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The tensor with the dimensions swapped.</returns>
-    /// <seealso cref="Tensor`1.swapDim``1"/>
+    /// <seealso cref="Tensor`1.swapDim"/>
     let swapDim ax1 ax2 (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.swapDim ax1 ax2)
 
@@ -343,7 +343,7 @@ module ITensor =
     /// <param name="permut">The permutation to apply to the dimensions of tensor.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The tensor with the dimensions permuted.</returns>
-    /// <seealso cref="Tensor`1.permuteAxes``1"/>
+    /// <seealso cref="Tensor`1.permuteAxes"/>
     let permuteAxes (permut: int list) (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.permuteAxes permut)
 
@@ -351,7 +351,7 @@ module ITensor =
     /// <param name="ax">The axis to reverse.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The tensor with the dimensions permuted.</returns>
-    /// <seealso cref="Tensor`1.reverseAxis``1"/>
+    /// <seealso cref="Tensor`1.reverseAxis"/>
     let reverseAxis ax (a: ITensor) =
         a.Relayout (a.Layout |> TensorLayout.reverseAxis ax)        
 
@@ -360,7 +360,7 @@ module ITensor =
     /// <param name="minDims">The minimum number of dimensions.</param>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least <paramref name="minDims"/> dimensions.</returns>
-    /// <seealso cref="Tensor`1.atLeastND``1"/>
+    /// <seealso cref="Tensor`1.atLeastND"/>
     let atLeastND minDims (a: ITensor) =
         if a.NDims >= minDims then a
         else
@@ -370,33 +370,33 @@ module ITensor =
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least one dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least one dimensions.</returns>
-    /// <seealso cref="Tensor`1.atLeast1D``1"/>
+    /// <seealso cref="Tensor`1.atLeast1D"/>
     let atLeast1D (a: ITensor) = a |> atLeastND 1
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least two dimensions.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least two dimensions.</returns>
-    /// <seealso cref="Tensor`1.atLeast2D``1"/>
+    /// <seealso cref="Tensor`1.atLeast2D"/>
     let atLeast2D (a: ITensor) = a |> atLeastND 2
 
     /// <summary>Pads the tensor from the left with size-one dimensions until it has at least three dimensions.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A tensor with at least three dimensions.</returns>
-    /// <seealso cref="Tensor`1.atLeast3D``1"/>
+    /// <seealso cref="Tensor`1.atLeast3D"/>
     let atLeast3D (a: ITensor) = a |> atLeastND 3
 
     /// <summary>Returns a copy of the tensor.</summary>
     /// <param name="a">The tensor to copy.</param>
     /// <param name="order">The memory layout of the copy. (default: row-major)</param>
     /// <returns>A copy of the tensor.</returns>
-    /// <seealso cref="Tensor`1.copy``1"/>
+    /// <seealso cref="Tensor`1.copy"/>
     let copy (a: ITensor) = a.Copy()
 
     /// <summary>Transfers a tensor to the specifed device.</summary>
     /// <param name="dev">The target device.</param>
     /// <param name="a">The tensor to transfer.</param>
     /// <returns>A tensor on the target device.</returns>
-    /// <seealso cref="Tensor`1.transfer``1"/>
+    /// <seealso cref="Tensor`1.transfer"/>
     let transfer (dev: ITensorDevice) (src: ITensor) =
         src.Transfer (dev)
         

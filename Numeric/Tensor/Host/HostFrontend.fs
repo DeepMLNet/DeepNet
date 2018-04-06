@@ -40,25 +40,25 @@ type private HDFFuncs =
 /// <remarks>This module contains functions for creating tensors stored in host memory.
 /// It further contains functions that only work with tensors stored in host memory.
 /// Calling these functions with tensors stored on other devices will result in an
-/// <see cref="InvalidOperationException"/>.</remarks>
-/// <seealso cref="Tensor`1"/>
+/// <see cref="System.InvalidOperationException"/>.</remarks>
+/// <seealso cref="Tensor`1"/><seealso cref="HostTensor.Parallel"/>
 module HostTensor =
 
     /// <summary>Tensor device using a .NET array in host memory as data storage.</summary>
     /// <seealso cref="Tensor`1.Dev"/>
     let Dev = TensorHostDevice.Instance :> ITensorDevice
 
-    /// Gets backend of a host tensor.
+    /// Gets the backend of a host tensor.
     let internal backend (trgt: Tensor<'T>) =
         if trgt.Dev <> Dev then
-            invalidOp "This operation requires a tensor stored on the host, but got storage %A." trgt.Dev
+            invalidOp "This operation requires a tensor stored on the host, but got device %A." trgt.Dev
         trgt.Backend :?> TensorHostBackend<'T>
 
     /// <summary>Fills the tensor with values returned by the specifed function.</summary>
     /// <param name="trgt">The target tensor to fill.</param>
     /// <param name="fn">A function that takes the index of the element to fill and returns
     /// the corresponding value.</param>
-    /// <seealso cref="init``3"/>    
+    /// <seealso cref="init``1"/>    
     let FillIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'T) =
         (backend trgt).FillIndexed (fn=fn, trgt=trgt, useThreads=false)
 
@@ -66,21 +66,23 @@ module HostTensor =
     /// <param name="shape">The shape of the new tensor.</param>
     /// <param name="fn">A function that takes the index of the element to fill and returns
     /// the corresponding value.</param>
-    /// <seealso cref="FillIndexed``3"/>    
+    /// <seealso cref="FillIndexed``1"/>    
     let init (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, Dev)
         FillIndexed x fn
         x           
 
     /// <summary>Transfers a tensor to the host device.</summary>
+    /// <typeparam name="'T">The data type of the tensor.</typeparam>    
     /// <param name="a">The tensor to transfer.</param>
     /// <returns>A tensor on the host device.</returns>
     /// <seealso cref="Tensor`1.transfer"/>
-    let transfer a = Tensor.transfer Dev a
+    let transfer (a: Tensor<'T>) = Tensor.transfer Dev a
 
     /// <summary>Creates a new, empty tensor with the given number of dimensions.</summary>
     /// <typeparam name="'T">The data type of the new tensor.</typeparam>    
     /// <param name="nDims">The number of dimensions of the new, empty tensor.</param>
+    /// <returns>The new tensor.</returns>    
     /// <seealso cref="Tensor`1.empty"/>
     let empty<'T> nDims = Tensor<'T>.empty Dev nDims
 
@@ -137,12 +139,12 @@ module HostTensor =
     let counting nElems = Tensor.counting Dev nElems
 
     /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
-    /// <typeparam name="'V">The data type of the new tensor.</typeparam>
+    /// <typeparam name="^V">The data type of the new tensor.</typeparam>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive element.</param>   
     /// <param name="stop">The end value, which is not included.</param>
     /// <returns>The new tensor.</returns>
-    /// <seealso cref="Tensor`1.arange"/>
+    /// <seealso cref="Tensor`1.arange``3"/>
     let inline arange (start: 'V) (incr: 'V) (stop: 'V) = 
         Tensor.arange Dev start incr stop
 
@@ -152,7 +154,7 @@ module HostTensor =
     /// <param name="stop">The end value, which is not included.</param>
     /// <param name="nElems">The size of the vector.</param>   
     /// <returns>The new tensor.</returns>
-    /// <seealso cref="Tensor`1.linspace"/>
+    /// <seealso cref="Tensor`1.linspace``2"/>
     let inline linspace (start: 'V) (stop: 'V) nElems = 
         Tensor.linspace Dev start stop nElems
   
@@ -162,7 +164,7 @@ module HostTensor =
     /// <returns>A tensor using the array <c>data</c> as its storage.</returns>
     /// <remarks>The data array is referenced, not copied.
     /// Thus changing the tensor modifies the specified data array and vice versa.</remarks>
-    /// <seealso cref="ofArray"/>
+    /// <seealso cref="ofArray``1"/>
     let usingArray (data: 'T []) =
         let shp = [data.LongLength]
         let layout = TensorLayout.newC shp
@@ -174,8 +176,8 @@ module HostTensor =
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="usingArray"/>
-    /// <seealso cref="ofArray2D"/><seealso cref="ofArray3D"/><seealso cref="ofArray4D"/>
+    /// <seealso cref="usingArray``1"/>
+    /// <seealso cref="ofArray2D``1"/><seealso cref="ofArray3D``1"/><seealso cref="ofArray4D``1"/>
     let ofArray (data: 'T []) =
         let shp = [Array.length data]
         let shp = shp |> List.map int64
@@ -186,7 +188,7 @@ module HostTensor =
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="ofArray"/><seealso cref="ofArray3D"/><seealso cref="ofArray4D"/>
+    /// <seealso cref="ofArray``1"/><seealso cref="ofArray3D``1"/><seealso cref="ofArray4D``1"/>
     let ofArray2D (data: 'T [,]) =
         let shp = [Array2D.length1 data; Array2D.length2 data]
         let shp = shp |> List.map int64
@@ -197,7 +199,7 @@ module HostTensor =
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="ofArray"/><seealso cref="ofArray2D"/><seealso cref="ofArray4D"/>
+    /// <seealso cref="ofArray``1"/><seealso cref="ofArray2D``1"/><seealso cref="ofArray4D``1"/>
     let ofArray3D (data: 'T [,,]) =
         let shp = [Array3D.length1 data; Array3D.length2 data; Array3D.length3 data]
         let shp = shp |> List.map int64
@@ -208,7 +210,7 @@ module HostTensor =
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="ofArray"/><seealso cref="ofArray2D"/><seealso cref="ofArray3D"/>
+    /// <seealso cref="ofArray``1"/><seealso cref="ofArray2D``1"/><seealso cref="ofArray3D``1"/>
     let ofArray4D (data: 'T [,,,]) =
         let shp = [Array4D.length1 data; Array4D.length2 data; 
                    Array4D.length3 data; Array4D.length4 data]
@@ -220,7 +222,7 @@ module HostTensor =
     /// <param name="data">The data to fill the tensor with.</param>
     /// <returns>A tensor containing values from the specifed sequence.</returns>
     /// <remarks>The sequence must be finite.</remarks>
-    /// <seealso cref="ofSeqWithShape"/><seealso cref="ofList"/> 
+    /// <seealso cref="ofSeqWithShape``1"/><seealso cref="ofList``1"/> 
     let ofSeq (data: 'T seq) =
         data |> Array.ofSeq |> usingArray
 
@@ -231,7 +233,7 @@ module HostTensor =
     /// <returns>A tensor containing values from the specifed sequence.</returns>
     /// <remarks>Only the number of elements required to fill the tensor of the specified
     /// shape are consumed from the sequence. Thus it may be infinite.</remarks>
-    /// <seealso cref="ofSeq"/>
+    /// <seealso cref="ofSeq``1"/>
     let ofSeqWithShape shape (data: 'T seq) =
         let nElems = shape |> List.fold (*) 1L
         data |> Seq.take (int32 nElems) |> ofSeq |> Tensor.reshape shape
@@ -241,7 +243,7 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A sequence of all elements of the tensor.</returns>
     /// <remarks>The enumeration is done so that the last index is the fastest changing index.</remarks>
-    /// <seealso cref="ofSeq"/>
+    /// <seealso cref="ofSeq``1"/>
     let toSeq (a: Tensor<'T>) : seq<'T> =
         backend a :> IEnumerable<'T> 
 
@@ -249,8 +251,8 @@ module HostTensor =
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data to fill the tensor with.</param>
     /// <returns>A tensor containing values from the specifed list.</returns>
-    /// <seealso cref="ofSeq"/><seealso cref="ofList2D"/>    
-    /// <seealso cref="toList"/>
+    /// <seealso cref="ofSeq``1"/><seealso cref="ofList2D``1"/>    
+    /// <seealso cref="toList``1"/>
     let ofList (data: 'T list) =
         data |> Array.ofList |> usingArray
 
@@ -258,8 +260,8 @@ module HostTensor =
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data to fill the tensor with.</param>
     /// <returns>A tensor containing values from the specifed lists.</returns>
-    /// <seealso cref="ofSeq"/><seealso cref="ofList"/>    
-    /// <seealso cref="toList2D"/>
+    /// <seealso cref="ofSeq``1"/><seealso cref="ofList``1"/>    
+    /// <seealso cref="toList2D``1"/>
     let ofList2D (data: 'T list list) =
         data |> array2D |> ofArray2D
 
@@ -268,8 +270,8 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>An array containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toArray2D"/><seealso cref="toArray3D"/><seealso cref="toArray4D"/>
-    /// <seealso cref="ofArray"/>
+    /// <seealso cref="toArray2D``1"/><seealso cref="toArray3D``1"/><seealso cref="toArray4D``1"/>
+    /// <seealso cref="ofArray``1"/>
     let toArray (ary: Tensor<'T>) =
         if Tensor.nDims ary <> 1 then invalidOp "Tensor must have 1 dimension"
         let shp = Tensor.shape ary
@@ -281,8 +283,8 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>An array containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toArray"/><seealso cref="toArray2D"/><seealso cref="toArray3D"/>
-    /// <seealso cref="ofArray2D"/>
+    /// <seealso cref="toArray``1"/><seealso cref="toArray2D``1"/><seealso cref="toArray3D``1"/>
+    /// <seealso cref="ofArray2D``1"/>
     let toArray2D (a: Tensor<'T>) =
         if Tensor.nDims a <> 2 then invalidOp "Tensor must have 2 dimensions"
         let shp = Tensor.shape a
@@ -294,8 +296,8 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>An array containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toArray"/><seealso cref="toArray2D"/><seealso cref="toArray4D"/>
-    /// <seealso cref="ofArray3D"/>
+    /// <seealso cref="toArray``1"/><seealso cref="toArray2D``1"/><seealso cref="toArray4D``1"/>
+    /// <seealso cref="ofArray3D``1"/>
     let toArray3D (a: Tensor<'T>) =
         if Tensor.nDims a <> 3 then invalidOp "Tensor must have 3 dimensions"
         let shp = Tensor.shape a
@@ -307,8 +309,8 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>An array containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toArray"/><seealso cref="toArray2D"/><seealso cref="toArray3D"/>
-    /// <seealso cref="ofArray4D"/>
+    /// <seealso cref="toArray``1"/><seealso cref="toArray2D``1"/><seealso cref="toArray3D``1"/>
+    /// <seealso cref="ofArray4D``1"/>
     let toArray4D (a: Tensor<'T>) =
         if Tensor.nDims a <> 4 then invalidOp "Tensor must have 4 dimensions"
         let shp = Tensor.shape a
@@ -320,7 +322,7 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A list containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toList2D"/><seealso cref="ofList"/>
+    /// <seealso cref="toList2D``1"/><seealso cref="ofList``1"/>
     let toList (a: Tensor<'T>) =
         a |> toArray |> Array.toList
 
@@ -329,7 +331,7 @@ module HostTensor =
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>A list of lists containing the values from the tensor.</returns>
     /// <remarks>The data is copied.</remarks>
-    /// <seealso cref="toList"/><seealso cref="ofList2D"/>
+    /// <seealso cref="toList``1"/><seealso cref="ofList2D``1"/>
     let toList2D (a: Tensor<'T>) =
         if Tensor.nDims a <> 2 then invalidOp "Tensor must have 2 dimensions"
         [0L .. a.Shape.[0]-1L] |> List.map (fun i0 -> toList a.[i0, *])
@@ -347,7 +349,7 @@ module HostTensor =
     /// <param name="hdf5">The HDF5 file.</param>
     /// <param name="path">The HDF5 object path.</param>
     /// <returns>A tensor filled with data read from the HDF5 file.</returns>
-    /// <exception cref="InvalidOperationException">The data type stored in the HDF5 does 
+    /// <exception cref="System.InvalidOperationException">The data type stored in the HDF5 does 
     /// not match type <c>'T</c>.</exception>
     /// <seealso cref="write"/><seealso cref="readUntyped"/>
     let read<'T> (hdf5: HDF5) (path: string) : Tensor<'T> =
@@ -357,7 +359,7 @@ module HostTensor =
     /// <param name="hdf5">The HDF5 file.</param>
     /// <param name="path">The HDF5 object path.</param>
     /// <returns>A tensor filled with data read from the HDF5 file.</returns>
-    /// <seealso cref="read`1"/>
+    /// <seealso cref="read``1"/>
     let readUntyped (hdf5: HDF5) (path: string) = 
         let dataType = hdf5.GetDataType path
         callGeneric<HDFFuncs, ITensor> "Read" [dataType] (hdf5, path)
@@ -410,69 +412,129 @@ module HostTensor =
             if enumerator.MoveNext() then enumerator.Current
             else invalidArg "data" "Sequence ended before tensor of shape %A was filled." trgt.Shape)
 
-    /// <summary>Applies to specified function to all elements of the tensor.</summary>
+    /// <summary>Applies to specified function to all elements of the tensor using the specified tensor as target.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="trgt">The output tensor to fill.</param>
-    /// <param name="fn">A function taking a value from the input tensor and returns the corresponding output value.</param>        
-    /// <param name="a">The source tensor.</param>
+    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The input tensor.</param>
+    /// <seealso cref="map``2"/>
     let FillMap (trgt: Tensor<'T>) (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         (backend trgt).Map (fn=fn, trgt=trgt, a=a, useThreads=false)
 
-    /// maps all elements using the specified function into a new tensor
+    /// <summary>Applies to specified function to all elements of the tensor.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The source tensor.</param>
+    /// <returns>The output tensor.</returns>
+    /// <seealso cref="FillMap``2"/><seealso cref="mapi``2"/><seealso cref="map2``3"/>
     let map (fn: 'T -> 'R) (a: Tensor<'T>) =
         let trgt, a = Tensor.PrepareElemwise (a)
         FillMap trgt fn a
         trgt       
 
-    /// maps all elements using the specified indexed function into this tensor
+    /// <summary>Applies to specified indexed function to all elements of the tensor using the specified tensor as 
+    /// target.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The output tensor to fill.</param>
+    /// <param name="fn">A function that takes an index and the corresponding value from the input tensor and returns 
+    /// the corresponding output value.</param>        
+    /// <param name="a">The input tensor.</param>
+    /// <seealso cref="mapi``2"/>
     let FillMapIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         (backend trgt).MapIndexed (fn=fn, trgt=trgt, a=a, useThreads=false)
 
-    /// maps all elements using the specified indexed function into a new tensor
+    /// <summary>Applies to specified indexed function to all elements of the tensor.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="fn">A function that takes an index and the corresponding value from the input tensor and returns 
+    /// the corresponding output value.</param>        
+    /// <param name="a">The source tensor.</param>
+    /// <returns>The output tensor.</returns>
+    /// <seealso cref="FillMapIndexed``2"/><seealso cref="map``2"/>
     let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
         let trgt, a = Tensor.PrepareElemwise (a)
         FillMapIndexed trgt fn a
         trgt     
 
-    /// maps all elements using the specified function into this tensor
+    /// <summary>Applies to specified function to all elements of the two tensors using the specified tensor as target.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The output tensor to fill.</param>
+    /// <param name="fn">A function that takes a value from the first input tensor and a value from the second input 
+    /// tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The first input tensor.</param>
+    /// <param name="b">The second input tensor.</param>
+    /// <seealso cref="map2``3"/>
     let FillMap2 (trgt: Tensor<'T>) (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         (backend trgt).Map2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=false)
 
-    /// maps all elements using the specified function into a new tensor
+    /// <summary>Applies to specified function to all elements of the two tensors.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="fn">A function that takes a value from the first input tensor and a value from the second input 
+    /// tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The first input tensor.</param>
+    /// <param name="b">The second input tensor.</param>
+    /// <returns>The output tensor.</returns>
+    /// <seealso cref="FillMap2``3"/><seealso cref="map``2"/><seealso cref="mapi2``3"/>
     let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         FillMap2 trgt fn a b
         trgt       
 
-    /// maps all elements using the specified indexed function into this tensor
+    /// <summary>Applies to specified indexed function to all elements of the two tensors using the specified tensor as target.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The output tensor to fill.</param>
+    /// <param name="fn">A function that takes an index, the corresponding value from the first input and second input 
+    /// tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The first input tensor.</param>
+    /// <param name="b">The second input tensor.</param>
+    /// <seealso cref="mapi2``3"/>
     let FillMapIndexed2 (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         (backend trgt).MapIndexed2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=false)
 
-    /// maps all elements using the specified indexed function into a new tensor
+    /// <summary>Applies to specified indexed function to all elements of the two tensors.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="fn">A function that takes an index, the corresponding value from the first input and second input 
+    /// tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The first input tensor.</param>
+    /// <param name="b">The second input tensor.</param>
+    /// <returns>The output tensor.</returns>
+    /// <seealso cref="FillMapIndexed2``3"/><seealso cref="map2``3"/>
     let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         FillMapIndexed2 trgt fn a b
         trgt       
 
-    // TODO: change to Tensor folder function      
-    /// folds the function over the given axis, using this tensor as target 
+    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the computation.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The output tensor that will contain the final state values.</param>
+    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state value.</param>        
+    /// <param name="initial">The initial state value.</param>
+    /// <param name="axis">The axis to fold over.</param>
+    /// <param name="a">The source tensor.</param>
+    /// <seealso cref="foldAxis``2"/>
     let FillFoldAxis (trgt: Tensor<'T>) (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
         let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
         (backend trgt).FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, a=a, useThreads=false)        
 
-    // TODO: change to Tensor folder function
-    /// folds the function over the given axis
+    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the computation.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state value.</param>        
+    /// <param name="initial">The initial state value.</param>
+    /// <param name="axis">The axis to fold over.</param>
+    /// <param name="a">The source tensor.</param>
+    /// <returns>The output tensor containg the final states.</returns>
+    /// <seealso cref="FillFoldAxis``2"/>
     let foldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
         let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
         FillFoldAxis trgt fn initial axis a
         trgt
 
 
-    /// Multi-threaded operations of Tensor<'T>.
+    /// <summary>Multi-threaded operations for tensors stored on the host device.</summary>
+    /// <seealso cref="HostTensor"/>
     module Parallel = 
 
         /// Fills the tensor with the values returned by the function using multiple threads.
