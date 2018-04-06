@@ -342,7 +342,7 @@ module HostTensor =
         callGeneric<HDFFuncs, unit> "Write" [x.DataType] (hdf5, path, x)
 
     /// <summary>Reads a tensor from the specified HDF5 object path in an HDF5 file.</summary>
-    /// <typeparm name="'T">The type of the data. This must match the type of the data stored in the
+    /// <typeparam name="'T">The type of the data. This must match the type of the data stored in the
     /// HDF5 file.</typeparam>
     /// <param name="hdf5">The HDF5 file.</param>
     /// <param name="path">The HDF5 object path.</param>
@@ -394,18 +394,27 @@ module HostTensor =
         |> Seq.map conv<'T>
         |> ofSeqWithShape shp       
     
-    /// Fills the tensor with the values returned by the function.
+    /// <summary>Fills the tensor with the values returned by the function.</summary>
+    /// <param name="trgt">The target tensor to fill.</param>
+    /// <param name="fn">A function that returns the values to fill the tensor with.</param>
     let Fill (trgt: Tensor<'T>) (fn: unit -> 'T)  =
         (backend trgt).Fill (fn=fn, trgt=trgt, useThreads=false)
 
-    /// Fills the tensor with the values returned by the given sequence.
+    /// <summary>Fills the tensor with the values returned by the given sequence.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The target tensor to fill.</param>
+    /// <param name="data">The sequence of data to fill the tensor with.</param>    
     let FillSeq (trgt: Tensor<'T>) (data: 'T seq) =
         use enumerator = data.GetEnumerator()
         Fill trgt (fun () -> 
             if enumerator.MoveNext() then enumerator.Current
             else invalidArg "data" "Sequence ended before tensor of shape %A was filled." trgt.Shape)
 
-    /// maps all elements using the specified function into this tensor
+    /// <summary>Applies to specified function to all elements of the tensor.</summary>
+    /// <typeparam name="'T">The type of the data.</typeparam>
+    /// <param name="trgt">The output tensor to fill.</param>
+    /// <param name="fn">A function taking a value from the input tensor and returns the corresponding output value.</param>        
+    /// <param name="a">The source tensor.</param>
     let FillMap (trgt: Tensor<'T>) (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         (backend trgt).Map (fn=fn, trgt=trgt, a=a, useThreads=false)
