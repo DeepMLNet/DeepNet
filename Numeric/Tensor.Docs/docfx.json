@@ -3,9 +3,10 @@
     {
       "src": [
         {
-          "src": "../Tensor",
+          "src": "../",
           "files": [
-            "Tensor.fsproj"
+            "Tensor/Tensor.fsproj",
+            "Tensor.Algorithm/Tensor.Algorithm.fsproj"
           ]          
         }
       ],
