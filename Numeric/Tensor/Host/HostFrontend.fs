@@ -41,6 +41,9 @@ type private HDFFuncs =
 /// It further contains functions that only work with tensors stored in host memory.
 /// Calling these functions with tensors stored on other devices will result in an
 /// <see cref="System.InvalidOperationException"/>.</remarks>
+/// <example><code language="fsharp">
+/// let x = HostTensor.zeros [3L; 3L]  // x.Dev = HostTensor.Dev
+/// </code></example>
 /// <seealso cref="Tensor`1"/><seealso cref="HostTensor.Parallel"/>
 module HostTensor =
 
@@ -58,7 +61,7 @@ module HostTensor =
     /// <param name="trgt">The target tensor to fill.</param>
     /// <param name="fn">A function that takes the index of the element to fill and returns
     /// the corresponding value.</param>
-    /// <seealso cref="init``1"/>    
+    /// <seealso cref="init``1"/><seealso cref="HostTensor.Parallel.FillIndexed``1"/>      
     let FillIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'T) =
         (backend trgt).FillIndexed (fn=fn, trgt=trgt, useThreads=false)
 
@@ -66,7 +69,7 @@ module HostTensor =
     /// <param name="shape">The shape of the new tensor.</param>
     /// <param name="fn">A function that takes the index of the element to fill and returns
     /// the corresponding value.</param>
-    /// <seealso cref="FillIndexed``1"/>    
+    /// <seealso cref="FillIndexed``1"/><seealso cref="HostTensor.Parallel.init``1"/>  
     let init (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, Dev)
         FillIndexed x fn
@@ -399,6 +402,7 @@ module HostTensor =
     /// <summary>Fills the tensor with the values returned by the function.</summary>
     /// <param name="trgt">The target tensor to fill.</param>
     /// <param name="fn">A function that returns the values to fill the tensor with.</param>
+    /// <seealso cref="HostTensor.Parallel.Fill``1"/>
     let Fill (trgt: Tensor<'T>) (fn: unit -> 'T)  =
         (backend trgt).Fill (fn=fn, trgt=trgt, useThreads=false)
 
@@ -412,22 +416,26 @@ module HostTensor =
             if enumerator.MoveNext() then enumerator.Current
             else invalidArg "data" "Sequence ended before tensor of shape %A was filled." trgt.Shape)
 
-    /// <summary>Applies to specified function to all elements of the tensor using the specified tensor as target.</summary>
+    /// <summary>Applies to specified function to all elements of the tensor using the specified tensor as 
+    /// target.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="trgt">The output tensor to fill.</param>
-    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output value.</param>        
+    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output 
+    /// value.</param>        
     /// <param name="a">The input tensor.</param>
-    /// <seealso cref="map``2"/>
+    /// <seealso cref="map``2"/><seealso cref="HostTensor.Parallel.FillMap``2"/>
     let FillMap (trgt: Tensor<'T>) (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         (backend trgt).Map (fn=fn, trgt=trgt, a=a, useThreads=false)
 
     /// <summary>Applies to specified function to all elements of the tensor.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
-    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output value.</param>        
+    /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output 
+    /// value.</param>        
     /// <param name="a">The source tensor.</param>
     /// <returns>The output tensor.</returns>
     /// <seealso cref="FillMap``2"/><seealso cref="mapi``2"/><seealso cref="map2``3"/>
+    /// <seealso cref="HostTensor.Parallel.map``2"/>
     let map (fn: 'T -> 'R) (a: Tensor<'T>) =
         let trgt, a = Tensor.PrepareElemwise (a)
         FillMap trgt fn a
@@ -440,7 +448,7 @@ module HostTensor =
     /// <param name="fn">A function that takes an index and the corresponding value from the input tensor and returns 
     /// the corresponding output value.</param>        
     /// <param name="a">The input tensor.</param>
-    /// <seealso cref="mapi``2"/>
+    /// <seealso cref="mapi``2"/><seealso cref="HostTensor.Parallel.FillMapIndexed``2"/>
     let FillMapIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         (backend trgt).MapIndexed (fn=fn, trgt=trgt, a=a, useThreads=false)
@@ -451,20 +459,21 @@ module HostTensor =
     /// the corresponding output value.</param>        
     /// <param name="a">The source tensor.</param>
     /// <returns>The output tensor.</returns>
-    /// <seealso cref="FillMapIndexed``2"/><seealso cref="map``2"/>
+    /// <seealso cref="FillMapIndexed``2"/><seealso cref="map``2"/><seealso cref="HostTensor.Parallel.map``2"/>
     let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
         let trgt, a = Tensor.PrepareElemwise (a)
         FillMapIndexed trgt fn a
         trgt     
 
-    /// <summary>Applies to specified function to all elements of the two tensors using the specified tensor as target.</summary>
+    /// <summary>Applies to specified function to all elements of the two tensors using the specified tensor as 
+    /// target.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="trgt">The output tensor to fill.</param>
     /// <param name="fn">A function that takes a value from the first input tensor and a value from the second input 
     /// tensor and returns the corresponding output value.</param>        
     /// <param name="a">The first input tensor.</param>
     /// <param name="b">The second input tensor.</param>
-    /// <seealso cref="map2``3"/>
+    /// <seealso cref="map2``3"/><seealso cref="HostTensor.Parallel.FillMap2``3"/>
     let FillMap2 (trgt: Tensor<'T>) (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         (backend trgt).Map2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=false)
@@ -477,19 +486,21 @@ module HostTensor =
     /// <param name="b">The second input tensor.</param>
     /// <returns>The output tensor.</returns>
     /// <seealso cref="FillMap2``3"/><seealso cref="map``2"/><seealso cref="mapi2``3"/>
+    /// <seealso cref="HostTensor.Parallel.map2``3"/>
     let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         FillMap2 trgt fn a b
         trgt       
 
-    /// <summary>Applies to specified indexed function to all elements of the two tensors using the specified tensor as target.</summary>
+    /// <summary>Applies to specified indexed function to all elements of the two tensors using the specified tensor as 
+    /// target.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="trgt">The output tensor to fill.</param>
     /// <param name="fn">A function that takes an index, the corresponding value from the first input and second input 
     /// tensor and returns the corresponding output value.</param>        
     /// <param name="a">The first input tensor.</param>
     /// <param name="b">The second input tensor.</param>
-    /// <seealso cref="mapi2``3"/>
+    /// <seealso cref="mapi2``3"/><seealso cref="HostTensor.Parallel.FillMapIndexed2``3"/>
     let FillMapIndexed2 (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         (backend trgt).MapIndexed2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=false)
@@ -501,32 +512,36 @@ module HostTensor =
     /// <param name="a">The first input tensor.</param>
     /// <param name="b">The second input tensor.</param>
     /// <returns>The output tensor.</returns>
-    /// <seealso cref="FillMapIndexed2``3"/><seealso cref="map2``3"/>
+    /// <seealso cref="FillMapIndexed2``3"/><seealso cref="map2``3"/><seealso cref="HostTensor.Parallel.mapi2``3"/>
     let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
         FillMapIndexed2 trgt fn a b
         trgt       
 
-    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the computation.</summary>
+    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the 
+    /// computation.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="trgt">The output tensor that will contain the final state values.</param>
-    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state value.</param>        
+    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state 
+    /// value.</param>        
     /// <param name="initial">The initial state value.</param>
     /// <param name="axis">The axis to fold over.</param>
     /// <param name="a">The source tensor.</param>
-    /// <seealso cref="foldAxis``2"/>
+    /// <seealso cref="foldAxis``2"/><seealso cref="HostTensor.Parallel.FillFoldAxis``3"/>
     let FillFoldAxis (trgt: Tensor<'T>) (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
         let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
         (backend trgt).FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, a=a, useThreads=false)        
 
-    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the computation.</summary>
+    /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the 
+    /// computation.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
-    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state value.</param>        
+    /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new state 
+    /// value.</param>        
     /// <param name="initial">The initial state value.</param>
     /// <param name="axis">The axis to fold over.</param>
     /// <param name="a">The source tensor.</param>
     /// <returns>The output tensor containg the final states.</returns>
-    /// <seealso cref="FillFoldAxis``2"/>
+    /// <seealso cref="FillFoldAxis``2"/><seealso cref="HostTensor.Parallel.foldAxis``2"/>
     let foldAxis (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
         let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
         FillFoldAxis trgt fn initial axis a
@@ -537,71 +552,156 @@ module HostTensor =
     /// <seealso cref="HostTensor"/>
     module Parallel = 
 
-        /// Fills the tensor with the values returned by the function using multiple threads.
+        /// <summary>Fills the tensor with values returned by the specifed function using multiple threads.</summary>
+        /// <param name="trgt">The target tensor to fill.</param>
+        /// <param name="fn">A function that takes the index of the element to fill and returns
+        /// the corresponding value.</param>
+        /// <seealso cref="HostTensor.FillIndexed``1"/> 
         let FillIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'T) =
             (backend trgt).FillIndexed (fn=fn, trgt=trgt, useThreads=true)
 
-        /// Fills the tensor with the values returned by the function using multiple threads.
+        /// <summary>Fills the tensor with the values returned by the function using multiple threads.</summary>
+        /// <param name="trgt">The target tensor to fill.</param>
+        /// <param name="fn">A function that returns the values to fill the tensor with.</param>
+        /// <seealso cref="HostTensor.Fill``1"/>
         let Fill (trgt: Tensor<'T>) (fn: unit -> 'T)  =
             (backend trgt).Fill (fn=fn, trgt=trgt, useThreads=true)
 
-        /// maps all elements using the specified function into this tensor using multiple threads
+        /// <summary>Applies to specified function to all elements of the tensor using the specified tensor as target 
+        /// using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="trgt">The output tensor to fill.</param>
+        /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output 
+        /// value.</param>        
+        /// <param name="a">The input tensor.</param>
+        /// <seealso cref="HostTensor.FillMap``2"/>
         let FillMap (trgt: Tensor<'T>) (fn: 'TA -> 'T) (a: Tensor<'TA>) = 
             let a = Tensor.PrepareElemwiseSources (trgt, a)
             (backend trgt).Map (fn=fn, trgt=trgt, a=a, useThreads=false)
 
-        /// maps all elements using the specified indexed function into this tensor using multiple threads
+        /// <summary>Applies to specified indexed function to all elements of the tensor using the specified tensor as 
+        /// target using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="trgt">The output tensor to fill.</param>
+        /// <param name="fn">A function that takes an index and the corresponding value from the input tensor and returns 
+        /// the corresponding output value.</param>        
+        /// <param name="a">The input tensor.</param>
+        /// <seealso cref="HostTensor.FillMapIndexed``2"/>
         let FillMapIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'T) (a: Tensor<'TA>) = 
             let a = Tensor.PrepareElemwiseSources (trgt, a)
             (backend trgt).MapIndexed (fn=fn, trgt=trgt, a=a, useThreads=true)
 
-        /// maps all elements using the specified function into this tensor using multiple threads
+        /// <summary>Applies to specified function to all elements of the two tensors using the specified tensor as 
+        /// target using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="trgt">The output tensor to fill.</param>
+        /// <param name="fn">A function that takes a value from the first input tensor and a value from the second input 
+        /// tensor and returns the corresponding output value.</param>        
+        /// <param name="a">The first input tensor.</param>
+        /// <param name="b">The second input tensor.</param>
+        /// <seealso cref="HostTensor.FillMap2``3"/>
         let FillMap2 (trgt: Tensor<'T>) (fn: 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
             let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
             (backend trgt).Map2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=true)
 
-        /// maps all elements using the specified indexed function into this tensor using multiple threads
+        /// <summary>Applies to specified indexed function to all elements of the two tensors using the specified tensor 
+        /// as target using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="trgt">The output tensor to fill.</param>
+        /// <param name="fn">A function that takes an index, the corresponding value from the first input and second input 
+        /// tensor and returns the corresponding output value.</param>        
+        /// <param name="a">The first input tensor.</param>
+        /// <param name="b">The second input tensor.</param>
+        /// <seealso cref="HostTensor.FillMapIndexed2``3"/>
         let FillMapIndexed2 (trgt: Tensor<'T>) (fn: int64[] -> 'TA -> 'TB -> 'T) (a: Tensor<'TA>) (b: Tensor<'TB>) = 
             let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
             (backend trgt).MapIndexed2 (fn=fn, trgt=trgt, a=a, b=b, useThreads=true)
 
-        // TODO: change to Tensor folder function
-        /// folds the function over the given axis, using this tensor as target and multiple threads
+        /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through the 
+        /// computation using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="trgt">The output tensor that will contain the final state values.</param>
+        /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new 
+        /// state value.</param>        
+        /// <param name="initial">The initial state value.</param>
+        /// <param name="axis">The axis to fold over.</param>
+        /// <param name="a">The source tensor.</param>
+        /// <seealso cref="HostTensor.FillFoldAxis``3"/>
         let FillFoldAxis (trgt: Tensor<'T>) (fn: 'T -> 'TA -> 'T) (initial: Tensor<'T>) (axis: int) (a: Tensor<'TA>) =
             let a, initial = Tensor.PrepareAxisReduceSources (trgt, axis, a, Some initial)
             (backend trgt).FoldLastAxis (fn=fn, initial=initial.Value, trgt=trgt, a=a, useThreads=true) 
 
-        /// Creates a new tensor with the values returned by the function.
-        let init<'T> (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+        /// <summary>Creates a new tensor with values returned by the specified function using multiple threads.</summary>
+        /// <param name="shape">The shape of the new tensor.</param>
+        /// <param name="fn">A function that takes the index of the element to fill and returns
+        /// the corresponding value.</param>
+        /// <seealso cref="HostTensor.FillIndexed``1"/>      
+        let init (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
             let x = Tensor<'T> (shape, Dev)
             FillIndexed x fn
             x          
 
-        /// Maps all elements using the specified function into a new tensor.
+        /// <summary>Applies to specified function to all elements of the tensor using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="fn">A function that takes a value from the input tensor and returns the corresponding output 
+        /// value.</param>        
+        /// <param name="a">The source tensor.</param>
+        /// <returns>The output tensor.</returns>
+        /// <seealso cref="HostTensor.map``2"/>
         let map (fn: 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
             FillMap trgt fn a
             trgt       
 
-        /// Maps all elements using the specified indexed function into a new tensor.
+        /// <summary>Applies to specified indexed function to all elements of the tensor using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="fn">A function that takes an index and the corresponding value from the input tensor and returns 
+        /// the corresponding output value.</param>        
+        /// <param name="a">The source tensor.</param>
+        /// <returns>The output tensor.</returns>
+        /// <seealso cref="HostTensor.map``2"/>
         let mapi (fn: int64[] -> 'T -> 'R) (a: Tensor<'T>) =
             let trgt, a = Tensor.PrepareElemwise (a)
             FillMapIndexed trgt fn a
             trgt      
 
-        /// Maps all elements using the specified function into a new tensor.
+        /// <summary>Applies to specified function to all elements of the two tensors using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="fn">A function that takes a value from the first input tensor and a value from the second input 
+        /// tensor and returns the corresponding output value.</param>        
+        /// <param name="a">The first input tensor.</param>
+        /// <param name="b">The second input tensor.</param>
+        /// <returns>The output tensor.</returns>
+        /// <seealso cref="HostTensor.map2``3"/>
         let map2 (fn: 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
             FillMap2 trgt fn a b
             trgt           
 
-        /// Maps all elements using the specified indexed function into a new tensor.
+        /// <summary>Applies to specified indexed function to all elements of the two tensors using multiple 
+        /// threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="fn">A function that takes an index, the corresponding value from the first input and second 
+        /// input tensor and returns the corresponding output value.</param>        
+        /// <param name="a">The first input tensor.</param>
+        /// <param name="b">The second input tensor.</param>
+        /// <returns>The output tensor.</returns>
+        /// <seealso cref="HostTensor.mapi2``3"/>
         let mapi2 (fn: int64[] -> 'TA -> 'TB -> 'R) (a: Tensor<'TA>) (b: Tensor<'TB>) =
             let trgt, a, b = Tensor.PrepareElemwise (a, b)
             FillMapIndexed2 trgt fn a b
             trgt            
 
-        /// Folds the function over the given axis.
+        /// <summary>Applies to specified function to all elements of the tensor, threading an accumulator through 
+        /// the computation using multiple threads.</summary>
+        /// <typeparam name="'T">The type of the data.</typeparam>
+        /// <param name="fn">A function that takes a state value and a value from the input tensor and returns a new 
+        /// state value.</param>        
+        /// <param name="initial">The initial state value.</param>
+        /// <param name="axis">The axis to fold over.</param>
+        /// <param name="a">The source tensor.</param>
+        /// <returns>The output tensor containg the final states.</returns>
+        /// <seealso cref="HostTensor.foldAxis``2"/>
         let foldAxis (fn: 'T -> 'TA -> 'T) (initial: 'T) (axis: int) (a: Tensor<'TA>) =
             let trgt, a = Tensor.PrepareAxisReduceTarget (axis, a)
             FillFoldAxis trgt fn initial axis a
