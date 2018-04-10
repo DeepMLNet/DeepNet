@@ -18,13 +18,15 @@ module Operators =
                  (fun x -> unbox(mi.Invoke(null, [|box x|])))
         static member Result : ('T -> 'T) = result
 
-    /// Sign of value returned using same type.
-    /// In contrast, the F# builtin function sign returns an int.
-    /// Calls static method Sgn on non-primitive types.
+    /// <summary>Sign of value returned using same type as input.</summary>
+    /// <typeparam name="'T">Type of input and output values.</typeparam>
+    /// <param name="x">Input value.</param>
+    /// <returns>If <c>x&lt;0</c>, then <c>-1</c>. If <c>x=0</c>, then <c>0</c>. If <c>x&gt;0</c>, then <c>1</c>.</returns> 
+    /// <remarks>
+    /// <para>In contrast, the F# builtin function <c>sign</c> returns an <c>int</c> regardless of the input data type.</para>
+    /// <para>This calls static method Sgn on non-primitive types.</para>
+    /// </remarks>
     [<CompiledName("Sgn")>]
-    let sgn x = 
-        SgnDynamicImplTable<_>.Result x 
-        
-
-
+    let sgn (x: 'T) = 
+        SgnDynamicImplTable<_>.Result x        
 

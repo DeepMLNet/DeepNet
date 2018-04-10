@@ -93,7 +93,15 @@ type private HDF5Mode =
     | HDF5Overwrite
 
 
-/// A HDF5 file.
+/// <summary>An object representing an HDF5 file.</summary>
+/// <remarks>
+/// <p>HDF5 is an open, cross-plattform, industry-standard file format for data exchange. 
+/// More information is available at <see href="https://www.hdfgroup.org"/>.</p>
+/// <p>This object represents an HDF5 file. Use <see cref="OpenRead"/> and <see cref="OpenWrite"/> to open an HDF5 file 
+/// for reading or writing.</p>
+/// <p>This object does not aim to expose all functions provided by the HDF5 standard. Instead, it focuses on providing
+/// a simple interface for reading and writing arrays as well as attributes.</p>
+/// </remarks>
 type HDF5 private (path: string, mode: HDF5Mode) = 
         
     let mutable disposed = false
@@ -122,7 +130,7 @@ type HDF5 private (path: string, mode: HDF5Mode) =
     let checkDisposed () =
         if disposed then raise (ObjectDisposedException("HDF5", "HDF5 file was previously disposed"))
 
-    /// closes the HDF5 file
+    /// <summary>Closes the HDF5 file.</summary>
     member this.Dispose () = 
         if not disposed then             
             if fileHnd >= 0L then
@@ -132,16 +140,22 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             disposed <- true
 
     interface IDisposable with
+        /// <summary>Closes the HDF5 file.</summary>
         member this.Dispose () = this.Dispose ()
 
+    /// <summary>Closes the HDF5 file.</summary>
     override this.Finalize () =
         this.Dispose ()
                     
-    /// opens the specified HDF5 file for reading
+    /// <summary>Opens the specified HDF5 file for reading.</summary>
+    /// <param name="path">The path to the HDF5 file.</param>
+    /// <returns>An HDF5 object representing the opened file.</returns>
     static member OpenRead  path = new HDF5 (path, HDF5Read)
 
-    /// Opens the specified HDF5 file for writing.
-    /// If the file already exists it will be overwritten.
+    /// <summary>Opens the specified HDF5 file for writing.</summary>
+    /// <param name="path">The path to the HDF5 file.</param>
+    /// <returns>An HDF5 object representing the opened file.</returns>
+    /// <remarks>If the file already exists, it will be overwritten.</remarks>
     static member OpenWrite path = new HDF5 (path, HDF5Overwrite)
 
     /// Splits a HDF5 path string into a list.
@@ -156,7 +170,9 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         |> List.filter (fun d -> String.length d > 0)
         |> String.concat "/" 
             
-    /// Checks whether an object (array or group) with the given name exists.
+    /// <summary>Checks whether an object (array or group) with the given name exists.</summary>
+    /// <param name="name">HDF5 path to check.</param>
+    /// <returns><c>true</c> if the path exists; <c>false</c> otherwise.</returns>
     member this.Exists (name: string) =
         checkDisposed ()
         let rec exists prefix dirs =
@@ -169,8 +185,10 @@ type HDF5 private (path: string, mode: HDF5Mode) =
                     exists nextPrefix dirs
         exists [] (HDF5.SplitPath name) 
 
-    /// Creates the given group path. All necessary parent groups are created automatically.
-    /// If the group with the given path already exists, nothing happens.
+    /// <summary>Creates the given group path.</summary>
+    /// <param name="path">HDF5 group path to create.</param>
+    /// <remarks>All necessary parent groups are created automatically.
+    /// If the group with the given path already exists, nothing happens.</remarks>
     member this.CreateGroups (path: string) =
         checkDisposed ()
         let rec create prefix dirs =
@@ -197,7 +215,13 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             |> HDF5.CombinePath
             |> this.CreateGroups
 
-    /// Write data array using specified name and shape.
+    /// <summary>Write data array to HDF5 file.</summary>
+    /// <typeparam name="'T">Type of the data.</typeparam>
+    /// <param name="name">HDF5 path to write to.</param>
+    /// <param name="data">Data array to write.</param>
+    /// <param name="shape">Array shape to use.</param>
+    /// <remarks>All HDF5 groups are automatically created as necessary.</remarks>
+    /// <seealso cref="Read``1"/><seealso cref="HostTensor.write"/>
     member this.Write (name: string, data: 'T array, shape: int64 list) =
         checkDisposed ()
         if mode <> HDF5Overwrite then
@@ -219,8 +243,15 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         H5S.close shapeHnd |> check |> ignore
         H5T.close typeHnd |> check |> ignore
 
-    /// Read data array using specified name. Returns tuple of data and shape.
-    member this.Read<'T> (name: string) =            
+    /// <summary>Read data array from HDF5 file.</summary>
+    /// <typeparam name="'T">Type of the data.</typeparam>
+    /// <param name="name">HDF5 path to read from.</param>
+    /// <returns>A tuple of <c>(data, shape)</c> where <c>data</c> is the read data array and <c>shape</c> is the 
+    /// corresponding shape.</returns>
+    /// <remarks>The type <c>'T</c> must match the data type stored in the HDF5 file, otherwise an exception is raised.
+    /// </remarks>
+    /// <seealso cref="Write``1"/><seealso cref="GetDataType"/><seealso cref="HostTensor.read``1"/>
+    member this.Read<'T> (name: string) = 
         checkDisposed ()
         if not (this.Exists name) then
             invalidOp "HDF5 dataset %s does not exist in file %s." name path
@@ -250,7 +281,9 @@ type HDF5 private (path: string, mode: HDF5Mode) =
 
         data, shape |> intShape
 
-    /// Returns data type of data array using specified name.
+    /// <summary>Get data type of array in HDF5 file.</summary>
+    /// <param name="name">HDF5 path to read from.</param>
+    /// <returns>Data type.</returns>    
     member this.GetDataType (name: string) =
         checkDisposed ()
         if not (this.Exists name) then
@@ -262,7 +295,12 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         H5T.close typeHnd |> check |> ignore
         netType
 
-    /// Sets the HDF5 attribute with the specified `atrName` on object specified by `name`.
+    /// <summary>Set attribute value on an HDF5 object.</summary>
+    /// <typeparam name="'T">Type of the attribute value.</typeparam>
+    /// <param name="name">HDF5 path to operate on.</param>
+    /// <param name="atrName">Name of the attribute.</param>
+    /// <param name="value">Value to set attribute to.</param>    
+    /// <seealso cref="GetAttribute``1"/><seealso cref="SetRecord``1"/>    
     member this.SetAttribute (name: string, atrName: string, value: 'T) =
         checkDisposed ()
         if not (this.Exists name) then
@@ -298,7 +336,12 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         H5S.close shapeHnd |> check |> ignore
         H5T.close typeHnd |> check |> ignore
 
-    /// Gets the HDF5 attribute with the specified `name` on object specified by `path`.
+    /// <summary>Get attribute value on an HDF5 object.</summary>
+    /// <typeparam name="'T">Type of the attribute value.</typeparam>
+    /// <param name="name">HDF5 path to operate on.</param>
+    /// <param name="atrName">Name of the attribute.</param>
+    /// <returns>Value of the attribute.</returns>    
+    /// <seealso cref="SetAttribute``1"/><seealso cref="GetRecord``1"/>
     member this.GetAttribute (name: string, atrName: string) : 'T =
         checkDisposed ()
         if not (this.Exists name) then
@@ -352,7 +395,15 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         else
             data.GetValue(0) :?> 'T
 
-    /// Attaches the specified record as attributes to the object with `name`.
+    /// <summary>Set attribute values on an HDF5 object using the provided record.</summary>
+    /// <typeparam name="'R">Type of the F# record. It must contain only field of primitive data types.</typeparam>
+    /// <param name="name">HDF5 path to operate on.</param>
+    /// <param name="record">Record containing the attribute values.</param>    
+    /// <remarks>
+    /// <p>The record must consists only of fields of primitive data types (int, float, string, etc.).</p>
+    /// <p>Each record field is stored as an HDF5 attribute using the same name.</p>
+    /// </remarks>
+    /// <seealso cref="GetRecord``1"/><seealso cref="SetAttribute``1"/>
     member this.SetRecord (name: string, record: 'R) =
         if not (FSharpType.IsRecord typeof<'R>) then
             invalidArg "record" "Must specify a value of record type."
@@ -361,7 +412,15 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             callGenericInst<HDF5, unit> this "SetAttribute" [fi.PropertyType]
                 (name, fi.Name, value)
 
-    /// Reads the record attached as attributes to the object with `name`.
+    /// <summary>Get attribute values on an HDF5 object and returns them as a record.</summary>
+    /// <typeparam name="'R">Type of the F# record. It must contain only field of primitive data types.</typeparam>
+    /// <param name="name">HDF5 path to operate on.</param>
+    /// <returns>Record containing the attribute values.</returns>    
+    /// <remarks>
+    /// <p>The record must consists only of fields of primitive data types (int, float, string, etc.).</p>
+    /// <p>Each record field is read from an HDF5 attribute using the same name.</p>
+    /// </remarks>
+    /// <seealso cref="SetRecord``1"/><seealso cref="GetAttribute``1"/>
     member this.GetRecord (name: string) : 'R =
         if not (FSharpType.IsRecord typeof<'R>) then
             invalidArg "return" "Must use a record as return type."
@@ -372,10 +431,5 @@ type HDF5 private (path: string, mode: HDF5Mode) =
                     (name, fi.Name)
             )
         FSharpValue.MakeRecord (typeof<'R>, values) :?> 'R
-
-
-            
-
-            
-
+              
 
