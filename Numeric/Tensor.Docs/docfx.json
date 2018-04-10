@@ -55,7 +55,7 @@
     "fileMetadataFiles": [],
     "template": [
       "default",
-      "../../../docfx_plugins/memberpage.2.31.0/content"
+      "MemberLevelManagedReference"
     ],
     "postProcessors": [],
     "noLangKeyword": false,
