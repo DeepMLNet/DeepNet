@@ -256,6 +256,5 @@ ModelManifest.xml
 .idea
 
 
-.vscode
 bin/
 obj/

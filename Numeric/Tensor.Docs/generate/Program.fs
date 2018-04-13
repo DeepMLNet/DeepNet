@@ -74,11 +74,14 @@ let sections = [
 
 [<EntryPoint>]
 let main argv =
+    use apiFile = new StreamReader "../api/Tensor.Tensor-1.yml"
+    use outFile = new StreamWriter "../articles/Tensor.md"
+
+    let out fmt = Printf.kprintf (fun s -> outFile.WriteLine s) fmt
+
     let ys = YamlStream()
-    use file = new StreamReader("../api/Tensor.Tensor-1.yml")
-    ys.Load(file)
-    let mapping = ys.Documents.[0].RootNode  :?> YamlMappingNode
-    
+    ys.Load(apiFile)
+    let mapping = ys.Documents.[0].RootNode  :?> YamlMappingNode   
     let entries = seq {
         for entry in mapping.Children.[YamlScalarNode "items"] :?> YamlSequenceNode do
             let entry = entry :?> YamlMappingNode
@@ -97,24 +100,28 @@ let main argv =
     //    printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
 
     let findEntry (name: string) =
-        entries |> Seq.find (fun entry -> entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
+        entries |> Seq.tryFind (fun entry -> entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
 
-    printfn "# Tensor"
-    printfn "This page lists all tensor functions by category."
-    printfn "For an alphabetical reference see [Tensor`1](Tensor)."
-    printfn ""
+    out "# Tensor"
+    out "This page lists all tensor functions by category."
+    out "For an alphabetical reference see [Tensor<'T>](Tensor`1)."
+    out ""
     
     for title, descr, members in sections do
-        printfn "## %s" title
-        printfn "%s" descr
-        printfn ""
-        printfn "Function | Description"
-        printfn "-------- | -----------"
+        out "## %s" title
+        out "%s" descr
+        out ""
+        out "Function | Description"
+        out "-------- | -----------"
+        // TODO: linking.
+        // For this we need to include the file into DocFX and see how it is rendered.
+        // For that make it write to output file.
         for name in members do
-            let ent = findEntry name
-            printfn "%s | %s" ent.Name ent.Summary
-        printfn ""
-        printfn ""
+            match findEntry name with
+            | Some ent -> out "%s | %s" ent.Name ent.Summary
+            | None -> out "%s | NOT FOUND" name
+        out ""
+        out ""
 
 
 

@@ -1,8 +1,11 @@
 TODO:
 
 - TOC linking
-- fix broken links
-- document HostTensor and CudaTensor
+- Yes, we had this plan...
+- Is it still important?
+- Yes, it is.
+- So, how to go forward on it?
+- Plan was to use a generator to make the initial TOC
 
 
 
