@@ -27,7 +27,8 @@ type Member = {
 let sections = [
     "Operators",
     "These unary or binary operators can be applied to tensors.", [
-        "( ~- )"; "( + )"; "( - )"; "( * )"; "( / )"; "( % )"; "( .* )"]
+        "( ~- )/op_UnaryNegation"; "( + )/op_Addition"; "( - )/op_Subtraction"; "( * )/op_Multiply"; 
+        "( / )/op_Division"; "( % )/op_Modulus"; "( .* )/op_DotMultiply"]
     "Elementwise functions", 
     "These mathematical functions are applied element-wise to each element of the tensor.", [
         "Abs"; "Acos"; "Asin"; "Atan"; "Ceiling"; "Cos"; "Cosh"; "Exp"; "Floor"; "Log"; "Log10"; 
@@ -43,13 +44,16 @@ let sections = [
     "Data type functions", "", [
         "convert"; "dataType"]
     "Logical functions", "", [
-        "( ~~~~ )"; "( &&&& )"; "( |||| )"; "( ^^^^ )";
+        "( ~~~~ )/op_TwiddleTwiddleTwiddleTwiddle"; "( &&&& )/op_AmpAmpAmpAmp"; 
+        "( \\|\\|\\|\\| )/op_BarBarBarBar"; "( ^^^^ )/op_HatHatHatHat";
         "all"; "allAxis"; "allElems"; "allTensor"; "any"; "anyAxis"; "anyTensor"; "allIdx"; 
         "allIdxOfDim"; "ifThenElse"]
     "Index functions", "", [
         "find"; "findAxis"; "gather"; "range"; "scatter"; "tryFind"; "trueIdx"]
     "Comparison functions", "", [
-        "( ==== )"; "( <<<< )"; "( <<== )"; "( >>>> )"; "( >>== )";
+        "( ==== )/op_EqualsEqualsEqualsEquals"; "( <<<< )/op_LessLessLessLess"; 
+        "( <<== )/op_LessLessEqualsEquals"; "( >>>> )/op_GreaterGreaterGreaterGreater"; 
+        "( >>== )/op_GreaterGreaterEqualsEquals";
         "almostEqual"; "isClose"; "isFinite"; "maxElemwise"; "minElemwise"; "allFinite"]
     "Creation functions", "", [
         "arange"; "concat"; "copy"; "Copy"; "counting"; "empty"; "falses"; "identity"; 
@@ -75,7 +79,7 @@ let sections = [
 
 
 [<EntryPoint>]
-let main argv =
+let main _ =
     use apiFile = new StreamReader "../api/Tensor.Tensor-1.yml"
     use outFile = new StreamWriter "../articles/Tensor.md"
 
@@ -98,8 +102,8 @@ let main argv =
                 yield {Signature=signature; Name=name; Summary=summary}
     }
 
-    for entry in entries do
-        printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
+    //for entry in entries do
+    //    printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
 
     let findEntry (name: string) =
         entries |> Seq.tryFind (fun entry -> entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
@@ -116,13 +120,12 @@ let main argv =
         out "Function | Description"
         out "-------- | -----------"
         for name in members do
+            let dispName, name = 
+                match name.LastIndexOf "/" with
+                | -1 -> name, name
+                | p -> name.[..p-1], name.[p+1..]
             match findEntry name with
-            | Some ent -> 
-                if ent.Name = "( |||| )" then
-                    let link = @"<a href=""../api/Tensor.Tensor-1.%28------%29_1.html"">( \|\|\|\| )</a>"
-                    out "%s | %s" link ent.Summary
-                else
-                    out "[%s](xref:Tensor.Tensor`1.%s*) | %s" ent.Name ent.Name ent.Summary
+            | Some ent -> out "[%s](xref:Tensor.Tensor`1.%s*) | %s" dispName ent.Name ent.Summary
             | None -> out "%s | NOT FOUND" name
         out ""
         out ""

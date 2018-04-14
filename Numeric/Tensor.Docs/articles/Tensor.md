@@ -7,13 +7,13 @@ These unary or binary operators can be applied to tensors.
 
 Function | Description
 -------- | -----------
-[( ~- )](xref:Tensor.Tensor`1.( ~- )*) | Element-wise negation.
-[( + )](xref:Tensor.Tensor`1.( + )*) | Element-wise addition.
-[( - )](xref:Tensor.Tensor`1.( - )*) | Element-wise substraction.
-[( * )](xref:Tensor.Tensor`1.( * )*) | Element-wise multiplication.
-[( / )](xref:Tensor.Tensor`1.( / )*) | Element-wise division.
-[( % )](xref:Tensor.Tensor`1.( % )*) | Element-wise remainder of division.
-[( .* )](xref:Tensor.Tensor`1.( .* )*) | Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.
+[( ~- )](xref:Tensor.Tensor`1.op_UnaryNegation*) | Element-wise negation.
+[( + )](xref:Tensor.Tensor`1.op_Addition*) | Element-wise addition.
+[( - )](xref:Tensor.Tensor`1.op_Subtraction*) | Element-wise substraction.
+[( * )](xref:Tensor.Tensor`1.op_Multiply*) | Element-wise multiplication.
+[( / )](xref:Tensor.Tensor`1.op_Division*) | Element-wise division.
+[( % )](xref:Tensor.Tensor`1.op_Modulus*) | Element-wise remainder of division.
+[( .* )](xref:Tensor.Tensor`1.op_DotMultiply*) | Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.
 
 
 ## Elementwise functions
@@ -93,10 +93,10 @@ Function | Description
 
 Function | Description
 -------- | -----------
-[( ~~~~ )](xref:Tensor.Tensor`1.( ~~~~ )*) | Element-wise logical negation.
-[( &&&& )](xref:Tensor.Tensor`1.( &&&& )*) | Element-wise loigcal and.
-<a href="../api/Tensor.Tensor-1.%28------%29_1.html">( \|\|\|\| )</a> | Element-wise loigcal or.
-[( ^^^^ )](xref:Tensor.Tensor`1.( ^^^^ )*) | Element-wise loigcal xor.
+[( ~~~~ )](xref:Tensor.Tensor`1.op_TwiddleTwiddleTwiddleTwiddle*) | Element-wise logical negation.
+[( &&&& )](xref:Tensor.Tensor`1.op_AmpAmpAmpAmp*) | Element-wise loigcal and.
+[( \|\|\|\| )](xref:Tensor.Tensor`1.op_BarBarBarBar*) | Element-wise loigcal or.
+[( ^^^^ )](xref:Tensor.Tensor`1.op_HatHatHatHat*) | Element-wise loigcal xor.
 [all](xref:Tensor.Tensor`1.all*) | Checks if all elements of the tensor are true.
 [allAxis](xref:Tensor.Tensor`1.allAxis*) | Checks if all elements along the specified axis are true.
 [allElems](xref:Tensor.Tensor`1.allElems*) | Gets a sequence of all all elements within the tensor.
@@ -128,11 +128,11 @@ Function | Description
 
 Function | Description
 -------- | -----------
-[( ==== )](xref:Tensor.Tensor`1.( ==== )*) | Element-wise equality test.
-[( <<<< )](xref:Tensor.Tensor`1.( <<<< )*) | Element-wise less-than test.
-[( <<== )](xref:Tensor.Tensor`1.( <<== )*) | Element-wise less-than-or-equal test.
-[( >>>> )](xref:Tensor.Tensor`1.( >>>> )*) | Element-wise greater-than test.
-[( >>== )](xref:Tensor.Tensor`1.( >>== )*) | Element-wise greater-than-or-equal test.
+[( ==== )](xref:Tensor.Tensor`1.op_EqualsEqualsEqualsEquals*) | Element-wise equality test.
+[( <<<< )](xref:Tensor.Tensor`1.op_LessLessLessLess*) | Element-wise less-than test.
+[( <<== )](xref:Tensor.Tensor`1.op_LessLessEqualsEquals*) | Element-wise less-than-or-equal test.
+[( >>>> )](xref:Tensor.Tensor`1.op_GreaterGreaterGreaterGreater*) | Element-wise greater-than test.
+[( >>== )](xref:Tensor.Tensor`1.op_GreaterGreaterEqualsEquals*) | Element-wise greater-than-or-equal test.
 [almostEqual](xref:Tensor.Tensor`1.almostEqual*) | Checks if two tensors have the same (within machine precision) values in all elements.
 [isClose](xref:Tensor.Tensor`1.isClose*) | Element-wise check if two tensors have same (within machine precision) values.
 [isFinite](xref:Tensor.Tensor`1.isFinite*) | Element-wise finity check (not -Inf, Inf or NaN).
@@ -149,7 +149,7 @@ Function | Description
 [arange](xref:Tensor.Tensor`1.arange*) | Creates a new vector filled with equaly spaced values using a specifed increment.
 [concat](xref:Tensor.Tensor`1.concat*) | Concatenates tensors along an axis.
 [copy](xref:Tensor.Tensor`1.copy*) | Returns a copy of the tensor.
-[copy](xref:Tensor.Tensor`1.copy*) | Returns a copy of the tensor.
+[Copy](xref:Tensor.Tensor`1.copy*) | Returns a copy of the tensor.
 [counting](xref:Tensor.Tensor`1.counting*) | Creates a new vector filled with the integers from zero to the specified maximum.
 [empty](xref:Tensor.Tensor`1.empty*) | Creates a new, empty tensor with the given number of dimensions.
 [falses](xref:Tensor.Tensor`1.falses*) | Creates a new boolean tensor filled with falses.
