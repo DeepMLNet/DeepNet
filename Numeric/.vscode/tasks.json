@@ -4,6 +4,18 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Tensor",
+            "type": "shell",
+            "command": "dotnet build Tensor.sln",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "Tensor.Docs",
             "type": "shell",
             "command": "../../docfx/src/docfx/bin/Release/net461/docfx.exe Tensor.Docs/docfx.json",
@@ -14,6 +26,6 @@
             "type": "shell",
             "command": "cd Tensor.Docs/generate ; dotnet run ; cd ../..; ../../docfx/src/docfx/bin/Release/net461/docfx.exe Tensor.Docs/docfx.json",
             "problemMatcher": []
-        }        
+        }
     ]
 }
