@@ -25,33 +25,35 @@ type Member = {
 
 
 let sections = [
+    "Operators",
+    "These unary or binary operators can be applied to tensors.", [
+        "( ~- )"; "( + )"; "( - )"; "( * )"; "( / )"; "( % )"; "( .* )"]
     "Elementwise functions", 
     "These mathematical functions are applied element-wise to each element of the tensor.", [
         "Abs"; "Acos"; "Asin"; "Atan"; "Ceiling"; "Cos"; "Cosh"; "Exp"; "Floor"; "Log"; "Log10"; 
         "Pow"; "Round"; "Sgn"; "Sin"; "Sinh"; "Sqrt"; "Tan"; "Tanh"; "Truncate"]
-    
     "Shape functions", 
     "The following functions are for working with the shape and memory layout of a tensor.", [
         "atLeast1D"; "atLeast2D"; "atLeast3D"; "atLeastND"; "broadcastDim"; "broadcastTo"; 
-        "broadcastToSame"; "broadcastToSameInDims"; "canReshapeView"; "CheckAxis"; "cutLeft"; "cutRight"; 
-        "flatten"; "insertAxis"; "isBroadcasted"; "isColumnMajor"; "isRowMajor"; "layout"; "nDims"; 
-        "nElems"; "offset"; "padLeft"; "padRight"; "padToSame"; "padToSame"; "padToSame"; "permuteAxes"; 
-        "reshape"; "reshapeView"; "reverseAxis"; "relayout"; "shape"; "stride"; "swapDim"; "transpose"; 
+        "broadcastToSame"; "broadcastToSameInDims"; "CheckAxis"; "cutLeft"; "cutRight"; 
+        "flatten"; "insertAxis"; "isBroadcasted"; "layout"; "nDims"; 
+        "nElems"; "padLeft"; "padRight"; "padToSame"; "permuteAxes"; 
+        "reshape"; "reshapeView"; "reverseAxis"; "relayout"; "shape"; "swapDim"; "transpose"; 
         "tryReshapeView"]
     "Data type functions", "", [
-        "bool"; "byte"; "convert"; "double"; "float"; "float32"; "int"; "int16"; "int32"; "int64"; 
-        "nativeint"; "sbyte"; "single"; "uint16"; "uint32"; "uint64"; "dataType"]
+        "convert"; "dataType"]
     "Logical functions", "", [
+        "( ~~~~ )"; "( &&&& )"; "( |||| )"; "( ^^^^ )";
         "all"; "allAxis"; "allElems"; "allTensor"; "any"; "anyAxis"; "anyTensor"; "allIdx"; 
         "allIdxOfDim"; "ifThenElse"]
     "Index functions", "", [
         "find"; "findAxis"; "gather"; "range"; "scatter"; "tryFind"; "trueIdx"]
     "Comparison functions", "", [
-        "almostEqual"; "almostEqualWithTol"; "isClose"; "isCloseWithTol"; "isFinite"; 
-        "maxElemwise"; "minElemwise"; "allFinite"]
+        "( ==== )"; "( <<<< )"; "( <<== )"; "( >>>> )"; "( >>== )";
+        "almostEqual"; "isClose"; "isFinite"; "maxElemwise"; "minElemwise"; "allFinite"]
     "Creation functions", "", [
         "arange"; "concat"; "copy"; "Copy"; "counting"; "empty"; "falses"; "identity"; 
-        "diagMat"; "diagMatAxis"; "NewOfType"; "ofBlocks"; "ones"; "onesLike"; "init"; 
+        "diagMat"; "diagMatAxis"; "NewOfType"; "ofBlocks"; "ones"; "onesLike";  
         "linspace"; "replicate"; "scalar"; "scalarLike"; "trues"; "zeros"; "zerosLike"]
     "Reduction functions", "", [
         "argMax"; "argMaxAxis"; "argMin"; "argMinAxis"; "countTrue"; "countTrueAxis";
@@ -65,8 +67,8 @@ let sections = [
         "dev"; "transfer"; "TransferFrom"]
     "Tensor operations", "", [
         "diag"; "diagAxis"; "diff"; "diffAxis"; "dot"; "tensorProduct"]
-    "Functional functions", "", [
-        "foldAxis"; "map"; "map2"; "mapi"; "mapi2"]
+//    "Functional functions", "", [
+//        "foldAxis"; "map"; "map2"; "mapi"; "mapi2"]
     "Element access functions", "", [
         "get"; "set"; "value"]
 ]
@@ -90,21 +92,21 @@ let main argv =
                 let summary = (entry.Children.[YamlScalarNode "summary"] :?> YamlScalarNode).Value
                 let summary = summary.Replace("\n", " ").Trim()
                 let name = 
-                    match signature.IndexOf '(' with
+                    match signature.LastIndexOf '(' with
                     | p when p >= 0 -> signature.[0 .. p-1]
                     | _ -> signature
                 yield {Signature=signature; Name=name; Summary=summary}
     }
 
-    //for entry in entries do
-    //    printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
+    for entry in entries do
+        printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
 
     let findEntry (name: string) =
         entries |> Seq.tryFind (fun entry -> entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
 
     out "# Tensor"
     out "This page lists all tensor functions by category."
-    out "For an alphabetical reference see [Tensor<'T>](Tensor`1)."
+    out "For an alphabetical reference see [Tensor<'T>](xref:Tensor.Tensor`1)."
     out ""
     
     for title, descr, members in sections do
@@ -113,12 +115,14 @@ let main argv =
         out ""
         out "Function | Description"
         out "-------- | -----------"
-        // TODO: linking.
-        // For this we need to include the file into DocFX and see how it is rendered.
-        // For that make it write to output file.
         for name in members do
             match findEntry name with
-            | Some ent -> out "%s | %s" ent.Name ent.Summary
+            | Some ent -> 
+                if ent.Name = "( |||| )" then
+                    let link = @"<a href=""../api/Tensor.Tensor-1.%28------%29_1.html"">( \|\|\|\| )</a>"
+                    out "%s | %s" link ent.Summary
+                else
+                    out "[%s](xref:Tensor.Tensor`1.%s*) | %s" ent.Name ent.Name ent.Summary
             | None -> out "%s | NOT FOUND" name
         out ""
         out ""
