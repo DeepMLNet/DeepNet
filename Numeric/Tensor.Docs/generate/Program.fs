@@ -144,7 +144,7 @@ let main _ =
     use outFile = new StreamWriter "../articles/Tensor.md"
     let out fmt = Printf.kprintf (fun s -> outFile.WriteLine s) fmt
 
-    out "# Tensor"
+    out "# Tensor at a glance"
     out "This page provides an overview of most commonly used tensor functions by category."
     out ""
     out "For a complete, alphabetical reference of all tensor functions see [Tensor<'T>](xref:Tensor.Tensor`1) \

@@ -20,7 +20,7 @@ The following system requirements must be met.
 ## Installation
 
 The library is provided as a NuGet package.
-Since we have made modifications (porting to .NET core) to libraries we depend on and these changes have not yet been merged upstream, a [MyGet](https://myget.org/) feed is currently used to deliever the library and its dependencies.
+Since we have made modifications (porting to .NET core) to our dependencies and these changes have not yet been merged upstream, a [MyGet](https://myget.org/) feed is currently used to deliever the library and its modified dependencies.
 Once all necessary modifications have been merged upstream, the Tensor library will be delivered via standard [NuGet](https://nuget.org).
 
 The library is deliverd in two NuGet packages.
@@ -29,7 +29,8 @@ Additional algorithms and data exchange methods are provided in the [Tensor.Algo
 
 The packages can be installed into your project by performing the following steps.
 
-1. Add the line ```<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json"/>``` to the `activePackageSource` section of your project `NuGet.config` file.
+1. Add the NuGet feed <https://www.myget.org/feed/Packages/coreports> to your project. 
+This can be done by adding the line ```<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json"/>``` to the `activePackageSource` section of your project `NuGet.config` file.
 
 1. Install the `Tensor` and `Tensor.Algorithm` using the NuGet package manager (either via command line or graphical interface).
 
@@ -71,7 +72,7 @@ let main argv =
     printfn "x = %A" x
     0
 ```
-If everything works fine `dotnet run` automatically builds your project and produces the following output.
+If everything works fine, `dotnet run` automatically builds your project and produces the following output.
 ```
 $ dotnet run
 x = [   0    1    2    3    4    5]
