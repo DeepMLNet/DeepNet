@@ -95,7 +95,6 @@ printfn "The numeric value of s1 is %f." s1.Value
 ```
 If you try to use this property on a non-scalar tensor, an exception will be raised.
 
-
 ### Host-only creation methods
 Some tensor creation methods can only produce tensors stored in host memory, which, of course, can be transferred to GPU memory subsequently.
 For example the [HostTensor.init](xref:Tensor.HostTensor.init) function takes a function and uses it to compute the initial value of each element of the tensor.
@@ -114,77 +113,75 @@ The first argument specifies the shape of the tensor.
 The second argument is a function that takes the n-dimensional index (zero-based) of an entry and computes its initial value; here we use the formula $5i + j$ where $i$ is the row and $j$ is the column of the matrix.
 The data type (here `float`) is automatically inferred from the return type of the initialization function.
 
-
-
 ### Creation from F# sequences, lists and arrays
-
-The `ArrayNDHost.ofSeq` converts a [F# sequence](https://en.wikibooks.org/wiki/F_Sharp_Programming/Sequences) of finite length into a one-dimensional tensor.
-For example, the code
-
+The [HostTensor.ofSeq](xref:Tensor.HostTensor.ofSeq) converts an [F# sequence](https://en.wikibooks.org/wiki/F_Sharp_Programming/Sequences) of finite length into a one-dimensional tensor.
 ```fsharp
-let seq1 = seq { for i=0 to 20 do if i % 3 = 0 then yield i } |> ArrayNDHost.ofSeq
+let seq1 = seq { for i=0 to 20 do if i % 3 = 0 then yield i } |> HostTensor.ofSeq
+// seq1 = [   0    3    6    9   12   15   18]
 ```
+The example above creates a vector of all multiplies of 3 in the range between 0 and 20.
 
-creates a vector of all multiplies of 3 in the range between 0 and 20:
+A list can be converted into a one-dimensional tensor using the [HostTensor.ofList](xref:Tensor.HostTensor.ofList) function.
+To convert an array into a tensor use the [HostTensor.ofArray](xref:Tensor.HostTensor.ofArray) function.
+The [HostTensor.ofList2D](xref:Tensor.HostTensor.ofList2D) and [HostTensor.ofArray2D](xref:Tensor.HostTensor.ofArray2D) take two-dimensional lists or arrays and convert them into tensors of respective shapes.
 
-    seq1 = [   0    3    6    9   12   15   18]
+### Conversion to F# sequences, lists and arrays
+Use the [HostTensor.toSeq](xref:Tensor.HostTensor.toSeq) function to expose the elements of a tensor as a sequence.
+If the tensor has more than one dimension, it is flattened before the operation is performed.
 
-A list can be converted into a one-dimensional tensor using the `ArrayNDHost.ofList` function.
+Use the [HostTensor.toList](xref:Tensor.HostTensor.toList) or [HostTensor.toList2D](xref:Tensor.HostTensor.toList2D) functions to convert a tensor into a list.
+The [HostTensor.toArray](xref:Tensor.HostTensor.toArray), [HostTensor.toArray2D](xref:Tensor.HostTensor.toArray2D), [HostTensor.toArray3D](xref:Tensor.HostTensor.toArray3D) convert a tensor into an array of respective dimensionality.
 
-To convert an array into a tensor use the `ArrayNDHost.ofArray` function.
-The `ArrayNDHost.ofArray2D` and `ArrayNDHost.ofArray3D` take two-dimensional and three-dimensional arrays and convert them into tensors of respective shapes.
+All these operations copy the elements of the tensor.
 
-### Conversion to F# lists and arrays
-Use the `ArrayNDHost.toList` function to convert a tensor into a list.
-A multi-dimensional tensor is flattened before the conversion.
-
-Use the `ArrayNDHost.toArray`, `ArrayNDHost.toArray2D` and `ArrayNDHost.toArray3D` to convert a tensor into an array of respective dimensionality.
-
-Printing tensors
-----------------
+Printing tensors and string representation
+------------------------------------------
 
 Tensors can be printed using the `%A` format specifier of the standard `printf` function.
-
 ```fsharp
-printfn "The tensor a is\n%A" a
-printfn "The tensor z1 is\n%A" z1
-printfn "The tensor o1 is\n%A" o1
-printfn "The tensor id1 is\n%A" id1
+printfn "The tensor seq1 is\n%A" seq1
+// The tensor seq1 is
+// [   0    3    6    9   12   15   18]
 ```
-
 The output of large tensors is automatically truncated to a reasonable size.
+The corresponding string representation can also be accessed thorugh the [Pretty](xref:Tensor.Tensor`1.Pretty) property.
+The full (untruncated) string representation is available through the [Full](xref:Tensor.Tensor`1.Full) property.
+Use the [ToString](xref:Tensor.Tensor`1.ToString) method when it is required to adjust the maximum number of elements that are printed before truncation occurs.
 
-Accessing elements
-------------------
+Accessing individual elements
+-----------------------------
 
 Individual elements of a tensor can be accessed using the `tensor.[[idx0; idx1; ...; idxN]]` notation.
 Zero-based indexing is used.
-For example
-
 ```fsharp
-a.[[1; 1]]
+// a =
+//    [[   0.0000    1.0000    2.0000    3.0000    4.0000]
+//     [   5.0000    6.0000    7.0000    8.0000    9.0000]
+//     [  10.0000   11.0000   12.0000   13.0000   14.0000]
+//     [  15.0000   16.0000   17.0000   18.0000   19.0000]
+//     [  20.0000   21.0000   22.0000   23.0000   24.0000]
+//     [  25.0000   26.0000   27.0000   28.0000   29.0000]
+//     [  30.0000   31.0000   32.0000   33.0000   34.0000]]
+let v = a.[[1L; 1L]]
+// v = 6.0
 ```
-
-accesses the element at index $1,1$ and returns `5.0`.
-Note that the indices are specified with double brackets ([[ and ]]) and separated using a semicolon.
+The above example accesses the element at index $1,1$.
+Note that the indices are specified as 64-bit integers surrounded by double brackets (`[[` and `]]`) and separated using a semicolon.
 
 Tensors are mutable objects.
 An element can be changed using the `tensor.[[idx0; idx1; ...; idxN]] <- newValue` notation.
-For example
-
 ```fsharp
-a.[[2; 2]] <- 55.
+a.[[2L; 2L]] <- 55.
+// a =
+//    [[   0.0000    1.0000    2.0000    3.0000    4.0000]
+//     [   5.0000    6.0000    7.0000    8.0000    9.0000]
+//     [  10.0000   11.0000   55.0000   13.0000   14.0000]
+//     [  15.0000   16.0000   17.0000   18.0000   19.0000]
+//     [  20.0000   21.0000   22.0000   23.0000   24.0000]
+//     [  25.0000   26.0000   27.0000   28.0000   29.0000]
+//     [  30.0000   31.0000   32.0000   33.0000   34.0000]]
 ```
-
-changes the tensor to
-
-    [[   0.0000    1.0000    2.0000    3.0000    4.0000]
-     [   5.0000    6.0000    7.0000    8.0000    9.0000]
-     [  10.0000   11.0000   55.0000   13.0000   14.0000]
-     [  15.0000   16.0000   17.0000   18.0000   19.0000]
-     [  20.0000   21.0000   22.0000   23.0000   24.0000]
-     [  25.0000   26.0000   27.0000   28.0000   29.0000]
-     [  30.0000   31.0000   32.0000   33.0000   34.0000]]
+The above example changes the value at index $2,2$ to 55.
 
 
 Slicing
