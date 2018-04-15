@@ -1,7 +1,7 @@
 # Tensor
 This page provides an overview of most commonly used tensor functions by category.
 
-For a complete, alphabetical reference of all tensor functions see [Tensor<'T>](xref:Tensor.Tensor`1), [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor).
+For a complete, alphabetical reference of all tensor functions see [Tensor<'T>](xref:Tensor.Tensor`1) and the device-specific functions in [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor).
 
 ## Creation functions
 Use these functions to create a new tensor.
@@ -260,7 +260,7 @@ Function | Description
 
 
 ## Random number generation (host only)
-Use these functions generate tensors filled with random numbers.
+Use these functions to generate tensors filled with random numbers.
 
 Function | Description
 -------- | -----------

@@ -1,8 +1,12 @@
 - name: Introduction
   href: intro.md
-- name: Tutorial
-  href: Tutorial.md
-- name: Tensor
+- name: Guide
+  items:
+    - name: Installation
+      href: Guide-Installation.md
+    - name: Tutorial
+      href: Guide-Tutorial.md
+- name: Tensor at a glance
   href: Tensor.md
 
   

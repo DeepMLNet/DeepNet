@@ -1,5 +1,4 @@
-Working with tensors
-====================
+# Working with tensors
 
 A *tensor* is an n-dimensional array of an arbitrary data type (for example `single` or `double`).
 Tensors of data type `'T` are implemented by the [Tensor<'T>](xref:Tensor.Tensor`1) type.
@@ -12,15 +11,9 @@ The tensor library provides functionality similar to [Numpy's Ndarray](http://do
 
 This open source library is written in [F#](http://fsharp.org/) and targets the [.NET Standard 2.0 platform](https://github.com/dotnet/standard/blob/master/docs/versions/netstandard2.0.md) with Linux and Microsoft Windows as supported operating systems.
 
+## Architecture
 
-Architecture
-------------
-
-To work with the tensor library, reference the [Tensor NuGet package](https://www.nuget.org/packages/Tensor/) by running
-```
-dotnet add package Tensor
-```
-inside your project directory and open the `Tensor` namespace within your source file.
+To work with the Tensor library, install the NuGet packages as described in the [installation guide](Guide-Installation.md) and open the `Tensor` namespace within your source file.
 ```fsharp
 open Tensor
 ```
@@ -29,8 +22,7 @@ It provides functions to work with tensors regardless of their storage device.
 The modules [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor) contain additional functions that are only applicable to tensors stored in host or GPU memory respectively.
 
 
-Creating tensors
-----------------
+## Creating tensors
 
 Let us create a $3 \times 2$ matrix, i.e. a two-dimensional tensor, of data type `int` filled with zeros in host memory.
 For this purpose we use the [Tensor<'T>.zeros](xref:Tensor.Tensor`1.zeros*) function.
