@@ -1,11 +1,11 @@
 TODO:
 
-- TOC linking
-- Yes, we had this plan...
-- Is it still important?
-- Yes, it is.
-- So, how to go forward on it?
-- Plan was to use a generator to make the initial TOC
+- overhead bar
+- logo
+- see other DocFX sites to see how it is done
+- translate introductory examples
+- perhaps ask DocFX about the ' token
+- union/mod/etc fix
 
 
 

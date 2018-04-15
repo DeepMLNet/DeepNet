@@ -583,7 +583,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="permuteAxes"/><seealso cref="T"/>
     static member swapDim ax1 ax2 (a: Tensor<'T>) = ITensor.swapDim ax1 ax2 a :?> Tensor<'T>
 
-    /// <summary>Transpose of a matrix.</summary>
+    /// <summary>(Batched) transpose of a matrix.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The result of this operation.</returns>
     /// <seealso cref="T"/>
@@ -3342,7 +3342,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// per dimension of this tensor.</param>
     /// <returns>The value of the selected element.</returns>
     /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
-    static member inline get (a: Tensor<_>) (pos: int64 list) = 
+    static member inline get (a: Tensor<'T>) (pos: int64 list) = 
         a.[pos]
     
     /// <summary>Sets the value of a single element of the tensor.</summary>
@@ -3351,7 +3351,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// per dimension of this tensor.</param>
     /// <param name="value">The new value of the element.</param>
     /// <seealso cref="Item(Microsoft.FSharp.Collections.FSharpList{System.Int64})"/>
-    static member inline set (a: Tensor<_>) (pos: int64 list) value = 
+    static member inline set (a: Tensor<'T>) (pos: int64 list) value = 
         a.[pos] <- value
 
     /// Checks that this Tensor is a scalar tensor.
@@ -4283,7 +4283,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member ofBlocks (bs: Tensor<'T> list list list) =
         bs |> List.map (List.map (List.map Block >> SubBlocks) >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
-    /// tensor product
+    /// <summary>Computes the tensor product between two tensors.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>    
     static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
         let a, b = Tensor.padToSame (a, b)
         let rec generate (pos: int64 list) = 

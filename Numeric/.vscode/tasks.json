@@ -26,6 +26,12 @@
             "type": "shell",
             "command": "cd Tensor.Docs/generate ; dotnet run ; cd ../..; ../../docfx/src/docfx/bin/Release/net461/docfx.exe Tensor.Docs/docfx.json",
             "problemMatcher": []
-        }
+        },
+        {
+            "label": "Tensor.Docs generate only",
+            "type": "shell",
+            "command": "cd Tensor.Docs/generate ; dotnet run",
+            "problemMatcher": []
+        }        
     ]
 }

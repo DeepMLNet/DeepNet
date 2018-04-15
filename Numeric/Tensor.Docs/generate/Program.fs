@@ -6,88 +6,107 @@ open YamlDotNet
 open YamlDotNet.RepresentationModel
 
 type Member = {
+    Prefix: string
     Signature: string
     Name: string
     Summary: string
 }
 
-// Okay, what to do here?
-// first, we definitely need links
-// seconds the element-wise functions are a bit sucky, because they should not be called directly
-// thirdly, we need operators, especially the comparison thingies
-// big problem is how to document the operators...
-// actually, it does not even make sense to link to the member functions, does it???
-// Well it is actually okay, when in the sample we call them directly
-// Problem with overrides is that documentation then becomes solely docfx accessible which might be undesired.
-// so best keep documentation in source as much as possible.
-// Put in source for now.
-// Try writing exemplary documentation for Abs.
-
 
 let sections = [
-    "Operators",
-    "These unary or binary operators can be applied to tensors.", [
+    "Creation functions", 
+    "Use these functions to create a new tensor.", [
+        "arange"; "counting"; "empty"; "falses"; "filled"; "identity"; 
+        "ones"; "onesLike";  "linspace"; "scalar"; "scalarLike"; "trues"; 
+        "zeros"; "zerosLike"]
+
+    "Slicing and element access functions", 
+    "Use these functions to slice tensors or access individual elements of them.", [
+        "Item"; "M"; "Value"]
+
+    "Element-wise operations", 
+    "These mathematical operations are applied element-wise to each element of the tensor(s).", [
         "( ~- )/op_UnaryNegation"; "( + )/op_Addition"; "( - )/op_Subtraction"; "( * )/op_Multiply"; 
-        "( / )/op_Division"; "( % )/op_Modulus"; "( .* )/op_DotMultiply"]
-    "Elementwise functions", 
-    "These mathematical functions are applied element-wise to each element of the tensor.", [
+        "( / )/op_Division"; "( % )/op_Modulus";         
         "Abs"; "Acos"; "Asin"; "Atan"; "Ceiling"; "Cos"; "Cosh"; "Exp"; "Floor"; "Log"; "Log10"; 
         "Pow"; "Round"; "Sgn"; "Sin"; "Sinh"; "Sqrt"; "Tan"; "Tanh"; "Truncate"]
+
+    "Tensor operations", 
+    "These functions perform various operations on one or more tensors.", [
+        "concat"; "copy"; "diag"; "diagAxis"; "diagMat"; "diagMatAxis"; "diff"; "diffAxis"; 
+        "ofBlocks"; "replicate"; "T"; ]        
+
+    "Linear algebra functions", 
+    "Use these functions to perform basic linear algebra operations on tensors.", [
+        "( .* )/op_DotMultiply"; "norm"; "normAxis"; "invert"; "pseudoInvert"; 
+        "SVD"; "symmetricEigenDecomposition"; "tensorProduct"]
+
     "Shape functions", 
-    "The following functions are for working with the shape and memory layout of a tensor.", [
-        "atLeast1D"; "atLeast2D"; "atLeast3D"; "atLeastND"; "broadcastDim"; "broadcastTo"; 
-        "broadcastToSame"; "broadcastToSameInDims"; "CheckAxis"; "cutLeft"; "cutRight"; 
-        "flatten"; "insertAxis"; "isBroadcasted"; "layout"; "nDims"; 
-        "nElems"; "padLeft"; "padRight"; "padToSame"; "permuteAxes"; 
-        "reshape"; "reshapeView"; "reverseAxis"; "relayout"; "shape"; "swapDim"; "transpose"; 
-        "tryReshapeView"]
-    "Data type functions", "", [
-        "convert"; "dataType"]
-    "Logical functions", "", [
-        "( ~~~~ )/op_TwiddleTwiddleTwiddleTwiddle"; "( &&&& )/op_AmpAmpAmpAmp"; 
-        "( \\|\\|\\|\\| )/op_BarBarBarBar"; "( ^^^^ )/op_HatHatHatHat";
-        "all"; "allAxis"; "allElems"; "allTensor"; "any"; "anyAxis"; "anyTensor"; "allIdx"; 
-        "allIdxOfDim"; "ifThenElse"]
-    "Index functions", "", [
-        "find"; "findAxis"; "gather"; "range"; "scatter"; "tryFind"; "trueIdx"]
-    "Comparison functions", "", [
+    "Use these functions to work with the shape and memory layout of a tensor.", [
+        "atLeastND"; "broadcastDim"; "broadcastTo"; 
+        "broadcastToSame"; "broadcastToSameInDims"; "cutLeft"; "cutRight"; 
+        "flatten"; "insertAxis"; "isBroadcasted"; "Layout"; "NDims"; 
+        "NElems"; "padLeft"; "padRight"; "padToSame"; "permuteAxes"; 
+        "reshape"; "reverseAxis"; "relayout"; "Shape"; "swapDim"; ]
+
+    "Data type functions", 
+    "Use these functions to query or change the data type of the elements of a tensor.", [
+        "convert"; "DataType"]
+
+    "Device and storage functions", 
+    "Use these functions to query or change the storage device of a tensor.", [
+        "Dev"; "Storage"; "transfer"]        
+
+    "Comparison functions", 
+    "Use these functions to perform comparisons of tensors. The results are mostly boolean tensors.", [
         "( ==== )/op_EqualsEqualsEqualsEquals"; "( <<<< )/op_LessLessLessLess"; 
         "( <<== )/op_LessLessEqualsEquals"; "( >>>> )/op_GreaterGreaterGreaterGreater"; 
-        "( >>== )/op_GreaterGreaterEqualsEquals";
+        "( >>== )/op_GreaterGreaterEqualsEquals"; "( <<>> )/op_LessLessGreaterGreater";
         "almostEqual"; "isClose"; "isFinite"; "maxElemwise"; "minElemwise"; "allFinite"]
-    "Creation functions", "", [
-        "arange"; "concat"; "copy"; "Copy"; "counting"; "empty"; "falses"; "identity"; 
-        "diagMat"; "diagMatAxis"; "NewOfType"; "ofBlocks"; "ones"; "onesLike";  
-        "linspace"; "replicate"; "scalar"; "scalarLike"; "trues"; "zeros"; "zerosLike"]
-    "Reduction functions", "", [
-        "argMax"; "argMaxAxis"; "argMin"; "argMinAxis"; "countTrue"; "countTrueAxis";
-        "countTrueTensor"; "max"; "maxAxis"; "maxTensor"; "min"; "minAxis"; "minTensor"; 
-        "mean"; "meanAxis"; "product"; "productAxis"; "productTensor"; "std"; "stdAxis"; 
-        "sum"; "sumAxis"; "sumTensor"; "var"; "varAxis"; "trace"; "traceAxis"]
-    "Linear algebra functions", "", [
-        "norm"; "normAxis"; "invert"; "pseudoInvert"; "SVD"; "SVDWithoutUV"; 
-        "symmetricEigenDecomposition"]
-    "Device functions", "", [
-        "dev"; "transfer"; "TransferFrom"]
-    "Tensor operations", "", [
-        "diag"; "diagAxis"; "diff"; "diffAxis"; "dot"; "tensorProduct"]
-//    "Functional functions", "", [
-//        "foldAxis"; "map"; "map2"; "mapi"; "mapi2"]
-    "Element access functions", "", [
-        "get"; "set"; "value"]
+
+    "Logical functions", 
+    "Use these functions to work with boolean tensors.", [
+        "( ~~~~ )/op_TwiddleTwiddleTwiddleTwiddle"; "( &&&& )/op_AmpAmpAmpAmp"; 
+        "( \\|\\|\\|\\| )/op_BarBarBarBar"; "( ^^^^ )/op_HatHatHatHat";
+        "all"; "allAxis"; "allElems"; "allTensor"; "any"; "anyAxis"; "anyTensor"; 
+        "ifThenElse"]
+
+    "Index functions", 
+    "These functions return tensor of indices or work with them.", [
+        "allIdx"; "allIdxOfDim"; "argMax"; "argMaxAxis"; "argMin"; "argMinAxis";
+        "find"; "findAxis"; "gather"; "scatter"; "trueIdx"]
+
+    "Reduction functions", 
+    "These functions perform operations on tensors that reduce their dimensionality.", [
+        "countTrue"; "countTrueAxis"; "max"; "maxAxis"; "min"; "minAxis";
+        "mean"; "meanAxis"; "product"; "productAxis"; "std"; "stdAxis"; 
+        "sum"; "sumAxis"; "var"; "varAxis"; "trace"; "traceAxis"]
+
+    "Functional operations (host only)", 
+    "Use these functions to perform operations that are common in functional programming languages. \
+     They require the tensor to be stored in host memory.", [
+        "HostTensor.foldAxis"; "HostTensor.init"; "HostTensor.map"; "HostTensor.map2"; 
+        "HostTensor.mapi"; "HostTensor.mapi2"]
+
+    "Data exchange (host only)", 
+    "Use these functions to convert tensors to and from other storage modalities. \
+     They require the tensor to be stored in host memory.", [
+        "HostTensor.ofArray"; "HostTensor.ofList"; "HostTensor.ofSeq";
+        "HostTensor.read"; "HostTensor.readUntyped";
+        "HostTensor.toArray"; "HostTensor.toList"; "HostTensor.toSeq";
+        "HostTensor.usingArray"; 
+        "HostTensor.write"]
+
+    "Random number generation (host only)", 
+    "Use these functions generate tensors filled with random numbers.", [
+        "HostTensor.randomInt"; "HostTensor.randomNormal"; "HostTensor.randomUniform"]
 ]
 
-
-[<EntryPoint>]
-let main _ =
-    use apiFile = new StreamReader "../api/Tensor.Tensor-1.yml"
-    use outFile = new StreamWriter "../articles/Tensor.md"
-
-    let out fmt = Printf.kprintf (fun s -> outFile.WriteLine s) fmt
-
+let yamlEntries (prefix: string) (filename: string) = 
+    use apiFile = new StreamReader (filename)
     let ys = YamlStream()
     ys.Load(apiFile)
-    let mapping = ys.Documents.[0].RootNode  :?> YamlMappingNode   
+    let mapping = ys.Documents.[0].RootNode :?> YamlMappingNode   
     let entries = seq {
         for entry in mapping.Children.[YamlScalarNode "items"] :?> YamlSequenceNode do
             let entry = entry :?> YamlMappingNode
@@ -99,18 +118,37 @@ let main _ =
                     match signature.LastIndexOf '(' with
                     | p when p >= 0 -> signature.[0 .. p-1]
                     | _ -> signature
-                yield {Signature=signature; Name=name; Summary=summary}
+                yield {Prefix=prefix; Signature=signature; Name=name; Summary=summary}
     }
+    Seq.cache entries
+
+
+[<EntryPoint>]
+let main _ =
+    let tensor = yamlEntries "Tensor`1" "../api/Tensor.Tensor-1.yml"
+    let hostTensor = yamlEntries "HostTensor" "../api/Tensor.HostTensor.yml"
+    let cudaTensor = yamlEntries "CudaTensor" "../api/Tensor.CudaTensor.yml"
+    let entries = Seq.concat [tensor; hostTensor; cudaTensor]
 
     //for entry in entries do
     //    printfn "Name: %s\nSignature: %s\nSummary: %s\n\n" entry.Name entry.Signature entry.Summary
 
     let findEntry (name: string) =
-        entries |> Seq.tryFind (fun entry -> entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
+        let prefix, name =
+            match name.LastIndexOf '.' with
+            | -1 -> "Tensor`1", name
+            | p -> name.[..p-1], name.[p+1..]
+        entries |> Seq.tryFind (fun entry -> entry.Prefix.ToLowerInvariant() = prefix.ToLowerInvariant() &&
+                                             entry.Name.ToLowerInvariant() = name.ToLowerInvariant())
+
+    use outFile = new StreamWriter "../articles/Tensor.md"
+    let out fmt = Printf.kprintf (fun s -> outFile.WriteLine s) fmt
 
     out "# Tensor"
-    out "This page lists all tensor functions by category."
-    out "For an alphabetical reference see [Tensor<'T>](xref:Tensor.Tensor`1)."
+    out "This page provides an overview of most commonly used tensor functions by category."
+    out ""
+    out "For a complete, alphabetical reference of all tensor functions see [Tensor<'T>](xref:Tensor.Tensor`1) \
+         and the device-specific functions in [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor)."
     out ""
     
     for title, descr, members in sections do
@@ -125,7 +163,7 @@ let main _ =
                 | -1 -> name, name
                 | p -> name.[..p-1], name.[p+1..]
             match findEntry name with
-            | Some ent -> out "[%s](xref:Tensor.Tensor`1.%s*) | %s" dispName ent.Name ent.Summary
+            | Some ent -> out "[%s](xref:Tensor.%s.%s*) | %s" dispName ent.Prefix ent.Name ent.Summary
             | None -> out "%s | NOT FOUND" name
         out ""
         out ""
