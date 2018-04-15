@@ -1,4 +1,4 @@
-# Getting started
+# Creating tensors
 
 To work with the Tensor library, install the NuGet packages as described in the [installation guide](Guide-Installation.md) and open the `Tensor` namespace within your source file.
 You can run the following examples by pasting the code into the `main` function in `Program.fs` of the skeleton project.
@@ -7,10 +7,9 @@ The primary type you will work with is [Tensor<'T>](xref:Tensor.Tensor`1).
 It provides functions to work with tensors regardless of their storage device.
 The modules [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor) contain additional functions that are only applicable to tensors stored in host or GPU memory respectively.
 
+## Creating a tensor filled with zeros
 
-## Creating tensors
-
-Let us create a $3 \times 2$ matrix, i.e. a two-dimensional tensor, of data type `int` filled with zeros in host memory.
+Let us create a *3x2* matrix, i.e. a two-dimensional tensor, of data type `int` filled with zeros in host memory.
 For this purpose we use the [Tensor<'T>.zeros](xref:Tensor.Tensor`1.zeros*) function.
 ```fsharp
 let z1 = Tensor<int>.zeros HostTensor.Dev [3L; 2L]
@@ -37,6 +36,8 @@ let z1 = HostTensor.zeros<int> [3L; 2L]
 to perform the same task.
 These shorthands are available for all tensor creation function and listed in the [HostTensor](xref:Tensor.HostTensor) module.
 
+## Other initialization possibilities
+
 Similarly, we can use the [Tensor.ones](xref:Tensor.Tensor`1.ones) function to obtain a vector of data type `single` and size `3` filled with ones.
 ```fsharp
 let o1 = Tensor<single>.ones HostTensor.Dev [3L]
@@ -49,9 +50,9 @@ let id1 = Tensor<float>.identity HostTensor.Dev 3L
 //        [0.0; 1.0; 0.0]
 //        [0.0; 0.0; 1.0]]
 ```
-This created a $3 \times 3$ identity matrix.
+This created a *3x3* identity matrix.
 
-### Scalar tensors
+## Scalar tensors
 A scalar tensor is a tensor that has a dimensionality of zero.
 It contains exactly one element and can be treated like a tensor of any other dimensionality.
 However, for convenience, special functions are provided to make working with scalar tensors easier.
@@ -73,7 +74,7 @@ printfn "The numeric value of s1 is %f." s1.Value
 ```
 If you try to use this property on a non-scalar tensor, an exception will be raised.
 
-### Host-only creation methods
+## Host-only creation methods
 Some tensor creation methods can only produce tensors stored in host memory, which, of course, can be transferred to GPU memory subsequently.
 For example the [HostTensor.init](xref:Tensor.HostTensor.init) function takes a function and uses it to compute the initial value of each element of the tensor.
 ```fsharp
@@ -88,10 +89,10 @@ let a = HostTensor.init [7L; 5L] (fun [i; j] -> 5.0 * float i + float j)
 //     [  30.0000   31.0000   32.0000   33.0000   34.0000]]
 ```
 The first argument specifies the shape of the tensor.
-The second argument is a function that takes the n-dimensional index (zero-based) of an entry and computes its initial value; here we use the formula $5i + j$ where $i$ is the row and $j$ is the column of the matrix.
+The second argument is a function that takes the n-dimensional index (zero-based) of an entry and computes its initial value; here we use the formula *5i + j* where *i* is the row and *j* is the column of the matrix.
 The data type (here `float`) is automatically inferred from the return type of the initialization function.
 
-### Creation from F# sequences, lists and arrays
+## Creation from F# sequences, lists and arrays
 The [HostTensor.ofSeq](xref:Tensor.HostTensor.ofSeq) converts an [F# sequence](https://en.wikibooks.org/wiki/F_Sharp_Programming/Sequences) of finite length into a one-dimensional tensor.
 ```fsharp
 let seq1 = seq { for i=0 to 20 do if i % 3 = 0 then yield i } |> HostTensor.ofSeq
@@ -103,7 +104,7 @@ A list can be converted into a one-dimensional tensor using the [HostTensor.ofLi
 To convert an array into a tensor use the [HostTensor.ofArray](xref:Tensor.HostTensor.ofArray) function.
 The [HostTensor.ofList2D](xref:Tensor.HostTensor.ofList2D) and [HostTensor.ofArray2D](xref:Tensor.HostTensor.ofArray2D) take two-dimensional lists or arrays and convert them into tensors of respective shapes.
 
-### Conversion to F# sequences, lists and arrays
+## Conversion to F# sequences, lists and arrays
 Use the [HostTensor.toSeq](xref:Tensor.HostTensor.toSeq) function to expose the elements of a tensor as a sequence.
 If the tensor has more than one dimension, it is flattened before the operation is performed.
 

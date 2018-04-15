@@ -1,14 +1,18 @@
-- name: Introduction
+- name: Overview
   href: Intro.md
 - name: Guide
   href: Guide-Installation.md
   items:
     - name: Installation
       href: Guide-Installation.md
-    - name: Getting started
-      href: Guide-Getting-Started.md
+    - name: Creating tensors
+      href: Guide-Creation.md
     - name: Elements and slicing
       href: Guide-Elements.md      
+    - name: Shape
+      href: Guide-Shape.md            
+    - name: Tensor operations
+      href: Guide-Operations.md                  
 - name: Tensor at a glance
   href: Tensor.md
 
