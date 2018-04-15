@@ -98,7 +98,7 @@ let sections = [
         "HostTensor.write"]
 
     "Random number generation (host only)", 
-    "Use these functions generate tensors filled with random numbers.", [
+    "Use these functions to generate tensors filled with random numbers.", [
         "HostTensor.randomInt"; "HostTensor.randomNormal"; "HostTensor.randomUniform"]
 ]
 

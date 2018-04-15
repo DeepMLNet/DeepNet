@@ -1,11 +1,13 @@
 TODO:
 
+- first see the old documentation
 - overhead bar
 - logo
 - see other DocFX sites to see how it is done
 - translate introductory examples
 - perhaps ask DocFX about the ' token
 - union/mod/etc fix
+- fix DocFX function brackets missing.
 
 
 

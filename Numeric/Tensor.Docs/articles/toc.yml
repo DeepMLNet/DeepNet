@@ -1,5 +1,7 @@
 - name: Introduction
   href: intro.md
+- name: Tutorial
+  href: Tutorial.md
 - name: Tensor
   href: Tensor.md
 
