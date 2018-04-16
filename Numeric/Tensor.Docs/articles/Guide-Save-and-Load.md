@@ -46,7 +46,7 @@ If the data type is unknown at compile time, you can use the [HostTensor.readUnt
 The resulting file can be viewed using any HDF5 viewer, for example using the free, cross-platform [HDFView](https://www.hdfgroup.org/products/java/hdfview/) application as shown below.
 Many useful tools for working with HDF5 file are provided at <https://support.hdfgroup.org/products/hdf5_tools/toolsbycat.html>.
 
-![HDFView screenshot](hdfview.png)
+![HDFView screenshot](../images/hdfview.png)
 
 
 ## Reading .npy and .npz files produced by Numpy
