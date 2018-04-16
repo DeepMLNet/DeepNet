@@ -1,7 +1,11 @@
 # Comparison and logic operations
 
+Comparison is used to element-wise compare the elements of two tensors resulting in a boolean tensor containing the comparison results.
+Several operations that can be performed with boolean tensors are described on this page.
+
 ## Element-wise comparison operators
 Element-wise comparisons are performed using the [==== (element-wise equal)](xref:Tensor.Tensor`1.op_EqualsEqualsEqualsEquals*), [<<<< (element-wise smaller than)](xref:Tensor.Tensor`1.op_LessLessLessLess), [>>>> (element-wise greater than)](xref:op_GreaterGreaterGreaterGreater) and [<<>> (element-wise not equal)](xref:op_LessLessGreaterGreater) operators.
+These operators return tensors of boolean data type.
 
 The following example compares the elements of tensors `d` and `e` for equality.
 ```fsharp
@@ -64,6 +68,49 @@ The following example demonstrates the use of this function.
  let ifFalse = HostTensor.ofList [5.0; 6.0; 7.0]
  let t = Tensor.ifThenElse cond ifTrue ifFalse
  // t = [2.0; 6.0; 7.0]
+```
+
+## Masking tensors with boolean tensors
+Boolean tensors can be used to select elements from another tensor.
+This is operation is called masking and picks elements from the tensor for which the corresponding element in the mask tensor is `true`.
+
+Masking is performed by using the [M property](xref:Tensor.Tensor`1.M*) of a tensor and specifying a boolean tensor as argument.
+The property can be used for reading and for assignment.
+Reading for the property always returns a copy of the data.
+
+If the mask tensor has the same shape as the value tensor, the result is always a vector, regardless of the dimensionality of both tensors.
+The following example shows this use case.
+
+```fsharp
+ let a = HostTensor.ofList2D [[1.0; 2.0; 3.0]
+                              [4.0; 5.0; 6.0]]
+ let m = HostTensor.ofList2D [[true;  true;  false]
+                              [false; false; true ]]
+ let b = a.M(m)
+ // b = [1.0; 2.0; 6.0]
+```
+
+If a particular dimension should not be masked, the special identifier [NoMask](xref:Tensor.TensorVal.NoMask) can be specified instead.
+For example, this allows to select whole rows or columns of a matrix and is illustrated in the next code segment.
+
+```fsharp
+let m0 = HostTensor.ofList [true; false]
+let e = a.M(m0, NoMask)
+// e = [[1.0; 2.0; 3.0]]
+```
+
+You can also assign to the [M property](xref:Tensor.Tensor`1.M*) and therefore replace the elements within the original tensor, for which the mask tensor contains `true` entries.
+The number of elements in the assignment vector must match the number of `true` entries in the mask tensor.
+Otherwise an exception is raised.
+
+The following example shows how to replace elements within a tensor using a boolean mask.
+
+```fsharp
+let m = HostTensor.ofList [[true;  true;  false]
+                           [false; false; true ]]
+a.M(m) <- [8.0; 9.0; 0.0]
+// a = [[8.0; 9.0; 3.0]
+//      [4.0; 5.0; 0.0]]
 ```
 
 ## Logical reduction operations

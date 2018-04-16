@@ -1,4 +1,4 @@
-# Tensor
+# Tensor at a glance
 This page provides an overview of most commonly used tensor functions by category.
 
 For a complete, alphabetical reference of all tensor functions see [Tensor<'T>](xref:Tensor.Tensor`1) and the device-specific functions in [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor).
@@ -183,6 +183,8 @@ Function | Description
 [any](xref:Tensor.Tensor`1.any*) | Checks if any elements of the tensor are true.
 [anyAxis](xref:Tensor.Tensor`1.anyAxis*) | Checks if any element along the specified axis is true.
 [anyTensor](xref:Tensor.Tensor`1.anyTensor*) | Checks if any element of the tensor is true returning the result as a tensor.
+[countTrue](xref:Tensor.Tensor`1.countTrue*) | Counts the elements being true.
+[countTrueAxis](xref:Tensor.Tensor`1.countTrueAxis*) | Counts the elements being true along the specified axis.
 [ifThenElse](xref:Tensor.Tensor`1.ifThenElse*) | Element-wise choice between two sources depending on a condition.
 
 
@@ -209,8 +211,6 @@ These functions perform operations on tensors that reduce their dimensionality.
 
 Function | Description
 -------- | -----------
-[countTrue](xref:Tensor.Tensor`1.countTrue*) | Counts the elements being true.
-[countTrueAxis](xref:Tensor.Tensor`1.countTrueAxis*) | Counts the elements being true along the specified axis.
 [max](xref:Tensor.Tensor`1.max*) | Calculates the maximum of all elements.
 [maxAxis](xref:Tensor.Tensor`1.maxAxis*) | Calculates the maximum value of the elements along the specified axis.
 [min](xref:Tensor.Tensor`1.min*) | Calculates the minimum of all elements.

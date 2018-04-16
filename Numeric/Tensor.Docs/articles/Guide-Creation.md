@@ -129,18 +129,18 @@ Use the [ToString](xref:Tensor.Tensor`1.ToString) method when it is required to 
 
 ## Transferring tensors to the GPU
 
-If your workstation is equipped with a [CUDA](https://en.wikipedia.org/wiki/CUDA) [capable GPU](https://developer.nvidia.com/cuda-gpus), you can transfer tensors to GPU memory and perform operations on the GPU.
-GPU tensors are instances of the generic type `ArrayNDCudaT<'T>` where `'T` is the contained data type.
+If your workstation is equipped with a CUDA capable GPU, you can transfer tensors to GPU memory and perform operations on the GPU.
 
-
-### Data transfer
-Tensors can be transferred to the GPU by using the `ArrayNDCuda.toDev` function.
-Transfer back to host memory is done using the `ArrayNDCuda.toHost` function.
+Tensors can be transferred to the GPU by using the [CudaTensor.transfer](xref:Tensor.CudaTensor.transfer*) function.
+Transfer back to host memory is done using the [HostTensor.transfer](xref:Tensor.HostTensor.transfer*) function.
 
 ```fsharp
-let m = seq {1 .. 10} |> ArrayNDHost.ofSeq
-let mGpu = ArrayNDCuda.toDev m
+let m = seq {1 .. 10} |> HostTensor.ofSeq
+// m.Dev = HostTensor.Dev
+let mGpu = CudaTensor.transfer m
+// mGpu.Dev = CudaTensor.Dev
 ```
 
-`mGpu` is now a copy of `m` in GPU memory.
+The above sample code creates tensor `m` in host memory and then creates the copy `mGpu` in GPU memory.
+All operations performed on `mGpu` will execute directly on the GPU.
 
