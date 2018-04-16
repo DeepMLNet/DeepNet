@@ -125,3 +125,22 @@ The output of large tensors is automatically truncated to a reasonable size.
 The corresponding string representation can also be accessed thorugh the [Pretty](xref:Tensor.Tensor`1.Pretty) property.
 The full (untruncated) string representation is available through the [Full](xref:Tensor.Tensor`1.Full) property.
 Use the [ToString](xref:Tensor.Tensor`1.ToString) method when it is required to adjust the maximum number of elements that are printed before truncation occurs.
+
+
+## Transferring tensors to the GPU
+
+If your workstation is equipped with a [CUDA](https://en.wikipedia.org/wiki/CUDA) [capable GPU](https://developer.nvidia.com/cuda-gpus), you can transfer tensors to GPU memory and perform operations on the GPU.
+GPU tensors are instances of the generic type `ArrayNDCudaT<'T>` where `'T` is the contained data type.
+
+
+### Data transfer
+Tensors can be transferred to the GPU by using the `ArrayNDCuda.toDev` function.
+Transfer back to host memory is done using the `ArrayNDCuda.toHost` function.
+
+```fsharp
+let m = seq {1 .. 10} |> ArrayNDHost.ofSeq
+let mGpu = ArrayNDCuda.toDev m
+```
+
+`mGpu` is now a copy of `m` in GPU memory.
+

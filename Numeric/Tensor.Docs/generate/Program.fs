@@ -69,7 +69,7 @@ let sections = [
         "( ~~~~ )/op_TwiddleTwiddleTwiddleTwiddle"; "( &&&& )/op_AmpAmpAmpAmp"; 
         "( \\|\\|\\|\\| )/op_BarBarBarBar"; "( ^^^^ )/op_HatHatHatHat";
         "all"; "allAxis"; "allElems"; "allTensor"; "any"; "anyAxis"; "anyTensor"; 
-        "ifThenElse"]
+        "countTrue"; "countTrueAxis"; "ifThenElse"]
 
     "Index functions", 
     "These functions return tensor of indices or work with them.", [
@@ -78,7 +78,7 @@ let sections = [
 
     "Reduction functions", 
     "These functions perform operations on tensors that reduce their dimensionality.", [
-        "countTrue"; "countTrueAxis"; "max"; "maxAxis"; "min"; "minAxis";
+        "max"; "maxAxis"; "min"; "minAxis";
         "mean"; "meanAxis"; "product"; "productAxis"; "std"; "stdAxis"; 
         "sum"; "sumAxis"; "var"; "varAxis"; "trace"; "traceAxis"]
 

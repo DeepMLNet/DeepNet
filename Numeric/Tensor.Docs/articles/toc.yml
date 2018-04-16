@@ -12,7 +12,16 @@
     - name: Shape
       href: Guide-Shape.md            
     - name: Tensor operations
-      href: Guide-Operations.md                  
+      href: Guide-Operations.md
+    - name: Reduction operations
+      href: Guide-Reductions.md                  
+    - name: Comparison and logic
+      href: Guide-Logic.md      
+    - name: Index functions
+      href: Guide-Index.md            
+    - name: Save and load
+      href: Guide-Save-and-Load.md      
+      
 - name: Tensor at a glance
   href: Tensor.md
 
