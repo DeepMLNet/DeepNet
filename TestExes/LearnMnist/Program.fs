@@ -33,13 +33,15 @@ let main argv =
     let nBatch  = mb.Size "nBatch"
     let nInput  = mb.Size "nInput"
     let nClass  = mb.Size "nClass"
-    let nHidden = mb.Size "nHidden"
+    let nHidden1 = mb.Size "nHidden1"
+    let nHidden2 = mb.Size "nHidden2"
 
     // define model parameters
     let mlp = 
         MLP.pars (mb.Module "MLP") 
-            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden; TransferFunc=ActivationFunc.Tanh}
-                        {NeuralLayer.defaultHyperPars with NInput=nHidden; NOutput=nClass; TransferFunc=ActivationFunc.SoftMax}]
+            { Layers = [{NeuralLayer.defaultHyperPars with NInput=nInput; NOutput=nHidden1; TransferFunc=ActivationFunc.Tanh}
+                        {NeuralLayer.defaultHyperPars with NInput=nHidden1; NOutput=nHidden2; TransferFunc=ActivationFunc.Tanh}
+                        {NeuralLayer.defaultHyperPars with NInput=nHidden2; NOutput=nClass; TransferFunc=ActivationFunc.SoftMax}]
               LossMeasure = LossLayer.CrossEntropy }
 
     // define variables
@@ -49,7 +51,8 @@ let main argv =
     // instantiate model
     mb.SetSize nInput mnist.Trn.[0L].Input.Shape.[0]
     mb.SetSize nClass mnist.Trn.[0L].Target.Shape.[0]
-    mb.SetSize nHidden 100L
+    mb.SetSize nHidden1 100L
+    mb.SetSize nHidden2 100L
     let mi = mb.Instantiate device
 
     // prediction
