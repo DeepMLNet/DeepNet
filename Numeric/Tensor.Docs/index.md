@@ -1,4 +1,4 @@
-# Tensor
+# Tensor for F#
 
 A *tensor* is an n-dimensional array of an arbitrary data type (for example `single` or `double`).
 Tensors of data type `'T` are implemented by the [Tensor<'T>](xref:Tensor.Tensor`1) type.
