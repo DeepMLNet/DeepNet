@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Common.targets" />
+  <PropertyGroup>
+    <PackageId>Tensor.Algorithm</PackageId>
+    <title>Algorithms building on Tensor</title>
+    <summary></summary>
+    <description>
+      Data types:
+        - arbitrary precision rational numbers
+
+      Matrix algebra (integer, rational):
+        - Row echelon form
+        - Smith normal form
+        - Kernel, cokernel and (pseudo-)inverse 
+
+      Matrix decomposition (floating point):
+        - Principal component analysis (PCA)
+        - ZCA whitening
+
+      Misc:
+        - Bezout's identity      
+        - Loading of NumPy's .npy and .npz files.
+    </description>
+    <PackageTags>rational row echelon smith kernel cokernel inverse pca zca Bezout npy npz</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="BigIntegerExtensions.fs" />
+    <Compile Include="Rat.fs" />
+    <Compile Include="Decomposition.fs" />
+    <Compile Include="LinAlg.fs" />
+    <Compile Include="NumpyFiles.fs" />    
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tensor\Tensor.fsproj" />
+  </ItemGroup>  
+</Project>

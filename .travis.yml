@@ -1,0 +1,21 @@
+language: csharp
+mono: none
+dotnet: 2.1.104
+env:
+  - secure: "fRLB3ZnIWTLJECstFjA+dfZUcmf/YI4B5QesZpmohVVvoVUWvC2rs8x40Pjrov6egE3df/LDtvANuY5u4Njvl58lG8psJ8PbtB+f14FlRHOBNHmWJUOA4ABajz537ddxVNgXlMCLDzd9WRxDSd1PZhzhL35FL/yH7H8EYCfAX1b1/Y7GgicBa1t6x0vHjLjFLFIVGqC6B/EPG89/zt+RfFMmo3g6B+B33tbXXhIDSpci6LwOATDGGN9PWuS5KYqAZghAKOAL28NaEdTsvyMZZxISDGLYPoSrJOCm5BNranUYQSad98m7Va7NKJcvPnpq8oC44uFXemJu4oLbMV6lISLEnkrURY/TR1mY+haymw4PDF4EUL8N2BPtKgdvX6cHd1mTe++jOEP/eODB5rnM/gnNPLIr5HddACJVws4JEikxvVrnbZpqbXh9DB0yp3rtxpHrmVnRn2cem34K7kbpQNYEykE98Hs1wB5SmyAMTr/Co23V7wVIJDWMaei468jHnlYIg/6VvX/3Qow4MdVewqsBpvSkNcVBlL6us0q54BpwAkscgvOwKyuCM+pht8+ZoH3M7hdw2k0njVKMPZJTmg8oXQSVWC+J1wZAUMIrRO4EsBCZ5NxzUb77OTEi5z49UaUb9zMgbyU9PA1AKwD7XShNgnMFpMrTOmImUSyNnho="
+solution: Numeric/Tensor.sln
+install:
+  - mkdir -p ~/.nuget/NuGet
+  - echo '<?xml version="1.0" encoding="utf-8"?>' > ~/.nuget/NuGet/NuGet.Config
+  - echo '<configuration><packageSources>' >> ~/.nuget/NuGet/NuGet.Config
+  - echo '<add key="Core Ports" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />' >> ~/.nuget/NuGet/NuGet.Config
+  - echo '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />' >> ~/.nuget/NuGet/NuGet.Config
+  - echo '</packageSources></configuration>' >> ~/.nuget/NuGet/NuGet.Config
+script: 
+  - echo "<Project><PropertyGroup><Rev>$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets
+  - dotnet build Numeric/Tensor.sln
+  - dotnet test Numeric/Tensor.Test/Tensor.Test.fsproj
+  - dotnet pack -c Release Numeric/Tensor.sln
+after_success:
+  - if [ "$TRAVIS_BRANCH" = "core2" ]; then dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'; fi
+

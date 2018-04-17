@@ -1,0 +1,10 @@
+This directory contains prebuilt Intel MKL libraries for Deep.Net.
+
+Intel MKL can be obtained from
+https://software.intel.com/en-us/articles/free-mkl
+and the binaries are redistributable according to
+https://software.intel.com/en-us/articles/which-intel-math-kernel-library-intel-mkl-libraries-are-redistributables
+
+Only the functions listed in funcs.txt are included in the library.
+After changing the list run build.cmd (Windows) and build.sh (Linux) to rebuild the binaries.
+You need an Intel MKL installation for that.

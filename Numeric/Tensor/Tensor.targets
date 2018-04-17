@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <NativeLibs Include="$(MSBuildThisFileDirectory)/*.dll" />
+    <NativeLibs Include="$(MSBuildThisFileDirectory)/*.so" />
+    <None Include="@(NativeLibs)">
+      <Link>%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

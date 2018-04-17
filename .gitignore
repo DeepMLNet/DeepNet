@@ -254,3 +254,7 @@ ModelManifest.xml
 /TestExes/LangRNN/Data/Gutenberg.txt
 /TestExes/LangRNN/Data/Gutenberg1000000.txt
 .idea
+
+
+bin/
+obj/

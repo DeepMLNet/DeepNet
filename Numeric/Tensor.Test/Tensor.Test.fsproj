@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <NoWarn>988</NoWarn>
+    <Platform>x64</Platform>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Utils.fs" />  
+    <Compile Include="BaseTests.fs" />
+    <Compile Include="BigIntegerTests.fs" />
+    <Compile Include="CudaTests.fs" />
+    <Compile Include="NumpyFilesTest.fs" />
+    <Compile Include="HDF5Tests.fs" />
+    <Compile Include="RatTests.fs" />
+    <Compile Include="LinAlgTests.fs" />
+    <Compile Include="Main.fs" />
+    <Content Include="App.config" />
+    <None Include="TestData\MatInv.h5">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestData\NPZ1.npz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tensor\Tensor.fsproj" />
+    <ProjectReference Include="..\Tensor.Algorithm\Tensor.Algorithm.fsproj" />    
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsUnit.Xunit" Version="3.0.0" />
+    <PackageReference Include="xunit" Version="2.3.0-beta5-build3769" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.0-beta5-build3769" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.0-beta5-build3769" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
+  </ItemGroup>
+</Project>

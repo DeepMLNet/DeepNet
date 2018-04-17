@@ -1,0 +1,93 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Common.targets" />
+  <PropertyGroup>
+    <PackageId>Tensor</PackageId>
+    <title>F# Tensor (multidimensional array) library with SIMD and GPU acceleration</title>
+    <summary>Provides n-dimensional arrays (tensors) in host memory or on CUDA GPUs. Support many operations from NumPy.</summary>
+    <description>
+      Tensor (n-dimensional array) library for F#
+
+      Core features:
+        - n-dimensional arrays (tensors) in host memory or on CUDA GPUs 
+        - element-wise operations (addition, multiplication, absolute value, etc.)
+        - basic linear algebra operations (dot product, SVD decomposition, matrix inverse, etc.)
+        - reduction operations (sum, product, average, maximum, arg max, etc.)
+        - logic operations (comparision, and, or, etc.)
+        - views, slicing, reshaping, broadcasting (similar to NumPy) 
+        - scatter and gather by indices
+        - standard functional operations (map, fold, etc.)
+
+      Data exchange:
+        - read/write support for HDF5 (.h5)
+        - interop with standard F# types (Seq, List, Array, Array2D, Array3D, etc.)
+
+      Performance:
+        - host: SIMD and Intel MKL accelerated operations 
+        - CUDA GPU: all operations performed locally on GPU and cuBLAS used for matrix operations
+
+      Requirements: 
+        - Linux or Windows on x64 only
+        - for GPU support: CUDA 8.0 libraries installed and in PATH (Windows) or LD_LIBRARY_PATH (Linux)
+
+      Additional algorithms are provided in the Tensor.Algorithm package.
+    </description>
+    <PackageTags>Tensor ndarray array MKL SIMD BLAS CUDA CUBLAS HDF5</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HDF.PInvoke" Version="1.10.1.1" />
+    <PackageReference Include="ManagedCuda" Version="8.0.35" />
+    <PackageReference Include="ManagedCuda-CUBLAS" Version="8.0.35" />
+    <PackageReference Include="ManagedCuda-NVRTC" Version="8.0.35" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
+    <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Utils.fs" />
+    <Compile Include="DiskMap.fs" />
+    <Compile Include="HDF5.fs" />
+    <Compile Include="Sgn.fs" />
+    <Compile Include="TensorRng.fs" />
+    <Compile Include="TensorLayout.fs" />
+    <Compile Include="TensorBackend.fs" />
+    <Compile Include="ITensor.fs" />
+    <Compile Include="Tensor.fs" />
+    <Compile Include="TensorVal.fs" />
+    <Compile Include="BlasSupport.fs" />
+    <Compile Include="Host/HostBLAS.fs" />
+    <Compile Include="Host/FastAccess.fs" />
+    <Compile Include="Host/ScalarOps.fs" />
+    <Compile Include="Host/VectorOps.fs" />
+    <Compile Include="Host/HostBackend.fs" />
+    <Compile Include="Host/HostFrontend.fs" />
+    <Compile Include="Cuda/CudaCfg.fs" />
+    <Compile Include="Cuda/CudaUtils.fs" />
+    <Compile Include="Cuda/CudaBLAS.fs" />    
+    <Compile Include="Cuda/CudaRegMem.fs" />
+    <Compile Include="Cuda/NativeTensor.fs" />
+    <Compile Include="Cuda/KernelCompiler.fs" />
+    <Compile Include="Cuda/CudaKernels.fs" />
+    <Compile Include="Cuda/CudaBackend.fs" />
+    <Compile Include="Cuda/CudaFrontend.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Cuda/Kernels/*.cuh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Tensor.targets" PackagePath="build" />
+    <Content Include="MKL/libtensor_mkl.so" PackagePath="lib/netstandard2.0" />
+    <Content Include="MKL/libtensor_mkl.so" PackagePath="build">
+      <Link>libtensor_mkl.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MKL/tensor_mkl.dll" PackagePath="build">
+      <Link>tensor_mkl.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MKL/libiomp5md.dll" PackagePath="build">
+      <Link>libiomp5md.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>
