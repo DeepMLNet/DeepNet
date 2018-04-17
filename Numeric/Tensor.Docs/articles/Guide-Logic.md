@@ -4,7 +4,7 @@ Comparison is used to element-wise compare the elements of two tensors resulting
 Several operations that can be performed with boolean tensors are described on this page.
 
 ## Element-wise comparison operators
-Element-wise comparisons are performed using the [==== (element-wise equal)](xref:Tensor.Tensor`1.op_EqualsEqualsEqualsEquals*), [<<<< (element-wise smaller than)](xref:Tensor.Tensor`1.op_LessLessLessLess), [>>>> (element-wise greater than)](xref:op_GreaterGreaterGreaterGreater) and [<<>> (element-wise not equal)](xref:op_LessLessGreaterGreater) operators.
+Element-wise comparisons are performed using the [==== (element-wise equal)](xref:Tensor.Tensor`1.op_EqualsEqualsEqualsEquals*), [<<<< (element-wise smaller than)](xref:Tensor.Tensor`1.op_LessLessLessLess*), [>>>> (element-wise greater than)](xref:Tensor.Tensor`1.op_GreaterGreaterGreaterGreater*) and [<<>> (element-wise not equal)](xref:Tensor.Tensor`1.op_LessLessGreaterGreater*) operators.
 These operators return tensors of boolean data type.
 
 The following example compares the elements of tensors `d` and `e` for equality.
@@ -56,7 +56,7 @@ let b = Tensor.trueIdx a
 Sometimes it is desirable to select an element from either a tensor or another, depending on the truth value of a condition.
 For example, `r.[1]` should be `5` if `c.[1]` is `true`, but `7` if `c.[1]` is `false`.
 
-The [ifThenElse](xref:Tensor.Tensor`1.ifThenElse) function provides this functionality.
+The [ifThenElse](xref:Tensor.Tensor`1.ifThenElse*) function provides this functionality.
 It takes a boolean condition tensor, a tensor for the values to use if the condition is `true` and a tensor for the values to use if the conditions is `false`.
 All three tensors must be of same shape.
 
@@ -90,7 +90,7 @@ The following example shows this use case.
  // b = [1.0; 2.0; 6.0]
 ```
 
-If a particular dimension should not be masked, the special identifier [NoMask](xref:Tensor.TensorVal.NoMask) can be specified instead.
+If a particular dimension should not be masked, the special identifier [NoMask](xref:Tensor.TensorVal.NoMask()) can be specified instead.
 For example, this allows to select whole rows or columns of a matrix and is illustrated in the next code segment.
 
 ```fsharp

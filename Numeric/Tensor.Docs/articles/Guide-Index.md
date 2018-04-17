@@ -56,7 +56,7 @@ let b = Tensor.findAxis 3.0 1 a
 // b = [2L; 3L]
 ```
 
-If the specified value is not present, this function returns the special value [NotFound](xref:Tensor.Tensor`1.NotFound) instead.
+If the specified value is not present, this function returns the special value [NotFound](xref:Tensor.TensorVal.NotFound()) instead.
 
 ## Indices of all true values
 

@@ -1,14 +1,5 @@
 TODO:
 
-- first see the old documentation
-- overhead bar
-- logo
-- see other DocFX sites to see how it is done
-- translate introductory examples
-- perhaps ask DocFX about the ' token
-- union/mod/etc fix
+- remove wrong coloring of ' token
+- proper titles for F# union, module, active pattern, etc.
 - fix DocFX function brackets missing.
-
-
-
-

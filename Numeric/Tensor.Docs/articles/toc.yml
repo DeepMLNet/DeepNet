@@ -3,7 +3,7 @@
   items:
     - name: Installation
       href: Guide-Installation.md
-    - name: Creating tensors
+    - name: Creating and transferring tensors
       href: Guide-Creation.md
     - name: Elements and slicing
       href: Guide-Elements.md      

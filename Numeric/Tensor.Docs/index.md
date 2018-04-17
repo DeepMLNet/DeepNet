@@ -47,6 +47,6 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 To get an overview of available functions by category, see [Tensor at a glance](articles/Tensor.md).
 We also provide [full reference documentation](xref:Tensor).
 
-To start using the library, follow the [installation guide](articles/Guide-Installation.md) and the [getting started guide](Guide-Creation.md).
+To start using the library, follow the [installation guide](articles/Guide-Installation.md) and the [getting started guide](articles/Guide-Creation.md).
 
 Current limitations are documented on the [status page](articles/Status.md).

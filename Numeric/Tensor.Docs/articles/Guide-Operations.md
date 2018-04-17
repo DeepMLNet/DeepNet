@@ -41,11 +41,11 @@ Thus, in our example, the last dimension of tensor `a` is broadcasted resulting 
 If the shapes still differ after applying the above rules, the operation fails and an exception is raised.
 
 ### Storage devices must match
-All tensors participating in an operation must be located on the same storage device, i.e. their [Dev](xref:Tensor.Tensor`1.Dev) property must be equal.
+All tensors participating in an operation must be located on the same storage device, i.e. their [Dev](xref:Tensor.Tensor`1.Dev*) property must be equal.
 The result will be stored on the same device as the sources.
 No automatic transfer between different devices (e.g. GPU and host memory) is performed; instead an exception is raised.
 
-If working with tensors stored on different devices, you first have to use the [transfer](xref:Tensor.Tensor`1.transfer) function to copy them to the same device, before applying an operator on them.
+If working with tensors stored on different devices, you first have to use the [transfer](xref:Tensor.Tensor`1.transfer*) function to copy them to the same device, before applying an operator on them.
 
 ## Element-wise arithmetic and rounding functions
 The standard F# arithmetic functions, such as [sin](xref:Tensor.Tensor`1.Sin*), [exp](xref:Tensor.Tensor`1.Exp*), [log](xref:Tensor.Tensor`1.Log*), and rounding functions, such as [floor](xref:Tensor.Tensor`1.Floor*) and [ceil](xref:Tensor.Tensor`1.Ceiling*), can also be applied to tensors.
@@ -85,7 +85,7 @@ This is especially useful when working with very large tensors and thus care mus
 You can find the `Fill*` variants of each operation by checking the "*see also*" section in its reference documentation.
 
 ## Matrix multiplication (dot product)
-Matrix multiplication (dot product) is implemented using the [.* operator](xref:Tensor.Tensor`1.op_DotMultiply).
+Matrix multiplication (dot product) is implemented using the [.* operator](xref:Tensor.Tensor`1.op_DotMultiply*).
 This operator can be used to calculate a vector/vector product resulting in a scalar, a matrix/vector product resulting in a vector and a matrix/matrix product resulting in a matrix.
 If the inputs have more than two dimensions, a batched matrix/matrix product is computed.
 
@@ -112,17 +112,17 @@ let hi = h .* i
 The diagonal of a matrix can be extracted using the [diag](xref:Tensor.Tensor`1.diag*) function.
 To create a diagonal matrix with specific elements on the diagonal use the [diagMat](xref:Tensor.Tensor`1.diagMat*) function.
 
-The norm can be computed using the [norm](xref:Tensor.Tensor`1.norm*) and [normAxis](xref:Tensor.Tensor`1.normAxis) functions.
+The norm can be computed using the [norm](xref:Tensor.Tensor`1.norm*) and [normAxis](xref:Tensor.Tensor`1.normAxis*) functions.
 
 To invert a square, invertable matrix use the [invert](xref:Tensor.Tensor`1.invert*) function.
 However, this may be numerically instable, especially if the condition number of the matrix is low.
 Thus it is usually better, but also more expensive, to compute the Moore-Penrose pseudo-inverse using the [pseudoInvert](xref:Tensor.Tensor`1.pseudoInvert*) function.
 This is also applicable to non-square and non-invertable matrices.
 
-The singular value decomposition (SVD) of a matrix is available through [SVD](xref:Tensor.Tensor`1.SVD).
-The eigen-decomposition of a symmetric matrix can be computed using the [symmetricEigenDecomposition](xref:Tensor.Tensor`1.symmetricEigenDecomposition) function.
+The singular value decomposition (SVD) of a matrix is available through [SVD](xref:Tensor.Tensor`1.SVD*).
+The eigen-decomposition of a symmetric matrix can be computed using the [symmetricEigenDecomposition](xref:Tensor.Tensor`1.symmetricEigenDecomposition*) function.
 
-The tensor product (pairwise product between all elements of two tensors) between two tensors can be obtained using the the [tensorProduct](xref:Tensor.Tensor`1.tensorProduct) function.
+The tensor product (pairwise product between all elements of two tensors) between two tensors can be obtained using the the [tensorProduct](xref:Tensor.Tensor`1.tensorProduct*) function.
 
 ## Concatenation and block tensors
 Tensors can be concatenated along an axis using the [concat](xref:Tensor.Tensor`1.concat*) function.
@@ -132,7 +132,7 @@ To replicate a tensor along an axis use the [replicate](xref:Tensor.Tensor`1.rep
 A tensor built out of smaller tensors block can be created using the [ofBlocks](xref:Tensor.Tensor`1.ofBlocks*) function.
 
 ## Element-wise function application (host-only)
-For tensors stored in host memory, it is also possible to apply an arbitrary function element-wise using the [HostTensor.map](xref:Tensor.HostTensor.map) function.
+For tensors stored in host memory, it is also possible to apply an arbitrary function element-wise using the [HostTensor.map](xref:Tensor.HostTensor.map*) function.
 
 ```fsharp
 let f3 = HostTensor.map (fun x -> if x > 15.0 then 7.0 + x else -1.0) f
@@ -140,7 +140,7 @@ let f3 = HostTensor.map (fun x -> if x > 15.0 then 7.0 + x else -1.0) f
 ```
 
 Likewise, the [HostTensor.map2](xref:Tensor.HostTensor.map2*) function takes two tensors and applies a binary function to their elements.
-Indexed variants of both function are provided by [HostTensor.mapi](xref:Tensor.HostTensor.mapi) and [HostTensor.mapi2](xref:Tensor.HostTensor.mapi2).
+Indexed variants of both function are provided by [HostTensor.mapi](xref:Tensor.HostTensor.mapi*) and [HostTensor.mapi2](xref:Tensor.HostTensor.mapi2*).
 
 The [HostTensor.foldAxis](xref:Tensor.HostTensor.foldAxis*) applies a function along the specified axis of a tensor and threads an state through the computation.
 
