@@ -19,7 +19,7 @@ Reshaping changes the shape of the tensor while keeping the number of elements c
 
 For example consider the *4x4* matrix `b`, that is created as follows.
 ```fsharp
-let b = HostTensor.init [4L; 4L] (fun [y; x] -> 4 * int y + int x)
+let b = HostTensor.init [4L; 4L] (fun [|y; x|] -> 4 * int y + int x)
 // b =
 //    [[   0    1    2    3]
 //     [   4    5    6    7]
@@ -103,7 +103,7 @@ This is called broadcasting.
 
 Consider the *1x4* matrix `c` created using the following code.
 ```fsharp
-let c = HostTensor.init [1L; 4L] (fun [_; i] -> int i)
+let c = HostTensor.init [1L; 4L] (fun [|_; i|] -> int i)
 // c = [[   0    1    2    3]]
 ```
 

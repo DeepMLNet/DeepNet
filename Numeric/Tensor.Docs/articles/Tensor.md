@@ -194,7 +194,6 @@ These functions return tensor of indices or work with them.
 Function | Description
 -------- | -----------
 [allIdx](xref:Tensor.Tensor`1.allIdx*) | Gets a sequence of all indices to enumerate all elements within the tensor.
-[allIdxOfDim](xref:Tensor.Tensor`1.allIdxOfDim*) | Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.
 [argMax](xref:Tensor.Tensor`1.argMax*) | Finds the indicies of the maximum value of the tensor.
 [argMaxAxis](xref:Tensor.Tensor`1.argMaxAxis*) | Finds the index of the maximum value along the specified axis.
 [argMin](xref:Tensor.Tensor`1.argMin*) | Finds the indicies of the minimum value of the tensor.

@@ -73,7 +73,7 @@ let sections = [
 
     "Index functions", 
     "These functions return tensor of indices or work with them.", [
-        "allIdx"; "allIdxOfDim"; "argMax"; "argMaxAxis"; "argMin"; "argMinAxis";
+        "allIdx"; "argMax"; "argMaxAxis"; "argMin"; "argMinAxis";
         "find"; "findAxis"; "gather"; "scatter"; "trueIdx"]
 
     "Reduction functions", 

@@ -2091,9 +2091,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         Tensor.CheckSameStorage ([src :> ITensor] @ 
             List.choose (Option.map (fun t -> t :> ITensor)) indices)
         if src.NDims <> indices.Length then
-            invalidArg "indices" "for each dimension of src an index tensor must be specified"        
+            invalidArg "indices" "For each dimension of src an index tensor must be specified."        
         if indices |> List.skip trgt.NDims |> List.exists Option.isNone then
-            invalidArg "indices" "index dimensions beyond the number of target dimensions must not be None"
+            invalidArg "indices" "Index dimensions beyond the number of target dimensions must not be None."
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo trgt.Shape :> ITensorFrontend<_>))
         trgt.Backend.Gather (trgt=trgt, srcIdxs=indices, src=src)
 
@@ -2103,11 +2103,23 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>Result with the shape of the (broadcasted) tensors specified in <paramref name="indices"/>.</returns>
     /// <example><code language="fsharp">
+    /// let src = HostTensor.ofList2D [[0.0; 0.1; 0.2; 0.3]
+    ///                                [1.0; 1.1; 1.2; 1.3]
+    ///                                [2.0; 2.1; 2.2; 2.3]]
+    /// let i0 = HostTensor.ofList [1L; 2L; 0L; 0L]
+    /// let i1 = HostTensor.ofList [3L; 1L; 0L; 3L]
+    /// let g = Tensor.gather [Some i0; Some i1] src // g = [1.3000    2.1000    0.0000    0.3000]
+    ///
+    /// // Using None instead of an index tensor.    
+    /// let j1 = HostTensor.ofList [3L; 1L; 0L]
+    /// let g2 = Tensor.gather [None; Some j1] src // g2 = [0.3000    1.1000    2.0000]
     /// </code></example>
     /// <remarks>
     /// <para>The output element with indices <c>[i_0; i_1; i_2; ...]</c> is given by the source element with indices 
     /// <c>[j_0; j_1; j_2; ...]</c>, where each index <c>j_k</c> is given by <c>j_k = indices.[k].[i_0; i_1; i_2; ...]</c>.
-    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.</para>
+    /// If <c>indices.[k]</c> is <c>None</c>, then <c>j_k = i_k</c> is assumed instead.
+    /// Index dimensions beyond the number of target dimensions must not be <c>None</c>.
+    /// </para>
     /// <para>The tensors <paramref name="indices"/> and <paramref name="src"/> must have the same storage.
     /// All index tensors are broadcasted to the same size.</para>
     /// </remarks>
@@ -2116,7 +2128,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         // broadcast specified indices to same shape
         let specIndices = indices |> List.choose id
         if List.isEmpty specIndices then
-            invalidArg "indicies" "at least one index tensor must not be None"
+            invalidArg "indicies" "At least one index tensor must not be None."
         let bcSpecIndices = Tensor<_>.broadcastToSame specIndices
         let rec rebuild idxs repIdxs =
             match idxs, repIdxs with
@@ -2140,9 +2152,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         Tensor.CheckSameStorage ([src :> ITensor] @ 
             List.choose (Option.map (fun t -> t :> ITensor)) indices)
         if trgt.NDims <> indices.Length then
-            invalidArg "indices" "for each dimension of the target an index tensor must be specified"        
+            invalidArg "indices" "For each dimension of the target an index tensor must be specified."        
         if indices |> List.skip src.NDims |> List.exists Option.isNone then
-            invalidArg "indices" "index dimensions beyond the number of source dimensions must not be None"
+            invalidArg "indices" "Index dimensions beyond the number of source dimensions must not be None."
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo src.Shape :> ITensorFrontend<_>))
         trgt.Backend.FillConst (trgt=trgt, value=zero<'T>)
         trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)
@@ -2154,6 +2166,22 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>Result with the shape specified in <paramref name="trgtShp"/>.</returns>
     /// <example><code language="fsharp">
+    /// // Sum first row of src into last element and swap rows 1 and 2.
+    /// let src = HostTensor.ofList2D [[0.0; 0.1; 0.2; 0.3]
+    ///                                [1.0; 1.1; 1.2; 1.3]
+    ///                                [2.0; 2.1; 2.2; 2.3]]
+    /// let i0 = HostTensor.ofList2D [[0L; 0L; 0L; 0L]
+    ///                               [2L; 2L; 2L; 2L]
+    ///                               [1L; 1L; 1L; 1L]]
+    /// let i1 = HostTensor.ofList2D [[3L; 3L; 3L; 3L]
+    ///                               [0L; 1L; 2L; 3L]
+    ///                               [0L; 1L; 2L; 3L]]
+    /// let s = Tensor.scatter [Some i0; Some i1] [4L; 4L] src
+    /// // s =
+    /// //     [[   0.0000    0.0000    0.0000    0.6000]
+    /// //      [   2.0000    2.1000    2.2000    2.3000]
+    /// //      [   1.0000    1.1000    1.2000    1.3000]
+    /// //      [   0.0000    0.0000    0.0000    0.0000]]    
     /// </code></example>
     /// <remarks>
     /// <para>The source element with indices <c>[i_0; i_1; i_2; ...]</c> is written to the target element with indices 
