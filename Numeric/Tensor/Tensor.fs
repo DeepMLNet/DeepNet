@@ -206,14 +206,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="allIdxOfDim"/><seealso cref="allElems"/>
     static member allIdx (a: Tensor<'T>) = ITensor.allIdx a
 
-    /// <summary>Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.</summary>
-    /// <param name="dim">The dimension to enumerate.</param>
-    /// <param name="a">The tensor to operate on.</param>
-    /// <returns>Sequence of indicies.</returns>
-    /// <remarks>The sequence sequentially enumerates the indices of the elements of the specified dimension.</remarks>
-    /// <seealso cref="allIdx"/>
-    static member allIdxOfDim dim (a: Tensor<'T>) = ITensor.allIdxOfDim dim a
-            
     /// <summary>Gets a sequence of all all elements within the tensor.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>Sequence of elements.</returns>

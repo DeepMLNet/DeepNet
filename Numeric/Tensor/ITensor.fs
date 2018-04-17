@@ -191,14 +191,6 @@ module ITensor =
     /// <seealso cref="Tensor`1.allIdxOfDim"/>
     let allIdx (a: ITensor) = a.Layout |> TensorLayout.allIdx
 
-    /// <summary>Gets a sequence of all indices to enumerate all elements of the specified dimension of the tensor.</summary>
-    /// <param name="dim">The dimension to enumerate.</param>
-    /// <param name="a">The tensor to operate on.</param>
-    /// <returns>Sequence of indicies.</returns>
-    /// <remarks>The sequence sequentially enumerates the indices of the elements of the specified dimension.</remarks>
-    /// <seealso cref="Tensor`1.allIdx"/>
-    let allIdxOfDim dim (a: ITensor) = a.Layout |> TensorLayout.allIdxOfDim dim 
-
     /// <summary>Insert a dimension of size one as the first dimension.</summary>
     /// <param name="a">The tensor to operate on.</param>
     /// <returns>The resulting tensor.</returns>
