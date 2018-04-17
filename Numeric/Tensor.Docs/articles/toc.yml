@@ -1,5 +1,3 @@
-- name: Overview
-  href: Intro.md
 - name: Guide
   href: Guide-Installation.md
   items:
@@ -20,9 +18,7 @@
     - name: Index functions
       href: Guide-Index.md            
     - name: Save and load
-      href: Guide-Save-and-Load.md      
-      
-- name: Tensor at a glance
-  href: Tensor.md
-
+      href: Guide-Save-and-Load.md     
+- name: Status
+  href: Status.md
   

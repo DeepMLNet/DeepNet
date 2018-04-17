@@ -1,5 +1,9 @@
+- name: Home
+  href: index.md
 - name: Articles
   href: articles/
-- name: Api Documentation
+  homepage: articles/Guide-Installation.md
+- name: Tensor at a glance
+  href: articles/Tensor.md
+- name: Reference
   href: api/
-  homepage: api/index.md
