@@ -13,12 +13,11 @@
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
   before_build:
-    - ps: New-Item -ItemType Directory $HOME/.nuget/NuGet
-    - ps: Add-Content $HOME/.nuget/NuGet/NuGet.Config '<?xml version="1.0" encoding="utf-8"?>' 
-    - ps: Add-Content $HOME/.nuget/NuGet/NuGet.Config '<configuration><packageSources>'
-    - ps: Add-Content $HOME/.nuget/NuGet/NuGet.Config '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />'
-    - ps: Add-Content $HOME/.nuget/NuGet/NuGet.Config '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />'
-    - ps: Add-Content $HOME/.nuget/NuGet/NuGet.Config '</packageSources></configuration>'
+    - ps: Add-Content NuGet.Config '<?xml version="1.0" encoding="utf-8"?>' 
+    - ps: Add-Content NuGet.Config '<configuration><packageSources>'
+    - ps: Add-Content NuGet.Config '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />'
+    - ps: Add-Content NuGet.Config '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />'
+    - ps: Add-Content NuGet.Config '</packageSources></configuration>'
     - ps: cat $HOME/.nuget/NuGet/NuGet.Config
     - ps: Remove-Item Revision.targets
     - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
