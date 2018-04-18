@@ -3,7 +3,7 @@
     only:
       - master
 
-  version: 0.3.0.{build}
+  version: 0.4.0.{build}
   shallow_clone: true  
   image: Visual Studio 2017
 
@@ -16,20 +16,18 @@
     - Appveyor\install.cmd
 
   before_build:
-    - nuget restore DeepNet-CI.sln -Verbosity quiet
+    - ps: Remove-Item Revision.targets
+    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>$APPVEYOR_BUILD_NUMBER</Rev></PropertyGroup></Project>"
+    - dotnet restore Numeric/Tensor.sln
 
   platform: x64
   configuration: Release
   build:
-    project: DeepNet-CI.sln
+    project: Numeric/Tensor.sln
     verbosity: minimal
   
   assembly_info:
-    patch: true
-    file: AssemblyInfo.*
-    assembly_version: "{version}"
-    assembly_file_version: "{version}"
-    assembly_informational_version: "{version}"  
+    patch: false
   
   test:
     categories:

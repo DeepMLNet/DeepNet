@@ -20,11 +20,10 @@ Push-Location docfx
 if ($docfxSrc -eq "NuGet") {
     nuget install docfx.console -source $docfxNuGet -ExcludeVersion -Prerelease 
     nuget install memberpage -source $docfxNuGet -ExcludeVersion -Prerelease 
-    ls -la
-    ls -la docfx.console
 } elseif ($docfxSrc -eq "Path") {
     $docfxPath = Resolve-Path $docfxPath
-    New-Item -ItemType SymbolicLink -Path "docfx.console" -Value "$docfxPath/src/docfx/bin/Release/net461"
+    New-Item -ItemType Directory -Path "docfx.console"
+    New-Item -ItemType SymbolicLink -Path "docfx.console/tools" -Value "$docfxPath/src/docfx/bin/Release/net461"
     New-Item -ItemType Directory -Path "memberpage/content"
     New-Item -ItemType SymbolicLink -Path "memberpage/content/ManagedReference.extension.js" -Value "$docfxPath/plugins/Microsoft.DocAsCode.Build.MemberLevelManagedReference/resources/ManagedReference.extension.js"
     New-Item -ItemType SymbolicLink -Path "memberpage/content/ManagedReference.overwrite.js" -Value "$docfxPath/plugins/Microsoft.DocAsCode.Build.MemberLevelManagedReference/resources/ManagedReference.overwrite.js"
@@ -36,7 +35,7 @@ if ($docfxSrc -eq "NuGet") {
     exit 1
 }
 if ($PSVersionTable.Platform -eq "Unix") {
-    chmod +x "docfx.console/docfx.exe"
+    chmod +x "docfx.console/tools/docfx.exe"
 }
 Pop-Location
 

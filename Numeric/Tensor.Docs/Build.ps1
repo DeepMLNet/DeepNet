@@ -15,13 +15,13 @@ if ($PSVersionTable.Platform -eq "Unix") {
     $executor = ""
 }
 
-& $executor ./docfx/docfx.console/docfx.exe metadata
+& $executor ./docfx/docfx.console/tools/docfx.exe metadata
 
 Push-Location generate
 dotnet run
 Pop-Location
 
-& $executor ./docfx/docfx.console/docfx.exe
+& $executor ./docfx/docfx.console/tools/docfx.exe
 
 Pop-Location
 
