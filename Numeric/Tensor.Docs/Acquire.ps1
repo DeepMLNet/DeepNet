@@ -11,7 +11,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 Push-Location $PSScriptRoot
-Remove-Item -Recurse -Force docfx
+if (Test-Path -Path docfx) {
+    Remove-Item -Recurse -Force docfx
+}
 New-Item -ItemType Directory docfx
 
 Push-Location docfx
