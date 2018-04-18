@@ -12,12 +12,9 @@
     access_token:
       secure: RLs8gRDVPiOjMQTgFUS8ZwSAZik+klFVV6kvdIfxz72dHFUJlUzAnuDH+qdztzMk
 
-  install:
-    - Appveyor\install.cmd
-
   before_build:
     - ps: Remove-Item Revision.targets
-    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>$APPVEYOR_BUILD_NUMBER</Rev></PropertyGroup></Project>"
+    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
     - dotnet restore Numeric/Tensor.sln
 
   platform: x64
@@ -37,11 +34,11 @@
   artifacts:
     - path: dist\Release\*.nupkg
 
-  deploy:
-    - provider: NuGet
-      api_key:
-        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-      artifact: /.*\.nupkg/
+#  deploy:
+#    - provider: NuGet
+#      api_key:
+#        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
+#      artifact: /.*\.nupkg/
 
   notifications:
     - provider: Slack

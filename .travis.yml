@@ -17,6 +17,7 @@ install:
   - echo '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />' >> ~/.nuget/NuGet/NuGet.Config
   - echo '</packageSources></configuration>' >> ~/.nuget/NuGet/NuGet.Config
 script: 
+  - unset DOTNET_CLI_TELEMETRY_OPTOUT
   - echo "<Project><PropertyGroup><Rev>$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets
   - dotnet build Numeric/Tensor.sln
   - dotnet test Numeric/Tensor.Test/Tensor.Test.fsproj
