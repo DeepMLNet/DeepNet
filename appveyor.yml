@@ -18,7 +18,7 @@
     - ps: Add-Content NuGet.Config '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />'
     - ps: Add-Content NuGet.Config '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />'
     - ps: Add-Content NuGet.Config '</packageSources></configuration>'
-    - ps: cat $HOME/.nuget/NuGet/NuGet.Config
+    - ps: cat NuGet.Config
     - ps: Remove-Item Revision.targets
     - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
     - dotnet restore Numeric/Tensor.sln
