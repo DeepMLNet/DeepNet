@@ -8,6 +8,7 @@ param(
     [string] $docfxPath = "../../../../docfx"
 )
 
+$ErrorActionPreference = "Stop"
 
 Push-Location $PSScriptRoot
 Remove-Item -Recurse -Force docfx
