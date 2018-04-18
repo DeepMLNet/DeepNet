@@ -1,1 +1,0 @@
-../../../../docfx/plugins/Microsoft.DocAsCode.Build.MemberLevelManagedReference/resources/ManagedReference.extension.js

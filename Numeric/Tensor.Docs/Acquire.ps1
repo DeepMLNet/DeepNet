@@ -30,6 +30,9 @@ if ($docfxSrc -eq "NuGet") {
     Write-Host "docfxSrc must be either NuGet or Path."
     exit 1
 }
+if ($PSVersionTable.Platform -eq "Unix") {
+    chmod +x "docfx.console/docfx.exe"
+}
 Pop-Location
 
 Pop-Location
