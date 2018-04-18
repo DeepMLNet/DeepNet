@@ -1,3 +1,4 @@
+#!/usr/bin/pwsh
 # Script to acquire DocFX.
 # It fetches DocFX, either using NuGet or a local source and runs to build command.
 
@@ -17,7 +18,8 @@ if ($docfxSrc -eq "NuGet") {
     nuget install docfx.console -source $docfxNuGet -ExcludeVersion -Prerelease 
     nuget install memberpage -source $docfxNuGet -ExcludeVersion -Prerelease 
 } elseif ($docfxSrc -eq "Path") {
-    New-Item -ItemType SymbolicLink -Path "docfx.console" -Value "$docfxPath/src/docfx/bin/net461/Release"
+    $docfxPath = Resolve-Path $docfxPath
+    New-Item -ItemType SymbolicLink -Path "docfx.console" -Value "$docfxPath/src/docfx/bin/Release/net461"
     New-Item -ItemType Directory -Path "memberpage/content"
     New-Item -ItemType SymbolicLink -Path "memberpage/content/ManagedReference.extension.js" -Value "$docfxPath/plugins/Microsoft.DocAsCode.Build.MemberLevelManagedReference/resources/ManagedReference.extension.js"
     New-Item -ItemType SymbolicLink -Path "memberpage/content/ManagedReference.overwrite.js" -Value "$docfxPath/plugins/Microsoft.DocAsCode.Build.MemberLevelManagedReference/resources/ManagedReference.overwrite.js"
