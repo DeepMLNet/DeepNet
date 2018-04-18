@@ -19,8 +19,8 @@ install:
 script: 
   - unset DOTNET_CLI_TELEMETRY_OPTOUT
   - echo "<Project><PropertyGroup><Rev>$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets
-  - dotnet build Numeric/Tensor.sln
-  - dotnet test Numeric/Tensor.Test/Tensor.Test.fsproj
+  - dotnet build -c Release Numeric/Tensor.sln
+  - dotnet test -c Release Numeric/Tensor.Test/Tensor.Test.fsproj
   - dotnet pack -c Release Numeric/Tensor.sln
   - ./Numeric/Tensor.Docs/Build.ps1
 after_success:

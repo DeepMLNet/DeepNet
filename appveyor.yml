@@ -23,10 +23,10 @@
     - dotnet restore Numeric/Tensor.sln
 
   build_script:
-    - dotnet build Numeric/Tensor.sln
+    - dotnet build -c Release Numeric/Tensor.sln
   
   test_script:
-    - dotnet test Numeric/Tensor.Test/Tensor.Test.fsproj 
+    - dotnet test -c Release Numeric/Tensor.Test/Tensor.Test.fsproj 
   
   after_test:
     - dotnet pack -c Release Numeric/Tensor.sln
