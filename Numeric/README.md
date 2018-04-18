@@ -1,4 +1,5 @@
 # Tensor for F#
+
 [![Build Status](https://www.travis-ci.org/DeepMLNet/DeepNet.svg?branch=master)](https://www.travis-ci.org/DeepMLNet/DeepNet)
 [![Build status](https://ci.appveyor.com/api/projects/status/7qrfufbj0mvb6llv/branch/master?svg=true)](https://ci.appveyor.com/project/surban/deepnet/branch/master)
 
@@ -44,11 +45,11 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
   * Bezout's identity
   * Loading of NumPy's .npy and .npz files.
 
+## NuGet packages
+
+NuGet packages can be downloaded from <https://www.myget.org/feed/Packages/coreports>.
+
 ## Documentation
 
-To get an overview of available functions by category, see [Tensor at a glance](articles/Tensor.md).
-We also provide [full reference documentation](xref:Tensor).
+Documentation is provided at <http://www.deepml.net/Tensor>.
 
-To start using the library, follow the [installation guide](articles/Guide-Installation.md) and the [getting started guide](articles/Guide-Creation.md).
-
-Current limitations are documented on the [status page](articles/Status.md).
