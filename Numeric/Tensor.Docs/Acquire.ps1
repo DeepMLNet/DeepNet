@@ -20,6 +20,8 @@ Push-Location docfx
 if ($docfxSrc -eq "NuGet") {
     nuget install docfx.console -source $docfxNuGet -ExcludeVersion -Prerelease 
     nuget install memberpage -source $docfxNuGet -ExcludeVersion -Prerelease 
+    ls -la
+    ls -la docfx.console
 } elseif ($docfxSrc -eq "Path") {
     $docfxPath = Resolve-Path $docfxPath
     New-Item -ItemType SymbolicLink -Path "docfx.console" -Value "$docfxPath/src/docfx/bin/Release/net461"
