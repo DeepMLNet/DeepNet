@@ -24,3 +24,14 @@ script:
   - ./Numeric/Tensor.Docs/Build.ps1
 after_success:
   - if [ "$TRAVIS_BRANCH" = "master" ]; then dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'; fi
+  - if [ "$TRAVIS_BRANCH" = "master" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Numeric/Tensor.Docs/_site/ webpage/Tensor; fi
+deploy:
+  provider: pages
+  local-dir: webpage
+  repo: DeepMLNet/webpage
+  fqdn: www.deepml.net
+  skip-cleanup: true
+  github-token: $GITHUB_TOKEN  
+  keep-history: true
+  on:
+    branch: master
