@@ -18,33 +18,21 @@
     - ps: Add-Content NuGet.Config '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />'
     - ps: Add-Content NuGet.Config '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />'
     - ps: Add-Content NuGet.Config '</packageSources></configuration>'
-    - ps: cat NuGet.Config
     - ps: Remove-Item Revision.targets
     - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
     - dotnet restore Numeric/Tensor.sln
 
-  platform: x64
-  configuration: Release
-  build:
-    project: Numeric/Tensor.sln
-    verbosity: minimal
+  build_script:
+    - dotnet build Numeric/Tensor.sln
   
-  assembly_info:
-    patch: false
+  test_script:
+    - dotnet test Numeric/Tensor.Test/Tensor.Test.fsproj 
   
-  test:
-    categories:
-      except:
-        - Skip_CI
+  after_test:
+    - dotnet pack -c Release Numeric/Tensor.sln
 
   artifacts:
-    - path: dist\Release\*.nupkg
-
-#  deploy:
-#    - provider: NuGet
-#      api_key:
-#        secure: uVzfwaf8HYpirCVXO/sqI7Dh7i8K6pNkY2HmYrQG0x8dqSfU5HAzF6WAIgyvLTbF
-#      artifact: /.*\.nupkg/
+    - path: Packages\Release\*.nupkg
 
   notifications:
     - provider: Slack
