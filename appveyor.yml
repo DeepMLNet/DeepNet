@@ -14,7 +14,7 @@
 
   before_build:
     - ps: Remove-Item Revision.targets
-    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
+    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
     - dotnet restore Numeric/Tensor.sln
 
   platform: x64
