@@ -341,6 +341,11 @@ module HostTensor =
     /// <param name="hdf5">The HDF5 file.</param>
     /// <param name="path">The HDF5 object path.</param>
     /// <param name="x">The tensor to write.</param>
+    /// <example><code language="fsharp">
+    /// let k = HostTensor.init [5L; 3L] (fun [|i; j|] -> 3.0 * float i + float j)
+    /// use hdfFile = HDF5.OpenWrite "tensors.h5"
+    /// HostTensor.write hdfFile "k" k
+    /// </code></example>    
     let write (hdf5: HDF5) (path: string) (x: ITensor) =
         callGeneric<HDFFuncs, unit> "Write" [x.DataType] (hdf5, path, x)
 
@@ -352,6 +357,10 @@ module HostTensor =
     /// <returns>A tensor filled with data read from the HDF5 file.</returns>
     /// <exception cref="System.InvalidOperationException">The data type stored in the HDF5 does 
     /// not match type <c>'T</c>.</exception>
+    /// <example><code language="fsharp">
+    /// use hdfFile = HDF5.OpenRead "tensors.h5"
+    /// let k = HostTensor.read<float> hdfFile "k"
+    /// </code></example>    
     /// <seealso cref="write"/><seealso cref="readUntyped"/>
     let read<'T> (hdf5: HDF5) (path: string) : Tensor<'T> =
         HDFFuncs.Read (hdf5, path)

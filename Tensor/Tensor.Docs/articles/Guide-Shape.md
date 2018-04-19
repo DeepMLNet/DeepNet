@@ -62,7 +62,7 @@ It will raise an error, if creating a reshaped view of the original tensor is im
 The [Tensor.swapDim](xref:Tensor.Tensor`1.swapDim*) function creates a new view of a tensor with the given dimensions swapped.
 For example, the following code transpose the matrix `b`.
 ```fsharp
-let b3 = ArrayND.swapDim 0 1 b
+let b3 = Tensor.swapDim 0 1 b
 // b3 =
 //    [[   0    4    8   12]
 //     [   1    5    9   13]
@@ -109,7 +109,7 @@ let c = HostTensor.init [1L; 4L] (fun [|_; i|] -> int i)
 
 We can use the [Tensor.broadcastTo](xref:Tensor.Tensor`1.broadcastTo*) function to obtain a tensor with the first dimension repeated 3 times.
 ```fsharp
-let c1 = Tensor.broadcastTo[3L; 4L] c
+let c1 = Tensor.broadcastTo [3L; 4L] c
 // c1 =
 //    [[   0    1    2    3]
 //     [   0    1    2    3]
@@ -129,6 +129,6 @@ c1.[[1L; 1L]] <- 11
 ```
 
 ### Automatic broadcasting
-Broadcasting is also performed automatically when performing element-wise operations between two tensors of different, but compatible, shapes.
-This will be explained in the following chapters of the guide.
 
+Broadcasting is also performed automatically when performing element-wise operations between two tensors of different, but compatible, shapes.
+This will be explained in the section about [tensor operations](Guide-Operations.md) of the guide.

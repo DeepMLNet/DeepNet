@@ -40,6 +40,40 @@ Thus, in our example, the last dimension of tensor `a` is broadcasted resulting 
 
 If the shapes still differ after applying the above rules, the operation fails and an exception is raised.
 
+```fsharp
+let a = HostTensor.init [4L; 3L; 1L] (fun [|i; j; k|] -> float i + 0.1 * float j)
+let b = HostTensor.init [2L] (fun [|i|] -> 10.0 * float i)
+// a =
+//   [[[   0.0000]
+//     [   0.1000]
+//     [   0.2000]]
+//    [[   1.0000]
+//     [   1.1000]
+//     [   1.2000]]
+//    [[   2.0000]
+//     [   2.1000]
+//     [   2.2000]]
+//    [[   3.0000]
+//     [   3.1000]
+//     [   3.2000]]]
+// b = [   0.0000   10.0000]
+let apb = a + b
+// apb =
+//   [[[   0.0000   10.0000]
+//     [   0.1000   10.1000]
+//     [   0.2000   10.2000]]
+//    [[   1.0000   11.0000]
+//     [   1.1000   11.1000]
+//     [   1.2000   11.2000]]
+//    [[   2.0000   12.0000]
+//     [   2.1000   12.1000]
+//     [   2.2000   12.2000]]
+//    [[   3.0000   13.0000]
+//     [   3.1000   13.1000]
+//     [   3.2000   13.2000]]]
+// apb.Shape = [4L; 3L; 2L]
+```
+
 ### Storage devices must match
 All tensors participating in an operation must be located on the same storage device, i.e. their [Dev](xref:Tensor.Tensor`1.Dev*) property must be equal.
 The result will be stored on the same device as the sources.
@@ -106,6 +140,11 @@ let i = 0.1 + HostTensor.identity 3L
 //      [   0.1000    0.1000    1.1000]]
 let hi = h .* i
 // hi =
+//     [[   0.3000    1.3000    2.3000]
+//      [   4.2000    5.2000    6.2000]
+//      [   8.1000    9.1000   10.1000]
+//      [  12.0000   13.0000   14.0000]
+//      [  15.9000   16.9000   17.9000]]
 ```
 
 ## Linear algebra operations
@@ -118,6 +157,14 @@ To invert a square, invertable matrix use the [invert](xref:Tensor.Tensor`1.inve
 However, this may be numerically instable, especially if the condition number of the matrix is low.
 Thus it is usually better, but also more expensive, to compute the Moore-Penrose pseudo-inverse using the [pseudoInvert](xref:Tensor.Tensor`1.pseudoInvert*) function.
 This is also applicable to non-square and non-invertable matrices.
+
+```fsharp
+let iinv = Tensor.invert i
+// iinv =
+//    [[   0.9231    -0.077    -0.077]
+//     [   -0.077    0.9231    -0.077]
+//     [   -0.077    -0.077    0.9231]]
+```
 
 The singular value decomposition (SVD) of a matrix is available through [SVD](xref:Tensor.Tensor`1.SVD*).
 The eigen-decomposition of a symmetric matrix can be computed using the [symmetricEigenDecomposition](xref:Tensor.Tensor`1.symmetricEigenDecomposition*) function.

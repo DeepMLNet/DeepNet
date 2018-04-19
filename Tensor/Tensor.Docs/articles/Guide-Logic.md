@@ -106,9 +106,9 @@ Otherwise an exception is raised.
 The following example shows how to replace elements within a tensor using a boolean mask.
 
 ```fsharp
-let m = HostTensor.ofList [[true;  true;  false]
-                           [false; false; true ]]
-a.M(m) <- [8.0; 9.0; 0.0]
+let m = HostTensor.ofList2D [[true;  true;  false]
+                             [false; false; true ]]
+a.M(m) <- HostTensor.ofList [8.0; 9.0; 0.0]
 // a = [[8.0; 9.0; 3.0]
 //      [4.0; 5.0; 0.0]]
 ```

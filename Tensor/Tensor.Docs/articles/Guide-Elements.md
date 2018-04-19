@@ -28,7 +28,7 @@ Note that the indices are specified as 64-bit integers surrounded by double brac
 Tensors are mutable objects.
 An element can be changed using the `tensor.[[idx0; idx1; ...; idxN]] <- newValue` notation.
 ```fsharp
-a.[[2L; 2L]] <- 55.
+a.[[2L; 2L]] <- 55.0
 // a =
 //    [[   0.0000    1.0000    2.0000    3.0000    4.0000]
 //     [   5.0000    6.0000    7.0000    8.0000    9.0000]
@@ -76,7 +76,7 @@ a1.[[1L]] <- 99.0
 Slicing can also be used to change multiple elements of a tensor at once.
 For example the following code sets all elements of the first row of `a` to 1.
 ```fsharp
-let a2 = HostTensor<float>.ones [5L]
+let a2 = HostTensor.ones<float> [5L]
 // a2 = [1.0  1.0  1.0  1.0  1.0]
 a.[0L, *] <- a2
 // a =

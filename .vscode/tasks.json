@@ -38,6 +38,14 @@
             "type": "shell",
             "command": "./Tensor/Tensor.Docs/Build.ps1 -noGenerate",
             "problemMatcher": []
-        }
+        },
+        {
+            "label": "Tensor.Sample",
+            "type": "shell",
+            "command": "dotnet run -p Tensor/Tensor.Sample/Tensor.Sample.Internal.fsproj",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        }        
     ]
 }

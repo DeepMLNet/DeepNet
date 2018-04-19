@@ -18,7 +18,7 @@ For this purpose, the tensor library provides the [Tensor.sumAxis](xref:Tensor.T
 The following example illustrates its usage.
 
 ```fsharp
-let g = Tensor.init [4L; 4L] (fun [|y; x|] -> 4 * int y + int x)
+let g = HostTensor.init [4L; 4L] (fun [|y; x|] -> 4 * int y + int x)
 // g =
 //    [[   0    1    2    3]
 //     [   4    5    6    7]
@@ -38,6 +38,11 @@ Likewise [Tensor.product](xref:Tensor.Tensor`1.product*) and [Tensor.productAxis
 ## Maximum and minimum
 The [Tensor.min](xref:Tensor.Tensor`1.min*) and [Tensor.max](xref:Tensor.Tensor`1.max*) compute the minimum and maximum of a tensor and return a primitive value.
 Analogously [Tensor.minAxis](xref:Tensor.Tensor`1.minAxis*) and [Tensor.maxAxis](xref:Tensor.Tensor`1.maxAxis*) compute the minimum and maximum over the given axis.
+
+```fsharp
+let m2 = Tensor.maxAxis 0 g
+// m2 = [  12   13   14   15]
+```
 
 ## Mean and variance
 The [Tensor.mean](xref:Tensor.Tensor`1.mean*) and [Tensor.var](xref:Tensor.Tensor`1.var*) compute the emperical mean and variance of a tensor.
