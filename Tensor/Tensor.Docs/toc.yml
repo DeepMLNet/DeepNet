@@ -2,7 +2,7 @@
   href: index.md
 - name: Articles
   href: articles/
-  homepage: articles/Guide-Installation.md
+  homepage: articles/ReleaseNotes.md
 - name: Tensor at a glance
   href: articles/Tensor.md
 - name: Reference

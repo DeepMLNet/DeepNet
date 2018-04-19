@@ -46,7 +46,7 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 
 ## Documentation
 
-See the [release notes](artices/ReleaseNotes.md) to learn about recent changes.
+See the [release notes](articles/ReleaseNotes.md) to learn about recent changes.
 
 To get an overview of available functions by category, see [Tensor at a glance](articles/Tensor.md).
 
