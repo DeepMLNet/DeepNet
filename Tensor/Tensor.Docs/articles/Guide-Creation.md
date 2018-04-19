@@ -141,3 +141,5 @@ let mGpu = CudaTensor.transfer m
 
 The above sample code creates tensor `m` in host memory and then creates the copy `mGpu` in GPU memory.
 All operations performed on `mGpu` will execute directly on the GPU.
+
+If you receive an error message when trying to perform GPU operations, read the [troubleshooting guide](Troubleshooting.md) to get help.

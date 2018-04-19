@@ -15,22 +15,27 @@ open Tensor.Cuda.CudaBLASExtensions
 
 
 
-/// CUDA context helper
-module private CudaContext =
+/// CUDA initialization helper.
+/// We check that CUDA context access is possible before calling other CUDA functions to avoid
+/// exceptions being thrown from static initializers.
+module private CudaInit =
 
     /// the CUDA context we are using
-    let mutable private context = None
+    let mutable private initialized = false
 
     /// Checks if CUDA context access is possible.
     /// If not, a CudaError is thrown.
     let check () =
-        match context with
-        | Some _ -> ()
-        | None ->
-            try context <- Some (new CudaContext(createNew=false))
+        if not initialized then
+            // First try to obtain a CudaContext.
+            try new CudaContext(createNew=false) |> ignore
             with e ->
                 let msg = sprintf "Cannot create CUDA context: %s" e.Message
                 raise (CudaException msg)
+            // If this succeeds, initialize the Cuda module.
+            Cuda.context.Context |> ignore
+            Cuda.blas.CublasHandle |> ignore
+            initialized <- true
 
 
 
@@ -47,10 +52,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
                     (data: CudaDeviceVariable<'T>) =
 
     new (nElems: int64) =
-        // We check that CUDA context access is possible before calling other CUDA functions to avoid
-        // exceptions being thrown from static initializers.
-        CudaContext.check ()
-
+        CudaInit.check ()
         // CUDA cannot allocate memory of size zero
         let nElems = if nElems > 0L then nElems else 1L
         TensorCudaStorage<'T> (Cuda.newDevVar nElems)
@@ -498,7 +500,8 @@ and TensorCudaDevice private () =
     
     override this.Id = "Cuda"
     override this.Create nElems = 
-        // we use reflection to drop the constraints on 'T 
+        CudaInit.check ()
+        // We use reflection to drop the constraints on 'T.
         let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
         Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
     override this.Zeroed = false

@@ -44,10 +44,13 @@ module internal Cuda =
         with e ->
             let msg = sprintf "Cannot create CUDA context: %s" e.Message
             raise (CudaException msg)        
-
+        
     // CUDA BLAS handle
     let blas =
-        new CudaBlas.CudaBlas()
+        try new CudaBlas.CudaBlas()
+        with e ->
+            let msg = sprintf "Cannot create CUBLAS context: %s" e.Message
+            raise (CudaException msg)        
 
     /// CUDA device info
     let deviceInfo =
