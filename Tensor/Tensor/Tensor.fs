@@ -3651,7 +3651,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
     /// <example><code language="fsharp">
-    /// let a = Tensor<float>.zeros HostTensor.Dev [2L; 3L]
+    /// let a = Tensor&lt;float&gt;.zeros HostTensor.Dev [2L; 3L]
     /// // a = [[0.0; 0.0; 0.0]
     /// //      [0.0; 0.0; 0.0]]
     /// </code></example>    
@@ -3682,7 +3682,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
     /// <example><code language="fsharp">
-    /// let a = Tensor<float>.ones HostTensor.Dev [2L; 3L]
+    /// let a = Tensor&lt;float&gt;.ones HostTensor.Dev [2L; 3L]
     /// // a = [[1.0; 1.0; 1.0]
     /// //      [1.0; 1.0; 1.0]]
     /// </code></example>      
@@ -3801,7 +3801,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="size">The size of the square identity matrix.</param>
     /// <returns>The new tensor.</returns>
     /// <example><code language="fsharp">
-    /// let a = Tensor<float>.identity HostTensor.Dev 3L
+    /// let a = Tensor&lt;float&gt;.identity HostTensor.Dev 3L
     /// // a = [[1.0; 0.0; 0.0]
     /// //      [0.0; 1.0; 0.0]
     /// //      [0.0; 0.0; 1.0]]    
