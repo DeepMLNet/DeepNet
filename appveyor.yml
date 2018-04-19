@@ -19,6 +19,7 @@
   
   test_script:
     - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj 
+    - dotnet run -c Release -p Tensor/Tensor.Sample/Tensor.Sample.Internal.fsproj
   
   after_test:
     - dotnet pack -c Release Tensor/Tensor.sln
