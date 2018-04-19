@@ -21,7 +21,7 @@ script:
   - dotnet pack -c Release Tensor/Tensor.sln
   - pwsh Tensor/Tensor.Docs/Build.ps1
 after_success:
-  - dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg'
+  - dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg' || true
   - if [ "$TRAVIS_BRANCH" = "master" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
 deploy:
   provider: pages
