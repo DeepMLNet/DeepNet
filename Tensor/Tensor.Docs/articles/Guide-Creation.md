@@ -26,14 +26,13 @@ The second argument specifies the desired shape.
 All shapes and indices in this tensor library are 64-bit integers.
 Thus we have to use the `L` postfix when writing integer literals, i.e. `3L` instead of `3`.
 
-Since creating tensors in host memory is a very common operation, the library also provides the shorter notation
+Since creating tensors in host memory is a very common operation, the library also provides the shorter notation shown below to perform the same task.
 ```fsharp
 let z1 = HostTensor.zeros<int> [3L; 2L]
 // z1 = [[0; 0]
 //       [0; 0]
 //       [0; 0]]
 ```
-to perform the same task.
 These shorthands are available for all tensor creation function and listed in the [HostTensor](xref:Tensor.HostTensor) module.
 
 ## Other initialization possibilities
@@ -78,7 +77,7 @@ If you try to use this property on a non-scalar tensor, an exception will be rai
 Some tensor creation methods can only produce tensors stored in host memory, which, of course, can be transferred to GPU memory subsequently.
 For example the [HostTensor.init](xref:Tensor.HostTensor.init*) function takes a function and uses it to compute the initial value of each element of the tensor.
 ```fsharp
-let a = HostTensor.init [7L; 5L] (fun [i; j] -> 5.0 * float i + float j)
+let a = HostTensor.init [7L; 5L] (fun [|i; j|] -> 5.0 * float i + float j)
 // a =
 //    [[   0.0000    1.0000    2.0000    3.0000    4.0000]
 //     [   5.0000    6.0000    7.0000    8.0000    9.0000]

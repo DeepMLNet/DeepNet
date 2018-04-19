@@ -3650,10 +3650,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor<float>.zeros HostTensor.Dev [2L; 3L]
+    /// // a = [[0.0; 0.0; 0.0]
+    /// //      [0.0; 0.0; 0.0]]
+    /// </code></example>    
     /// <remarks>
     /// <para>A new tensor of the specified shape is created on the specified device.</para>
     /// <para>The tensor is filled with zeros.</para>
     /// </remarks>
+    /// <seealso cref="zerosLike"/><seealso cref="ones"/>
     static member zeros (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         if not dev.Zeroed then 
@@ -3667,6 +3673,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A new tensor is created with the same shape and on the same device as <paramref name="tmpl"/>.</para>
     /// <para>The tensor is filled with zeros.</para>
     /// </remarks>
+    /// <seealso cref="zeros"/>
     static member zerosLike (tmpl: Tensor<'T>) : Tensor<'T> =
         Tensor<'T>.zeros tmpl.Storage.Dev tmpl.Shape
 
@@ -3674,10 +3681,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor<float>.ones HostTensor.Dev [2L; 3L]
+    /// // a = [[1.0; 1.0; 1.0]
+    /// //      [1.0; 1.0; 1.0]]
+    /// </code></example>      
     /// <remarks>
     /// <para>A new tensor of the specified shape is created on the specified device.</para>
     /// <para>The tensor is filled with ones.</para>
     /// </remarks>
+    /// <seealso cref="onesLike"/><seealso cref="zeros"/>    
     static member ones (dev: ITensorDevice) (shape: int64 list) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst one<'T>
@@ -3690,6 +3703,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A new tensor is created with the same shape and on the same device as <paramref name="tmpl"/>.</para>
     /// <para>The tensor is filled with ones.</para>
     /// </remarks>
+    /// <seealso cref="ones"/>
     static member onesLike (tmpl: Tensor<'T>) : Tensor<'T> =
         Tensor<'T>.ones tmpl.Storage.Dev tmpl.Shape 
 
@@ -3697,10 +3711,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.falses HostTensor.Dev [2L; 3L]
+    /// // a = [[false; false; false]
+    /// //      [false; false; false]]
+    /// </code></example>        
     /// <remarks>
     /// <para>A new tensor of the specified shape is created on the specified device.</para>
     /// <para>The tensor is filled with falses.</para>
     /// </remarks>
+    /// <seealso cref="trues"/>
     static member falses (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst false
@@ -3710,10 +3730,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="shape">The shape of the new tensor.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.trues HostTensor.Dev [2L; 3L]
+    /// // a = [[true; true; true]
+    /// //      [true; true; true]]
+    /// </code></example>       
     /// <remarks>
     /// <para>A new tensor of the specified shape is created on the specified device.</para>
     /// <para>The tensor is filled with trues.</para>
     /// </remarks>
+    /// <seealso cref="falses"/>
     static member trues (dev: ITensorDevice) (shape: int64 list) : Tensor<bool> =
         let x = Tensor<bool> (shape, dev)
         x.FillConst true
@@ -3723,10 +3749,15 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="value">The value of the new, scalar tensor.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.scalar HostTensor.Dev 2.5f
+    /// // a = 2.5f
+    /// </code></example>       
     /// <remarks>
     /// <para>A new tensor of zero-dimensional shape is created on the specified device.</para>
     /// <para>The values of the tensor is set to the specified value.</para>
     /// </remarks>
+    /// <seealso cref="scalarLike"/>
     static member scalar (dev: ITensorDevice) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> ([], dev)
         x.Value <- value
@@ -3741,6 +3772,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A new tensor of zero-dimensional shape is created on the same device as <paramref name="tmpl"/>.</para>
     /// <para>The values of the tensor is set to the specified value.</para>
     /// </remarks>
+    /// <seealso cref="scalar"/>
     static member scalarLike (tmpl: ITensor) (value: 'T) : Tensor<'T> =
         Tensor<'T>.scalar tmpl.Storage.Dev value 
 
@@ -3749,10 +3781,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="shape">The shape of the new tensor.</param>
     /// <param name="value">The value to fill the new tensor with.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.filled HostTensor.Dev [2L; 3L] 1.5
+    /// // a = [[1.5; 1.5; 1.5]
+    /// //      [1.5; 1.5; 1.5]]
+    /// </code></example>         
     /// <remarks>
     /// <para>A new tensor of the specified shape is created on the specified device.</para>
     /// <para>The tensor is filled with the specified value.</para>
     /// </remarks>
+    /// <seealso cref="FillConst"/>
     static member filled (dev: ITensorDevice) (shape: int64 list) (value: 'T) : Tensor<'T> =
         let x = Tensor<'T> (shape, dev)
         x.FillConst value
@@ -3762,6 +3800,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the matrix on.</param>
     /// <param name="size">The size of the square identity matrix.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor<float>.identity HostTensor.Dev 3L
+    /// // a = [[1.0; 0.0; 0.0]
+    /// //      [0.0; 1.0; 0.0]
+    /// //      [0.0; 0.0; 1.0]]    
+    /// </code></example>         
     /// <remarks>
     /// <para>A new square matrix of the specified size is created on the specified device.</para>
     /// <para>The tensor is filled with ones on the diagonal and zeros elsewhere.</para>
@@ -3776,10 +3820,15 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="nElems">The number of elements of the new vector.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.counting HostTensor.Dev 5L
+    /// // a = [0L; 1L; 2L; 3L; 4L]
+    /// </code></example>          
     /// <remarks>
     /// <para>A new vector with the specified number of elements is created on the specified device.</para>
     /// <para>The tensor is filled with <c>[0L; 1L; 2L; ...; nElems-1L]</c>. </para>
     /// </remarks>
+    /// <seealso cref="arange``1"/>
     static member counting (dev: ITensorDevice) (nElems: int64) =
         let x = Tensor<int64> ([nElems], dev)
         x.FillIncrementing (0L, 1L)
@@ -3792,11 +3841,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="incr">The increment between successive element.</param>   
     /// <param name="stop">The end value, which is not included.</param>
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.arange HostTensor.Dev 1.0 0.1 2.0
+    /// // a = [1.0; 1.1; 1.2; 1.3; 1.4; 1.5; 1.6; 1.7; 1.8; 1.9]
+    /// </code></example>         
     /// <remarks>
     /// <para>A new vector with <c>floor ((stop - start) / incr)</c> elements is created on the specified device.</para>
     /// <para>The vector is filled with <c>[start; start+1*incr; start+2*incr; ...]</c>.</para>
     /// <para>If stop is smaller or equal to start, an empty vector is returned.</para>
     /// </remarks>
+    /// <seealso cref="counting"/><seealso cref="linspace``1"/>
     static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
         let nElems = max 0L ((stop - start) / incr |> int64)
         let x = Tensor<'V> ([nElems], dev)
@@ -3809,11 +3863,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="stop">The end value, which is not included.</param>
     /// <param name="nElems">The size of the vector.</param>   
     /// <returns>The new tensor.</returns>
+    /// <example><code language="fsharp">
+    /// let a = Tensor.linspace HostTensor.Dev 1.0 2.0 5L
+    /// // a = [1.0; 1.2; 1.4; 1.6; 1.8]
+    /// </code></example>        
     /// <remarks>
     /// <para>A new vector with <paramref name="nElems"/> elements is created on the specified device.</para>
     /// <para>The vector is filled with <c>[start; start+1*incr; start+2*incr; ...; stop]</c> where
     /// <c>incr = (stop - start) / (nElems - 1)</c>.</para>
     /// </remarks>
+    /// <seealso cref="arange``1"/>
     static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
         if nElems < 2L then invalidArg "nElems" "linspace requires at least two elements."
         let incr = (stop - start) / conv<'V> (nElems - 1L)      
