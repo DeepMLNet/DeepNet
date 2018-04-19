@@ -22,6 +22,7 @@
         - Loading of NumPy's .npy and .npz files.
     </description>
     <PackageTags>rational row echelon smith kernel cokernel inverse pca zca Bezout npy npz</PackageTags>
+    <PackageProjectUrl>http://www.deepml.net/Tensor</PackageProjectUrl>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <Platforms>x64</Platforms>
   </PropertyGroup>
