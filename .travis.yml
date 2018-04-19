@@ -18,18 +18,22 @@ script:
   - if [ "$TRAVIS_BRANCH" != "master" ]; then echo "<Project><PropertyGroup><Rev>$VER-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets; fi
   - dotnet build -c Release Tensor/Tensor.sln
   - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj
+  - dotnet run -c Release -p Tensor/Tensor.Sample/Tensor.Sample.Internal.fsproj
   - dotnet pack -c Release Tensor/Tensor.sln
   - pwsh Tensor/Tensor.Docs/Build.ps1
 after_success:
-  - dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg' || true
   - if [ "$TRAVIS_BRANCH" = "master" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
 deploy:
-  provider: pages
-  local-dir: webpage
-  repo: DeepMLNet/webpage
-  fqdn: www.deepml.net
-  skip-cleanup: true
-  github-token: $GITHUB_TOKEN  
-  keep-history: true
-  on:
-    branch: master
+  - provider: pages
+    local-dir: webpage
+    repo: DeepMLNet/webpage
+    fqdn: www.deepml.net
+    skip-cleanup: true
+    github-token: $GITHUB_TOKEN  
+    keep-history: true
+    on:
+      branch: master
+  - provider: script
+    script: bash deploy.sh
+    skip-cleanup: true
+    

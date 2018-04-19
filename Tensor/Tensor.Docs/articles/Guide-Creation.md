@@ -3,6 +3,8 @@
 To work with the Tensor library, install the NuGet packages as described in the [installation guide](Guide-Installation.md) and open the `Tensor` namespace within your source file.
 You can run the following examples by pasting the code into the `main` function in `Program.fs` of the skeleton project.
 
+You can also clone the official example project, which follows this guide, from <https://github.com/DeepMLNet/Tensor.Sample>.
+
 The primary type you will work with is [Tensor<'T>](xref:Tensor.Tensor`1).
 It provides functions to work with tensors regardless of their storage device.
 The modules [HostTensor](xref:Tensor.HostTensor) and [CudaTensor](xref:Tensor.CudaTensor) contain additional functions that are only applicable to tensors stored in host or GPU memory respectively.

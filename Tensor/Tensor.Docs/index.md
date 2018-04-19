@@ -46,12 +46,18 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 
 ## Documentation
 
-See the [release notes](articles/ReleaseNotes.md) to learn about recent changes.
-
 To get an overview of available functions by category, see [Tensor at a glance](articles/Tensor.md).
-
 We also provide [full reference documentation](xref:Tensor).
 
 To start using the library, follow the [installation guide](articles/Guide-Installation.md) and the [getting started guide](articles/Guide-Creation.md).
 
-Current limitations are documented on the [status page](articles/Status.md).
+## Example
+
+Check out our example project that demonstrates essential features of the library at <https://github.com/DeepMLNet/Tensor.Sample>.
+
+## Authors
+
+[Sebastian Urban](https://github.com/surban/)  
+Marcus Basalla  
+Johannes Langer  
+Wiebke Köpp
