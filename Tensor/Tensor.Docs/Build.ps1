@@ -1,6 +1,10 @@
 #!/usr/bin/pwsh
 # Script to build DocFX documentation.
 
+param(
+    [switch] $noGenerate = $false
+)
+
 $ErrorActionPreference = "Stop"
 
 Push-Location $PSScriptRoot
@@ -15,11 +19,12 @@ if ($PSVersionTable.Platform -eq "Unix") {
     $executor = ""
 }
 
-& $executor ./docfx/docfx.console/tools/docfx.exe metadata
-
-Push-Location generate
-dotnet run
-Pop-Location
+if (!$noGenerate) {
+    & $executor ./docfx/docfx.console/tools/docfx.exe metadata
+    Push-Location generate
+    dotnet run
+    Pop-Location
+}
 
 & $executor ./docfx/docfx.console/tools/docfx.exe
 

@@ -1,0 +1,11 @@
+{
+    "editor.rulers": [
+        120
+    ],
+    "FSharp.excludeProjectDirectories": [
+        ".git",
+        "ML",
+        "Examples",
+        "Symbolic"
+    ]
+}

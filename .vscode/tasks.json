@@ -6,7 +6,7 @@
         {
             "label": "Tensor",
             "type": "shell",
-            "command": "dotnet build Tensor.sln",
+            "command": "dotnet build Tensor/Tensor.sln",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -16,22 +16,28 @@
             }
         },
         {
+            "label": "Tensor.Test",
+            "type": "shell",
+            "command": "dotnet test Tensor/Tensor.Test",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },        
+        {
             "label": "Tensor.Docs",
             "type": "shell",
-            "command": "../../docfx/src/docfx/bin/Release/net461/docfx.exe Tensor.Docs/docfx.json",
+            "command": "./Tensor/Tensor.Docs/Build.ps1",
             "problemMatcher": []
         },
         {
-            "label": "Tensor.Docs generate",
+            "label": "Tensor.Docs (no generate)",
             "type": "shell",
-            "command": "cd Tensor.Docs/generate ; dotnet run ; cd ../..; ../../docfx/src/docfx/bin/Release/net461/docfx.exe Tensor.Docs/docfx.json",
+            "command": "./Tensor/Tensor.Docs/Build.ps1 -noGenerate",
             "problemMatcher": []
-        },
-        {
-            "label": "Tensor.Docs generate only",
-            "type": "shell",
-            "command": "cd Tensor.Docs/generate ; dotnet run",
-            "problemMatcher": []
-        }        
+        }
     ]
 }

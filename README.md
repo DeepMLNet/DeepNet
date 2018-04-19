@@ -11,7 +11,7 @@ Deep<span></span>.Net is currently being ported to .NET Standard 2.0.
 In the process the API is being streamlined and the documentation is being improved. 
 The port of the numeric Tensor library is complete, but the port of the symbolic libraries is still in progress.
 
-Go to the [README of the Tensor library](Numeric/README.md).
+Go to the [README of the Tensor library](Tensor/README.md).
 
 
 

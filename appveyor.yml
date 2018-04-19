@@ -12,16 +12,16 @@
     - ps: Add-Content NuGet.Config '</packageSources></configuration>'
     - ps: Remove-Item Revision.targets
     - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
-    - dotnet restore Numeric/Tensor.sln
+    - dotnet restore Tensor/Tensor.sln
 
   build_script:
-    - dotnet build -c Release Numeric/Tensor.sln
+    - dotnet build -c Release Tensor/Tensor.sln
   
   test_script:
-    - dotnet test -c Release Numeric/Tensor.Test/Tensor.Test.fsproj 
+    - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj 
   
   after_test:
-    - dotnet pack -c Release Numeric/Tensor.sln
+    - dotnet pack -c Release Tensor/Tensor.sln
 
   artifacts:
     - path: Packages\Release\*.nupkg
