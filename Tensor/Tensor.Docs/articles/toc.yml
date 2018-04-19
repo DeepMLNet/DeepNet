@@ -1,3 +1,5 @@
+- name: Release notes
+  href: ReleaseNotes.md
 - name: Guide
   href: Guide-Installation.md
   items:

@@ -12,6 +12,3 @@ In the process the API is being streamlined and the documentation is being impro
 The port of the numeric Tensor library is complete, but the port of the symbolic libraries is still in progress.
 
 Go to the [README of the Tensor library](Tensor/README.md).
-
-
-

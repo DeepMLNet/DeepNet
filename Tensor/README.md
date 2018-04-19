@@ -45,6 +45,10 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
   * Bezout's identity
   * Loading of NumPy's .npy and .npz files.
 
+## Release notes
+
+Release notes are at <http://www.deepml.net/Tensor/articles/ReleaseNotes.html>.
+
 ## NuGet packages
 
 NuGet packages can be downloaded from <https://www.myget.org/feed/Packages/coreports>.
