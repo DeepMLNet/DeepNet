@@ -17,7 +17,7 @@ install:
 script: 
   - unset DOTNET_CLI_TELEMETRY_OPTOUT
   - VER=$(cat Revision.targets | egrep -o '[0-9]+')
-  - if [ "$TRAVIS_BRANCH" != "master" ]; then echo "<Project><PropertyGroup><Rev>$VER-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets
+  - if [ "$TRAVIS_BRANCH" != "master" ]; then echo "<Project><PropertyGroup><Rev>$VER-$TRAVIS_BRANCH-$TRAVIS_BUILD_NUMBER</Rev></PropertyGroup></Project>" > Revision.targets; fi
   - dotnet build -c Release Tensor/Tensor.sln
   - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj
   - dotnet pack -c Release Tensor/Tensor.sln
