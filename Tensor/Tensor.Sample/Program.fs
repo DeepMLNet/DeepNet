@@ -182,10 +182,22 @@ let main argv =
     // This is also called the matrix product.
     // If applied to a matrix and a vector, the matrix-vector product will be computed.
     // If applied to two vectors, the scalar product will be computed.
-    let h = HostTensor.init [5L; 3L] (fun [|i; j|] -> 3.0 * float i + float j)
-    let i = 0.1 + HostTensor.identity 3L
+    let h = HostTensor.init [5L; 3L] (fun [|i; j|] -> 3.0f * single i + single j)
+    let i = 0.1f + HostTensor.identity 3L
     let hi = h .* i
     printfn "hi=\n%A" hi
+
+    // If both tensors are stored on the GPU, then the dot product is
+    // evaluated directly on the GPU using CUBLAS.
+    try
+        let hGpu = CudaTensor.transfer h
+        let iGpu = CudaTensor.transfer i
+        let hiGpu = hGpu .* iGpu
+        printfn "hiGpu=%A" hiGpu
+        printfn "hiGpu.Dev=%A" hiGpu.Dev
+    with e ->
+        printfn "CUDA error: %A" e.Message
+        printfn "This is normal if no CUDA GPU is present."    
 
     // Matrix inversion
     let iinv = Tensor.invert i
