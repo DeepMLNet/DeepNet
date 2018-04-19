@@ -8,7 +8,6 @@ if [ "$TRAVIS_BRANCH" = "master" ]; then
     git config --local user.name "Deep.Net Build"
     git config --local user.email "build@deepml.net"
     git clone https://${GITHUB_TOKEN}@github.com/DeepMLNet/Tensor.Sample.git sampleDeploy_old
-    mkdir sampleDeploy
     cp -av Tensor/Tensor.Sample sampleDeploy
     mv sampleDeploy_old/.git sampleDeploy/
     cd sampleDeploy
