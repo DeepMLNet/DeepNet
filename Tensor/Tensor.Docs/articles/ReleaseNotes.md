@@ -1,5 +1,8 @@
 # Release notes
 
+* 0.4.5
+  * No changes.
+
 * 0.4.4
   * Fix tensor_mkl.dll not being found.
   * Update Tensor.Sample sample project.
