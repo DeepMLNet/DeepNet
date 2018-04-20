@@ -30,7 +30,7 @@ Additional algorithms and data exchange methods are provided in the [Tensor.Algo
 The packages can be installed into your project by performing the following steps.
 
 1. Add the NuGet feed <https://www.myget.org/feed/Packages/coreports> to your project. 
-This can be done by adding the line ```<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json"/>``` to the `activePackageSource` section of your project `NuGet.config` file.
+This can be done by adding the line ```<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json"/>``` to the `packageSources` section of your project `NuGet.config` file.
 
 1. Install the `Tensor` and `Tensor.Algorithm` using the NuGet package manager (either via command line or graphical interface).
 
@@ -49,9 +49,9 @@ Then, create the file `NuGet.config` in the project directory with the following
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
-    <activePackageSource>
+    <packageSources>
         <add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" />
-    </activePackageSource>
+    </packageSources>
 </configuration>
 ```
 Finally run the following commands to install the Tensor library into your project.
