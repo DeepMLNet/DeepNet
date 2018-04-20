@@ -359,7 +359,7 @@ module HostTensor =
     /// not match type <c>'T</c>.</exception>
     /// <example><code language="fsharp">
     /// use hdfFile = HDF5.OpenRead "tensors.h5"
-    /// let k = HostTensor.read<float> hdfFile "k"
+    /// let k = HostTensor.read&lt;float&gt; hdfFile "k"
     /// </code></example>    
     /// <seealso cref="write"/><seealso cref="readUntyped"/>
     let read<'T> (hdf5: HDF5) (path: string) : Tensor<'T> =
