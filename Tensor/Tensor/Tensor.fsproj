@@ -90,5 +90,17 @@
       <Link>libiomp5md.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="MKL/tensor_mkl.dll" PackagePath="runtimes/win-x64/native">
+      <Link>tensor_mkl.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MKL/libiomp5md.dll" PackagePath="runtimes/win-x64/native">
+      <Link>libiomp5md.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>    
+    <Content Include="MKL/libtensor_mkl.so" PackagePath="runtimes/linux-x64/native">
+      <Link>libtensor_mkl.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>    
   </ItemGroup>
 </Project>
