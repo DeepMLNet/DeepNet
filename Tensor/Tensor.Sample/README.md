@@ -1,5 +1,8 @@
 # Example project for F# Tensor
 
+[![Build Status](https://travis-ci.org/DeepMLNet/Tensor.Sample.svg?branch=master)](https://travis-ci.org/DeepMLNet/Tensor.Sample)
+[![Build status](https://ci.appveyor.com/api/projects/status/wrun3ku66kl09ki6?svg=true)](https://ci.appveyor.com/project/surban/tensor-sample)
+
 This is an example project that demonstrates the capabilites of the [F# tensor library](http://www.deepml.net/Tensor).
 
 ## System requirements
