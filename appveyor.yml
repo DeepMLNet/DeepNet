@@ -4,11 +4,6 @@
 
   before_build:
     - dotnet --version
-    - ps: Add-Content NuGet.Config '<?xml version="1.0" encoding="utf-8"?>' 
-    - ps: Add-Content NuGet.Config '<configuration><packageSources>'
-    - ps: Add-Content NuGet.Config '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />'
-    - ps: Add-Content NuGet.Config '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />'
-    - ps: Add-Content NuGet.Config '</packageSources></configuration>'
 #    - ps: Remove-Item Revision.targets
 #    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
     - dotnet restore Tensor/Tensor.sln

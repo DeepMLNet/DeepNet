@@ -7,11 +7,6 @@ before_install:
   - curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
   - sudo apt-get update -q
   - sudo apt-get install -y powershell
-install:
-  - echo '<?xml version="1.0" encoding="utf-8"?>' > NuGet.Config
-  - echo '<configuration><packageSources>' >> NuGet.Config
-  - echo '<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" protocolVersion="3" />' >> NuGet.Config
-  - echo '</packageSources></configuration>' >> NuGet.Config
 script: 
   - unset DOTNET_CLI_TELEMETRY_OPTOUT
   - VER=$(cat Revision.targets | egrep -o '[0-9]+')
