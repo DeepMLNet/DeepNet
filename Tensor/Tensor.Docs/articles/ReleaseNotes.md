@@ -1,5 +1,8 @@
 # Release notes
 
+* 0.4.6
+  * Fix double-precision BLAS operations on CUDA GPU.
+
 * 0.4.5
   * No changes.
 
