@@ -199,6 +199,25 @@ let main argv =
         printfn "CUDA error: %A" e.Message
         printfn "This is normal if no CUDA GPU is present."    
 
+    // We can also use double-precision data types for dot products.
+    let fh = Tensor<float>.convert h
+    let fi = Tensor<float>.convert i
+    let fhi = fh .* fi
+    printfn "fhi=\n%A" fhi
+
+    // Of course, this also works on GPUs.
+    // However, must GPUs are significantly slower when using double-precision arithmetic.
+    // Thus you might want to stick to single-precision floats when you plan to use GPU acceleration.
+    try
+        let fhGpu = CudaTensor.transfer fh
+        let fiGpu = CudaTensor.transfer fi
+        let fhiGpu = fhGpu .* fiGpu
+        printfn "fhiGpu=%A" fhiGpu
+        printfn "fhiGpu.Dev=%A" fhiGpu.Dev  
+    with e ->
+        printfn "CUDA error: %A" e.Message
+        printfn "This is normal if no CUDA GPU is present."    
+
     // Matrix inversion
     let iinv = Tensor.invert i
     printfn "iinv=\n%A" iinv

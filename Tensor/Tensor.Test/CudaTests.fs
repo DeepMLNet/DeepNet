@@ -1,5 +1,7 @@
 ﻿namespace global
 
+#nowarn "25"
+
 open Xunit
 open Xunit.Abstractions
 open FsUnit.Xunit
@@ -34,7 +36,6 @@ type CudaTests (output: ITestOutputHelper) =
 
         Tensor.almostEqual (data, back) |> should equal true
 
-
     [<CudaFact>]
     let ``Tensor transfer to Cuda 2``() =    
         let data = HostTensor.counting 30L |> Tensor<float>.convert |> Tensor.reshape [3L; 2L; 5L]
@@ -49,6 +50,29 @@ type CudaTests (output: ITestOutputHelper) =
 
         Tensor.almostEqual (data, back)  |> should equal true
 
+    [<CudaFact>]
+    let ``Single matrix dot`` () =
+        let h = HostTensor.init [5L; 3L] (fun [|i; j|] -> 3.0f * single i + single j)
+        let i = 0.1f + HostTensor.identity 3L
+        let hi = h .* i
+
+        let hGpu = CudaTensor.transfer h
+        let iGpu = CudaTensor.transfer i
+        let hiGpu = hGpu .* iGpu
+
+        Tensor.almostEqual (hi, HostTensor.transfer hiGpu) |> should equal true
+
+    [<CudaFact>]
+    let ``Double matrix dot`` () =
+        let h = HostTensor.init [5L; 3L] (fun [|i; j|] -> 3.0 * double i + double j)
+        let i = 0.1 + HostTensor.identity 3L
+        let hi = h .* i
+
+        let hGpu = CudaTensor.transfer h
+        let iGpu = CudaTensor.transfer i
+        let hiGpu = hGpu .* iGpu
+
+        Tensor.almostEqual (hi, HostTensor.transfer hiGpu) |> should equal true
 
     [<CudaFact>]
     let ``Mixed Cuda tests`` () =
