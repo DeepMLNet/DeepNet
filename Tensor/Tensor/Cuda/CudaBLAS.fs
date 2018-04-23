@@ -24,7 +24,7 @@ module internal CudaBLASExtensions =
             | BLAS.ConjTrans -> CudaBlas.Operation.ConjugateTranspose
         member this.CPtr<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> () =
             let ptr = this.Ptr |> SizeT |> CUdeviceptr
-            new CudaDeviceVariable<'T> (ptr, false, SizeT 4)
+            new CudaDeviceVariable<'T> (ptr, false, SizeT (sizeof<'T>))
         member this.CPtrs (stream: CUstream) =
             let ptrs = this.Ptrs
             let hostPtrs = new CudaPageLockedHostMemory<nativeint> (SizeT ptrs.Length)
@@ -53,7 +53,7 @@ module internal CudaBLASExtensions =
     type Tensor.Backend.BLAS.ScalarInfo with
         member this.CPtr<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> () =
             let ptr = this.Ptr |> SizeT |> CUdeviceptr
-            new CudaDeviceVariable<'T> (ptr, false, SizeT 4)    
+            new CudaDeviceVariable<'T> (ptr, false, SizeT (sizeof<'T>))    
 
     type CUBLAS =
         static member Invoke<'T, 'R> (stream, ?singleFn, ?doubleFn, ?int32Fn, ?int64Fn)  =
