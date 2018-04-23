@@ -9,10 +9,7 @@ mono: latest
 dotnet: 2.1.105
 solution: Tensor/Tensor.sln
 before_install:
-  - curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-  - curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
-  - sudo apt-get update -q
-  - sudo apt-get install -y powershell
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - ; curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list ; sudo apt-get update -q ; sudo apt-get install -y powershell ; fi
 script: 
   - unset DOTNET_CLI_TELEMETRY_OPTOUT
   - VER=$(cat Revision.targets | egrep -o '[0-9]+')
@@ -21,9 +18,9 @@ script:
   - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj
   - dotnet run -c Release -p Tensor/Tensor.Sample/Tensor.Sample.Internal.fsproj
   - dotnet pack -c Release Tensor/Tensor.sln
-  - pwsh Tensor/Tensor.Docs/Build.ps1
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then pwsh Tensor/Tensor.Docs/Build.ps1 ; fi
 after_success:
-  - if [ "$TRAVIS_BRANCH" = "master" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
+  - if [ "$TRAVIS_BRANCH" = "master" && "$TRAVIS_OS_NAME" = "linux" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
 deploy:
   - provider: pages
     local-dir: webpage
@@ -34,7 +31,9 @@ deploy:
     keep-history: true
     on:
       branch: master
+      condition: $TRAVIS_OS_NAME = linux
   - provider: script
     script: bash deploy.sh
     skip-cleanup: true
-    
+    on:
+      condition: $TRAVIS_OS_NAME = linux
