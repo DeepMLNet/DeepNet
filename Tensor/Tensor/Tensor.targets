@@ -2,6 +2,7 @@
   <ItemGroup>
     <NativeLibs Include="$(MSBuildThisFileDirectory)/*.dll" />
     <NativeLibs Include="$(MSBuildThisFileDirectory)/*.so" />
+    <NativeLibs Include="$(MSBuildThisFileDirectory)/*.dylib" />
     <None Include="@(NativeLibs)">
       <Link>%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
