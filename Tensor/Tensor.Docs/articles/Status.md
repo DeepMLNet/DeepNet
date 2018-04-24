@@ -19,7 +19,7 @@ Invoking them will raise an exception.
 * Some useful linear algebra functions like LU and QR decomposition are missing.
 * No standarized interface for exposing tensors to native code is yet available.
 However, getting pointers to their memory already works fine.
-* MacOS is unsupported due to the lack of development hardware.
+* MacOS has no GPU acceleration due to the lack of development hardware.
 * No backend exists yet for [OpenCL](https://en.wikipedia.org/wiki/OpenCL) hardware and thus AMD and Intel GPUs are not supported.
 * The host backend is currently hard coded to use [Intel MKL](https://software.intel.com/en-us/mkl) as its BLAS library.
 It would be nice, if we could dynamically switch the BLAS library, for example to use the free [OpenBLAS](https://www.openblas.net/).

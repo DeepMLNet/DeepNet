@@ -1,5 +1,8 @@
 # Release notes
 
+* 0.4.7
+  * Experimental support for macOS (without CUDA).
+
 * 0.4.6
   * Fix double-precision BLAS operations on CUDA GPU.
 

@@ -7,11 +7,13 @@ This page guides you through installing the Tensor library and creating a skelet
 The following system requirements must be met.
 
 * System architecture: x86-64 (AMD64 or Intel 64)
-* Operating system: Linux or Microsoft Windows
+* Operating system: Linux, MacOS or Microsoft Windows
 * Microsoft .NET Standard 2.0 implementation
   * Recommended platform is [.NET Core >= 2.0](https://www.microsoft.com/net/learn/get-started)
   * .NET Framework >= 4.7 is supported
   * [Mono](https://www.mono-project.com/download/stable/) >= 5.10 is supported, but significantly slower
+* For MacOS
+  * [HDF5 libraries](https://support.hdfgroup.org/HDF5/) (install from [Homebrew](https://brew.sh/) by running `brew install hdf5`)
 * For GPU acceleration (optional)
   * nVidia GPU supporting [CUDA compute capability](https://developer.nvidia.com/cuda-gpus) 3.5 or higher
   * [CUDA SDK 8.0](https://developer.nvidia.com/cuda-80-ga2-download-archive) installed (exact version)
@@ -22,6 +24,9 @@ The following system requirements must be met.
 The library is provided as a NuGet package.
 Since we have made modifications (porting to .NET core) to our dependencies and these changes have not yet been merged upstream, a [MyGet](https://myget.org/) feed is currently used to deliever the library and its modified dependencies.
 Once all necessary modifications have been merged upstream, the Tensor library will be delivered via standard [NuGet](https://nuget.org).
+
+For MacOS you must make sure that the HDF5 libraries are installed on your system.
+They can be installed via [Homebrew](https://brew.sh/) by running `brew install hdf5`.
 
 The library is deliverd in two NuGet packages.
 The [Tensor NuGet package](https://www.myget.org/feed/coreports/package/nuget/Tensor) provides the [Tensor<'T>](xref:Tensor.Tensor`1) type and all core functions.
