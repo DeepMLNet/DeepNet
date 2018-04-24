@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Push NuGet packages.
+rm -f Packages/Release/*.symbols.nupkg
 dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg' || true
 
 # Push to Tensor.Sample repository.
