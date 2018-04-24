@@ -38,7 +38,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HDF.PInvoke" Version="1.10.4" />
+    <PackageReference Include="HDF.PInvoke" Version="1.10.5" />
     <PackageReference Include="ManagedCuda" Version="8.0.35" />
     <PackageReference Include="ManagedCuda-CUBLAS" Version="8.0.35" />
     <PackageReference Include="ManagedCuda-NVRTC" Version="8.0.35" />
