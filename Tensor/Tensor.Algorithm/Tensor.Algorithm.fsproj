@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="../../Common.targets" />
+
   <PropertyGroup>
     <PackageId>Tensor.Algorithm</PackageId>
     <title>Algorithms building on Tensor</title>
@@ -23,9 +24,9 @@
     </description>
     <PackageTags>rational row echelon smith kernel cokernel inverse pca zca Bezout npy npz</PackageTags>
     <PackageProjectUrl>http://www.deepml.net/Tensor</PackageProjectUrl>
-    <NoPackageAnalysis>true</NoPackageAnalysis>
     <Platforms>x64</Platforms>
   </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="BigIntegerExtensions.fs" />
     <Compile Include="Rat.fs" />
@@ -33,7 +34,9 @@
     <Compile Include="LinAlg.fs" />
     <Compile Include="NumpyFiles.fs" />    
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj" />
   </ItemGroup>  
+  
 </Project>

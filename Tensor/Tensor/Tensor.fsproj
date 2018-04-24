@@ -34,7 +34,6 @@
     </description>
     <PackageTags>Tensor ndarray array MKL SIMD BLAS CUDA CUBLAS HDF5</PackageTags>
     <PackageProjectUrl>http://www.deepml.net/Tensor</PackageProjectUrl>
-    <!-- <NoPackageAnalysis>true</NoPackageAnalysis> -->
     <Platforms>x64</Platforms>
   </PropertyGroup>
 

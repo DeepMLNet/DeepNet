@@ -22,6 +22,11 @@ script:
 after_success:
   - if [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_OS_NAME" = "linux" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
 deploy:
+  - provider: script
+    script: bash deploy.sh
+    skip-cleanup: true
+    on:
+      condition: $TRAVIS_OS_NAME = linux  
   - provider: pages
     local-dir: webpage
     repo: DeepMLNet/webpage
@@ -31,9 +36,4 @@ deploy:
     keep-history: true
     on:
       branch: master
-      condition: $TRAVIS_OS_NAME = linux
-  - provider: script
-    script: bash deploy.sh
-    skip-cleanup: true
-    on:
       condition: $TRAVIS_OS_NAME = linux

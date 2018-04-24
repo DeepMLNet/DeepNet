@@ -8,8 +8,6 @@
 
       <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    
       <GenerateDocumentationFile>true</GenerateDocumentationFile>
-      <IncludeSymbols>true</IncludeSymbols>
-      <IncludeSource>true</IncludeSource>
 
       <Product>Deep.Net</Product>    
       <Company>Deep.Net Developers</Company>
@@ -28,7 +26,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SourceLink.Create.CommandLine" Version="2.8.0" PrivateAssets="All" /> 
+    <PackageReference Include="SourceLink.Create.CommandLine" Version="2.8.1" PrivateAssets="All" /> 
   </ItemGroup>
 
 </Project>
