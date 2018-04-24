@@ -20,7 +20,7 @@ script:
   - dotnet pack -c Release Tensor/Tensor.sln
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then pwsh Tensor/Tensor.Docs/Build.ps1 ; fi
 after_success:
-  - if [ "$TRAVIS_BRANCH" = "master" && "$TRAVIS_OS_NAME" = "linux" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
+  - if [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_OS_NAME" = "linux" ]; then git clone https://github.com/DeepMLNet/webpage.git; rm -rf webpage/.git webpage/Tensor; cp -av Tensor/Tensor.Docs/_site/ webpage/Tensor; fi
 deploy:
   - provider: pages
     local-dir: webpage
