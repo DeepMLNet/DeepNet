@@ -18,6 +18,8 @@ type BLASLib =
     | Vendor
     /// <summary>Intel MKL BLAS and LAPACK (shipped in NuGet package)</summary>
     | IntelMKL
+    /// <summary>OpenBLAS BLAS and LAPACK</summary>
+    | OpenBLAS
     /// <summary>Custom BLAS and LAPACK libraries.</summary>
     /// <param name="blas">Name of BLAS native library.</param>
     /// <param name="lapack">Name of LAPACK native library.</param>
@@ -28,7 +30,8 @@ type BLASLib =
 /// <seealso cref="HostTensor"/>
 type Cfg private () = 
 
-    static let mutable blasLib : BLASLib = BLASLib.IntelMKL
+    //static let mutable blasLib : BLASLib = BLASLib.IntelMKL
+    static let mutable blasLib : BLASLib = BLASLib.OpenBLAS
 
     static let blasLibChangedEvent = new Event<_>()
     

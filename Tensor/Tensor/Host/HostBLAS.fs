@@ -165,6 +165,7 @@ type BLAS private () =
         match Cfg.BLASLib with
         | BLASLib.Vendor -> BLAS.Impl (NativeLibName.Translated "blas", NativeLibName.Translated "lapacke")
         | BLASLib.IntelMKL -> BLAS.Impl (NativeLibName.Packaged "tensor_mkl", NativeLibName.Packaged "tensor_mkl")
+        | BLASLib.OpenBLAS -> BLAS.Impl (NativeLibName.Packaged "openblas", NativeLibName.Packaged "openblas")
         | BLASLib.Custom (blas, lapack) -> BLAS.Impl (blas, lapack)
 
     static let mutable impl = load ()
