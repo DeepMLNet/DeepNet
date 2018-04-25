@@ -2,7 +2,11 @@
   <Import Project="../../Common.targets" />
 
   <PropertyGroup>
-    <PackageId>Tensor</PackageId>
+    <DefaultBLAS Condition=" '$(DefaultBLAS)' == '' ">OpenBLAS</DefaultBLAS>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId Condition=" '$(DefaultBLAS)' == 'OpenBLAS' ">Tensor</PackageId>
     <title>F# Tensor (multidimensional array) library with SIMD and GPU acceleration</title>
     <summary>Provides n-dimensional arrays (tensors) in host memory or on CUDA GPUs. Support many operations from NumPy.</summary>
     <description>
@@ -23,7 +27,7 @@
         - interop with standard F# types (Seq, List, Array, Array2D, Array3D, etc.)
 
       Performance:
-        - host: SIMD and Intel MKL accelerated operations 
+        - host: SIMD and BLAS (OpenBLAS, Intel MKL or vendor-specific) accelerated operations 
         - CUDA GPU: all operations performed locally on GPU and cuBLAS used for matrix operations
 
       Requirements: 
@@ -35,6 +39,14 @@
     <PackageTags>Tensor ndarray array MKL SIMD BLAS CUDA CUBLAS HDF5</PackageTags>
     <PackageProjectUrl>http://www.deepml.net/Tensor</PackageProjectUrl>
     <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>TRACE;DEBUG;$(DefaultBLAS)</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DefineConstants>$(DefaultBLAS)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -81,11 +93,14 @@
     <EmbeddedResource Include="Cuda/Kernels/*.cuh" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition=" '$(DefaultBLAS)' == 'OpenBLAS' ">
     <Content Include="Host/OpenBLAS/libopenblas.so" PackagePath="runtimes/linux-x64/native">
       <Link>libopenblas.so</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>       
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(DefaultBLAS)' == 'IntelMKL' ">    
     <Content Include="Host/MKL/libtensor_mkl.so" PackagePath="runtimes/linux-x64/native">
       <Link>libtensor_mkl.so</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

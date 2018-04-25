@@ -16,7 +16,7 @@ type BLASLib =
     /// Mac OS: libblas.dylib and liblapacke.dylib.
     /// </remarks>
     | Vendor
-    /// <summary>Intel MKL BLAS and LAPACK (shipped in NuGet package)</summary>
+    /// <summary>Intel MKL BLAS and LAPACK</summary>
     | IntelMKL
     /// <summary>OpenBLAS BLAS and LAPACK</summary>
     | OpenBLAS
@@ -30,15 +30,18 @@ type BLASLib =
 /// <seealso cref="HostTensor"/>
 type Cfg private () = 
 
-    //static let mutable blasLib : BLASLib = BLASLib.IntelMKL
+#if OpenBLAS
     static let mutable blasLib : BLASLib = BLASLib.OpenBLAS
+#endif
+#if IntelMKL
+    static let mutable blasLib : BLASLib = BLASLib.IntelMKL
+#endif
 
     static let blasLibChangedEvent = new Event<_>()
     
     /// <summary>The BLAS and LAPACK library to use.</summary>
     /// <remarks>
     /// <para>This setting is global to the all threads.</para>
-    /// <para>The default BLAS library is Intel MKL (shipped in NuGet package).</para>
     /// </remarks>
     static member BLASLib
         with get() = blasLib
