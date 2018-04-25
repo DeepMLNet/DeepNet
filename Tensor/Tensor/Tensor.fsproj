@@ -38,7 +38,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HDF.PInvoke" Version="1.10.5" />
+    <PackageReference Include="HDF.PInvoke" Version="1.10.4" />
     <PackageReference Include="ManagedCuda" Version="8.0.35" />
     <PackageReference Include="ManagedCuda-CUBLAS" Version="8.0.35" />
     <PackageReference Include="ManagedCuda-NVRTC" Version="8.0.35" />
@@ -49,6 +49,7 @@
   <ItemGroup>
     <Compile Include="Utils.fs" />
     <Compile Include="DiskMap.fs" />
+    <Compile Include="NativeLib.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="TensorRng.fs" />
@@ -58,6 +59,7 @@
     <Compile Include="Tensor.fs" />
     <Compile Include="TensorVal.fs" />
     <Compile Include="BlasSupport.fs" />
+    <Compile Include="Host/HostCfg.fs" />
     <Compile Include="Host/HostBLAS.fs" />
     <Compile Include="Host/FastAccess.fs" />
     <Compile Include="Host/ScalarOps.fs" />
@@ -80,21 +82,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="MKL/libtensor_mkl.so" PackagePath="runtimes/linux-x64/native">
+    <Content Include="Host/MKL/libtensor_mkl.so" PackagePath="runtimes/linux-x64/native">
       <Link>libtensor_mkl.so</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>       
 
-    <Content Include="MKL/libtensor_mkl.dylib" PackagePath="runtimes/osx-x64/native">
+    <Content Include="Host/MKL/libtensor_mkl.dylib" PackagePath="runtimes/osx-x64/native">
       <Link>libtensor_mkl.dylib</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>               
 
-    <Content Include="MKL/tensor_mkl.dll" PackagePath="runtimes/win-x64/native">
+    <Content Include="Host/MKL/tensor_mkl.dll" PackagePath="runtimes/win-x64/native">
       <Link>tensor_mkl.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="MKL/libiomp5md.dll" PackagePath="runtimes/win-x64/native">
+    <Content Include="Host/MKL/libiomp5md.dll" PackagePath="runtimes/win-x64/native">
       <Link>libiomp5md.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>       

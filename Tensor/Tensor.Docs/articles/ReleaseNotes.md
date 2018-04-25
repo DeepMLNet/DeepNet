@@ -1,5 +1,9 @@
 # Release notes
 
+* 0.4.8
+  * Support for dynamic loading of BLAS libraries for host tensors.
+    Use Tensor.Host.Cfg.BLASLib to configure.
+
 * 0.4.7
   * Experimental support for macOS (without CUDA).
 

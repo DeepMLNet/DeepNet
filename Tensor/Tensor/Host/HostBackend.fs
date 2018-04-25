@@ -467,10 +467,10 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 BLAS.Invoke<'T, unit>
                     (singleFn=(fun () -> 
                         let trgt = trgt |> box :?> Tensor<single>
-                        trgt.Value <- BLAS.cblas_sdot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)),
+                        trgt.Value <- BLAS.F.cblas_sdot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)),
                         doubleFn=(fun () -> 
                         let trgt = trgt |> box :?> Tensor<double>
-                        trgt.Value <- BLAS.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
+                        trgt.Value <- BLAS.F.cblas_ddot (x.Size, x.Ptr, x.Inc, y.Ptr, y.Inc)))
             else
                 (trgt :?> Tensor<'T>).FillSumAxis 0 ((a :?> Tensor<'T>) * (b :?> Tensor<'T>))
 
@@ -480,14 +480,14 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 use x = BLAS.GetVector (b, isSource=true, isTarget=false)
                 use y = BLAS.GetVector (trgt, isSource=false, isTarget=true)
                 BLAS.Invoke<'T, unit>
-                    (singleFn=(fun () -> BLAS.cblas_sgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                           a.CTrans, a.Rows, a.Cols, 1.0f,
-                                                           a.Ptr, a.Ld, x.Ptr, x.Inc,
-                                                           0.0f, y.Ptr, y.Inc)),
-                     doubleFn=(fun () -> BLAS.cblas_dgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                           a.CTrans, a.Rows, a.Cols, 1.0,
-                                                           a.Ptr, a.Ld, x.Ptr, x.Inc,
-                                                           0.0, y.Ptr, y.Inc)))  
+                    (singleFn=(fun () -> BLAS.F.cblas_sgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             a.CTrans, a.Rows, a.Cols, 1.0f,
+                                                             a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                             0.0f, y.Ptr, y.Inc)),
+                     doubleFn=(fun () -> BLAS.F.cblas_dgemv (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             a.CTrans, a.Rows, a.Cols, 1.0,
+                                                             a.Ptr, a.Ld, x.Ptr, x.Inc,
+                                                             0.0, y.Ptr, y.Inc)))  
                 y.FetchResult()
             else
                 (trgt :?> Tensor<'T>).FillSumAxis 1 ((a :?> Tensor<'T>) * Tensor.padLeft (b :?> Tensor<'T>))
@@ -498,14 +498,14 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
                 use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
                 BLAS.Invoke<'T, unit>
-                    (singleFn=(fun () -> BLAS.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                           a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
-                                                           1.0f, a.Ptr, a.Ld, b.Ptr, b.Ld,
-                                                           0.0f, c.Ptr, c.Ld)),
-                     doubleFn=(fun () -> BLAS.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                           a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
-                                                           1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
-                                                           0.0, c.Ptr, c.Ld)))              
+                    (singleFn=(fun () -> BLAS.F.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                             1.0f, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                             0.0f, c.Ptr, c.Ld)),
+                     doubleFn=(fun () -> BLAS.F.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                             a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                             1.0, a.Ptr, a.Ld, b.Ptr, b.Ld,
+                                                             0.0, c.Ptr, c.Ld)))              
                 c.FetchResult()
             else
                 (trgt :?> Tensor<'T>).FillSumAxis 1 (Tensor.padRight (a :?> Tensor<'T>) * Tensor.padLeft (b :?> Tensor<'T>))
@@ -514,23 +514,36 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             if isBlasSupported then
                 use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
                 use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
-                use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-                BLAS.Invoke<'T, unit>
-                    (singleFn=(fun () -> BLAS.cblas_sgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                                 [|a.CTrans|], [|b.CTrans|], 
-                                                                 [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0f|],
-                                                                 a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
-                                                                 [|0.0f|], c.Ptrs, [|c.Ld|],
-                                                                 1L, [|a.BatchSize|])),
-                     doubleFn=(fun () -> BLAS.cblas_dgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
-                                                                 [|a.CTrans|], [|b.CTrans|], 
-                                                                 [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0|],
-                                                                 a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
-                                                                 [|0.0|], c.Ptrs, [|c.Ld|],
-                                                                 1L, [|a.BatchSize|])))
+                use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)            
+                if BLAS.F.Has_cblas_gemm_batch then 
+                    BLAS.Invoke<'T, unit>
+                        (singleFn=(fun () -> BLAS.F.cblas_sgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                       [|a.CTrans|], [|b.CTrans|], 
+                                                                       [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0f|],
+                                                                       a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                                       [|0.0f|], c.Ptrs, [|c.Ld|],
+                                                                       1L, [|a.BatchSize|])),
+                         doubleFn=(fun () -> BLAS.F.cblas_dgemm_batch (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                       [|a.CTrans|], [|b.CTrans|], 
+                                                                       [|a.OpRows|], [|b.OpCols|], [|a.OpCols|], [|1.0|],
+                                                                       a.Ptrs, [|a.Ld|], b.Ptrs, [|b.Ld|],
+                                                                       [|0.0|], c.Ptrs, [|c.Ld|],
+                                                                       1L, [|a.BatchSize|])))
+                else
+                    for s in 0 .. int a.BatchSize - 1 do
+                        BLAS.Invoke<'T, unit>
+                            (singleFn=(fun () -> BLAS.F.cblas_sgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                     a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                                     1.0f, a.Ptrs.[s], a.Ld, b.Ptrs.[s], b.Ld,
+                                                                     0.0f, c.Ptrs.[s], c.Ld)),
+                             doubleFn=(fun () -> BLAS.F.cblas_dgemm (BLAS.CBLAS_LAYOUT.CblasColMajor,
+                                                                     a.CTrans, b.CTrans, a.OpRows, b.OpCols, a.OpCols, 
+                                                                     1.0, a.Ptrs.[s], a.Ld, b.Ptrs.[s], b.Ld,
+                                                                     0.0, c.Ptrs.[s], c.Ld)))                      
                 c.FetchResult()
             else
-                (trgt :?> Tensor<'T>).FillSumAxis 2 ((a :?> Tensor<'T>).[*, *, *, NewAxis] * (b :?> Tensor<'T>).[*, NewAxis, *, *])
+                (trgt :?> Tensor<'T>).FillSumAxis 2 ((a :?> Tensor<'T>).[*, *, *, NewAxis] * 
+                                                     (b :?> Tensor<'T>).[*, NewAxis, *, *])
 
         member this.BatchedInvert (trgt, src) =
             if not isBlasSupported then
@@ -549,16 +562,16 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 let ipiv : BLAS.lapack_int[] = Array.zeroCreate (int32 size)
                 let info =
                     BLAS.Invoke<'T, BLAS.lapack_int> 
-                        (singleFn=(fun () -> BLAS.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)),
-                            doubleFn=(fun () -> BLAS.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
+                        (singleFn=(fun () -> BLAS.F.LAPACKE_sgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.F.LAPACKE_dgetrf (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Cols, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixException "cannot invert singular matrix")
 
                 // compute matrix inverse
                 let info =
                     BLAS.Invoke<'T, BLAS.lapack_int> 
-                        (singleFn=(fun () -> BLAS.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)),
-                            doubleFn=(fun () -> BLAS.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
+                        (singleFn=(fun () -> BLAS.F.LAPACKE_sgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)),
+                         doubleFn=(fun () -> BLAS.F.LAPACKE_dgetri (BLAS.LAPACK_COL_MAJOR, a.Rows, a.Ptrs.[s], a.Ld, ipiv)))
                 if info < 0L then failwithf "LAPACK argument error %d" info
                 if info > 0L then raise (SingularMatrixException "cannot invert singular matrix")
             a.FetchResult()
@@ -579,16 +592,16 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 for smpl in 0 .. int a.BatchSize - 1 do
                     let info =
                         BLAS.Invoke<'T, BLAS.lapack_int>
-                            (singleFn=(fun() -> BLAS.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)),
-                             doubleFn=(fun() -> BLAS.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)))
+                            (singleFn=(fun() -> BLAS.F.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)),
+                             doubleFn=(fun() -> BLAS.F.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'A', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], u.Ptrs.[smpl], u.Ld, vt.Ptrs.[smpl], vt.Ld)))
                     if info < 0L then failwithf "LAPACK argument error %d" info
                     if info > 0L then failwithf "SVD did not converge: %d" info
             | None -> 
                 for smpl in 0 .. int a.BatchSize - 1 do
                     let info =
                         BLAS.Invoke<'T, BLAS.lapack_int>
-                            (singleFn=(fun() -> BLAS.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)),
-                             doubleFn=(fun() -> BLAS.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)))
+                            (singleFn=(fun() -> BLAS.F.LAPACKE_sgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)),
+                             doubleFn=(fun() -> BLAS.F.LAPACKE_dgesdd (BLAS.LAPACK_COL_MAJOR, 'N', M, N, a.Ptrs.[smpl], a.Ld, s.Ptrs.[smpl], nativeint 0, 1L, nativeint 0, 1L)))
                     if info < 0L then failwithf "LAPACK argument error %d" info
                     if info > 0L then failwithf "SVD did not converge: %d" info
 
@@ -608,8 +621,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             use w = BLAS.GetVector (eigVals, isSource=false, isTarget=true)
             let info = 
                 BLAS.Invoke<'T, BLAS.lapack_int> 
-                    (singleFn=(fun () -> BLAS.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)),
-                     doubleFn=(fun () -> BLAS.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)))
+                    (singleFn=(fun () -> BLAS.F.LAPACKE_ssyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)),
+                     doubleFn=(fun () -> BLAS.F.LAPACKE_dsyevd (BLAS.LAPACK_COL_MAJOR, 'V', part, a.Rows, a.Ptr, a.Ld, w.Ptr)))
             if info < 0L then failwithf "LAPACK argument error %d" info
             if info > 0L then raise (SingularMatrixException "cannot compute eigen decomposition of singular matrix")
             a.FetchResult()

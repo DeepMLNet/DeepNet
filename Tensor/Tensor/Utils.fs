@@ -360,6 +360,15 @@ module internal Util =
         if typeof<'T> = typeof<obj> || typeof<'T> = typeof<IComparable> then
             failwith "the type must be instantiated with explicit generic parameters"
 
+    /// Path to this assembly.
+    let assemblyPath = 
+        let myPath = new Uri(Assembly.GetExecutingAssembly().CodeBase)        
+        Uri.UnescapeDataString myPath.AbsolutePath
+
+    /// Directory of this assembly.
+    let assemblyDir =
+        Path.GetDirectoryName assemblyPath
+
 
 
 /// Exception helpers
