@@ -2,11 +2,11 @@
   <Import Project="../../Common.targets" />
 
   <PropertyGroup>
-    <DefaultBLAS Condition=" '$(DefaultBLAS)' == '' ">OpenBLAS</DefaultBLAS>
+    <DefaultBLAS Condition=" '$(DefaultBLAS)' == '' ">IntelMKL</DefaultBLAS>
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId Condition=" '$(DefaultBLAS)' == 'OpenBLAS' ">Tensor</PackageId>
+    <PackageId>Tensor</PackageId>
     <title>F# Tensor (multidimensional array) library with SIMD and GPU acceleration</title>
     <summary>Provides n-dimensional arrays (tensors) in host memory or on CUDA GPUs. Support many operations from NumPy.</summary>
     <description>
@@ -27,7 +27,9 @@
         - interop with standard F# types (Seq, List, Array, Array2D, Array3D, etc.)
 
       Performance:
-        - host: SIMD and BLAS (OpenBLAS, Intel MKL or vendor-specific) accelerated operations 
+        - host: SIMD and BLAS accelerated operations 
+          - by default Intel MKL is used (shipped with NuGet package)
+          - other BLASes (OpenBLAS, vendor-specific) can be selected by configuration option
         - CUDA GPU: all operations performed locally on GPU and cuBLAS used for matrix operations
 
       Requirements: 
@@ -91,13 +93,6 @@
   
   <ItemGroup>
     <EmbeddedResource Include="Cuda/Kernels/*.cuh" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(DefaultBLAS)' == 'OpenBLAS' ">
-    <Content Include="Host/OpenBLAS/libopenblas.so" PackagePath="runtimes/linux-x64/native">
-      <Link>libopenblas.so</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>       
   </ItemGroup>
 
   <ItemGroup Condition=" '$(DefaultBLAS)' == 'IntelMKL' ">    

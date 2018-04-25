@@ -1,8 +1,0 @@
-
-Git version: v0.2.20
-
-Build options:
-make DYNAMIC_ARCH=1 USE_THREAD=1 BINARY=64 NUM_THREADS=64 PREFIX=target NO_LAPACK=0 
-make PREFIX=target install
-
-
