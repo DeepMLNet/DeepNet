@@ -42,7 +42,6 @@ module private OSLoader =
         extern IntPtr GetProcAddress (IntPtr hModule, string procName)   
 
     let load (filename: string) =
-        printfn "Assmebly path is %s" Util.assemblyPath
         if RuntimeInformation.IsOSPlatform OSPlatform.Linux || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
             let hnd = Unix.dlopen (filename, Unix.RTLD_NOW)
             if hnd <> IntPtr.Zero then Ok hnd
@@ -117,10 +116,10 @@ type NativeLib (libName: NativeLibName) =
             else OSLoader.unsupPlatform ()
         let cands = 
             [yield Path.Combine (Util.assemblyDir, filename)
-             yield Path.Combine (Util.assemblyDir, "..", "..", "runtimes", rid, "native")]
+             yield Path.Combine (Util.assemblyDir, "..", "..", "runtimes", rid, "native", filename)]
         match cands |> List.tryFind File.Exists with
         | Some path -> 
-            printfn "Resolved library %s to %s." filename path
+            //printfn "Resolved library %s to %s." filename path
             path
         | None ->
             let msg = sprintf "Cannot resolve library path for %s. Candidates are %A." filename cands

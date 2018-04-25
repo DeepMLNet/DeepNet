@@ -162,7 +162,6 @@ module BLAS =
 type BLAS private () =
 
     static let load () =
-        printfn "Loading BLAS: %A" Cfg.BLASLib
         match Cfg.BLASLib with
         | BLASLib.Vendor -> BLAS.Impl (NativeLibName.Translated "blas", NativeLibName.Translated "lapacke")
         | BLASLib.IntelMKL -> BLAS.Impl (NativeLibName.Packaged "tensor_mkl", NativeLibName.Packaged "tensor_mkl")
