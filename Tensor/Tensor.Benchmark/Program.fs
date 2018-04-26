@@ -1,4 +1,6 @@
-﻿open System
+﻿namespace Tensor.Benchmark
+
+open System
 open System.Reflection
 open System.IO
 open System.Collections.Generic
@@ -26,6 +28,7 @@ open Tensor.Utils
 //     do this.Add job
 
 
+[<AllowNullLiteral>]
 type IWorker =
     abstract Nothing: unit -> unit
     abstract Zeros: unit -> unit
@@ -88,40 +91,6 @@ type IWorker =
     abstract SVD: unit -> unit
     abstract SymEigDec: unit -> unit
     
-
-type Cache (name: string) =
-    let cacheDir = "Cache"
-    do if not (Directory.Exists cacheDir) then Directory.CreateDirectory cacheDir |> ignore
-    let path = Path.Combine (cacheDir, name)
-    let onDisk = if File.Exists path then Some (HDF5.OpenRead path) else None
-    let contents = Dictionary<string, ITensor> ()
-    let mutable changed = false
-
-    member __.Get name createFn =
-        match onDisk with
-        | _ when contents.ContainsKey name -> contents.[name] :?> Tensor<_>
-        | Some d when d.Exists name -> 
-            let v = HostTensor.read d name
-            contents.[name] <- v
-            v
-        | _ -> 
-            changed <- true
-            let v = createFn ()
-            contents.[name] <- v 
-            v
-
-    member __.Dispose () =
-        match onDisk with
-        | Some d -> d.Dispose ()
-        | _ -> ()
-        if changed then
-            use toDisk = HDF5.OpenWrite path
-            for KeyValue (name, data) in contents do
-                HostTensor.write toDisk name data
-
-    interface IDisposable with
-        member this.Dispose () = this.Dispose ()
-
 
 type Worker<'T> (dev, shape) =
     let cacheName = 
@@ -216,7 +185,7 @@ type Worker<'T> (dev, shape) =
 [<ShortRunJob>]
 type Bench () =
 
-    let mutable worker = Worker<int> (HostTensor.Dev, [1L]) :> IWorker
+    let mutable worker = null
 
     let mutable cudaContext : CudaContext = null
 
@@ -324,9 +293,11 @@ type Bench () =
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SVD () = worker.SVD () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SymEigDec () = worker.SymEigDec () ; sync ()
 
-[<EntryPoint>]
-let main argv = 
-    let switcher = BenchmarkSwitcher (Assembly.GetExecutingAssembly())
-    switcher.Run (args=argv) |> ignore
-    0
+
+module Main =
+    [<EntryPoint>]
+    let main argv = 
+        let switcher = BenchmarkSwitcher (Assembly.GetExecutingAssembly())
+        switcher.Run (args=argv) |> ignore
+        0
 
