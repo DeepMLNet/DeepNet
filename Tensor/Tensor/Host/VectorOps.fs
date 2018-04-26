@@ -52,7 +52,7 @@ type internal VectorOps() =
         while trgtPosIter.Active do
             match trgt.FastLayout.Stride.[nd-1] with
             | 1 -> vectorInnerLoop trgtPosIter.Addr 
-            | _ -> failwith "vector operation to applicable to the given tensor"
+            | _ -> failwith "vector operation not applicable to the given tensor"
             trgtPosIter.MoveNext()      
             
     static member inline private ApplyUnary (vectorOp: Vector<'T1> -> Vector<'T>,
@@ -98,7 +98,7 @@ type internal VectorOps() =
             match trgt.FastLayout.Stride.[nd-1], src1.FastLayout.Stride.[nd-1] with
             | 1, 1 -> stride11InnerLoop trgtPosIter.Addr src1PosIter.Addr 
             | 1, 0 -> stride10InnerLoop trgtPosIter.Addr src1PosIter.Addr 
-            | _ -> failwith "vector operation to applicable to the given tensor"
+            | _ -> failwith "vector operation not applicable to the given tensor"
             trgtPosIter.MoveNext()
             src1PosIter.MoveNext()
                     
@@ -193,7 +193,7 @@ type internal VectorOps() =
             | 1, 1, 0 -> stride110InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
             | 1, 0, 1 -> stride101InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
             | 1, 0, 0 -> stride100InnerLoop trgtPosIter.Addr src1PosIter.Addr src2PosIter.Addr
-            | _ -> failwith "vector operation to applicable to the given tensor"
+            | _ -> failwith "vector operation not applicable to the given tensor"
             trgtPosIter.MoveNext()
             src1PosIter.MoveNext()
             src2PosIter.MoveNext()                   
