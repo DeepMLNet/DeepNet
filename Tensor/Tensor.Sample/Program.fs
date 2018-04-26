@@ -47,6 +47,14 @@ let main argv =
     let seq1 = seq { for i=0 to 20 do if i % 3 = 0 then yield i } |> HostTensor.ofSeq
     printfn "The tensor seq1 is\n%A" seq1
 
+    // Create a vector with a specified increment between elements.
+    let arange1 = HostTensor.arange 5.0 0.1 6.0
+    printfn "arange1=%A" arange1
+
+    // Create a vector with a fixed increment and specified number of elements.
+    let linspace1 = HostTensor.linspace 2.0 4.0 30L
+    printfn "linspace1=%A" linspace1
+
     // Transfer a tensor to the GPU.
     // This works only if you have a CUDA-capable GPU and CUDA SDK 8.0 is installed.
     try

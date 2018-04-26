@@ -142,22 +142,22 @@ module HostTensor =
     let counting nElems = Tensor.counting Dev nElems
 
     /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
-    /// <typeparam name="^V">The data type of the new tensor.</typeparam>
+    /// <typeparam name="'T">The data type of the new tensor.</typeparam>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive element.</param>   
     /// <param name="stop">The end value, which is not included.</param>
     /// <returns>The new tensor.</returns>
     /// <seealso cref="Tensor`1.arange``3"/>
-    let inline arange (start: 'V) (incr: 'V) (stop: 'V) = Tensor.arange Dev start incr stop
+    let arange (start: 'T) (incr: 'T) (stop: 'T) = Tensor.arange Dev start incr stop
 
     /// <summary>Creates a new vector of given size filled with equaly spaced values.</summary>
-    /// <typeparam name="'V">The data type of the new tensor.</typeparam>
+    /// <typeparam name="'T">The data type of the new tensor.</typeparam>
     /// <param name="start">The starting value.</param>
     /// <param name="stop">The end value, which is not included.</param>
     /// <param name="nElems">The size of the vector.</param>   
     /// <returns>The new tensor.</returns>
     /// <seealso cref="Tensor`1.linspace``2"/>
-    let inline linspace (start: 'V) (stop: 'V) nElems = Tensor.linspace Dev start stop nElems
+    let linspace (start: 'T) (stop: 'T) nElems = Tensor.linspace Dev start stop nElems
   
     /// <summary>Creates a one-dimensional tensor referencing the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>

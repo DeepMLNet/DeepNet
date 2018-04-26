@@ -3835,7 +3835,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         x
 
     /// <summary>Creates a new vector filled with equaly spaced values using a specifed increment.</summary>
-    /// <typeparam name="^V">The data type of the new tensor.</typeparam>
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive element.</param>   
@@ -3851,9 +3850,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>If stop is smaller or equal to start, an empty vector is returned.</para>
     /// </remarks>
     /// <seealso cref="counting"/><seealso cref="linspace``1"/>
-    static member inline arange (dev: ITensorDevice) (start: 'V) (incr: 'V) (stop: 'V) = 
-        let nElems = max 0L ((stop - start) / incr |> int64)
-        let x = Tensor<'V> ([nElems], dev)
+    static member arange (dev: ITensorDevice) (start: 'T) (incr: 'T) (stop: 'T) = 
+        let op = ScalarPrimitives.For<'T, 'T> ()
+        let opc = ScalarPrimitives.For<int64, 'T> ()
+        let nElemsT = op.Divide (op.Subtract stop start) incr
+        let nElemsInt = opc.Convert nElemsT
+        let nElems = max 0L nElemsInt
+        let x = Tensor<'T> ([nElems], dev)
         x.FillIncrementing (start, incr)
         x
 
@@ -3873,11 +3876,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <c>incr = (stop - start) / (nElems - 1)</c>.</para>
     /// </remarks>
     /// <seealso cref="arange``1"/>
-    static member inline linspace (dev: ITensorDevice) (start: 'V) (stop: 'V) (nElems: int64) =
+    static member linspace (dev: ITensorDevice) (start: 'T) (stop: 'T) (nElems: int64) =
         if nElems < 2L then invalidArg "nElems" "linspace requires at least two elements."
-        let incr = (stop - start) / conv<'V> (nElems - 1L)      
-        let x = Tensor<'V> ([nElems], dev)
-        x.FillIncrementing(start, incr)
+        let op = ScalarPrimitives.For<'T, int64> ()
+        let nElemsT = op.Convert (nElems - 1L)
+        let incr = op.Divide (op.Subtract stop start) nElemsT
+        let x = Tensor<'T> ([nElems], dev)
+        x.FillIncrementing (start, incr)
         x
 
     /// <summary>Element-wise check if two tensors have same (within machine precision) values.</summary>
