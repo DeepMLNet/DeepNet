@@ -1,5 +1,7 @@
 ﻿open System
 open System.Reflection
+open System.IO
+open System.Collections.Generic
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
@@ -87,7 +89,47 @@ type IWorker =
     abstract SymEigDec: unit -> unit
     
 
+type Cache (name: string) =
+    let cacheDir = "Cache"
+    do if not (Directory.Exists cacheDir) then Directory.CreateDirectory cacheDir |> ignore
+    let path = Path.Combine (cacheDir, name)
+    let onDisk = if File.Exists path then Some (HDF5.OpenRead path) else None
+    let contents = Dictionary<string, ITensor> ()
+    let mutable changed = false
+
+    member __.Get name createFn =
+        match onDisk with
+        | _ when contents.ContainsKey name -> contents.[name] :?> Tensor<_>
+        | Some d when d.Exists name -> 
+            let v = HostTensor.read d name
+            contents.[name] <- v
+            v
+        | _ -> 
+            changed <- true
+            let v = createFn ()
+            contents.[name] <- v 
+            v
+
+    member __.Dispose () =
+        match onDisk with
+        | Some d -> d.Dispose ()
+        | _ -> ()
+        if changed then
+            use toDisk = HDF5.OpenWrite path
+            for KeyValue (name, data) in contents do
+                HostTensor.write toDisk name data
+
+    interface IDisposable with
+        member this.Dispose () = this.Dispose ()
+
+
 type Worker<'T> (dev, shape) =
+    let cacheName = 
+        let typeName = typeof<'T>.FullName
+        let shpStr = shape |> Seq.map (sprintf "%d") |> String.concat "x"
+        sprintf "%s-%s" typeName shpStr
+    let cache = new Cache (cacheName)
+
     let lastAxis = List.length shape - 1
     let nElems = shape |> List.fold (*) 1L
 
@@ -95,15 +137,17 @@ type Worker<'T> (dev, shape) =
     let rndNumbers = Seq.initInfinite (fun _ -> rng.NextDouble() * 100. - 50. |> conv<'T>)
     let rndBools = Seq.initInfinite (fun _ -> rng.NextDouble() >= 0.5)
 
-    let a = rndNumbers |> HostTensor.ofSeqWithShape shape |> Tensor.transfer dev
-    let b = rndNumbers |> HostTensor.ofSeqWithShape shape |> Tensor.transfer dev
-    let p = rndBools |> HostTensor.ofSeqWithShape shape |> Tensor.transfer dev
-    let q = rndBools |> HostTensor.ofSeqWithShape shape |> Tensor.transfer dev
+    let a = cache.Get "a" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+    let b = cache.Get "b" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+    let p = cache.Get "p" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+    let q = cache.Get "q" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
     
     let maskedSetTarget = Tensor<'T>.zeros dev shape
     let maskedSetElems = 
-        if dev = HostTensor.Dev then a.M(p)
+        if dev = HostTensor.Dev then cache.Get "maskedSetElems" (fun () -> a.M(p))
         else Tensor<'T>.zeros dev shape // masking currently unsupported on CUDA
+
+    do cache.Dispose ()
 
     interface IWorker with
         member __.Nothing () = let c = a in ()
