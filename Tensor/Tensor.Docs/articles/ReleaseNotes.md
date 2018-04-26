@@ -1,5 +1,8 @@
 # Release notes
 
+* 0.4.9
+  * Remove type constraints on Tensor.arange and Tensor.linspace.
+
 * 0.4.8
   * Support for dynamic loading of BLAS libraries for host tensors.
     Use Tensor.Host.Cfg.BLASLib to configure.
