@@ -261,3 +261,6 @@ bin/
 obj/
 
 tensors.h5
+
+.ropeproject
+.pytest_cache
