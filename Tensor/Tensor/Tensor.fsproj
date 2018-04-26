@@ -66,6 +66,7 @@
     <Compile Include="NativeLib.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
+    <Compile Include="ScalarPrimitives.fs" />
     <Compile Include="TensorRng.fs" />
     <Compile Include="TensorLayout.fs" />
     <Compile Include="TensorBackend.fs" />
