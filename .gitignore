@@ -264,3 +264,7 @@ tensors.h5
 
 .ropeproject
 .pytest_cache
+*.pyc
+__pycache__
+.cache
+BenchmarkDotNet.Artifacts

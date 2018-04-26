@@ -46,6 +46,14 @@
             "problemMatcher": [
                 "$msCompile"
             ]
-        }        
+        },
+        {
+            "label": "Tensor.Benchmark",
+            "type": "shell",
+            "command": "dotnet run -p Tensor/Tensor.Benchmark -c Release",
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        }                   
     ]
 }
