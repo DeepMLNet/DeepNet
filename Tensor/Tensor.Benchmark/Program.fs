@@ -1,4 +1,7 @@
-﻿namespace Tensor.Benchmark
+﻿// To run the benchmark execute the following command:
+// dotnet run -c Release -- TensorBenchmark
+
+namespace Tensor.Benchmark
 
 open System
 open System.Reflection
@@ -48,6 +51,7 @@ type IWorker =
     abstract Multiply: unit -> unit
     abstract Divide: unit -> unit
     abstract Power: unit -> unit
+    abstract Modulo: unit -> unit
     abstract Dot: unit -> unit
     abstract Sgn: unit -> unit
     abstract Log: unit -> unit
@@ -155,6 +159,7 @@ type Worker<'T> (dev, shape) =
         member __.Multiply () = let c = a * b in ()
         member __.Divide () = let c = a / b in ()
         member __.Power () = let c = a ** b in ()
+        member __.Modulo () = let c = a % b in ()
         member __.Dot () = let c = a .* b in ()
         member __.Sgn () = let c = sgn a in ()
         member __.Log () = let c = log a in ()
@@ -266,6 +271,7 @@ type TensorBenchmark () =
     [<Benchmark>] member __.Multiply () = worker.Multiply () ; sync ()
     [<Benchmark>] member __.Divide () = worker.Divide () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Power () = worker.Power () ; sync ()
+    [<Benchmark>] member __.Modulo () = worker.Modulo () ; sync ()    
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Dot () = worker.Dot () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Sgn () = worker.Sgn () ; sync ()
     [<Benchmark>] member __.Log () = worker.Log () ; sync ()
