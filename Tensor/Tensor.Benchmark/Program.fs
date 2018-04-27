@@ -97,16 +97,29 @@ type Worker<'T> (dev, shape) =
     let rndNumbers = Seq.initInfinite (fun _ -> rng.NextDouble() * 100. - 50. |> conv<'T>)
     let rndBools = Seq.initInfinite (fun _ -> rng.NextDouble() >= 0.5)
 
-    let a = cache.Get "a" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
-    let b = cache.Get "b" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+    let a = 
+        if typeof<'T> <> typeof<bool> then
+            cache.Get "a" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+        else 
+            cache.Get "b" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev |> box :?> Tensor<'T>
+    let b = 
+        if typeof<'T> <> typeof<bool> then
+            cache.Get "b" (fun () -> rndNumbers |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
+        else 
+            cache.Get "b" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev |> box :?> Tensor<'T>
     let p = cache.Get "p" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
     let q = cache.Get "q" (fun () -> rndBools |> HostTensor.ofSeqWithShape shape) |> Tensor.transfer dev
     
-    let maskedSetTarget = Tensor<'T>.zeros dev shape
+    let maskedSetTarget = 
+        if typeof<'T> <> typeof<bool> then Tensor<'T>.zeros dev shape
+        else Tensor.falses dev shape |> box :?> Tensor<'T>
     let maskedSetElems = 
         if dev = HostTensor.Dev then cache.Get "maskedSetElems" (fun () -> a.M(p))
-        else Tensor<'T>.zeros dev shape // masking currently unsupported on CUDA
-
+        else 
+            // masking currently unsupported on CUDA
+            if typeof<'T> <> typeof<bool> then Tensor<'T>.zeros dev shape
+            else Tensor.falses dev shape |> box :?> Tensor<'T>        
+            
     do cache.Dispose ()
 
     let ensureBool () =
