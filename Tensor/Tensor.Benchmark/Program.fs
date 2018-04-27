@@ -13,9 +13,25 @@ open BenchmarkDotNet.Configs
 open BenchmarkDotNet.Attributes
 open BenchmarkDotNet.Attributes.Jobs
 open BenchmarkDotNet.Running
+open BenchmarkDotNet.Order
 
 open Tensor
 open Tensor.Utils
+open BenchmarkDotNet.Columns
+
+
+type MyOrder () =  
+    interface IOrderProvider with
+        member __.GetExecutionOrder benchmarks = Seq.ofArray benchmarks
+        member __.GetSummaryOrder (benchmarks, summary) = benchmarks |> Seq.sortBy (fun b -> b.Target.Method.Name)
+        member __.GetHighlightGroupKey _ = null
+        member __.GetLogicalGroupKey (config, allBenchmarks, benchmark) = benchmark.Target.Method.Name
+        member __.GetLogicalGroupOrder logicalGroups = logicalGroups |> Seq.sortBy (fun lg -> lg.Key)
+        member __.SeparateLogicalGroups = true
+
+type MyConfig () as this =
+    inherit ManualConfig ()
+    do this.Set (MyOrder())
 
 
 [<AllowNullLiteral>]
@@ -193,6 +209,7 @@ type Worker<'T> (dev, shape) =
 
 
 [<SimpleJob(launchCount=1, warmupCount=1, targetCount=4)>]
+[<Config(typeof<MyConfig>)>]
 type TensorBenchmark () =
     let mutable worker = null
     let mutable cudaContext : CudaContext = null
@@ -201,18 +218,17 @@ type TensorBenchmark () =
         if not (isNull cudaContext) then
             cudaContext.Synchronize()
 
+    //[<Params("100x100", "1000x1000")>]
+    [<Params("1000x1000", "2000x2000", "8000x8000")>]
+    member val Shape = "" with get, set
+
     //[<Params("int32", "int64", "single", "double")>]
     //[<Params("single")>]
     [<Params("int32", "int64", "single", "double", "bool")>]
     member val Type = "" with get, set
 
-    //[<Params("Host")>]
     [<Params("Host", "Cuda")>]
     member val Dev = "" with get, set
-
-    //[<Params("100x100", "1000x1000")>]
-    [<Params("1000x1000", "2000x2000", "8000x8000")>]
-    member val Shape = "" with get, set
 
     [<GlobalSetup>]
     member this.Setup () =
