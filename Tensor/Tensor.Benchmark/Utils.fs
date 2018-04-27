@@ -13,7 +13,9 @@ type Cache (name: string) =
     do if not (Directory.Exists cacheDir) then Directory.CreateDirectory cacheDir |> ignore
     let path = (Path.Combine (cacheDir, name) + ".h5") |> Path.GetFullPath
     //do printfn "Cache %s is at %s" name path
-    let onDisk = if File.Exists path then Some (HDF5.OpenRead path) else None
+    let onDisk = 
+        try if File.Exists path then Some (HDF5.OpenRead path) else None
+        with _ -> None
     let contents = Dictionary<string, ITensor> ()
     let mutable changed = false
 
@@ -39,9 +41,11 @@ type Cache (name: string) =
         | Some d -> d.Dispose ()
         | _ -> ()
         if changed then
-            use toDisk = HDF5.OpenWrite path
-            for KeyValue (name, data) in contents do
-                HostTensor.write toDisk name data
+            try
+                use toDisk = HDF5.OpenWrite path
+                for KeyValue (name, data) in contents do
+                    HostTensor.write toDisk name data
+            with _ -> ()
 
     interface IDisposable with
         member this.Dispose () = this.Dispose ()

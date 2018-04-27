@@ -18,21 +18,12 @@ open Tensor
 open Tensor.Utils
 
 
-// type FastRunConfig () as this =
-//     inherit ManualConfig ()
-//     let job = Job()
-//     //let job = job.WithIterationTime 100
-//     let job = job.WithLaunchCount 1
-//     let job = job.WithWarmupCount 1
-//     let job = job.WithTargetCount 2
-//     do this.Add job
-
-
 [<AllowNullLiteral>]
 type IWorker =
     abstract Nothing: unit -> unit
     abstract Zeros: unit -> unit
     abstract Ones: unit -> unit
+    abstract Identity: unit -> unit
     abstract Arange: unit -> unit
     abstract Copy: unit -> unit
     abstract Negate: unit -> unit
@@ -118,11 +109,16 @@ type Worker<'T> (dev, shape) =
 
     do cache.Dispose ()
 
+    let ensureBool () =
+        if typeof<'T> <> typeof<bool> then
+            failwith "Operation only supported for boolean data type."
+
     interface IWorker with
         member __.Nothing () = let c = a in ()
         member __.Zeros () = let c = Tensor<'T>.zeros dev shape in ()
         member __.Ones () = let c = Tensor<'T>.ones dev shape in ()
         member __.Arange () = let c = Tensor.arange dev (conv<'T> 0L) (conv<'T> 1L) (conv<'T> nElems) in ()
+        member __.Identity () = let c = Tensor.identity dev shape.[0] in ()
         member __.Copy () = let c = Tensor.copy a in ()
         member __.Negate () = let c = -a in ()
         member __.Add () = let c = a + b in ()
@@ -157,36 +153,35 @@ type Worker<'T> (dev, shape) =
         member __.LessOrEqual () = let c = a <<== b in ()
         member __.Greater () = let c = a >>>> b in ()
         member __.GreaterOrEqual () = let c = a >>== b in ()
-        member __.Not () = let c = ~~~~p  in ()
-        member __.And () = let c = p &&&& q in ()
-        member __.Or () = let c = p |||| q in ()
-        member __.Xor () = let c = p ^^^^ q in ()
-        member __.CountTrueAxis () = let c = Tensor.countTrueAxis lastAxis p in ()
         member __.IfThenElse () = let c = Tensor.ifThenElse p a b in ()
         member __.SumAxis () = let c = Tensor.sumAxis lastAxis a in ()
         member __.ProductAxis () = let c = Tensor.productAxis lastAxis a in ()
         member __.MaxAxis () = let c = Tensor.maxAxis lastAxis a in ()
         member __.MinAxis () = let c = Tensor.minAxis lastAxis a in ()
-        member __.AllAxis () = let c = Tensor.allAxis lastAxis p in ()
-        member __.AnyAxis () = let c = Tensor.anyAxis lastAxis p in ()
         member __.ArgMaxAxis () = let c = Tensor.argMaxAxis lastAxis a in ()
         member __.ArgMinAxis () = let c = Tensor.argMinAxis lastAxis a in ()
         member __.FindAxis () = let c = Tensor.findAxis (conv<'T> 0) lastAxis a in ()
         member __.MaskedGet () = let c = a.M(p) in ()
         member __.MaskedSet () = maskedSetTarget.M(p) <- maskedSetElems
-        member __.TrueIndices () = let c = Tensor.trueIdx p in ()
         member __.Invert () = let c = Tensor.invert a in ()
         member __.PseudoInvert () = let c = Tensor.pseudoInvert a in ()
         member __.SVD () = let u, s, v = Tensor.SVD a in ()
         member __.SymEigDec () = let vals, vecs = Tensor.symmetricEigenDecomposition MatrixPart.Upper a in ()
 
+        member __.Not () = ensureBool() ; let c = ~~~~p  in ()
+        member __.And () = ensureBool() ; let c = p &&&& q in ()
+        member __.Or () = ensureBool() ; let c = p |||| q in ()
+        member __.Xor () = ensureBool() ; let c = p ^^^^ q in ()
+        member __.CountTrueAxis () = ensureBool() ; let c = Tensor.countTrueAxis lastAxis p in ()
+        member __.AllAxis () = ensureBool() ; let c = Tensor.allAxis lastAxis p in ()
+        member __.AnyAxis () = ensureBool() ; let c = Tensor.anyAxis lastAxis p in ()
+        member __.TrueIndices () = ensureBool() ; let c = Tensor.trueIdx p in ()
 
-//[<Config(typeof<FastRunConfig>)>]
-[<ShortRunJob>]
-type Bench () =
 
+
+[<SimpleJob(launchCount=1, warmupCount=1, targetCount=4)>]
+type TensorBenchmark () =
     let mutable worker = null
-
     let mutable cudaContext : CudaContext = null
 
     let sync () =
@@ -195,7 +190,7 @@ type Bench () =
 
     //[<Params("int32", "int64", "single", "double")>]
     //[<Params("single")>]
-    [<Params("single", "double")>]
+    [<Params("int32", "int64", "single", "double", "bool")>]
     member val Type = "" with get, set
 
     //[<Params("Host")>]
@@ -203,8 +198,6 @@ type Bench () =
     member val Dev = "" with get, set
 
     //[<Params("100x100", "1000x1000")>]
-    //[<Params("1000x1000")>]
-    //[<Params("1000x1000", "2000x2000")>]
     [<Params("1000x1000", "2000x2000", "8000x8000")>]
     member val Shape = "" with get, set
 
@@ -212,9 +205,9 @@ type Bench () =
     member this.Setup () =
         if this.Dev = "Cuda" then
             cudaContext <- new CudaContext(createNew=false)
-
         let typ =
             match this.Type with
+            | "bool" -> typeof<bool>
             | "int32" -> typeof<int32>
             | "int64" -> typeof<int64>
             | "single" -> typeof<single>
@@ -235,6 +228,7 @@ type Bench () =
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Nothing () = worker.Nothing () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Zeros () = worker.Zeros () ; sync ()
     [<Benchmark>] member __.Ones () = worker.Ones () ; sync ()
+    [<Benchmark>] member __.Identity () = worker.Identity () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Arange () = worker.Arange () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Copy () = worker.Copy () ; sync ()
     [<Benchmark>] member __.Negate () = worker.Negate () ; sync ()
@@ -270,33 +264,37 @@ type Bench () =
     [<Benchmark>] member __.LessOrEqual () = worker.LessOrEqual () ; sync ()
     [<Benchmark>] member __.Greater () = worker.Greater () ; sync ()
     [<Benchmark>] member __.GreaterOrEqual () = worker.GreaterOrEqual () ; sync ()
-    [<Benchmark>] member __.Not () = worker.Not () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.And () = worker.And () ; sync ()
-    [<Benchmark>] member __.Or () = worker.Or () ; sync ()
-    [<Benchmark>] member __.Xor () = worker.Xor () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.CountTrueAxis () = worker.CountTrueAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.IfThenElse () = worker.IfThenElse () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SumAxis () = worker.SumAxis () ; sync ()
     [<Benchmark>] member __.ProductAxis () = worker.ProductAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaxAxis () = worker.MaxAxis () ; sync ()
     [<Benchmark>] member __.MinAxis () = worker.MinAxis () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.AllAxis () = worker.AllAxis () ; sync ()
-    [<Benchmark>] member __.AnyAxis () = worker.AnyAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.ArgMaxAxis () = worker.ArgMaxAxis () ; sync ()
     [<Benchmark>] member __.ArgMinAxis () = worker.ArgMinAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.FindAxis () = worker.FindAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedGet () = worker.MaskedGet () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedSet () = worker.MaskedSet () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.TrueIndices () = worker.TrueIndices () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Invert () = worker.Invert () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.PseudoInvert () = worker.PseudoInvert () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SVD () = worker.SVD () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SymEigDec () = worker.SymEigDec () ; sync ()
 
+    [<Benchmark>] member __.Not () = worker.Not () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.And () = worker.And () ; sync ()
+    [<Benchmark>] member __.Or () = worker.Or () ; sync ()
+    [<Benchmark>] member __.Xor () = worker.Xor () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.CountTrueAxis () = worker.CountTrueAxis () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.AllAxis () = worker.AllAxis () ; sync ()
+    [<Benchmark>] member __.AnyAxis () = worker.AnyAxis () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.TrueIndices () = worker.TrueIndices () ; sync ()
+
 
 module Main =
     [<EntryPoint>]
     let main argv = 
+        Tensor.Cuda.Cfg.FastKernelMath <- true
+        Tensor.Cuda.Cfg.RestrictKernels <- true
+        
         let switcher = BenchmarkSwitcher (Assembly.GetExecutingAssembly())
         switcher.Run (args=argv) |> ignore
         0

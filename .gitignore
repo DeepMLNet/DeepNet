@@ -268,3 +268,4 @@ tensors.h5
 __pycache__
 .cache
 BenchmarkDotNet.Artifacts
+Tensor/Tensor.Benchmark/bin
