@@ -97,7 +97,7 @@ def test_add(benchmark, shape, typ):
     benchmark(lambda: a + b)
 
 @params
-def test_subtract(benchmark, s0.0, dtype))hape, typ): 
+def test_subtract(benchmark, shape, typ): 
     a,b = get_data(shape, typ)
     benchmark(lambda: a - b)
 
