@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import pytest_benchmark
 
-shapes = ["1000x1000", "2000x2000", "8000x8000"]
+shapes = ["1000x1000", "2000x2000", "4000x4000"]
 types = ['int32', 'int64', 'single', 'double']
 
 def params(func):
@@ -53,10 +53,10 @@ def get_bool_data (shape):
     b = np.random.sample (size=shape) > 0.5
     return (a,b)
 
-@params
-def test_nothing(benchmark, shape, typ): 
-    a,b = get_data(shape, typ)
-    benchmark(lambda: a)
+# @params
+# def test_nothing(benchmark, shape, typ): 
+#     a,b = get_data(shape, typ)
+#     benchmark(lambda: a)
 
 @params
 def test_zeros(benchmark, shape, typ): 

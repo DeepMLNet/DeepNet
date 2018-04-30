@@ -17,24 +17,36 @@ open BenchmarkDotNet.Attributes
 open BenchmarkDotNet.Attributes.Jobs
 open BenchmarkDotNet.Running
 open BenchmarkDotNet.Order
+open BenchmarkDotNet.Columns
+open BenchmarkDotNet.Engines
 
 open Tensor
 open Tensor.Utils
-open BenchmarkDotNet.Columns
+open BenchmarkDotNet.Jobs
+open BenchmarkDotNet.Jobs
+open BenchmarkDotNet.Horology
+open BenchmarkDotNet.Reports
+open BenchmarkDotNet.Exporters
+open BenchmarkDotNet.Exporters.Csv
 
 
 type MyOrder () =  
     interface IOrderProvider with
         member __.GetExecutionOrder benchmarks = Seq.ofArray benchmarks
-        member __.GetSummaryOrder (benchmarks, summary) = benchmarks |> Seq.sortBy (fun b -> b.Target.Method.Name)
+        member __.GetSummaryOrder (benchmarks, summary) = 
+            let names = benchmarks |> Seq.groupBy (fun b -> b.Target.Method.Name) |> Seq.map fst |> Array.ofSeq
+            benchmarks |> Seq.sortBy (fun b -> names |> Array.findIndex ((=) b.Target.Method.Name))
         member __.GetHighlightGroupKey _ = null
         member __.GetLogicalGroupKey (config, allBenchmarks, benchmark) = benchmark.Target.Method.Name
-        member __.GetLogicalGroupOrder logicalGroups = logicalGroups |> Seq.sortBy (fun lg -> lg.Key)
+        member __.GetLogicalGroupOrder logicalGroups = logicalGroups 
         member __.SeparateLogicalGroups = true
 
 type MyConfig () as this =
     inherit ManualConfig ()
+    do this.Add (CsvExporter (CsvSeparator.CurrentCulture, SummaryStyle(PrintUnitsInHeader=true, PrintUnitsInContent=false, TimeUnit=TimeUnit.Millisecond)))
+    do this.Add (Job.Default.WithWarmupCount(0).WithLaunchCount(1).WithIterationTime(TimeInterval.FromMilliseconds 250.0).WithTargetCount(4).WithUnrollFactor(1).WithMinInvokeCount(1))
     do this.Set (MyOrder())
+    do this.Set (SummaryStyle (PrintUnitsInHeader=true, PrintUnitsInContent=false, TimeUnit=TimeUnit.Millisecond))
 
 
 [<AllowNullLiteral>]
@@ -195,8 +207,10 @@ type Worker<'T> (dev, shape) =
         member __.ArgMaxAxis () = let c = Tensor.argMaxAxis lastAxis a in ()
         member __.ArgMinAxis () = let c = Tensor.argMinAxis lastAxis a in ()
         member __.FindAxis () = let c = Tensor.findAxis (conv<'T> 0) lastAxis a in ()
+
         member __.MaskedGet () = let c = a.M(p) in ()
         member __.MaskedSet () = maskedSetTarget.M(p) <- maskedSetElems
+
         member __.Invert () = let c = Tensor.invert a in ()
         member __.PseudoInvert () = let c = Tensor.pseudoInvert a in ()
         member __.SVD () = let u, s, v = Tensor.SVD a in ()
@@ -213,7 +227,8 @@ type Worker<'T> (dev, shape) =
 
 
 
-[<SimpleJob(launchCount=1, warmupCount=1, targetCount=4)>]
+//[<SimpleJob(launchCount=1, warmupCount=1, targetCount=4, invocationCount=2)>]
+//[<SimpleJob(RunStrategy.Monitoring)>]
 [<Config(typeof<MyConfig>)>]
 type TensorBenchmark () =
     let mutable worker = null
@@ -224,12 +239,12 @@ type TensorBenchmark () =
             cudaContext.Synchronize()
 
     //[<Params("100x100", "1000x1000")>]
-    [<Params("1000x1000", "2000x2000", "8000x8000")>]
+    [<Params("1000x1000", "2000x2000", "4000x4000")>]
     member val Shape = "" with get, set
 
     //[<Params("int32", "int64", "single", "double")>]
     //[<Params("single")>]
-    [<Params("int32", "int64", "single", "double", "bool")>]
+    [<Params("bool", "int32", "int64", "single", "double")>]
     member val Type = "" with get, set
 
     [<Params("Host", "Cuda")>]
@@ -259,12 +274,13 @@ type TensorBenchmark () =
         worker <- Activator.CreateInstance (workerType, dev, shape) :?> IWorker
         sync()
 
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Nothing () = worker.Nothing () ; sync ()
+    //[<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Nothing () = worker.Nothing () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Zeros () = worker.Zeros () ; sync ()
     [<Benchmark>] member __.Ones () = worker.Ones () ; sync ()
     [<Benchmark>] member __.Identity () = worker.Identity () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Arange () = worker.Arange () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Copy () = worker.Copy () ; sync ()
+
     [<Benchmark>] member __.Negate () = worker.Negate () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Add () = worker.Add () ; sync ()
     [<Benchmark>] member __.Subtract () = worker.Subtract () ; sync ()
@@ -291,28 +307,32 @@ type TensorBenchmark () =
     [<Benchmark>] member __.Floor () = worker.Floor () ; sync ()
     [<Benchmark>] member __.Round () = worker.Round () ; sync ()
     [<Benchmark>] member __.Truncate () = worker.Truncate () ; sync ()
+
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaxElemwise () = worker.MaxElemwise () ; sync ()
     [<Benchmark>] member __.MinElemwise () = worker.MinElemwise () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SumAxis () = worker.SumAxis () ; sync ()
+    [<Benchmark>] member __.ProductAxis () = worker.ProductAxis () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaxAxis () = worker.MaxAxis () ; sync ()
+    [<Benchmark>] member __.MinAxis () = worker.MinAxis () ; sync ()
+
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.ArgMaxAxis () = worker.ArgMaxAxis () ; sync ()
+    [<Benchmark>] member __.ArgMinAxis () = worker.ArgMinAxis () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.FindAxis () = worker.FindAxis () ; sync ()
+
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedGet () = worker.MaskedGet () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedSet () = worker.MaskedSet () ; sync ()
+
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Invert () = worker.Invert () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.PseudoInvert () = worker.PseudoInvert () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SVD () = worker.SVD () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SymEigDec () = worker.SymEigDec () ; sync ()
+
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Equal () = worker.Equal () ; sync ()
     [<Benchmark>] member __.NotEqual () = worker.NotEqual () ; sync ()
     [<Benchmark>] member __.Less () = worker.Less () ; sync ()
     [<Benchmark>] member __.LessOrEqual () = worker.LessOrEqual () ; sync ()
     [<Benchmark>] member __.Greater () = worker.Greater () ; sync ()
     [<Benchmark>] member __.GreaterOrEqual () = worker.GreaterOrEqual () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.IfThenElse () = worker.IfThenElse () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SumAxis () = worker.SumAxis () ; sync ()
-    [<Benchmark>] member __.ProductAxis () = worker.ProductAxis () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaxAxis () = worker.MaxAxis () ; sync ()
-    [<Benchmark>] member __.MinAxis () = worker.MinAxis () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.ArgMaxAxis () = worker.ArgMaxAxis () ; sync ()
-    [<Benchmark>] member __.ArgMinAxis () = worker.ArgMinAxis () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.FindAxis () = worker.FindAxis () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedGet () = worker.MaskedGet () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.MaskedSet () = worker.MaskedSet () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.Invert () = worker.Invert () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.PseudoInvert () = worker.PseudoInvert () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SVD () = worker.SVD () ; sync ()
-    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.SymEigDec () = worker.SymEigDec () ; sync ()
 
     [<Benchmark>] member __.Not () = worker.Not () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.And () = worker.And () ; sync ()
@@ -322,13 +342,14 @@ type TensorBenchmark () =
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.AllAxis () = worker.AllAxis () ; sync ()
     [<Benchmark>] member __.AnyAxis () = worker.AnyAxis () ; sync ()
     [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.TrueIndices () = worker.TrueIndices () ; sync ()
+    [<Benchmark>] [<BenchmarkCategory("Overview")>] member __.IfThenElse () = worker.IfThenElse () ; sync ()
 
 
 module Main =
     [<EntryPoint>]
     let main argv = 
         Tensor.Cuda.Cfg.FastKernelMath <- true
-        Tensor.Cuda.Cfg.RestrictKernels <- true
+        //Tensor.Cuda.Cfg.RestrictKernels <- true
         
         let switcher = BenchmarkSwitcher (Assembly.GetExecutingAssembly())
         switcher.Run (args=argv) |> ignore
