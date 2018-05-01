@@ -1,0 +1,8 @@
+{
+    "Name": "hostname",
+    "CPU": "Intel Pentium",
+    "GPU": "nVidia Geforce",
+    "OS": "Microsoft Windows",
+    "Tensor": "Tensor 0.x on dotnet 2.x",
+    "NumPy": "NumPy 1.x on Anaconda3 5.x"
+}
