@@ -28,6 +28,7 @@ open BenchmarkDotNet.Exporters
 open BenchmarkDotNet.Exporters.Csv
 
 open Tensor
+open System.Text.RegularExpressions
 
 
 module Main =
@@ -44,11 +45,10 @@ module Main =
 
     let getCpu () =
         if RuntimeInformation.IsOSPlatform (OSPlatform.Linux) then
-            let cpuLine = "model name      : "
             File.ReadAllLines "/proc/cpuinfo"
             |> Seq.pick (fun l -> 
-                if l.StartsWith cpuLine then Some (l.[cpuLine.Length..].Trim())
-                else None)
+                let m = Regex.Match(l, "model name\s*: (.+)")
+                if m.Success then Some m.Groups.[1].Value else None)
         elif RuntimeInformation.IsOSPlatform (OSPlatform.Windows) then
             (getProcessOutput "wmic" "cpu get name").Split("\n").[1].Trim()
         else
