@@ -16,10 +16,17 @@ if (Test-Path -Path docfx) {
 }
 New-Item -ItemType Directory docfx
 
+if ($PSVersionTable.Platform -eq "Unix") {
+    $nuget = "nuget"
+} else {
+    $nuget = "$PSScriptRoot/docfx/nuget.exe"
+    Invoke-WebRequest "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" -OutFile $nuget
+}
+
 Push-Location docfx
 if ($docfxSrc -eq "NuGet") {
-    nuget install docfx.console -source $docfxNuGet -ExcludeVersion -Prerelease 
-    nuget install memberpage -source $docfxNuGet -ExcludeVersion -Prerelease 
+    & $nuget install docfx.console -source $docfxNuGet -ExcludeVersion -Prerelease 
+    & $nuget install memberpage -source $docfxNuGet -ExcludeVersion -Prerelease 
 } elseif ($docfxSrc -eq "Path") {
     $docfxPath = Resolve-Path $docfxPath
     New-Item -ItemType Directory -Path "docfx.console"

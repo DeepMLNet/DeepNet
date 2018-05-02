@@ -6,6 +6,7 @@
 /**/packages/
 /**/bin/
 /**/obj/
+/benchmarks/
 _site
 rce
 docfx

@@ -1,0 +1,9 @@
+{
+  "Name": "mint3",
+  "CPU": "Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz",
+  "GPU": "nVidia Tesla K40c",
+  "OS": "Linux 4.13.0-38-generic #43~16.04.1-Ubuntu SMP Wed Mar 14 17:48:43 UTC 2018",
+  "Runtime": ".NET SDK 2.1.300-preview2-008533",
+  "Library": "F# Tensor 0.4.9",
+  "Date": "2018-05-01T00:00:00.0Z"
+}

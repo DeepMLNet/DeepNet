@@ -44,6 +44,10 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
   * Bezout's identity
   * Loading of NumPy's .npy and .npz files.
 
+## News
+
+- **2018/05/02**. [Initial benchmarks are available.](articles/Benchmarks.md)
+
 ## Documentation
 
 To get an overview of available functions by category, see [Tensor at a glance](articles/Tensor.md).
