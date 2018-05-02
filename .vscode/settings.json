@@ -7,5 +7,6 @@
         "ML",
         "Examples",
         "Symbolic"
-    ]
+    ],
+    "python.pythonPath": "D:\\Anaconda3\\python.exe"
 }
