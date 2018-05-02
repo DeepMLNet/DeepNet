@@ -9,6 +9,7 @@ mono: latest
 dotnet: 2.1.105
 before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - ; curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list ; sudo apt-get update -q ; sudo apt-get install -y powershell ; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install dotnet-sdk-2.1.300-preview2-008533 ; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then sudo rm '/usr/local/include/c++' ; brew update ; brew install hdf5 ; fi
 script: 
   - unset DOTNET_CLI_TELEMETRY_OPTOUT
