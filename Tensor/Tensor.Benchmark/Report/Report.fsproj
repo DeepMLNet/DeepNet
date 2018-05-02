@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <Compile Include="../Info.fs" />
-    <Compile Include="Consolidate.fs" />
+    <Compile Include="Report.fs" />
   </ItemGroup>
 
   <ItemGroup>

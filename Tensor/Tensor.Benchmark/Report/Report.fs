@@ -5,6 +5,7 @@ open System.Text.RegularExpressions
 open FSharp.Data
 open Newtonsoft.Json
 open Tensor.Benchmark
+open Argu
 
 [<Measure>] type ms
 
@@ -154,17 +155,40 @@ let generateHtml (columns: (string * Info) list) (bms: seq<Benchmark>) =
     sb.ToString()
 
 
+type CLIArguments =
+    | Output of output:string
+    | [<MainCommand; ExactlyOnce; Last>] Srcs of dirs:string list
+with 
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Output _ -> "Output path for generated HTML report."
+            | Srcs _ -> "Benchmark directories to include. Supports wildcards."
+
 [<EntryPoint>]
 let main argv =
-    let reportDir =
-        match argv with
-        | [|dir|] -> dir |> Path.GetFullPath
-        | _ -> printfn "Usage: <benchmark directory>"; exit 1
+    let parser = ArgumentParser.Create<CLIArguments>()
+    let results = 
+        try parser.ParseCommandLine()
+        with e -> printfn "%s" e.Message ; exit 1
+
+    let outputFile = results.GetResult (Output, defaultValue="report.html") |> Path.GetFullPath
+    let srcs = results.GetResult Srcs
+    let srcsExpanded = [
+        for src in srcs do
+            if src.Contains '?' || src.Contains '*' then
+                let p = src.LastIndexOfAny([|Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar|])
+                let dir, pattern =
+                    if p <> -1 then src.[..p], src.[p+1..]
+                    else "", src
+                yield! Directory.GetDirectories(dir, pattern)
+            else
+                yield src
+    ]
 
     let infos, benchmarks =
-        Directory.EnumerateDirectories reportDir 
-        |> List.ofSeq
-        |> List.sort
+        srcsExpanded
+        |> List.map Path.GetFullPath
         |> List.choose (fun dir ->
             let infoFile = Path.Combine (dir, "Info.json")
             if File.Exists infoFile then
@@ -173,9 +197,11 @@ let main argv =
                 let numpyBenchmarksFile = Path.Combine (dir, "NumPy.json") 
                 if File.Exists tensorBenchmarksFile then
                     let tensorBenchmarks = parseTensorCsv dir tensorBenchmarksFile 
+                    printfn "Loaded Tensor benchmark from %s" dir
                     Some ((dir, info), tensorBenchmarks)
                 elif File.Exists numpyBenchmarksFile then
                     let numpyBenchmarks = parseNumpy dir numpyBenchmarksFile 
+                    printfn "Loaded NumPy benchmark from %s" dir
                     Some ((dir, info), numpyBenchmarks)
                 else 
                     printfn "Skipping %s because it contains no benchmark" dir
@@ -185,13 +211,16 @@ let main argv =
                 None)
         |> List.unzip
 
+    if List.isEmpty benchmarks then
+        printfn "No benchmarks found."
+        exit 2
+
     let benchmarks = 
         benchmarks 
         |> List.reduce merge
         |> Seq.filter (fun bm -> Double.IsFinite (bm.Mean / 1.0<ms>))
         |> Seq.cache
 
-    let htmlFile = Path.Combine (reportDir, "report.html") |> Path.GetFullPath
-    File.WriteAllText (htmlFile, generateHtml infos benchmarks)
-
+    File.WriteAllText (outputFile, generateHtml infos benchmarks)
+    printfn "Wrote report to %s" outputFile
     0 
