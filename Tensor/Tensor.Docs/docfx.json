@@ -65,6 +65,7 @@
     "disableGitFeatures": false,
     "globalMetadata": {
       "_appTitle": "Tensor for F#",
+      "_appFaviconPath": "images/tensor.ico",
       "_appLogoPath": "images/tensor.svg",
       "_enableSearch": true
     }
