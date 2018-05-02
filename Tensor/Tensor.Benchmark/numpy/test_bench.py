@@ -16,13 +16,13 @@ def get_last_axis(a):
 
 def convert(typ, value):
     if typ == 'int32': 
-        return int32(value)
+        return int(value)
     elif typ == 'int64':
-        return int64(value)
+        return int(value)
     elif typ == 'single':
-        return single(value)
+        return float(value)
     elif typ == 'double':
-        return double(value)  
+        return float(value)  
 
 def get_shape_and_dtype(shape, typ):
     if typ == 'int32': 
@@ -30,9 +30,9 @@ def get_shape_and_dtype(shape, typ):
     elif typ == 'int64':
         dtype = np.int64
     elif typ == 'single':
-        dtype = np.single
+        dtype = np.float32
     elif typ == 'double':
-        dtype = np.double
+        dtype = np.float64
     shape = shape.split('x')
     for i in range(len(shape)):
         shape[i] = int(shape[i])
@@ -194,12 +194,12 @@ def test_sqrt(benchmark, shape, typ):
 @params
 def test_maximum(benchmark, shape, typ): 
     a,b = get_data(shape, typ)
-    benchmark(lambda: np.maximum(a))
+    benchmark(lambda: np.maximum(a, b))
 
 @params
 def test_minimum(benchmark, shape, typ): 
     a,b = get_data(shape, typ)
-    benchmark(lambda: np.minimum(a))
+    benchmark(lambda: np.minimum(a, b))
 
 @params
 def test_equal(benchmark, shape, typ): 
