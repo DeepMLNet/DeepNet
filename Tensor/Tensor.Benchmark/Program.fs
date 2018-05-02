@@ -72,7 +72,7 @@ module Main =
             CPU = getCpu ()
             GPU = getGpu ()
             OS = RuntimeInformation.OSDescription.Trim()
-            Library = sprintf "Tensor %d.%d.%d" tv.Major tv.Minor tv.Build
+            Library = sprintf "F# Tensor %d.%d.%d" tv.Major tv.Minor tv.Build
             Runtime = sprintf ".NET SDK %s" (getDotNetVersion())
             Date = DateTime.UtcNow
         }
