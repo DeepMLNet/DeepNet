@@ -15,7 +15,10 @@
 
   <ItemGroup>
     <Compile Include="Utils.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="BenchmarkCfg.fs" />
+    <Compile Include="Benchmark.fs" />    
+    <Compile Include="Info.fs" />
+    <Compile Include="Program.fs" />    
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +27,7 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.10.14" />
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />    
   </ItemGroup>
 
 </Project>

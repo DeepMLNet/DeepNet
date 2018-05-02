@@ -6,12 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Program.fs" />
+    <Compile Include="../Info.fs" />
+    <Compile Include="Consolidate.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="argu" Version="5.1.0" />
     <PackageReference Include="FSharp.Data" Version="3.0.0-beta3" />
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
   </ItemGroup>
 
 </Project>

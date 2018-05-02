@@ -267,6 +267,7 @@ tensors.h5
 *.pyc
 __pycache__
 .cache
+.benchmarks
 BenchmarkDotNet.Artifacts
 Tensor/Tensor.Benchmark/bin
 
