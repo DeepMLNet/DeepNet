@@ -23,7 +23,9 @@ type Benchmark = {
 type TensorCsv = CsvProvider<"TensorCsv.csv", ";">
 
 let parseTensorCsv (lib: string) (filename: string) =
-    let csv = TensorCsv.Load filename
+    let text = File.ReadAllText filename
+    let text = text.Replace(',', ';')
+    let csv = TensorCsv.Parse text
     csv.Rows |> Seq.map (fun row ->
         {
             Lib = lib
