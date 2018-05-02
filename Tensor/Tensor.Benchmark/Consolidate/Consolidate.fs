@@ -96,6 +96,8 @@ let generateHtml (columns: (string * Info) list) (bms: seq<Benchmark>) =
     out ".info {text-align: left; border: none; font-weight: normal; vertical-align: top; font-size: 80%%}\n"
     out "th.info {font-weight: bold;}\n"
     out "table.info {width: 230px}\n"
+    out ".min {width: 1px; white-space: nowrap; padding-left: 0px;}\n"
+    out ".npr {padding-right: 0px;}\n"
     out "</style>\n"
     out "</head><body>\n"
 
@@ -115,7 +117,7 @@ let generateHtml (columns: (string * Info) list) (bms: seq<Benchmark>) =
     out "</tr>\n"
     out "<tr><th class='txt'>Function</th><th class=txt>Shape</th><th class=txt>Type</th><th class=txt>Device</th>"
     for _ in columns do 
-        out "<th class='num lb'>Mean</th><th class='num'>StdDev</th>"
+        out "<th class='num lb npr'>Mean</th><th class='num min'>StdDev</th>"
     out "</tr>\n"
 
     let funcs = bms |> Seq.map (fun bm -> bm.Method) |> Seq.distinct
@@ -139,10 +141,10 @@ let generateHtml (columns: (string * Info) list) (bms: seq<Benchmark>) =
             for id, _ in columns do
                 let mean, std = 
                     match libBms |> Seq.tryFind (fun bm -> bm.Lib = id) with
-                    | Some bm -> sprintf "%.02f ms" bm.Mean, sprintf "%.02f ms" bm.StdDev
+                    | Some bm -> sprintf "%.02f ms" bm.Mean, sprintf "&plusmn;%.02f ms" bm.StdDev
                     | None -> "&mdash;", "&mdash;"                   
-                out "<td class='num lb'>%s</td>" mean
-                out "<td class='num'>%s</td>" std
+                out "<td class='num lb npr'>%s</td>" mean
+                out "<td class='num min'>%s</td>" std
             out "</tr>\n"                            
 
     out "</table>\n"    
