@@ -269,3 +269,5 @@ __pycache__
 .cache
 BenchmarkDotNet.Artifacts
 Tensor/Tensor.Benchmark/bin
+
+_AssemblyInfo.fs

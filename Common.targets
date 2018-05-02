@@ -6,7 +6,7 @@
       <TargetFramework>netstandard2.0</TargetFramework>
       <Platform>x64</Platform>      
 
-      <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    
+      <GenerateAssemblyInfo>false</GenerateAssemblyInfo>    
       <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
       <Product>Deep.Net</Product>    
@@ -22,11 +22,36 @@
       <BaseVersion>0.4</BaseVersion>
       <PackageVersion>$(BaseVersion).$(Rev)</PackageVersion>
       <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
+      <AssemblyFileVersion>$(PackageVersion)</AssemblyFileVersion>
       <FileVersion>$(PackageVersion)</FileVersion>  
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="SourceLink.Create.CommandLine" Version="2.8.1" PrivateAssets="All" /> 
   </ItemGroup>
+
+  <!-- Workaround for broken assembly info generation in .NET SDK 2.1. -->
+  <Target Name="WriteAssemblyInfo" BeforeTargets="CoreCompile" 
+          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)Revision.targets" 
+          Outputs="_AssemblyInfo.fs">
+    <ItemGroup>
+      <AssemblyInfoLine Include="namespace AssemblyInfo"/>
+      <AssemblyInfoLine Include="open System.Reflection"/>
+      <AssemblyInfoLine Include="open System.Runtime.InteropServices"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyTitle(&quot;$(PackageId)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyDescription(&quot;$(title)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyCompany(&quot;$(Company)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyProduct(&quot;$(Product)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyCopyright(&quot;$(Copyright)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyVersion(&quot;$(AssemblyVersion)&quot;)>]"/>
+      <AssemblyInfoLine Include="[&lt;assembly: AssemblyFileVersion(&quot;$(AssemblyFileVersion)&quot;)>]"/>
+      <AssemblyInfoLine Include="do ()"/>
+    </ItemGroup>
+    <WriteLinesToFile File="_AssemblyInfo.fs" Overwrite="true"
+                      Lines="@(AssemblyInfoLine)"  />
+  </Target>
+  <ItemGroup>
+    <Compile Include="_AssemblyInfo.fs" />
+  </ItemGroup>  
 
 </Project>
