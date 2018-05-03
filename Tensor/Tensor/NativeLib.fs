@@ -10,7 +10,27 @@ module private OSLoader =
 
     let unsupPlatform () = raise (PlatformNotSupportedException "NativeLib does not support this platform.")
 
-    module private Unix =
+    module private Linux =
+
+        let RTLD_LAZY = nativeint 1
+        let RTLD_NOW = nativeint 2
+
+        [<DllImport("libdl.so.2")>]
+        extern IntPtr dlopen (string filename, nativeint flags)
+
+        [<DllImport("libdl.so.2")>]
+        extern nativeint dlclose (IntPtr handle)
+
+        [<DllImport("libdl.so.2")>]
+        extern IntPtr dlsym (IntPtr handle, string symbol)
+
+        [<DllImport("libdl.so.2")>]
+        extern IntPtr dlerror ()
+
+        let dlerrorString () =
+            dlerror () |> Marshal.PtrToStringAnsi 
+
+    module private Mac =
 
         let RTLD_LAZY = nativeint 1
         let RTLD_NOW = nativeint 2
@@ -28,7 +48,7 @@ module private OSLoader =
         extern IntPtr dlerror ()
 
         let dlerrorString () =
-            dlerror () |> Marshal.PtrToStringAnsi 
+            dlerror () |> Marshal.PtrToStringAnsi             
 
     module private Windows =
 
@@ -42,10 +62,14 @@ module private OSLoader =
         extern IntPtr GetProcAddress (IntPtr hModule, string procName)   
 
     let load (filename: string) =
-        if RuntimeInformation.IsOSPlatform OSPlatform.Linux || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
-            let hnd = Unix.dlopen (filename, Unix.RTLD_NOW)
+        if RuntimeInformation.IsOSPlatform OSPlatform.Linux then
+            let hnd = Linux.dlopen (filename, Linux.RTLD_NOW)
             if hnd <> IntPtr.Zero then Ok hnd
-            else Error (Unix.dlerrorString ())
+            else Error (Linux.dlerrorString ())
+        elif RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            let hnd = Mac.dlopen (filename, Mac.RTLD_NOW)
+            if hnd <> IntPtr.Zero then Ok hnd
+            else Error (Mac.dlerrorString ())            
         elif RuntimeInformation.IsOSPlatform OSPlatform.Windows then
             let hnd = Windows.LoadLibraryEx (filename, IntPtr.Zero, nativeint 0)
             if hnd <> IntPtr.Zero then Ok hnd
@@ -54,18 +78,24 @@ module private OSLoader =
             unsupPlatform ()
 
     let free (hnd: IntPtr) =
-        if RuntimeInformation.IsOSPlatform OSPlatform.Linux || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
-            Unix.dlclose (hnd) |> ignore
+        if RuntimeInformation.IsOSPlatform OSPlatform.Linux then
+            Linux.dlclose (hnd) |> ignore
+        elif RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            Mac.dlclose (hnd) |> ignore            
         elif RuntimeInformation.IsOSPlatform OSPlatform.Windows then
             Windows.FreeLibrary (hnd) |> ignore
         else
             unsupPlatform ()
         
     let getAddress (hnd: IntPtr) (name: string) =
-        if RuntimeInformation.IsOSPlatform OSPlatform.Linux || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
-            let ptr = Unix.dlsym (hnd, name)
+        if RuntimeInformation.IsOSPlatform OSPlatform.Linux then
+            let ptr = Linux.dlsym (hnd, name)
             if ptr <> IntPtr.Zero then Ok ptr
-            else Error (Unix.dlerrorString ())           
+            else Error (Linux.dlerrorString ())       
+        elif RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            let ptr = Mac.dlsym (hnd, name)
+            if ptr <> IntPtr.Zero then Ok ptr
+            else Error (Mac.dlerrorString ())                   
         elif RuntimeInformation.IsOSPlatform OSPlatform.Windows then
             let ptr = Windows.GetProcAddress (hnd, name)
             if ptr <> IntPtr.Zero then Ok ptr
