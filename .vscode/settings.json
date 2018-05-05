@@ -8,5 +8,9 @@
         "Examples",
         "Symbolic"
     ],
-    "python.pythonPath": "D:\\Anaconda3\\python.exe"
+    "FSharp.externalAutocomplete": false,
+    "FSharp.keywordsAutocomplete": false,
+    "FSharp.minimizeBackgroundParsing": true,
+    "FSharp.resolveNamespaces": false,
+
 }
