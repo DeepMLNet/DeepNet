@@ -52,6 +52,9 @@ module private OSLoader =
 
     module private Windows =
 
+        let LOAD_LIBRARY_SEARCH_SYSTEM32 = 0x00000800n
+        let LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR = 0x00000100n
+
         [<DllImport("kernel32", SetLastError=true)>]
         extern IntPtr LoadLibraryEx (string lpFileName, IntPtr hReservedNull, nativeint dwFlags)
 
@@ -71,9 +74,11 @@ module private OSLoader =
             if hnd <> IntPtr.Zero then Ok hnd
             else Error (Mac.dlerrorString ())            
         elif RuntimeInformation.IsOSPlatform OSPlatform.Windows then
-            let hnd = Windows.LoadLibraryEx (filename, IntPtr.Zero, nativeint 0)
+            let hnd = 
+                Windows.LoadLibraryEx (filename, IntPtr.Zero, 
+                                       Windows.LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR ||| Windows.LOAD_LIBRARY_SEARCH_SYSTEM32)
             if hnd <> IntPtr.Zero then Ok hnd
-            else Error (sprintf "HResult: %d" (Marshal.GetHRForLastWin32Error()))
+            else Error (sprintf "HResult: 0x%x" (Marshal.GetHRForLastWin32Error()))
         else
             unsupPlatform ()
 
