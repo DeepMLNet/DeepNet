@@ -46,7 +46,10 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 
 ## News
 
-- **2018/05/02**. [Initial benchmarks are available.](articles/Benchmarks.md)
+* **2018/05/05**. [The CUDA SDK is no longer required for using GPU acceleration](articles/ReleaseNotes.md).
+  An up-to-date nVidia GPU driver must be installed, however.
+
+* **2018/05/02**. [Initial benchmarks are available.](articles/Benchmarks.md)
 
 ## Documentation
 
@@ -61,7 +64,7 @@ Check out our example project that demonstrates essential features of the librar
 
 ## Authors
 
-[Sebastian Urban](https://github.com/surban/)  
-Marcus Basalla  
-Johannes Langer  
+[Sebastian Urban](https://github.com/surban/)
+Marcus Basalla
+Johannes Langer
 Wiebke Köpp

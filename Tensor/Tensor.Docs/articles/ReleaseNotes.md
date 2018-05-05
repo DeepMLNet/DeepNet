@@ -1,5 +1,9 @@
 # Release notes
 
+* 0.4.10
+  * Update to CUDA 9.1
+  * CUDA SDK no longer required. 
+
 * 0.4.9
   * Remove type constraints on Tensor.arange and Tensor.linspace.
 

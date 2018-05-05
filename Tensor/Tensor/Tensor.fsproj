@@ -53,9 +53,9 @@
 
   <ItemGroup>
     <PackageReference Include="HDF.PInvoke" Version="1.10.6" />
-    <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.3-preview1" />
-    <PackageReference Include="ManagedCuda-CUBLAS.NETStandard" Version="9.1.3-preview1" />
-    <PackageReference Include="ManagedCuda-NVRTC.NETStandard" Version="9.1.3-preview1" />
+    <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
+    <PackageReference Include="ManagedCuda-CUBLAS.NETStandard" Version="9.1.300" />
+    <PackageReference Include="ManagedCuda-NVRTC.NETStandard" Version="9.1.300" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
     <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
   </ItemGroup>
