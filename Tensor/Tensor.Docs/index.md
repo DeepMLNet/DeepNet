@@ -66,7 +66,7 @@ Check out our example project that demonstrates essential features of the librar
 
 ## Authors
 
-[Sebastian Urban](https://github.com/surban/)
-Marcus Basalla
-Johannes Langer
-Wiebke Köpp
+[Sebastian Urban](https://github.com/surban/)  
+Marcus Basalla  
+Johannes Langer  
+Wiebke Köpp  
