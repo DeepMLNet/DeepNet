@@ -8,6 +8,9 @@
 
       <GenerateAssemblyInfo>false</GenerateAssemblyInfo>    
       <GenerateDocumentationFile>true</GenerateDocumentationFile>
+      <DebugSymbols>true</DebugSymbols>
+      <DebugType>embedded</DebugType>
+      <EmbedAllSources>true</EmbedAllSources>
 
       <Product>Deep.Net</Product>    
       <Company>Deep.Net Developers</Company>
@@ -25,10 +28,6 @@
       <AssemblyFileVersion>$(PackageVersion)</AssemblyFileVersion>
       <FileVersion>$(PackageVersion)</FileVersion>  
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="SourceLink.Create.CommandLine" Version="2.8.1" PrivateAssets="All" /> 
-  </ItemGroup>
 
   <!-- Workaround for broken assembly info generation in .NET SDK 2.1. -->
   <Target Name="WriteAssemblyInfo" BeforeTargets="CoreCompile" 
