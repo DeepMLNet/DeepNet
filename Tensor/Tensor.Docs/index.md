@@ -46,6 +46,8 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 
 ## News
 
+* **2018/05/07**. Packages are now available on public NuGet. [Tensor NuGet package](https://www.nuget.org/packages/Tensor) and [Tensor.Algorithm NuGet package](https://www.nuget.org/packages/Tensor.Algorithm).
+
 * **2018/05/05**. [The CUDA SDK is no longer required for using GPU acceleration](articles/ReleaseNotes.md).
   An up-to-date nVidia GPU driver must be installed, however.
 

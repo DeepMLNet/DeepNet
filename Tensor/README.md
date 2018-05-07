@@ -51,7 +51,10 @@ Release notes are at <http://www.deepml.net/Tensor/articles/ReleaseNotes.html>.
 
 ## NuGet packages
 
-NuGet packages can be downloaded from <https://www.myget.org/feed/Packages/coreports>.
+The following NuGet packages are available for download.
+
+* [Tensor NuGet package](https://www.nuget.org/packages/Tensor)
+* [Tensor.Algorithm NuGet package](https://www.nuget.org/packages/Tensor.Algorithm)
 
 ## Documentation
 

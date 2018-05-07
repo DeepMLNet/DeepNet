@@ -13,32 +13,18 @@ The following system requirements must be met.
   * .NET Framework >= 4.7 is supported
   * [Mono](https://www.mono-project.com/download/stable/) >= 5.10 is supported, but significantly slower
 * For Linux
-  * The library `libgomp.so.1` must be installed. (install on Ubuntu by running `apt install libgomp1`)
-* For MacOS
-  * [HDF5 libraries](https://support.hdfgroup.org/HDF5/) (install from [Homebrew](https://brew.sh/) by running `brew install hdf5`)
+  * The library `libgomp.so.1` must be installed. (install on Ubuntu by running `sudo apt install libgomp1`)
 * For GPU acceleration (optional)
   * nVidia GPU supporting [CUDA compute capability](https://developer.nvidia.com/cuda-gpus) 3.5 or higher
   * [nVidia GPU driver](http://www.nvidia.com/Download/index.aspx) 387.92 or higher
 
 ## Installation
 
-The library is provided as a NuGet package.
-Since we have made modifications (porting to .NET core) to our dependencies and these changes have not yet been merged upstream, a [MyGet](https://myget.org/) feed is currently used to deliever the library and its modified dependencies.
-Once all necessary modifications have been merged upstream, the Tensor library will be delivered via standard [NuGet](https://nuget.org).
+The library is delivered in two NuGet packages.
+The [Tensor NuGet package](https://www.nuget.org/packages/Tensor) provides the [Tensor<'T>](xref:Tensor.Tensor`1) type and all core functions.
+Additional algorithms and data exchange methods are provided in the [Tensor.Algorithm NuGet package](https://www.nuget.org/packages/Tensor.Algorithm).
 
-For MacOS you must make sure that the HDF5 libraries are installed on your system.
-They can be installed via [Homebrew](https://brew.sh/) by running `brew install hdf5`.
-
-The library is deliverd in two NuGet packages.
-The [Tensor NuGet package](https://www.myget.org/feed/coreports/package/nuget/Tensor) provides the [Tensor<'T>](xref:Tensor.Tensor`1) type and all core functions.
-Additional algorithms and data exchange methods are provided in the [Tensor.Algorithm NuGet package](https://www.myget.org/feed/coreports/package/nuget/Tensor.Algorithm).
-
-The packages can be installed into your project by performing the following steps.
-
-1. Add the NuGet feed <https://www.myget.org/feed/Packages/coreports> to your project. 
-This can be done by adding the line ```<add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json"/>``` to the `packageSources` section of your project `NuGet.config` file.
-
-1. Install the `Tensor` and `Tensor.Algorithm` using the NuGet package manager (either via command line or graphical interface).
+The packages can be installed into your project by installing the `Tensor` and `Tensor.Algorithm` packages using the NuGet package manager (either via command line or graphical interface).
 
 ## Skeleton project for .NET Core
 
@@ -51,16 +37,8 @@ $ mkdir tutorial
 $ cd tutorial
 $ dotnet new console -lang F#
 ```
-Then, create the file `NuGet.config` in the project directory with the following contents.
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-    <packageSources>
-        <add key="CorePorts" value="https://www.myget.org/F/coreports/api/v3/index.json" />
-    </packageSources>
-</configuration>
-```
-Finally run the following commands to install the Tensor library into your project.
+
+Then, run the following commands to install the Tensor library into your project.
 ```
 $ dotnet add package Tensor
 $ dotnet add package Tensor.Algorithm
@@ -96,4 +74,3 @@ You can also directly reference the `Tensor.fsproj` and `Tensor.Algorithm.fsproj
 This is useful if you want to modify the Tensor library itself or for debugging.
 
 Please report issues via <https://github.com/DeepMLNet/DeepNet/issues> and submit your pull requests via <https://github.com/DeepMLNet/DeepNet/pulls>.
-
