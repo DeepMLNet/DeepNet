@@ -12,12 +12,13 @@ The following system requirements must be met.
   * Recommended platform is [.NET Core >= 2.0](https://www.microsoft.com/net/learn/get-started)
   * .NET Framework >= 4.7 is supported
   * [Mono](https://www.mono-project.com/download/stable/) >= 5.10 is supported, but significantly slower
+* For Linux
+  * The library `libgomp.so.1` must be installed. (install on Ubuntu by running `apt install libgomp1`)
 * For MacOS
   * [HDF5 libraries](https://support.hdfgroup.org/HDF5/) (install from [Homebrew](https://brew.sh/) by running `brew install hdf5`)
 * For GPU acceleration (optional)
   * nVidia GPU supporting [CUDA compute capability](https://developer.nvidia.com/cuda-gpus) 3.5 or higher
-  * [CUDA SDK 8.0](https://developer.nvidia.com/cuda-80-ga2-download-archive) installed (exact version)
-  * CUDA driver installed and working
+  * [nVidia GPU driver](http://www.nvidia.com/Download/index.aspx) 387.92 or higher
 
 ## Installation
 

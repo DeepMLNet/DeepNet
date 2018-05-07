@@ -34,6 +34,7 @@
 
       Requirements: 
         - Linux, MacOS or Windows on x64
+        - Linux requires libgomp.so.1 installed.
 
       Additional algorithms are provided in the Tensor.Algorithm package.
     </description>
@@ -52,7 +53,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HDF.PInvoke" Version="1.10.6" />
+    <PackageReference Include="HDF.PInvoke.NETStandard" Version="1.10.200-preview1" />
     <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
     <PackageReference Include="ManagedCuda-CUBLAS.NETStandard" Version="9.1.300" />
     <PackageReference Include="ManagedCuda-NVRTC.NETStandard" Version="9.1.300" />
