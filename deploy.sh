@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Push NuGet packages.
-dotnet nuget push -s https://www.myget.org/F/coreports/api/v2/package -k $MYGETKEY 'Packages/Release/*.nupkg' || true
+dotnet nuget push -s https://api.nuget.org/v3/index.json -k $NUGETKEY 'Packages/Release/*.nupkg' || true
 
 # Push to Tensor.Sample repository.
 if [ "$TRAVIS_BRANCH" = "master" ]; then 
