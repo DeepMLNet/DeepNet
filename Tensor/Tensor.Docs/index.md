@@ -16,19 +16,19 @@ This open source library is written in [F#](http://fsharp.org/) and targets the 
 ### Features provided by the core Tensor library
 
 * Core features
-  * n-dimensional arrays (tensors) in host memory or on CUDA GPUs 
+  * n-dimensional arrays (tensors) in host memory or on CUDA GPUs
   * element-wise operations (addition, multiplication, absolute value, etc.)
   * basic linear algebra operations (dot product, SVD decomposition, matrix inverse, etc.)
   * reduction operations (sum, product, average, maximum, arg max, etc.)
-  * logic operations (comparision, and, or, etc.)
-  * views, slicing, reshaping, broadcasting (similar to NumPy) 
+  * logic operations (comparison, and, or, etc.)
+  * views, slicing, reshaping, broadcasting (similar to NumPy)
   * scatter and gather by indices
   * standard functional operations (map, fold, etc.)
 * Data exchange
   * read/write support for HDF5 (.h5)
   * interop with standard F# types (Seq, List, Array, Array2D, Array3D, etc.)
 * Performance
-  * host: SIMD and Intel MKL accelerated operations 
+  * host: SIMD and Intel MKL accelerated operations
   * CUDA GPU: all operations performed locally on GPU and cuBLAS used for matrix operations
 
 ### Additional features provided by Tensor.Algorithm
