@@ -3,13 +3,13 @@
 [![Build Status](https://travis-ci.org/DeepMLNet/Tensor.Sample.svg?branch=master)](https://travis-ci.org/DeepMLNet/Tensor.Sample)
 [![Build status](https://ci.appveyor.com/api/projects/status/wrun3ku66kl09ki6?svg=true)](https://ci.appveyor.com/project/surban/tensor-sample)
 
-This is an example project that demonstrates the capabilites of the [F# tensor library](http://www.deepml.net/Tensor).
+This is an example project that demonstrates the capabilities of the [F# tensor library](http://www.deepml.net/Tensor).
 
 ## System requirements
 
-* Linux or Microsoft Windows (64-bit)
+* Linux, MacOS or Microsoft Windows (64-bit)
 * [Microsoft .NET Core 2.0 or higher](https://www.microsoft.com/net/learn/get-started/)
-* For GPU acceleration (optional): [nVidia CUDA SDK 8.0](https://developer.nvidia.com/cuda-80-ga2-download-archive)
+* For GPU acceleration (optional): [nVidia CUDA GPU with recent driver](http://www.nvidia.com/Download/index.aspx)
 
 ## Running
 

@@ -1,8 +1,11 @@
 # Release notes
 
+* 0.4.11
+  * First release of 0.4 branch on public NuGet.
+
 * 0.4.10
   * Update to CUDA 9.1
-  * CUDA SDK no longer required. 
+  * CUDA SDK no longer required.
 
 * 0.4.9
   * Remove type constraints on Tensor.arange and Tensor.linspace.

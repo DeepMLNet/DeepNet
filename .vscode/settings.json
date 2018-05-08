@@ -12,5 +12,13 @@
     "FSharp.keywordsAutocomplete": false,
     "FSharp.minimizeBackgroundParsing": true,
     "FSharp.resolveNamespaces": false,
+    "cSpell.words": [
+        "BLAS",
+        "Bezout's",
+        "CUDA",
+        "MATLAB",
+        "SIMD",
+        "nVidia"
+    ],
 
 }
