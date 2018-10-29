@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="../../Tensor/Tensor/Utils.fs" />
+    <Compile Include="Util2.fs" />
     <Compile Include="Debug.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />

@@ -4,8 +4,8 @@ open Tensor.Utils
 open Tensor
 
 
-[<AutoOpen>]
 /// linear interpolator types
+[<AutoOpen>]
 module InterpolatorTypes =
 
     /// extrapolation behaviour

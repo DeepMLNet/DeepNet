@@ -357,10 +357,10 @@ module UExpr =
                         |> SimpleRangeSpec.eval (fun _ -> failwith "static")
                     let first = 
                         match sliceRng with
-                        | Rng (Some first, _) -> first
-                        | Rng (None, _) -> 0L
-                        | RngElem elem -> elem
-                        | RngNewAxis | RngAllFill -> failwith "unexpected range"
+                        | Rng.Rng (Some first, _) -> first
+                        | Rng.Rng (None, _) -> 0L
+                        | Rng.Elem elem -> elem
+                        | Rng.NewAxis | Rng.AllFill -> failwith "unexpected range"
                     regLoopChSlice loopExpr ch first               
                     for arg in loopArgs do
                         buildChFirst arg

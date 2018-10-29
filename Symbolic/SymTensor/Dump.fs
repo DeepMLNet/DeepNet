@@ -14,18 +14,21 @@ module Dump =
     let isActive () =
         target.IsSome
 
+    let private checkActive () =
+        if not (isActive ()) then failwith "no dump session active"
+
     let start dumpPath =
         if isActive () then failwith "dump session already active"
         target <- Some (HDF5.OpenWrite dumpPath)
         dumpedFullnames <- Set.empty
 
     let stop () =
-        if not (isActive ()) then failwith "no dump session active"
+        checkActive ()
         target.Value.Dispose ()
         target <- None
 
     let getTarget () =
-        if not (isActive ()) then failwith "no dump session active"
+        checkActive ()
         target.Value
 
     let dumpValue name value =

@@ -179,7 +179,7 @@ module Trace =
             let first, last = es.StoreResultEventRng
             let first, last = first |? 0, last |? Int32.MaxValue
             let resVal =
-                if (first <= id && id <= last) then Tensor.copy (res.Force())
+                if (first <= id && id <= last) then ITensor.copy (res.Force())
                 else empty
             ee.Trace.Add (ExprEvaled (uexpr, loopStack(), resVal, msg))
             
@@ -192,11 +192,11 @@ module Trace =
         | t, _ when t = typeof<float> ->
             let a = a :?> Tensor<float>
             let b = b :?> Tensor<float>
-            Tensor.almostEqualWithTol (a, b, absTol=1e-5, relTol=1e-5) 
+            Tensor.almostEqual (a, b, absTol=1e-5, relTol=1e-5) 
         | t, _ when t = typeof<single> ->
             let a = a :?> Tensor<single>
             let b = b :?> Tensor<single>
-            Tensor.almostEqualWithTol (a, b, absTol=1e-5f, relTol=1e-5f) 
+            Tensor.almostEqual (a, b, absTol=1e-5f, relTol=1e-5f) 
         | t, _ when t = typeof<bool> ->
             let a = a :?> Tensor<bool>
             let b = b :?> Tensor<bool>

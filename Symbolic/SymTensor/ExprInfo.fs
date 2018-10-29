@@ -5,6 +5,7 @@ open Expr
 
 type MultiChannelOpUsageT = MultiChannelOpT * List<ExprT>
 
+/// Provides information about a set of expressions (dependencies, channel usage).
 type ExprInfoT (exprs: ExprT list) =
     
     /// expression cache
@@ -115,7 +116,4 @@ type ExprInfoT (exprs: ExprT list) =
         match usedChannels.Force().TryFind (op, args) with
         | Some chnls -> chnls |> Set.ofSeq
         | None -> Set.empty
-
-
-
 

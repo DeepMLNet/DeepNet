@@ -2,8 +2,9 @@
 
 open System
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open Tensor.Backend
 open ShapeSpec
 open VarSpec
 open ElemExpr

@@ -714,7 +714,6 @@ module ShapeSpec =
     let substSymbols symVals (sa: ShapeSpecT) : ShapeSpecT =
         List.map (SizeSpec.substSymbols symVals) sa
 
-
     type SolutionT = {
         LeftValues:     Map<SizeSymbolT, SizeSpecT>
         RightValues:    Map<SizeSymbolT, SizeSpecT>
@@ -875,10 +874,10 @@ module SimpleRangeSpec =
     let eval dynEvaluator rs =
         match rs with
         | SRSSymStartSymEnd (s, fo) -> 
-            Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+            Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
         | SRSDynStartSymSize (s, elems) -> 
             let sv = dynEvaluator s
-            Rng (Some sv, Some (sv + SizeSpec.eval elems))
+            Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
 
     let canEvalSymbols rs =
         match rs with

@@ -22,10 +22,38 @@ module internal List =
     let without elem lst =
         List.concat [List.take elem lst; List.skip (elem+1) lst] 
 
+    /// removes all elements with the given value
+    let withoutValue value lst =
+        lst |> List.filter ((<>) value)
+
     /// insert the specified value at index elem
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
+
+/// Map extensions
+module internal Map = 
+
+    /// adds all items from q to p
+    let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
+        Map(Seq.concat [(Map.toSeq p); (Map.toSeq q)])    
+
+    /// merges two maps by adding the values of the same key
+    let inline addSameKeys (p:Map<'a,'b>) (q:Map<'a,'b>) = 
+        (p, q) ||> Map.fold (fun res key value ->
+            match res |> Map.tryFind key with
+            | Some oldValue -> res |> Map.add key (oldValue + value)
+            | None -> res |> Map.add key value)
+
+    /// merges two maps by summing the values of the same key      
+    let inline sum (ps:Map<'a,'b> seq) =
+        (Map.empty, ps) ||> Seq.fold addSameKeys
+
+    /// Creates a map from a System.Collection.Generic.Dictionary<_,_>.
+    let ofDictionary dictionary = 
+        (dictionary :> seq<_>)
+        |> Seq.map (|KeyValue|)
+        |> Map.ofSeq    
 
 
 /// Functions for working with permutations.

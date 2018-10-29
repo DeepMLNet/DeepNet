@@ -1,11 +1,35 @@
 ﻿namespace SymTensor.Compiler
 
+open System
 open System.Runtime.InteropServices
 open ManagedCuda
-open Tensor.Utils
+
 open Tensor
+open Tensor.Utils
+open Tensor.Backend
 open SymTensor
 open UExprTypes
+
+
+/// C++ data type helpers
+module internal Cpp =
+    /// C++ data type for given type instance
+    let cppTypeInst (typ: System.Type) = 
+        match typ with
+        | _ when typ = typeof<single>    -> "float"
+        | _ when typ = typeof<double>    -> "double"
+        | _ when typ = typeof<sbyte>     -> "int8_t"
+        | _ when typ = typeof<byte>      -> "uint8_t"
+        | _ when typ = typeof<int32>     -> "int32_t"
+        | _ when typ = typeof<uint32>    -> "uint32_t"
+        | _ when typ = typeof<int64>     -> "int64_t"
+        | _ when typ = typeof<uint64>    -> "uint64_t"
+        | _ when typ = typeof<bool>      -> "bool"
+        | _ when typ = typeof<nativeint> -> "ptr_t"
+        | _ -> failwithf "no C++ datatype for %A" typ
+
+    /// C++ data type for given type 
+    let cppType<'T> = cppTypeInst typeof<'T>
 
 
 [<AutoOpen>]
@@ -73,7 +97,7 @@ module ArrayNDManikinTypes =
             let shp = TensorLayout.shape layout
             let str = TensorLayout.stride layout
             let ofst = TensorLayout.offset layout
-            let cppDataType = Util.cppTypeInst this.DataType
+            let cppDataType = Cpp.cppTypeInst this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
@@ -86,7 +110,7 @@ module ArrayNDManikinTypes =
         member this.DynamicCPPType =
             let dims = TensorLayout.nDims layout
             let shp = TensorLayout.shape layout
-            let cppDataType = Util.cppTypeInst this.DataType
+            let cppDataType = Cpp.cppTypeInst this.DataType
             let shapeStr = 
                 if dims = 0 then "" 
                 else "<" + (shp |> Seq.map (sprintf "%dLL") |> String.concat ",") + ">"
@@ -203,7 +227,7 @@ module ArrayNDManikin =
         ary |> layout |> TensorLayout.isF
         
     /// a view of the specified tensor over the given range 
-    let range (rng: TensorRng list) a =
+    let range (rng: Rng list) a =
         a |> relayout (a |> layout |> TensorLayout.view rng)
 
     /// Tries to reshape the tensor without copying.
@@ -224,7 +248,7 @@ module ArrayNDManikin =
             let msg =
                 sprintf "cannot reshape tensor of shape %A and strides %A without copying"
                     (layout a).Shape (layout a).Stride
-            raise (ImpossibleWithoutCopy msg)
+            raise (InvalidOperationException msg)
 
     /// Returns true if the tensor can be reshaped without copying.
     let canReshapeView shp a =

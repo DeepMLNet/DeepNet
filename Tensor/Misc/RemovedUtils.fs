@@ -151,32 +151,6 @@ module internal Array2D =
 
 
 
-[<AutoOpen>]
-module internal Extensions =
-
-    type System.Collections.Generic.HashSet<'T> with
-        member this.LockedContains key =
-            lock this (fun () -> this.Contains key)
-
-        member this.LockedAdd key =
-            lock this (fun () -> this.Add key)
-
-
-
-
-
-    type System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue> with
-        member this.TryFindReadOnly key =
-            let value = ref (Unchecked.defaultof<'TValue>)
-            if this.TryGetValue (key, value) then Some !value
-            else None
-
-    type System.Collections.Generic.Queue<'T> with
-        member this.TryPeek =
-            if this.Count > 0 then Some (this.Peek())
-            else None
-
-
 
 module Util =
 

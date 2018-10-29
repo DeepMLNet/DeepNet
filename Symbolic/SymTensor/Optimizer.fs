@@ -487,6 +487,7 @@ module Optimizer =
                 | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), ZeroExpr, part) ->
                     let shp = shapeOf expr
                     Expr.buildTensor shp [SimpleRangesSpec.toBaseRangesSpec shp rngs] [optRec part]
+
                 // combine Add(BuildTensor, BuildTensor) into BuildTensor if ranges are not overlapping
                 | Binary (Add, Nary (BuildTensor (aShp, aRngs), aParts),
                                Nary (BuildTensor (bShp, bRngs), bParts)) when 
