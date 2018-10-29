@@ -5,12 +5,11 @@
     "FSharp.excludeProjectDirectories": [
         ".git",
         "ML",
-        "Examples",
-        "Symbolic"
+        "Examples"
     ],
     "FSharp.externalAutocomplete": false,
     "FSharp.keywordsAutocomplete": false,
-    "FSharp.minimizeBackgroundParsing": true,
+    // "FSharp.minimizeBackgroundParsing": true,
     "FSharp.resolveNamespaces": false,
     "cSpell.words": [
         "BLAS",
@@ -20,5 +19,6 @@
         "SIMD",
         "nVidia"
     ],
+    "FSharp.workspaceModePeekDeepLevel": 0,
 
 }

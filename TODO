@@ -1,0 +1,5 @@
+Port SymTensor to new Tensor.
+
+1. Port project files
+2. Add Solution files
+3. Remove CUDA project
