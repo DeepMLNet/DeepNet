@@ -38,6 +38,8 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "LearnMnist", "Examples\Lear
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "LangRNN", "Examples\LangRNN\LangRNN.fsproj", "{EE5322B2-C265-4785-B5C5-5B03D822D97A}"
 EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Sample.Internal", "Tensor\Tensor.Sample\Tensor.Sample.Internal.fsproj", "{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -88,6 +90,10 @@ Global
 		{EE5322B2-C265-4785-B5C5-5B03D822D97A}.Debug|x64.Build.0 = Debug|x64
 		{EE5322B2-C265-4785-B5C5-5B03D822D97A}.Release|x64.ActiveCfg = Release|x64
 		{EE5322B2-C265-4785-B5C5-5B03D822D97A}.Release|x64.Build.0 = Release|x64
+		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69}.Debug|x64.ActiveCfg = Debug|x64
+		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69}.Debug|x64.Build.0 = Debug|x64
+		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69}.Release|x64.ActiveCfg = Release|x64
+		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -104,6 +110,7 @@ Global
 		{8E87FC10-206C-40C5-A37F-1946C0AB1DF9} = {D1E60EE6-038B-462A-BB71-A4CAAD7D6908}
 		{731CA37A-78F3-4521-ACEA-F9B11CF677C0} = {AF9C187F-7E72-4FB9-B9C7-A58C9E87AD2B}
 		{EE5322B2-C265-4785-B5C5-5B03D822D97A} = {AF9C187F-7E72-4FB9-B9C7-A58C9E87AD2B}
+		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {24E68C9B-C44E-4F57-9580-9751FC214DFF}

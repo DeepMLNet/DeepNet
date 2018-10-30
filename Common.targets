@@ -6,7 +6,7 @@
       <TargetFramework>netstandard2.0</TargetFramework>
       <Platform>x64</Platform>      
 
-      <GenerateAssemblyInfo>false</GenerateAssemblyInfo>    
+      <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    
       <GenerateDocumentationFile>true</GenerateDocumentationFile>
       <DebugSymbols>true</DebugSymbols>
       <DebugType>embedded</DebugType>
@@ -28,29 +28,5 @@
       <AssemblyFileVersion>$(PackageVersion)</AssemblyFileVersion>
       <FileVersion>$(PackageVersion)</FileVersion>  
   </PropertyGroup>
-
-  <!-- Workaround for broken assembly info generation in .NET SDK 2.1. -->
-  <Target Name="WriteAssemblyInfo" BeforeTargets="CoreCompile" 
-          Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)Revision.targets" 
-          Outputs="_AssemblyInfo.fs">
-    <ItemGroup>
-      <AssemblyInfoLine Include="namespace AssemblyInfo"/>
-      <AssemblyInfoLine Include="open System.Reflection"/>
-      <AssemblyInfoLine Include="open System.Runtime.InteropServices"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyTitle(&quot;$(PackageId)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyDescription(&quot;$(title)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyCompany(&quot;$(Company)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyProduct(&quot;$(Product)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyCopyright(&quot;$(Copyright)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyVersion(&quot;$(AssemblyVersion)&quot;)>]"/>
-      <AssemblyInfoLine Include="[&lt;assembly: AssemblyFileVersion(&quot;$(AssemblyFileVersion)&quot;)>]"/>
-      <AssemblyInfoLine Include="do ()"/>
-    </ItemGroup>
-    <WriteLinesToFile File="_AssemblyInfo.fs" Overwrite="true"
-                      Lines="@(AssemblyInfoLine)"  />
-  </Target>
-  <ItemGroup>
-    <Compile Include="_AssemblyInfo.fs" />
-  </ItemGroup>  
 
 </Project>
