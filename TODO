@@ -4,5 +4,10 @@
 - but how to handle element expressions?
 - they still need to generate kernels
 - perhaps split off to completely seperate project
-- or merge with Tensor?
+
+
+1. Merge SymTensorCuda and SymTensor
+2. Think about ElemExpr code
+3. Remove direct CUDA calls from SymTensor
+4. Make backend work for both host and Cuda (what about Streams?)
 
