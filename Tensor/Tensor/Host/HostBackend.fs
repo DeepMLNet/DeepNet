@@ -10,8 +10,10 @@ open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
+open Tensor.Utils
+open DeepNet.Utils
+
 
 
 /// pinned .NET managed memory (wraps a GCHandle)

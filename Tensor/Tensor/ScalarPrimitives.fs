@@ -4,6 +4,8 @@ open System
 open System.Reflection
 open System.Linq.Expressions
 
+open DeepNet.Utils
+
 
 /// Generic scalar operation primitives.
 type internal ScalarPrimitives<'T, 'TC> () =

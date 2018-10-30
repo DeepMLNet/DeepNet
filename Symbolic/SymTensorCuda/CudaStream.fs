@@ -4,6 +4,8 @@ open System.Diagnostics
 open System.Collections.Generic
 
 open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
 

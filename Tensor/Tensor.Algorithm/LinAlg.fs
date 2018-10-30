@@ -2,6 +2,7 @@
 
 open Tensor
 open Tensor.Utils
+open DeepNet.Utils
 
 
 /// Linear algebra algorithms

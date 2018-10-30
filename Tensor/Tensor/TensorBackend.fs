@@ -7,7 +7,7 @@ open System.Diagnostics
 
 open Tensor
 open Tensor.Utils
-
+open DeepNet.Utils
 
 
 /// Tensor storage (type neutral).

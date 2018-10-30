@@ -2,10 +2,14 @@
 
 open System.Collections.Generic
 open System.Diagnostics
-
 open ManagedCuda
-open Tensor.Utils
+
 open Tensor
+open Tensor.Cuda
+open Tensor.Backend
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes

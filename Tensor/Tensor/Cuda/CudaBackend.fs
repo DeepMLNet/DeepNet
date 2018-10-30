@@ -8,10 +8,11 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
 open Tensor.Host
 open Tensor.Cuda.CudaBLASExtensions
+open Tensor.Utils
+open DeepNet.Utils
 
 
 
@@ -254,10 +255,10 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
             // ensure that source is in row-major order
             let src =
-                if TensorLayout.isC src.Layout then src
+                if TensorLayout.isRowMajor src.Layout then src
                 else src.Copy(order=RowMajor)
                
-            if TensorLayout.isC trgt.Layout then
+            if TensorLayout.isRowMajor trgt.Layout then
                 // target is in row-major order, do direct transfer
                 doTransfer trgt src
             else

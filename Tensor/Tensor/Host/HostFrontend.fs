@@ -10,23 +10,24 @@ open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
 
 open Tensor.Utils
+open DeepNet.Utils
 open Tensor.Backend
 open Tensor.Host
 
 
 module internal HostTensorHelpers = 
 
-    let ensureCAndOffsetFree (x: Tensor<'T>) =
+    let ensureRowMajorAndOffsetFree (x: Tensor<'T>) =
         if x.Dev <> (TensorHostDevice.Instance :> ITensorDevice) then
             invalidOp "Require a tensor stored on host device, but got a %s tensor." x.Dev.Id
-        if TensorLayout.isC x.Layout && x.Layout.Offset = 0L then x
+        if TensorLayout.isRowMajor x.Layout && x.Layout.Offset = 0L then x
         else Tensor.copy (x, order=RowMajor)
 
 
 type private HDFFuncs =
 
     static member Write<'T> (hdf5: HDF5, path: string, x: Tensor<'T>) =
-        let x = HostTensorHelpers.ensureCAndOffsetFree x
+        let x = HostTensorHelpers.ensureRowMajorAndOffsetFree x
         let storage = x.Storage :?> TensorHostStorage<'T>
         hdf5.Write (path, storage.Data, Tensor.shape x)
 

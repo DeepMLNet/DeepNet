@@ -8,16 +8,21 @@ open System.Security.Cryptography
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
-open Tensor.Utils
+
 open Tensor
+open Tensor.Host
+open Tensor.Cuda
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
-open DiskMap
 
 
 
 module Compile = 
+    open System
 
     type ModCacheKey = {
         Code:           string
@@ -231,26 +236,16 @@ module Compile =
             cppModCache.Set cacheKey (System.IO.File.ReadAllBytes libPath)
 
         // load compiled library
-        let libHndl = Native.LoadLibrary(libPath)
-        if libHndl = System.IntPtr.Zero then
-            raise (System.ComponentModel.Win32Exception(sprintf "LoadLibrary of %s failed" libPath))
+        let libHndl = new NativeLib (NativeLibName.Exact libPath)
 
         // get function addresses and build delegates
-        let funcs =
-            funcDelegates
-            |> Map.map (fun name delegateType ->
-                let addr = Native.GetProcAddress(libHndl, name)
-                if addr = System.IntPtr.Zero then
-                     raise (System.ComponentModel.Win32Exception(sprintf "GetProcAddress of %s in %s failed" name libPath))
-                System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer (addr, delegateType))
+        let funcs = funcDelegates |> Map.map (fun name delegateType -> libHndl.Func (name, delegateType))
 
         funcs, libHndl, compileDir
 
     /// unloads previously loaded CUDA C++ code
     let unloadCppCode libHndl =
-        let ret = Native.FreeLibrary(libHndl)
-        if not ret then
-            raise (System.ComponentModel.Win32Exception("FreeLibrary failed"))        
+        (libHndl :> IDisposable).Dispose()
 
 
 [<AutoOpen>]
@@ -690,14 +685,14 @@ module CudaExprWorkspaceTypes =
                 | ExecItem (PrintWithMsg (msg, res), strm) ->
                     Cuda.context.Synchronize ()
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = HostTensor.transfer resDev
+                    let resHost = ITensor.transfer HostTensor.Dev resDev
                     printfn "%s=\n%A\n" msg resHost                
 
                 | ExecItem (DumpValue (name, res), strm) ->
                     if Dump.isActive () then
                         Cuda.context.Synchronize ()
                         let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                        let resHost = HostTensor.transfer resDev
+                        let resHost = ITensor.transfer HostTensor.Dev resDev
                         Dump.dumpValue name resHost
 
                 | ExecItem (CheckNonFiniteCounter (name, counter), strm) ->
@@ -744,7 +739,7 @@ module CudaExprWorkspaceTypes =
                         reraise()
 
                     let resDev = CudaExecEnv.getArrayNDForManikin execEnv res
-                    let resHost = lazy (HostTensor.transfer resDev)
+                    let resHost = lazy (ITensor.transfer HostTensor.Dev resDev)
                     let msg = 
                         match previousCall with
                         | Some (ExecItem (Trace _, _)) | None -> "no previous call"

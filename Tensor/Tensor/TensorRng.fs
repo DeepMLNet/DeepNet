@@ -2,6 +2,7 @@ namespace Tensor
 
 open System
 
+open DeepNet.Utils
 open Tensor.Utils
 
 

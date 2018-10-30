@@ -12,6 +12,8 @@ open System.Runtime.InteropServices
 open Tensor
 open Tensor.Utils
 open Tensor.Backend
+open DeepNet.Utils
+
 
 
 /// Fast layout operations.

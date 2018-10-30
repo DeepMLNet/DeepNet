@@ -3,8 +3,11 @@
 open System
 open System.Reflection
 
-open Tensor.Utils
 open Tensor
+open Tensor.Cuda
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open UExprTypes
 open SymTensor.Compiler
@@ -57,20 +60,15 @@ module CudaEvalTypes =
                 (ary: Tensor<'T>) : Tensor<'T> =
             HostTensor.transfer ary
 
-    let private invokeHelperMethod<'T> name args = 
-        let gm = typeof<HelperT>.GetMethod (name, Util.allBindingFlags)
-        let m = gm.MakeGenericMethod ([|typeof<'T>|])
-        m.Invoke(null, args)  
-
 
     /// Evaluates the model on a CUDA GPU.
     let DevCuda = { 
         new IDevice with
             
             #if !CUDA_DUMMY
-            member this.Allocator shp : Tensor<'T>    = invokeHelperMethod<'T> "Allocator" [|shp|] |> unbox            
-            member this.ToDev ary : Tensor<'T1>       = invokeHelperMethod<'T1> "ToDev" [|ary|] |> unbox 
-            member this.ToHost ary : Tensor<'T2>      = invokeHelperMethod<'T2> "ToHost" [|ary|] |> unbox 
+            member this.Allocator shp : Tensor<'T>    = Generic.callGeneric<HelperT, Tensor<'T>> "Allocator" [typeof<'T>] (shp)
+            member this.ToDev ary : Tensor<'T1>       = Generic.callGeneric<HelperT, Tensor<'T1>> "ToDev" [typeof<'T1>] (ary)
+            member this.ToHost ary : Tensor<'T2>      = Generic.callGeneric<HelperT, Tensor<'T2>> "ToHost" [typeof<'T2>] (ary)
 
             #else
 

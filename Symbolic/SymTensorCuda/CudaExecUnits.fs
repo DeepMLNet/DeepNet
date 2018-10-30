@@ -3,8 +3,12 @@
 open System
 open Microsoft.FSharp.Reflection
 
-open Tensor.Utils
 open Tensor
+open Tensor.Cuda
+open Tensor.Backend
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
 open Expr
@@ -342,7 +346,7 @@ module CudaExecUnit =
                     BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
-                        Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                        Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
                     dfltChReq (Some (req |> ArrayNDManikin.range aryRng)))
             | _ -> dfltSrcWithNoViewReq ()            
 
@@ -507,7 +511,7 @@ module CudaExecUnit =
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (TensorLayout.isC hvLayout) then
+                if not (TensorLayout.isRowMajor hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // We will transfer variable from host to device during execution.
@@ -931,9 +935,9 @@ module CudaExecUnit =
             List.zip3 src.Shape isBroadcasted broadcastAllowed
             |> List.map (fun (size, isB, allowed) -> 
                             match size, isB, allowed with
-                            | _, false, _ -> size, RngAll                    // not broadcasted
-                            | _, true, true -> 1L, Rng (Some 0L, Some 0L)    // keep broadcasted
-                            | _, true, false -> size, RngAll)                // unbroadcast by copying
+                            | _, false, _ -> size, Rng.All                    // not broadcasted
+                            | _, true, true -> 1L, Rng.Rng (Some 0L, Some 0L) // keep broadcasted
+                            | _, true, false -> size, Rng.All)                // unbroadcast by copying
             |> List.unzip
         let srcView = src |> ArrayNDManikin.range srcRngs
         let tmpView = ArrayNDManikin.newC memAllocator src.TypeName tmpShp
@@ -1007,7 +1011,7 @@ module CudaExecUnit =
             let tmpTrgt = ArrayNDManikin.newC memAllocator trgt.TypeName tmpShp
 
             // perform reduction of batch
-            let batchTrgtRng = [RngAllFill; Rng (Some 0L, Some (reduceBatches-1L))]
+            let batchTrgtRng = [Rng.AllFill; Rng.Rng (Some 0L, Some (reduceBatches-1L))]
             let batchTrgt = tmpTrgt |> ArrayNDManikin.range batchTrgtRng
             let batchExecItems = reduceFn batchTrgt batchSrc
 
@@ -1015,9 +1019,9 @@ module CudaExecUnit =
             let remExecItems =
                 if reduceRem = 0L then []
                 else
-                    let remSrcRng = [RngAllFill; Rng (Some (reduceBatches*reduceBatchSize), None)]
+                    let remSrcRng = [Rng.AllFill; Rng.Rng (Some (reduceBatches*reduceBatchSize), None)]
                     let remSrc = src |> ArrayNDManikin.range remSrcRng
-                    let remTrgtRng = [RngAllFill; RngElem reduceBatches]
+                    let remTrgtRng = [Rng.AllFill; Rng.Elem reduceBatches]
                     let remTrgt = tmpTrgt |> ArrayNDManikin.range remTrgtRng
                     reduceFn remTrgt remSrc
 
@@ -1232,7 +1236,7 @@ module CudaExecUnit =
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
                 let hvLayout = {Shape=vs.NShape; Stride=hvStride; Offset=0L}
-                if not (TensorLayout.isC hvLayout) then
+                if not (TensorLayout.isRowMajor hvLayout) then
                     failwithf "host variable %A must be in C-order" vs
 
                 // copy
@@ -1319,7 +1323,7 @@ module CudaExecUnit =
                     execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
             let parts = rngs |> List.map (fun rng ->
                 let aryRng = rng |> List.map (fun (first, last) -> 
-                    Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
                 dfltChTrgt() |> ArrayNDManikin.range aryRng)            
             let copyItems = 
                 List.zip (srcsDfltCh()) parts 

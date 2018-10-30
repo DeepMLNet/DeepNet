@@ -5,8 +5,13 @@ open System.Runtime.InteropServices
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
-open Tensor.Utils
 open Tensor
+open Tensor.Backend
+open Tensor.Cuda
+open Tensor.Host
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
 open UExprTypes
@@ -167,7 +172,7 @@ module CudaCompileEnv =
 
     /// creates a new texture object
     let newTextureObject (contents: ArrayNDManikinT) descriptor (env: CudaCompileEnvT) =
-        if not (TensorLayout.isC contents.Layout && contents.Layout.Offset = 0L) then
+        if not (TensorLayout.isRowMajor contents.Layout && contents.Layout.Offset = 0L) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
             Contents   = contents
@@ -228,7 +233,7 @@ module CudaExecEnv =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]            
-            if hv.Offset = 0L && Tensor.isRowMajor hv then
+            if hv.Layout.Offset = 0L && TensorLayout.isRowMajor hv.Layout then
                 let hvStorage = hv.Storage :?> ITensorHostStorage
                 CudaRegMem.getCudaRegisteredMemory hvStorage
             else
@@ -355,7 +360,8 @@ module ArgTemplates =
                     valueTmpls
                     |> List.map (fun vt -> vt.GetArg env)
                     |> List.toArray
-                PassArrayByVal.passArrayByValue argVals
+                //PassArrayByVal.passArrayByValue argVals
+                failwith "removed for now"
 
     type NullPtrArgTmpl () =
         interface ICudaArgTmpl with
@@ -382,7 +388,7 @@ module ArgTemplates =
     /// device memory range over the elements of a contiguous ArrayND
     type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
         do 
-            if not (TensorLayout.isC manikin.Layout) then 
+            if not (TensorLayout.isRowMajor manikin.Layout) then 
                 failwith "manikin for MemRng is not contiguous"
         interface IDevMemRngTmpl with
             member this.GetRng env =
@@ -394,7 +400,7 @@ module ArgTemplates =
     /// registered host memory range over the elements of a contiguous ArrayND    
     type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
         do 
-            if not (TensorLayout.isC manikin.Layout) then 
+            if not (TensorLayout.isRowMajor manikin.Layout) then 
                 failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =

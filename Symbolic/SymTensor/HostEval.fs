@@ -5,7 +5,7 @@ open System.Reflection
 
 open Tensor
 open Tensor.Backend
-open Tensor.Utils
+open DeepNet.Utils
 
 open UExprTypes
 open SymTensor.Compiler

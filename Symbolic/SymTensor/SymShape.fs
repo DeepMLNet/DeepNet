@@ -1,6 +1,6 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
+open DeepNet.Utils
 
 
 module Utils =

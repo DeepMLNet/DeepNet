@@ -4,6 +4,7 @@ open System
 
 open Tensor
 open Tensor.Utils
+open DeepNet.Utils
 
 
 /// backend-neutral BLAS support 

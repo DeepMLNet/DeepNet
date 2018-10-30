@@ -23,7 +23,7 @@ open BenchmarkDotNet.Exporters
 open BenchmarkDotNet.Exporters.Csv
 
 open Tensor
-open Tensor.Utils
+open DeepNet.Utils
 
 
 [<AllowNullLiteral>]

@@ -1,7 +1,8 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open DeepNet.Utils
 
 
 /// linear interpolator types

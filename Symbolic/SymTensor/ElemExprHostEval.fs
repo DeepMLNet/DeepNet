@@ -3,8 +3,10 @@
 open System
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
+open Tensor.Utils
+open DeepNet.Utils
+
 open ShapeSpec
 open VarSpec
 open ElemExpr

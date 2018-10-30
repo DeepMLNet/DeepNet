@@ -4,6 +4,8 @@ open System
 open System.Threading
 
 open Tensor.Utils
+open DeepNet.Utils
+
 
 /// <summary>BLAS and LAPACK libraries.</summary>
 /// <seealso cref="Cfg.BLAS"/>

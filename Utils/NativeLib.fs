@@ -1,4 +1,4 @@
-namespace Tensor.Utils
+namespace DeepNet.Utils
 
 open System
 open System.Runtime.InteropServices
@@ -192,6 +192,15 @@ type NativeLib (libName: NativeLibName) =
         | Error msg -> Error msg
 
     /// <summary>Get delegate to native function.</summary>
+    /// <param name="symbol">The symbol name.</param>
+    /// <param name="delegateType">Delegate type of the native function.</param>
+    /// <returns>A delegate to the native function or <c>Error msg</c> if the function does not exist.</returns>
+    member __.TryFunc (symbol: string, delegateType: Type) =
+        match OSLoader.getAddress hnd symbol with
+        | Ok ptr -> Marshal.GetDelegateForFunctionPointer (ptr, delegateType) |> Ok
+        | Error msg -> Error msg
+
+    /// <summary>Get delegate to native function.</summary>
     /// <typeparam name="'F">Delegate type of the native function.</typeparam>
     /// <param name="symbol">The symbol name.</param>
     /// <returns>A delegate to the native function.</returns>
@@ -201,11 +210,20 @@ type NativeLib (libName: NativeLibName) =
         | Ok f -> f
         | Error msg -> raise (SymbolNotFound (filename, symbol, msg))
 
+    /// <summary>Get delegate to native function.</summary>
+    /// <param name="symbol">The symbol name.</param>
+    /// <param name="delegateType">Delegate type of the native function.</param>
+    /// <returns>A delegate to the native function.</returns>
+    /// <exception cref="SymbolNotFound">The specified symbol was not found in the library.</exception>
+    member this.Func (symbol: string, delegateType: Type) =
+        match this.TryFunc (symbol, delegateType) with
+        | Ok f -> f
+        | Error msg -> raise (SymbolNotFound (filename, symbol, msg))
+
     /// <summary>Get delegate to native function failing at invocation if function does not exists.</summary>
     /// <typeparam name="'F">Delegate type of the native function.</typeparam>
     /// <param name="symbol">The symbol name.</param>
     /// <returns>A delegate to the native function.</returns>
-    /// <exception cref="SymbolNotFound">The specified symbol was not found in the library.</exception>
     member this.LazyFunc<'F> (symbol: string) =
         match this.TryFunc<'F> symbol with
         | Ok f -> f

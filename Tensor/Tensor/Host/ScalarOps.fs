@@ -7,7 +7,9 @@ open System.Collections.Generic
 open Tensor
 open Tensor.Utils
 open Tensor.Backend
-     
+open DeepNet.Utils
+
+
 
 /// Scalar operations on host tensors.
 type internal ScalarOps =

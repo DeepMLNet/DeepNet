@@ -1,8 +1,8 @@
 ﻿namespace SymTensor
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
+open DeepNet.Utils
 
 
 /// functions for loop evaluation

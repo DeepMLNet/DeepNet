@@ -12,6 +12,8 @@ open Tensor
 open Tensor.Utils
 open Tensor.Cuda
 open Tensor.Backend
+open Tensor.Utils
+open DeepNet.Utils
 
 
 

@@ -221,10 +221,10 @@ module ArrayNDManikin =
         ArrayNDManikinT (newLayout, ary.Storage)
 
     let isC (ary: ArrayNDManikinT) =
-        ary |> layout |> TensorLayout.isC
+        ary |> layout |> TensorLayout.isRowMajor
 
     let isF (ary: ArrayNDManikinT) =
-        ary |> layout |> TensorLayout.isF
+        ary |> layout |> TensorLayout.isColumnMajor
         
     /// a view of the specified tensor over the given range 
     let range (rng: Rng list) a =

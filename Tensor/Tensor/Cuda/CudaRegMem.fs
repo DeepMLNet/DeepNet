@@ -13,8 +13,10 @@ open System.Text.RegularExpressions
 open ManagedCuda
 open ManagedCuda.BasicTypes
 
-open Tensor.Utils
 open Tensor.Host
+open Tensor.Utils
+open DeepNet.Utils
+
 
 
 /// Cannot register host memory with CUDA, maybe because it is not properly aligned.

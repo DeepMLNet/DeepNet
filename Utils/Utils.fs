@@ -1,4 +1,4 @@
-﻿namespace Tensor.Utils
+﻿namespace DeepNet.Utils
 
 open System
 open System.Reflection
@@ -36,6 +36,19 @@ module internal List =
     let insert elem value lst =
         List.concat [List.take elem lst; [value]; List.skip elem lst]
 
+    /// Elementwise addition of two list. If one list is shorter, it is padded with zeros.
+    let inline addElemwise a b =
+        let rec build a b =
+            match a, b with
+            | av::ra, bv::rb -> (av+bv)::(build ra rb)
+            | av::ra, [] -> av::(build ra [])
+            | [], bv::rb -> bv::(build [] rb)
+            | [], [] -> []
+        build a b
+
+    /// Elementwise summation of lists. All lists are padded to the same size with zeros.
+    let inline sumElemwise (ls: 'a list seq) =
+        ([], ls) ||> Seq.fold addElemwise
 
 /// Map extensions
 module internal Map = 
@@ -157,6 +170,24 @@ module internal CollectionExtensions =
         member this.TryDequeue () =
             let value = ref (Unchecked.defaultof<'T>)
             if this.TryDequeue (value) then Some !value
+            else None
+
+    type System.Collections.Generic.HashSet<'T> with
+        member this.LockedContains key =
+            lock this (fun () -> this.Contains key)
+
+        member this.LockedAdd key =
+            lock this (fun () -> this.Add key)
+
+    type System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue> with
+        member this.TryFindReadOnly key =
+            let value = ref (Unchecked.defaultof<'TValue>)
+            if this.TryGetValue (key, value) then Some !value
+            else None
+
+    type System.Collections.Generic.Queue<'T> with
+        member this.TryPeek =
+            if this.Count > 0 then Some (this.Peek())
             else None
 
     // allow access to common collections without having to open System.Collections
@@ -405,7 +436,85 @@ module internal Util =
     let assemblyDir =
         Path.GetDirectoryName assemblyPath
 
+    /// matches integral values (e.g. 2, 2.0 or 2.0f, etc.)
+    let (|Integral|_|) (x: 'T) =
+        match typeof<'T> with
+        | t when t = typeof<int> ->
+            Some (x |> box |> unbox<int>)
+        | t when t = typeof<byte> ->
+            Some (x |> box |> unbox<byte> |> int)
+        | t when t = typeof<float> ->
+            let f = x |> box |> unbox<float>
+            if abs (f % 1.0) < System.Double.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | t when t = typeof<single> ->
+            let f = x |> box |> unbox<single>
+            if abs (f % 1.0f) < System.Single.Epsilon then
+                Some (f |> round |> int)
+            else None
+        | _ -> None
 
+    /// Returns the contents of a blittable structure as a byte array.
+    let structToBytes (s: 'S when 'S: struct) =
+        let size = Marshal.SizeOf(typeof<'S>)
+        let byteAry : byte[] = Array.zeroCreate size
+
+        let tmpPtr = Marshal.AllocHGlobal(size)
+        Marshal.StructureToPtr(s, tmpPtr, false)
+        Marshal.Copy(tmpPtr, byteAry, 0, size)
+        Marshal.DestroyStructure(tmpPtr, typeof<'S>)
+        Marshal.FreeHGlobal(tmpPtr)
+
+        byteAry
+
+
+/// Utility operators        
+[<AutoOpen>]
+module internal UtilOperators = 
+
+    /// Default value for options. Returns b if a is None, else the value of a.
+    let inline (|?) (a: 'a option) b = 
+        match a with
+        | Some v -> v
+        | None -> b
+                      
+
+
+/// String extensions
+module internal String =
+
+    /// combines sequence of string with given seperator but returns empty if sequence is empty
+    let concatButIfEmpty empty sep items =
+        if Seq.isEmpty items then empty
+        else String.concat sep items
+
+    /// object x converted to a string and capped to a maximum length
+    let inline truncObj x =
+        let maxLen = 80
+        let s = sprintf "%A" x
+        let s = s.Replace ("\n", " ")
+        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
+        else s
+
+    /// part of a limited string length format specifier
+    type LimitedPart =
+        /// a delimiter that is always inserted
+        | Delim of string
+        /// a formatter that is replaced by "..." if string becomes too long
+        | Formatter of (int -> string)
+
+    /// builds a string of approximate maximum length from the given format specifier parts
+    let limited maxLength parts =
+        ("", parts)
+        ||> List.fold (fun s p ->
+            match p with
+            | Delim d -> s + d
+            | Formatter fmtFn -> 
+                match maxLength - s.Length with
+                | remLength when remLength > 0 -> s + fmtFn remLength
+                | _ -> s + "..."
+            )
 
 /// Exception helpers
 [<AutoOpen>]

@@ -14,6 +14,7 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor.Utils
+open DeepNet.Utils
 
 
 /// C++ data type helpers

@@ -2,6 +2,7 @@
 
 open Tensor
 open Tensor.Utils
+open DeepNet.Utils
 
 
 /// Matrix decomposition functions.

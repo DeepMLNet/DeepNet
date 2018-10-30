@@ -1,10 +1,13 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open DeepNet.Utils
+
 open ShapeSpec
 open VarSpec
 open ElemExpr
+
 
 
 module ElemExprDeriv =

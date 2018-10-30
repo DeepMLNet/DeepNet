@@ -1,14 +1,8 @@
-Port SymTensor to new Tensor.
+- How to handle SymTensorCuda?
 
-1. Port project files
-2. Add Solution files
-3. Remove CUDA project
+- should contain no cuda invocation code anymore
+- but how to handle element expressions?
+- they still need to generate kernels
+- perhaps split off to completely seperate project
+- or merge with Tensor?
 
-
-How to handle the expression visualizer?
-
-- should it be deactivated for now?
-- or should it be handled differently?
-- i.e. output to graphic file?
-- hmm, then it would not be interactive anymore
-- however, this might be good

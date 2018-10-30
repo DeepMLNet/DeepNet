@@ -62,9 +62,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Utils.fs" />
-    <Compile Include="DiskMap.fs" />
-    <Compile Include="NativeLib.fs" />
+    <Compile Include="../../Utils/Utils.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="ScalarPrimitives.fs" />

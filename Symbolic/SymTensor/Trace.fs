@@ -6,8 +6,10 @@ open System.Collections.Generic
 open System.Threading
 
 open Tensor
-open Tensor.Utils
+open DeepNet.Utils
+
 open UExprTypes
+
 
 
 module Trace =

@@ -6,9 +6,10 @@ open System.IO.Compression
 open System.Text.RegularExpressions
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
 open Tensor.Host
+open Tensor.Utils
+open DeepNet.Utils
 
 
 /// methods for accessing Numpy .npy data files.

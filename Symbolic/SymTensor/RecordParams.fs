@@ -4,8 +4,9 @@ open System
 open FSharp.Reflection
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
+open DeepNet.Utils
+
 
 
 type private VarRecordHelpers () =

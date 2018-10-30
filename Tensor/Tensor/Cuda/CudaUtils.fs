@@ -9,6 +9,7 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor.Utils
+open DeepNet.Utils
 
 
 /// Out of CUDA memory.
@@ -209,4 +210,13 @@ module internal Cuda =
                         (sizeInBytes / pown 2L 20) e.CudaError
             raise (OutOfCudaMemoryException msg)
 
-
+    /// Checks that the thread's current CUDA context is the CUDA context that was active
+    /// or created while this module was initialized.
+    let checkContext () =
+        let ctx = ref (CUcontext ())
+        if DriverAPINativeMethods.ContextManagement.cuCtxGetCurrent (ctx) <> CUResult.Success then
+            failwith "cuCtxGetCurrent failed"
+        if context.Context <> (!ctx) then
+            failwithf "Current CUDA context %A does not match library initialization CUDA context %A"
+                (!ctx).Pointer context.Context.Pointer
+                        

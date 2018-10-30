@@ -7,6 +7,7 @@ open System.Diagnostics
 
 open Tensor.Utils
 open Tensor.Backend
+open DeepNet.Utils
 
 
 

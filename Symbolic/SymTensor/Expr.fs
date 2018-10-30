@@ -3,8 +3,10 @@
 open System.Collections.Generic
 open Microsoft.FSharp.Reflection
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open DeepNet.Utils
+
 open ShapeSpec
 open VarSpec
 
@@ -392,24 +394,24 @@ module Expr =
             match this with
             | Leaf op -> sprintf "{%A}" op
             | Unary (op, a) -> 
-                Util.limitedToString maxLength [Util.Formatter (fun _ -> sprintf "{%A}" op)
-                                                Util.Delim " ("
-                                                Util.Formatter (fun ml -> a.ToString ml)
-                                                Util.Delim ")"]
+                String.limited maxLength [String.Formatter (fun _ -> sprintf "{%A}" op)
+                                          String.Delim " ("
+                                          String.Formatter (fun ml -> a.ToString ml)
+                                          String.Delim ")"]
             | Binary (op, a, b) -> 
-                Util.limitedToString maxLength [Util.Formatter (fun _ -> sprintf "{%A}" op)
-                                                Util.Delim " ("
-                                                Util.Formatter (fun ml -> a.ToString ml)
-                                                Util.Delim ", "
-                                                Util.Formatter (fun ml -> b.ToString ml)
-                                                Util.Delim ")"]
+                String.limited maxLength [String.Formatter (fun _ -> sprintf "{%A}" op)
+                                          String.Delim " ("
+                                          String.Formatter (fun ml -> a.ToString ml)
+                                          String.Delim ", "
+                                          String.Formatter (fun ml -> b.ToString ml)
+                                          String.Delim ")"]
             | Nary (op, es) -> 
-                Util.limitedToString maxLength [yield Util.Formatter (fun _ -> sprintf "{%A}" op)
-                                                yield Util.Delim " ("
-                                                for p, e in List.indexed es do
-                                                    yield Util.Formatter (fun ml -> e.ToString ml)
-                                                    if p < List.length es - 1 then yield Util.Delim ", "
-                                                yield Util.Delim ")"]               
+                String.limited maxLength [yield String.Formatter (fun _ -> sprintf "{%A}" op)
+                                          yield String.Delim " ("
+                                          for p, e in List.indexed es do
+                                              yield String.Formatter (fun ml -> e.ToString ml)
+                                              if p < List.length es - 1 then yield String.Delim ", "
+                                          yield String.Delim ")"]               
 
         /// converts expression to string with unlimited length
         override this.ToString () = this.ToString System.Int32.MaxValue

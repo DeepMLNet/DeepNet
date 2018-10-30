@@ -4,9 +4,10 @@ open Xunit
 open Xunit.Abstractions
 open FsUnit.Xunit
 
-open Tensor.Utils
 open Tensor
 open Tensor.Algorithm
+open Tensor.Utils
+open DeepNet.Utils
 
 
 type RatTests (output: ITestOutputHelper) =

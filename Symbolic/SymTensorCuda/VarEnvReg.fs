@@ -1,8 +1,13 @@
 ﻿namespace SymTensor.Compiler.Cuda
 
-
 open System
+
 open Tensor
+open Tensor.Host
+open Tensor.Cuda
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 
 

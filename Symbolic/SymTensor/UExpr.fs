@@ -4,8 +4,9 @@ open System.Diagnostics
 open System.Reflection
 open System.Collections.Generic
 
-open Tensor.Utils
 open Tensor
+open DeepNet.Utils
+
 open Expr
 
 

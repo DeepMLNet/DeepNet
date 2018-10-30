@@ -1,10 +1,11 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
+open System
+
+open DeepNet.Utils
 open Tensor
 open ShapeSpec
 open VarSpec
-open System
 
 /// element expression
 module ElemExpr =

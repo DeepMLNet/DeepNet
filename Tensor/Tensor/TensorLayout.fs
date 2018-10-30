@@ -4,8 +4,7 @@ open System
 
 open Tensor
 open Tensor.Utils
-
-
+open DeepNet.Utils
 
 
 /// Layout (shape, offset, stride) of a Tensor.
@@ -133,17 +132,17 @@ module TensorLayout =
         List.zip3 shp aStr bStr
         |> List.forall (fun (s, a, b) -> if s > 1L then a = b else true)
 
-    /// true if the ArrayND is contiguous
-    let isC a = 
+    /// true if the layout is in row-major (C) order
+    let isRowMajor a = 
         stridesEqual a.Shape (stride a) (cStride a.Shape)
 
-    /// true if the ArrayND is in Fortran order
-    let isF a = 
+    /// true if the layout is in column-major (Fortan) order
+    let isColumnMajor a = 
         stridesEqual a.Shape (stride a) (fStride a.Shape)
 
-    /// true if the memory of the ArrayND is a contiguous block
+    /// true if the layout represents a contiguous memory block
     let hasContiguousMemory a =
-        isC a || isF a
+        isRowMajor a || isColumnMajor a
         // TODO: extend to any memory ordering
 
     /// adds a new dimension of size one to the left
@@ -318,7 +317,7 @@ module TensorLayout =
             | _ -> None
 
         match tfStride [] shp a.Stride a.Shape with
-        | _ when isC a -> Some {a with Shape=shp; Stride=cStride shp}
+        | _ when isRowMajor a -> Some {a with Shape=shp; Stride=cStride shp}
         | Some newStr -> 
             //printfn "Using stride transform to reshape from\n%A\nto\n%A\n" a {a with Shape=shp; Stride=newStr}
             Some {a with Shape=shp; Stride=newStr}

@@ -2,11 +2,12 @@
 
 open System
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open DeepNet.Utils
+
 open SymTensor
 open SymTensor.Compiler
-
 open ElemExpr
 open UElemExpr
 

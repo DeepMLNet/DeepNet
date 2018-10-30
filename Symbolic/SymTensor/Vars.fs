@@ -2,7 +2,7 @@
 
 open System.Runtime.InteropServices
 
-open Tensor.Utils
+open DeepNet.Utils
 open ShapeSpec
 
 

@@ -1,6 +1,7 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
+open DeepNet.Utils
+
 open Expr
 
 

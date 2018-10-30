@@ -3,6 +3,8 @@
 open System.Diagnostics
 
 open Tensor.Utils
+open DeepNet.Utils
+
 
 [<AutoOpen>]
 module DerivTypes =

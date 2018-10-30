@@ -8,9 +8,10 @@ open ManagedCuda
 open ManagedCuda.BasicTypes
 
 open Tensor
-open Tensor.Utils
 open Tensor.Backend
 open Tensor.Host
+open Tensor.Utils
+open DeepNet.Utils
 
 
 
