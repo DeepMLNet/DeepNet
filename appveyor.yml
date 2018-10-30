@@ -6,10 +6,10 @@
     - dotnet --version
 #    - ps: Remove-Item Revision.targets
 #    - ps: Add-Content Revision.targets "<Project><PropertyGroup><Rev>${env:APPVEYOR_BUILD_NUMBER}</Rev></PropertyGroup></Project>"
-    - dotnet restore Tensor/Tensor.sln
+    - dotnet restore DeepNet.sln
 
   build_script:
-    - dotnet build -c Release Tensor/Tensor.sln
+    - dotnet build -c Release DeepNet.sln
   
   test_script:
     - dotnet test -c Release Tensor/Tensor.Test/Tensor.Test.fsproj 
