@@ -273,3 +273,4 @@ Tensor/Tensor.Benchmark/bin
 Tensor/Tensor.Benchmark/Report/test
 
 _AssemblyInfo.fs
+Examples/Data/MNIST/MNIST.h5
