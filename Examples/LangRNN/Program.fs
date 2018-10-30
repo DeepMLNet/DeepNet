@@ -3,8 +3,9 @@
 open System.IO
 open Argu
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
+open Tensor.Cuda
 open Models
 
 
@@ -13,7 +14,7 @@ module Program =
     type CLIArgs = 
         | Generate of int 
         | Train
-        | Slack of string
+        //| Slack of string
         | TokenLimit of int
         | MaxIters of int
         | BatchSize of int64
@@ -31,7 +32,7 @@ module Program =
                 match s with
                 | Generate _ -> "generates samples from trained model using the specified seed"
                 | Train -> "train model"
-                | Slack _ -> "connect as a slack bot using the specified key"
+                //| Slack _ -> "connect as a slack bot using the specified key"
                 | TokenLimit _ -> "limits the number of training tokens"
                 | MaxIters _ -> "limits the number of training epochs"
                 | BatchSize _ -> "training batch size"
@@ -47,7 +48,7 @@ module Program =
     [<EntryPoint>]
     let main argv = 
         // debug
-        Util.disableCrashDialog ()
+        //Util.disableCrashDialog ()
         //SymTensor.Compiler.Cuda.Debug.ResourceUsage <- true
         //SymTensor.Compiler.Cuda.Debug.SyncAfterEachCudaCall <- true
         SymTensor.Compiler.Cuda.Debug.FastKernelMath <- true
@@ -58,7 +59,7 @@ module Program =
         //SymTensor.Compiler.Cuda.Debug.TraceCompile <- true
 
         // required for SlackBot
-        Cuda.setContext ()
+        //Cuda.setContext ()
 
         // tests
         //verifyRNNGradientOneHot DevCuda
@@ -93,7 +94,7 @@ module Program =
         if args.Contains <@PrintSamples@> then
             for smpl in 0L .. 3L do
                 for i, s in Seq.indexed (data.Dataset.Trn.SlotBatches batchSize stepsPerSmpl) do
-                    let words = s.Words.[smpl, *] |> data.ToStr
+                    let words = s.Words.[smpl, *] |> Tensor.allElems |> data.ToStr
                     printfn "Batch %d, sample %d:\n%s\n" i smpl words
 
         // train model or load checkpoint
@@ -145,23 +146,23 @@ module Program =
             let genWords = genWords.Words |> HostTensor.transfer
             for s in 0 .. NPred-1 do
                 printfn "======================= Sample %d ====================================" s
-                printfn "====> prime:      \n%s" (data.ToStr startWords.[int64 s, 0L .. int64 NStart-1L])
-                printfn "\n====> generated:\n> %s" (data.ToStr genWords.[int64 s, *])
-                printfn "\n====> original: \n> %s" (data.ToStr startWords.[int64 s, int64 NStart ..])
+                printfn "====> prime:      \n%s" (startWords.[int64 s, 0L .. int64 NStart-1L] |> Tensor.allElems |> data.ToStr)
+                printfn "\n====> generated:\n> %s" (genWords.[int64 s, *] |> Tensor.allElems |> data.ToStr)
+                printfn "\n====> original: \n> %s" (startWords.[int64 s, int64 NStart ..] |> Tensor.allElems |> data.ToStr)
                 printfn ""
         | None -> ()
 
         // slack bot
-        match args.TryGetResult <@Slack@> with
-        | Some slackKey -> 
-            let bot = SlackBot (data, model, slackKey)
-            printfn "\nSlackBot is connected. Press Ctrl+C to quit."
-            while true do
-               Async.Sleep 10000 |> Async.RunSynchronously
-        | None -> ()
+        //match args.TryGetResult <@Slack@> with
+        //| Some slackKey -> 
+        //    let bot = SlackBot (data, model, slackKey)
+        //    printfn "\nSlackBot is connected. Press Ctrl+C to quit."
+        //    while true do
+        //       Async.Sleep 10000 |> Async.RunSynchronously
+        //| None -> ()
 
         // shutdown
-        Cuda.shutdown ()
+        //Cuda.shutdown ()
         0 
 
 

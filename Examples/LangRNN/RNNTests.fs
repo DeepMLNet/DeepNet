@@ -1,6 +1,6 @@
 ﻿namespace LangRNN
 
-open Tensor.Utils
+open DeepNet.Utils
 open System.IO
 
 open Tensor
@@ -43,9 +43,9 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.UniformTensor (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
+        let vInput = HostTensor.randomUniform rng (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
         let vInitial = HostTensor.zeros [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.UniformTensor (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
+        let vTarget = HostTensor.randomUniform rng (-1.0f, 1.0f) [NBatch; NSteps; NWords] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput; initial, vInitial; target, vTarget] 
 
         DerivCheck.checkExpr device 1e-2f 1e-3f (varEnv |> mi.Use) (loss |> mi.Use)
@@ -81,9 +81,9 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vInput = HostTensor.randomInt rng (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = HostTensor.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vTarget = HostTensor.randomInt rng (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
                                    initial, vInitial :> ITensor 
                                    target, vTarget :> ITensor] 
@@ -121,9 +121,9 @@ module RNNTests =
         mi.InitPars 100
 
         let rng = System.Random 123
-        let vInput = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vInput = HostTensor.randomInt rng (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let vInitial = HostTensor.zeros<single> [NBatch; NRecurrent] |> device.ToDev
-        let vTarget = rng.IntTensor (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
+        let vTarget = HostTensor.randomInt rng (0, int NWords - 1) [NBatch; NSteps] |> device.ToDev
         let varEnv = VarEnv.ofSeq [input, vInput :> ITensor 
                                    initial, vInitial :> ITensor 
                                    target, vTarget :> ITensor] 

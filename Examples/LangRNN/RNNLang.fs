@@ -1,8 +1,8 @@
 ﻿namespace LangRNN
 
-open Tensor.Utils
 open System.IO
 
+open DeepNet.Utils
 open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda

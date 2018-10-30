@@ -1,7 +1,6 @@
 ﻿namespace LangRNN
 
-
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open SymTensor
 open SymTensor.Compiler.Cuda
@@ -43,7 +42,9 @@ module GRULang =
 
     let internal initWeights seed (shp: int64 list) = 
         let r = 1.0f / sqrt (single shp.[1])       
-        (System.Random seed).SeqSingle(-r, r) |> HostTensor.ofSeqWithShape shp
+        (System.Random seed).SeqDouble (float -r, float r) 
+        |> HostTensor.ofSeqWithShape shp 
+        |> Tensor<single>.convert
         
     let internal initBias seed (shp: int64 list) =
         HostTensor.zeros<single> shp
@@ -222,7 +223,7 @@ type GRUInst (VocSize:       int64,
                 CudaTensor.zeros<single> [nBatch; EmbeddingDim] 
             else
                 let rng = System.Random seed 
-                rng.UniformTensor (-0.1f, 0.1f) [nBatch; EmbeddingDim] |> CudaTensor.transfer 
+                HostTensor.randomUniform rng (-0.1f, 0.1f) [nBatch; EmbeddingDim] |> CudaTensor.transfer 
         let primed = 
             // last word of array is not actually processed
             if nStart > 1L then processFn initial sw.[*, 0L .. nStart-1L]
