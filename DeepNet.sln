@@ -5,15 +5,17 @@ VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tensor", "Tensor", "{99EB6FBC-381C-41A7-9378-A619A79751BD}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor", "Tensor\Tensor\Tensor.fsproj", "{0C4F8C34-412C-4CF3-83AD-EEDE17658501}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor", "Tensor\Tensor\Tensor.fsproj", "{0C4F8C34-412C-4CF3-83AD-EEDE17658501}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor.Test", "Tensor\Tensor.Test\Tensor.Test.fsproj", "{A4CCBFF4-86BD-4B9B-BBFE-C266C7156FCF}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Test", "Tensor\Tensor.Test\Tensor.Test.fsproj", "{A4CCBFF4-86BD-4B9B-BBFE-C266C7156FCF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Symbolic", "Symbolic", "{2C53BDC4-C10F-4442-909A-A9B83F09A849}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensor", "Symbolic\SymTensor\SymTensor.fsproj", "{2DE8B6ED-EBE1-4E08-BBF7-6A174725ED46}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "SymTensor", "Symbolic\SymTensor\SymTensor.fsproj", "{2DE8B6ED-EBE1-4E08-BBF7-6A174725ED46}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tensor.Algorithm", "Tensor\Tensor.Algorithm\Tensor.Algorithm.fsproj", "{F8D86086-5037-47C4-98B1-56FEAA68B0A2}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Algorithm", "Tensor\Tensor.Algorithm\Tensor.Algorithm.fsproj", "{F8D86086-5037-47C4-98B1-56FEAA68B0A2}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SymTensor.Visualizer", "Symbolic\SymTensor.Visualizer\SymTensor.Visualizer.fsproj", "{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,9 +25,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{0C4F8C34-412C-4CF3-83AD-EEDE17658501}.Debug|Any CPU.ActiveCfg = Debug|x64
@@ -76,11 +75,30 @@ Global
 		{F8D86086-5037-47C4-98B1-56FEAA68B0A2}.Release|x64.Build.0 = Release|x64
 		{F8D86086-5037-47C4-98B1-56FEAA68B0A2}.Release|x86.ActiveCfg = Release|x64
 		{F8D86086-5037-47C4-98B1-56FEAA68B0A2}.Release|x86.Build.0 = Release|x64
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|x64.Build.0 = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Debug|x86.Build.0 = Debug|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|x64.ActiveCfg = Release|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|x64.Build.0 = Release|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|x86.ActiveCfg = Release|Any CPU
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{0C4F8C34-412C-4CF3-83AD-EEDE17658501} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
 		{A4CCBFF4-86BD-4B9B-BBFE-C266C7156FCF} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
 		{2DE8B6ED-EBE1-4E08-BBF7-6A174725ED46} = {2C53BDC4-C10F-4442-909A-A9B83F09A849}
 		{F8D86086-5037-47C4-98B1-56FEAA68B0A2} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
+		{15E9F585-AFFB-45B9-BBD7-9718C1DCB722} = {2C53BDC4-C10F-4442-909A-A9B83F09A849}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {24E68C9B-C44E-4F57-9580-9751FC214DFF}
 	EndGlobalSection
 EndGlobal

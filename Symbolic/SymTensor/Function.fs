@@ -2,8 +2,9 @@
 
 open System.Diagnostics
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open Tensor.Backend
 open UExprTypes
 
 
@@ -64,11 +65,11 @@ module VarEnv =
     let inferSymSizes (symSizeEnv: SymSizeEnvT) (varEnv: VarEnvT) : SymSizeEnvT =
         (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
-                if VarSpec.nDims vSym <> Tensor.nDims vVal then
+                if VarSpec.nDims vSym <> ITensor.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
-                        (Tensor.shape vVal) vSym
+                        (ITensor.shape vVal) vSym
 
-                (VarSpec.shape vSym, Tensor.shape vVal)
+                (VarSpec.shape vSym, ITensor.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     let failShape () =
@@ -103,9 +104,9 @@ module VarEnv =
 
             let ss = VarSpec.shape vs
             match ShapeSpec.tryEval ss with
-            | Some ns when Tensor.shape value <> ns ->
+            | Some ns when ITensor.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A waTensorded" vs.Name ns ss (Tensor.shape value)
+                           value with shape %A waTensorded" vs.Name ns ss (ITensor.shape value)
             | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
             | _ -> ()
         )
@@ -116,7 +117,7 @@ module VarEnv =
 
     /// gets the locations of the variable value arrays
     let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> Tensor.dev vVal)
+        varEnv |> Map.map (fun _ vVal -> ITensor.dev vVal)
 
     /// gets the strides of the variable value arrays
     let valueStrides (varEnv: VarEnvT) : VarStridesT =
@@ -532,8 +533,4 @@ module FuncTypes =
         fun (ve: VarEnvT) ->
             f (VarEnv.join ve varEnv)
 
-//    let (^@^) a b =
-//        (addArg a) b
-//            
-//    let (^<|) a b =
-//        a b
+

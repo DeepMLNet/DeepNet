@@ -3,3 +3,12 @@ Port SymTensor to new Tensor.
 1. Port project files
 2. Add Solution files
 3. Remove CUDA project
+
+
+How to handle the expression visualizer?
+
+- should it be deactivated for now?
+- or should it be handled differently?
+- i.e. output to graphic file?
+- hmm, then it would not be interactive anymore
+- however, this might be good
