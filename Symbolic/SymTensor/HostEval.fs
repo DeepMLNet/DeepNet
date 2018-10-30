@@ -3,9 +3,11 @@
 open System
 open System.Reflection
 
-open Tensor.Utils
-open UExprTypes
 open Tensor
+open Tensor.Backend
+open Tensor.Utils
+
+open UExprTypes
 open SymTensor.Compiler
 
 
@@ -72,7 +74,7 @@ module HostEval =
                     | Identity (ss, tn) -> HostTensor.identity (sizeEval ss) 
                     | SizeValue (sv, tn) -> sizeEval sv |> conv<'T> |> HostTensor.scalar
                     | Arange (ss, tn) -> 
-                        HostTensor.counting (sizeEval ss) |> Tensor.convert<'T>
+                        HostTensor.counting (sizeEval ss) |> Tensor<'T>.convert
                     | ScalarConst sc -> HostTensor.scalar (sc.GetValue())
                     | Var(vs) -> varEval vs 
                     |> box |> unbox
@@ -196,7 +198,7 @@ module HostEval =
                         let trgt = HostTensor.zeros<'R> (shapeEval shp)
                         for rng, e in List.zip rngs es do                            
                             let aryRng = rng |> List.map (fun (first, last) -> 
-                                Rng (Some (sizeEval first), Some (sizeEval last)))
+                                Rng.Rng (Some (sizeEval first), Some (sizeEval last)))
                             trgt.[aryRng] <- subEval e |> toR
                         trgt |> box
                     | Elements (resShape, elemExpr) -> 

@@ -1,31 +1,31 @@
 ﻿namespace SymTensor
 
 open System
-open System.Reflection
 open FSharp.Reflection
 
-open Tensor.Utils
 open Tensor
-open UExprTypes
+open Tensor.Utils
+open Tensor.Backend
+
 
 type private VarRecordHelpers () =
     static member PublishLocStride<'T when 'T: equality and 'T: comparison> 
-            (expr: ExprT) (loc: ITensorDevice) (stride: int64 list option) (mi: ModelInstance<'T>) =
+            (expr: ExprT, loc: ITensorDevice, stride: int64 list option, mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
         match stride with
         | Some stride -> mi.SetStride expr stride
         | None -> ()
-    static member ValueArrayOnDev<'T> (value: 'T) (dev: IDevice) = 
+    static member ValueArrayOnDev<'T> (value: 'T, dev: IDevice) = 
         HostTensor.scalar value |> dev.ToDev :> ITensor
     static member UVarSpecOfExpr<'T> (expr: ExprT) =
         Expr.extractVar expr
-    static member WriteArrayToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: Tensor<'T>) =
+    static member WriteArrayToHDF<'T> (hdf: HDF5, dev: IDevice, name: string, value: Tensor<'T>) =
         value |> dev.ToHost |> HostTensor.write hdf name
-    static member WriteScalarToHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) (value: 'T) =
+    static member WriteScalarToHDF<'T> (hdf: HDF5, dev: IDevice, name: string, value: 'T) =
         value |> HostTensor.scalar |> HostTensor.write hdf name
-    static member ReadArrayFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : Tensor<'T> =
+    static member ReadArrayFromHDF<'T> (hdf: HDF5, dev: IDevice, name: string) : Tensor<'T> =
         HostTensor.read hdf name |> dev.ToDev
-    static member ReadScalarFromHDF<'T> (hdf: HDF5) (dev: IDevice) (name: string) : 'T =
+    static member ReadScalarFromHDF<'T> (hdf: HDF5, dev: IDevice, name: string) : 'T =
         HostTensor.read hdf name |> Tensor.value
 
 type private ValueType =
@@ -76,9 +76,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                         valField.Name valField.PropertyType exprType exprField.PropertyType
 
                 // extract UVarSpecT
-                let mi = typeof<VarRecordHelpers>.GetMethod("UVarSpecOfExpr", Util.allBindingFlags) 
-                let m = mi.MakeGenericMethod baseType
-                let varSpec = m.Invoke(null, [|exprData|]) :?> VarSpecT
+                let varSpec = Generic.callGeneric<VarRecordHelpers, VarSpecT> "UVarSpecOfExpr" [baseType] exprData
 
                 yield {Expr=exprData; VarSpec=varSpec; ValueType=valueType}
         } 
@@ -102,9 +100,8 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 ||> Seq.fold (fun varEnv (fi, value) ->
                     match fi.ValueType with
                     | Scalar baseType ->
-                        let mi = typeof<VarRecordHelpers>.GetMethod("ValueArrayOnDev", Util.allBindingFlags) 
-                        let m = mi.MakeGenericMethod baseType
-                        let valueAry = m.Invoke(null, [|box value; box dev|]) :?> ITensor
+                        let valueAry = 
+                            Generic.callGeneric<VarRecordHelpers, ITensor> "ValueArrayOnDev" [baseType] (value, dev)
                         varEnv |> VarEnv.addVarSpec fi.VarSpec valueAry
                     | Array _ ->
                         varEnv |> VarEnv.addVarSpec fi.VarSpec (value :?> ITensor)
@@ -128,9 +125,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
             let stride = Option.map TensorLayout.cStride shp
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("PublishLocStride", Util.allBindingFlags)
-                let m = mi.MakeGenericMethod typeof<'T>
-                m.Invoke(null, [|fi.Expr; loc; stride; model|]) |> ignore
+                Generic.callGeneric<VarRecordHelpers, unit> "PublishLocStride" [typeof<'T>] (fi.Expr, loc, stride, model)
         )
 
     /// Saves the record values as a HDF5 file.
@@ -139,13 +134,11 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
         for fi, value in Seq.zip fieldInfos values do
             match fi.ValueType with
             | Scalar typ ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("WriteScalarToHDF", Util.allBindingFlags)
-                let m = mi.MakeGenericMethod typ
-                m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
+                Generic.callGeneric<VarRecordHelpers, unit> "WriteScalarToHDF" [typ] 
+                    (hdf, dev, prefix + "/" + fi.VarSpec.Name, value)
             | Array typ ->
-                let mi = typeof<VarRecordHelpers>.GetMethod("WriteArrayToHDF", Util.allBindingFlags)
-                let m = mi.MakeGenericMethod typ
-                m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name); value|]) |> ignore
+                Generic.callGeneric<VarRecordHelpers, unit> "WriteArrayToHDF" [typ]
+                    (hdf, dev, prefix + "/" + fi.VarSpec.Name, value)
 
     /// Load the record value from a HDF5 file using the specifed prefix
     member this.LoadValue hdf prefix : 'RVal =
@@ -153,13 +146,11 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
             for fi in fieldInfos do
                 match fi.ValueType with
                 | Scalar typ ->
-                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadScalarFromHDF", Util.allBindingFlags)
-                    let m = mi.MakeGenericMethod typ
-                    yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|]) 
+                    yield Generic.callGeneric<VarRecordHelpers, obj> "ReadScalarFromHDF" [typ] 
+                        (hdf, dev, prefix + "/" + fi.VarSpec.Name)
                 | Array typ ->
-                    let mi = typeof<VarRecordHelpers>.GetMethod("ReadArrayFromHDF", Util.allBindingFlags)
-                    let m = mi.MakeGenericMethod typ
-                    yield m.Invoke(null, [|box hdf; box dev; box (prefix + "/" + fi.VarSpec.Name)|])         
+                    yield Generic.callGeneric<VarRecordHelpers, obj> "ReadArrayFromHDF" [typ]
+                        (hdf, dev, prefix + "/" + fi.VarSpec.Name)
         }
         FSharpValue.MakeRecord (typeof<'RVal>, Array.ofSeq values) :?> 'RVal
 

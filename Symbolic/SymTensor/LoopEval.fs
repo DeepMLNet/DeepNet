@@ -1,7 +1,8 @@
 ﻿namespace SymTensor
 
-open Tensor.Utils
 open Tensor
+open Tensor.Utils
+open Tensor.Backend
 
 
 /// functions for loop evaluation
@@ -82,7 +83,7 @@ module LoopEval =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 
-            List.replicate (Tensor.nDims ary) RngAll
+            List.replicate (ITensor.nDims ary) Rng.All
             |> List.set dim dimSlice
 
         /// The slice of the channel's target for the specified iteration.
@@ -94,7 +95,7 @@ module LoopEval =
             let offset = trgtSize - 1L - ((nIters - 1L) % trgtSize)
             assert ((offset + nIters - 1L) % trgtSize = trgtSize - 1L)
             let pos = (offset + iter) % trgtSize
-            let slice = rngAllBut channels.[ch].Target dim (RngElem pos)
+            let slice = rngAllBut channels.[ch].Target dim (Rng.Elem pos)
             channels.[ch].Target.[slice]
 
         // build variable environment for value sources
@@ -107,7 +108,7 @@ module LoopEval =
                     | ConstArg idx -> 
                         args.[idx] 
                     | SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
-                        let slice = rngAllBut args.[idx] dim (RngElem iter)
+                        let slice = rngAllBut args.[idx] dim (Rng.Elem iter)
                         args.[idx].[slice] 
                     | PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
                         let delay = SizeSpec.eval delay
@@ -119,7 +120,7 @@ module LoopEval =
                         if prvIter >= 0L then targetSlice ch prvIter
                         else
                             let initialIter = args.[ivIdx].Shape.[dim] + prvIter
-                            let slice = rngAllBut args.[ivIdx] dim (RngElem initialIter)
+                            let slice = rngAllBut args.[ivIdx] dim (Rng.Elem initialIter)
                             args.[ivIdx].[slice] 
                     | IterationIndex -> iterAry
                     | IterationsRemaining -> itersRemainingAry

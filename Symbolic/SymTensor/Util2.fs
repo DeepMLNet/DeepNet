@@ -77,3 +77,20 @@ module internal Extensions =
             if this.Count > 0 then Some (this.Peek())
             else None
 
+
+
+/// String extensions
+module internal String =
+
+    /// combines sequence of string with given seperator but returns empty if sequence is empty
+    let concatButIfEmpty empty sep items =
+        if Seq.isEmpty items then empty
+        else String.concat sep items
+
+    /// object x converted to a string and capped to a maximum length
+    let inline truncObj x =
+        let maxLen = 80
+        let s = sprintf "%A" x
+        let s = s.Replace ("\n", " ")
+        if String.length s > maxLen then s.[0..maxLen-3-1] + "..."
+        else s

@@ -18,6 +18,12 @@ module internal List =
             | l::ls, _ -> l::(set (elem-1) value ls)
             | [], _ -> invalidArg "elem" "element index out of bounds"
 
+    /// swaps the elements at the specified positions
+    let swap elem1 elem2 lst =
+        lst
+        |> set elem1 lst.[elem2]
+        |> set elem2 lst.[elem1]
+
     /// removes element with index elem 
     let without elem lst =
         List.concat [List.take elem lst; List.skip (elem+1) lst] 
@@ -364,7 +370,9 @@ module internal Generic =
                 genericMethodCache.[gmd] <- m
                 m
 
-        let args = FSharpValue.GetTupleFields args
+        let args = 
+            try FSharpValue.GetTupleFields args
+            with :? ArgumentException -> [|args|]
         m.Invoke (instance, args) :?> 'R       
 
     /// Calls the specified static method on the type 'U with the specified generic type arguments
