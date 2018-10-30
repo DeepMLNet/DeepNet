@@ -1,6 +1,6 @@
 ﻿namespace Models 
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open Datasets
 
@@ -41,8 +41,8 @@ module SSE =
     /// Calculates the sum squared error.
     /// Shapes: pred[smpl, ...], target[smpl, ...]
     let error (trgt: Tensor<'T>) (pred: Tensor<'T>) =
-        let pred = pred |> HostTensor.transfer |> Tensor.float
-        let trgt = trgt |> HostTensor.transfer |> Tensor.float
+        let pred = pred |> HostTensor.transfer |> Tensor<float>.convert
+        let trgt = trgt |> HostTensor.transfer |> Tensor<float>.convert
 
         (pred - trgt) ** 2.0
         |> Tensor.sum

@@ -468,6 +468,16 @@ module internal Util =
 
         byteAry
 
+    /// Returns "Some key" when a key was pressed, otherwise "None".
+    let getKey () =
+        try
+            if Console.KeyAvailable then Some (Console.ReadKey().KeyChar)
+            else None
+        with :? InvalidOperationException -> 
+            // InvalidOperationException is thrown when process does not have a console or 
+            // input is redirected from a file.
+            None
+
 
 /// Utility operators        
 [<AutoOpen>]

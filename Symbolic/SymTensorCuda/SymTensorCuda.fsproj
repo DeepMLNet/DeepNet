@@ -14,8 +14,8 @@
   <ItemGroup>
     <Compile Include="../../Utils\Utils.fs" />
     <Compile Include="..\..\Utils\DiskMap.fs" Link="DiskMap.fs" />
-    <Compile Include="..\..\Utils\NativeLib.fs" Link="NativeLib.fs" />
     <Compile Include="DiskMapOld.fs" />
+    <Compile Include="..\..\Utils\NativeLib.fs" Link="NativeLib.fs" />
     <Compile Include="..\..\Tensor\Tensor\Cuda\CudaUtils.fs" Link="CudaUtils.fs" />
     <Compile Include="Debug.fs" />
     <Compile Include="CudaTypes.fs" />

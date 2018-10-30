@@ -1,6 +1,6 @@
 ﻿namespace Optimizers
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open SymTensor
 
@@ -85,7 +85,7 @@ type Adam<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
-        let shp = Tensor.shape parVals
+        let shp = ITensor.shape parVals
         {
             Iter        = HostTensor.zeros []  |> dev.ToDev
             LastStep    = HostTensor.zeros shp |> dev.ToDev

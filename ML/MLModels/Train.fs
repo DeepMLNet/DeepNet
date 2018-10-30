@@ -3,9 +3,9 @@
 open System
 open System.Diagnostics
 open System.IO
-open Nessos.FsPickler.Json
+open MBrace.FsPickler.Json
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open Datasets
 open SymTensor

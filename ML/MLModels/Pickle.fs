@@ -1,8 +1,8 @@
 namespace Models
 
 open System.IO
-open Nessos.FsPickler
-open Nessos.FsPickler.Json
+open MBrace.FsPickler
+open MBrace.FsPickler.Json
 
 /// JSON serialization.
 module Json =

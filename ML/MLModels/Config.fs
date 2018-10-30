@@ -4,7 +4,7 @@ open System
 open System.IO
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
-open Tensor.Utils
+open DeepNet.Utils
 
 
 /// Configuration loader.
@@ -17,7 +17,7 @@ module Config =
         let argv = [| "C:\\fsi.exe" |]
         let allArgs = Array.append argv [|"--noninteractive"
                                           "--quiet"
-                                          "--lib:" + Util.assemblyDirectory
+                                          "--lib:" + Util.assemblyDir
                                           "--reference:MLModels.dll"
                                           "--reference:SymTensor.dll"
                                           "--define:CONFIG"

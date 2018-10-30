@@ -1,6 +1,6 @@
 ﻿namespace Models
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open SymTensor
 
@@ -94,7 +94,7 @@ module NeuralLayer =
         let fanOut = shp.[0] |> float
         let fanIn = shp.[1] |> float
         let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
-        rng.UniformTensor (conv<'T> -r, conv<'T> r) shp
+        HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) shp
         
     let internal initBias seed (shp: int64 list) : Tensor<'T> =
         HostTensor.zeros shp

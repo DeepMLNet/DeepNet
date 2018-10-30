@@ -1,8 +1,8 @@
 ﻿namespace Datasets
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
-open Util
+open Tensor.Algorithm
 
 
 [<AutoOpen>]

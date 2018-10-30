@@ -103,7 +103,7 @@ module Mnist =
         let testStr = if TestDataset then "-Test" else ""
         let hdfPath = Path.Combine (directory, sprintf "MNIST%s.h5" testStr)
         if File.Exists hdfPath then
-            use hdf = new HDF5 (hdfPath, HDF5Read)
+            use hdf = HDF5.OpenRead hdfPath
             {TrnImgs = HostTensor.read hdf "TrnImgs" 
              TrnLbls = HostTensor.read hdf "TrnLbls"
              TstImgs = HostTensor.read hdf "TstImgs" 
@@ -111,7 +111,7 @@ module Mnist =
         else
             printf "Converting MNIST to HDF5..."
             let mnist = doLoadRaw directory
-            use hdf = new HDF5 (hdfPath, HDF5Overwrite)
+            use hdf = HDF5.OpenWrite hdfPath
             HostTensor.write hdf "TrnImgs" mnist.TrnImgs 
             HostTensor.write hdf "TrnLbls" mnist.TrnLbls 
             HostTensor.write hdf "TstImgs" mnist.TstImgs 

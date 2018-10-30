@@ -74,7 +74,7 @@ module Cifar10 =
     let loadRaw directory =
         let hdfPath = Path.Combine (directory,"Cifar10")
         if File.Exists hdfPath then
-            use hdf = new HDF5 (hdfPath, HDF5Read)
+            use hdf = HDF5.OpenRead hdfPath
             {TrnData = HostTensor.read hdf "TrnData"; 
              TrnLbls = HostTensor.read hdf "TrnLbls";
              TstData = HostTensor.read hdf "TstData"; 
@@ -82,7 +82,7 @@ module Cifar10 =
         else
             printf "Converting Cifar10 to HDF5..."
             let cifar10 = doLoadRaw directory
-            use hdf = new HDF5 (hdfPath, HDF5Overwrite)
+            use hdf = HDF5.OpenWrite hdfPath
             HostTensor.write hdf "TrnImgs" cifar10.TrnData 
             HostTensor.write hdf "TrnLbls" cifar10.TrnLbls 
             HostTensor.write hdf "TstImgs" cifar10.TstData 

@@ -2,7 +2,6 @@
 
 open Tensor.Utils
 open Tensor
-open Util
 
 
 /// A data sample consisting of an input and target array.

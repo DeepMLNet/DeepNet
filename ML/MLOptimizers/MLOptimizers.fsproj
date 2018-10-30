@@ -1,92 +1,22 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Common.targets" />
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>c6ea7c8a-c74f-44df-828b-7c16b8a06329</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>Optimizers</RootNamespace>
-    <AssemblyName>MLOptimizers</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>MLOptimizers</Name>
-    <TargetFrameworkProfile />
+    <PackageId>MLOptimizers</PackageId>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
-  <PropertyGroup>
-    <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <Tailcalls>false</Tailcalls>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\MLOptimizers.XML</DocumentationFile>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <Tailcalls>true</Tailcalls>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\MLOptimizers.XML</DocumentationFile>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <Choose>
-    <When Condition="'$(VisualStudioVersion)' == '11.0'">
-      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">
-        <FSharpTargetsPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets</FSharpTargetsPath>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets')">
-        <FSharpTargetsPath>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets</FSharpTargetsPath>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
-  <Import Project="$(FSharpTargetsPath)" />
+
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
+    <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
+    <ProjectReference Include="../../Symbolic/SymTensor/SymTensor.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Utils/Utils.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="GradientDescent.fs" />
     <Compile Include="Adam.fs" />
     <Compile Include="RMSprop.fs" />
-    <Content Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="ManagedCuda">
-      <HintPath>..\packages\ManagedCuda-80.8.0.13\lib\net46\ManagedCuda.dll</HintPath>
-    </Reference>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\SymTensor\SymTensor.fsproj">
-      <Name>SymTensor</Name>
-      <Project>{2e96a03e-7031-43c3-aeee-b9c9dc543448}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Tensor\Tensor.fsproj">
-      <Name>Tensor</Name>
-      <Project>{82de3bae-bcec-4df8-9c46-07b7faf4e31a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>

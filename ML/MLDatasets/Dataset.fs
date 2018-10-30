@@ -4,9 +4,9 @@ open System.Collections
 open System.Collections.Generic
 open Microsoft.FSharp.Reflection
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
-open Util
+open Tensor.Backend
 
 /// A dataset of a record type 'S containing ArrayNDT<_> data variables.
 /// The first dimension of each record field is the sample.
@@ -24,7 +24,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
 
     // make sure that all field storages are in C-order
     do for fs in fieldStorages do
-        if not (Tensor.isRowMajor fs) then
+        if not (TensorLayout.isRowMajor fs.Layout) then
             failwith "all field storages in must be in C-order"
 
     /// number of samples
@@ -74,9 +74,9 @@ type Dataset<'S> (fieldStorages: ITensor list,
 
         // find largest shape of each field over all samples
         let maxShape (fieldSmpls: ITensor seq) =
-            let mutable maxShape = Seq.head fieldSmpls |> Tensor.shape
+            let mutable maxShape = Seq.head fieldSmpls |> ITensor.shape
             for smpl in fieldSmpls do
-                let smplShape = Tensor.shape smpl
+                let smplShape = ITensor.shape smpl
                 if List.length smplShape <> List.length maxShape then
                     failwith "dimensionality of a field must be equal over all samples"
                 maxShape <- (maxShape, smplShape) ||> List.map2 max
@@ -121,7 +121,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
     member this.GetSlice (start: int64 option, stop: int64 option) =
         start |> Option.iter checkRange; stop |> Option.iter checkRange
         let sliceData =
-            [| for fs in fieldStorages -> fs.[[Rng (start, stop); RngAllFill]] |> box |]
+            [| for fs in fieldStorages -> fs.[[Rng.Rng (start, stop); Rng.AllFill]] |> box |]
         FSharpValue.MakeRecord (typeof<'S>, sliceData) :?> 'S            
 
     /// For a sequence dataset,
@@ -131,8 +131,8 @@ type Dataset<'S> (fieldStorages: ITensor list,
         startSmpl |> Option.iter checkRange; stopSmpl |> Option.iter checkRange
         startStep |> Option.iter checkStepRange; stopStep |> Option.iter checkStepRange
         let sliceData =
-            [| for fs in fieldStorages -> fs.[[Rng (startSmpl, stopSmpl); 
-                                               Rng (startStep, stopStep); RngAllFill]] |> box |]
+            [| for fs in fieldStorages -> fs.[[Rng.Rng (startSmpl, stopSmpl); 
+                                               Rng.Rng (startStep, stopStep); Rng.AllFill]] |> box |]
         FSharpValue.MakeRecord (typeof<'S>, sliceData) :?> 'S            
                             
     /// Returns a record of type 'S containing all samples.
@@ -144,7 +144,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
     /// Returns a new dataset containing the samples from start to stop.
     member this.Part (start: int64, stop: int64) =        
         let partData =
-            fieldStorages |> List.map (fun fs -> fs.[[Rng (Some start, Some stop); RngAllFill]])
+            fieldStorages |> List.map (fun fs -> fs.[[Rng.Rng (Some start, Some stop); Rng.AllFill]])
         Dataset<'S> (partData, isSeq)
 
     /// number of samples
@@ -178,7 +178,7 @@ type Dataset<'S> (fieldStorages: ITensor list,
             else                   
                 fieldStorages
                 |> List.map (fun fsAll ->
-                    let shpAll = Tensor.shape fsAll
+                    let shpAll = ITensor.shape fsAll
                     let shpBatch = shpAll |> List.set 0 batchSize                    
                     let fsBatch = Tensor.NewOfType (shpBatch, fsAll.DataType, fsAll.Dev, order=RowMajor)
                     fsBatch.[0L .. lastBatchElems-1L, Fill] <- fsAll.[lastBatchStart .. nSamples-1L, Fill]
@@ -364,7 +364,7 @@ module Dataset =
                         z.[*, 0L .. nSteps-1L, Fill] <- fs.[Fill]
                         z
                     else fs
-                fs |> Tensor.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
+                fs |> ITensor.reshapeView ([ds.NSamples * nCuts; stepsPerCut] @ rShp))
         Dataset (cutFs, true)
 
     /// Cuts each sequence in the dataset into multiple chunks so that at least `minSamples` are 
@@ -385,15 +385,15 @@ module Dataset =
 
     /// copies this dataset to the specified device
     let transfer dev (ds: Dataset<'S>) : Dataset<'S> =
-        ds |> map (Tensor.transfer dev)
+        ds |> map (ITensor.transfer dev)
 
     /// copies this dataset to a CUDA GPU
     let toCuda (ds: Dataset<'S>) : Dataset<'S> =
-        ds |> map CudaTensor.transfer
+        ds |> map (ITensor.transfer CudaTensor.Dev)
 
     /// copies this dataset to the host
     let toHost (ds: Dataset<'S>) : Dataset<'S> =
-        ds |> map HostTensor.transfer
+        ds |> map (ITensor.transfer HostTensor.Dev)
 
 /// A training/validation/test partitioning of a dataset.
 [<StructuredFormatDisplay("{Pretty}")>]
@@ -407,8 +407,7 @@ type TrnValTst<'S> = {
 } with 
     member internal this.Pretty = 
         if this.Trn.IsSeq then
-            sprintf "sequence dataset (%d training, %d validation, %d test %ss with \
-                     %d steps per sample)" 
+            sprintf "sequence dataset (%d training, %d validation, %d test %ss with %d steps per sample)" 
                 this.Trn.NSamples this.Val.NSamples this.Tst.NSamples this.Trn.SampleType.Name
                 this.Trn.NSteps
         else

@@ -1,6 +1,6 @@
 ﻿namespace Optimizers
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
 open SymTensor
 
@@ -50,7 +50,7 @@ type GradientDescent<'T when 'T: equality and 'T: comparison>
     }
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> = {
-        LastStep    = HostTensor.zeros (Tensor.shape parVals) |> dev.ToDev
+        LastStep    = HostTensor.zeros (ITensor.shape parVals) |> dev.ToDev
     }
 
     member this.Minimize =
