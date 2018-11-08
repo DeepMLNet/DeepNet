@@ -267,7 +267,7 @@ module ArgTemplates =
         abstract member GetArg : CudaExecEnvT -> CUstream -> obj 
 
     /// CUDA C++ argument template for values that are passed by value in an array
-    type ICudaArrayMemberArgTmpl<'T when 'T :> ValueType> =
+    type ICudaArrayMemberArgTmpl<'T when 'T :> System.ValueType> =
         abstract member CPPTypeName : string
         abstract member GetArg : CudaExecEnvT -> 'T
 
@@ -351,7 +351,7 @@ module ArgTemplates =
                     mem.DevicePointer + SizeT offset |> Cuda.getIntPtr
                 | None -> IntPtr.Zero
 
-    type CPPArrayTmpl<'T when 'T :> ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
+    type CPPArrayTmpl<'T when 'T :> System.ValueType> (valueTmpls: ICudaArrayMemberArgTmpl<'T> list) =       
         interface ICudaArgTmpl with
             member this.CPPTypeName = 
                 sprintf "Array<%s, %d>" (valueTmpls.Head.CPPTypeName) (List.length valueTmpls)

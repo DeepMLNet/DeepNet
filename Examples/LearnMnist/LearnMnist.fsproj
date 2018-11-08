@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\ML\MLModels\MLModels.fsproj" />
-    <ProjectReference Include="..\..\Symbolic\SymTensorCuda\SymTensorCuda.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

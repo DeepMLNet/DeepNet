@@ -48,15 +48,15 @@ module CudaEval =
 module CudaEvalTypes =
 
     type private HelperT =
-        static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
+        static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                 (shp: NShapeSpecT) : Tensor<'T> =
             Tensor<'T> (shp, CudaTensor.Dev)
 
-        static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
+        static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                 (ary: Tensor<'T>) : Tensor<'T> =
             CudaTensor.transfer ary
 
-        static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> ValueType> 
+        static member ToHost<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                 (ary: Tensor<'T>) : Tensor<'T> =
             HostTensor.transfer ary
 

@@ -13,11 +13,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FsPickler" Version="5.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="../../Utils/Utils.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" />
+    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" />
+    <Compile Include="DiskMapOld.fs" />
+
     <Compile Include="Debug.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
@@ -44,6 +53,17 @@
     <Compile Include="ModelContext.fs" />
     <Compile Include="RecordParams.fs" />
     <Compile Include="DerivCheck.fs" />
+
+    <Compile Include="DebugCuda.fs" />
+    <Compile Include="CudaTypes.fs" />
+    <Compile Include="CudaElemExpr.fs" />
+    <Compile Include="CudaExecUnits.fs" />
+    <Compile Include="CudaStream.fs" />
+    <Compile Include="CudaRecipe.fs" />
+    <Compile Include="CudaExec.fs" />
+    <Compile Include="CudaEval.fs" />
+    <Compile Include="VarEnvReg.fs" />
+
   </ItemGroup>
 
 </Project>
