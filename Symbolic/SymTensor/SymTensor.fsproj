@@ -32,7 +32,7 @@
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="ElemExpr.fs" />
-    <Compile Include="ElemExprHostEval.fs" />
+    <Compile Include="ElemExprInterpreter.fs" />
     <Compile Include="Interpolator.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="ExprInfo.fs" />

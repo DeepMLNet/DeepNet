@@ -12,8 +12,7 @@ open VarSpec
 open ElemExpr
 
 
-module ElemExprHostEval =
-
+module ElemExprInterpreter =
 
     let inline uncheckedApply (f: 'T -> 'T) (a: 'S) : 'S =
         let av = a |> box |> unbox
@@ -36,7 +35,6 @@ module ElemExprHostEval =
         elif typeof<'T>.Equals(typeof<int>)    then uncheckedApply fInt    a 
         elif typeof<'T>.Equals(typeof<byte>)   then uncheckedApply fByte   a 
         else failwith "unknown type"
-
 
     let inline typedApply2   (fBool:   bool   -> bool   -> bool) 
                              (fDouble: double -> double -> double) 
@@ -62,7 +60,7 @@ module ElemExprHostEval =
     let evalElement (expr: ElemExprT) (args: Tensor<'T> list) (idxs: ShapeSpecT) : 'T =
         let retType = (ElemExpr.typeName expr).Type
         if retType <> typeof<'T> then
-            failwithf "elements expression of type %A does not match eval function of type %A"
+            failwithf "Element expression of type %A does not match eval function of type %A."
                 retType typeof<'T>                    
 
         let rec doEval symVals expr = 

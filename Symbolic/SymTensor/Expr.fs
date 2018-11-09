@@ -418,11 +418,7 @@ module Expr =
 
         /// pretty string
         member this.Pretty = this.ToString 80
-            //match this with
-            //| Leaf op -> sprintf "{%A}" op 
-            //| Unary (op, a) -> sprintf "{%A} (%A)" op a
-            //| Binary (op, a, b) -> sprintf "{%A} (%A, %A)" op a b
-            //| Nary (op, es) -> sprintf "{%A} (%A)" op es
+
 
     type FullExprRngSpecT = RangeSpecT<ExprT>
     type FullExprRngsSpecT = RangesSpecT<ExprT>
@@ -2065,9 +2061,3 @@ module ExprTypes =
     type LoopInputT = Expr.LoopInputT
     type LoopValueT = Expr.LoopValueT
     type LoopSpecT = Expr.LoopSpecT
-
-    
-
-
-
-

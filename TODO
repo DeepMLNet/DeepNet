@@ -11,3 +11,10 @@
 3. Remove direct CUDA calls from SymTensor
 4. Make backend work for both host and Cuda (what about Streams?)
 
+
+- no modifications required in SymShape.fs
+- no modifications required in SymSizeEnv.fs
+- no modifications required in Vars.fs
+- no modifications required in ElemExpr.fs
+- ElemExprHostEval should be renamed into ElemExprInterpreter to indicate that its purpose
+  is interpreting ElemExprs
