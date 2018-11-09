@@ -319,8 +319,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let order = defaultArg order RowMajor
         let layout = 
             match order with
-            | RowMajor -> TensorLayout.newC shape
-            | ColumnMajor -> TensorLayout.newF shape
+            | RowMajor -> TensorLayout.newRowMajor shape
+            | ColumnMajor -> TensorLayout.newColumnMajor shape
             | CustomOrder perm -> TensorLayout.newOrdered shape perm
         let storage = dev.Create layout.NElems
         Tensor<'T> (layout, storage)

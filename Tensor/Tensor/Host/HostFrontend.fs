@@ -33,7 +33,7 @@ type private HDFFuncs =
 
     static member Read<'T> (hdf5: HDF5, name: string) =
         let (data: 'T []), shape = hdf5.Read (name)
-        Tensor<'T> (TensorLayout.newC shape, TensorHostStorage<'T> data)         
+        Tensor<'T> (TensorLayout.newRowMajor shape, TensorHostStorage<'T> data)         
 
 
 
@@ -169,7 +169,7 @@ module HostTensor =
     /// <seealso cref="ofArray``1"/>
     let usingArray (data: 'T []) =
         let shp = [data.LongLength]
-        let layout = TensorLayout.newC shp
+        let layout = TensorLayout.newRowMajor shp
         let storage = TensorHostStorage<'T> (data)
         Tensor<'T> (layout, storage) 
 

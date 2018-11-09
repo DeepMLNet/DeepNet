@@ -386,7 +386,7 @@ module ModelContextTypes =
                     (varStrides, vars)
                     ||> Set.fold (fun varStrides var ->
                         match varStrides |> Map.tryFind var, ShapeSpec.tryEval var.Shape with
-                        | None, Some nShape -> varStrides |> Map.add var (TensorLayout.cStride nShape)
+                        | None, Some nShape -> varStrides |> Map.add var (TensorLayout.rowMajorStride nShape)
                         | _, _ -> varStrides)
 
             // create compile environement

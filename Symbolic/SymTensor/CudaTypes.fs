@@ -40,7 +40,7 @@ module Types =
 
     /// a CUDA texture object
     type TextureObjectT = {
-        Contents:                  ArrayNDManikinT
+        Contents:                  TensorManikin
         Descriptor:                BasicTypes.CudaTextureDescriptor
     }
 
@@ -171,7 +171,7 @@ module Types =
 module CudaCompileEnv =
 
     /// creates a new texture object
-    let newTextureObject (contents: ArrayNDManikinT) descriptor (env: CudaCompileEnvT) =
+    let newTextureObject (contents: TensorManikin) descriptor (env: CudaCompileEnvT) =
         if not (TensorLayout.isRowMajor contents.Layout && contents.Layout.Offset = 0L) then
             failwith "manikin for use with texture must be contiguous and offset free"
         let texObj = {
@@ -188,7 +188,7 @@ module CudaCompileEnv =
             TypeName = TypeName.ofTypeInst value.DataType
         }
         env.ConstantValues.Add (mc, value)
-        ArrayNDManikinT (value.Layout, MemConst mc)
+        TensorManikin (value.Layout, MemConst mc)
 
     /// adds a sub-workspace using the specified recipe description
     let newSubrecipe (recipeDesc: CudaRecipeDescT) (env: CudaCompileEnvT) : SubWorkspaceT =
@@ -225,11 +225,11 @@ module CudaExecEnv =
             aryStorage.ByteData, 0L            
 
     /// gets device memory and offset in bytes for an internal allocation or external reference
-    let getDevMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+    let getDevMemForManikin (env: CudaExecEnvT) (manikin: TensorManikin) =
         getDevMem env manikin.Storage
 
     /// gets host memory for an external reference
-    let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+    let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: TensorManikin) =
         match manikin.Storage with
         | MemExternal vs ->
             let hv = env.HostVar.[vs]            
@@ -242,9 +242,9 @@ module CudaExecEnv =
         | _ -> failwithf "host variable must be of type ExternalMem" 
 
     /// gets an IArrayNDCudaT in device memory for the specified manikin
-    let getArrayNDForManikin (env: CudaExecEnvT) (manikin: ArrayNDManikinT) =
+    let getArrayNDForManikin (env: CudaExecEnvT) (manikin: TensorManikin) =
         let devMem, offset = getDevMemForManikin env manikin
-        let typ = manikin |> ArrayNDManikin.typeName |> TypeName.getType
+        let typ = manikin |> TensorManikin.typeName |> TypeName.getType
         CudaTensor.usingPtrAndType (devMem.DevicePointer + SizeT offset) 
                                    (devMem.SizeInBytes - SizeT offset) 
                                    typ manikin.Layout
@@ -302,7 +302,7 @@ module ArgTemplates =
             member this.GetArg env strm = failwith "TemplateValue has no argument value"
 
     /// ArrayND argument template
-    type ArrayNDArgTmpl (manikin: ArrayNDManikinT) = 
+    type ArrayNDArgTmpl (manikin: TensorManikin) = 
         // TShape is ShapeStaicXD and TStride is StrideStaticXD.
         member this.Manikin = manikin
         interface ICudaArgTmpl with
@@ -315,13 +315,13 @@ module ArgTemplates =
 
     /// ArrayND argument with null data pointer template
     type ArrayNDNullArgTmpl (typ: TypeNameT, shape: NShapeSpecT) = 
-        let manikin = ArrayNDManikin.newZero typ shape
+        let manikin = TensorManikin.newZero typ shape
         member this.Manikin = manikin
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.CPPType
             member this.GetArg env strm = ArrayNDSSArg (nativeint 0) |> box
 
-    type ArrayNDSDArgTmpl (manikin: ArrayNDManikinT) =
+    type ArrayNDSDArgTmpl (manikin: TensorManikin) =
         // TShape is ShapeStaicXD and TStride is StrideDynamicXD.
         interface ICudaArgTmpl with
             member this.CPPTypeName = manikin.DynamicCPPType
@@ -329,7 +329,7 @@ module ArgTemplates =
                 // currently this cannot be passed as an argument
                 failwith "passing ArrayNDSDArg is not implemented"
 
-    type IdxTPtrFromArrayNDIdxTmpl (manikinOpt: ArrayNDManikinT option) = 
+    type IdxTPtrFromArrayNDIdxTmpl (manikinOpt: TensorManikin option) = 
         do 
             match manikinOpt with
             | Some manikin ->
@@ -386,7 +386,7 @@ module ArgTemplates =
             member this.GetArg env strm = box strm
 
     /// device memory range over the elements of a contiguous ArrayND
-    type ArrayNDDevMemRngTmpl (manikin: ArrayNDManikinT) =
+    type ArrayNDDevMemRngTmpl (manikin: TensorManikin) =
         do 
             if not (TensorLayout.isRowMajor manikin.Layout) then 
                 failwith "manikin for MemRng is not contiguous"
@@ -394,29 +394,29 @@ module ArgTemplates =
             member this.GetRng env =
                 let mem, offset = CudaExecEnv.getDevMemForManikin env manikin
                 {DeviceMem = mem
-                 OffsetInBytes = offset + ArrayNDManikin.offsetInBytes manikin
-                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin}
+                 OffsetInBytes = offset + TensorManikin.offsetInBytes manikin
+                 LengthInBytes = TensorManikin.sizeInBytes manikin}
     
     /// registered host memory range over the elements of a contiguous ArrayND    
-    type ArrayNDHostRegMemRngTmpl (manikin: ArrayNDManikinT) =
+    type ArrayNDHostRegMemRngTmpl (manikin: TensorManikin) =
         do 
             if not (TensorLayout.isRowMajor manikin.Layout) then 
                 failwith "manikin for MemRng is not contiguous"
         interface IHostMemRngTmpl with
             member this.GetRng env =
                 {HostMem = CudaExecEnv.getHostRegMemForManikin env manikin;
-                 OffsetInBytes = ArrayNDManikin.offsetInBytes manikin;
-                 LengthInBytes = ArrayNDManikin.sizeInBytes manikin;}      
+                 OffsetInBytes = TensorManikin.offsetInBytes manikin;
+                 LengthInBytes = TensorManikin.sizeInBytes manikin;}      
 
     /// checks that the specified manikin is usable with BLAS
-    let checkBlasManikin isBatch (manikin: ArrayNDManikinT) =
+    let checkBlasManikin isBatch (manikin: TensorManikin) =
         let nDims = manikin.NDims
         match isBatch with
         | true when nDims < 2 -> failwith "Batched ArrayND for BLAS requires 2 or more dimensions"
         | false when nDims <> 2 -> failwith "ArrayND for use with BLAS must be 2-dimensional" 
         | _ -> ()
 
-        if not ((manikin |> ArrayNDManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
+        if not ((manikin |> TensorManikin.typeName |> TypeName.getType).Equals(typeof<single>)) then
             failwith "CUBLAS currently requires single values"
 
         let stride, shape = manikin.Layout.Stride, manikin.Layout.Shape
@@ -432,7 +432,7 @@ module ArgTemplates =
         | _ , _-> ()
 
     /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "float *"
-    type BlasTransposedMatrixTmpl (manikin: ArrayNDManikinT) =
+    type BlasTransposedMatrixTmpl (manikin: TensorManikin) =
         // All CUBLAS calls use Fortran matrices. This means:
         // - one-based indexing
         // - column major
@@ -471,7 +471,7 @@ module ArgTemplates =
 
         member this.GetVar env =
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin
-            let offset = memOffset + ArrayNDManikin.offsetInBytes manikin
+            let offset = memOffset + TensorManikin.offsetInBytes manikin
             new CudaDeviceVariable<single>(devVar.DevicePointer + SizeT offset, 
                                            devVar.SizeInBytes - SizeT offset)
 
@@ -481,7 +481,7 @@ module ArgTemplates =
 
     /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "(float *)[]".
     /// All but the last two dimensions are exposed as batches.
-    type BlasTransposedMatrixBatchTmpl (manikin:         ArrayNDManikinT, 
+    type BlasTransposedMatrixBatchTmpl (manikin:         TensorManikin, 
                                         ptrAryDevMem:    MemManikinT,
                                         ptrAryHostMem:   MemManikinT) =
 
@@ -493,7 +493,7 @@ module ArgTemplates =
 
         do checkBlasManikin true manikin   
             
-        new (manikin: ArrayNDManikinT, memAllocator: MemAllocatorT) =
+        new (manikin: TensorManikin, memAllocator: MemAllocatorT) =
             let nSmpls = manikin.Shape.[0 .. manikin.NDims-3] |> List.fold (*) 1L      
             let ptrAryDevMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocDev
             let ptrAryHostMem = memAllocator TypeName.ofType<CUdeviceptr> nSmpls MemAllocRegHost
@@ -522,7 +522,7 @@ module ArgTemplates =
         member this.GetPointerArrayValues env = 
             let devVar, memOffset = CudaExecEnv.getDevMemForManikin env manikin                
             [| for idx in TensorLayout.allIdxOfShape batchShp do
-                let offset = memOffset + ArrayNDManikin.addrInBytes (idx @ [0L; 0L]) manikin
+                let offset = memOffset + TensorManikin.addrInBytes (idx @ [0L; 0L]) manikin
                 yield devVar.DevicePointer + BasicTypes.SizeT(offset) |]
 
         member this.PointerArrayCacheKey env =
@@ -587,7 +587,7 @@ module ArgTemplates =
         new (nonFiniteCountPtr, name) = 
             {NonFiniteCountPtr=nonFiniteCountPtr; Name=name}
 
-    type CheckFiniteIEOpArgTmpl<'T> (nonFiniteCount: ArrayNDManikinT,
+    type CheckFiniteIEOpArgTmpl<'T> (nonFiniteCount: TensorManikin,
                                      name:           string) =
 
         interface ICudaArgTmpl with

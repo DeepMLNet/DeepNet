@@ -17,4 +17,9 @@
 - no modifications required in Vars.fs
 - no modifications required in ElemExpr.fs
 - ElemExprHostEval should be renamed into ElemExprInterpreter to indicate that its purpose
-  is interpreting ElemExprs
+  is interpreting ElemExprs => Done
+- Interpolator.fs can stay as-is for now
+- no modifications required in Expr.fs
+
+
+ - What can be used as a TensorDevice?

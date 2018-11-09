@@ -105,8 +105,8 @@ module NPYFile =
 
         // create layout
         let layout =
-            if fortranOrder then TensorLayout.newF shp
-            else TensorLayout.newC shp
+            if fortranOrder then TensorLayout.newColumnMajor shp
+            else TensorLayout.newRowMajor shp
         let nElems = TensorLayout.nElems layout
 
         // read data

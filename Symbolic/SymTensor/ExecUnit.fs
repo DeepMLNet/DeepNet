@@ -481,7 +481,7 @@ module ExecUnit =
                 eusByReadVar.[vs].Add eu.Id |> ignore
             | _ -> ()            
             for m in eu.Manikins do
-                let mem = ArrayNDManikin.storage m
+                let mem = TensorManikin.storage m
                 if not (eusByAccessMem.ContainsKey mem) then
                     eusByAccessMem.[mem] <- HashSet<ExecUnitIdT> ()
                 eusByAccessMem.[mem].Add eu.Id |> ignore

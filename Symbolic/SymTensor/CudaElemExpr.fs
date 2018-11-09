@@ -236,7 +236,7 @@ module CudaElemExpr =
     /// Returns a map from dimension to the number of stride one reads/writes that would occur
     /// if this dimension was the X work dimension of the CUDA kernel calculating the elements
     /// expression.
-    let strideStats (trgt: ArrayNDManikinT) (srcs: ArrayNDManikinT list) 
+    let strideStats (trgt: TensorManikin) (srcs: TensorManikin list) 
                     {Expr=expr; NDims=nTrgtDims; NArgs=nArgs} =
         
         let rec srcStats expr =

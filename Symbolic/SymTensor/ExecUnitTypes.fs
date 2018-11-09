@@ -16,13 +16,13 @@ module ExecUnitsTypes =
     type ChannelIdT = string
 
     /// manikins representing the data in each channel
-    type ChannelManikinsT = Map<ChannelIdT, ArrayNDManikinT>
+    type ChannelManikinsT = Map<ChannelIdT, TensorManikin>
 
     /// manikins representing the data in each channel and flag if it is shared
-    type ChannelManikinsAndSharedT = Map<ChannelIdT, ArrayNDManikinT * bool>
+    type ChannelManikinsAndSharedT = Map<ChannelIdT, TensorManikin * bool>
 
     /// requests for manikins representing the data in each channel
-    type ChannelReqsT = Map<ChannelIdT, ArrayNDManikinT option>
+    type ChannelReqsT = Map<ChannelIdT, TensorManikin option>
 
     /// a command to be executed
     type IExecItem =
@@ -37,9 +37,9 @@ module ExecUnitsTypes =
         DependsOn:    ExecUnitIdT list
         Items:        IExecItem list
         Expr:         UExprT
-        Manikins:     ArrayNDManikinT list
+        Manikins:     TensorManikin list
         Channels:     ChannelManikinsAndSharedT 
-        Srcs:         ArrayNDManikinT list        
+        Srcs:         TensorManikin list        
         ExtraMem:     MemManikinT list
         RerunAfter:   ExecUnitIdT list
     }

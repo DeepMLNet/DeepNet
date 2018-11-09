@@ -486,7 +486,7 @@ module CudaRecipe =
                     let stride = 
                         match resInfo.Stride with
                         | Some stride -> stride
-                        | None -> TensorLayout.cStride vs.NShape
+                        | None -> TensorLayout.rowMajorStride vs.NShape
                     let locs = locs |> Map.add vs compileEnv.ResultLoc                    
                     let strides = strides |> Map.add vs stride
                     locs, strides                                

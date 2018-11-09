@@ -123,7 +123,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                 fi.VarSpec.Shape 
                 |> SymSizeEnv.substShape model.CompileEnv.SymSizes
                 |> ShapeSpec.tryEval
-            let stride = Option.map TensorLayout.cStride shp
+            let stride = Option.map TensorLayout.rowMajorStride shp
             match fi.ValueType with
             | Scalar baseType | Array baseType ->
                 Generic.callGeneric<VarRecordHelpers, unit> "PublishLocStride" [typeof<'T>] (fi.Expr, loc, stride, model)

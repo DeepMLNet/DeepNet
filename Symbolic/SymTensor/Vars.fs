@@ -188,21 +188,28 @@ module ConstSpec =
 /// variable specification types
 module VarSpecTypes =
 
-    /// variable specification: has a name, type and shape specificaiton
+    /// Variable (a value that is passed in at runtime) specification.
     [<StructuredFormatDisplay("{Pretty}")>]
     type VarSpecT = {
+        /// variable name
         Name:      string
+        /// symbolic shape
         Shape:     ShapeSpecT
+        /// data type
         TypeName:  TypeNameT
     } with
+        /// data type
         member this.Type = TypeName.getType this.TypeName
+        /// pretty string representation
         member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
+        /// numeric shape
         member this.NShape = this.Shape |> ShapeSpec.eval
         
 
-/// variable specification
+/// Variable (a value that is passed in at runtime) specification.
 module VarSpec =
 
+    /// Creates a variable specification using the specified name, type and symbolic shape.
     let create name typ shape : VarSpecT =
         {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
 

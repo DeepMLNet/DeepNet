@@ -103,12 +103,12 @@ module TensorLayout =
             | [] -> []
         build 1L order |> List.permute (fun i -> order.[i])
 
-    /// computes the stride given the shape for the ArrayND to be in C-order (row-major)
-    let cStride (shape: int64 list) =
+    /// computes the stride given the shape for the Tensor to be in C-order (row-major)
+    let rowMajorStride (shape: int64 list) =
         orderedStride shape (List.rev [0 .. shape.Length-1])
 
-    /// computes the stride given the shape for the ArrayND to be in Fortran-order (column-major)
-    let fStride (shape: int64 list) =
+    /// computes the stride given the shape for the Tensor to be in Fortran-order (column-major)
+    let columnMajorStride (shape: int64 list) =
         orderedStride shape [0 .. shape.Length-1]
 
     /// a ArrayND layout of the given shape and stride order
@@ -116,12 +116,12 @@ module TensorLayout =
         {Shape=shp; Stride=orderedStride shp strideOrder; Offset=0L}
 
     /// a C-order (row-major) ArrayND layout of the given shape 
-    let newC shp =
-        {Shape=shp; Stride=cStride shp; Offset=0L}
+    let newRowMajor shp =
+        {Shape=shp; Stride=rowMajorStride shp; Offset=0L}
 
     /// a Fortran-order (column-major) ArrayND layout of the given shape 
-    let newF shp =
-        {Shape=shp; Stride=fStride shp; Offset=0L}
+    let newColumnMajor shp =
+        {Shape=shp; Stride=columnMajorStride shp; Offset=0L}
 
     /// an ArrayND layout for an empty (zero elements) vector (1D)
     let emptyVector =
@@ -134,11 +134,11 @@ module TensorLayout =
 
     /// true if the layout is in row-major (C) order
     let isRowMajor a = 
-        stridesEqual a.Shape (stride a) (cStride a.Shape)
+        stridesEqual a.Shape (stride a) (rowMajorStride a.Shape)
 
     /// true if the layout is in column-major (Fortan) order
     let isColumnMajor a = 
-        stridesEqual a.Shape (stride a) (fStride a.Shape)
+        stridesEqual a.Shape (stride a) (columnMajorStride a.Shape)
 
     /// true if the layout represents a contiguous memory block
     let hasContiguousMemory a =
@@ -317,7 +317,7 @@ module TensorLayout =
             | _ -> None
 
         match tfStride [] shp a.Stride a.Shape with
-        | _ when isRowMajor a -> Some {a with Shape=shp; Stride=cStride shp}
+        | _ when isRowMajor a -> Some {a with Shape=shp; Stride=rowMajorStride shp}
         | Some newStr -> 
             //printfn "Using stride transform to reshape from\n%A\nto\n%A\n" a {a with Shape=shp; Stride=newStr}
             Some {a with Shape=shp; Stride=newStr}
@@ -463,12 +463,12 @@ module TensorLayout =
     /// Linear indexing is performed in row-major order.
     let idxToLinear a idx =
         checkIndex a.Shape idx
-        List.map2 (*) idx (cStride a.Shape) |> List.sum
+        List.map2 (*) idx (rowMajorStride a.Shape) |> List.sum
 
     /// Computes the index of a given linear index.
     let linearToIdx a linear = 
         let idx =
-            (linear, cStride a.Shape) 
+            (linear, rowMajorStride a.Shape) 
             |> List.unfold (fun (l, str) ->
                 match str with
                 | s::rs -> Some (l / s, (l % s, rs))
