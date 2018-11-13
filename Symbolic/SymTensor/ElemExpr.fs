@@ -162,7 +162,7 @@ module ElemExpr =
 
     /// index size of given dimension of the result
     let idx dim =
-        Base (Sym (idxSymbol dim)) 
+        Base (BaseSize.Sym (idxSymbol dim)) 
 
     /// tuple of 1 index symbol
     let idx1 = idx 0
@@ -186,12 +186,12 @@ module ElemExpr =
 
     /// summation index size of given name
     let sumIdx name =
-        Base (Sym (sumSymbol name))
+        Base (BaseSize.Sym (sumSymbol name))
 
     /// sum exprover given index (created by sumIdx) from first to last
     let sum idx first last expr =
         match idx with
-        | Base (Sym (sumSym)) ->
+        | Base (BaseSize.Sym (sumSym)) ->
             Unary (Sum (sumSym, first, last), expr) |> check
         | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
 

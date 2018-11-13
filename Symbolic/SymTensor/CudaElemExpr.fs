@@ -45,8 +45,8 @@ module CudaElemExpr =
         | Some v -> sprintf "%dLL" v
         | None ->
             match SizeSpec.simplify ss with 
-            | Base (Fixed c) -> sprintf "%dLL" c.IntValue
-            | Base (Sym sym) -> sizeSymVars.[sym]
+            | Base (BaseSize.Fixed c) -> sprintf "%dLL" c.IntValue
+            | Base (BaseSize.Sym sym) -> sizeSymVars.[sym]
             | Broadcast -> "1LL"
             | Multinom m ->
                 m.Products

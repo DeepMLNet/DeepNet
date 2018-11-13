@@ -36,7 +36,7 @@ module SymSizeEnv =
 
     /// adds inferred symbol value
     let add sym value env =
-        if subst env value = Base (Sym sym) then
+        if subst env value = Base (BaseSize.Sym sym) then
             failwithf "inferrering %A = %A would introduce a loop" sym value
 
         match Map.tryFind sym env with

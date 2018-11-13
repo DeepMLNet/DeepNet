@@ -57,7 +57,7 @@ module ElemExprDeriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
-            | Sum (sym, first, last) -> eg |> kroneckerRng (Base (Sym sym)) first last |> rds a
+            | Sum (sym, first, last) -> eg |> kroneckerRng (Base (BaseSize.Sym sym)) first last |> rds a
             | KroneckerRng (sym, first, last) -> eg |> kroneckerRng sym first last |> rds a                
 
         | Binary (op, a, b) ->
@@ -125,10 +125,10 @@ module ElemExprDeriv =
                         let egIdxSyms = 
                             egIdxDimInfo 
                             |> List.map (function
-                                         | SummingDim (sym, _, _, _) -> Base (Sym sym)
+                                         | SummingDim (sym, _, _, _) -> Base (BaseSize.Sym sym)
                                          | FixedDim (ss, _) -> ss)
                         let funcDimSym = SizeSymbol.ofName "F"
-                        let egIdxSyms = (Base (Sym funcDimSym)) :: egIdxSyms
+                        let egIdxSyms = (Base (BaseSize.Sym funcDimSym)) :: egIdxSyms
 
                         // sum over dimensions for which it is necessary
                         let argExprSumed = 
@@ -138,7 +138,7 @@ module ElemExprDeriv =
                                 | SummingDim (sym, first, last, oldSym) ->
                                     let substSum = 
                                         derivSumSoFar 
-                                        |> ElemExpr.substSymSizes (Map [oldSym, Base (Sym sym)]) 
+                                        |> ElemExpr.substSymSizes (Map [oldSym, Base (BaseSize.Sym sym)]) 
                                     Unary (Sum (sym, first, last), substSum) 
                                 | FixedDim (ss, oldSym) -> 
                                     derivSumSoFar
@@ -148,7 +148,7 @@ module ElemExprDeriv =
                         let argExpr =
                             (argExprSumed, sol.RightValues)
                             ||> Map.fold (fun kroneckersSoFar idxSym reqVal ->
-                                ElemExpr.ifThenElse (Base (Sym idxSym)) reqVal kroneckersSoFar zero)
+                                ElemExpr.ifThenElse (Base (BaseSize.Sym idxSym)) reqVal kroneckersSoFar zero)
 
                         // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
                         let resSyms = [for d=1 to nArgDims do yield idx d]

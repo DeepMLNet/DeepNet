@@ -299,15 +299,15 @@ module ModelContextTypes =
         /// sets a symbolic size to a numeric value
         member this.SetSize size value =
             match size with
-            | Base (Sym sym) -> symSizeEnv <- SymSizeEnv.add sym (SizeSpec.fix value) symSizeEnv
+            | Base (BaseSize.Sym sym) -> symSizeEnv <- SymSizeEnv.add sym (SizeSpec.fix value) symSizeEnv
             | _ -> failwith "need a size symbol to set size"
 
         /// gets the numeric value of a previously set symbolic size
         member this.GetSize size =
             match size with
-            | Base (Sym sym) -> 
+            | Base (BaseSize.Sym sym) -> 
                 match symSizeEnv |> Map.tryFind sym with
-                | Some (Base (Fixed _) as value) -> SizeSpec.eval value
+                | Some (Base (BaseSize.Fixed _) as value) -> SizeSpec.eval value
                 | _ -> failwith "size symbol is unknown or does not a have a numeric value"
             | _ -> failwith "need a size symbol to set size"
 
