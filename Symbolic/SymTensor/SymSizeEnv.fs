@@ -2,11 +2,10 @@
 
 open DeepNet.Utils
 
-[<AutoOpen>]
-module SymSizeEnvTypes =
-    type SymSizeEnvT = Map<SizeSymbol, SizeSpec>
+/// Environment for resolving symbolic sizes.
+type SymSizeEnv = Map<SizeSymbol, SizeSpec>
 
-
+/// Functions for working with SymSizeEnv.
 module SymSizeEnv =
 
     /// empty size symbol environment    
@@ -52,7 +51,4 @@ module SymSizeEnv =
     /// merges two environments
     let merge aEnv bEnv =
         Seq.fold (fun mEnv (a, b) -> add a b mEnv) aEnv (bEnv |> Map.toSeq)
-
-
-    
 

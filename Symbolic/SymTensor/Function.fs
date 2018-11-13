@@ -63,7 +63,7 @@ module VarEnv =
         Map.join a b
 
     /// infers symbol sizes from the variable environment
-    let inferSymSizes (symSizeEnv: SymSizeEnvT) (varEnv: VarEnvT) : SymSizeEnvT =
+    let inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnvT) : SymSizeEnv =
         (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
                 if VarSpec.nDims vSym <> ITensor.nDims vVal then
@@ -143,7 +143,7 @@ module EnvTypes =
 
     /// Information necessary to compile an expression.
     type CompileEnvT = {
-        SymSizes:           SymSizeEnvT
+        SymSizes:           SymSizeEnv
         VarLocs:            VarLocsT
         VarStrides:         VarStridesT
         ChannelStrides:     ChannelStridesT
@@ -222,8 +222,8 @@ module CompileEnv =
 module Func =
 
     type private UExprGenT = {
-        Generate:               SymSizeEnvT -> ExprT
-        UVarSpecsAndEvalable:   bool -> SymSizeEnvT -> Set<VarSpecT> * bool       
+        Generate:               SymSizeEnv -> ExprT
+        UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<VarSpecT> * bool       
     }
 
     let private exprGenerate baseExpr symSizes =

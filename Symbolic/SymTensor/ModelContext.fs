@@ -127,7 +127,7 @@ module ModelContextTypes =
     /// Actual values for variables in a ParameterSet.
     type ParameterStorageT<'T when 'T: equality and 'T: comparison> 
             (parameterSet:    ParameterSetT<'T>,
-             symSizes:        SymSizeEnvT,
+             symSizes:        SymSizeEnv,
              device:          IDevice) =
 
         let evalSize = SymSizeEnv.subst symSizes >> SizeSpec.eval

@@ -295,7 +295,7 @@ module Expr =
         /// Should return the op with all symbolic sizes substituted using the specified
         /// substitution table.
         /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-        abstract SubstSymSizes: symSizes: SymSizeEnvT -> IOp
+        abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
 
         /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
         /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
