@@ -3,7 +3,21 @@
 open DeepNet.Utils
 
 
-module Utils =
+/// A symbolic size.
+[<StructuredFormatDisplay ("\"{Name}\"")>]
+type SizeSymbol = {
+    /// identifier
+    Name:       string
+} with
+    /// identifier
+    static member name sym = sym.Name
+
+    /// creates a symbolic size with the specified name
+    static member ofName name = { Name=name }
+
+
+/// Internal types to represent fractions.
+module FracInternals =
 
     /// greatest common divisor of a and b 
     let rec gcd a b =
@@ -23,20 +37,8 @@ module Utils =
     let lcm a b =
         abs (a * b) / gcd a b
 
-
-[<AutoOpen>]
-module SizeSymbolTypes =
-    open Utils
-
-    /// a symbolic size
-    [<StructuredFormatDisplay ("\"{Name}\"")>]
-    type SizeSymbol = {
-        Name:       string;
-    }
-
-    [<StructuredFormatDisplay("{Pretty}")>]
-    [<Struct>]
-    /// a rational number
+    /// A rational number.
+    [<Struct; StructuredFormatDisplay("{Pretty}")>]
     type Frac = 
         val Nom: int64
         val Dnm: int64
@@ -83,72 +85,59 @@ module SizeSymbolTypes =
             if this.Dnm = 1L then sprintf "%d" this.Nom
             else sprintf "(%d/%d)" this.Nom this.Dnm
 
-    /// elementary size specification, can be either a symbol or a fixed quantity
-    [<StructuredFormatDisplay ("{Pretty}")>]
-    type BaseSize =
-        | Sym of SizeSymbol
-        | Fixed of Frac
+        static member nom (frac: Frac) = frac.Nom
+        static member dnm (frac: Frac) = frac.Dnm
+        static member ofInt i = Frac (i)
+        static member toInt (frac: Frac) = frac.IntValue
+        static member zero = Frac (0L)
+        static member one = Frac (1L)
 
-        member this.Pretty =
-            match this with
-            | Sym s -> sprintf "%A" s
-            | Fixed f -> sprintf "%A" f
-
-
-module SizeSymbol =
-    let name sym =
-        sym.Name
-
-    let ofName name =
-        {Name=name}
-
-
-module Frac =
-    let nom (frac: Frac) =
-        frac.Nom
-
-    let dnm (frac: Frac) =
-        frac.Dnm
-
-    let ofInt i =
-        Frac (i)
-
-    let toInt (frac: Frac) =
-        frac.IntValue
-
-    let zero =
-        Frac (0L)
-
-    let one =
-        Frac (1L)
-
-    let (|Zero|_|) frac =
-        if frac = zero then Some ()
-        else None
-
-    let (|One|_|) frac =
-        if frac = one then Some ()
-        else None
-
-    let (|Integral|_|) (frac: Frac) =
-        if frac.Dnm = 1L then Some frac.Nom
-        else None
-
-    let roundTowardZero (f: Frac) =
-        Frac (f.Nom / f.Dnm)
-
-    let roundAwayFromZero (f: Frac) =
-        if f.Nom % f.Dnm = 0L then
+        static member roundTowardZero (f: Frac) = 
             Frac (f.Nom / f.Dnm)
-        elif f.Nom > 0L then
-            Frac (f.Nom / f.Dnm + 1L)
-        else
-            Frac (f.Nom / f.Dnm - 1L)
+        static member roundAwayFromZero (f: Frac) =
+            if f.Nom % f.Dnm = 0L then
+                Frac (f.Nom / f.Dnm)
+            elif f.Nom > 0L then
+                Frac (f.Nom / f.Dnm + 1L)
+            else
+                Frac (f.Nom / f.Dnm - 1L)
 
-//[<AutoOpen>]
-module SizeProductTypes = 
-      
-    /// product of elementary size specifications
+    /// Active patterns for Frac.
+    module Frac =
+        let (|Zero|_|) frac =
+            if frac = zero then Some ()
+            else None
+
+        let (|One|_|) frac =
+            if frac = one then Some ()
+            else None
+
+        let (|Integral|_|) (frac: Frac) =
+            if frac.Dnm = 1L then Some frac.Nom
+            else None
+
+            
+open FracInternals
+
+/// Elementary size specification
+/// Can be either a symbol or a fixed quantity.
+[<StructuredFormatDisplay ("{Pretty}")>]
+type BaseSize =
+    /// symbolic size
+    | Sym of SizeSymbol
+    /// numeric size
+    | Fixed of Frac
+
+    /// pretty string
+    member this.Pretty =
+        match this with
+        | Sym s -> sprintf "%A" s
+        | Fixed f -> sprintf "%A" f
+
+/// Internal types to represent symbolic sizes.
+module SymShapeInternals =     
+
+    /// Product of elementary size specifications.
     [<StructuredFormatDisplay("{Pretty}")>]
     type SizeProduct(symbols: Map<SizeSymbol, int64>) =
         let symbols = symbols |> Map.filter (fun _ sPower -> sPower <> 0L)
@@ -196,37 +185,32 @@ module SizeProductTypes =
                 | :? SizeProduct as other -> compare this.Symbols other.Symbols
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
+        /// true if product is empty (equal to 1)
+        static member isEmpty (p: SizeProduct) =
+            Map.isEmpty p.Symbols
 
-module SizeProduct =
-    open SizeProductTypes
+        /// empty product (equal to 1)
+        static member empty =
+            SizeProduct()
 
-    /// true if product is empty (equal to 1)
-    let isEmpty (p: SizeProduct) =
-        Map.isEmpty p.Symbols
+    /// Active patterns for SizeProduct.
+    module SizeProduct =
 
-    /// empty product (equal to 1)
-    let empty =
-        SizeProduct()
+        /// matches if product consists of a single symbol with power 1
+        let (|SingleSymbol|_|) (sp: SizeProduct) =
+            let mc = Map.toList sp.Symbols
+            match List.length mc with
+            | 1 -> 
+                let bs, power = mc.[0]
+                if power = 1L then Some bs else None
+            | _ -> None
 
-    /// matches if product consists of a single symbol with power 1
-    let (|SingleSymbol|_|) (sp: SizeProduct) =
-        let mc = Map.toList sp.Symbols
-        match List.length mc with
-        | 1 -> 
-            let bs, power = mc.[0]
-            if power = 1L then Some bs else None
-        | _ -> None
-
-    /// matches if product is empty (equal to 1)
-    let (|Empty|_|) (sp: SizeProduct) =
-        if isEmpty sp then Some () else None
+        /// matches if product is empty (equal to 1)
+        let (|Empty|_|) (sp: SizeProduct) =
+            if SizeProduct.isEmpty sp then Some () else None
 
 
-//[<AutoOpen>]
-module SizeMultinomTypes =
-    open SizeProductTypes
-
-    // symbolic multinomial
+    /// Symbolic multinomial.
     [<StructuredFormatDisplay("{Pretty}")>]
     type SizeMultinom (products: Map<SizeProduct, Frac>) =
         let products = products |> Map.filter (fun _ fac -> fac .<> Frac.zero)
@@ -299,174 +283,162 @@ module SizeMultinomTypes =
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 
-[<AutoOpen>]
-module SizeSpecTypes =
-    open SizeMultinomTypes
+open SymShapeInternals
 
-    /// symbolic size specification of a dimension (axis)
-    [<StructuredFormatDisplay ("{Pretty}")>]
-    [<StructuralEquality; StructuralComparison>]
-    type SizeSpec =
-        | Base of BaseSize               // fixed size or symbol
-        | Broadcast                       // size 1 and broadcastable
-        | Multinom of SizeMultinom       // product of fixed sizes and symbols
-
-        /// simplify size specification
-        static member Simplify (ss: SizeSpec) =
-            match ss with
-            | Multinom m -> 
-                match m.Products |> Map.toList with
-                | [SizeProduct.SingleSymbol s, Frac.One] -> Base (Sym s)
-                | [SizeProduct.Empty, f] -> Base (Fixed f)
-                | [] -> Base (Fixed Frac.zero)
-                | _ -> ss
-            | _ -> ss
-
-        static member get_Zero () = Base (Fixed Frac.zero)
-
-        static member (~-) (ssa: SizeSpec) =
-            match ssa with
-            | Base (Fixed Frac.Zero) -> ssa
-            | Base b -> Multinom (-SizeMultinom(b))
-            | Broadcast -> Multinom (-SizeMultinom(Fixed Frac.one))
-            | Multinom m -> Multinom (-m)
-            |> SizeSpec.Simplify
-
-        static member (+) (ssa: SizeSpec, ssb: SizeSpec) =
-            match ssa, ssb with
-            | Base (Fixed Frac.Zero), ss | ss, Base (Fixed Frac.Zero) -> ss
-            | Broadcast, ss | ss, Broadcast -> ss + (Base (Fixed Frac.one))
-            | Multinom ma, Multinom mb -> Multinom (ma + mb)
-            | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinom(b))
-            | Base ba, Base bb -> Multinom (SizeMultinom(ba) + SizeMultinom(bb))
-            |> SizeSpec.Simplify
-
-        static member (-) (ssa: SizeSpec, ssb: SizeSpec) =
-            ssa + (-ssb)
-
-        static member (*) (ssa: SizeSpec, ssb: SizeSpec) =
-            match ssa, ssb with
-            | Base (Fixed Frac.Zero), _ | _, Base (Fixed Frac.Zero) -> Base (Fixed Frac.zero)
-            | Broadcast, ss | ss, Broadcast -> ss
-            | Multinom ma, Multinom mb -> Multinom (ma * mb)
-            | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinom(b))
-            | Base ba, Base bb -> Multinom (SizeMultinom(ba) * SizeMultinom(bb))
-            |> SizeSpec.Simplify
-
-        static member Pow (ssa: SizeSpec, pow: int64) =
-            match pow with
-            | 0L -> Base (Fixed Frac.one)
-            | 1L -> ssa
-            | _ ->
-                match ssa with
-                | Base (Fixed f) -> Base (Fixed (pown f (int32 pow)))
-                | Base (Sym s) -> Multinom (SizeMultinom (Sym s, pow))
-                | Broadcast -> Broadcast
-                | Multinom m ->
-                    m
-                    |> Seq.replicate (int32 pow)
-                    |> Seq.reduce (*)
-                    |> Multinom
-            |> SizeSpec.Simplify
-
-        // operations with FracT
-        static member (+) (ssa: SizeSpec, ssb: Frac) = ssa + (Base (Fixed ssb))
-        static member (+) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) + ssb
-        static member (-) (ssa: SizeSpec, ssb: Frac) = ssa - (Base (Fixed ssb))
-        static member (-) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) - ssb
-        static member (*) (ssa: SizeSpec, ssb: Frac) = ssa * (Base (Fixed ssb))
-        static member (*) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) * ssb
-
-        // operations with int
-        static member (+) (ssa: SizeSpec, ssb: int64) = ssa + Frac ssb
-        static member (+) (ssa: int64, ssb: SizeSpec) = Frac ssa + ssb
-        static member (-) (ssa: SizeSpec, ssb: int64) = ssa - Frac ssb
-        static member (-) (ssa: int64, ssb: SizeSpec) = Frac ssa - ssb
-        static member (*) (ssa: SizeSpec, ssb: int64) = ssa * Frac ssb
-        static member (*) (ssa: int64, ssb: SizeSpec) = Frac ssa * ssb
-
-        /// equal size with broadcastability
-        static member (%=) (ssa: SizeSpec, ssb: SizeSpec) = 
-            SizeSpec.Simplify ssa = SizeSpec.Simplify ssb 
-
-        /// equal size ignoring broadcastability
-        static member (.=) (ssa: SizeSpec, ssb: SizeSpec) = 
-            match SizeSpec.Simplify ssa, SizeSpec.Simplify ssb with
-            | Broadcast, Base (Fixed Frac.One) | Base (Fixed Frac.One), Broadcast -> true
-            | a, b -> a = b
-
-        /// unequal size ignoring broadcastability
-        static member (.<>) (ssa: SizeSpec, ssb: SizeSpec) = not (ssa .= ssb)
-
-        /// the set of all contained SizeSymbols
-        member this.ContainedSizeSymbols =
-            match this with
-            | Base (Sym s)   -> Set [s]
-            | Base (Fixed _) -> Set.empty
-            | Broadcast      -> Set.empty
-            | Multinom m     -> m.ContainedSizeSymbols
-            
-        /// true if the specified SizeSymbol occurs in this SizeSpec
-        member this.ContainsSymbol sym =
-            this.ContainedSizeSymbols.Contains sym
-
-        member this.Pretty =
-            match this with
-            | Base b -> sprintf "%A" b
-            | Broadcast -> "1*"
-            | Multinom m -> sprintf "%A" m
-
-
-module SizeSpec =
-    open SizeSymbolTypes
+/// symbolic size specification of a dimension (axis)
+[<StructuredFormatDisplay ("{Pretty}")>]
+[<StructuralEquality; StructuralComparison>]
+type SizeSpec =
+    | Base of BaseSize               // fixed size or symbol
+    | Broadcast                       // size 1 and broadcastable
+    | Multinom of SizeMultinom       // product of fixed sizes and symbols
 
     /// simplify size specification
-    let simplify (ss: SizeSpec) = SizeSpec.Simplify ss
+    static member Simplify (ss: SizeSpec) =
+        match ss with
+        | Multinom m -> 
+            match m.Products |> Map.toList with
+            | [SizeProduct.SingleSymbol s, Frac.One] -> Base (Sym s)
+            | [SizeProduct.Empty, f] -> Base (Fixed f)
+            | [] -> Base (Fixed Frac.zero)
+            | _ -> ss
+        | _ -> ss
+
+    static member get_Zero () = Base (Fixed Frac.zero)
+
+    static member (~-) (ssa: SizeSpec) =
+        match ssa with
+        | Base (Fixed Frac.Zero) -> ssa
+        | Base b -> Multinom (-SizeMultinom(b))
+        | Broadcast -> Multinom (-SizeMultinom(Fixed Frac.one))
+        | Multinom m -> Multinom (-m)
+        |> SizeSpec.Simplify
+
+    static member (+) (ssa: SizeSpec, ssb: SizeSpec) =
+        match ssa, ssb with
+        | Base (Fixed Frac.Zero), ss | ss, Base (Fixed Frac.Zero) -> ss
+        | Broadcast, ss | ss, Broadcast -> ss + (Base (Fixed Frac.one))
+        | Multinom ma, Multinom mb -> Multinom (ma + mb)
+        | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinom(b))
+        | Base ba, Base bb -> Multinom (SizeMultinom(ba) + SizeMultinom(bb))
+        |> SizeSpec.Simplify
+
+    static member (-) (ssa: SizeSpec, ssb: SizeSpec) =
+        ssa + (-ssb)
+
+    static member (*) (ssa: SizeSpec, ssb: SizeSpec) =
+        match ssa, ssb with
+        | Base (Fixed Frac.Zero), _ | _, Base (Fixed Frac.Zero) -> Base (Fixed Frac.zero)
+        | Broadcast, ss | ss, Broadcast -> ss
+        | Multinom ma, Multinom mb -> Multinom (ma * mb)
+        | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinom(b))
+        | Base ba, Base bb -> Multinom (SizeMultinom(ba) * SizeMultinom(bb))
+        |> SizeSpec.Simplify
+
+    static member Pow (ssa: SizeSpec, pow: int64) =
+        match pow with
+        | 0L -> Base (Fixed Frac.one)
+        | 1L -> ssa
+        | _ ->
+            match ssa with
+            | Base (Fixed f) -> Base (Fixed (pown f (int32 pow)))
+            | Base (Sym s) -> Multinom (SizeMultinom (Sym s, pow))
+            | Broadcast -> Broadcast
+            | Multinom m ->
+                m
+                |> Seq.replicate (int32 pow)
+                |> Seq.reduce (*)
+                |> Multinom
+        |> SizeSpec.Simplify
+
+    // operations with FracT
+    static member (+) (ssa: SizeSpec, ssb: Frac) = ssa + (Base (Fixed ssb))
+    static member (+) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) + ssb
+    static member (-) (ssa: SizeSpec, ssb: Frac) = ssa - (Base (Fixed ssb))
+    static member (-) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) - ssb
+    static member (*) (ssa: SizeSpec, ssb: Frac) = ssa * (Base (Fixed ssb))
+    static member (*) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) * ssb
+
+    // operations with int
+    static member (+) (ssa: SizeSpec, ssb: int64) = ssa + Frac ssb
+    static member (+) (ssa: int64, ssb: SizeSpec) = Frac ssa + ssb
+    static member (-) (ssa: SizeSpec, ssb: int64) = ssa - Frac ssb
+    static member (-) (ssa: int64, ssb: SizeSpec) = Frac ssa - ssb
+    static member (*) (ssa: SizeSpec, ssb: int64) = ssa * Frac ssb
+    static member (*) (ssa: int64, ssb: SizeSpec) = Frac ssa * ssb
+
+    /// equal size with broadcastability
+    static member (%=) (ssa: SizeSpec, ssb: SizeSpec) = 
+        SizeSpec.Simplify ssa = SizeSpec.Simplify ssb 
+
+    /// equal size ignoring broadcastability
+    static member (.=) (ssa: SizeSpec, ssb: SizeSpec) = 
+        match SizeSpec.Simplify ssa, SizeSpec.Simplify ssb with
+        | Broadcast, Base (Fixed Frac.One) | Base (Fixed Frac.One), Broadcast -> true
+        | a, b -> a = b
+
+    /// unequal size ignoring broadcastability
+    static member (.<>) (ssa: SizeSpec, ssb: SizeSpec) = not (ssa .= ssb)
+
+    /// the set of all contained SizeSymbols
+    member this.ContainedSizeSymbols =
+        match this with
+        | Base (Sym s)   -> Set [s]
+        | Base (Fixed _) -> Set.empty
+        | Broadcast      -> Set.empty
+        | Multinom m     -> m.ContainedSizeSymbols
+            
+    /// true if the specified SizeSymbol occurs in this SizeSpec
+    member this.ContainsSymbol sym =
+        this.ContainedSizeSymbols.Contains sym
+
+    member this.Pretty =
+        match this with
+        | Base b -> sprintf "%A" b
+        | Broadcast -> "1*"
+        | Multinom m -> sprintf "%A" m
+
+    /// simplify size specification
+    static member simplify (ss: SizeSpec) = SizeSpec.Simplify ss
 
     /// True if both sizes have the same number of elements and 
     /// are both broadcastable or non-broadcastable.
-    let equalWithBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa %= ssb        
+    static member equalWithBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa %= ssb        
 
     /// True if both sizes have the same number of elements.
     /// Broadcastable and non-broadcastable are treated as equal.
-    let equalWithoutBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa .= ssb
+    static member equalWithoutBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa .= ssb
 
     /// size zero
-    let zero =
-        Base (Fixed Frac.zero)
+    static member zero = Base (Fixed Frac.zero)
 
     /// not-broadcastable size one
-    let one =
-        Base (Fixed Frac.one)
+    static member one = Base (Fixed Frac.one)
 
     /// fixed integer size
-    let fix s =
-        Base (Fixed (Frac s))
+    static member fix s = Base (Fixed (Frac s))
 
     /// fixed fractional size
-    let fixFrac nom dnm =
-        Base (Fixed (Frac (nom, dnm)))
+    static member fixFrac nom dnm = Base (Fixed (Frac (nom, dnm)))
 
     /// symbolic size
-    let symbol s =
-        Base (Sym {Name=s})
+    static member symbol s = Base (Sym {Name=s})
 
     /// broadcastable size one
-    let broadcastable =
-        Broadcast
+    static member broadcastable = Broadcast
 
     /// extracts the size symbol
-    let extractSymbol s =
+    static member extractSymbol s =
         match s with
         | Base (Sym sym) -> sym
         | _ -> failwith "specified SizeSpec is not a symbol"
 
     /// substitute the symbols into the SizeSpec and simplifies it
-    let rec substSymbols symVals ss =
+    static member substSymbols symVals ss =
         match ss with
         | Base (Sym sym) ->
             match Map.tryFind sym symVals with
-            | Some sv -> substSymbols symVals sv
+            | Some sv -> SizeSpec.substSymbols symVals sv
             | None -> ss
         | Base (Fixed _) -> ss
         | Broadcast -> ss
@@ -479,54 +451,45 @@ module SizeSpec =
                         (one, prod.Symbols)
                         ||> Map.fold 
                             (fun substProd sBaseSym sPow ->
-                                let sBaseSubst = substSymbols symVals (Base (Sym sBaseSym))
+                                let sBaseSubst = SizeSpec.substSymbols symVals (Base (Sym sBaseSym))
                                 substProd * (sBaseSubst ** sPow))
                     substSum + fac * substProd)
-        |> simplify
+        |> SizeSpec.simplify
             
     /// evaluate symbolic size specification to a number
-    let tryEval ss =
-        match simplify ss with
+    static member tryEval ss =
+        match SizeSpec.simplify ss with
         | Base (Fixed (Frac.Integral i)) -> Some i
         | Broadcast -> Some 1L
         | _ -> None
 
     /// true, if evaluation to numeric shape is possible
-    let canEval ss =
-        match tryEval ss with
+    static member canEval ss =
+        match SizeSpec.tryEval ss with
         | Some _ -> true
         | None -> false
 
     /// evaluate symbolic size specification to a number
-    let eval ss =
-        match tryEval ss with
+    static member eval ss =
+        match SizeSpec.tryEval ss with
         | Some s -> s
         | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
 
     /// returns the set of all contained SizeSymbols
-    let containedSizeSymbols (ss: SizeSpec) =
-        ss.ContainedSizeSymbols
+    static member containedSizeSymbols (ss: SizeSpec) = ss.ContainedSizeSymbols
 
     /// true if the specified SizeSymbol occurs in the SizeSpec
-    let containsSymbol sym (ss: SizeSpec) =
-        ss.ContainsSymbol sym 
+    static member containsSymbol sym (ss: SizeSpec) = ss.ContainsSymbol sym 
+         
 
-            
+/// shape specifcation of a tensor
+type ShapeSpec = SizeSpec list
 
-
-[<AutoOpen>]
-module ShapeSpecTypes =
-
-    /// shape specifcation of a tensor
-    type ShapeSpec = SizeSpec list
-
-    /// evaluated shape specification of a tensor
-    type NShapeSpec = int64 list
-
+/// evaluated shape specification of a tensor
+type NShapeSpec = int64 list
 
 /// shape specification of a tensor
 module ShapeSpec =
-    open SizeSymbolTypes
 
     let insertAxis ax ss (sa: ShapeSpec) : ShapeSpec =
         sa |> List.insert ax ss
@@ -746,53 +709,13 @@ module ShapeSpec =
         }
                 
 
+/// basic range specification for one dimension
+type BaseRangeSpec = SizeSpec * SizeSpec
 
-[<AutoOpen>]
-module RangeSpecTypes =
+/// basic range specification for multiple dimensions
+type BaseRangesSpec = BaseRangeSpec list
 
-    /// basic range specification for one dimension
-    type BaseRangeSpec = SizeSpec * SizeSpec
-    /// basic range specification for multiple dimensions
-    type BaseRangesSpec = BaseRangeSpec list
-
-    /// symbolic/dynamic range specification for one dimension
-    type RangeSpec<'Dyn> = 
-        // ranges with symbolic size (length)
-        | RSSymElem            of SizeSpec                           
-        | RSDynElem            of 'Dyn                                
-        | RSSymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
-        | RSDynStartSymSize    of 'Dyn * SizeSpec                    
-        | RSNewAxis                                                   
-        | RSAllFill                                                   
-        //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
-        //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
-        //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
-        //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
-
-    /// all elements
-    let RSAll = RSSymStartSymEnd (None, None)
-
-    // symbolic/dynamic subtensor specification
-    type RangesSpecT<'Dyn> = RangeSpec<'Dyn> list
-
-    /// simple range specification for one dimension
-    [<StructuredFormatDisplay("{Pretty}")>]
-    type SimpleRangeSpec<'Dyn> =
-        | SRSSymStartSymEnd     of SizeSpec * (SizeSpec option)
-        | SRSDynStartSymSize    of 'Dyn * SizeSpec                    
-        member this.Pretty =
-            match this with
-            | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
-            | SRSSymStartSymEnd (first, None) -> sprintf "%A.." first
-            | SRSDynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
-
-    /// all elements
-    let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
-        
-    /// simple range specification for multiple dimensions
-    type SimpleRangesSpec<'Dyn> = SimpleRangeSpec<'Dyn> list
-
-
+/// Functions for working with BaseRangesSpec.
 module BaseRangesSpec =
 
     /// Try to evalualte a BaseRangesSpecT to a numeric range.
@@ -867,6 +790,40 @@ module BaseRangesSpec =
             shpElems = rngElems
 
 
+/// symbolic/dynamic range specification for one dimension
+type RangeSpec<'Dyn> = 
+    // ranges with symbolic size (length)
+    | RSSymElem            of SizeSpec                           
+    | RSDynElem            of 'Dyn                                
+    | RSSymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
+    | RSDynStartSymSize    of 'Dyn * SizeSpec                    
+    | RSNewAxis                                                   
+    | RSAllFill                                                   
+    //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
+    //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
+    //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
+    //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
+
+    static member RSAll = RSSymStartSymEnd (None, None)
+
+// symbolic/dynamic subtensor specification
+type RangesSpecT<'Dyn> = RangeSpec<'Dyn> list
+
+/// Simple range specification for one dimension.
+[<StructuredFormatDisplay("{Pretty}")>]
+type SimpleRangeSpec<'Dyn> =
+    | SRSSymStartSymEnd     of SizeSpec * (SizeSpec option)
+    | SRSDynStartSymSize    of 'Dyn * SizeSpec                    
+
+    member this.Pretty =
+        match this with
+        | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
+        | SRSSymStartSymEnd (first, None) -> sprintf "%A.." first
+        | SRSDynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
+    
+    static member SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
+     
+/// Function for working with SimpleRangeSpec.
 module SimpleRangeSpec =
     open Tensor
 
@@ -900,6 +857,11 @@ module SimpleRangeSpec =
         | SRSSymStartSymEnd (first, None) -> first, size - 1L
         | _ -> failwithf "cannot convert %A to BaseRangeSpec" rs
 
+
+/// Simple range specification for multiple dimensions.
+type SimpleRangesSpec<'Dyn> = SimpleRangeSpec<'Dyn> list
+
+/// Functions for working with SimpleRangesSpec.
 module SimpleRangesSpec =
 
     /// evaluate a RangesSpecT to a RangeT list
@@ -917,6 +879,21 @@ module SimpleRangesSpec =
 
     let toBaseRangesSpec (shape: ShapeSpec) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
+
+///// U
+//[<AutoOpen>]
+//module RangeSpecTypes =
+//    /// all elements
+//    let RSAll = RSSymStartSymEnd (None, None)
+
+//    // TODO?
+//    /// all elements
+//    //let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
+
+
+
+
+
 
 
 
