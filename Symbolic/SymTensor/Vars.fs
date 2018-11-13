@@ -194,7 +194,7 @@ module VarSpecTypes =
         /// variable name
         Name:      string
         /// symbolic shape
-        Shape:     ShapeSpecT
+        Shape:     ShapeSpec
         /// data type
         TypeName:  TypeNameT
     } with

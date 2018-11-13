@@ -4,7 +4,7 @@ open DeepNet.Utils
 
 [<AutoOpen>]
 module SymSizeEnvTypes =
-    type SymSizeEnvT = Map<SizeSymbolT, SizeSpecT>
+    type SymSizeEnvT = Map<SizeSymbol, SizeSpec>
 
 
 module SymSizeEnv =
@@ -22,11 +22,11 @@ module SymSizeEnv =
         SizeSpec.substSymbols env size
 
     /// substitutes all symbols into the shape and simplifies it
-    let substShape env (shape: ShapeSpecT) : ShapeSpecT =
+    let substShape env (shape: ShapeSpec) : ShapeSpec =
         List.map (subst env) shape
 
     /// substitutes all symbols into the simplified range specification
-    let substRange env (srs: SimpleRangesSpecT<_>) = 
+    let substRange env (srs: SimpleRangesSpec<_>) = 
         srs
         |> List.map (function
                      | SRSSymStartSymEnd (s, fo) -> 

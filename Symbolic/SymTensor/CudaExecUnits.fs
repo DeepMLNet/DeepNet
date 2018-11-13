@@ -19,7 +19,7 @@ open UExprTypes
 module CudaExecUnitTypes =
 
     type LoopChannelManikinInfoT = {
-        Shape:          NShapeSpecT
+        Shape:          NShapeSpec
         SliceDim:       int
         TargetManikin:  TensorManikin
     }

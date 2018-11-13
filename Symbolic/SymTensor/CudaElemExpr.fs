@@ -40,7 +40,7 @@ module CudaElemExpr =
         | _ -> failwithf "unsupported type: %A" tn
 
 
-    let generateSizeSpecCode (sizeSymVars: Map<SizeSymbolT, VarNameT>) (ss: SizeSpecT) =
+    let generateSizeSpecCode (sizeSymVars: Map<SizeSymbol, VarNameT>) (ss: SizeSpec) =
         match SizeSpec.tryEval ss with
         | Some v -> sprintf "%dLL" v
         | None ->
@@ -63,7 +63,7 @@ module CudaElemExpr =
 
 
     let private valueCode op tn (subExprVars: VarNameT list) 
-            (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbolT, VarNameT>)  =
+            (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>)  =
         let ssCode = generateSizeSpecCode sizeSymVars
 
         match op with
@@ -138,7 +138,7 @@ module CudaElemExpr =
             sprintf "s%d" sumIdxCount
 
         let rec genExpr (UElemExpr (op, subExprs, tn) as expr) (exprVars: Map<UElemExprT, VarNameT>) 
-                (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbolT, VarNameT>) (indent: int)
+                (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>) (indent: int)
                 : VarNameT * Map<UElemExprT, VarNameT> * CodeT =
 
             let spc = String.replicate indent " "

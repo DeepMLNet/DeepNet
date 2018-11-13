@@ -53,9 +53,9 @@ module NeuralLayer =
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
-        NInput:             SizeSpecT
+        NInput:             SizeSpec
         /// number of outputs
-        NOutput:            SizeSpecT
+        NOutput:            SizeSpec
         /// transfer (activation) function
         TransferFunc:       ActivationFunc
         /// weights trainable

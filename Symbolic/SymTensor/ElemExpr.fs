@@ -14,11 +14,11 @@ module ElemExpr =
     type ArgT = Arg of pos:int
 
     /// element of an argument
-    type ArgElementSpecT = ArgT * ShapeSpecT
+    type ArgElementSpecT = ArgT * ShapeSpec
     
     type LeafOpT =
         | Const of ConstSpecT
-        | SizeValue of value:SizeSpecT * typ:TypeNameT
+        | SizeValue of value:SizeSpec * typ:TypeNameT
         | ArgElement of argElem:ArgElementSpecT * typ:TypeNameT
 
     and UnaryOpT = 
@@ -42,8 +42,8 @@ module ElemExpr =
         | Floor
         | Round
         | Truncate
-        | Sum of SizeSymbolT * SizeSpecT * SizeSpecT
-        | KroneckerRng of SizeSpecT * SizeSpecT * SizeSpecT
+        | Sum of SizeSymbol * SizeSpec * SizeSpec
+        | KroneckerRng of SizeSpec * SizeSpec * SizeSpec
 
     and BinaryOpT = 
         | Add                           
@@ -52,7 +52,7 @@ module ElemExpr =
         | Divide                        
         | Modulo
         | Power        
-        | IfThenElse of SizeSpecT * SizeSpecT
+        | IfThenElse of SizeSpec * SizeSpec
         
     /// an element expression
     and [<StructuredFormatDisplay("{PrettyString}")>]
@@ -252,8 +252,8 @@ module ElemExpr =
         | Binary (op, a, b) -> max (requiredNumberOfArgs a) (requiredNumberOfArgs b)
     
     /// checks if the arguments' shapes are compatible with the result shape and that the types match
-    let checkCompatibility (expr: ElemExprT) (argShapes: ShapeSpecT list) (argTypes: TypeNameT list) 
-            (resShape: ShapeSpecT) =
+    let checkCompatibility (expr: ElemExprT) (argShapes: ShapeSpec list) (argTypes: TypeNameT list) 
+            (resShape: ShapeSpec) =
 
         // check number of arguments
         let nArgs = List.length argShapes

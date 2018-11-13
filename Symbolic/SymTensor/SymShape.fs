@@ -30,7 +30,7 @@ module SizeSymbolTypes =
 
     /// a symbolic size
     [<StructuredFormatDisplay ("\"{Name}\"")>]
-    type SizeSymbolT = {
+    type SizeSymbol = {
         Name:       string;
     }
 
@@ -85,8 +85,8 @@ module SizeSymbolTypes =
 
     /// elementary size specification, can be either a symbol or a fixed quantity
     [<StructuredFormatDisplay ("{Pretty}")>]
-    type BaseSizeT =
-        | Sym of SizeSymbolT
+    type BaseSize =
+        | Sym of SizeSymbol
         | Fixed of Frac
 
         member this.Pretty =
@@ -150,16 +150,16 @@ module SizeProductTypes =
       
     /// product of elementary size specifications
     [<StructuredFormatDisplay("{Pretty}")>]
-    type SizeProductT(symbols: Map<SizeSymbolT, int64>) =
+    type SizeProduct(symbols: Map<SizeSymbol, int64>) =
         let symbols = symbols |> Map.filter (fun _ sPower -> sPower <> 0L)
   
-        new() = SizeProductT(Map.empty)
-        new(b: SizeSymbolT) = SizeProductT(b, 1L)
-        new(b: SizeSymbolT, pow: int64) = SizeProductT(Map.empty |> Map.add b pow)
+        new() = SizeProduct(Map.empty)
+        new(b: SizeSymbol) = SizeProduct(b, 1L)
+        new(b: SizeSymbol, pow: int64) = SizeProduct(Map.empty |> Map.add b pow)
 
         member this.Symbols = symbols
 
-        static member (*) (a: SizeProductT, b: SizeProductT) =
+        static member (*) (a: SizeProduct, b: SizeProduct) =
             let pSymbols = 
                 Map.fold 
                     (fun p bBase bPower -> 
@@ -167,10 +167,10 @@ module SizeProductTypes =
                         | Some pPower -> Map.add bBase (pPower + bPower) p
                         | None -> Map.add bBase bPower p) 
                     a.Symbols b.Symbols
-            SizeProductT(pSymbols)
+            SizeProduct(pSymbols)
          
-        static member (*) (a: SizeProductT, b: SizeSymbolT) = a * SizeProductT(b)
-        static member (*) (a: SizeSymbolT, b: SizeProductT) = SizeProductT(a) * b
+        static member (*) (a: SizeProduct, b: SizeSymbol) = a * SizeProduct(b)
+        static member (*) (a: SizeSymbol, b: SizeProduct) = SizeProduct(a) * b
 
         member this.Pretty = 
             this.Symbols
@@ -184,7 +184,7 @@ module SizeProductTypes =
                         
         override this.Equals(otherObj) =
             match otherObj with
-            | :? SizeProductT as other -> this.Symbols = other.Symbols 
+            | :? SizeProduct as other -> this.Symbols = other.Symbols 
             | _ -> false
 
         override this.GetHashCode() =
@@ -193,7 +193,7 @@ module SizeProductTypes =
         interface System.IComparable with
             member this.CompareTo otherObj =
                 match otherObj with
-                | :? SizeProductT as other -> compare this.Symbols other.Symbols
+                | :? SizeProduct as other -> compare this.Symbols other.Symbols
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 
@@ -201,15 +201,15 @@ module SizeProduct =
     open SizeProductTypes
 
     /// true if product is empty (equal to 1)
-    let isEmpty (p: SizeProductT) =
+    let isEmpty (p: SizeProduct) =
         Map.isEmpty p.Symbols
 
     /// empty product (equal to 1)
     let empty =
-        SizeProductT()
+        SizeProduct()
 
     /// matches if product consists of a single symbol with power 1
-    let (|SingleSymbol|_|) (sp: SizeProductT) =
+    let (|SingleSymbol|_|) (sp: SizeProduct) =
         let mc = Map.toList sp.Symbols
         match List.length mc with
         | 1 -> 
@@ -218,7 +218,7 @@ module SizeProduct =
         | _ -> None
 
     /// matches if product is empty (equal to 1)
-    let (|Empty|_|) (sp: SizeProductT) =
+    let (|Empty|_|) (sp: SizeProduct) =
         if isEmpty sp then Some () else None
 
 
@@ -228,41 +228,41 @@ module SizeMultinomTypes =
 
     // symbolic multinomial
     [<StructuredFormatDisplay("{Pretty}")>]
-    type SizeMultinomT (products: Map<SizeProductT, Frac>) =
+    type SizeMultinom (products: Map<SizeProduct, Frac>) =
         let products = products |> Map.filter (fun _ fac -> fac .<> Frac.zero)
 
-        new (bs: BaseSizeT) = SizeMultinomT (Frac.one, bs, 1L)
-        new (bs: BaseSizeT, pow: int64) = SizeMultinomT (Frac.one, bs, pow)
-        new (fac: Frac, bs: BaseSizeT, pow: int64) =
+        new (bs: BaseSize) = SizeMultinom (Frac.one, bs, 1L)
+        new (bs: BaseSize, pow: int64) = SizeMultinom (Frac.one, bs, pow)
+        new (fac: Frac, bs: BaseSize, pow: int64) =
             let m =
                 match bs with
-                | Sym s -> Map [SizeProductT (s, pow), fac]
-                | Fixed f -> Map [SizeProductT (), fac * (pown f (int32 pow))]
-            SizeMultinomT (m)
+                | Sym s -> Map [SizeProduct (s, pow), fac]
+                | Fixed f -> Map [SizeProduct (), fac * (pown f (int32 pow))]
+            SizeMultinom (m)
 
         member this.Products = products
 
-        static member (~-) (a: SizeMultinomT) =
+        static member (~-) (a: SizeMultinom) =
             a.Products 
             |> Map.map (fun _ fac -> -fac)
-            |> SizeMultinomT 
+            |> SizeMultinom 
 
-        static member (+) (a: SizeMultinomT, b: SizeMultinomT) =
+        static member (+) (a: SizeMultinom, b: SizeMultinom) =
             (a.Products, b.Products)
             ||> Map.fold (fun res prod fac -> 
                 match Map.tryFind prod res with
                 | Some rFac -> res |> Map.add prod (fac + rFac)
                 | None      -> res |> Map.add prod fac)
-            |> SizeMultinomT
+            |> SizeMultinom
                 
-        static member (-) (a: SizeMultinomT, b: SizeMultinomT) = a + (-b)
+        static member (-) (a: SizeMultinom, b: SizeMultinom) = a + (-b)
         
-        static member (*) (a: SizeMultinomT, b: SizeMultinomT) =
+        static member (*) (a: SizeMultinom, b: SizeMultinom) =
             seq { for KeyValue(ap, af) in a.Products do
                     for KeyValue(bp, bf) in b.Products do
                         yield ap*bp, af*bf }
             |> Map.ofSeq
-            |> SizeMultinomT
+            |> SizeMultinom
 
         member this.ContainedSizeSymbols =
             products
@@ -286,7 +286,7 @@ module SizeMultinomTypes =
         
         override this.Equals(otherObj) =
             match otherObj with
-            | :? SizeMultinomT as other -> this.Products = other.Products 
+            | :? SizeMultinom as other -> this.Products = other.Products 
             | _ -> false
 
         override this.GetHashCode() =
@@ -295,7 +295,7 @@ module SizeMultinomTypes =
         interface System.IComparable with
             member this.CompareTo otherObj =
                 match otherObj with
-                | :? SizeMultinomT as other -> compare this.Products other.Products
+                | :? SizeMultinom as other -> compare this.Products other.Products
                 | _ -> invalidArg "otherObj" "cannot compare values of different types"
 
 
@@ -306,13 +306,13 @@ module SizeSpecTypes =
     /// symbolic size specification of a dimension (axis)
     [<StructuredFormatDisplay ("{Pretty}")>]
     [<StructuralEquality; StructuralComparison>]
-    type SizeSpecT =
-        | Base of BaseSizeT               // fixed size or symbol
+    type SizeSpec =
+        | Base of BaseSize               // fixed size or symbol
         | Broadcast                       // size 1 and broadcastable
-        | Multinom of SizeMultinomT       // product of fixed sizes and symbols
+        | Multinom of SizeMultinom       // product of fixed sizes and symbols
 
         /// simplify size specification
-        static member Simplify (ss: SizeSpecT) =
+        static member Simplify (ss: SizeSpec) =
             match ss with
             | Multinom m -> 
                 match m.Products |> Map.toList with
@@ -324,79 +324,79 @@ module SizeSpecTypes =
 
         static member get_Zero () = Base (Fixed Frac.zero)
 
-        static member (~-) (ssa: SizeSpecT) =
+        static member (~-) (ssa: SizeSpec) =
             match ssa with
             | Base (Fixed Frac.Zero) -> ssa
-            | Base b -> Multinom (-SizeMultinomT(b))
-            | Broadcast -> Multinom (-SizeMultinomT(Fixed Frac.one))
+            | Base b -> Multinom (-SizeMultinom(b))
+            | Broadcast -> Multinom (-SizeMultinom(Fixed Frac.one))
             | Multinom m -> Multinom (-m)
-            |> SizeSpecT.Simplify
+            |> SizeSpec.Simplify
 
-        static member (+) (ssa: SizeSpecT, ssb: SizeSpecT) =
+        static member (+) (ssa: SizeSpec, ssb: SizeSpec) =
             match ssa, ssb with
             | Base (Fixed Frac.Zero), ss | ss, Base (Fixed Frac.Zero) -> ss
             | Broadcast, ss | ss, Broadcast -> ss + (Base (Fixed Frac.one))
             | Multinom ma, Multinom mb -> Multinom (ma + mb)
-            | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinomT(b))
-            | Base ba, Base bb -> Multinom (SizeMultinomT(ba) + SizeMultinomT(bb))
-            |> SizeSpecT.Simplify
+            | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinom(b))
+            | Base ba, Base bb -> Multinom (SizeMultinom(ba) + SizeMultinom(bb))
+            |> SizeSpec.Simplify
 
-        static member (-) (ssa: SizeSpecT, ssb: SizeSpecT) =
+        static member (-) (ssa: SizeSpec, ssb: SizeSpec) =
             ssa + (-ssb)
 
-        static member (*) (ssa: SizeSpecT, ssb: SizeSpecT) =
+        static member (*) (ssa: SizeSpec, ssb: SizeSpec) =
             match ssa, ssb with
             | Base (Fixed Frac.Zero), _ | _, Base (Fixed Frac.Zero) -> Base (Fixed Frac.zero)
             | Broadcast, ss | ss, Broadcast -> ss
             | Multinom ma, Multinom mb -> Multinom (ma * mb)
-            | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinomT(b))
-            | Base ba, Base bb -> Multinom (SizeMultinomT(ba) * SizeMultinomT(bb))
-            |> SizeSpecT.Simplify
+            | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinom(b))
+            | Base ba, Base bb -> Multinom (SizeMultinom(ba) * SizeMultinom(bb))
+            |> SizeSpec.Simplify
 
-        static member Pow (ssa: SizeSpecT, pow: int64) =
+        static member Pow (ssa: SizeSpec, pow: int64) =
             match pow with
             | 0L -> Base (Fixed Frac.one)
             | 1L -> ssa
             | _ ->
                 match ssa with
                 | Base (Fixed f) -> Base (Fixed (pown f (int32 pow)))
-                | Base (Sym s) -> Multinom (SizeMultinomT (Sym s, pow))
+                | Base (Sym s) -> Multinom (SizeMultinom (Sym s, pow))
                 | Broadcast -> Broadcast
                 | Multinom m ->
                     m
                     |> Seq.replicate (int32 pow)
                     |> Seq.reduce (*)
                     |> Multinom
-            |> SizeSpecT.Simplify
+            |> SizeSpec.Simplify
 
         // operations with FracT
-        static member (+) (ssa: SizeSpecT, ssb: Frac) = ssa + (Base (Fixed ssb))
-        static member (+) (ssa: Frac, ssb: SizeSpecT) = (Base (Fixed ssa)) + ssb
-        static member (-) (ssa: SizeSpecT, ssb: Frac) = ssa - (Base (Fixed ssb))
-        static member (-) (ssa: Frac, ssb: SizeSpecT) = (Base (Fixed ssa)) - ssb
-        static member (*) (ssa: SizeSpecT, ssb: Frac) = ssa * (Base (Fixed ssb))
-        static member (*) (ssa: Frac, ssb: SizeSpecT) = (Base (Fixed ssa)) * ssb
+        static member (+) (ssa: SizeSpec, ssb: Frac) = ssa + (Base (Fixed ssb))
+        static member (+) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) + ssb
+        static member (-) (ssa: SizeSpec, ssb: Frac) = ssa - (Base (Fixed ssb))
+        static member (-) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) - ssb
+        static member (*) (ssa: SizeSpec, ssb: Frac) = ssa * (Base (Fixed ssb))
+        static member (*) (ssa: Frac, ssb: SizeSpec) = (Base (Fixed ssa)) * ssb
 
         // operations with int
-        static member (+) (ssa: SizeSpecT, ssb: int64) = ssa + Frac ssb
-        static member (+) (ssa: int64, ssb: SizeSpecT) = Frac ssa + ssb
-        static member (-) (ssa: SizeSpecT, ssb: int64) = ssa - Frac ssb
-        static member (-) (ssa: int64, ssb: SizeSpecT) = Frac ssa - ssb
-        static member (*) (ssa: SizeSpecT, ssb: int64) = ssa * Frac ssb
-        static member (*) (ssa: int64, ssb: SizeSpecT) = Frac ssa * ssb
+        static member (+) (ssa: SizeSpec, ssb: int64) = ssa + Frac ssb
+        static member (+) (ssa: int64, ssb: SizeSpec) = Frac ssa + ssb
+        static member (-) (ssa: SizeSpec, ssb: int64) = ssa - Frac ssb
+        static member (-) (ssa: int64, ssb: SizeSpec) = Frac ssa - ssb
+        static member (*) (ssa: SizeSpec, ssb: int64) = ssa * Frac ssb
+        static member (*) (ssa: int64, ssb: SizeSpec) = Frac ssa * ssb
 
         /// equal size with broadcastability
-        static member (%=) (ssa: SizeSpecT, ssb: SizeSpecT) = 
-            SizeSpecT.Simplify ssa = SizeSpecT.Simplify ssb 
+        static member (%=) (ssa: SizeSpec, ssb: SizeSpec) = 
+            SizeSpec.Simplify ssa = SizeSpec.Simplify ssb 
 
         /// equal size ignoring broadcastability
-        static member (.=) (ssa: SizeSpecT, ssb: SizeSpecT) = 
-            match SizeSpecT.Simplify ssa, SizeSpecT.Simplify ssb with
+        static member (.=) (ssa: SizeSpec, ssb: SizeSpec) = 
+            match SizeSpec.Simplify ssa, SizeSpec.Simplify ssb with
             | Broadcast, Base (Fixed Frac.One) | Base (Fixed Frac.One), Broadcast -> true
             | a, b -> a = b
 
         /// unequal size ignoring broadcastability
-        static member (.<>) (ssa: SizeSpecT, ssb: SizeSpecT) = not (ssa .= ssb)
+        static member (.<>) (ssa: SizeSpec, ssb: SizeSpec) = not (ssa .= ssb)
 
         /// the set of all contained SizeSymbols
         member this.ContainedSizeSymbols =
@@ -421,15 +421,15 @@ module SizeSpec =
     open SizeSymbolTypes
 
     /// simplify size specification
-    let simplify (ss: SizeSpecT) = SizeSpecT.Simplify ss
+    let simplify (ss: SizeSpec) = SizeSpec.Simplify ss
 
     /// True if both sizes have the same number of elements and 
     /// are both broadcastable or non-broadcastable.
-    let equalWithBroadcastability (ssa: SizeSpecT) (ssb: SizeSpecT) = ssa %= ssb        
+    let equalWithBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa %= ssb        
 
     /// True if both sizes have the same number of elements.
     /// Broadcastable and non-broadcastable are treated as equal.
-    let equalWithoutBroadcastability (ssa: SizeSpecT) (ssb: SizeSpecT) = ssa .= ssb
+    let equalWithoutBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa .= ssb
 
     /// size zero
     let zero =
@@ -504,11 +504,11 @@ module SizeSpec =
         | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
 
     /// returns the set of all contained SizeSymbols
-    let containedSizeSymbols (ss: SizeSpecT) =
+    let containedSizeSymbols (ss: SizeSpec) =
         ss.ContainedSizeSymbols
 
     /// true if the specified SizeSymbol occurs in the SizeSpec
-    let containsSymbol sym (ss: SizeSpecT) =
+    let containsSymbol sym (ss: SizeSpec) =
         ss.ContainsSymbol sym 
 
             
@@ -518,63 +518,63 @@ module SizeSpec =
 module ShapeSpecTypes =
 
     /// shape specifcation of a tensor
-    type ShapeSpecT = SizeSpecT list
+    type ShapeSpec = SizeSpec list
 
     /// evaluated shape specification of a tensor
-    type NShapeSpecT = int64 list
+    type NShapeSpec = int64 list
 
 
 /// shape specification of a tensor
 module ShapeSpec =
     open SizeSymbolTypes
 
-    let insertAxis ax ss (sa: ShapeSpecT) : ShapeSpecT =
+    let insertAxis ax ss (sa: ShapeSpec) : ShapeSpec =
         sa |> List.insert ax ss
 
-    let withoutAxis ax (sa: ShapeSpecT) : ShapeSpecT =
+    let withoutAxis ax (sa: ShapeSpec) : ShapeSpec =
         sa |> List.without ax
 
-    let insertBroadcastAxis ax (sa: ShapeSpecT) : ShapeSpecT =
+    let insertBroadcastAxis ax (sa: ShapeSpec) : ShapeSpec =
         sa |> insertAxis ax Broadcast
 
-    let set ax size (sa: ShapeSpecT) : ShapeSpecT =
+    let set ax size (sa: ShapeSpec) : ShapeSpec =
         sa |> List.set ax size
 
-    let nDim (sa: ShapeSpecT) =
+    let nDim (sa: ShapeSpec) =
         List.length sa
 
-    let nElem (sa: ShapeSpecT) =
+    let nElem (sa: ShapeSpec) =
         if List.isEmpty sa then SizeSpec.one
         else List.reduce (*) sa
 
-    let flatten (sa: ShapeSpecT) : ShapeSpecT =
+    let flatten (sa: ShapeSpec) : ShapeSpec =
         [nElem sa]
 
-    let concat (sa: ShapeSpecT) (sb: ShapeSpecT) : ShapeSpecT =
+    let concat (sa: ShapeSpec) (sb: ShapeSpec) : ShapeSpec =
         sa @ sb
 
-    let transpose (sa: ShapeSpecT) : ShapeSpecT =
+    let transpose (sa: ShapeSpec) : ShapeSpec =
         if nDim sa <> 2 then failwithf "need matrix to transpose but have shape %A" sa
         List.rev sa
 
-    let swap (ax1: int) (ax2: int) (sa: ShapeSpecT) : ShapeSpecT =
+    let swap (ax1: int) (ax2: int) (sa: ShapeSpec) : ShapeSpec =
         sa  |> List.set ax1 sa.[ax2]
             |> List.set ax2 sa.[ax1]
 
-    let scalar : ShapeSpecT = []
+    let scalar : ShapeSpec = []
 
-    let vector (ss: SizeSpecT) : ShapeSpecT = [ss]
+    let vector (ss: SizeSpec) : ShapeSpec = [ss]
 
-    let matrix (sr: SizeSpecT) (sc: SizeSpecT) : ShapeSpecT = [sr; sc]
+    let matrix (sr: SizeSpec) (sc: SizeSpec) : ShapeSpec = [sr; sc]
 
-    let emptyVector : ShapeSpecT = [SizeSpec.zero]
+    let emptyVector : ShapeSpec = [SizeSpec.zero]
 
     /// pads shape by inserting broadcast dimension on the left
-    let padLeft (sa: ShapeSpecT) : ShapeSpecT =
+    let padLeft (sa: ShapeSpec) : ShapeSpec =
         (Broadcast)::sa
 
     /// pads shape by inserting broadcast dimension on the right
-    let padRight (sa: ShapeSpecT) : ShapeSpecT =
+    let padRight (sa: ShapeSpec) : ShapeSpec =
         sa @ [Broadcast]
 
     /// pads shape from the left to specified number of dimensions
@@ -601,12 +601,12 @@ module ShapeSpec =
                 sa <- padLeft sa
             sa)
 
-    let broadcast (sa: ShapeSpecT) dim size : ShapeSpecT =
+    let broadcast (sa: ShapeSpec) dim size : ShapeSpec =
         match sa.[dim] with
         | Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
-    let broadcastToShape (trgtShp: ShapeSpecT) (saIn: ShapeSpecT) : ShapeSpecT =
+    let broadcastToShape (trgtShp: ShapeSpec) (saIn: ShapeSpec) : ShapeSpec =
         let mutable sa = saIn
         if nDim sa <> nDim trgtShp then
             failwithf "cannot broadcast shape %A to shape %A" saIn trgtShp
@@ -663,39 +663,39 @@ module ShapeSpec =
                 failwithf "cannot broadcast shapes %A of different rank to same size" sas                
             broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
 
-    let enableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
+    let enableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
         | Base (Fixed Frac.One) | Broadcast -> List.set dim Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBroadcast dim (sa: ShapeSpecT) : ShapeSpecT =
+    let disableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
         | Base (Fixed Frac.One) | Broadcast -> List.set dim (Base (Fixed Frac.one)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableAllBroadcasts sa : ShapeSpecT =
+    let disableAllBroadcasts sa : ShapeSpec =
         List.map (fun ss -> if ss = Broadcast then Base (Fixed Frac.one) else ss) sa
         
     /// True if both shape have the same number of elements and 
     /// are both broadcastable or non-broadcastable in each dimension.
-    let equalWithBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
+    let equalWithBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
         List.length sa = List.length sb &&
             List.forall2 SizeSpec.equalWithBroadcastability sa sb
 
     /// True if both shapes have the same number of elements in each dimension.
     /// Broadcastable and non-broadcastable are treated as equal.            
-    let equalWithoutBroadcastability (sa: ShapeSpecT) (sb: ShapeSpecT) =
+    let equalWithoutBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
          List.length sa = List.length sb &&
             List.forall2 SizeSpec.equalWithoutBroadcastability sa sb
 
     /// Permutes the axes as specified.
-    let permuteAxes (permut: int list) (sa: ShapeSpecT) : ShapeSpecT =
+    let permuteAxes (permut: int list) (sa: ShapeSpec) : ShapeSpec =
         if nDim sa <> List.length permut then
             failwithf "permutation %A must have same rank as shape %A" permut sa
         sa |> List.permute (fun i -> permut.[i])
 
     /// evaluates shape to numeric shape, if possible
-    let tryEval (sa: ShapeSpecT) : NShapeSpecT option =
+    let tryEval (sa: ShapeSpec) : NShapeSpec option =
         let c = List.map (SizeSpec.tryEval) sa
         if List.exists (Option.isNone) c then None
         else Some (List.map Option.get c)          
@@ -707,25 +707,25 @@ module ShapeSpec =
         | None -> false
 
     /// evaluates shape to numeric shape
-    let eval (sa: ShapeSpecT) : NShapeSpecT =
+    let eval (sa: ShapeSpec) : NShapeSpec =
         List.map (SizeSpec.eval) sa
 
     /// substitute the symbols into the ShapeSpec and simplifies it
-    let substSymbols symVals (sa: ShapeSpecT) : ShapeSpecT =
+    let substSymbols symVals (sa: ShapeSpec) : ShapeSpec =
         List.map (SizeSpec.substSymbols symVals) sa
 
     type SolutionT = {
-        LeftValues:     Map<SizeSymbolT, SizeSpecT>
-        RightValues:    Map<SizeSymbolT, SizeSpecT>
+        LeftValues:     Map<SizeSymbol, SizeSpec>
+        RightValues:    Map<SizeSymbol, SizeSpec>
     }        
 
-    let solve (left: ShapeSpecT) (right: SizeSymbolT list) =
+    let solve (left: ShapeSpec) (right: SizeSymbol list) =
         if left.Length <> right.Length then failwith "dimension mismatch"
         if right |> Set.ofList |> Set.count <> right.Length then
             failwith "symbols on the right must be unique"
         
-        let leftValues = Dictionary<SizeSymbolT, SizeSpecT>()
-        let rightValues = Dictionary<SizeSymbolT, SizeSpecT>()
+        let leftValues = Dictionary<SizeSymbol, SizeSpec>()
+        let rightValues = Dictionary<SizeSymbol, SizeSpec>()
 
         for l, r in List.zip left right do
             match l with
@@ -751,17 +751,17 @@ module ShapeSpec =
 module RangeSpecTypes =
 
     /// basic range specification for one dimension
-    type BaseRangeSpecT = SizeSpecT * SizeSpecT
+    type BaseRangeSpec = SizeSpec * SizeSpec
     /// basic range specification for multiple dimensions
-    type BaseRangesSpecT = BaseRangeSpecT list
+    type BaseRangesSpec = BaseRangeSpec list
 
     /// symbolic/dynamic range specification for one dimension
-    type RangeSpecT<'Dyn> = 
+    type RangeSpec<'Dyn> = 
         // ranges with symbolic size (length)
-        | RSSymElem            of SizeSpecT                           
+        | RSSymElem            of SizeSpec                           
         | RSDynElem            of 'Dyn                                
-        | RSSymStartSymEnd     of (SizeSpecT option) * (SizeSpecT option)
-        | RSDynStartSymSize    of 'Dyn * SizeSpecT                    
+        | RSSymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
+        | RSDynStartSymSize    of 'Dyn * SizeSpec                    
         | RSNewAxis                                                   
         | RSAllFill                                                   
         //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
@@ -773,13 +773,13 @@ module RangeSpecTypes =
     let RSAll = RSSymStartSymEnd (None, None)
 
     // symbolic/dynamic subtensor specification
-    type RangesSpecT<'Dyn> = RangeSpecT<'Dyn> list
+    type RangesSpecT<'Dyn> = RangeSpec<'Dyn> list
 
     /// simple range specification for one dimension
     [<StructuredFormatDisplay("{Pretty}")>]
-    type SimpleRangeSpecT<'Dyn> =
-        | SRSSymStartSymEnd     of SizeSpecT * (SizeSpecT option)
-        | SRSDynStartSymSize    of 'Dyn * SizeSpecT                    
+    type SimpleRangeSpec<'Dyn> =
+        | SRSSymStartSymEnd     of SizeSpec * (SizeSpec option)
+        | SRSDynStartSymSize    of 'Dyn * SizeSpec                    
         member this.Pretty =
             match this with
             | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
@@ -790,13 +790,13 @@ module RangeSpecTypes =
     let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
         
     /// simple range specification for multiple dimensions
-    type SimpleRangesSpecT<'Dyn> = SimpleRangeSpecT<'Dyn> list
+    type SimpleRangesSpec<'Dyn> = SimpleRangeSpec<'Dyn> list
 
 
 module BaseRangesSpec =
 
     /// Try to evalualte a BaseRangesSpecT to a numeric range.
-    let tryEval (rng: BaseRangesSpecT) =
+    let tryEval (rng: BaseRangesSpec) =
         let rec doEval rng =
             match rng with
             | (first, last) :: rrng ->
@@ -807,19 +807,19 @@ module BaseRangesSpec =
         doEval rng
 
     /// True if a BaseRangesSpecT can be evaluated to a numeric range.
-    let canEval (rng: BaseRangesSpecT) =
+    let canEval (rng: BaseRangesSpec) =
         match tryEval rng with
         | Some _ -> true
         | None -> false
 
     /// Evaluates a BaseRangesSpecT to a numeric range.
-    let eval (rng: BaseRangesSpecT) =
+    let eval (rng: BaseRangesSpec) =
         match tryEval rng with
         | Some rng -> rng
         | None -> failwithf "cannot evaluate BaseRangesSpecT %A to numeric range" rng
 
     /// checks that the BaseRangesSpec is valid
-    let check (rng: BaseRangesSpecT) =
+    let check (rng: BaseRangesSpec) =
         match tryEval rng with
         | Some rng ->
             for first, last in rng do
@@ -829,7 +829,7 @@ module BaseRangesSpec =
 
     /// True if two BaseRangesSpec overlap.
     /// Both BaseRangesSpec must be evaluateble to numeric ranges.
-    let overlapping (a: BaseRangesSpecT) (b: BaseRangesSpecT) =
+    let overlapping (a: BaseRangesSpec) (b: BaseRangesSpec) =
         check a; check b
         (eval a, eval b)
         ||> List.forall2 (fun (aFirst, aLast) (bFirst, bLast) ->
@@ -840,7 +840,7 @@ module BaseRangesSpec =
     /// True if any two ranges are overlapping.
     /// This has complexity O(N^2) currently.
     /// All BaseRangesSpec must be evaluateble to numeric ranges.
-    let areOverlapping (rngs: BaseRangesSpecT list) =       
+    let areOverlapping (rngs: BaseRangesSpec list) =       
         let rec testOvlp nonOvlp cands =
             match cands with
             | cand::rCands ->
@@ -852,7 +852,7 @@ module BaseRangesSpec =
     /// True if the BaseRangesSpecTs cover a tensor of the specified shape completely without overlap.
     /// All BaseRangesSpecT and the ShapeSpecT must be evaluatable to numeric ranges and a
     /// numeric shape respectively.
-    let areCoveringWithoutOverlap (shp: ShapeSpecT) (rngs: BaseRangesSpecT list) =       
+    let areCoveringWithoutOverlap (shp: ShapeSpec) (rngs: BaseRangesSpec list) =       
         if areOverlapping rngs then false
         else
             let shpElems = 
@@ -894,7 +894,7 @@ module SimpleRangeSpec =
     let (|Dynamic|Static|) rs =
         if isDynamic rs then Dynamic else Static
 
-    let toBaseRangeSpec (size: SizeSpecT) rs =
+    let toBaseRangeSpec (size: SizeSpec) rs =
         match rs with
         | SRSSymStartSymEnd (first, Some last) -> first, last
         | SRSSymStartSymEnd (first, None) -> first, size - 1L
@@ -915,7 +915,7 @@ module SimpleRangesSpec =
     let (|Dynamic|Static|) rs =
         if isDynamic rs then Dynamic else Static
 
-    let toBaseRangesSpec (shape: ShapeSpecT) rs =
+    let toBaseRangesSpec (shape: ShapeSpec) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
 
 

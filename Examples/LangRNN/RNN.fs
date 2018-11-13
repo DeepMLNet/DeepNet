@@ -14,11 +14,11 @@ module RecurrentLayer =
     /// Neural layer hyper-parameters.
     type HyperPars = {
         /// number of inputs
-        NInput:                     SizeSpecT
+        NInput:                     SizeSpec
         /// number of recurrent units
-        NRecurrent:                 SizeSpecT
+        NRecurrent:                 SizeSpec
         /// number of output units
-        NOutput:                    SizeSpecT
+        NOutput:                    SizeSpec
         /// recurrent transfer (activation) function
         RecurrentActivationFunc:    ActivationFunc
         /// output transfer (activation) function

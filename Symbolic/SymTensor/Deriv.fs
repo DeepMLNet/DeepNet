@@ -13,7 +13,7 @@ module DerivTypes =
     /// Jacobians for each variable
     type DerivT = {
         /// the number of elements of the function the derivative is taken of
-        FunElems:   SizeSpecT
+        FunElems:   SizeSpec
         /// the Jacobians w.r.t. the variables occuring in the expression
         Jacobians:  Map<VarSpecT, ExprT>
     }
@@ -136,8 +136,8 @@ module Deriv =
                 let mutable egUnbroadcasted = egExp
                 for ax, (eSize, aSize) in List.indexed (List.zip ss (shapeOf a)) do
                     match eSize, aSize with
-                    | SizeSpecT.Broadcast, SizeSpecT.Broadcast -> ()
-                    | _, SizeSpecT.Broadcast ->
+                    | SizeSpec.Broadcast, SizeSpec.Broadcast -> ()
+                    | _, SizeSpec.Broadcast ->
                         egUnbroadcasted <- egUnbroadcasted |> sumKeepingAxis (ax + 1)
                     | _ -> ()
                 egUnbroadcasted |> collapse 

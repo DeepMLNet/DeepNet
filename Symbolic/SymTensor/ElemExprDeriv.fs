@@ -85,10 +85,10 @@ module ElemExprDeriv =
         | None -> zero
 
     type private DerivDim =
-        | SummingDim of SizeSymbolT * SizeSpecT * SizeSpecT * SizeSymbolT
-        | FixedDim of SizeSpecT * SizeSymbolT
+        | SummingDim of SizeSymbol * SizeSpec * SizeSpec * SizeSymbol
+        | FixedDim of SizeSpec * SizeSymbol
 
-    let buildDerivElemExpr (expr: ElemExprT) (exprShp: ShapeSpecT) nArgs =
+    let buildDerivElemExpr (expr: ElemExprT) (exprShp: ShapeSpec) nArgs =
         let nDims = ShapeSpec.nDim exprShp
         let allDerives = compute expr
         let egArgNo = nArgs

@@ -13,8 +13,8 @@ open Optimizers
 module GRULang =
 
     type HyperPars = {
-        NWords:                     SizeSpecT
-        EmbeddingDim:               SizeSpecT
+        NWords:                     SizeSpec
+        EmbeddingDim:               SizeSpec
         MultiStepLoss:              bool
     }
 

@@ -19,8 +19,8 @@ module UExprTypes =
     let dfltChId : ChannelT = "#"
 
     // int holds the position of the subuexpr that has the dynamic value
-    type UExprRngSpecT = SimpleRangeSpecT<int>
-    type UExprRngsSpecT = SimpleRangesSpecT<int>
+    type UExprRngSpecT = SimpleRangeSpec<int>
+    type UExprRngsSpecT = SimpleRangesSpec<int>
 
     /// An operation in an unified expression.
     type IUOp =
@@ -31,7 +31,7 @@ module UExprTypes =
         /// the data type of the result channels
         ChannelType:   Map<ChannelT, TypeNameT>
         /// the numeric shape of the result channels
-        ChannelShape:  Map<ChannelT, NShapeSpecT>
+        ChannelShape:  Map<ChannelT, NShapeSpec>
         /// the generating expression, if created from one
         Expr:          Expr.ExprT option
     }
@@ -54,7 +54,7 @@ module UExprTypes =
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
-        | Elements of ShapeSpecT * UElemExpr.UElemFuncT
+        | Elements of ShapeSpec * UElemExpr.UElemFuncT
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT
@@ -161,7 +161,7 @@ module UExprRngsSpec =
         | _                               , _         -> failwith "invalid unified subtensor spec"
 
     /// checks that the static parts of the range specification are compatible with the given shape
-    let checkCompatibility (shp: ShapeSpecT) (srs: UExprRngsSpecT) =
+    let checkCompatibility (shp: ShapeSpec) (srs: UExprRngsSpecT) =
         let shp = ShapeSpec.eval shp
         let failRng () =
             failwithf "Subtensor range specification %A is invalid for tensor of shape %A." srs shp
@@ -431,7 +431,7 @@ module UExpr =
                             chMap |> Map.map (fun ch lv -> 
                                 {lv with OutputFrom = lv.OutputFrom + getChFirst loopExpr loopSpec ch})
                         let trimChShapes chShps =
-                            chShps |> Map.map (fun ch (shp: NShapeSpecT) ->
+                            chShps |> Map.map (fun ch (shp: NShapeSpec) ->
                                 let sliceDim = loopSpec.Channels.[ch].SliceDim
                                 let outputSize = shp.[sliceDim] - getChFirst loopExpr loopSpec ch
                                 let trimedShp = shp |> List.set sliceDim outputSize

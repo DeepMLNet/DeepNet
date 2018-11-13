@@ -14,9 +14,9 @@ module Optimizer =
     /// Broadcast information
     type BroadcastInfoT =
         /// axis is broadcasted to specific size
-        | Broadcasted of SizeSpecT
+        | Broadcasted of SizeSpec
         /// axis is not broadcasted and has specific size
-        | NotBroadcasted of SizeSpecT
+        | NotBroadcasted of SizeSpec
         /// true if axis is broadcasted
         member this.IsBC =
             match this with

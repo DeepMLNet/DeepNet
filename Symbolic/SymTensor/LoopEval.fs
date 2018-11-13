@@ -11,14 +11,14 @@ module LoopEval =
 
     /// channel information for loop execution
     type LoopChannelInfoT = {
-        Shape:          NShapeSpecT
+        Shape:          NShapeSpec
         SliceDim:       int
         Target:         ITensor
     } 
 
     /// channel layout information for building loop strides
     type LoopChannelLayoutInfoT = {
-        Shape:          NShapeSpecT
+        Shape:          NShapeSpec
         SliceDim:       int
         TargetLayout:   TensorLayout
     } 

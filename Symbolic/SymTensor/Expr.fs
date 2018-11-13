@@ -23,7 +23,7 @@ module Expr =
         | None -> None
 
     /// start plus the specified number of (symbolic elements)
-    type PlusElems (elems: SizeSpecT) =
+    type PlusElems (elems: SizeSpec) =
         new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
         member this.Elems = elems
 
@@ -40,13 +40,13 @@ module Expr =
         /// scalar of given value
         | ScalarConst of value:ConstSpecT
         /// scalar of the given size
-        | SizeValue of value:SizeSpecT * typ:TypeNameT
+        | SizeValue of value:SizeSpec * typ:TypeNameT
 
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | Identity of shape:SizeSpecT * typ:TypeNameT
+        | Identity of shape:SizeSpec * typ:TypeNameT
         /// vector counting from zero to given size minus one
-        | Arange of size:SizeSpecT * typ:TypeNameT
+        | Arange of size:SizeSpec * typ:TypeNameT
 
         // ==== variable access ====
         /// variable read
@@ -112,9 +112,9 @@ module Expr =
 
         // ==== shape operations ====
         /// reshape tensor; element count does not change
-        | Reshape of ShapeSpecT         
+        | Reshape of ShapeSpec         
         /// broadcast tensor; element count may change
-        | DoBroadcast of ShapeSpecT       
+        | DoBroadcast of ShapeSpec       
         /// permutes the axes of the tensor
         | PermuteAxes of perm:int list
         /// subtensor 
@@ -124,7 +124,7 @@ module Expr =
         /// select elements according to the specified index arrays
         | Gather of indices:ExprT option list
         /// disperses elements according to the specified index arrays
-        | Scatter of indices:ExprT option list * shp:ShapeSpecT
+        | Scatter of indices:ExprT option list * shp:ShapeSpec
 
         // ==== variable storage ====
         /// variable write
@@ -146,18 +146,18 @@ module Expr =
         | Annotated of string       
         /// an op that will expand into an expression once symbolic sizes have
         /// been substituted
-        | Held of derivsShp:ShapeSpecT list * op:UnaryHeldOpT
+        | Held of derivsShp:ShapeSpec list * op:UnaryHeldOpT
 
     /// an op that will expand into an expression once symbolic sizes have been substituted
     and UnaryHeldOpT =
         /// replicates the axes to the specified size
-        | ReplicateTo of dim:int * size:SizeSpecT
+        | ReplicateTo of dim:int * size:SizeSpec
 
     /// a simplified range specification of one dimension
-    and ExprRngSpecT = SimpleRangeSpecT<ExprT>
+    and ExprRngSpecT = SimpleRangeSpec<ExprT>
 
     /// a simplified range specification of all dimensions
-    and ExprRngsSpecT = SimpleRangesSpecT<ExprT>
+    and ExprRngsSpecT = SimpleRangesSpec<ExprT>
 
     /// ops with two exprs as arguments
     and [<StructuralComparison; StructuralEquality>] 
@@ -205,9 +205,9 @@ module Expr =
         /// evaluate all subexpressions but discard them
         | Discard        
         /// build tensor using numeric ranges
-        | BuildTensor of shp:ShapeSpecT * rngs:BaseRangesSpecT list
+        | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list
         /// elementwise calculated tensor
-        | Elements of shape:ShapeSpecT * elemExpr:ElemExpr.ElemExprT
+        | Elements of shape:ShapeSpec * elemExpr:ElemExpr.ElemExprT
         /// elementwise interpolation
         | Interpolate of InterpolatorT
         /// use specified channel of a multi-channel op
@@ -236,7 +236,7 @@ module Expr =
         /// the channel to use
         Channel:       ChannelT
         /// the delay, must be at least one
-        Delay:         SizeSpecT
+        Delay:         SizeSpec
         /// the index of the argument specifying the initial values
         InitialArg:    int
     }
@@ -271,7 +271,7 @@ module Expr =
     /// as a channel.
     and LoopSpecT = {
         /// number of loop iterations
-        Length:     SizeSpecT
+        Length:     SizeSpec
         /// specifies the values of the variables used in the channel value expressions,
         /// i.e. LoopValueT.Expr
         Vars:       Map<VarSpecT, LoopInputT>   
@@ -286,11 +286,11 @@ module Expr =
         inherit System.IComparable
       
         /// Should return the shape of the result, given the shape of the arguments.
-        abstract Shape: argShapes: ShapeSpecT list -> ShapeSpecT      
+        abstract Shape: argShapes: ShapeSpec list -> ShapeSpec      
         
         /// Should check if the shapes of the arguments are acceptable and,
         /// if not, raise an exception.
-        abstract CheckArgs: argShapes: ShapeSpecT list -> unit      
+        abstract CheckArgs: argShapes: ShapeSpec list -> unit      
 
         /// Should return the op with all symbolic sizes substituted using the specified
         /// substitution table.
@@ -420,7 +420,7 @@ module Expr =
         member this.Pretty = this.ToString 80
 
 
-    type FullExprRngSpecT = RangeSpecT<ExprT>
+    type FullExprRngSpecT = RangeSpec<ExprT>
     type FullExprRngsSpecT = RangesSpecT<ExprT>
    
     /// matches all unary ops that work elementwise
@@ -546,7 +546,7 @@ module Expr =
     and internal loopOutputTypeNames (spec: LoopSpecT) =
         spec.Channels |> Map.map (fun ch lv -> typename lv.Expr)
 
-    let private shapeCache = ConcurrentDictionary<ExprT, ShapeSpecT> (HashIdentity.Reference)
+    let private shapeCache = ConcurrentDictionary<ExprT, ShapeSpec> (HashIdentity.Reference)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -768,7 +768,7 @@ module Expr =
             if typename expr = TypeName.ofType<obj> then
                 failwith "Expression type cannot be object."
 
-            let (..=) (sa: ShapeSpecT) (sb: ShapeSpecT) =
+            let (..=) (sa: ShapeSpec) (sb: ShapeSpec) =
                 if sa.Length = sb.Length then List.forall2 (.=) sa sb
                 else false
             let (..<>) sa sb = not (sa ..= sb)
@@ -803,7 +803,7 @@ module Expr =
                             sa ss
                     for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                         match sa.[dim], ss.[dim] with
-                        | SizeSpecT.Broadcast, _ -> ()
+                        | SizeSpec.Broadcast, _ -> ()
                         | ssa, ssb when ssa .<> ssb -> 
                             failwithf "cannot broadcast from %A to %A because non-broadcast dimensions must not change" sa ss
                         | _ -> ()
@@ -1600,7 +1600,7 @@ module Expr =
         Leaf(Identity(size, typename expr)) |> check
 
     /// tensor of given shape filled with specified value
-    let filled (shp: ShapeSpecT) value =
+    let filled (shp: ShapeSpec) value =
         let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
         scalar value
         |> reshape bcShp
@@ -1608,7 +1608,7 @@ module Expr =
 
     /// zero tensor of given shape
     [<RequiresExplicitTypeArguments>]
-    let zeros<'T> (shp: ShapeSpecT) =
+    let zeros<'T> (shp: ShapeSpec) =
         filled shp (conv<'T> 0)
 
     /// zero tensor of given type and shape
@@ -1626,11 +1626,11 @@ module Expr =
 
     /// variable of given name and shape
     [<RequiresExplicitTypeArguments>]
-    let var<'T> name (ss: ShapeSpecT) = 
+    let var<'T> name (ss: ShapeSpec) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> check
 
     /// variable of given name, type and shape
-    let varOfType name typ (ss: ShapeSpecT) = 
+    let varOfType name typ (ss: ShapeSpec) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> check
 
     /// Vector counting from zero to given size minus one.
@@ -1763,11 +1763,11 @@ module Expr =
                 | [:? FullExprRngsSpecT as rngs] -> rngs
 
                 // slices
-                | (:? (SizeSpecT option) as so)  :: (:? (SizeSpecT option) as fo)    :: rest ->
+                | (:? (SizeSpec option) as so)  :: (:? (SizeSpec option) as fo)    :: rest ->
                     RSSymStartSymEnd (so, fo) :: parseArgs rest
-                | (:? (SizeSpecT option) as so)  :: null                             :: rest ->
+                | (:? (SizeSpec option) as so)  :: null                             :: rest ->
                     RSSymStartSymEnd (so, None) :: parseArgs rest
-                | null                           :: (:? (SizeSpecT option) as fo)    :: rest ->
+                | null                           :: (:? (SizeSpec option) as fo)    :: rest ->
                     RSSymStartSymEnd (None, fo) :: parseArgs rest
                 | (:? (ExprT option) as so)      :: (:? (PlusElems option) as fo)    :: rest ->
                     if typename so.Value <> TypeName.ofType<int> then
@@ -1777,7 +1777,7 @@ module Expr =
                     RSSymStartSymEnd (None, None) :: parseArgs rest
 
                 // items
-                | (:? SizeSpecT as s)     :: rest -> RSSymElem s :: parseArgs rest
+                | (:? SizeSpec as s)     :: rest -> RSSymElem s :: parseArgs rest
                 | (:? int64 as s)         :: rest when s = NewAxis -> RSNewAxis :: parseArgs rest
                 | (:? int64 as s)         :: rest when s = Fill ->    RSAllFill :: parseArgs rest
                 | (:? ExprT as e)         :: rest -> if typename e <> TypeName.ofType<int> then
@@ -1787,7 +1787,7 @@ module Expr =
                 | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
             /// converts a full range specification into a simple range specification
-            let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpecT) (simpleRs: ExprRngsSpecT) (newShape: ShapeSpecT) =
+            let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpec) (simpleRs: ExprRngsSpecT) (newShape: ShapeSpec) =
                 match rngs, shps with
                 | RSSymElem e :: rngs, _::shps -> splitFRS rngs shps (SRSSymStartSymEnd (e, Some e)::simpleRs) newShape
                 | RSDynElem e :: rngs, _::shps -> splitFRS rngs shps (SRSDynStartSymSize (e, SizeSpec.one)::simpleRs) newShape

@@ -21,7 +21,7 @@ module ModelContextTypes =
 
     /// Model evaluation device specification.
     type IDevice =
-        abstract member Allocator:      NShapeSpecT -> Tensor<'T> 
+        abstract member Allocator:      NShapeSpec -> Tensor<'T> 
         abstract member ToDev:          Tensor<'T> -> Tensor<'T>
         abstract member ToHost:         Tensor<'T> -> Tensor<'T>
         abstract member Compiler:       IUExprCompiler
@@ -245,13 +245,13 @@ module ModelContextTypes =
 
         /// Creates and returns a model variable.
         [<RequiresExplicitTypeArguments>]
-        member this.Var<'V> (name: string) (shape: ShapeSpecT) : ExprT =
+        member this.Var<'V> (name: string) (shape: ShapeSpec) : ExprT =
             let v = Expr.var<'V> (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v)
             v
 
         /// Creates and returns a model parameter.
-        member this.Param (name: string, shape: ShapeSpecT, ?initializer: Initializer<'T>) =
+        member this.Param (name: string, shape: ShapeSpec, ?initializer: Initializer<'T>) =
             let initializer = defaultArg initializer defaultInitializer
             if instantiated then failwith "cannot add parameter after model has been instantiated"
 
@@ -345,7 +345,7 @@ module ModelContextTypes =
 
         /// instantiates the model with numeric sizes for all size symbols and initializes 
         /// the parameter values
-        member this.Instantiate (device: IDevice, ?sizeValues: Map<SizeSpecT, int64>, ?canDelay: bool) =
+        member this.Instantiate (device: IDevice, ?sizeValues: Map<SizeSpec, int64>, ?canDelay: bool) =
             let canDelay = defaultArg canDelay true
             let sizeValues = defaultArg sizeValues Map.empty
             if isSubModule then failwith "a submoule cannot be instantiated"
