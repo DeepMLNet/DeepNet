@@ -1094,7 +1094,7 @@ module CudaExecUnit =
         // or runtime (for variable arrays)
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
-            | MemZero _
+            | StorageManikin.Zero _
             | MemConst _
             | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
             | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]

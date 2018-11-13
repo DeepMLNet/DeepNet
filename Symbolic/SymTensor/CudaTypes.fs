@@ -213,7 +213,7 @@ module CudaExecEnv =
     /// Gets device memory and offset in bytes for an internal allocation or external reference.
     let getDevMem (env: CudaExecEnvT) (memManikin: StorageManikin) =
         match memManikin with
-        | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0L), SizeT 0L), 0L
+        | StorageManikin.Zero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0L), SizeT 0L), 0L
         | MemAlloc im -> env.InternalMem.[im], 0L
         | MemExternal vs ->
             let ev = env.ExternalVar.[vs]
@@ -374,7 +374,7 @@ module ArgTemplates =
             member this.GetArg env strm = 
                 let storage = 
                     match memManikin with
-                    | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0)
+                    | StorageManikin.Zero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0)
                     | MemAlloc im -> env.InternalMem.[im]
                     | MemExternal vs -> (env.ExternalVar.[vs].Storage :?> ITensorCudaStorage).ByteData
                     | MemConst mc -> (env.ConstantValues.[mc].Storage :?> ITensorCudaStorage).ByteData

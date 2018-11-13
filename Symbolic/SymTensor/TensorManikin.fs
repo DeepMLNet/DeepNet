@@ -70,10 +70,10 @@ module TensorManikinTypes =
     /// Memory can either be internal to an expression workspace or external, e.g.
     /// used by a variable passed in variable at runtime.
     /// Memory can either be on the host or the accelerator.
-    [<StructuredFormatDisplay("{Pretty}")>]
+    [<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
     type StorageManikin =
         /// no memory (represents a null pointer)
-        | MemZero of TypeNameT
+        | Zero of TypeNameT
         /// a memory allocation internal to the workspace
         | MemAlloc of MemAllocManikinT
         /// an external variable
@@ -83,7 +83,7 @@ module TensorManikinTypes =
         with 
             member this.Pretty = 
                 match this with
-                | MemZero t -> sprintf "MemZero %A" t.Type
+                | StorageManikin.Zero t -> sprintf "StorageManikin.Zero %A" t.Type
                 | MemAlloc a -> sprintf "MemAlloc %d (%d KB)" a.Id (a.ByteSize / 1024L)
                 | MemExternal vs -> sprintf "MemExternal %A" vs
                 | MemConst c -> sprintf "MemConst %d" c.Id
@@ -134,7 +134,7 @@ module TensorManikinTypes =
             | MemAlloc {TypeName=tn} -> tn
             | MemExternal vs -> vs.TypeName
             | MemConst mc -> mc.TypeName
-            | MemZero t -> t
+            | StorageManikin.Zero t -> t
 
         member this.NewView (layout: TensorLayout) = 
             TensorManikin(layout, storage) 
@@ -164,7 +164,7 @@ module TensorManikin =
     /// creates a new ArrayNDManikinT using no storage
     let newZero typ shape =
         let layout = TensorLayout.newRowMajor shape
-        TensorManikin (layout, MemZero typ)
+        TensorManikin (layout, StorageManikin.Zero typ)
 
     /// creates a new MemoryManikinT and a new TensorManikinT with C-order
     let newRowMajor memAllocator typ shape = 
