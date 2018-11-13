@@ -45,10 +45,10 @@ module CudaElemExpr =
         | Some v -> sprintf "%dLL" v
         | None ->
             match SizeSpec.simplify ss with 
-            | Base (BaseSize.Fixed c) -> sprintf "%dLL" c.IntValue
-            | Base (BaseSize.Sym sym) -> sizeSymVars.[sym]
-            | Broadcast -> "1LL"
-            | Multinom m ->
+            | SizeSpec.Base (BaseSize.Fixed c) -> sprintf "%dLL" c.IntValue
+            | SizeSpec.Base (BaseSize.Sym sym) -> sizeSymVars.[sym]
+            | SizeSpec.Broadcast -> "1LL"
+            | SizeSpec.Multinom m ->
                 m.Products
                 |> Map.toSeq
                 |> Seq.map (fun (sp, fac) ->

@@ -264,7 +264,7 @@ module Optimizer =
                     let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
                     let insSubst1 =
                         dimRng
-                        |> List.map (fun d -> ElemExpr.idxSymbol d, Base (BaseSize.Sym (rplSym d)))
+                        |> List.map (fun d -> ElemExpr.idxSymbol d, SizeSpec.Base (BaseSize.Sym (rplSym d)))
                         |> Map.ofList
                     let insSubst2 =
                         dimRng

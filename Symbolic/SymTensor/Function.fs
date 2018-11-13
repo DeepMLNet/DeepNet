@@ -78,14 +78,14 @@ module VarEnv =
                         failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
                             vSym vSymShp vVal.Shape
                     match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-                    | Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
-                    | Base (BaseSize.Fixed f) -> 
+                    | SizeSpec.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
+                    | SizeSpec.Base (BaseSize.Fixed f) -> 
                         if f .= svVal then env
                         else failShape ()
-                    | Broadcast ->
+                    | SizeSpec.Broadcast ->
                         if 1L = svVal then env
                         else failShape ()
-                    | Multinom m -> failShape ()
+                    | SizeSpec.Multinom m -> failShape ()
                 ) env)
 
 

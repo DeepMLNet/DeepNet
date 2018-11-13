@@ -184,40 +184,40 @@ module SymShapeInternals =
 open SymShapeInternals
 
 /// symbolic size specification of a dimension (axis)
-[<StructuralEquality; StructuralComparison; StructuredFormatDisplay ("{Pretty}")>]
+[<RequireQualifiedAccess; StructuralEquality; StructuralComparison; StructuredFormatDisplay ("{Pretty}")>]
 type SizeSpec =
     | Base of BaseSize               // fixed size or symbol
-    | Broadcast                       // size 1 and broadcastable
+    | Broadcast                      // size 1 and broadcastable
     | Multinom of SizeMultinom       // product of fixed sizes and symbols
 
     /// simplify size specification
     static member Simplify (ss: SizeSpec) =
         match ss with
-        | Multinom m -> 
+        | SizeSpec.Multinom m -> 
             match m.Products |> Map.toList with
-            | [SizeProduct.SingleSymbol s, Frac.One] -> Base (BaseSize.Sym s)
-            | [SizeProduct.Empty, f] -> Base (BaseSize.Fixed f)
-            | [] -> Base (BaseSize.Fixed Frac.zero)
+            | [SizeProduct.SingleSymbol s, Frac.One] -> SizeSpec.Base (BaseSize.Sym s)
+            | [SizeProduct.Empty, f] -> SizeSpec.Base (BaseSize.Fixed f)
+            | [] -> SizeSpec.Base (BaseSize.Fixed Frac.zero)
             | _ -> ss
         | _ -> ss
 
-    static member get_Zero () = Base (BaseSize.Fixed Frac.zero)
+    static member get_Zero () = SizeSpec.Base (BaseSize.Fixed Frac.zero)
 
     static member (~-) (ssa: SizeSpec) =
         match ssa with
-        | Base (BaseSize.Fixed Frac.Zero) -> ssa
-        | Base b -> Multinom (-SizeMultinom(b))
-        | Broadcast -> Multinom (-SizeMultinom(BaseSize.Fixed Frac.one))
-        | Multinom m -> Multinom (-m)
+        | SizeSpec.Base (BaseSize.Fixed Frac.Zero) -> ssa
+        | SizeSpec.Base b -> SizeSpec.Multinom (-SizeMultinom(b))
+        | SizeSpec.Broadcast -> SizeSpec.Multinom (-SizeMultinom(BaseSize.Fixed Frac.one))
+        | SizeSpec.Multinom m -> SizeSpec.Multinom (-m)
         |> SizeSpec.Simplify
 
     static member (+) (ssa: SizeSpec, ssb: SizeSpec) =
         match ssa, ssb with
-        | Base (BaseSize.Fixed Frac.Zero), ss | ss, Base (BaseSize.Fixed Frac.Zero) -> ss
-        | Broadcast, ss | ss, Broadcast -> ss + (Base (BaseSize.Fixed Frac.one))
-        | Multinom ma, Multinom mb -> Multinom (ma + mb)
-        | Multinom m, Base b | Base b, Multinom m -> Multinom (m + SizeMultinom(b))
-        | Base ba, Base bb -> Multinom (SizeMultinom(ba) + SizeMultinom(bb))
+        | SizeSpec.Base (BaseSize.Fixed Frac.Zero), ss | ss, SizeSpec.Base (BaseSize.Fixed Frac.Zero) -> ss
+        | SizeSpec.Broadcast, ss | ss, SizeSpec.Broadcast -> ss + (SizeSpec.Base (BaseSize.Fixed Frac.one))
+        | SizeSpec.Multinom ma, SizeSpec.Multinom mb -> SizeSpec.Multinom (ma + mb)
+        | SizeSpec.Multinom m, SizeSpec.Base b | SizeSpec.Base b, SizeSpec.Multinom m -> SizeSpec.Multinom (m + SizeMultinom(b))
+        | SizeSpec.Base ba, SizeSpec.Base bb -> SizeSpec.Multinom (SizeMultinom(ba) + SizeMultinom(bb))
         |> SizeSpec.Simplify
 
     static member (-) (ssa: SizeSpec, ssb: SizeSpec) =
@@ -225,36 +225,36 @@ type SizeSpec =
 
     static member (*) (ssa: SizeSpec, ssb: SizeSpec) =
         match ssa, ssb with
-        | Base (BaseSize.Fixed Frac.Zero), _ | _, Base (BaseSize.Fixed Frac.Zero) -> Base (BaseSize.Fixed Frac.zero)
-        | Broadcast, ss | ss, Broadcast -> ss
-        | Multinom ma, Multinom mb -> Multinom (ma * mb)
-        | Multinom m, Base b | Base b, Multinom m -> Multinom (m * SizeMultinom(b))
-        | Base ba, Base bb -> Multinom (SizeMultinom(ba) * SizeMultinom(bb))
+        | SizeSpec.Base (BaseSize.Fixed Frac.Zero), _ | _, SizeSpec.Base (BaseSize.Fixed Frac.Zero) -> SizeSpec.Base (BaseSize.Fixed Frac.zero)
+        | SizeSpec.Broadcast, ss | ss, SizeSpec.Broadcast -> ss
+        | SizeSpec.Multinom ma, SizeSpec.Multinom mb -> SizeSpec.Multinom (ma * mb)
+        | SizeSpec.Multinom m, SizeSpec.Base b | SizeSpec.Base b, SizeSpec.Multinom m -> SizeSpec.Multinom (m * SizeMultinom(b))
+        | SizeSpec.Base ba, SizeSpec.Base bb -> SizeSpec.Multinom (SizeMultinom(ba) * SizeMultinom(bb))
         |> SizeSpec.Simplify
 
     static member Pow (ssa: SizeSpec, pow: int64) =
         match pow with
-        | 0L -> Base (BaseSize.Fixed Frac.one)
+        | 0L -> SizeSpec.Base (BaseSize.Fixed Frac.one)
         | 1L -> ssa
         | _ ->
             match ssa with
-            | Base (BaseSize.Fixed f) -> Base (BaseSize.Fixed (pown f (int32 pow)))
-            | Base (BaseSize.Sym s) -> Multinom (SizeMultinom (BaseSize.Sym s, pow))
-            | Broadcast -> Broadcast
-            | Multinom m ->
+            | SizeSpec.Base (BaseSize.Fixed f) -> SizeSpec.Base (BaseSize.Fixed (pown f (int32 pow)))
+            | SizeSpec.Base (BaseSize.Sym s) -> SizeSpec.Multinom (SizeMultinom (BaseSize.Sym s, pow))
+            | SizeSpec.Broadcast -> SizeSpec.Broadcast
+            | SizeSpec.Multinom m ->
                 m
                 |> Seq.replicate (int32 pow)
                 |> Seq.reduce (*)
-                |> Multinom
+                |> SizeSpec.Multinom
         |> SizeSpec.Simplify
 
     // operations with FracT
-    static member (+) (ssa: SizeSpec, ssb: Frac) = ssa + (Base (BaseSize.Fixed ssb))
-    static member (+) (ssa: Frac, ssb: SizeSpec) = (Base (BaseSize.Fixed ssa)) + ssb
-    static member (-) (ssa: SizeSpec, ssb: Frac) = ssa - (Base (BaseSize.Fixed ssb))
-    static member (-) (ssa: Frac, ssb: SizeSpec) = (Base (BaseSize.Fixed ssa)) - ssb
-    static member (*) (ssa: SizeSpec, ssb: Frac) = ssa * (Base (BaseSize.Fixed ssb))
-    static member (*) (ssa: Frac, ssb: SizeSpec) = (Base (BaseSize.Fixed ssa)) * ssb
+    static member (+) (ssa: SizeSpec, ssb: Frac) = ssa + (SizeSpec.Base (BaseSize.Fixed ssb))
+    static member (+) (ssa: Frac, ssb: SizeSpec) = (SizeSpec.Base (BaseSize.Fixed ssa)) + ssb
+    static member (-) (ssa: SizeSpec, ssb: Frac) = ssa - (SizeSpec.Base (BaseSize.Fixed ssb))
+    static member (-) (ssa: Frac, ssb: SizeSpec) = (SizeSpec.Base (BaseSize.Fixed ssa)) - ssb
+    static member (*) (ssa: SizeSpec, ssb: Frac) = ssa * (SizeSpec.Base (BaseSize.Fixed ssb))
+    static member (*) (ssa: Frac, ssb: SizeSpec) = (SizeSpec.Base (BaseSize.Fixed ssa)) * ssb
 
     // operations with int
     static member (+) (ssa: SizeSpec, ssb: int64) = ssa + Frac ssb
@@ -271,7 +271,7 @@ type SizeSpec =
     /// equal size ignoring broadcastability
     static member (.=) (ssa: SizeSpec, ssb: SizeSpec) = 
         match SizeSpec.Simplify ssa, SizeSpec.Simplify ssb with
-        | Broadcast, Base (BaseSize.Fixed Frac.One) | Base (BaseSize.Fixed Frac.One), Broadcast -> true
+        | SizeSpec.Broadcast, SizeSpec.Base (BaseSize.Fixed Frac.One) | SizeSpec.Base (BaseSize.Fixed Frac.One), SizeSpec.Broadcast -> true
         | a, b -> a = b
 
     /// unequal size ignoring broadcastability
@@ -280,10 +280,10 @@ type SizeSpec =
     /// the set of all contained SizeSymbols
     member this.ContainedSizeSymbols =
         match this with
-        | Base (BaseSize.Sym s)   -> Set [s]
-        | Base (BaseSize.Fixed _) -> Set.empty
-        | Broadcast      -> Set.empty
-        | Multinom m     -> m.ContainedSizeSymbols
+        | SizeSpec.Base (BaseSize.Sym s)   -> Set [s]
+        | SizeSpec.Base (BaseSize.Fixed _) -> Set.empty
+        | SizeSpec.Broadcast      -> Set.empty
+        | SizeSpec.Multinom m     -> m.ContainedSizeSymbols
             
     /// true if the specified SizeSymbol occurs in this SizeSpec
     member this.ContainsSymbol sym =
@@ -291,9 +291,9 @@ type SizeSpec =
 
     member this.Pretty =
         match this with
-        | Base b -> sprintf "%A" b
-        | Broadcast -> "1*"
-        | Multinom m -> sprintf "%A" m
+        | SizeSpec.Base b -> sprintf "%A" b
+        | SizeSpec.Broadcast -> "1*"
+        | SizeSpec.Multinom m -> sprintf "%A" m
 
     /// simplify size specification
     static member simplify (ss: SizeSpec) = SizeSpec.Simplify ss
@@ -307,39 +307,39 @@ type SizeSpec =
     static member equalWithoutBroadcastability (ssa: SizeSpec) (ssb: SizeSpec) = ssa .= ssb
 
     /// size zero
-    static member zero = Base (BaseSize.Fixed Frac.zero)
+    static member zero = SizeSpec.Base (BaseSize.Fixed Frac.zero)
 
     /// not-broadcastable size one
-    static member one = Base (BaseSize.Fixed Frac.one)
+    static member one = SizeSpec.Base (BaseSize.Fixed Frac.one)
 
     /// fixed integer size
-    static member fix s = Base (BaseSize.Fixed (Frac s))
+    static member fix s = SizeSpec.Base (BaseSize.Fixed (Frac s))
 
     /// fixed fractional size
-    static member fixFrac nom dnm = Base (BaseSize.Fixed (Frac (nom, dnm)))
+    static member fixFrac nom dnm = SizeSpec.Base (BaseSize.Fixed (Frac (nom, dnm)))
 
     /// symbolic size
-    static member symbol s = Base (BaseSize.Sym {Name=s})
+    static member symbol s = SizeSpec.Base (BaseSize.Sym {Name=s})
 
     /// broadcastable size one
-    static member broadcastable = Broadcast
+    static member broadcastable = SizeSpec.Broadcast
 
     /// extracts the size symbol
     static member extractSymbol s =
         match s with
-        | Base (BaseSize.Sym sym) -> sym
+        | SizeSpec.Base (BaseSize.Sym sym) -> sym
         | _ -> failwith "specified SizeSpec is not a symbol"
 
     /// substitute the symbols into the SizeSpec and simplifies it
     static member substSymbols symVals ss =
         match ss with
-        | Base (BaseSize.Sym sym) ->
+        | SizeSpec.Base (BaseSize.Sym sym) ->
             match Map.tryFind sym symVals with
             | Some sv -> SizeSpec.substSymbols symVals sv
             | None -> ss
-        | Base (BaseSize.Fixed _) -> ss
-        | Broadcast -> ss
-        | Multinom m -> 
+        | SizeSpec.Base (BaseSize.Fixed _) -> ss
+        | SizeSpec.Broadcast -> ss
+        | SizeSpec.Multinom m -> 
             // rebuild multinom with substituted values
             (zero, m.Products)
             ||> Map.fold 
@@ -348,7 +348,7 @@ type SizeSpec =
                         (one, prod.Symbols)
                         ||> Map.fold 
                             (fun substProd sBaseSym sPow ->
-                                let sBaseSubst = SizeSpec.substSymbols symVals (Base (BaseSize.Sym sBaseSym))
+                                let sBaseSubst = SizeSpec.substSymbols symVals (SizeSpec.Base (BaseSize.Sym sBaseSym))
                                 substProd * (sBaseSubst ** sPow))
                     substSum + fac * substProd)
         |> SizeSpec.simplify
@@ -356,8 +356,8 @@ type SizeSpec =
     /// evaluate symbolic size specification to a number
     static member tryEval ss =
         match SizeSpec.simplify ss with
-        | Base (BaseSize.Fixed (Frac.Integral i)) -> Some i
-        | Broadcast -> Some 1L
+        | SizeSpec.Base (BaseSize.Fixed (Frac.Integral i)) -> Some i
+        | SizeSpec.Broadcast -> Some 1L
         | _ -> None
 
     /// true, if evaluation to numeric shape is possible
@@ -395,7 +395,7 @@ module ShapeSpec =
         sa |> List.without ax
 
     let insertBroadcastAxis ax (sa: ShapeSpec) : ShapeSpec =
-        sa |> insertAxis ax Broadcast
+        sa |> insertAxis ax SizeSpec.Broadcast
 
     let set ax size (sa: ShapeSpec) : ShapeSpec =
         sa |> List.set ax size
@@ -431,11 +431,11 @@ module ShapeSpec =
 
     /// pads shape by inserting broadcast dimension on the left
     let padLeft (sa: ShapeSpec) : ShapeSpec =
-        (Broadcast)::sa
+        (SizeSpec.Broadcast)::sa
 
     /// pads shape by inserting broadcast dimension on the right
     let padRight (sa: ShapeSpec) : ShapeSpec =
-        sa @ [Broadcast]
+        sa @ [SizeSpec.Broadcast]
 
     /// pads shape from the left to specified number of dimensions
     let padTo dims saIn =
@@ -463,7 +463,7 @@ module ShapeSpec =
 
     let broadcast (sa: ShapeSpec) dim size : ShapeSpec =
         match sa.[dim] with
-        | Broadcast -> List.set dim size sa
+        | SizeSpec.Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
     let broadcastToShape (trgtShp: ShapeSpec) (saIn: ShapeSpec) : ShapeSpec =
@@ -472,7 +472,7 @@ module ShapeSpec =
             failwithf "cannot broadcast shape %A to shape %A" saIn trgtShp
         for d=0 to nDim trgtShp - 1 do
             match sa.[d], trgtShp.[d] with
-            | al, bl when al = Broadcast -> sa <- broadcast sa d bl
+            | al, bl when al = SizeSpec.Broadcast -> sa <- broadcast sa d bl
             | al, bl when al = bl -> ()
             | _ -> failwithf "cannot broadcast shape %A to %A in dimension %d" sa trgtShp d
         sa
@@ -483,8 +483,8 @@ module ShapeSpec =
             if not (d < nDim sa && d < nDim sb) then
                 failwithf "cannot broadcast shapes %A and %A to same size in non-existant dimension %d" sa sb d
             match sa.[d], sb.[d] with
-            | al, bl when al = Broadcast -> sa <- broadcast sa d bl
-            | al, bl when bl = Broadcast -> sb <- broadcast sb d al
+            | al, bl when al = SizeSpec.Broadcast -> sa <- broadcast sa d bl
+            | al, bl when bl = SizeSpec.Broadcast -> sb <- broadcast sb d al
             | al, bl when (if mustEqual then al = bl else true) -> ()        
             | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
@@ -495,8 +495,8 @@ module ShapeSpec =
             if not (sas |> List.forall (fun sa -> d < nDim sa)) then
                 failwithf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
             let ls = sas |> List.map (fun sa -> sa.[d])
-            if ls |> List.exists ((=) Broadcast) then
-                let nonBc = ls |> List.filter (fun l -> l <> Broadcast)
+            if ls |> List.exists ((=) SizeSpec.Broadcast) then
+                let nonBc = ls |> List.filter (fun l -> l <> SizeSpec.Broadcast)
                 match Set nonBc |> Set.count with
                 | 0 -> ()
                 | 1 ->
@@ -525,16 +525,16 @@ module ShapeSpec =
 
     let enableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
-        | Base (BaseSize.Fixed Frac.One) | Broadcast -> List.set dim Broadcast sa
+        | SizeSpec.Base (BaseSize.Fixed Frac.One) | SizeSpec.Broadcast -> List.set dim SizeSpec.Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
     let disableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
-        | Base (BaseSize.Fixed Frac.One) | Broadcast -> List.set dim (Base (BaseSize.Fixed Frac.one)) sa
+        | SizeSpec.Base (BaseSize.Fixed Frac.One) | SizeSpec.Broadcast -> List.set dim (SizeSpec.Base (BaseSize.Fixed Frac.one)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
     let disableAllBroadcasts sa : ShapeSpec =
-        List.map (fun ss -> if ss = Broadcast then Base (BaseSize.Fixed Frac.one) else ss) sa
+        List.map (fun ss -> if ss = SizeSpec.Broadcast then SizeSpec.Base (BaseSize.Fixed Frac.one) else ss) sa
         
     /// True if both shape have the same number of elements and 
     /// are both broadcastable or non-broadcastable in each dimension.
@@ -589,16 +589,16 @@ module ShapeSpec =
 
         for l, r in List.zip left right do
             match l with
-            | Base (BaseSize.Fixed _)
-            | Broadcast -> 
+            | SizeSpec.Base (BaseSize.Fixed _)
+            | SizeSpec.Broadcast -> 
                 rightValues.Add (r, l)
-            | Base (BaseSize.Sym s) ->
+            | SizeSpec.Base (BaseSize.Sym s) ->
                 if leftValues.ContainsKey s then
                     let pv = leftValues.[s]
                     rightValues.Add (r, pv)
                 else
-                    leftValues.Add (s, Base (BaseSize.Sym r))
-            | Multinom _ -> failwith "cannot solve with multinoms"
+                    leftValues.Add (s, SizeSpec.Base (BaseSize.Sym r))
+            | SizeSpec.Multinom _ -> failwith "cannot solve with multinoms"
                 
         {
             LeftValues = leftValues |> Map.ofDictionary
