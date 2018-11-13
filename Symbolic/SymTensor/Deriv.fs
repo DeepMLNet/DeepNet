@@ -129,7 +129,7 @@ module Deriv =
                 egExp |> permuteAxes egePerm |> collapse 
             | Subtensor srs ->
                 let agExpanded = zeros (funElems :: (shapeOf a))
-                setSubtensor agExpanded.[SRSAll :: srs] egExp
+                setSubtensor agExpanded.[SimpleRangeSpec.All :: srs] egExp
                 |> collapse 
             | Reshape ss -> eg 
             | DoBroadcast ss -> 
@@ -263,8 +263,8 @@ module Deriv =
                 da .+ db
             | TensorProduct -> failwith "not implemented"
             | SetSubtensor sr ->
-                let bgExpanded = egExp.[SRSAll::sr]
-                let agExpanded = setSubtensor egExp.[SRSAll::sr] (zerosLike bgExpanded)
+                let bgExpanded = egExp.[SimpleRangeSpec.All::sr]
+                let agExpanded = setSubtensor egExp.[SimpleRangeSpec.All::sr] (zerosLike bgExpanded)
                 (agExpanded |> collapse) .+ (bgExpanded |> collapse)
 
         | Nary(op, es) ->
@@ -403,9 +403,9 @@ module Deriv =
 
                 // set Jacobian w.r.t. input argument argIdx specification
                 let slice = [
-                    yield RSAll                         // function element axis
-                    for d=0 to liDims-1 do yield RSAll  // derivative axes
-                    yield RSSymElem (spec.Length - 1L)  // sequence slice axis
+                    yield RangeSpec.All                         // function element axis
+                    for d=0 to liDims-1 do yield RangeSpec.All  // derivative axes
+                    yield RangeSpec.SymElem (spec.Length - 1L)  // sequence slice axis
                 ]
                 argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=None} |> ignore
 
@@ -421,10 +421,10 @@ module Deriv =
                 
                 // set Jacobian w.r.t. input argument argIdx specification
                 let slice = [
-                    yield RSAll                                 // function element axis
-                    for d=0 to sliceDim-1 do yield RSAll        // derivative axes
-                    yield RSAll                                 // sequence slice axis
-                    for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
+                    yield RangeSpec.All                                 // function element axis
+                    for d=0 to sliceDim-1 do yield RangeSpec.All        // derivative axes
+                    yield RangeSpec.All                                 // sequence slice axis
+                    for d=sliceDim to liDims-1 do yield RangeSpec.All   // derivative axes
                 ]
                 argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
@@ -453,11 +453,11 @@ module Deriv =
                 // It is available in the last "Delay" steps of the derivative loop port.
                 let sliceDim = spec.Channels.[pp.Channel].SliceDim
                 let slice = [
-                    yield RSAll                                 // function element axis
-                    for d=0 to sliceDim-1 do yield RSAll        // derivative axes
-                    yield RSSymStartSymEnd                      // sequence slice axis
+                    yield RangeSpec.All                                 // function element axis
+                    for d=0 to sliceDim-1 do yield RangeSpec.All        // derivative axes
+                    yield RangeSpec.SymStartSymEnd                      // sequence slice axis
                         (Some (spec.Length - pp.Delay), Some (spec.Length - 1L))                
-                    for d=sliceDim to liDims-1 do yield RSAll   // derivative axes
+                    for d=sliceDim to liDims-1 do yield RangeSpec.All   // derivative axes
                 ]
                 argIdxDerivs.[pp.InitialArg].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
@@ -546,9 +546,9 @@ module Deriv =
                     let revPortSeq = portSeq |> Expr.reverseAxis sliceDim
 
                     let delaySlice : FullExprRngsSpecT = [
-                        for d=0 to sliceDim-1 do yield RSAll 
-                        yield RSSymStartSymEnd (Some pp.Delay, None)
-                        for d=sliceDim to portExpr.NDims-1 do yield RSAll
+                        for d=0 to sliceDim-1 do yield RangeSpec.All 
+                        yield RangeSpec.SymStartSymEnd (Some pp.Delay, None)
+                        for d=sliceDim to portExpr.NDims-1 do yield RangeSpec.All
                     ]
                     let delayedPortSeq = revPortSeq.[delaySlice]
 

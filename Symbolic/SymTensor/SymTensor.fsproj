@@ -28,6 +28,8 @@
     <Compile Include="DiskMapOld.fs" />
 
     <Compile Include="Debug.fs" />
+
+    <Compile Include="Frac.fs" />
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />

@@ -147,16 +147,16 @@ module UExprRngsSpec =
         ||> List.mapFold (fun dynExprs rng ->
             let idx = List.length dynExprs 
             match rng with
-            | SRSSymStartSymEnd  (s, fo)     -> SRSSymStartSymEnd (s, fo),       dynExprs
-            | SRSDynStartSymSize (s, size)   -> SRSDynStartSymSize (idx, size),  dynExprs @ [s])
+            | SimpleRangeSpec.SymStartSymEnd  (s, fo)     -> SimpleRangeSpec.SymStartSymEnd (s, fo),       dynExprs
+            | SimpleRangeSpec.DynStartSymSize (s, size)   -> SimpleRangeSpec.DynStartSymSize (idx, size),  dynExprs @ [s])
 
     /// converts a UExprRngSpecT to a ExprRngsSpecT
     let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT list)  =
         if drs |> List.exists (fun dr -> Expr.typename dr <> TypeName.ofType<int>) then
             failwith "need inttype for range spec"
         match srs, drs with
-        | SRSSymStartSymEnd (s, fo) :: srs, _         -> SRSSymStartSymEnd (s, fo)   :: toExprRngsSpec srs drs
-        | SRSDynStartSymSize (_, f) :: srs, dr :: rdrs-> SRSDynStartSymSize (dr, f)  :: toExprRngsSpec srs rdrs
+        | SimpleRangeSpec.SymStartSymEnd (s, fo) :: srs, _         -> SimpleRangeSpec.SymStartSymEnd (s, fo)   :: toExprRngsSpec srs drs
+        | SimpleRangeSpec.DynStartSymSize (_, f) :: srs, dr :: rdrs-> SimpleRangeSpec.DynStartSymSize (dr, f)  :: toExprRngsSpec srs rdrs
         | []                              , []        -> []
         | _                               , _         -> failwith "invalid unified subtensor spec"
 
@@ -168,13 +168,13 @@ module UExprRngsSpec =
         if shp.Length <> srs.Length then failRng ()
         (shp, srs) ||> List.iter2 (fun size rng ->           
             match rng with
-            | SRSSymStartSymEnd (s, fo) ->
+            | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
                 let s, fo = SizeSpec.eval s, Option.map SizeSpec.eval fo
                 if not (0L <= s && s < size) then failRng ()
                 match fo with
                 | Some fo when not (0L <= fo && fo < size && fo >= s-1L) -> failRng ()
                 | _ -> ()
-            | SRSDynStartSymSize _ -> ())        
+            | SimpleRangeSpec.DynStartSymSize _ -> ())        
         
 
 /// Functions for dealing with unified expressions.
@@ -394,10 +394,10 @@ module UExpr =
                         let offset = getChFirst loopExpr loopSpec ch
                         let offsetSliceRng =
                             match rng.[sliceDim] with
-                            | SRSSymStartSymEnd (first, Some last) -> 
-                                SRSSymStartSymEnd (first - offset, Some (last - offset))
-                            | SRSSymStartSymEnd (first, None) -> 
-                                SRSSymStartSymEnd (first - offset, None)
+                            | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> 
+                                SimpleRangeSpec.SymStartSymEnd (first - offset, Some (last - offset))
+                            | SimpleRangeSpec.SymStartSymEnd (first, None) -> 
+                                SimpleRangeSpec.SymStartSymEnd (first - offset, None)
                             | _ -> failwith "static range expected"
                         let offsetRng = rng |> List.set sliceDim offsetSliceRng
                         //printfn "Adjusting channel %A slice from %A to %A." ch rng offsetRng

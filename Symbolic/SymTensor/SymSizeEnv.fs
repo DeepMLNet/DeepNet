@@ -29,10 +29,10 @@ module SymSizeEnv =
     let substRange env (srs: SimpleRangesSpec<_>) = 
         srs
         |> List.map (function
-                     | SRSSymStartSymEnd (s, fo) -> 
-                         SRSSymStartSymEnd (subst env s, Option.map (subst env) fo)
-                     | SRSDynStartSymSize (s, elems) ->
-                         SRSDynStartSymSize (s, subst env elems))
+                     | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+                         SimpleRangeSpec.SymStartSymEnd (subst env s, Option.map (subst env) fo)
+                     | SimpleRangeSpec.DynStartSymSize (s, elems) ->
+                         SimpleRangeSpec.DynStartSymSize (s, subst env elems))
 
     /// adds inferred symbol value
     let add sym value env =

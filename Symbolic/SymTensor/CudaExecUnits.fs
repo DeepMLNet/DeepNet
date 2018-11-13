@@ -850,11 +850,11 @@ module CudaExecUnit =
         // the indices
         let rec rngToIdxPntrs rngs rngManikins =
             match rngs, rngManikins with
-            | SRSDynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
+            | SimpleRangeSpec.DynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
                 // for dynamic range pass pointer to result of expression calculating the index
                 (IdxTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rrngManikins 
-            | SRSSymStartSymEnd _ :: rrngs, _ ->
+            | SimpleRangeSpec.SymStartSymEnd _ :: rrngs, _ ->
                 // symbolic range has already been applied, pass null (meaning no offset to add)
                 (IdxTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rngManikins 

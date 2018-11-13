@@ -4,7 +4,7 @@ open DeepNet.Utils
 
 
 /// A symbolic size.
-[<StructuredFormatDisplay ("\"{Name}\"")>]
+[<Struct; StructuredFormatDisplay ("\"{Name}\"")>]
 type SizeSymbol = {
     /// identifier
     Name:       string
@@ -15,109 +15,6 @@ type SizeSymbol = {
     /// creates a symbolic size with the specified name
     static member ofName name = { Name=name }
 
-
-/// Internal types to represent fractions.
-module FracInternals =
-
-    /// greatest common divisor of a and b 
-    let rec gcd a b =
-        // Euclidean algorithm
-        if a < 0L then gcd -a b
-        elif b < 0L then gcd a -b
-        elif a = 0L then b
-        elif b = 0L then a
-        elif a < b then gcd b a
-        else
-            //let q = a / b
-            let r = a % b
-            if r = 0L then b
-            else gcd b r
-
-    /// least common multiple of a and b
-    let lcm a b =
-        abs (a * b) / gcd a b
-
-    /// A rational number.
-    [<Struct; StructuredFormatDisplay("{Pretty}")>]
-    type Frac = 
-        val Nom: int64
-        val Dnm: int64
-
-        new (nom, dnm) = 
-            let nom, dnm =
-                match dnm with
-                | 0L -> failwith "denominator cannot be zero"
-                | _ when dnm < 0L -> -nom, -dnm
-                | _ -> nom, dnm
-            let cd = gcd nom dnm
-            {Nom=nom/cd; Dnm=dnm/cd}
-        new (value) = Frac (value, 1L)               
-
-        static member (~-) (a: Frac) = Frac (-a.Nom, a.Dnm)
-        static member (+) (a: Frac, b: Frac) = Frac (a.Nom * b.Dnm + b.Nom * a.Dnm, a.Dnm * b.Dnm)
-        static member (-) (a: Frac, b: Frac) = a + (-b)
-        static member (*) (a: Frac, b: Frac) = Frac (a.Nom * b.Nom, a.Dnm * b.Dnm)
-        static member (/) (a: Frac, b: Frac) = Frac (a.Nom * b.Dnm, a.Dnm * b.Nom)
-        static member (.=) (a: Frac, b: Frac) = a = b
-        static member (.<>) (a: Frac, b: Frac) = a <> b
-        static member get_Zero () = Frac (0L)
-        static member get_One () = Frac (1L)
-
-        static member (+) (a: Frac, b: int64) = a + Frac b
-        static member (-) (a: Frac, b: int64) = a - Frac b
-        static member (*) (a: Frac, b: int64) = a * Frac b
-        static member (/) (a: Frac, b: int64) = a / Frac b
-        static member (.=) (a: Frac, b: int64) = a .= Frac b
-        static member (.<>) (a: Frac, b: int64) = a .<> Frac b
-
-        static member (+) (a: int64, b: Frac) = Frac a + b
-        static member (-) (a: int64, b: Frac) = Frac a - b
-        static member (*) (a: int64, b: Frac) = Frac a * b
-        static member (/) (a: int64, b: Frac) = Frac a / b
-        static member (.=) (a: int64, b: Frac) = Frac a .= b
-        static member (.<>) (a: int64, b: Frac) = Frac a .<> b
-         
-        member this.IntValue = 
-            if this.Dnm = 1L then this.Nom
-            else failwithf "%A is not an integer" this
-
-        member this.Pretty =
-            if this.Dnm = 1L then sprintf "%d" this.Nom
-            else sprintf "(%d/%d)" this.Nom this.Dnm
-
-        static member nom (frac: Frac) = frac.Nom
-        static member dnm (frac: Frac) = frac.Dnm
-        static member ofInt i = Frac (i)
-        static member toInt (frac: Frac) = frac.IntValue
-        static member zero = Frac (0L)
-        static member one = Frac (1L)
-
-        static member roundTowardZero (f: Frac) = 
-            Frac (f.Nom / f.Dnm)
-        static member roundAwayFromZero (f: Frac) =
-            if f.Nom % f.Dnm = 0L then
-                Frac (f.Nom / f.Dnm)
-            elif f.Nom > 0L then
-                Frac (f.Nom / f.Dnm + 1L)
-            else
-                Frac (f.Nom / f.Dnm - 1L)
-
-    /// Active patterns for Frac.
-    module Frac =
-        let (|Zero|_|) frac =
-            if frac = zero then Some ()
-            else None
-
-        let (|One|_|) frac =
-            if frac = one then Some ()
-            else None
-
-        let (|Integral|_|) (frac: Frac) =
-            if frac.Dnm = 1L then Some frac.Nom
-            else None
-
-            
-open FracInternals
 
 /// Elementary size specification
 /// Can be either a symbol or a fixed quantity.
@@ -133,6 +30,7 @@ type BaseSize =
         match this with
         | Sym s -> sprintf "%A" s
         | Fixed f -> sprintf "%A" f
+
 
 /// Internal types to represent symbolic sizes.
 module SymShapeInternals =     
@@ -791,71 +689,71 @@ module BaseRangesSpec =
 
 
 /// symbolic/dynamic range specification for one dimension
+[<RequireQualifiedAccess>]
 type RangeSpec<'Dyn> = 
     // ranges with symbolic size (length)
-    | RSSymElem            of SizeSpec                           
-    | RSDynElem            of 'Dyn                                
-    | RSSymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
-    | RSDynStartSymSize    of 'Dyn * SizeSpec                    
-    | RSNewAxis                                                   
-    | RSAllFill                                                   
+    | SymElem            of SizeSpec                           
+    | DynElem            of 'Dyn                                
+    | SymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
+    | DynStartSymSize    of 'Dyn * SizeSpec                    
+    | NewAxis                                                   
+    | AllFill                                                   
     //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
     //| RngDynStartDynEnd     of ExprT<int> * ExprT<int>             // size: dynamic
     //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
     //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
 
-    static member RSAll = RSSymStartSymEnd (None, None)
+    static member All = RangeSpec<'Dyn>.SymStartSymEnd (None, None)
 
 // symbolic/dynamic subtensor specification
-type RangesSpecT<'Dyn> = RangeSpec<'Dyn> list
+type RangesSpec<'Dyn> = RangeSpec<'Dyn> list
 
 /// Simple range specification for one dimension.
-[<StructuredFormatDisplay("{Pretty}")>]
+[<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
 type SimpleRangeSpec<'Dyn> =
-    | SRSSymStartSymEnd     of SizeSpec * (SizeSpec option)
-    | SRSDynStartSymSize    of 'Dyn * SizeSpec                    
+    | SymStartSymEnd     of SizeSpec * (SizeSpec option)
+    | DynStartSymSize    of 'Dyn * SizeSpec                    
 
     member this.Pretty =
         match this with
-        | SRSSymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
-        | SRSSymStartSymEnd (first, None) -> sprintf "%A.." first
-        | SRSDynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
+        | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
+        | SimpleRangeSpec.SymStartSymEnd (first, None) -> sprintf "%A.." first
+        | SimpleRangeSpec.DynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
     
-    static member SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
+    static member All = SimpleRangeSpec<'Dyn>.SymStartSymEnd (SizeSpec.zero, None)
      
-/// Function for working with SimpleRangeSpec.
-module SimpleRangeSpec =
-    open Tensor
-
-    /// evaluate a SimpleRangeSpecT to a RangeT
-    let eval dynEvaluator rs =
+    /// evaluate a SimpleRangeSpec to a Tensor.Rng
+    static member eval dynEvaluator (rs: SimpleRangeSpec<'Dyn>) =
         match rs with
-        | SRSSymStartSymEnd (s, fo) -> 
-            Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
-        | SRSDynStartSymSize (s, elems) -> 
+        | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+            Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+        | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
             let sv = dynEvaluator s
-            Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
+            Tensor.Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
 
-    let canEvalSymbols rs =
+    static member canEvalSymbols (rs: SimpleRangeSpec<'Dyn>) =
         match rs with
-        | SRSSymStartSymEnd (s, fo) ->
+        | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
             SizeSpec.canEval s && Option.forall SizeSpec.canEval fo
-        | SRSDynStartSymSize (_, elems) ->
+        | SimpleRangeSpec.DynStartSymSize (_, elems) ->
             SizeSpec.canEval elems
 
-    let isDynamic rs =
+    static member isDynamic (rs: SimpleRangeSpec<'Dyn>) =
         match rs with
-        | SRSDynStartSymSize _ -> true
+        | SimpleRangeSpec.DynStartSymSize _ -> true
         | _ -> false
 
-    let (|Dynamic|Static|) rs =
-        if isDynamic rs then Dynamic else Static
-
-    let toBaseRangeSpec (size: SizeSpec) rs =
+    static member toBaseRangeSpec (size: SizeSpec) (rs: SimpleRangeSpec<'Dyn>) =
         match rs with
-        | SRSSymStartSymEnd (first, Some last) -> first, last
-        | SRSSymStartSymEnd (first, None) -> first, size - 1L
+        | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> first, last
+        | SimpleRangeSpec.SymStartSymEnd (first, None) -> first, size - 1L
         | _ -> failwithf "cannot convert %A to BaseRangeSpec" rs
+
+/// Active patterns for SimpleRangeSpec.
+module SimpleRangeSpec =
+
+   let (|Dynamic|Static|) rs =
+        if SimpleRangeSpec.isDynamic rs then Dynamic else Static
 
 
 /// Simple range specification for multiple dimensions.
@@ -879,21 +777,5 @@ module SimpleRangesSpec =
 
     let toBaseRangesSpec (shape: ShapeSpec) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
-
-///// U
-//[<AutoOpen>]
-//module RangeSpecTypes =
-//    /// all elements
-//    let RSAll = RSSymStartSymEnd (None, None)
-
-//    // TODO?
-//    /// all elements
-//    //let SRSAll = SRSSymStartSymEnd (SizeSpec.zero, None)
-
-
-
-
-
-
 
 
