@@ -308,7 +308,7 @@ module ExecUnit =
             initItems.AddRange ii
 
         // storage space
-        let memAllocs = ResizeArray<MemAllocManikinT>()
+        let memAllocs = ResizeArray<StorageAlloc>()
         let newMemory typ elements kind = 
             let mem = {Id=memAllocs.Count; TypeName=typ; Elements=elements; Kind=kind}
             memAllocs.Add mem

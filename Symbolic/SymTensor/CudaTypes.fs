@@ -77,7 +77,7 @@ module Types =
         /// textures for interpolator
         InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
         /// values for constants
-        ConstantValues:             Dictionary<MemConstManikinT, ITensor>
+        ConstantValues:             Dictionary<StorageConst, ITensor>
         /// recipe descriptions for sub-workspaces (e.g. loop iteration)
         SubWorkspaces:              ResizeArray<CudaRecipeDescT>
     }
@@ -129,12 +129,12 @@ module Types =
     type CudaExecEnvT = {
         Stream:                 Dictionary<StreamT, CudaStream>
         Event:                  Dictionary<EventObjectT, CudaEvent>
-        InternalMem:            Dictionary<MemAllocManikinT, CudaDeviceVariable<byte>>
-        RegHostMem:             Dictionary<MemAllocManikinT, RegHostMemT>
+        InternalMem:            Dictionary<StorageAlloc, CudaDeviceVariable<byte>>
+        RegHostMem:             Dictionary<StorageAlloc, RegHostMemT>
         mutable ExternalVar:    Map<VarSpecT, ITensor>
         mutable HostVar:        Map<VarSpecT, ITensor>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
-        ConstantValues:         Map<MemConstManikinT, ITensor>
+        ConstantValues:         Map<StorageConst, ITensor>
         SubWorkspaces:          Dictionary<SubWorkspaceT, ICudaExprWorkspace>
     }
     
@@ -183,7 +183,7 @@ module CudaCompileEnv =
 
     /// creates a new constant
     let newConstant (value: ITensor) (env: CudaCompileEnvT) =   
-        let mc : MemConstManikinT = {
+        let mc : StorageConst = {
             Id = env.ConstantValues.Keys.Count
             TypeName = TypeName.ofTypeInst value.DataType
         }

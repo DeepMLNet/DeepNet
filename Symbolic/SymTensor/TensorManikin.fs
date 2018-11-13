@@ -35,32 +35,35 @@ module internal Cpp =
 [<AutoOpen>]
 module TensorManikinTypes = 
 
-    // TODO: extend to multiple devices
-
+    // TODO: remove
     /// Kind of memory allocation.
-    type MemAllocKindT =
+    type MemAllocKind =
         /// device memory allocation
         | MemAllocDev
         /// registered host memory allocation
         | MemAllocRegHost
 
     /// Represents a memory allocation.
-    type MemAllocManikinT = {
+    type StorageAlloc = {
         /// allocation id
         Id:             int
         /// data type
         TypeName:       TypeNameT
         /// number of elements
         Elements:       int64
+        // TODO: remove
         /// kind of allocation
-        Kind:           MemAllocKindT
+        Kind:           MemAllocKind
+        // TODO: add
+        /// storage device
+        //Device:         ITensorDevice
     } with
         /// size of allocation in bytes
         member this.ByteSize = this.Elements * TypeName.size64 this.TypeName
 
     /// Represents constant memory?
-    type MemConstManikinT = {
-        /// allocation id?
+    type StorageConst = {
+        /// allocation id
         Id:             int
         /// data type
         TypeName:       TypeNameT
@@ -75,11 +78,11 @@ module TensorManikinTypes =
         /// no memory (represents a null pointer)
         | Zero of TypeNameT
         /// a memory allocation internal to the workspace
-        | Alloc of MemAllocManikinT
+        | Alloc of StorageAlloc
         /// an external variable
         | External of VarSpecT
         /// a constant array
-        | Const of MemConstManikinT
+        | Const of StorageConst
         with 
             member this.Pretty = 
                 match this with
@@ -96,12 +99,16 @@ module TensorManikinTypes =
         /// storage manikin
         member this.Storage = storage
 
+        /// layout
         member this.Layout = layout
 
+        /// shape
         member this.Shape = this.Layout.Shape
 
+        /// number of dimensions
         member this.NDims = this.Layout.NDims
 
+        // TODO: remove
         /// C++ type name
         member this.CPPType = 
             let dims = TensorLayout.nDims layout
@@ -117,6 +124,7 @@ module TensorManikinTypes =
             sprintf "ArrayND%dD<%s, ShapeStatic%dD%s, StrideStatic%dD%s>" 
                 dims cppDataType dims shapeStr dims strideStr     
 
+        // TODO: remove
         /// C++ type name for ArrayND with static shape and dynamic offset/strides
         member this.DynamicCPPType =
             let dims = TensorLayout.nDims layout
@@ -136,17 +144,21 @@ module TensorManikinTypes =
             | StorageManikin.Const mc -> mc.TypeName
             | StorageManikin.Zero t -> t
 
+        /// Creates a view of underlying data with a new layout.
         member this.NewView (layout: TensorLayout) = 
             TensorManikin(layout, storage) 
 
+        /// type of stored data
         member this.DataType =
             TypeName.getType this.TypeName    
 
+        /// transposed tensor
         member this.T = 
             TensorManikin (TensorLayout.transpose this.Layout, this.Storage)
 
+        /// pretty string
         member this.Pretty = 
-            sprintf "TensorManikinT (Storage=%A; Shape=%A; Strides=%A)" 
+            sprintf "TensorManikin (Storage=%A; Shape=%A; Strides=%A)" 
                 storage layout.Shape layout.Stride
 
         override this.Equals other =
@@ -161,27 +173,27 @@ module TensorManikinTypes =
 
 module TensorManikin =
 
-    /// creates a new ArrayNDManikinT using no storage
+    /// creates a new TensorManikin using no storage
     let newZero typ shape =
         let layout = TensorLayout.newRowMajor shape
         TensorManikin (layout, StorageManikin.Zero typ)
 
-    /// creates a new MemoryManikinT and a new TensorManikinT with C-order
+    /// creates a new StorageManikin and a new TensorManikin with C-order
     let newRowMajor memAllocator typ shape = 
         let layout = TensorLayout.newRowMajor shape
         TensorManikin (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
-    /// creates a new MemoryManikinT and a new TensorManikinT with Fortran-order
+    /// creates a new StorageManikin and a new TensorManikin with Fortran-order
     let newColumnMajor memAllocator typ shape = 
         let layout = TensorLayout.newColumnMajor shape
         TensorManikin (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
-    /// creates a new MemoryManikinT and a new TensorManikinT with specifed stride order
+    /// creates a new StorageManikin and a new TensorManikin with specifed stride order
     let newOrdered memAllocator typ shape strideOrder =
         let layout = TensorLayout.newOrdered shape strideOrder
         TensorManikin (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
-    /// create a new MemoryManikinT and a new TensorManikinT with layout suitable for being a BLAS target
+    /// create a new StorageManikin and a new TensorManikin with layout suitable for being a BLAS target
     let newBlasTarget memAllocator typ shape = 
         let nd = List.length shape
         let smplShp = shape.[0..nd-3]
@@ -200,12 +212,12 @@ module TensorManikin =
         let layout = {Shape=shape; Stride=stride; Offset=0L}
         TensorManikin (layout, memAllocator typ (TensorLayout.nElems layout) MemAllocDev)
 
-    /// creates a new ArrayNDManikinT with contiguous layout using the specified storage
+    /// creates a new TensorManikin with contiguous layout using the specified storage
     let externalRowMajor storage shape =
         let layout = TensorLayout.newRowMajor shape
         TensorManikin (layout, storage) 
 
-    /// creates a new ArrayNDManikinT with specified strides and using the specified storage
+    /// creates a new TensorManikin with specified strides and using the specified storage
     let external storage shape stride =
         let layout = {Shape=shape; Stride=stride; Offset=0L}
         TensorManikin (layout, storage)

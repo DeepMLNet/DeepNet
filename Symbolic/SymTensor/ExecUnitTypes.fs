@@ -58,7 +58,7 @@ module ExecUnitsTypes =
         OnCompletion:   EvalResultT -> unit
     }
 
-    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKindT -> StorageManikin
+    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKind -> StorageManikin
 
     type ExecItemsForOpArgs = {
         MemAllocator:       MemAllocatorT
@@ -105,7 +105,7 @@ module ExecUnitsTypes =
         Expr:           UExprT
         ExecUnits:      ExecUnitT list
         Result:         EvalResultT
-        MemAllocs:      MemAllocManikinT list
+        MemAllocs:      StorageAlloc list
         InitItems:      IExecItem list
     }
 

@@ -24,8 +24,8 @@ module CudaRecipeTypes =
     /// CUDA api call
     type CudaCallT =
         // memory mangement
-        | MemAlloc          of MemAllocManikinT
-        | MemFree           of MemAllocManikinT
+        | MemAlloc          of StorageAlloc
+        | MemFree           of StorageAlloc
         // stream management
         | StreamCreate      of StreamT * BasicTypes.CUStreamFlags
         | StreamDestory     of StreamT
@@ -65,7 +65,7 @@ module CudaRecipeTypes =
         InitCalls:          CudaCallT list
         DisposeCalls:       CudaCallT list
         ExecCalls:          CudaCallT list
-        ConstantValues:     Map<MemConstManikinT, ITensor>
+        ConstantValues:     Map<StorageConst, ITensor>
         SubRecipes:         Map<SubWorkspaceT, CudaRecipeT>
     } 
 
