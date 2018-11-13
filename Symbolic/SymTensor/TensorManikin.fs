@@ -75,18 +75,18 @@ module TensorManikinTypes =
         /// no memory (represents a null pointer)
         | Zero of TypeNameT
         /// a memory allocation internal to the workspace
-        | MemAlloc of MemAllocManikinT
+        | Alloc of MemAllocManikinT
         /// an external variable
-        | MemExternal of VarSpecT
+        | External of VarSpecT
         /// a constant array
-        | MemConst of MemConstManikinT
+        | Const of MemConstManikinT
         with 
             member this.Pretty = 
                 match this with
                 | StorageManikin.Zero t -> sprintf "StorageManikin.Zero %A" t.Type
-                | MemAlloc a -> sprintf "MemAlloc %d (%d KB)" a.Id (a.ByteSize / 1024L)
-                | MemExternal vs -> sprintf "MemExternal %A" vs
-                | MemConst c -> sprintf "MemConst %d" c.Id
+                | StorageManikin.Alloc a -> sprintf "StorageManikin.Alloc %d (%d KB)" a.Id (a.ByteSize / 1024L)
+                | StorageManikin.External vs -> sprintf "StorageManikin.External %A" vs
+                | StorageManikin.Const c -> sprintf "StorageManikin.Const %d" c.Id
 
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     [<StructuredFormatDisplay("{Pretty}")>]
@@ -131,9 +131,9 @@ module TensorManikinTypes =
         /// typename of the data stored in this tensor
         member this.TypeName = 
             match storage with
-            | MemAlloc {TypeName=tn} -> tn
-            | MemExternal vs -> vs.TypeName
-            | MemConst mc -> mc.TypeName
+            | StorageManikin.Alloc {TypeName=tn} -> tn
+            | StorageManikin.External vs -> vs.TypeName
+            | StorageManikin.Const mc -> mc.TypeName
             | StorageManikin.Zero t -> t
 
         member this.NewView (layout: TensorLayout) = 

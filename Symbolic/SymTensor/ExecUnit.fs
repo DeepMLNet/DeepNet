@@ -312,7 +312,7 @@ module ExecUnit =
         let newMemory typ elements kind = 
             let mem = {Id=memAllocs.Count; TypeName=typ; Elements=elements; Kind=kind}
             memAllocs.Add mem
-            MemAlloc mem
+            StorageManikin.Alloc mem
 
         // evaluation request
         let evalReqsByExpr = Dictionary<UExprT, ResizeArray<EvalReqT>> (HashIdentity.Reference)
@@ -501,7 +501,7 @@ module ExecUnit =
                         | Some eus -> eus |> List.ofSeq
                         | None -> []
                     let accessMemEus =
-                        match eusByAccessMem.TryFind (MemExternal storeVs) with
+                        match eusByAccessMem.TryFind (StorageManikin.External storeVs) with
                         | Some eus -> eus |> List.ofSeq
                         | None -> []
                         

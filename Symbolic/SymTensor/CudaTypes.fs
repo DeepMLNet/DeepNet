@@ -188,7 +188,7 @@ module CudaCompileEnv =
             TypeName = TypeName.ofTypeInst value.DataType
         }
         env.ConstantValues.Add (mc, value)
-        TensorManikin (value.Layout, MemConst mc)
+        TensorManikin (value.Layout, StorageManikin.Const mc)
 
     /// adds a sub-workspace using the specified recipe description
     let newSubrecipe (recipeDesc: CudaRecipeDescT) (env: CudaCompileEnvT) : SubWorkspaceT =
@@ -207,19 +207,19 @@ module CudaExecEnv =
     /// Gets allocated host memory.
     let getHostRegMem (env: CudaExecEnvT) (memManikin: StorageManikin) = 
         match memManikin with
-        | MemAlloc im -> env.RegHostMem.[im]
+        | StorageManikin.Alloc im -> env.RegHostMem.[im]
         | _ -> failwithf "memory manikin %A was supposed to be an allocation" memManikin
 
     /// Gets device memory and offset in bytes for an internal allocation or external reference.
     let getDevMem (env: CudaExecEnvT) (memManikin: StorageManikin) =
         match memManikin with
         | StorageManikin.Zero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0L), SizeT 0L), 0L
-        | MemAlloc im -> env.InternalMem.[im], 0L
-        | MemExternal vs ->
+        | StorageManikin.Alloc im -> env.InternalMem.[im], 0L
+        | StorageManikin.External vs ->
             let ev = env.ExternalVar.[vs]
             let evStorage = ev.Storage :?> ITensorCudaStorage
             evStorage.ByteData, ev.Layout.Offset * int64 (Marshal.SizeOf (ev.DataType))
-        | MemConst mc -> 
+        | StorageManikin.Const mc -> 
             let ary = env.ConstantValues.[mc]
             let aryStorage = ary.Storage :?> ITensorCudaStorage
             aryStorage.ByteData, 0L            
@@ -231,7 +231,7 @@ module CudaExecEnv =
     /// gets host memory for an external reference
     let getHostRegMemForManikin (env: CudaExecEnvT) (manikin: TensorManikin) =
         match manikin.Storage with
-        | MemExternal vs ->
+        | StorageManikin.External vs ->
             let hv = env.HostVar.[vs]            
             if hv.Layout.Offset = 0L && TensorLayout.isRowMajor hv.Layout then
                 let hvStorage = hv.Storage :?> ITensorHostStorage
@@ -375,9 +375,9 @@ module ArgTemplates =
                 let storage = 
                     match memManikin with
                     | StorageManikin.Zero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0), SizeT 0)
-                    | MemAlloc im -> env.InternalMem.[im]
-                    | MemExternal vs -> (env.ExternalVar.[vs].Storage :?> ITensorCudaStorage).ByteData
-                    | MemConst mc -> (env.ConstantValues.[mc].Storage :?> ITensorCudaStorage).ByteData
+                    | StorageManikin.Alloc im -> env.InternalMem.[im]
+                    | StorageManikin.External vs -> (env.ExternalVar.[vs].Storage :?> ITensorCudaStorage).ByteData
+                    | StorageManikin.Const mc -> (env.ConstantValues.[mc].Storage :?> ITensorCudaStorage).ByteData
                 storage.DevicePointer |> Cuda.getIntPtr |> box
 
     type ExecStreamArgTmpl () =

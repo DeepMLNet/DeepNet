@@ -300,7 +300,7 @@ module CudaExecUnit =
                 // request to store directly into external var
                 let shp = vs.Shape |> ShapeSpec.eval
                 let stride = cudaEnv |> CudaCompileEnv.strideForVar vs
-                [dfltChReq (Some (TensorManikin.external (MemExternal vs) shp stride))]
+                [dfltChReq (Some (TensorManikin.external (StorageManikin.External vs) shp stride))]
             | dev when dev=HostTensor.Dev -> dfltSrcWithNoViewReq ()
             | dev -> unsupLoc dev
 
@@ -506,7 +506,7 @@ module CudaExecUnit =
             | dev when dev=CudaTensor.Dev ->
                 // create manikin for external variable
                 let stride = compileEnv |> CudaCompileEnv.strideForVar vs
-                dfltChTrgt (TensorManikin.external (MemExternal vs) vs.NShape stride) true
+                dfltChTrgt (TensorManikin.external (StorageManikin.External vs) vs.NShape stride) true
             | dev when dev=HostTensor.Dev ->
                 // check that host variable has C-stride
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
@@ -1095,9 +1095,9 @@ module CudaExecUnit =
         let appendPointerArrayItems (tmpl: BlasTransposedMatrixBatchTmpl) execItems =
             match tmpl.Manikin.Storage with
             | StorageManikin.Zero _
-            | MemConst _
-            | MemAlloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
-            | MemExternal _ -> execItems @ [BlasInitPointerArray tmpl]
+            | StorageManikin.Const _
+            | StorageManikin.Alloc _ -> submitInit [BlasInitPointerArray tmpl]; execItems
+            | StorageManikin.External _ -> execItems @ [BlasInitPointerArray tmpl]
 
         let helpers = {
             SrcsDfltCh              = srcsDfltCh
@@ -1123,7 +1123,7 @@ module CudaExecUnit =
             | dev when dev=CudaTensor.Dev -> []
             | dev when dev=HostTensor.Dev -> 
                 let hvStride = compileEnv |> CudaCompileEnv.strideForVar vs
-                let hv = TensorManikin.external (MemExternal vs) vs.NShape hvStride
+                let hv = TensorManikin.external (StorageManikin.External vs) vs.NShape hvStride
                 [MemcpyHtoD(ArrayNDHostRegMemRngTmpl(hv), ArrayNDDevMemRngTmpl(dfltChTrgt()))]       
             | dev -> unsupLoc dev
 
@@ -1213,7 +1213,7 @@ module CudaExecUnit =
         // variable access
         | UUnaryOp (StoreToVar vs) ->
             match compileEnv.VarStorLoc |> Map.find vs with
-            | dev when dev=CudaTensor.Dev && (firstSrcDfltCh()).Storage = (MemExternal vs) ->
+            | dev when dev=CudaTensor.Dev && (firstSrcDfltCh()).Storage = (StorageManikin.External vs) ->
                 // Source was evaluated directly into the variable storage.
                 // No copy necessary.
                 []
@@ -1221,7 +1221,7 @@ module CudaExecUnit =
                 // Our source has not been evaluated directly into the variable storage.
                 // Therefore we need to copy into the variable.
                 let varStride = compileEnv |> CudaCompileEnv.strideForVar vs
-                let dv = TensorManikin.external (MemExternal vs) vs.NShape varStride
+                let dv = TensorManikin.external (StorageManikin.External vs) vs.NShape varStride
                 copyExecItems dv (firstSrcDfltCh())
             | dev when dev=HostTensor.Dev ->            
                 let copyItems, memcpySrc = 
@@ -1240,7 +1240,7 @@ module CudaExecUnit =
                     failwithf "host variable %A must be in C-order" vs
 
                 // copy
-                let hv = TensorManikin.external (MemExternal vs) vs.NShape hvStride
+                let hv = TensorManikin.external (StorageManikin.External vs) vs.NShape hvStride
                 copyItems @ [MemcpyDtoH(ArrayNDDevMemRngTmpl(memcpySrc), ArrayNDHostRegMemRngTmpl(hv))]   
             | dev -> unsupLoc dev
                                  
