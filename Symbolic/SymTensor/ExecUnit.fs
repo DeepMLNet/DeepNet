@@ -140,11 +140,11 @@ module ExecUnit =
 
     /// Builds a map that for every storage contains a set of the ids of the ExecUnits
     /// that will access it last during execution.
-    let private buildLastStorageAccess (coll: Collection) : Map<MemManikinT, Set<ExecUnitIdT>> =
+    let private buildLastStorageAccess (coll: Collection) : Map<StorageManikin, Set<ExecUnitIdT>> =
                 
         // map of last storage access taking into account the key ExecUnit and its predecessors
         let lastStorageAccessInOrAbove = 
-            Dictionary<ExecUnitIdT, Dictionary<MemManikinT, HashSet<ExecUnitIdT>>> ()
+            Dictionary<ExecUnitIdT, Dictionary<StorageManikin, HashSet<ExecUnitIdT>>> ()
 
         // Visit each ExecUnit eu so that, all ExecUnits that eu depends on are visited before
         // eu is visited.
@@ -157,7 +157,7 @@ module ExecUnit =
                 |> Set.ofList
 
             // build last storage access taking into account eu and its predecessors
-            let lsa = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
+            let lsa = Dictionary<StorageManikin, HashSet<ExecUnitIdT>> ()
 
             // for all storages that eu is accessing, it is the sole last storage accessor
             for storage in euStorages do
@@ -363,7 +363,7 @@ module ExecUnit =
                     // continuation, when eval requests for all sources have been processed                     
 
                     // function for logging allocated memory
-                    let allocatedMemory = ResizeArray<MemManikinT> ()
+                    let allocatedMemory = ResizeArray<StorageManikin> ()
                     let newMemoryWithLogging typ elems kind =
                         let mem = newMemory typ elems kind
                         allocatedMemory.Add mem
@@ -472,7 +472,7 @@ module ExecUnit =
         
         // build variable access and memory access tables
         let eusByReadVar = Dictionary<VarSpecT, HashSet<ExecUnitIdT>> ()
-        let eusByAccessMem = Dictionary<MemManikinT, HashSet<ExecUnitIdT>> ()
+        let eusByAccessMem = Dictionary<StorageManikin, HashSet<ExecUnitIdT>> ()
         for eu in execUnits do
             match eu.Expr with
             | UExpr(ULeafOp (Expr.Var vs), _, _) -> 

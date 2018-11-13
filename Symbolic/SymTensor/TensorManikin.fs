@@ -71,7 +71,7 @@ module TensorManikinTypes =
     /// used by a variable passed in variable at runtime.
     /// Memory can either be on the host or the accelerator.
     [<StructuredFormatDisplay("{Pretty}")>]
-    type MemManikinT =
+    type StorageManikin =
         /// no memory (represents a null pointer)
         | MemZero of TypeNameT
         /// a memory allocation internal to the workspace
@@ -91,7 +91,7 @@ module TensorManikinTypes =
     /// represents an n-dimensional array that will be allocated or accessed during execution 
     [<StructuredFormatDisplay("{Pretty}")>]
     type TensorManikin (layout:           TensorLayout, 
-                        storage:          MemManikinT) = 
+                        storage:          StorageManikin) = 
 
         /// storage manikin
         member this.Storage = storage

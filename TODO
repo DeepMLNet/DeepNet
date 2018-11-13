@@ -23,3 +23,5 @@
 
 
  - What can be used as a TensorDevice?
+ - shall we just use a ITensorDevice?
+  => yes, try that for now...

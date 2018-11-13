@@ -40,7 +40,7 @@ module ExecUnitsTypes =
         Manikins:     TensorManikin list
         Channels:     ChannelManikinsAndSharedT 
         Srcs:         TensorManikin list        
-        ExtraMem:     MemManikinT list
+        ExtraMem:     StorageManikin list
         RerunAfter:   ExecUnitIdT list
     }
 
@@ -58,7 +58,7 @@ module ExecUnitsTypes =
         OnCompletion:   EvalResultT -> unit
     }
 
-    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKindT -> MemManikinT
+    type MemAllocatorT = TypeNameT -> int64 -> MemAllocKindT -> StorageManikin
 
     type ExecItemsForOpArgs = {
         MemAllocator:       MemAllocatorT

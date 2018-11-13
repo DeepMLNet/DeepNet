@@ -25,7 +25,7 @@ module Types =
     /// device memory pointer
     type DevMemPtrT = {
         /// base memory
-        Base: MemManikinT
+        Base: StorageManikin
         /// offset in elements
         Offset: int64
     }
@@ -205,13 +205,13 @@ module CudaCompileEnv =
 module CudaExecEnv = 
 
     /// Gets allocated host memory.
-    let getHostRegMem (env: CudaExecEnvT) (memManikin: MemManikinT) = 
+    let getHostRegMem (env: CudaExecEnvT) (memManikin: StorageManikin) = 
         match memManikin with
         | MemAlloc im -> env.RegHostMem.[im]
         | _ -> failwithf "memory manikin %A was supposed to be an allocation" memManikin
 
     /// Gets device memory and offset in bytes for an internal allocation or external reference.
-    let getDevMem (env: CudaExecEnvT) (memManikin: MemManikinT) =
+    let getDevMem (env: CudaExecEnvT) (memManikin: StorageManikin) =
         match memManikin with
         | MemZero _ -> new CudaDeviceVariable<byte> (CUdeviceptr (SizeT 0L), SizeT 0L), 0L
         | MemAlloc im -> env.InternalMem.[im], 0L
@@ -482,8 +482,8 @@ module ArgTemplates =
     /// BLAS view of ArrayND. The ArrayND is implicitly transposed and exposed as a "(float *)[]".
     /// All but the last two dimensions are exposed as batches.
     type BlasTransposedMatrixBatchTmpl (manikin:         TensorManikin, 
-                                        ptrAryDevMem:    MemManikinT,
-                                        ptrAryHostMem:   MemManikinT) =
+                                        ptrAryDevMem:    StorageManikin,
+                                        ptrAryHostMem:   StorageManikin) =
 
         let nDims = manikin.NDims
         let rowDim = nDims - 2
@@ -544,7 +544,7 @@ module ArgTemplates =
 
 
     /// BLAS int array. For example it is used for pivot and info arrays of CUDA LAPACK routines.
-    type BlasIntArrayTmpl (mem: MemManikinT) =
+    type BlasIntArrayTmpl (mem: StorageManikin) =
 
         new (size: int64, memAllocator: MemAllocatorT) = 
             let mem = memAllocator TypeName.ofType<int> size MemAllocDev
