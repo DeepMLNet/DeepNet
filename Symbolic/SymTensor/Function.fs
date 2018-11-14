@@ -13,13 +13,13 @@ open UExprTypes
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable value collection
-    type VarEnvT = Map<VarSpec, ITensor>
+    type VarEnvT = Map<Var, ITensor>
 
     /// specification of variable storage locations
-    type VarLocsT = Map<VarSpec, ITensorDevice>
+    type VarLocsT = Map<Var, ITensorDevice>
 
     /// specification of variable strides
-    type VarStridesT = Map<VarSpec, int64 list>
+    type VarStridesT = Map<Var, int64 list>
 
     /// specification of channel strides
     type ChannelStridesT = Map<ChannelT, int64 list>
@@ -29,15 +29,15 @@ module VarEnvTypes =
 module VarEnv = 
 
     /// add variable value to environment
-    let addVarSpec (vs: VarSpec) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
+    let addVarSpec (vs: Var) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
         Map.add vs (value :> ITensor) varEnv
 
     /// remove variable value from environment
-    let removeVarSpec (vs: VarSpec) (varEnv: VarEnvT) : VarEnvT =
+    let removeVarSpec (vs: Var) (varEnv: VarEnvT) : VarEnvT =
         Map.remove vs varEnv
 
     /// get variable value from environment
-    let getVarSpec (vs: VarSpec) (varEnv: VarEnvT) : #ITensor =
+    let getVarSpec (vs: Var) (varEnv: VarEnvT) : #ITensor =
         match varEnv |> Map.tryFind vs with
         | Some v -> v |> box |> unbox
         | None -> failwithf "variable %A is not present in the specified VarEnv" vs
@@ -66,11 +66,11 @@ module VarEnv =
     let inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnvT) : SymSizeEnv =
         (symSizeEnv, varEnv) ||> Map.fold 
             (fun env vSym vVal ->   
-                if VarSpec.nDims vSym <> ITensor.nDims vVal then
+                if Var.nDims vSym <> ITensor.nDims vVal then
                     failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
                         (ITensor.shape vVal) vSym
 
-                (VarSpec.shape vSym, ITensor.shape vVal)
+                (Var.shape vSym, ITensor.shape vVal)
                 ||> List.zip
                 |> List.fold (fun env (svSym, svVal) ->
                     let failShape () =
@@ -93,7 +93,7 @@ module VarEnv =
     let substSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
         varEnv 
         |> Map.toSeq
-        |> Seq.map (fun (vs, value) -> VarSpec.substSymSizes symSizes vs, value)
+        |> Seq.map (fun (vs, value) -> Var.substSymSizes symSizes vs, value)
         |> Map.ofSeq
 
     /// checks that the values are valid in type and shape for the variables
@@ -103,7 +103,7 @@ module VarEnv =
                 failwithf "variable %A was expected to be of type %A but a \
                            value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
 
-            let ss = VarSpec.shape vs
+            let ss = Var.shape vs
             match ShapeSpec.tryEval ss with
             | Some ns when ITensor.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
@@ -161,7 +161,7 @@ module EnvTypes =
         /// the CompileEnvT used for this compilation
         CompileEnv:         CompileEnvT
         /// the variables necessary to evaluate the expressions
-        NeededVars:         Set<VarSpec>
+        NeededVars:         Set<Var>
         /// the evaluation function
         Eval:               EvalFn
         /// diagnostic information
@@ -223,7 +223,7 @@ module Func =
 
     type private UExprGenT = {
         Generate:               SymSizeEnv -> ExprT
-        UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<VarSpec> * bool       
+        UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<Var> * bool       
     }
 
     let private exprGenerate baseExpr symSizes =
@@ -275,7 +275,7 @@ module Func =
             let substVarSizes varMap =
                 varMap
                 |> Map.toSeq
-                |> Seq.map (fun (vs, value) -> (vs |> VarSpec.substSymSizes compileEnv.SymSizes, value))
+                |> Seq.map (fun (vs, value) -> (vs |> Var.substSymSizes compileEnv.SymSizes, value))
                 |> Map.ofSeq
             let compileEnv = {compileEnv with VarLocs=substVarSizes compileEnv.VarLocs
                                               VarStrides=substVarSizes compileEnv.VarStrides}
@@ -355,12 +355,12 @@ module Func =
                 if not (varLocs.ContainsKey vs) then
                     failwithf "cannot evaluate expression because value for variable %A is missing" vs
                 
-                let cmplLoc = VarSpec.findByName vs compileRes.CompileEnv.VarLocs
+                let cmplLoc = Var.findByName vs compileRes.CompileEnv.VarLocs
                 if varLocs.[vs] <> cmplLoc then
                     failwithf "variable %A was expected to be in location %A but a value in \
                                location %A was specified" vs cmplLoc varLocs.[vs]
 
-                let cmplStrides = VarSpec.findByName vs compileRes.CompileEnv.VarStrides
+                let cmplStrides = Var.findByName vs compileRes.CompileEnv.VarStrides
                 if varStrides.[vs] <> cmplStrides then
                     failwithf "variable %A was expected to have strides %A but a value with \
                                strides %A was specified" vs cmplStrides varStrides.[vs]

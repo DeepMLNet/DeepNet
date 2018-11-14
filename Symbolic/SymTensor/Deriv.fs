@@ -15,7 +15,7 @@ module DerivTypes =
         /// the number of elements of the function the derivative is taken of
         FunElems:   SizeSpec
         /// the Jacobians w.r.t. the variables occuring in the expression
-        Jacobians:  Map<VarSpec, ExprT>
+        Jacobians:  Map<Var, ExprT>
     }
 
 
@@ -27,8 +27,8 @@ module DerivTypes =
 
 
     type internal PortContentsT = {
-        DerivWrt:   ResizeArray<VarSpec>
-        ValueOf:    VarSpec option
+        DerivWrt:   ResizeArray<Var>
+        ValueOf:    Var option
         SliceDim:   int
     }
 
@@ -328,13 +328,13 @@ module Deriv =
             addArg zeroExpr
 
         /// map from variable representing a derivative to the loop input specification
-        let varInputSpecs = Dictionary<VarSpec, LoopInputT> ()
+        let varInputSpecs = Dictionary<Var, LoopInputT> ()
 
         /// map from a loop output to the variable representing its derivative
-        let dOutputVars = Dictionary<ChannelT, VarSpec> ()
+        let dOutputVars = Dictionary<ChannelT, Var> ()
 
         /// map from a loop PreviousPort to the variables representing its derivative sources
-        let dPreviousVars = Dictionary<PreviousChannelT, VarSpec> ()
+        let dPreviousVars = Dictionary<PreviousChannelT, Var> ()
 
         /// map from a loop port to the value it must contain
         let portContents = Dictionary<ChannelT, PortContentsT> ()
@@ -362,7 +362,7 @@ module Deriv =
             let value = spec.Channels.[outPort]
             let dName = sprintf "d_%s" outPort
             let dVar =
-                VarSpec.create dName value.Expr.Type (funElems :: value.Expr.Shape)
+                Var.create dName value.Expr.Type (funElems :: value.Expr.Shape)
             dOutputVars.[outPort] <- dVar
 
             // create variable input specification:
@@ -384,7 +384,7 @@ module Deriv =
             | ConstArg argIdx ->
                 // create a variable for the sum of the accumulated Jacobian so far
                 let dAccumName = sprintf "dSum_ConstArg%d[-1]" argIdx
-                let dAccumVar = VarSpec.create dAccumName liType (funElems :: liShape)
+                let dAccumVar = Var.create dAccumName liType (funElems :: liShape)
 
                 // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                 let dPortName = sprintf "dSum_ConstArg%d" argIdx
@@ -437,7 +437,7 @@ module Deriv =
                 portContents.[dPortName].DerivWrt.Add usingVar
 
                 // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
-                let dVar = VarSpec.create dPortName liType (funElems :: liShape)
+                let dVar = Var.create dPortName liType (funElems :: liShape)
                 dPreviousVars.[pp] <- dVar
 
                 // create corresponding variable input specification:

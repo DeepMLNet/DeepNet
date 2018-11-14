@@ -49,7 +49,7 @@ module Expr =
 
         // ==== variable access ====
         /// variable read
-        | Var of VarSpec      
+        | Var of Var      
         
 
     /// ops with one expr as argument
@@ -127,7 +127,7 @@ module Expr =
 
         // ==== variable storage ====
         /// variable write
-        | StoreToVar of VarSpec
+        | StoreToVar of Var
 
         // ==== misc ====
         /// nullifies the Jacobian of its argument when calculating derivatives
@@ -273,7 +273,7 @@ module Expr =
         Length:     SizeSpec
         /// specifies the values of the variables used in the channel value expressions,
         /// i.e. LoopValueT.Expr
-        Vars:       Map<VarSpec, LoopInputT>   
+        Vars:       Map<Var, LoopInputT>   
         /// specifies the values of the loop channels
         Channels:   Map<ChannelT, LoopValueT>
     }
@@ -316,7 +316,7 @@ module Expr =
         abstract EvalSimple: args:Tensor<'T> list -> Tensor<'T>
 
         /// Should return the set of variables that this op instance depends on.
-        abstract ContainedVars: Set<VarSpec>
+        abstract ContainedVars: Set<Var>
 
     and [<StructuralComparison; StructuralEqualityAttribute>]
         private ExprProxyT = 
@@ -566,7 +566,7 @@ module Expr =
                 | Leaf(Arange (size, _)) -> ShapeSpec.vector size
 
                 // variable access
-                | Leaf(Var vs) -> VarSpec.shape vs
+                | Leaf(Var vs) -> Var.shape vs
 
                 // unary elementwise
                 | Unary (Negate, a)                       
@@ -704,7 +704,7 @@ module Expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// Caches for extracted variables.
-    let private extractedVars = Dictionary<ExprT, Set<VarSpec>> () 
+    let private extractedVars = Dictionary<ExprT, Set<Var>> () 
 
     /// extract all variables from an expression
     let rec extractVars expr =
@@ -1119,13 +1119,13 @@ module Expr =
                 match expr with
                 | Leaf (Identity (ss, tn)) -> tSize ss
                 | Leaf (SizeValue (sc, tn)) -> tSize sc
-                | Leaf (Var vs) -> tShp (VarSpec.shape vs)
+                | Leaf (Var vs) -> tShp (Var.shape vs)
                 | Leaf (Arange (size, tn)) -> tSize size
                 | Leaf _ -> true
 
                 | Unary (Reshape ss, a) -> tShp ss && subTest a
                 | Unary (DoBroadcast ss, a) -> tShp ss && subTest a
-                | Unary (StoreToVar vs, a) -> tShp (VarSpec.shape vs) && subTest a
+                | Unary (StoreToVar vs, a) -> tShp (Var.shape vs) && subTest a
                 | Unary (Subtensor srs, a) -> tSrs srs && subTest a
                 | Unary (Held (derivsShp, heldOp), a) ->
                     let canEvalOp =
@@ -1957,7 +1957,7 @@ module Expr =
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name
-                let vs = VarSpec.ofNameShapeAndTypeName (genName 0) expr.Shape expr.TypeName
+                let vs = Var.ofNameShapeAndTypeName (genName 0) expr.Shape expr.TypeName
                 let lv = ConstArg (addArg expr)
                 vars <- vars |> Map.add vs lv
                 vs

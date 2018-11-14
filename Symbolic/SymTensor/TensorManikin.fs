@@ -80,7 +80,7 @@ module TensorManikinTypes =
         /// a memory allocation internal to the workspace
         | Alloc of StorageAlloc
         /// an external variable
-        | External of VarSpec
+        | External of Var
         /// a constant array
         | Const of StorageConst
         with 

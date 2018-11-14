@@ -166,7 +166,7 @@ module Const =
 
 /// Variable (a value that is passed in at runtime) specification.
 [<Struct; StructuredFormatDisplay("{Pretty}")>]
-type VarSpec = {
+type Var = {
     /// variable name
     Name:      string
     /// symbolic shape
@@ -174,6 +174,7 @@ type VarSpec = {
     /// data type
     TypeName:  TypeName
 } with
+
     /// data type
     member this.Type = TypeName.getType this.TypeName
 
@@ -184,42 +185,42 @@ type VarSpec = {
     member this.NShape = this.Shape |> ShapeSpec.eval
 
     /// Creates a variable specification using the specified name, type and symbolic shape.
-    static member create name typ shape : VarSpec =
+    static member create name typ shape : Var =
         {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
 
     /// create variable specifation by name and shape and type
-    static member inline ofNameShapeAndTypeName name shape typeName : VarSpec =
+    static member inline ofNameShapeAndTypeName name shape typeName : Var =
         {Name=name; Shape=shape; TypeName=typeName}
 
     /// name of variable
-    static member name (vs: VarSpec) = vs.Name
+    static member name (vs: Var) = vs.Name
 
     /// shape of variable
-    static member shape (vs: VarSpec) = vs.Shape
+    static member shape (vs: Var) = vs.Shape
 
     /// number of dimensions of variable
-    static member nDims vs = VarSpec.shape vs |> ShapeSpec.nDim
+    static member nDims vs = Var.shape vs |> ShapeSpec.nDim
 
     /// type of variable
-    static member typ (vs: VarSpec) = vs.TypeName |> TypeName.getType 
+    static member typ (vs: Var) = vs.TypeName |> TypeName.getType 
 
     /// typename of variable
-    static member typeName (vs: VarSpec) = vs.TypeName
+    static member typeName (vs: Var) = vs.TypeName
 
     /// substitutes the size symbol environment into the variable
-    static member substSymSizes symSizes (vs: VarSpec) = 
+    static member substSymSizes symSizes (vs: Var) = 
         {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
 
     /// gets variable by name
-    static member tryFindByName (vs: VarSpec) map =
+    static member tryFindByName (vs: Var) map =
         map |> Map.tryPick 
             (fun cvs value -> 
-                if VarSpec.name cvs = VarSpec.name vs then Some value
+                if Var.name cvs = Var.name vs then Some value
                 else None)
 
     /// gets variable by name
     static member findByName vs map =
-        match VarSpec.tryFindByName vs map with
+        match Var.tryFindByName vs map with
         | Some value -> value
         | None -> raise (System.Collections.Generic.KeyNotFoundException())
 

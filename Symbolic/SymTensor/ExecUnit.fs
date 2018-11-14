@@ -46,7 +46,7 @@ module ExecUnit =
                 addWithDependencies eu
 
         let storesByVar =
-            let build = Dictionary<VarSpec, List<ExecUnitT>> ()
+            let build = Dictionary<Var, List<ExecUnitT>> ()
             for eu in eus do
                 match eu.Expr with
                 | UExpr (UUnaryOp (Expr.StoreToVar vs), _, _) ->
@@ -471,7 +471,7 @@ module ExecUnit =
                 uniqueProcessedRequests execUnits.Length
         
         // build variable access and memory access tables
-        let eusByReadVar = Dictionary<VarSpec, HashSet<ExecUnitIdT>> ()
+        let eusByReadVar = Dictionary<Var, HashSet<ExecUnitIdT>> ()
         let eusByAccessMem = Dictionary<StorageManikin, HashSet<ExecUnitIdT>> ()
         for eu in execUnits do
             match eu.Expr with
