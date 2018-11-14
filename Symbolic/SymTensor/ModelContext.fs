@@ -45,7 +45,7 @@ module ModelContextTypes =
     [<StructuredFormatDisplay("{Pretty}")>]
     type ParameterSetT<'T when 'T: equality and 'T: comparison> 
             (name:           string, 
-             parameters:     VarSpecT seq) =
+             parameters:     VarSpec seq) =
 
         let flatVarName = "PS_" + name
         let pars = parameters |> Seq.toList |> List.sort
@@ -102,7 +102,7 @@ module ModelContextTypes =
 
         /// variable for a given parameter
         member this.Item
-            with get (par: VarSpecT) = parameterSubstExprs.[par]
+            with get (par: VarSpec) = parameterSubstExprs.[par]
 
         /// returns the parameter for the given substituion expression
         member this.ParameterOfSubstExpr expr = 
@@ -155,8 +155,8 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: VarSpecT) : Tensor<'T> = parameterVals.[par]
-            and set (par: VarSpecT) (value: Tensor<'T>) = parameterVals.[par].[Fill] <- value
+            with get (par: VarSpec) : Tensor<'T> = parameterVals.[par]
+            and set (par: VarSpec) (value: Tensor<'T>) = parameterVals.[par].[Fill] <- value
 
         /// value for a given parameter
         member this.Item
@@ -199,8 +199,8 @@ module ModelContextTypes =
                                              isSubModule:   bool) =
 
         let mutable subMBs = Map.empty
-        let mutable parameters : Map<VarSpecT, ParameterInfo<'T>> = Map.empty
-        let mutable vars : Set<VarSpecT> = Set.empty
+        let mutable parameters : Map<VarSpec, ParameterInfo<'T>> = Map.empty
+        let mutable vars : Set<VarSpec> = Set.empty
         let mutable symSizes = []
         let mutable symSizeEnv = SymSizeEnv.empty
         let mutable varLocs : VarLocsT = Map.empty
@@ -413,7 +413,7 @@ module ModelContextTypes =
     /// A model with numeric sizes for all size symbols and allocated parameter storage.
     and ModelInstance<'T when 'T: equality and 'T: comparison> 
                                             (context:         string,
-                                             parameters:      Map<VarSpecT, ParameterInfo<'T>>,
+                                             parameters:      Map<VarSpec, ParameterInfo<'T>>,
                                              device:          IDevice,                                             
                                              compileEnv:      CompileEnvT) =
 
@@ -507,7 +507,7 @@ module ModelContextTypes =
         member this.SavePars (hdf, ?prefix) = this.ParameterStorage.Save (hdf, ?prefix=prefix)
 
         /// Initializes the specified paramter value using the initialization function.
-        member this.InitPar (seed: int) (ps: VarSpecT) = 
+        member this.InitPar (seed: int) (ps: VarSpec) = 
             let pi = parameters.[ps]
             let shp = this.ParameterStorage.[ps].Shape
             this.ParameterStorage.[ps] <- pi.Initializer seed shp |> device.ToDev

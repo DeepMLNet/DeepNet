@@ -8,7 +8,6 @@ open Tensor.Utils
 open DeepNet.Utils
 
 open ShapeSpec
-open VarSpec
 
 
 /// expression module
@@ -50,7 +49,7 @@ module Expr =
 
         // ==== variable access ====
         /// variable read
-        | Var of VarSpecT      
+        | Var of VarSpec      
         
 
     /// ops with one expr as argument
@@ -128,7 +127,7 @@ module Expr =
 
         // ==== variable storage ====
         /// variable write
-        | StoreToVar of VarSpecT
+        | StoreToVar of VarSpec
 
         // ==== misc ====
         /// nullifies the Jacobian of its argument when calculating derivatives
@@ -274,7 +273,7 @@ module Expr =
         Length:     SizeSpec
         /// specifies the values of the variables used in the channel value expressions,
         /// i.e. LoopValueT.Expr
-        Vars:       Map<VarSpecT, LoopInputT>   
+        Vars:       Map<VarSpec, LoopInputT>   
         /// specifies the values of the loop channels
         Channels:   Map<ChannelT, LoopValueT>
     }
@@ -317,7 +316,7 @@ module Expr =
         abstract EvalSimple: args:Tensor<'T> list -> Tensor<'T>
 
         /// Should return the set of variables that this op instance depends on.
-        abstract ContainedVars: Set<VarSpecT>
+        abstract ContainedVars: Set<VarSpec>
 
     and [<StructuralComparison; StructuralEqualityAttribute>]
         private ExprProxyT = 
@@ -705,7 +704,7 @@ module Expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// Caches for extracted variables.
-    let private extractedVars = Dictionary<ExprT, Set<VarSpecT>> () 
+    let private extractedVars = Dictionary<ExprT, Set<VarSpec>> () 
 
     /// extract all variables from an expression
     let rec extractVars expr =

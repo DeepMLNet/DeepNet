@@ -3,7 +3,6 @@
 open System.Runtime.InteropServices
 
 open DeepNet.Utils
-//open ShapeSpec
 
 
 /// Assembly qualified name of a .NET type.
@@ -165,72 +164,62 @@ module Const =
         | _ -> false
         
 
-[<AutoOpen>]
-/// variable specification types
-module VarSpecTypes =
-
-    /// Variable (a value that is passed in at runtime) specification.
-    [<StructuredFormatDisplay("{Pretty}")>]
-    type VarSpecT = {
-        /// variable name
-        Name:      string
-        /// symbolic shape
-        Shape:     ShapeSpec
-        /// data type
-        TypeName:  TypeName
-    } with
-        /// data type
-        member this.Type = TypeName.getType this.TypeName
-        /// pretty string representation
-        member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
-        /// numeric shape
-        member this.NShape = this.Shape |> ShapeSpec.eval
-        
-
 /// Variable (a value that is passed in at runtime) specification.
-module VarSpec =
+[<Struct; StructuredFormatDisplay("{Pretty}")>]
+type VarSpec = {
+    /// variable name
+    Name:      string
+    /// symbolic shape
+    Shape:     ShapeSpec
+    /// data type
+    TypeName:  TypeName
+} with
+    /// data type
+    member this.Type = TypeName.getType this.TypeName
+
+    /// pretty string representation
+    member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
+
+    /// numeric shape
+    member this.NShape = this.Shape |> ShapeSpec.eval
 
     /// Creates a variable specification using the specified name, type and symbolic shape.
-    let create name typ shape : VarSpecT =
+    static member create name typ shape : VarSpec =
         {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
 
     /// create variable specifation by name and shape and type
-    let inline ofNameShapeAndTypeName name shape typeName : VarSpecT =
+    static member inline ofNameShapeAndTypeName name shape typeName : VarSpec =
         {Name=name; Shape=shape; TypeName=typeName}
 
     /// name of variable
-    let name (vs: VarSpecT) =
-        vs.Name
+    static member name (vs: VarSpec) = vs.Name
 
     /// shape of variable
-    let shape (vs: VarSpecT) =
-        vs.Shape
+    static member shape (vs: VarSpec) = vs.Shape
 
     /// number of dimensions of variable
-    let nDims vs =
-        shape vs |> ShapeSpec.nDim
+    static member nDims vs = VarSpec.shape vs |> ShapeSpec.nDim
 
     /// type of variable
-    let typ (vs: VarSpecT) = 
-        vs.TypeName |> TypeName.getType 
+    static member typ (vs: VarSpec) = vs.TypeName |> TypeName.getType 
 
     /// typename of variable
-    let typeName (vs: VarSpecT) =
-        vs.TypeName
+    static member typeName (vs: VarSpec) = vs.TypeName
 
     /// substitutes the size symbol environment into the variable
-    let substSymSizes symSizes (vs: VarSpecT) = 
+    static member substSymSizes symSizes (vs: VarSpec) = 
         {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
 
     /// gets variable by name
-    let tryFindByName (vs: VarSpecT) map =
+    static member tryFindByName (vs: VarSpec) map =
         map |> Map.tryPick 
             (fun cvs value -> 
-                if name cvs = name vs then Some value
+                if VarSpec.name cvs = VarSpec.name vs then Some value
                 else None)
 
     /// gets variable by name
-    let findByName vs map =
-        match tryFindByName vs map with
+    static member findByName vs map =
+        match VarSpec.tryFindByName vs map with
         | Some value -> value
         | None -> raise (System.Collections.Generic.KeyNotFoundException())
+

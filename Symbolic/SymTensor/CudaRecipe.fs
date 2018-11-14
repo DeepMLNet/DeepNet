@@ -56,7 +56,7 @@ module CudaRecipeTypes =
 
     /// CUDA execution recipe
     type CudaRecipeT = {
-        ChannelVars:        Map<ChannelT, VarSpecT option>
+        ChannelVars:        Map<ChannelT, VarSpec option>
         ChannelAllocators:  Map<ChannelT, unit -> ITensor>
         VarStrides:         VarStridesT
         VarStorLoc:         VarLocsT
@@ -339,7 +339,7 @@ module CudaRecipe =
 
     type private ResultInfoT = {
         TransferUExpr:  UExprT
-        Var:            VarSpecT option
+        Var:            VarSpec option
         Stride:         int64 list option
         Allocator:      unit -> ITensor
     }
@@ -450,7 +450,7 @@ module CudaRecipe =
                     // create variable that will be inserted into expression
                     let resVarName = sprintf "__%s__" channel
                     let resVar = {
-                        VarSpecT.Name = resVarName
+                        VarSpec.Name = resVarName
                         Shape         = nshp |> List.map SizeSpec.fix
                         TypeName      = tn
                     }

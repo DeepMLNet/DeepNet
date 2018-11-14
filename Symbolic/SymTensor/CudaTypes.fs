@@ -63,13 +63,13 @@ module Types =
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// variables storing the results of the expressions
-        ChannelVars:                Map<ChannelT, VarSpecT option>
+        ChannelVars:                Map<ChannelT, VarSpec option>
         /// function to allocate new storage for the result
         ChannelAllocators:          Map<ChannelT, unit -> ITensor>
         /// storage location of variables
-        VarStorLoc:                 Map<VarSpecT, ITensorDevice>
+        VarStorLoc:                 Map<VarSpec, ITensorDevice>
         /// optional stride specification for variables
-        VarStrides:                 Map<VarSpecT, int64 list>
+        VarStrides:                 Map<VarSpec, int64 list>
         /// op names for each elements function
         mutable ElemFuncsOpNames:   Map<UElemFuncInstT, string>
         /// texture objects
@@ -131,8 +131,8 @@ module Types =
         Event:                  Dictionary<EventObjectT, CudaEvent>
         InternalMem:            Dictionary<StorageAlloc, CudaDeviceVariable<byte>>
         RegHostMem:             Dictionary<StorageAlloc, RegHostMemT>
-        mutable ExternalVar:    Map<VarSpecT, ITensor>
-        mutable HostVar:        Map<VarSpecT, ITensor>
+        mutable ExternalVar:    Map<VarSpec, ITensor>
+        mutable HostVar:        Map<VarSpec, ITensor>
         TextureObject:          Dictionary<TextureObjectT, CudaTexObjectAndArray>
         ConstantValues:         Map<StorageConst, ITensor>
         SubWorkspaces:          Dictionary<SubWorkspaceT, ICudaExprWorkspace>
@@ -197,7 +197,7 @@ module CudaCompileEnv =
         id
 
     /// Gets the strides for an external variable.
-    let strideForVar (var: VarSpecT) (env: CudaCompileEnvT) =
+    let strideForVar (var: VarSpec) (env: CudaCompileEnvT) =
         match env.VarStrides |> Map.tryFind var with
         | Some strides -> strides
         | None -> failwithf "no strides were specified for variable %A" var

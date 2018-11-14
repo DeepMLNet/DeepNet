@@ -5,7 +5,6 @@ open System
 open DeepNet.Utils
 open Tensor
 open ShapeSpec
-open VarSpec
 
 /// element expression
 module ElemExpr =

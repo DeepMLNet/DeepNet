@@ -5,7 +5,6 @@ open Tensor.Utils
 open DeepNet.Utils
 
 open ShapeSpec
-open VarSpec
 open ElemExpr
 
 

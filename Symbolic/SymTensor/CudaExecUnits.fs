@@ -28,7 +28,7 @@ module CudaExecUnitTypes =
     type ExecLoopInfoT = {
         Length:                int64
         Channels:              Map<ChannelT, LoopChannelManikinInfoT>
-        Vars:                  Map<VarSpecT, LoopInputT>
+        Vars:                  Map<VarSpec, LoopInputT>
         Workspace:             SubWorkspaceT
         Args:                  TensorManikin list
         IterManikin:           TensorManikin

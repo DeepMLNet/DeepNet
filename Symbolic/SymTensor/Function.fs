@@ -13,13 +13,13 @@ open UExprTypes
 [<AutoOpen>]
 module VarEnvTypes = 
     /// variable value collection
-    type VarEnvT = Map<VarSpecT, ITensor>
+    type VarEnvT = Map<VarSpec, ITensor>
 
     /// specification of variable storage locations
-    type VarLocsT = Map<VarSpecT, ITensorDevice>
+    type VarLocsT = Map<VarSpec, ITensorDevice>
 
     /// specification of variable strides
-    type VarStridesT = Map<VarSpecT, int64 list>
+    type VarStridesT = Map<VarSpec, int64 list>
 
     /// specification of channel strides
     type ChannelStridesT = Map<ChannelT, int64 list>
@@ -29,15 +29,15 @@ module VarEnvTypes =
 module VarEnv = 
 
     /// add variable value to environment
-    let addVarSpec (vs: VarSpecT) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
+    let addVarSpec (vs: VarSpec) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
         Map.add vs (value :> ITensor) varEnv
 
     /// remove variable value from environment
-    let removeVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : VarEnvT =
+    let removeVarSpec (vs: VarSpec) (varEnv: VarEnvT) : VarEnvT =
         Map.remove vs varEnv
 
     /// get variable value from environment
-    let getVarSpec (vs: VarSpecT) (varEnv: VarEnvT) : #ITensor =
+    let getVarSpec (vs: VarSpec) (varEnv: VarEnvT) : #ITensor =
         match varEnv |> Map.tryFind vs with
         | Some v -> v |> box |> unbox
         | None -> failwithf "variable %A is not present in the specified VarEnv" vs
@@ -161,7 +161,7 @@ module EnvTypes =
         /// the CompileEnvT used for this compilation
         CompileEnv:         CompileEnvT
         /// the variables necessary to evaluate the expressions
-        NeededVars:         Set<VarSpecT>
+        NeededVars:         Set<VarSpec>
         /// the evaluation function
         Eval:               EvalFn
         /// diagnostic information
@@ -223,7 +223,7 @@ module Func =
 
     type private UExprGenT = {
         Generate:               SymSizeEnv -> ExprT
-        UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<VarSpecT> * bool       
+        UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<VarSpec> * bool       
     }
 
     let private exprGenerate baseExpr symSizes =

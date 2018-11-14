@@ -44,7 +44,7 @@ module UExprTypes =
 
     and ULoopSpecT = {
         Length:     int64
-        Vars:       Map<VarSpecT, LoopInputT>
+        Vars:       Map<VarSpec, LoopInputT>
         Channels:   Map<ChannelT, ULoopValueT>
     }
 

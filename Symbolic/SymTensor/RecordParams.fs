@@ -35,7 +35,7 @@ type private ValueType =
 
 type private RFieldInfo = {
     Expr:           obj
-    VarSpec:        VarSpecT
+    VarSpec:        VarSpec
     ValueType:      ValueType
 }
 
@@ -77,7 +77,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                         valField.Name valField.PropertyType exprType exprField.PropertyType
 
                 // extract UVarSpecT
-                let varSpec = Generic.callGeneric<VarRecordHelpers, VarSpecT> "UVarSpecOfExpr" [baseType] exprData
+                let varSpec = Generic.callGeneric<VarRecordHelpers, VarSpec> "UVarSpecOfExpr" [baseType] exprData
 
                 yield {Expr=exprData; VarSpec=varSpec; ValueType=valueType}
         } 

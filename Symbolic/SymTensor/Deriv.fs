@@ -15,7 +15,7 @@ module DerivTypes =
         /// the number of elements of the function the derivative is taken of
         FunElems:   SizeSpec
         /// the Jacobians w.r.t. the variables occuring in the expression
-        Jacobians:  Map<VarSpecT, ExprT>
+        Jacobians:  Map<VarSpec, ExprT>
     }
 
 
@@ -27,8 +27,8 @@ module DerivTypes =
 
 
     type internal PortContentsT = {
-        DerivWrt:   ResizeArray<VarSpecT>
-        ValueOf:    VarSpecT option
+        DerivWrt:   ResizeArray<VarSpec>
+        ValueOf:    VarSpec option
         SliceDim:   int
     }
 
@@ -328,13 +328,13 @@ module Deriv =
             addArg zeroExpr
 
         /// map from variable representing a derivative to the loop input specification
-        let varInputSpecs = Dictionary<VarSpecT, LoopInputT> ()
+        let varInputSpecs = Dictionary<VarSpec, LoopInputT> ()
 
         /// map from a loop output to the variable representing its derivative
-        let dOutputVars = Dictionary<ChannelT, VarSpecT> ()
+        let dOutputVars = Dictionary<ChannelT, VarSpec> ()
 
         /// map from a loop PreviousPort to the variables representing its derivative sources
-        let dPreviousVars = Dictionary<PreviousChannelT, VarSpecT> ()
+        let dPreviousVars = Dictionary<PreviousChannelT, VarSpec> ()
 
         /// map from a loop port to the value it must contain
         let portContents = Dictionary<ChannelT, PortContentsT> ()

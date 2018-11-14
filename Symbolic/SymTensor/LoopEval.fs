@@ -24,7 +24,7 @@ module LoopEval =
     } 
 
     /// build strides information for loop sources and targets
-    let buildStrides (vars: Map<VarSpecT, LoopInputT>) (args: TensorLayout list) 
+    let buildStrides (vars: Map<VarSpec, LoopInputT>) (args: TensorLayout list) 
                      (channels: Map<ChannelT, LoopChannelLayoutInfoT>) 
                      : VarStridesT * ChannelStridesT * int list option list =
 
@@ -77,7 +77,7 @@ module LoopEval =
 
     /// builds inputs and outputs for one loop iteration 
     let buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
-                   (vars: Map<VarSpecT, LoopInputT>)
+                   (vars: Map<VarSpec, LoopInputT>)
                    (args: ITensor list) (channels: Map<ChannelT, LoopChannelInfoT>)
                    : VarEnvT * Map<ChannelT, ITensor> =
 
