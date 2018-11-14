@@ -1,18 +1,18 @@
 ﻿namespace SymTensor
 
-open Tensor
-open Tensor.Utils
+//open Tensor
+//open Tensor.Utils
 open DeepNet.Utils
 
 open ShapeSpec
-open ElemExpr
+open Elem
 
 
 
 module ElemExprDeriv =
 
     /// map containing the derivative for each argument
-    type DerivT = Map<ArgElementSpecT, ElemExprT>
+    type DerivT = Map<ArgElementSpec, Elem.Expr>
         
     /// merges to derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
@@ -21,11 +21,11 @@ module ElemExprDeriv =
                                     | Some ovg -> m |> Map.add v (vg + ovg)
                                     | None -> m |> Map.add v vg) 
 
-    let rec reverseDiffStep (expr: ElemExprT) (eg: ElemExprT) : DerivT =    
+    let rec reverseDiffStep (expr: Elem.Expr) (eg: Elem.Expr) : DerivT =    
         let rds = reverseDiffStep
-        let zero = 0 |> convTo expr.Type |> scalar
-        let one = 1 |> convTo expr.Type |> scalar
-        let two = 2 |> convTo expr.Type |> scalar
+        let zero = 0 |> convTo expr.Type |> Elem.Expr.scalar
+        let one = 1 |> convTo expr.Type |> Elem.Expr.scalar
+        let two = 2 |> convTo expr.Type |> Elem.Expr.scalar
 
         match expr with
         | Leaf (op) ->
@@ -37,27 +37,27 @@ module ElemExprDeriv =
         | Unary (op, a) ->
             match op with
             | Negate -> -eg |> rds a
-            | Abs -> eg * signt a |> rds a
+            | Abs -> eg * Elem.Expr.signt a |> rds a
             | SignT -> Map.empty
             | Log -> eg * (a ** -(one)) |> rds a
-            | Log10 -> eg |> rds (log a / log (scalar 10))
+            | Log10 -> eg |> rds (log a / log (Elem.Expr.scalar 10))
             | Exp -> eg * exp a |> rds a
             | Sin -> eg * cos a |> rds a
             | Cos -> eg * (-sin a) |> rds a
             | Tan -> eg * (one + (tan a)**two) |> rds a
-            | Asin -> eg * (one / sqrtt (one - a**two)) |> rds a
-            | Acos -> eg * (-one / sqrtt (one - a**two)) |> rds a
+            | Asin -> eg * (one / Elem.Expr.sqrtt (one - a**two)) |> rds a
+            | Acos -> eg * (-one / Elem.Expr.sqrtt (one - a**two)) |> rds a
             | Atan -> eg * (one / (one + a**two)) |> rds a
             | Sinh -> eg * cosh a |> rds a
             | Cosh -> eg * sinh a |> rds a
             | Tanh -> eg * (one - (tanh a)**two) |> rds a
-            | Sqrt -> eg * (one / (two * sqrtt a)) |> rds a
+            | Sqrt -> eg * (one / (two * Elem.Expr.sqrtt a)) |> rds a
             | Ceil -> Map.empty
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
-            | Sum (sym, first, last) -> eg |> kroneckerRng (SizeSpec.Base (BaseSize.Sym sym)) first last |> rds a
-            | KroneckerRng (sym, first, last) -> eg |> kroneckerRng sym first last |> rds a                
+            | Sum (sym, first, last) -> eg |> Elem.Expr.kroneckerRng (SizeSpec.Base (BaseSize.Sym sym)) first last |> rds a
+            | KroneckerRng (sym, first, last) -> eg |> Elem.Expr.kroneckerRng sym first last |> rds a                
 
         | Binary (op, a, b) ->
             let inline (.+) da db = 
@@ -71,15 +71,15 @@ module ElemExprDeriv =
             | Modulo -> eg .+ (-truncate (a / b))    // TODO: FIXME
             | Power -> (eg * b * a**(b - one)) .+ (eg * a**b * log a)
             | IfThenElse (left, right) -> 
-                ifThenElse left right eg zero .+ ifThenElse left right zero eg 
+                Elem.Expr.ifThenElse left right eg zero .+ Elem.Expr.ifThenElse left right zero eg 
 
-    let compute (expr: ElemExprT) : DerivT =
-        let one = 1 |> convTo expr.Type |> scalar
+    let compute (expr: Elem.Expr) : DerivT =
+        let one = 1 |> convTo expr.Type |> Elem.Expr.scalar
         reverseDiffStep expr one
 
-    let ofArgElem (argElem: ElemExprT) (deriv: DerivT) =
-        let zero = 0 |> convTo argElem.Type |> scalar
-        match deriv |> Map.tryFind (ElemExpr.extractArg argElem) with
+    let ofArgElem (argElem: Elem.Expr) (deriv: DerivT) =
+        let zero = 0 |> convTo argElem.Type |> Elem.Expr.scalar
+        match deriv |> Map.tryFind (Elem.Expr.extractArg argElem) with
         | Some da -> da
         | None -> zero
 
@@ -87,17 +87,17 @@ module ElemExprDeriv =
         | SummingDim of SizeSymbol * SizeSpec * SizeSpec * SizeSymbol
         | FixedDim of SizeSpec * SizeSymbol
 
-    let buildDerivElemExpr (expr: ElemExprT) (exprShp: ShapeSpec) nArgs =
+    let buildDerivElemExpr (expr: Elem.Expr) (exprShp: ShapeSpec) nArgs =
         let nDims = ShapeSpec.nDim exprShp
         let allDerives = compute expr
         let egArgNo = nArgs
-        let egElem = ElemExpr.argElemWithType (ElemExpr.typeName expr).Type egArgNo
-        let zero = 0 |> convTo expr.Type |> scalar
+        let egElem = Elem.Expr.argElemWithType (Elem.Expr.typeName expr).Type egArgNo
+        let zero = 0 |> convTo expr.Type |> Elem.Expr.scalar
 
         let mutable sumSymbolCnt = 0
         let newSumSymbol () =
             sumSymbolCnt <- sumSymbolCnt + 1
-            sprintf "__DERIV_%d" sumSymbolCnt |> ElemExpr.sumSymbol
+            sprintf "__DERIV_%d" sumSymbolCnt |> Elem.Expr.sumSymbol
 
         let argDerivExprs = [
             for arg=0 to nArgs-1 do
@@ -113,7 +113,7 @@ module ElemExprDeriv =
                         // extract sum information
                         let egIdxDimInfo = [
                             for exprDim=0 to nDims-1 do
-                                let exprDimSym = ElemExpr.idxSymbol exprDim
+                                let exprDimSym = Elem.Expr.idxSymbol exprDim
                                 match sol.LeftValues |> Map.tryFind exprDimSym with
                                 | Some ss -> yield FixedDim (ss, exprDimSym)
                                 | None -> yield SummingDim (newSumSymbol(),
@@ -137,25 +137,25 @@ module ElemExprDeriv =
                                 | SummingDim (sym, first, last, oldSym) ->
                                     let substSum = 
                                         derivSumSoFar 
-                                        |> ElemExpr.substSymSizes (Map [oldSym, SizeSpec.Base (BaseSize.Sym sym)]) 
+                                        |> Elem.Expr.substSymSizes (Map [oldSym, SizeSpec.Base (BaseSize.Sym sym)]) 
                                     Unary (Sum (sym, first, last), substSum) 
                                 | FixedDim (ss, oldSym) -> 
                                     derivSumSoFar
-                                    |> ElemExpr.substSymSizes (Map [oldSym, ss]))
+                                    |> Elem.Expr.substSymSizes (Map [oldSym, ss]))
 
                         // apply constraints if necessary
                         let argExpr =
                             (argExprSumed, sol.RightValues)
                             ||> Map.fold (fun kroneckersSoFar idxSym reqVal ->
-                                ElemExpr.ifThenElse (SizeSpec.Base (BaseSize.Sym idxSym)) reqVal kroneckersSoFar zero)
+                                Elem.Expr.ifThenElse (SizeSpec.Base (BaseSize.Sym idxSym)) reqVal kroneckersSoFar zero)
 
                         // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
-                        let resSyms = [for d=1 to nArgDims do yield idx d]
+                        let resSyms = [for d=1 to nArgDims do yield Elem.Expr.idx d]
                         let idxToResSyms = 
                             List.zip idxSyms resSyms 
                             |> Map.ofList
-                            |> Map.add funcDimSym (idx 0)
-                        yield ElemExpr.substSymSizes idxToResSyms argExpr
+                            |> Map.add funcDimSym (Elem.Expr.idx 0)
+                        yield Elem.Expr.substSymSizes idxToResSyms argExpr
                 ]
 
                 let argExprSum = 

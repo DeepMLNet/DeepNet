@@ -56,7 +56,7 @@ module Types =
     
     /// instantiation (with pos order) of an UElemFunc
     type UElemFuncInstT = {
-        UElemFunc:                  UElemExpr.UElemFuncT
+        UElemFunc:                  UElemExpr.UElemFunc
         PosOrder:                   int list
     }
 

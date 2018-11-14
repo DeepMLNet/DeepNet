@@ -54,7 +54,7 @@ module UExprTypes =
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
-        | Elements of ShapeSpec * UElemExpr.UElemFuncT
+        | Elements of ShapeSpec * UElemExpr.UElemFunc
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT

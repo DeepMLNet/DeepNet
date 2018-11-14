@@ -206,7 +206,7 @@ module Expr =
         /// build tensor using numeric ranges
         | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list
         /// elementwise calculated tensor
-        | Elements of shape:ShapeSpec * elemExpr:ElemExpr.ElemExprT
+        | Elements of shape:ShapeSpec * elemExpr:Elem.Expr
         /// elementwise interpolation
         | Interpolate of InterpolatorT
         /// use specified channel of a multi-channel op
@@ -533,7 +533,7 @@ module Expr =
             -> TypeName.ofType<bool>
 
         | Nary (Elements (_, elemExpr), _) 
-            -> ElemExpr.typeName elemExpr
+            -> Elem.Expr.typeName elemExpr
         | Nary (Channel (Loop spec, channel), _)
             -> loopOutputTypeNames spec |> Map.find channel 
 
@@ -937,8 +937,8 @@ module Expr =
                 | Elements (trgtShp, elemExpr) -> 
                     checkEqualTypes()
                     let tns = es |> List.map typename
-                    ElemExpr.check elemExpr |> ignore
-                    ElemExpr.checkCompatibility elemExpr ss tns trgtShp
+                    Elem.Expr.check elemExpr |> ignore
+                    Elem.Expr.checkCompatibility elemExpr ss tns trgtShp
                 | BuildTensor (shp, rngs) ->
                     if List.length rngs <> List.length es then
                         failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments"
@@ -1080,7 +1080,7 @@ module Expr =
                         Nary (BuildTensor (sShp shp, rngs |> List.map (List.map (fun (f,l) -> sSize f, sSize l))), 
                               List.map sSub es)
                     | Nary (Elements (trgtShp, elemExpr), es) -> 
-                        Nary (Elements (sShp trgtShp, ElemExpr.substSymSizes symSizes elemExpr), List.map sSub es)
+                        Nary (Elements (sShp trgtShp, Elem.Expr.substSymSizes symSizes elemExpr), List.map sSub es)
                     | Nary (Channel (Loop spec, channel), es) ->
                         let substSpec = {
                             Length = sSize spec.Length
@@ -1153,7 +1153,7 @@ module Expr =
                     List.forall subTest es
                 | Nary (Elements (trgtShp, elemExpr), es) -> 
                     tShp trgtShp && 
-                    ElemExpr.canEvalAllSymSizes elemExpr && 
+                    Elem.Expr.canEvalAllSymSizes elemExpr && 
                     List.forall subTest es
                 | Nary (Channel (Loop spec, channel), es) ->
                     (tSize spec.Length) 

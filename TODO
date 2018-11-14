@@ -7,7 +7,7 @@
 
 
 1. Merge SymTensorCuda and SymTensor
-2. Think about ElemExpr code
+2. Think about Elem.Expr code
 3. Remove direct CUDA calls from SymTensor
 4. Make backend work for both host and Cuda (what about Streams?)
 
@@ -15,7 +15,7 @@
 - no modifications required in SymShape.fs
 - no modifications required in SymSizeEnv.fs
 - no modifications required in Vars.fs
-- no modifications required in ElemExpr.fs
+- no modifications required in Elem.Expr.fs
 - ElemExprHostEval should be renamed into ElemExprInterpreter to indicate that its purpose
   is interpreting ElemExprs => Done
 - Interpolator.fs can stay as-is for now

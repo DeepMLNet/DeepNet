@@ -2,13 +2,11 @@
 
 open System
 
-open Tensor
-open Tensor.Utils
 open DeepNet.Utils
 
 open SymTensor
 open SymTensor.Compiler
-open ElemExpr
+open Elem
 open UElemExpr
 
 
@@ -63,7 +61,7 @@ module CudaElemExpr =
 
 
     let private valueCode op tn (subExprVars: VarNameT list) 
-            (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>)  =
+            (argVars: Map<Elem.Arg, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>)  =
         let ssCode = generateSizeSpecCode sizeSymVars
 
         match op with
@@ -137,9 +135,9 @@ module CudaElemExpr =
             sumIdxCount <- sumIdxCount + 1
             sprintf "s%d" sumIdxCount
 
-        let rec genExpr (UElemExpr (op, subExprs, tn) as expr) (exprVars: Map<UElemExprT, VarNameT>) 
-                (argVars: Map<ElemExpr.ArgT, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>) (indent: int)
-                : VarNameT * Map<UElemExprT, VarNameT> * CodeT =
+        let rec genExpr (UElemExpr (op, subExprs, tn) as expr) (exprVars: Map<UElemExpr, VarNameT>) 
+                (argVars: Map<Elem.Arg, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>) (indent: int)
+                : VarNameT * Map<UElemExpr, VarNameT> * CodeT =
 
             let spc = String.replicate indent " "
 
@@ -196,10 +194,10 @@ module CudaElemExpr =
 
         // build arguments vars
         let argVars = 
-            seq {for a=0 to nArgs-1 do yield (ElemExpr.Arg a), sprintf "a%d" a}
+            seq {for a=0 to nArgs-1 do yield (Elem.Arg a), sprintf "a%d" a}
             |> Map.ofSeq
         let posVars =
-            seq {for d=0 to nTrgtDims-1 do yield ElemExpr.idxSymbol d, sprintf "p%d" d}
+            seq {for d=0 to nTrgtDims-1 do yield Elem.Expr.idxSymbol d, sprintf "p%d" d}
             |> Map.ofSeq
         
         // generate calculation code
@@ -216,7 +214,7 @@ module CudaElemExpr =
             for a=0 to nArgs-1 do yield sprintf "const Ta%d &a%d" a a
         ]
         let trgtIdxStr =
-            seq {for d=0 to nTrgtDims-1 do yield generateSizeSpecCode posVars (ElemExpr.idx d)}
+            seq {for d=0 to nTrgtDims-1 do yield generateSizeSpecCode posVars (Elem.Expr.idx d)}
             |> String.concat ", "
         let functorCode =    
             let tmpl =         
@@ -246,7 +244,7 @@ module CudaElemExpr =
                 List.init nTrgtDims (fun warpDim ->
                     idxs
                     |> List.indexed
-                    |> List.filter (fun (_, pos) -> pos = ElemExpr.idx warpDim)
+                    |> List.filter (fun (_, pos) -> pos = Elem.Expr.idx warpDim)
                     |> List.sumBy (fun (argDim, _) -> arg.Layout.Stride.[argDim])
                     |> fun strIncr -> if strIncr = 1L then 1L else 0L)
             | UElemExpr (UUnaryOp (Sum (sumSym, first, last)), [summand], _) ->

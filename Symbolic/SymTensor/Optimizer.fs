@@ -50,36 +50,36 @@ module Optimizer =
 
             let argsBroadcasted =
                 List.indexed args
-                |> List.map (fun (argPos, arg) -> ElemExpr.Arg argPos, axesBroadcasted arg)
+                |> List.map (fun (argPos, arg) -> Elem.Arg argPos, axesBroadcasted arg)
                 |> Map.ofList
 
             let rec sigInDim dim elemExpr =
-                let dimSym = ElemExpr.idxSymbol dim
+                let dimSym = Elem.Expr.idxSymbol dim
                 match elemExpr with
-                | ElemExpr.Leaf (ElemExpr.SizeValue (ss, _)) -> ss.ContainsSymbol dimSym 
-                | ElemExpr.Leaf (ElemExpr.ArgElement ((arg, sa), _)) ->
+                | Elem.Expr.Leaf (Elem.SizeValue (ss, _)) -> ss.ContainsSymbol dimSym 
+                | Elem.Expr.Leaf (Elem.ArgElement ((arg, sa), _)) ->
                     List.zip sa argsBroadcasted.[arg]
                     |> List.exists (fun (dimSs, dimBc) ->
                         dimSs.ContainsSymbol dimSym && not dimBc.IsBC)
-                | ElemExpr.Leaf _ -> false
+                | Elem.Expr.Leaf _ -> false
 
-                | ElemExpr.Unary (ElemExpr.Sum (_, first, last), a) ->
+                | Elem.Expr.Unary (Elem.Sum (_, first, last), a) ->
                     first.ContainsSymbol dimSym 
                     || last.ContainsSymbol dimSym
                     || sigInDim dim a
-                | ElemExpr.Unary (ElemExpr.KroneckerRng (ss, first, last), a) ->
+                | Elem.Expr.Unary (Elem.KroneckerRng (ss, first, last), a) ->
                     ss.ContainsSymbol dimSym
                     || first.ContainsSymbol dimSym
                     || last.ContainsSymbol dimSym
                     || sigInDim dim a
-                | ElemExpr.Unary (_, a) ->
+                | Elem.Expr.Unary (_, a) ->
                     sigInDim dim a
 
-                | ElemExpr.Binary (ElemExpr.IfThenElse (left, right), a, b) ->
+                | Elem.Expr.Binary (Elem.IfThenElse (left, right), a, b) ->
                     left.ContainsSymbol dimSym
                     || right.ContainsSymbol dimSym
                     || sigInDim dim a || sigInDim dim b
-                | ElemExpr.Binary (_, a, b) ->
+                | Elem.Expr.Binary (_, a, b) ->
                     sigInDim dim a || sigInDim dim b
 
             let nDims = List.length resShape
@@ -101,22 +101,22 @@ module Optimizer =
 
             let rec splitSum elemExpr =
                 match elemExpr with
-                | ElemExpr.Unary (ElemExpr.Sum (sym, first, last), summand) ->     
+                | Elem.Expr.Unary (Elem.Sum (sym, first, last), summand) ->     
                     // replace sum by argument access
-                    let typ = (ElemExpr.typeName elemExpr).Type
+                    let typ = (Elem.Expr.typeName elemExpr).Type
                     let sumArgPos = newArg ()
                     let sumArgIdx =
-                        [for d=0 to nDims - 1 do yield ElemExpr.idx d]
-                    let sumArg = ElemExpr.argElemWithType typ sumArgPos sumArgIdx
+                        [for d=0 to nDims - 1 do yield Elem.Expr.idx d]
+                    let sumArg = Elem.Expr.argElemWithType typ sumArgPos sumArgIdx
 
                     // add summation dimension to the right
                     let sumElems = last - first + 1L
                     let sumandShape = resShape @ [sumElems]
-                    let sumandIdx = first + ElemExpr.idx nDims
+                    let sumandIdx = first + Elem.Expr.idx nDims
 
                     // substitute summation symbol with last dimension index
                     let subst = Map [sym, sumandIdx]
-                    let summandSubst = summand |> ElemExpr.substSymSizes subst
+                    let summandSubst = summand |> Elem.Expr.substSymSizes subst
 
                     // build sumand elements expression and sum over last dimensions
                     let summandExpr = Expr.elements sumandShape summandSubst args
@@ -124,15 +124,15 @@ module Optimizer =
 
                     sumArg, [optRec summedExpr]
 
-                | ElemExpr.Leaf (op) -> 
-                    ElemExpr.Leaf (op), []
-                | ElemExpr.Unary (op, a) ->
+                | Elem.Expr.Leaf (op) -> 
+                    Elem.Expr.Leaf (op), []
+                | Elem.Expr.Unary (op, a) ->
                     let aSplit, aArgs = splitSum a
-                    ElemExpr.Unary (op, aSplit), aArgs
-                | ElemExpr.Binary (op, a, b) ->
+                    Elem.Expr.Unary (op, aSplit), aArgs
+                | Elem.Expr.Binary (op, a, b) ->
                     let aSplit, aArgs = splitSum a
                     let bSplit, bArgs = splitSum b
-                    ElemExpr.Binary (op, aSplit, bSplit), aArgs @ bArgs
+                    Elem.Expr.Binary (op, aSplit, bSplit), aArgs @ bArgs
 
             let elemExprWithoutSum, sumArgs = splitSum elemExpr
             Expr.elements resShape elemExprWithoutSum (args @ sumArgs)
@@ -168,10 +168,10 @@ module Optimizer =
         | _ -> failwith "not an elements expression"
 
     /// optimizes an element expression
-    and optimizeElemExpr (elemExpr: ElemExprT) =
+    and optimizeElemExpr (elemExpr: Elem.Expr) =
         match elemExpr with
 
-        | ElemExpr.Binary (ElemExpr.Power, a, ElemExpr.Leaf (ElemExpr.Const cs)) ->
+        | Elem.Expr.Binary (Elem.Power, a, Elem.Expr.Leaf (Elem.Const cs)) ->
             // replace powers with integral exponents less than 5 with iterated multiplications
             let p = 
                 match cs with
@@ -182,21 +182,21 @@ module Optimizer =
 
             let rec repMul cnt arg =
                 match cnt with
-                | 0 -> ElemExpr.constSpec (Const.one elemExpr.Type)
+                | 0 -> Elem.Expr.constSpec (Const.one elemExpr.Type)
                 | 1 -> arg
                 | _ when cnt > 0 ->
                     arg * repMul (cnt - 1) arg
                 | _ when cnt < 0 ->
-                    ElemExpr.constSpec (Const.one elemExpr.Type) / repMul (-cnt) arg
+                    Elem.Expr.constSpec (Const.one elemExpr.Type) / repMul (-cnt) arg
                 | _ -> failwith "impossible"
 
             match p with
             | Some p when abs p < 5 -> repMul p a
             | _ -> elemExpr                
 
-        | ElemExpr.Leaf _ -> elemExpr
-        | ElemExpr.Unary (op, a) -> ElemExpr.Unary(op, optimizeElemExpr a)
-        | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, optimizeElemExpr a, optimizeElemExpr b)
+        | Elem.Expr.Leaf _ -> elemExpr
+        | Elem.Expr.Unary (op, a) -> Elem.Expr.Unary(op, optimizeElemExpr a)
+        | Elem.Expr.Binary (op, a, b) -> Elem.Expr.Binary (op, optimizeElemExpr a, optimizeElemExpr b)
 
     /// optimizes elements expression in an expression
     and optimizeElements elements =
@@ -207,42 +207,42 @@ module Optimizer =
 
     and leafOpToElemOp op =
         match op with
-        | ScalarConst cs        -> Some (ElemExpr.Const cs)
-        | SizeValue (value, tn) -> Some (ElemExpr.SizeValue (value, tn))
+        | ScalarConst cs        -> Some (Elem.Const cs)
+        | SizeValue (value, tn) -> Some (Elem.SizeValue (value, tn))
         | _                     -> None
 
     and unaryOpToElemOp op =
         match op with
-        | Negate    -> Some ElemExpr.Negate
-        | Abs       -> Some ElemExpr.Abs
-        | SignT     -> Some ElemExpr.SignT
-        | Log       -> Some ElemExpr.Log
-        | Log10     -> Some ElemExpr.Log10  
-        | Exp       -> Some ElemExpr.Exp
-        | Sin       -> Some ElemExpr.Sin 
-        | Cos       -> Some ElemExpr.Cos 
-        | Tan       -> Some ElemExpr.Tan  
-        | Asin      -> Some ElemExpr.Asin
-        | Acos      -> Some ElemExpr.Acos
-        | Atan      -> Some ElemExpr.Atan
-        | Sinh      -> Some ElemExpr.Sinh
-        | Cosh      -> Some ElemExpr.Cosh
-        | Tanh      -> Some ElemExpr.Tanh
-        | Sqrt      -> Some ElemExpr.Sqrt 
-        | Ceil      -> Some ElemExpr.Ceil
-        | Floor     -> Some ElemExpr.Floor
-        | Round     -> Some ElemExpr.Round
-        | Truncate  -> Some ElemExpr.Truncate
+        | Negate    -> Some Elem.Negate
+        | Abs       -> Some Elem.Abs
+        | SignT     -> Some Elem.SignT
+        | Log       -> Some Elem.Log
+        | Log10     -> Some Elem.Log10  
+        | Exp       -> Some Elem.Exp
+        | Sin       -> Some Elem.Sin 
+        | Cos       -> Some Elem.Cos 
+        | Tan       -> Some Elem.Tan  
+        | Asin      -> Some Elem.Asin
+        | Acos      -> Some Elem.Acos
+        | Atan      -> Some Elem.Atan
+        | Sinh      -> Some Elem.Sinh
+        | Cosh      -> Some Elem.Cosh
+        | Tanh      -> Some Elem.Tanh
+        | Sqrt      -> Some Elem.Sqrt 
+        | Ceil      -> Some Elem.Ceil
+        | Floor     -> Some Elem.Floor
+        | Round     -> Some Elem.Round
+        | Truncate  -> Some Elem.Truncate
         | _         -> None
 
     and binaryOpToElemOp op =
         match op with
-        | Add       -> Some ElemExpr.Add
-        | Substract -> Some ElemExpr.Substract
-        | Multiply  -> Some ElemExpr.Multiply
-        | Divide    -> Some ElemExpr.Divide
-        | Modulo    -> Some ElemExpr.Modulo
-        | Power     -> Some ElemExpr.Power
+        | Add       -> Some Elem.Add
+        | Substract -> Some Elem.Substract
+        | Multiply  -> Some Elem.Multiply
+        | Divide    -> Some Elem.Divide
+        | Modulo    -> Some Elem.Modulo
+        | Power     -> Some Elem.Power
         | _         -> None
 
     /// combines elemwise and elements operations into one elements operation
@@ -264,14 +264,14 @@ module Optimizer =
                     let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
                     let insSubst1 =
                         dimRng
-                        |> List.map (fun d -> ElemExpr.idxSymbol d, SizeSpec.Base (BaseSize.Sym (rplSym d)))
+                        |> List.map (fun d -> Elem.Expr.idxSymbol d, SizeSpec.Base (BaseSize.Sym (rplSym d)))
                         |> Map.ofList
                     let insSubst2 =
                         dimRng
-                        |> List.map (fun d -> rplSym d, ElemExpr.idx (d+1))
+                        |> List.map (fun d -> rplSym d, Elem.Expr.idx (d+1))
                         |> Map.ofList
                     let substExpr = 
-                        elemExpr |> ElemExpr.substSymSizes insSubst1 |> ElemExpr.substSymSizes insSubst2
+                        elemExpr |> Elem.Expr.substSymSizes insSubst1 |> Elem.Expr.substSymSizes insSubst2
                     insertBcAxes substSize (substStartDim+1) srcShp remRsShp substExpr
                 | srcSize::remSrcShp, rsSize::remRsShp when srcSize = rsSize ->
                     insertBcAxes substSize (substStartDim+1) remSrcShp remRsShp elemExpr
@@ -285,11 +285,11 @@ module Optimizer =
                     Expr.shapeOf a
                     |> List.indexed
                     |> List.collect (fun (d, ss) ->
-                        if ss = SizeSpec.broadcastable then [ElemExpr.idxSymbol d, SizeSpec.zero]
+                        if ss = SizeSpec.broadcastable then [Elem.Expr.idxSymbol d, SizeSpec.zero]
                         else [])
                     |> Map.ofSeq
                 let bcElemExpr, bcArgs = getArgElemExpr a
-                bcElemExpr |> ElemExpr.substSymSizes bcSubst, bcArgs
+                bcElemExpr |> Elem.Expr.substSymSizes bcSubst, bcArgs
             | Unary (Reshape rsShp, src) when combinable() &&
                     (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape ->
                 // replace insertion of broadcast axes using Reshape op by insertion of
@@ -303,18 +303,18 @@ module Optimizer =
                 let rsElemExpr, rsArgs = getArgElemExpr src
                 insertBcAxes SizeSpec.one 0 src.Shape rsShp rsElemExpr, rsArgs
             | combArgExpr -> 
-                let idxs = [0 .. combArgExpr.NDims-1] |> List.map ElemExpr.idx
-                ElemExpr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
+                let idxs = [0 .. combArgExpr.NDims-1] |> List.map Elem.Expr.idx
+                Elem.Expr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
 
         /// Joins the arguments of two element expressions and adjusts them accordingly.
         let joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs) =
             let rec adjust expr =
                 match expr with
-                | ElemExpr.Leaf (ElemExpr.ArgElement ((ElemExpr.Arg arg, idx), tn)) ->
-                    ElemExpr.Leaf (ElemExpr.ArgElement ((ElemExpr.Arg (arg + List.length aArgs), idx), tn))
-                | ElemExpr.Leaf _ -> expr
-                | ElemExpr.Unary (op, a) -> ElemExpr.Unary (op, adjust a)
-                | ElemExpr.Binary (op, a, b) -> ElemExpr.Binary (op, adjust a, adjust b)
+                | Elem.Expr.Leaf (Elem.ArgElement ((Elem.Arg arg, idx), tn)) ->
+                    Elem.Expr.Leaf (Elem.ArgElement ((Elem.Arg (arg + List.length aArgs), idx), tn))
+                | Elem.Expr.Leaf _ -> expr
+                | Elem.Expr.Unary (op, a) -> Elem.Expr.Unary (op, adjust a)
+                | Elem.Expr.Binary (op, a, b) -> Elem.Expr.Binary (op, adjust a, adjust b)
             aElemExpr, adjust bElemExpr, aArgs @ bArgs
 
         match combined.LockedTryFind expr with
@@ -325,7 +325,7 @@ module Optimizer =
                 | Leaf op ->
                     match leafOpToElemOp op with
                     | Some elemOp -> 
-                        Expr.elements (Expr.shapeOf expr) (ElemExpr.Leaf elemOp) []
+                        Expr.elements (Expr.shapeOf expr) (Elem.Expr.Leaf elemOp) []
                         |> optimizeElements
                     | None -> expr
         
@@ -337,7 +337,7 @@ module Optimizer =
                     match unaryOpToElemOp op with
                     | Some elemOp ->       
                         let aElemExpr, aArgs = getArgElemExpr aExpr        
-                        let elemExpr = ElemExpr.Unary (elemOp, aElemExpr)
+                        let elemExpr = Elem.Expr.Unary (elemOp, aElemExpr)
                         Expr.elements (Expr.shapeOf expr) elemExpr aArgs
                         |> optimizeElements
                     | None -> Unary (op, subComb aExpr)
@@ -351,13 +351,13 @@ module Optimizer =
                         let bElemExpr, bArgs = getArgElemExpr bExpr   
                         let aElemExpr, bElemExpr, abArgs = 
                             joinArgsOfElemExprs (aElemExpr, aArgs) (bElemExpr, bArgs)
-                        let elemExpr = ElemExpr.Binary (elemOp, aElemExpr, bElemExpr) 
+                        let elemExpr = Elem.Expr.Binary (elemOp, aElemExpr, bElemExpr) 
                         Expr.elements (Expr.shapeOf expr) elemExpr abArgs
                         |> optimizeElements
                     | None -> Binary (op, subComb aExpr, subComb bExpr)
 
                 //| Nary (Elements (_, elemExpr), args) ->
-                    // TODO: if we are an ElemExpr, merge with children
+                    // TODO: if we are an Elem.Expr, merge with children
                     //printf "could combine two elemexprs"
                     //expr
 

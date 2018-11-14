@@ -8,7 +8,7 @@ open Tensor.Utils
 open DeepNet.Utils
 
 open ShapeSpec
-open ElemExpr
+open Elem
 
 
 module ElemExprInterpreter =
@@ -56,8 +56,8 @@ module ElemExprInterpreter =
         conv<'T> (sign x)
 
     /// evaluates the specified element of an element expression
-    let evalElement (expr: ElemExprT) (args: Tensor<'T> list) (idxs: ShapeSpec) : 'T =
-        let retType = (ElemExpr.typeName expr).Type
+    let evalElement (expr: Elem.Expr) (args: Tensor<'T> list) (idxs: ShapeSpec) : 'T =
+        let retType = (Elem.Expr.typeName expr).Type
         if retType <> typeof<'T> then
             failwithf "Element expression of type %A does not match eval function of type %A."
                 retType typeof<'T>                    
@@ -128,13 +128,13 @@ module ElemExprInterpreter =
                     if leftVal = rightVal then av () else bv ()
 
         let initialSymVals =
-            seq {for dim, idx in List.indexed idxs do yield (idxSymbol dim, idx)}
+            seq {for dim, idx in List.indexed idxs do yield (Expr.idxSymbol dim, idx)}
             |> Map.ofSeq
         doEval initialSymVals expr
 
 
     /// evaluates all elements of an element expression
-    let eval (expr: ElemExprT) (args: Tensor<'T> list) (resShape: NShapeSpec) =
+    let eval (expr: Elem.Expr) (args: Tensor<'T> list) (resShape: NShapeSpec) =
         let res = HostTensor.zeros<'T> resShape
         for idx in TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix
