@@ -48,7 +48,7 @@ module TensorManikinTypes =
         /// allocation id
         Id:             int
         /// data type
-        TypeName:       TypeNameT
+        TypeName:       TypeName
         /// number of elements
         Elements:       int64
         // TODO: remove
@@ -66,7 +66,7 @@ module TensorManikinTypes =
         /// allocation id
         Id:             int
         /// data type
-        TypeName:       TypeNameT
+        TypeName:       TypeName
     }
 
     /// Represents memory in which a tensor may be stored.
@@ -76,7 +76,7 @@ module TensorManikinTypes =
     [<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
     type StorageManikin =
         /// no memory (represents a null pointer)
-        | Zero of TypeNameT
+        | Zero of TypeName
         /// a memory allocation internal to the workspace
         | Alloc of StorageAlloc
         /// an external variable

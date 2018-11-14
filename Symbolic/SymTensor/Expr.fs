@@ -40,13 +40,13 @@ module Expr =
         /// scalar of given value
         | ScalarConst of value:ConstSpecT
         /// scalar of the given size
-        | SizeValue of value:SizeSpec * typ:TypeNameT
+        | SizeValue of value:SizeSpec * typ:TypeName
 
         // ==== tensor creation ====
         /// tensor with 1 on diagonal of given shape
-        | Identity of shape:SizeSpec * typ:TypeNameT
+        | Identity of shape:SizeSpec * typ:TypeName
         /// vector counting from zero to given size minus one
-        | Arange of size:SizeSpec * typ:TypeNameT
+        | Arange of size:SizeSpec * typ:TypeName
 
         // ==== variable access ====
         /// variable read

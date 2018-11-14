@@ -30,7 +30,7 @@ module InterpolatorTypes =
             /// ID
             Id:         int
             /// data type
-            TypeName:   TypeNameT
+            TypeName:   TypeName
             /// minimum argument value
             MinArg:     float list
             /// maximum argument value

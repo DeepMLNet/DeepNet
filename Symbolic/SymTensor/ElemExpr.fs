@@ -18,8 +18,8 @@ module ElemExpr =
     
     type LeafOpT =
         | Const of ConstSpecT
-        | SizeValue of value:SizeSpec * typ:TypeNameT
-        | ArgElement of argElem:ArgElementSpecT * typ:TypeNameT
+        | SizeValue of value:SizeSpec * typ:TypeName
+        | ArgElement of argElem:ArgElementSpecT * typ:TypeName
 
     and UnaryOpT = 
         | Negate                        
@@ -252,7 +252,7 @@ module ElemExpr =
         | Binary (op, a, b) -> max (requiredNumberOfArgs a) (requiredNumberOfArgs b)
     
     /// checks if the arguments' shapes are compatible with the result shape and that the types match
-    let checkCompatibility (expr: ElemExprT) (argShapes: ShapeSpec list) (argTypes: TypeNameT list) 
+    let checkCompatibility (expr: ElemExprT) (argShapes: ShapeSpec list) (argTypes: TypeName list) 
             (resShape: ShapeSpec) =
 
         // check number of arguments
@@ -411,7 +411,7 @@ module UElemExpr =
     
     /// unified element expression
     type UElemExprT =
-        | UElemExpr of UOpT * (UElemExprT list) * TypeNameT
+        | UElemExpr of UOpT * (UElemExprT list) * TypeName
 
     /// element function
     type UElemFuncT = {

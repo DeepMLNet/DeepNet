@@ -29,7 +29,7 @@ module UExprTypes =
     /// metadata for an unified expression
     type UMetadata = {
         /// the data type of the result channels
-        ChannelType:   Map<ChannelT, TypeNameT>
+        ChannelType:   Map<ChannelT, TypeName>
         /// the numeric shape of the result channels
         ChannelShape:  Map<ChannelT, NShapeSpec>
         /// the generating expression, if created from one

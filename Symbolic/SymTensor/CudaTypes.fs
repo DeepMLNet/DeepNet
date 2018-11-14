@@ -314,7 +314,7 @@ module ArgTemplates =
                 ArrayNDSSArg ptr |> box
 
     /// ArrayND argument with null data pointer template
-    type ArrayNDNullArgTmpl (typ: TypeNameT, shape: NShapeSpec) = 
+    type ArrayNDNullArgTmpl (typ: TypeName, shape: NShapeSpec) = 
         let manikin = TensorManikin.newZero typ shape
         member this.Manikin = manikin
         interface ICudaArgTmpl with
