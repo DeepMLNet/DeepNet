@@ -54,7 +54,7 @@ module UExprTypes =
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
-        | Elements of ShapeSpec * UElemExpr.UElemFunc
+        | Elements of ShapeSpec * Elem.Unified.UFunc
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of ChannelT
@@ -232,7 +232,7 @@ module UExpr =
                 | Expr.Nary (Expr.Elements (resShape, elemExpr), se) ->
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se
-                    extra (Elements (resShape, UElemExpr.toUElemFunc elemExpr nDims nArgs)) se
+                    extra (Elements (resShape, Elem.Unified.toUFunc elemExpr nDims nArgs)) se
                 | Expr.Nary (Expr.Channel (Expr.Loop loopSpec, channel), se) ->
                     // build separate loop op
                     let uLoopSpec = loopSpecToULoopSpec caches loopSpec

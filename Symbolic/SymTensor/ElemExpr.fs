@@ -393,49 +393,54 @@ module Elem =
         let arg7<'T> = Expr.argElem<'T> 0, Expr.argElem<'T> 1, Expr.argElem<'T> 2, Expr.argElem<'T> 3, Expr.argElem<'T> 4, Expr.argElem<'T> 5, Expr.argElem<'T> 6
 
 
-/// unified element expression
-module UElemExpr = 
-
-    /// unified element expression op
-    type UOp =
-        | ULeafOp of Elem.LeafOp
-        | UUnaryOp of Elem.UnaryOp
-        | UBinaryOp of Elem.BinaryOp
-    
     /// unified element expression
-    type UElemExpr = UElemExpr of UOp * (UElemExpr list) * TypeName
+    module Unified = 
 
-    /// element function
-    type UElemFunc = {
-        /// element expression
-        Expr:       UElemExpr
-        /// number of dimensions of the result
-        NDims:      int
-        /// number of input arguments
-        NArgs:      int
-    }
-
-    /// converts an element expression to a unified element expression
-    let toUElemExpr (elemExpr: Elem.Expr) =
-        let cache = Dictionary<Elem.Expr, UElemExpr> ()
-        let rec build elemExpr =
-            match cache.TryFind elemExpr with
-            | Some uElemExpr -> uElemExpr
-            | None ->
-                let uElemExpr =
-                    let tn = Elem.Expr.typeName elemExpr
-                    match elemExpr with
-                    | Elem.Leaf op -> UElemExpr (ULeafOp op, [], tn)
-                    | Elem.Unary (op, a) -> UElemExpr (UUnaryOp op, [build a], tn)
-                    | Elem.Binary (op, a, b) -> UElemExpr (UBinaryOp op, [build a; build b], tn)
-                cache.[elemExpr] <- uElemExpr
-                uElemExpr
-        build elemExpr
-
-    /// converts an element expression to a unified element function
-    let toUElemFunc elemExpr nDims nArgs =
-        {
-            Expr    = toUElemExpr elemExpr
-            NDims   = nDims
-            NArgs   = nArgs
+        /// unified element expression op
+        type UOp =
+            | ULeafOp of LeafOp
+            | UUnaryOp of UnaryOp
+            | UBinaryOp of BinaryOp
+    
+        /// unified element expression
+        //type UExpr = UExpr of UOp * (UExpr list) * TypeName
+        type UExpr = {
+            Op:         UOp
+            Args:       UExpr list
+            Type:       TypeName
         }
+
+        /// element function
+        type UFunc = {
+            /// element expression
+            Expr:       UExpr
+            /// number of dimensions of the result
+            NDims:      int
+            /// number of input arguments
+            NArgs:      int
+        }
+
+        /// converts an element expression to a unified element expression
+        let toUExpr (elemExpr: Expr) =
+            let cache = Dictionary<Expr, UExpr> ()
+            let rec build elemExpr =
+                match cache.TryFind elemExpr with
+                | Some uElemExpr -> uElemExpr
+                | None ->
+                    let uElemExpr =
+                        let tn = Expr.typeName elemExpr
+                        match elemExpr with
+                        | Leaf op -> { Op=ULeafOp op; Args=[]; Type=tn }
+                        | Unary (op, a) -> { Op=UUnaryOp op; Args=[build a]; Type=tn }
+                        | Binary (op, a, b) -> { Op=UBinaryOp op; Args=[build a; build b]; Type=tn }
+                    cache.[elemExpr] <- uElemExpr
+                    uElemExpr
+            build elemExpr
+
+        /// converts an element expression to a unified element function
+        let toUFunc elemExpr nDims nArgs =
+            {
+                Expr    = toUExpr elemExpr
+                NDims   = nDims
+                NArgs   = nArgs
+            }

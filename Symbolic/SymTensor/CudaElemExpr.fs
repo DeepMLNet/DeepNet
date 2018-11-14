@@ -7,7 +7,7 @@ open DeepNet.Utils
 open SymTensor
 open SymTensor.Compiler
 open Elem
-open UElemExpr
+open Elem.Unified
 
 
 module CudaElemExpr =
@@ -135,9 +135,9 @@ module CudaElemExpr =
             sumIdxCount <- sumIdxCount + 1
             sprintf "s%d" sumIdxCount
 
-        let rec genExpr (UElemExpr (op, subExprs, tn) as expr) (exprVars: Map<UElemExpr, VarNameT>) 
+        let rec genExpr ({Op=op; Args=subExprs; Type=tn} as expr) (exprVars: Map<UExpr, VarNameT>) 
                 (argVars: Map<Elem.Arg, VarNameT>) (sizeSymVars: Map<SizeSymbol, VarNameT>) (indent: int)
-                : VarNameT * Map<UElemExpr, VarNameT> * CodeT =
+                : VarNameT * Map<UExpr, VarNameT> * CodeT =
 
             let spc = String.replicate indent " "
 
@@ -239,7 +239,7 @@ module CudaElemExpr =
         
         let rec srcStats expr =
             match expr with
-            | UElemExpr (ULeafOp (ArgElement ((Arg argIdx, idxs), _)), _, _) -> 
+            | {UExpr.Op=ULeafOp (ArgElement ((Arg argIdx, idxs), _))} -> 
                 let arg = srcs.[argIdx]
                 List.init nTrgtDims (fun warpDim ->
                     idxs
@@ -247,10 +247,10 @@ module CudaElemExpr =
                     |> List.filter (fun (_, pos) -> pos = Elem.Expr.idx warpDim)
                     |> List.sumBy (fun (argDim, _) -> arg.Layout.Stride.[argDim])
                     |> fun strIncr -> if strIncr = 1L then 1L else 0L)
-            | UElemExpr (UUnaryOp (Sum (sumSym, first, last)), [summand], _) ->
+            | {Op=UUnaryOp (Sum (sumSym, first, last)); Args=[summand]} ->
                 let iters = SizeSpec.eval last - SizeSpec.eval first + 1L 
                 srcStats summand |> List.map (fun oneStrs -> oneStrs * iters)
-            | UElemExpr (_, args, _) ->
+            | {Args=args} ->
                 args |> List.map srcStats |> List.sumElemwise
 
         let trgtStats =         
