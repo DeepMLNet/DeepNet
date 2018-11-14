@@ -38,7 +38,7 @@ module Expr =
 
         // ==== scalars ============
         /// scalar of given value
-        | ScalarConst of value:ConstSpecT
+        | ScalarConst of value:Const
         /// scalar of the given size
         | SizeValue of value:SizeSpec * typ:TypeName
 
@@ -1229,7 +1229,7 @@ module Expr =
     /// False does not indicate that expression is non-zero.
     let rec isZero expr =
         match expr with
-        | Leaf (ScalarConst ConstZero) -> true
+        | Leaf (ScalarConst Const.Zero) -> true
         | Unary (Reshape _, a) -> isZero a
         | Unary (DoBroadcast _, a) -> isZero a
         | Unary (PermuteAxes _, a) -> isZero a
@@ -1263,7 +1263,7 @@ module Expr =
 
     /// scalar constant of given value
     let scalar f = 
-        Leaf (ScalarConst (ConstSpec.ofValue f)) |> check
+        Leaf (ScalarConst (Const.ofValue f)) |> check
 
     /// scalar of given value converted to same type as given expression
     let scalarOfSameType expr f = 

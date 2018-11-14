@@ -562,16 +562,16 @@ module ArgTemplates =
         val Value: 'T
         new (value: 'T) = {Value = value}
 
-    type ConstEOpArgTmpl (value: ConstSpecT) =
+    type ConstEOpArgTmpl (value: Const) =
         interface ICudaArgTmpl with
             member this.CPPTypeName = "ConstEOp_t"
             member this.GetArg env strm = 
                 match value with
-                | ConstInt    n -> ConstEOpArg n |> box
-                | ConstInt64  n -> ConstEOpArg n |> box
-                | ConstDouble n -> ConstEOpArg n |> box
-                | ConstSingle n -> ConstEOpArg n |> box
-                | ConstBool   n -> ConstEOpArg n |> box
+                | Const.Int    n -> ConstEOpArg n |> box
+                | Const.Int64  n -> ConstEOpArg n |> box
+                | Const.Double n -> ConstEOpArg n |> box
+                | Const.Single n -> ConstEOpArg n |> box
+                | Const.Bool   n -> ConstEOpArg n |> box
         interface ICudaOp with
             member this.IsIndexed = false
         interface ICudaOpAndArgTmpl

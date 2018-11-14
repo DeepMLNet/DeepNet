@@ -42,133 +42,128 @@ module TypeName =
         let ofType<'T> = TypeName (typeof<'T>.AssemblyQualifiedName)
 
 
-[<AutoOpen>]
-/// scalar constant value types
-module ConstSpecTypes =
-
-    /// scalar constant value
-    [<StructuralEquality; StructuralComparison>]
-    type ConstSpecT = 
-        | ConstInt of int
-        | ConstInt64 of int64
-        | ConstDouble of double
-        | ConstSingle of single
-        | ConstBool of bool
-        with
-            /// the type name of the constant
-            member this.TypeName = 
-                match this with
-                | ConstInt _    -> TypeName.ofType<int>
-                | ConstInt64 _  -> TypeName.ofType<int64>
-                | ConstDouble _ -> TypeName.ofType<double>
-                | ConstSingle _ -> TypeName.ofType<single>
-                | ConstBool _   -> TypeName.ofType<bool>
-
-            /// the type of the constant
-            member this.Type =
-                this.TypeName.Type
-
-            /// gets the value which must be of type 'T
-            member this.GetValue() : 'T =
-                match this with
-                | ConstInt v    -> v |> box |> unbox
-                | ConstInt64 v  -> v |> box |> unbox
-                | ConstDouble v -> v |> box |> unbox
-                | ConstSingle v -> v |> box |> unbox
-                | ConstBool v   -> v |> box |> unbox  
-            
-            /// the value as object
-            member this.Value =
-                match this with
-                | ConstInt v    -> v |> box 
-                | ConstInt64 v  -> v |> box 
-                | ConstDouble v -> v |> box
-                | ConstSingle v -> v |> box 
-                | ConstBool v   -> v |> box 
-                
-            /// gets the value converting it to type 'T
-            member this.GetConvertedValue<'T>() : 'T =   
-                this.Value |> conv<'T>          
-    
-    /// matches a zero constant of any type
-    let (|ConstZero|_|) cs =
-        match cs with
-        | ConstInt 0
-        | ConstInt64 0L
-        | ConstSingle 0.0f
-        | ConstDouble 0.0 -> Some ()
-        | _ -> None
-        
-
 /// scalar constant value
-module ConstSpec =
+[<RequireQualifiedAccess; StructuralEquality; StructuralComparison>]
+type Const = 
+    | Int of int
+    | Int64 of int64
+    | Double of double
+    | Single of single
+    | Bool of bool
+    with
+        /// the type name of the constant
+        member this.TypeName = 
+            match this with
+            | Const.Int _    -> TypeName.ofType<int>
+            | Const.Int64 _  -> TypeName.ofType<int64>
+            | Const.Double _ -> TypeName.ofType<double>
+            | Const.Single _ -> TypeName.ofType<single>
+            | Const.Bool _   -> TypeName.ofType<bool>
 
-    /// creates a ConstSpecT from a scalar value
-    let ofValue (value: obj) =
-        match value.GetType() with
-        | t when t = typeof<int> -> ConstInt (value |> unbox)
-        | t when t = typeof<int64> -> ConstInt64 (value |> unbox)
-        | t when t = typeof<double> -> ConstDouble (value |> unbox)
-        | t when t = typeof<single> -> ConstSingle (value |> unbox)
-        | t when t = typeof<bool> -> ConstBool (value |> unbox)
-        | t -> failwithf "unsupported constant type: %A" t
+        /// the type of the constant
+        member this.Type =
+            this.TypeName.Type
 
-    /// gets the value 
-    let value (cs: ConstSpecT) =
-        cs.GetValue ()
+        /// gets the value which must be of type 'T
+        member this.GetValue() : 'T =
+            match this with
+            | Const.Int v    -> v |> box |> unbox
+            | Const.Int64 v  -> v |> box |> unbox
+            | Const.Double v -> v |> box |> unbox
+            | Const.Single v -> v |> box |> unbox
+            | Const.Bool v   -> v |> box |> unbox  
+            
+        /// the value as object
+        member this.Value =
+            match this with
+            | Const.Int v    -> v |> box 
+            | Const.Int64 v  -> v |> box 
+            | Const.Double v -> v |> box
+            | Const.Single v -> v |> box 
+            | Const.Bool v   -> v |> box 
+                
+        /// gets the value converting it to type 'T
+        member this.GetConvertedValue<'T>() : 'T =   
+            this.Value |> conv<'T>          
+    
+        /// creates a Const from a scalar value
+        static member ofValue (value: obj) =
+            match value.GetType() with
+            | t when t = typeof<int> -> Const.Int (value |> unbox)
+            | t when t = typeof<int64> -> Const.Int64 (value |> unbox)
+            | t when t = typeof<double> -> Const.Double (value |> unbox)
+            | t when t = typeof<single> -> Const.Single (value |> unbox)
+            | t when t = typeof<bool> -> Const.Bool (value |> unbox)
+            | t -> failwithf "unsupported constant type: %A" t
 
-    /// the type name of the constant
-    let typeName (cs: ConstSpecT) =
-        cs.TypeName
+        /// gets the value 
+        static member value (cs: Const) =
+            cs.GetValue ()
 
-    /// the type of the constant
-    let typ (cs: ConstSpecT) =
-        cs.Type
+        /// the type name of the constant
+        static member typeName (cs: Const) =
+            cs.TypeName
 
-    /// one of specified type
-    let one (typ: System.Type) =
-        1 |> convTo typ |> ofValue
+        /// the type of the constant
+        static member typ (cs: Const) =
+            cs.Type
 
-    /// two of specified type
-    let two (typ: System.Type) =
-        1 |> convTo typ |> ofValue
+        /// one of specified type
+        static member one (typ: System.Type) =
+            1 |> convTo typ |> Const.ofValue
 
-    /// zero constant of specified type
-    let zero typ =
-        match typ with
-        | _ when typ = typeof<int>    -> ConstInt 0
-        | _ when typ = typeof<int64>  -> ConstInt64 0L
-        | _ when typ = typeof<double> -> ConstDouble 0.0
-        | _ when typ = typeof<single> -> ConstSingle 0.0f
-        | _ when typ = typeof<bool>   -> ConstBool false
-        | _ -> failwithf "unsupported type %A" typ
+        /// two of specified type
+        static member two (typ: System.Type) =
+            1 |> convTo typ |> Const.ofValue
 
-    /// minimum value constant of specified type
-    let minValue typ =
-        match typ with
-        | _ when typ = typeof<int>    -> ConstInt (System.Int32.MinValue)
-        | _ when typ = typeof<int64>  -> ConstInt64 (System.Int64.MinValue)
-        | _ when typ = typeof<double> -> ConstDouble (System.Double.MinValue)
-        | _ when typ = typeof<single> -> ConstSingle (System.Single.MinValue)
-        | _ when typ = typeof<bool>   -> ConstBool false
-        | _ -> failwithf "unsupported type %A" typ
+        /// zero constant of specified type
+        static member zero typ =
+            match typ with
+            | _ when typ = typeof<int>    -> Const.Int 0
+            | _ when typ = typeof<int64>  -> Const.Int64 0L
+            | _ when typ = typeof<double> -> Const.Double 0.0
+            | _ when typ = typeof<single> -> Const.Single 0.0f
+            | _ when typ = typeof<bool>   -> Const.Bool false
+            | _ -> failwithf "unsupported type %A" typ
 
-    /// maximum value constant of specified type
-    let maxValue typ =
-        match typ with
-        | _ when typ = typeof<int>    -> ConstInt (System.Int32.MaxValue)
-        | _ when typ = typeof<int64>  -> ConstInt64 (System.Int64.MaxValue)
-        | _ when typ = typeof<double> -> ConstDouble (System.Double.MaxValue)
-        | _ when typ = typeof<single> -> ConstSingle (System.Single.MaxValue)
-        | _ when typ = typeof<bool>   -> ConstBool true
-        | _ -> failwithf "unsupported type %A" typ
+        /// minimum value constant of specified type
+        static member minValue typ =
+            match typ with
+            | _ when typ = typeof<int>    -> Const.Int (System.Int32.MinValue)
+            | _ when typ = typeof<int64>  -> Const.Int64 (System.Int64.MinValue)
+            | _ when typ = typeof<double> -> Const.Double (System.Double.MinValue)
+            | _ when typ = typeof<single> -> Const.Single (System.Single.MinValue)
+            | _ when typ = typeof<bool>   -> Const.Bool false
+            | _ -> failwithf "unsupported type %A" typ
+
+        /// maximum value constant of specified type
+        static member maxValue typ =
+            match typ with
+            | _ when typ = typeof<int>    -> Const.Int (System.Int32.MaxValue)
+            | _ when typ = typeof<int64>  -> Const.Int64 (System.Int64.MaxValue)
+            | _ when typ = typeof<double> -> Const.Double (System.Double.MaxValue)
+            | _ when typ = typeof<single> -> Const.Single (System.Single.MaxValue)
+            | _ when typ = typeof<bool>   -> Const.Bool true
+            | _ -> failwithf "unsupported type %A" typ
+
+/// Active patterns for Const.         
+module Const = 
+
+    /// matches a zero constant of any type
+    let (|Zero|_|) cs =
+        match cs with
+        | Const.Int 0
+        | Const.Int64 0L
+        | Const.Single 0.0f
+        | Const.Double 0.0 -> Some ()
+        | _ -> None
 
     /// true if constant is zero
     let isZero cs =
         match cs with
-        | ConstZero -> true
+        | Zero -> true
         | _ -> false
-
+        
 
 [<AutoOpen>]
 /// variable specification types

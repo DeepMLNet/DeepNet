@@ -1112,7 +1112,7 @@ module CudaExecUnit =
         | ULeafOp (ScalarConst cs) -> execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue (sv, _)) -> 
             let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
-            let cs = ConstSpec.ofValue value
+            let cs = Const.ofValue value
             execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
         | ULeafOp (Arange _) ->
             execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("CountingIEOp_t", true)) [] 
@@ -1153,16 +1153,16 @@ module CudaExecUnit =
         | UUnaryOp Not -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("NotEOp_t", false)) (srcsDfltCh())
 
         // reductions
-        | UUnaryOp Sum -> execItemsForReduce memAllocator "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (ConstSpec.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp Product -> execItemsForReduce memAllocator "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (ProductAxis ax) -> execItemsForReduceAxis memAllocator ax "MultiplyEOp_t" (ConstSpec.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (ConstSpec.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (ConstSpec.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp Sum -> execItemsForReduce memAllocator "AddEOp_t" (Const.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (SumAxis ax) -> execItemsForReduceAxis memAllocator ax "AddEOp_t" (Const.zero (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp Product -> execItemsForReduce memAllocator "MultiplyEOp_t" (Const.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ProductAxis ax) -> execItemsForReduceAxis memAllocator ax "MultiplyEOp_t" (Const.one (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (MaxAxis ax) -> execItemsForReduceAxis memAllocator ax "MaxEOp_t" (Const.minValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (MinAxis ax) -> execItemsForReduceAxis memAllocator ax "MinEOp_t" (Const.maxValue (trgtDfltChType().Type)) (dfltChTrgt()) (firstSrcDfltCh())
 
         // index reductions
-        | UUnaryOp (ArgMaxAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMaxIROp_t" (ConstSpec.minValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
-        | UUnaryOp (ArgMinAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMinIROp_t" (ConstSpec.maxValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ArgMaxAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMaxIROp_t" (Const.minValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
+        | UUnaryOp (ArgMinAxis ax) -> execItemsForIdxReduceAxis memAllocator ax "ArgMinIROp_t" (Const.maxValue (firstSrcDfltCh().DataType)) (dfltChTrgt()) (firstSrcDfltCh())
 
         // tensor ops
         | UUnaryOp (Diag _) -> []
@@ -1319,7 +1319,7 @@ module CudaExecUnit =
             let zeroItems =
                 if BaseRangesSpec.areCoveringWithoutOverlap shp rngs then []
                 else 
-                    let cs = ConstSpec.zero (trgtDfltChType().Type)                    
+                    let cs = Const.zero (trgtDfltChType().Type)                    
                     execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
             let parts = rngs |> List.map (fun rng ->
                 let aryRng = rng |> List.map (fun (first, last) -> 
@@ -1441,7 +1441,7 @@ module CudaExecUnit =
         | UExtraOp (Scatter idxArgs) -> 
             let trgt, srcs = dfltChTrgt(), srcsDfltCh()
             // set target to zero
-            let zero = ConstSpec.zero trgt.DataType
+            let zero = Const.zero trgt.DataType
             let zeroItems = execItemsForElemwise trgt (ConstEOpArgTmpl zero) []
             // scatter from src into target
             let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]

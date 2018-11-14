@@ -175,19 +175,19 @@ module Optimizer =
             // replace powers with integral exponents less than 5 with iterated multiplications
             let p = 
                 match cs with
-                | ConstInt x -> Some x
-                | ConstDouble (Util.Integral x) -> Some x
-                | ConstSingle (Util.Integral x) -> Some x
+                | Const.Int x -> Some x
+                | Const.Double (Util.Integral x) -> Some x
+                | Const.Single (Util.Integral x) -> Some x
                 | _ -> None
 
             let rec repMul cnt arg =
                 match cnt with
-                | 0 -> ElemExpr.constSpec (ConstSpec.one elemExpr.Type)
+                | 0 -> ElemExpr.constSpec (Const.one elemExpr.Type)
                 | 1 -> arg
                 | _ when cnt > 0 ->
                     arg * repMul (cnt - 1) arg
                 | _ when cnt < 0 ->
-                    ElemExpr.constSpec (ConstSpec.one elemExpr.Type) / repMul (-cnt) arg
+                    ElemExpr.constSpec (Const.one elemExpr.Type) / repMul (-cnt) arg
                 | _ -> failwith "impossible"
 
             match p with

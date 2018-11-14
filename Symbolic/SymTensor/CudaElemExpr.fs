@@ -18,7 +18,7 @@ module CudaElemExpr =
     type CodeT = string
 
 
-    let private constCode tn (c: ConstSpecT) =
+    let private constCode tn (c: Const) =
         try
             match tn with
             | _ when tn = TypeName.ofType<int> -> sprintf "%d" (c.GetConvertedValue<int>())

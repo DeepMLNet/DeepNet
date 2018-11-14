@@ -17,7 +17,7 @@ module ElemExpr =
     type ArgElementSpecT = ArgT * ShapeSpec
     
     type LeafOpT =
-        | Const of ConstSpecT
+        | Const of Const
         | SizeValue of value:SizeSpec * typ:TypeName
         | ArgElement of argElem:ArgElementSpecT * typ:TypeName
 
@@ -88,13 +88,13 @@ module ElemExpr =
         typeName expr |> ignore
         expr
 
-    /// a constant value given by a ConstSpec
+    /// a constant value given by a Const
     let constSpec cs =
         Leaf (Const cs) |> check
 
     /// a constant value
     let scalar f =
-        f |> ConstSpec.ofValue |> constSpec              
+        f |> Const.ofValue |> constSpec              
 
     type ElemExprT with
 
