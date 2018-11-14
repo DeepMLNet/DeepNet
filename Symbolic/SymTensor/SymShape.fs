@@ -5,15 +5,13 @@ open DeepNet.Utils
 
 /// A symbolic size.
 [<Struct; StructuredFormatDisplay ("\"{Name}\"")>]
-type SizeSymbol = {
-    /// identifier
-    Name:       string
-} with
-    /// identifier
-    static member name sym = sym.Name
+type SizeSymbol = SizeSymbol of string with
 
-    /// creates a symbolic size with the specified name
-    static member ofName name = { Name=name }
+    /// identifier
+    static member name (SizeSymbol name) = name
+
+    /// creates a symbolic size with the specified identifier
+    static member ofName name = SizeSymbol name
 
 
 /// Elementary size specification
@@ -319,7 +317,7 @@ type SizeSpec =
     static member fixFrac nom dnm = SizeSpec.Base (BaseSize.Fixed (Frac (nom, dnm)))
 
     /// symbolic size
-    static member symbol s = SizeSpec.Base (BaseSize.Sym {Name=s})
+    static member symbol s = SizeSpec.Base (BaseSize.Sym (SizeSymbol s))
 
     /// broadcastable size one
     static member broadcastable = SizeSpec.Broadcast
