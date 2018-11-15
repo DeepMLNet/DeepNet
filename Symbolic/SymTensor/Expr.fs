@@ -208,7 +208,7 @@ module Expr =
         /// elementwise calculated tensor
         | Elements of shape:ShapeSpec * elemExpr:Elem.Expr
         /// elementwise interpolation
-        | Interpolate of InterpolatorT
+        | Interpolate of Interpolator
         /// use specified channel of a multi-channel op
         | Channel of channelOp:MultiChannelOpT * channel:ChannelT
         /// extension op

@@ -1,69 +1,65 @@
 ﻿namespace SymTensor
 
 open Tensor
-open Tensor.Utils
 open DeepNet.Utils
 
 
-/// linear interpolator types
-[<AutoOpen>]
-module InterpolatorTypes =
+/// extrapolation behaviour
+[<RequireQualifiedAccess>]
+type OutsideInterpolatorRange =
+    /// zero outside interpolation range
+    | Zero
+    /// clamp to nearest value outside interpolation range
+    | Nearest
 
-    /// extrapolation behaviour
-    type OutsideInterpolatorRangeT =
-        /// zero outside interpolation range
-        | Zero
-        /// clamp to nearest value outside interpolation range
-        | Nearest
+/// interpolation mode
+[<RequireQualifiedAccess>]
+type InterpolationMode =
+    /// linear interpolation
+    | Linear
+    /// interpolate to the table element left of the argument
+    | ToLeft
 
-    /// interpolation mode
-    type InterpolationModeT =
-        /// linear interpolation
-        | InterpolateLinearaly
-        /// interpolate to the table element left of the argument
-        | InterpolateToLeft
-
-
-    /// one dimensional linear interpoator
-    type InterpolatorT = 
-        {
-            /// ID
-            Id:         int
-            /// data type
-            TypeName:   TypeName
-            /// minimum argument value
-            MinArg:     float list
-            /// maximum argument value
-            MaxArg:     float list
-            /// resolution
-            Resolution: float list
-            /// interpolation behaviour
-            Mode:       InterpolationModeT
-            /// extrapolation behaviour
-            Outside:    OutsideInterpolatorRangeT list
-            /// interpolator for derivative
-            Derivative: InterpolatorT list option
-        }        
+/// one dimensional linear interpoator
+type Interpolator = 
+    {
+        /// ID
+        Id:         int
+        /// data type
+        TypeName:   TypeName
+        /// minimum argument value
+        MinArg:     float list
+        /// maximum argument value
+        MaxArg:     float list
+        /// resolution
+        Resolution: float list
+        /// interpolation behaviour
+        Mode:       InterpolationMode
+        /// extrapolation behaviour
+        Outside:    OutsideInterpolatorRange list
+        /// interpolator for derivative
+        Derivative: Interpolator list option
+    }        
         
-        member this.NDims = List.length this.Resolution
-
+    /// number of dimensions 
+    member this.NDims = List.length this.Resolution
 
 
 /// linear interpolator functions
 module Interpolator =
 
     /// interpolator tables
-    let private tables = new Dictionary<InterpolatorT, ITensor>()
+    let private tables = new Dictionary<Interpolator, ITensor>()
 
     /// numerically calculated derivatives
-    let private numDerivatives = new Dictionary<InterpolatorT, InterpolatorT list>()
+    let private numDerivatives = new Dictionary<Interpolator, Interpolator list>()
 
     /// Creates an n-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
     let create (tbl: Tensor<'T>) (minArg: float list) (maxArg: float list) 
-               (outside: OutsideInterpolatorRangeT list) (mode: InterpolationModeT) 
-               (derivative: InterpolatorT list option) =
+               (outside: OutsideInterpolatorRange list) (mode: InterpolationMode) 
+               (derivative: Interpolator list option) =
         
         // check arguments
         let nDims = minArg.Length
@@ -107,7 +103,7 @@ module Interpolator =
         getTableAsIArrayNDT ip :?> Tensor<'T>
 
     type private GetDerivative =
-        static member Do<'T> (derivDim: int, ip: InterpolatorT) =
+        static member Do<'T> (derivDim: int, ip: Interpolator) =
             if not (0 <= derivDim && derivDim < ip.NDims) then
                 invalidArg "derivDim" "derivative dimension out of range"
 
@@ -131,7 +127,7 @@ module Interpolator =
                             |> List.map (fun dd -> 
                                 let diffTbl =
                                     match ip.Mode with
-                                    | InterpolateLinearaly ->
+                                    | InterpolationMode.Linear ->
                                         let diffFac = Tensor.scalarLike tbl (conv<'T> ip.Resolution.[dd]) 
                                         let diffTbl = Tensor.diffAxis dd tbl / diffFac                                            
                                         let zeroShp =
@@ -140,7 +136,7 @@ module Interpolator =
                                                 else yield s]
                                         let zero = Tensor.zeros diffTbl.Dev zeroShp 
                                         Tensor.concat dd [diffTbl; zero]
-                                    | InterpolateToLeft ->
+                                    | InterpolationMode.ToLeft ->
                                         Tensor.zerosLike tbl
 
                                 // hack to work around slow ArrayNDCuda operations
@@ -150,8 +146,8 @@ module Interpolator =
 
                                 let outside =
                                     List.indexed ip.Outside
-                                    |> List.map (fun (d, o) -> if d = dd then Zero else o)
-                                create diffTbl ip.MinArg ip.MaxArg outside InterpolateToLeft None
+                                    |> List.map (fun (d, o) -> if d = dd then OutsideInterpolatorRange.Zero else o)
+                                create diffTbl ip.MinArg ip.MaxArg outside InterpolationMode.ToLeft None
                             )
 
                         // cache built tables
@@ -161,11 +157,11 @@ module Interpolator =
 
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
-    let getDerivative (derivDim: int) (ip: InterpolatorT) =
-        callGeneric<GetDerivative, InterpolatorT> "Do" [ip.TypeName.Type] (derivDim, ip)                
+    let getDerivative (derivDim: int) (ip: Interpolator) =
+        callGeneric<GetDerivative, Interpolator> "Do" [ip.TypeName.Type] (derivDim, ip)                
 
     /// Performs interpolation on host.
-    let interpolate (ip: InterpolatorT) (es: Tensor<'T> list) : Tensor<'T> =
+    let interpolate (ip: Interpolator) (es: Tensor<'T> list) : Tensor<'T> =
         let tbl : Tensor<'T> = getTable ip
 
         /// returns interpolation in dimensions to the right of leftIdxs
@@ -179,15 +175,15 @@ module Interpolator =
                 let fac = pos - posLeft
                 let idx = int64 posLeft 
                 match idx, ip.Outside.[d], ip.Mode with
-                | _, Nearest, _ when idx < 0L                  -> interpolateInDim (leftIdxs @ [0L]) x
-                | _, Zero,    _ when idx < 0L                  -> 0.0
-                | _, Nearest, _ when idx > tbl.Shape.[d] - 2L  -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1L]) x
-                | _, Zero,    _ when idx > tbl.Shape.[d] - 2L  -> 0.0
-                | _, _, InterpolateLinearaly -> 
+                | _, OutsideInterpolatorRange.Nearest, _ when idx < 0L                  -> interpolateInDim (leftIdxs @ [0L]) x
+                | _, OutsideInterpolatorRange.Zero,    _ when idx < 0L                  -> 0.0
+                | _, OutsideInterpolatorRange.Nearest, _ when idx > tbl.Shape.[d] - 2L  -> interpolateInDim (leftIdxs @ [tbl.Shape.[d] - 1L]) x
+                | _, OutsideInterpolatorRange.Zero,    _ when idx > tbl.Shape.[d] - 2L  -> 0.0
+                | _, _, InterpolationMode.Linear -> 
                     let left = interpolateInDim (leftIdxs @ [idx]) x
                     let right = interpolateInDim (leftIdxs @ [idx+1L]) x
                     (1.0 - fac) * left + fac * right
-                | _, _, InterpolateToLeft -> 
+                | _, _, InterpolationMode.ToLeft -> 
                     interpolateInDim (leftIdxs @ [idx]) x
 
         let res = Tensor.zerosLike es.Head

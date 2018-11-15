@@ -75,7 +75,7 @@ module Types =
         /// texture objects
         TextureObjects:             ResizeArray<TextureObjectT>
         /// textures for interpolator
-        InterpolatorTextures:       Dictionary<InterpolatorT, TextureObjectT>
+        InterpolatorTextures:       Dictionary<Interpolator, TextureObjectT>
         /// values for constants
         ConstantValues:             Dictionary<StorageConst, ITensor>
         /// recipe descriptions for sub-workspaces (e.g. loop iteration)
@@ -650,7 +650,7 @@ module ArgTemplates =
              Offset=offset}
 
 
-    type InterpolateEOpArgTmpl (ip:           InterpolatorT,
+    type InterpolateEOpArgTmpl (ip:           Interpolator,
                                 compileEnv:   CudaCompileEnvT) =
 
         let tbl = Interpolator.getTableAsIArrayNDT ip
@@ -671,12 +671,12 @@ module ArgTemplates =
                     if dim >= ip.NDims then adrModeForDim (dim - 1)
                     else 
                         match ip.Outside.[dim] with
-                        | Zero -> CUAddressMode.Border
-                        | Nearest -> CUAddressMode.Clamp
+                        | OutsideInterpolatorRange.Zero -> CUAddressMode.Border
+                        | OutsideInterpolatorRange.Nearest -> CUAddressMode.Clamp
                 let filterMode =
                     match ip.Mode with
-                    | InterpolateLinearaly -> CUFilterMode.Linear
-                    | InterpolateToLeft -> CUFilterMode.Point
+                    | InterpolationMode.Linear -> CUFilterMode.Linear
+                    | InterpolationMode.ToLeft -> CUFilterMode.Point
                 let desc =
                     CudaTextureDescriptor (adrModeForDim 0, adrModeForDim 1, adrModeForDim 2, 
                                            filterMode, CUTexRefSetFlags.None)
@@ -697,8 +697,8 @@ module ArgTemplates =
                 let texObj = CudaExecEnv.getTextureObj env texture
                 let offset = 
                     match ip.Mode with
-                    | InterpolateLinearaly -> 0.5f
-                    | InterpolateToLeft -> 0.0f
+                    | InterpolationMode.Linear -> 0.5f
+                    | InterpolationMode.ToLeft -> 0.0f
 
                 match ip.NDims with
                 | 1 -> Interpolate1DEOpArg (texObj.TexObject, 

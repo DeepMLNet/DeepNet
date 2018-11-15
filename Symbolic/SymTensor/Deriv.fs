@@ -280,12 +280,12 @@ module Deriv =
                     e, Expr.elements deShp deElemExpr deArgs |> collapse)
             | Interpolate ip -> 
                 match ip.Mode with
-                | InterpolateLinearaly ->
+                | InterpolationMode.Linear ->
                     List.indexed es
                     |> List.map (fun (d, e) ->
                         let ipd = ip |> Interpolator.getDerivative d 
                         e, egExp * padLeft (Expr.interpolate ipd es) |> collapse)
-                | InterpolateToLeft -> 
+                | InterpolationMode.ToLeft -> 
                     es |> List.map (fun e -> e, zeroJacobian e)
 
             | Channel (Loop spec, output) ->              
