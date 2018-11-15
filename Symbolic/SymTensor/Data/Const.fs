@@ -1,55 +1,18 @@
 ﻿namespace SymTensor
 
-open System.Runtime.InteropServices
-
 open DeepNet.Utils
 
 
-/// Assembly qualified name of a .NET type.
-[<Struct; StructuredFormatDisplay("{Pretty}")>]
-type TypeName = TypeName of string with 
-
-    /// gets the System.Type associated by this TypeName        
-    member this.Type = 
-        let (TypeName tn) = this
-        System.Type.GetType(tn)
-
-    /// gets the size of the represented type in bytes
-    member this.Size = Marshal.SizeOf this.Type
-
-    /// pretty string
-    member this.Pretty = sprintf "%s" this.Type.Name
-    
-    /// gets the System.Type associated by this TypeName
-    static member getType (tn: TypeName) = tn.Type
-
-    /// gets the size of the represented type in bytes
-    static member size (tn: TypeName) = tn.Size
-
-    /// gets the size of the represented type in bytes as int64
-    static member size64 (tn: TypeName) = tn.Size |> int64
-
-    /// gets the TypeName associated with the given System.Type object
-    static member ofTypeInst (t: System.Type) = TypeName t.AssemblyQualifiedName
-
-    /// gets the TypeName associated with the type of then given object
-    static member ofObject (o: obj) = TypeName.ofTypeInst (o.GetType())
-
-/// Assembly qualified name of a .NET type.
-module TypeName =
-        /// gets the TypeName associated with the given type
-        let ofType<'T> = TypeName (typeof<'T>.AssemblyQualifiedName)
-
-
 /// scalar constant value
-[<RequireQualifiedAccess; StructuralEquality; StructuralComparison>]
+[<Struct; RequireQualifiedAccess; StructuralEquality; StructuralComparison>]
 type Const = 
-    | Int of int
-    | Int64 of int64
-    | Double of double
-    | Single of single
-    | Bool of bool
+    | Int of intValue:int
+    | Int64 of int64Value:int64
+    | Double of doubleValue:double
+    | Single of singleValue:single
+    | Bool of boolValue:bool
     with
+
         /// the type name of the constant
         member this.TypeName = 
             match this with
@@ -163,64 +126,3 @@ module Const =
         | Zero -> true
         | _ -> false
         
-
-/// Variable (a value that is passed in at runtime) specification.
-[<Struct; StructuredFormatDisplay("{Pretty}")>]
-type Var = {
-    /// variable name
-    Name:      string
-    /// symbolic shape
-    Shape:     ShapeSpec
-    /// data type
-    TypeName:  TypeName
-} with
-
-    /// data type
-    member this.Type = TypeName.getType this.TypeName
-
-    /// pretty string representation
-    member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
-
-    /// numeric shape
-    member this.NShape = this.Shape |> ShapeSpec.eval
-
-    /// Creates a variable specification using the specified name, type and symbolic shape.
-    static member create name typ shape : Var =
-        {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
-
-    /// create variable specifation by name and shape and type
-    static member inline ofNameShapeAndTypeName name shape typeName : Var =
-        {Name=name; Shape=shape; TypeName=typeName}
-
-    /// name of variable
-    static member name (vs: Var) = vs.Name
-
-    /// shape of variable
-    static member shape (vs: Var) = vs.Shape
-
-    /// number of dimensions of variable
-    static member nDims vs = Var.shape vs |> ShapeSpec.nDim
-
-    /// type of variable
-    static member typ (vs: Var) = vs.TypeName |> TypeName.getType 
-
-    /// typename of variable
-    static member typeName (vs: Var) = vs.TypeName
-
-    /// substitutes the size symbol environment into the variable
-    static member substSymSizes symSizes (vs: Var) = 
-        {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
-
-    /// gets variable by name
-    static member tryFindByName (vs: Var) map =
-        map |> Map.tryPick 
-            (fun cvs value -> 
-                if Var.name cvs = Var.name vs then Some value
-                else None)
-
-    /// gets variable by name
-    static member findByName vs map =
-        match Var.tryFindByName vs map with
-        | Some value -> value
-        | None -> raise (System.Collections.Generic.KeyNotFoundException())
-

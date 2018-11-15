@@ -29,16 +29,21 @@
 
     <Compile Include="Debug.fs" />
 
-    <Compile Include="Sizes\Frac.fs" />
+    <Compile Include="Size\Frac.fs" />
 
-    <Compile Include="Sizes\Size.fs" />
+    <Compile Include="Size\Size.fs" />
 
-    <Compile Include="Sizes\Shape.fs" />
+    <Compile Include="Size\Shape.fs" />
 
-    <Compile Include="Sizes\Range.fs" />
+    <Compile Include="Size\Range.fs" />
 
-    <Compile Include="Sizes\Env.fs" />
-    <Compile Include="Vars.fs" />
+    <Compile Include="Size\Env.fs" />
+
+    <Compile Include="Data\TypeName.fs" />
+
+    <Compile Include="Data\Const.fs" />
+
+    <Compile Include="Data\Var.fs" />
     <Compile Include="Elem\Expr.fs" />
     <Compile Include="Elem\Unified.fs" />
     <Compile Include="Elem\Interpreter.fs" />
