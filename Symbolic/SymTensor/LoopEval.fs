@@ -24,8 +24,8 @@ module LoopEval =
     } 
 
     /// build strides information for loop sources and targets
-    let buildStrides (vars: Map<Var, LoopInputT>) (args: TensorLayout list) 
-                     (channels: Map<ChannelT, LoopChannelLayoutInfoT>) 
+    let buildStrides (vars: Map<Var, LoopInput>) (args: TensorLayout list) 
+                     (channels: Map<Channel, LoopChannelLayoutInfoT>) 
                      : VarStridesT * ChannelStridesT * int list option list =
 
         let mutable argRequiredStrideOrder = List.replicate args.Length None
@@ -77,9 +77,9 @@ module LoopEval =
 
     /// builds inputs and outputs for one loop iteration 
     let buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
-                   (vars: Map<Var, LoopInputT>)
-                   (args: ITensor list) (channels: Map<ChannelT, LoopChannelInfoT>)
-                   : VarEnvT * Map<ChannelT, ITensor> =
+                   (vars: Map<Var, LoopInput>)
+                   (args: ITensor list) (channels: Map<Channel, LoopChannelInfoT>)
+                   : VarEnvT * Map<Channel, ITensor> =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 

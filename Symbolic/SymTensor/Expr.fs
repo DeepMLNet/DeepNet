@@ -1,17 +1,11 @@
 ﻿namespace SymTensor
 
-open System.Collections.Generic
-open Microsoft.FSharp.Reflection
-
-open Tensor
-open Tensor.Utils
 open DeepNet.Utils
 
-open ShapeSpec
 
-
-/// expression module
+/// Expression module.
 module Expr =
+
     /// cache for ExprT hashes by reference
     let private exprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
 
@@ -27,13 +21,14 @@ module Expr =
         member this.Elems = elems
 
     /// arity of an op
-    type ArityT =
-        | FixedArity of int
-        | DynamicArity
+    [<RequireQualifiedAccess>]
+    type Arity =
+        | Fixed of int
+        | Dynamic
 
     /// ops with no exprs as arguments
     [<StructuralComparison; StructuralEquality>]
-    type LeafOpT =
+    type LeafOp =
 
         // ==== scalars ============
         /// scalar of given value
@@ -53,8 +48,7 @@ module Expr =
         
 
     /// ops with one expr as argument
-    and [<StructuralComparison; StructuralEquality>] 
-        UnaryOpT =
+    and [<StructuralComparison; StructuralEquality>] UnaryOp =
 
         // ==== unary elementwise ==== 
         | Negate                        
@@ -117,13 +111,13 @@ module Expr =
         /// permutes the axes of the tensor
         | PermuteAxes of perm:int list
         /// subtensor 
-        | Subtensor of ExprRngsSpecT
+        | Subtensor of ExprRngsSpec
         /// reverses the tensor in the given dimension 
         | ReverseAxis of dim:int
         /// select elements according to the specified index arrays
-        | Gather of indices:ExprT option list
+        | Gather of indices:Expr option list
         /// disperses elements according to the specified index arrays
-        | Scatter of indices:ExprT option list * shp:ShapeSpec
+        | Scatter of indices:Expr option list * shp:ShapeSpec
 
         // ==== variable storage ====
         /// variable write
@@ -133,7 +127,7 @@ module Expr =
         /// nullifies the Jacobian of its argument when calculating derivatives
         | NullifyJacobian
         /// assumes the specified Jacobian for its argument when calculating derivatives
-        | AssumeJacobian of ExprT
+        | AssumeJacobian of Expr
         /// prints the value together with the given string
         | Print of string
         /// dumps the value into the given dataset in the active HDF5 dump file
@@ -145,22 +139,21 @@ module Expr =
         | Annotated of string       
         /// an op that will expand into an expression once symbolic sizes have
         /// been substituted
-        | Held of derivsShp:ShapeSpec list * op:UnaryHeldOpT
+        | Held of derivsShp:ShapeSpec list * op:UnaryHeldOp
 
     /// an op that will expand into an expression once symbolic sizes have been substituted
-    and UnaryHeldOpT =
+    and UnaryHeldOp =
         /// replicates the axes to the specified size
         | ReplicateTo of dim:int * size:SizeSpec
 
     /// a simplified range specification of one dimension
-    and ExprRngSpecT = SimpleRangeSpec<ExprT>
+    and ExprRngSpec = SimpleRangeSpec<Expr>
 
     /// a simplified range specification of all dimensions
-    and ExprRngsSpecT = SimpleRangesSpec<ExprT>
+    and ExprRngsSpec = SimpleRangesSpec<Expr>
 
     /// ops with two exprs as arguments
-    and [<StructuralComparison; StructuralEquality>] 
-        BinaryOpT =
+    and [<StructuralComparison; StructuralEquality>] BinaryOp =
 
         // ==== binary elementwise ====
         | Add                           
@@ -185,7 +178,7 @@ module Expr =
         | Or
 
         // ==== element-wise conditional ====
-        | IfThenElse of ExprT
+        | IfThenElse of Expr
 
         // ==== matrix/tensor operations ====
         /// matrix*matrix => matrix dot product
@@ -195,11 +188,10 @@ module Expr =
         
         // ==== shape operations ====
         /// replace subtensor
-        | SetSubtensor of ExprRngsSpecT                 
+        | SetSubtensor of ExprRngsSpec                 
 
     /// ops with an arbitrary exprs as arguments
-    and [<StructuralComparison; StructuralEquality>] 
-        NaryOpT =
+    and [<StructuralComparison; StructuralEquality>] NaryOp =
 
         /// evaluate all subexpressions but discard them
         | Discard        
@@ -210,20 +202,20 @@ module Expr =
         /// elementwise interpolation
         | Interpolate of Interpolator
         /// use specified channel of a multi-channel op
-        | Channel of channelOp:MultiChannelOpT * channel:ChannelT
+        | Channel of channelOp:MultiChannelOp * channel:Channel
         /// extension op
         | ExtensionOp of IOp
 
     /// a channel of a multi-channel op or loop
-    and ChannelT = string
+    and Channel = string
 
     /// an n-ary op with multiple output channels
-    and MultiChannelOpT =
+    and MultiChannelOp =
         /// iterative evaluation of one or multiple expresisons
-        | Loop of spec:LoopSpecT    
+        | Loop of spec:LoopSpec    
      
     /// a slice of an argument to the loop
-    and SequenceArgSliceT = {
+    and SequenceArgSlice = {
         /// the index of the argument
         ArgIdx:     int
         /// the dimension the loop is performed over
@@ -231,9 +223,9 @@ module Expr =
     }
 
     /// references a loop channel of a previous iteration
-    and PreviousChannelT = {
+    and PreviousChannel = {
         /// the channel to use
-        Channel:       ChannelT
+        Channel:       Channel
         /// the delay, must be at least one
         Delay:         SizeSpec
         /// the index of the argument specifying the initial values
@@ -241,23 +233,23 @@ module Expr =
     }
 
     /// a loop variable value specification
-    and LoopInputT = 
+    and LoopInput = 
         /// provides the loop argument to all loop iterations
         | ConstArg of argIdx:int
         /// provides a slice of the loop argument to each loop iteration
-        | SequenceArgSlice of SequenceArgSliceT
+        | SequenceArgSlice of SequenceArgSlice
         /// provides the value of a loop channel from a previous loop iteration
-        | PreviousChannel of PreviousChannelT
+        | PreviousChannel of PreviousChannel
         /// provides the index of the current loop iteration (zero-based)
         | IterationIndex
         /// provides the number of remaining loop iterations after this iteration
         | IterationsRemaining
 
     /// the value of a loop channel
-    and LoopValueT = {
+    and LoopValue = {
         /// the expression to compute the loop channel;
         /// it may only use variables defined in LoopSpecT.Vars
-        Expr:       ExprT
+        Expr:       Expr
         /// the dimension to concatenate the results along to produce the loop output
         SliceDim:   int
     }
@@ -268,14 +260,14 @@ module Expr =
     /// loop iterations.
     /// A loop can compute multiple values at once. Each computed values is referred to
     /// as a channel.
-    and LoopSpecT = {
+    and LoopSpec = {
         /// number of loop iterations
         Length:     SizeSpec
         /// specifies the values of the variables used in the channel value expressions,
         /// i.e. LoopValueT.Expr
-        Vars:       Map<Var, LoopInputT>   
+        Vars:       Map<Var, LoopInput>   
         /// specifies the values of the loop channels
-        Channels:   Map<ChannelT, LoopValueT>
+        Channels:   Map<Channel, LoopValue>
     }
 
     /// A mathematical operation in an expression.
@@ -307,31 +299,29 @@ module Expr =
         /// w.r.t. which the derivative is being taken. 
         /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
         /// you return w.r.t. that argument must have NxM elements.
-        abstract Deriv: dOp:ExprT -> args:ExprT list -> ExprT list
+        abstract Deriv: dOp:Expr -> args:Expr list -> Expr list
 
         /// Should evaluate the numerical value of this op given the numerical values of its arguments.
         /// This evaluation should be done on the host using the simplest means possible and is used
         /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
         /// implementations. This method may be omitted when no verification will be done.
-        abstract EvalSimple: args:Tensor<'T> list -> Tensor<'T>
+        abstract EvalSimple: args:Tensor.Tensor<'T> list -> Tensor.Tensor<'T>
 
         /// Should return the set of variables that this op instance depends on.
         abstract ContainedVars: Set<Var>
 
-    and [<StructuralComparison; StructuralEqualityAttribute>]
-        private ExprProxyT = 
-        | ProxyLeaf of LeafOpT
-        | ProxyUnary of UnaryOpT * ExprT
-        | ProxyBinary of BinaryOpT * ExprT * ExprT
-        | ProxyNary of NaryOpT * (ExprT list)
+    and [<StructuralComparison; StructuralEqualityAttribute>] private ExprProxy = 
+        | ProxyLeaf of LeafOp
+        | ProxyUnary of UnaryOp * Expr
+        | ProxyBinary of BinaryOp * Expr * Expr
+        | ProxyNary of NaryOp * (Expr list)
 
     /// an expression
-    and [<CustomComparison; CustomEqualityAttribute; StructuredFormatDisplay("{Pretty}")>] 
-        ExprT =
-        | Leaf of LeafOpT
-        | Unary of UnaryOpT * ExprT
-        | Binary of BinaryOpT * ExprT * ExprT
-        | Nary of NaryOpT * (ExprT list)
+    and [<CustomComparison; CustomEqualityAttribute; StructuredFormatDisplay("{Pretty}")>] Expr =
+        | Leaf of LeafOp
+        | Unary of UnaryOp * Expr
+        | Binary of BinaryOp * Expr * Expr
+        | Nary of NaryOp * (Expr list)
 
         member inline private this.Proxy = 
             match this with
@@ -343,14 +333,14 @@ module Expr =
         // cache hash code using object reference
         override this.Equals other =
             match other with
-            | :? ExprT as other -> (this :> System.IEquatable<_>).Equals other
+            | :? Expr as other -> (this :> System.IEquatable<_>).Equals other
             | _ -> false
-        interface System.IEquatable<ExprT> with
+        interface System.IEquatable<Expr> with
             member this.Equals other = 
                 if obj.ReferenceEquals (this, other) then true
                 elif this.GetHashCode() <> other.GetHashCode() then false
                 else 
-                    let knownEqualTo = Dictionary<ExprT, HashSet<ExprT>> (HashIdentity.Reference)
+                    let knownEqualTo = Dictionary<Expr, HashSet<Expr>> (HashIdentity.Reference)
                     let rec treeCompare t o =
                         match knownEqualTo.TryFind t with
                         | Some k when k.Contains o -> true
@@ -368,7 +358,7 @@ module Expr =
                                 | _ -> false
                             if eq then
                                 if not (knownEqualTo.ContainsKey t) then
-                                    knownEqualTo.[t] <- HashSet<ExprT> (HashIdentity.Reference)
+                                    knownEqualTo.[t] <- HashSet<Expr> (HashIdentity.Reference)
                                 knownEqualTo.[t].Add o |> ignore
                             eq
                     treeCompare this other
@@ -379,13 +369,13 @@ module Expr =
                 let h = hash this.Proxy
                 exprHashCache.[this] <- h
                 h
-        interface System.IComparable<ExprT> with
+        interface System.IComparable<Expr> with
             member this.CompareTo other =
                 compare this.Proxy other.Proxy
         interface System.IComparable with
             member this.CompareTo other =
                 match other with
-                | :? ExprT as other -> (this :> System.IComparable<_>).CompareTo other
+                | :? Expr as other -> (this :> System.IComparable<_>).CompareTo other
                 | _ -> failwithf "cannot compare ExprT to type %A" (other.GetType())
 
         /// converts expression to string with approximate maximum length
@@ -419,8 +409,8 @@ module Expr =
         member this.Pretty = this.ToString 80
 
 
-    type FullExprRngSpecT = RangeSpec<ExprT>
-    type FullExprRngsSpecT = RangesSpec<ExprT>
+    type FullExprRngSpecT = RangeSpec<Expr>
+    type FullExprRngsSpecT = RangesSpec<Expr>
    
     /// matches all unary ops that work elementwise
     let (|UnaryElemwiseOp|_|) uop =
@@ -542,10 +532,10 @@ module Expr =
         | Nary (_, es) -> typename (List.head es)
 
     /// data type of loop otuput
-    and internal loopOutputTypeNames (spec: LoopSpecT) =
+    and internal loopOutputTypeNames (spec: LoopSpec) =
         spec.Channels |> Map.map (fun ch lv -> typename lv.Expr)
 
-    let private shapeCache = ConcurrentDictionary<ExprT, ShapeSpec> (HashIdentity.Reference)
+    let private shapeCache = ConcurrentDictionary<Expr, ShapeSpec> (HashIdentity.Reference)
 
     /// Returns the shape of the given expression.
     let rec shapeOf expr =
@@ -682,7 +672,7 @@ module Expr =
     
 
     /// Returns the shapes of the outputs of the loop channels.
-    and internal loopOutputShapes (spec: LoopSpecT) =
+    and internal loopOutputShapes (spec: LoopSpec) =
         spec.Channels
         |> Map.map (fun ch lv ->
             shapeOf lv.Expr |> ShapeSpec.insertAxis lv.SliceDim spec.Length)
@@ -704,7 +694,7 @@ module Expr =
         if ss = shapeOf expr then expr else Unary(DoBroadcast(ss), expr)
 
     /// Caches for extracted variables.
-    let private extractedVars = Dictionary<ExprT, Set<Var>> () 
+    let private extractedVars = Dictionary<Expr, Set<Var>> () 
 
     /// extract all variables from an expression
     let rec extractVars expr =
@@ -736,7 +726,7 @@ module Expr =
             extractedVars.[expr] <- evs
             evs
 
-    type ExprT with
+    type Expr with
         /// symbolic shape
         member this.Shape = shapeOf this
 
@@ -758,10 +748,10 @@ module Expr =
             failwithf "invalid axis %d for expression of shape %A" ax (shapeOf expr)
 
     /// expressions that were already checked for correctness
-    let checkedExprs = HashSet<ExprT> (HashIdentity.Reference)
+    let checkedExprs = HashSet<Expr> (HashIdentity.Reference)
 
     /// Checks ops' arguments for compatible shapes.
-    let rec checkExpr (expr: ExprT) =
+    let rec checkExpr (expr: Expr) =
         if not (checkedExprs.LockedContains expr) then
 
             if typename expr = TypeName.ofType<obj> then
@@ -1036,8 +1026,8 @@ module Expr =
             checkedExprs.LockedAdd expr |> ignore
 
     /// substitues the given symbol sizes into the expression
-    let rec substSymSizes symSizes (expr: ExprT) =
-        let substituted = Dictionary<ExprT, ExprT> ()
+    let rec substSymSizes symSizes (expr: Expr) =
+        let substituted = Dictionary<Expr, Expr> ()
         let sSize = SymSizeEnv.subst symSizes
         let sShp = SymSizeEnv.substShape symSizes
         let sSrs = SymSizeEnv.substRange symSizes
@@ -1097,7 +1087,7 @@ module Expr =
                             Channels = spec.Channels
                                        |> Map.map (fun ch lv -> {lv with Expr = sSub lv.Expr})
                         }
-                        Nary (Channel (Loop substSpec, channel), es |> List.map sSub)
+                        Nary (NaryOp.Channel (Loop substSpec, channel), es |> List.map sSub)
                     | Nary (ExtensionOp eop, es) -> Nary (ExtensionOp (eop.SubstSymSizes symSizes), List.map sSub es)
                     | Nary (op, es) -> Nary (op, List.map sSub es)
                 
@@ -1105,10 +1095,10 @@ module Expr =
                 subst
         sSub expr
 
-    let private exprsWithEvalableSymSizes = HashSet<ExprT> ()
+    let private exprsWithEvalableSymSizes = HashSet<Expr> ()
 
     /// tests if all symbolic sizes can be evaluated
-    let rec private testEvalAllSymSizes (failIfNot: bool) (expr: ExprT) =
+    let rec private testEvalAllSymSizes (failIfNot: bool) (expr: Expr) =
         let subTest = testEvalAllSymSizes failIfNot
         let tSize = SizeSpec.canEval
         let tShp = ShapeSpec.canEval
@@ -1175,22 +1165,22 @@ module Expr =
         evalable
 
     /// true if all shapes in the expression can be evaluated to numeric shapes
-    let canEvalAllSymSizes (expr: ExprT) =
+    let canEvalAllSymSizes (expr: Expr) =
         testEvalAllSymSizes false expr
 
     /// fails if the expression contains a shape that cannot be evaluated to a numeric shape
-    let failOnNotEvalableSymSize (expr: ExprT) =
+    let failOnNotEvalableSymSize (expr: Expr) =
         testEvalAllSymSizes true expr |> ignore
 
     /// Traverses the expression and checks ops' arguments for compatible shapes.
-    let check (expr: ExprT) : ExprT =
+    let check (expr: Expr) : Expr =
         checkExpr expr |> ignore
         expr
 
     /// Replaces all occurences of the map key with its value in the specified expression.
     /// Does not replace subexpressions within loop channel value expressions.
-    let subst (replacements: Map<ExprT, ExprT>) expr =
-        let substituted = Dictionary<ExprT, ExprT> ()
+    let subst (replacements: Map<Expr, Expr>) expr =
+        let substituted = Dictionary<Expr, Expr> ()
 
         // TODO: currently does not substitues into Subtensor and SetSubtensor dyanmic range expression.
         let rec subSubst expr =       
@@ -1240,7 +1230,7 @@ module Expr =
 
     /// counts operators, not counting repeating subexpressions
     let countUniqueOps expr  =
-        let visited = HashSet<ExprT> (HashIdentity.Structural)
+        let visited = HashSet<Expr> (HashIdentity.Structural)
         let rec doCount expr =
             if visited.Contains expr then 0
             else
@@ -1327,7 +1317,7 @@ module Expr =
     /// pads from the left and broadcasts the argument to the given shape if possible
     let broadcastToShape shp a =
         let sa = shapeOf a
-        let psa = sa |> ShapeSpec.padTo (nDim shp)
+        let psa = sa |> ShapeSpec.padTo (ShapeSpec.nDim shp)
         let bsa = psa |> ShapeSpec.broadcastToShape shp
         a |> reshapeIfNecessary psa |> broadcastIfNecessary bsa        
 
@@ -1369,95 +1359,95 @@ module Expr =
 
 
     // elementwise operators
-    type ExprT with
+    type Expr with
 
         // elementwise unary
-        static member (~+) (a: ExprT) = a |> check
-        static member (~-) (a: ExprT) = Unary(Negate, a) |> check 
-        static member Abs (a: ExprT) = Unary(Abs, a) |> check
-        static member SignT (a: ExprT) = Unary(SignT, a) |> check
-        static member Log (a: ExprT) = Unary(Log, a) |> check
-        static member Log10 (a: ExprT) = Unary(Log10, a) |> check
-        static member Exp (a: ExprT) = Unary(Exp, a) |> check
-        static member Sin (a: ExprT) = Unary(Sin, a) |> check
-        static member Cos (a: ExprT) = Unary(Cos, a) |> check
-        static member Tan (a: ExprT) = Unary(Tan, a) |> check
-        static member Asin (a: ExprT) = Unary(Asin, a) |> check
-        static member Acos (a: ExprT) = Unary(Acos, a) |> check
-        static member Atan (a: ExprT) = Unary(Atan, a) |> check
-        static member Sinh (a: ExprT) = Unary(Sinh, a) |> check
-        static member Cosh (a: ExprT) = Unary(Cosh, a) |> check
-        static member Tanh (a: ExprT) = Unary(Tanh, a) |> check
-        static member Sqrt (a: ExprT) = Unary(Sqrt, a) |> check
-        static member Ceiling (a: ExprT) = Unary(Ceil, a) |> check
-        static member Floor (a: ExprT) = Unary(Floor, a) |> check
-        static member Round (a: ExprT) = Unary(Round, a) |> check
-        static member Truncate (a: ExprT) = Unary(Truncate, a) |> check
+        static member (~+) (a: Expr) = a |> check
+        static member (~-) (a: Expr) = Unary(Negate, a) |> check 
+        static member Abs (a: Expr) = Unary(Abs, a) |> check
+        static member SignT (a: Expr) = Unary(SignT, a) |> check
+        static member Log (a: Expr) = Unary(Log, a) |> check
+        static member Log10 (a: Expr) = Unary(Log10, a) |> check
+        static member Exp (a: Expr) = Unary(Exp, a) |> check
+        static member Sin (a: Expr) = Unary(Sin, a) |> check
+        static member Cos (a: Expr) = Unary(Cos, a) |> check
+        static member Tan (a: Expr) = Unary(Tan, a) |> check
+        static member Asin (a: Expr) = Unary(Asin, a) |> check
+        static member Acos (a: Expr) = Unary(Acos, a) |> check
+        static member Atan (a: Expr) = Unary(Atan, a) |> check
+        static member Sinh (a: Expr) = Unary(Sinh, a) |> check
+        static member Cosh (a: Expr) = Unary(Cosh, a) |> check
+        static member Tanh (a: Expr) = Unary(Tanh, a) |> check
+        static member Sqrt (a: Expr) = Unary(Sqrt, a) |> check
+        static member Ceiling (a: Expr) = Unary(Ceil, a) |> check
+        static member Floor (a: Expr) = Unary(Floor, a) |> check
+        static member Round (a: Expr) = Unary(Round, a) |> check
+        static member Truncate (a: Expr) = Unary(Truncate, a) |> check
 
         // element-wise unary logic
-        static member (~~~~) (a: ExprT) = Unary(Not, a) |> check
+        static member (~~~~) (a: Expr) = Unary(Not, a) |> check
 
         // elementwise binary
-        static member (+) (a: ExprT, b: ExprT) = constructElementwise Add a b
-        static member (-) (a: ExprT, b: ExprT) = constructElementwise Substract a b
-        static member (*) (a: ExprT, b: ExprT) = constructElementwise Multiply a b
-        static member (/) (a: ExprT, b: ExprT) = constructElementwise Divide a b
-        static member (%) (a: ExprT, b: ExprT) = constructElementwise Modulo a b
-        static member Pow (a: ExprT, b: ExprT) = constructElementwise Power a b    
-        static member ( *** ) (a: ExprT, b: ExprT) = a ** b
+        static member (+) (a: Expr, b: Expr) = constructElementwise Add a b
+        static member (-) (a: Expr, b: Expr) = constructElementwise Substract a b
+        static member (*) (a: Expr, b: Expr) = constructElementwise Multiply a b
+        static member (/) (a: Expr, b: Expr) = constructElementwise Divide a b
+        static member (%) (a: Expr, b: Expr) = constructElementwise Modulo a b
+        static member Pow (a: Expr, b: Expr) = constructElementwise Power a b    
+        static member ( *** ) (a: Expr, b: Expr) = a ** b
 
         // element-wise binary logic
-        static member (&&&&) (a: ExprT, b: ExprT) = constructElementwise And a b
-        static member (||||) (a: ExprT, b: ExprT) = constructElementwise Or a b
+        static member (&&&&) (a: Expr, b: Expr) = constructElementwise And a b
+        static member (||||) (a: Expr, b: Expr) = constructElementwise Or a b
 
         // element-wise binary comparison
-        static member (====) (a: ExprT, b: ExprT) = constructElementwise Equal a b
-        static member (<<<<) (a: ExprT, b: ExprT) = constructElementwise Less a b
-        static member (<<==) (a: ExprT, b: ExprT) = constructElementwise LessEqual a b
-        static member (>>>>) (a: ExprT, b: ExprT) = constructElementwise Greater a b
-        static member (>>==) (a: ExprT, b: ExprT) = constructElementwise GreaterEqual a b
-        static member (<<>>) (a: ExprT, b: ExprT) = constructElementwise NotEqual a b
+        static member (====) (a: Expr, b: Expr) = constructElementwise Equal a b
+        static member (<<<<) (a: Expr, b: Expr) = constructElementwise Less a b
+        static member (<<==) (a: Expr, b: Expr) = constructElementwise LessEqual a b
+        static member (>>>>) (a: Expr, b: Expr) = constructElementwise Greater a b
+        static member (>>==) (a: Expr, b: Expr) = constructElementwise GreaterEqual a b
+        static member (<<>>) (a: Expr, b: Expr) = constructElementwise NotEqual a b
 
         // elementwise binary with basetype
-        static member (+) (a: ExprT, b: System.IComparable) = a + (scalar b)
-        static member (-) (a: ExprT, b: System.IComparable) = a - (scalar b)
-        static member (*) (a: ExprT, b: System.IComparable) = a * (scalar b)
-        static member (/) (a: ExprT, b: System.IComparable) = a / (scalar b)
-        static member (%) (a: ExprT, b: System.IComparable) = a % (scalar b)
-        static member Pow (a: ExprT, b: System.IComparable) = a ** (scalar b)
-        static member ( *** ) (a: ExprT, b: System.IComparable) = a ** (scalar b)
-        static member (====) (a: ExprT, b: System.IComparable) = constructElementwise Equal a (scalar b)
-        static member (<<<<) (a: ExprT, b: System.IComparable) = constructElementwise Less a (scalar b)
-        static member (<<==) (a: ExprT, b: System.IComparable) = constructElementwise LessEqual a (scalar b)
-        static member (>>>>) (a: ExprT, b: System.IComparable) = constructElementwise Greater a (scalar b)
-        static member (>>==) (a: ExprT, b: System.IComparable) = constructElementwise GreaterEqual a (scalar b)
-        static member (<<>>) (a: ExprT, b: System.IComparable) = constructElementwise NotEqual a (scalar b)
+        static member (+) (a: Expr, b: System.IComparable) = a + (scalar b)
+        static member (-) (a: Expr, b: System.IComparable) = a - (scalar b)
+        static member (*) (a: Expr, b: System.IComparable) = a * (scalar b)
+        static member (/) (a: Expr, b: System.IComparable) = a / (scalar b)
+        static member (%) (a: Expr, b: System.IComparable) = a % (scalar b)
+        static member Pow (a: Expr, b: System.IComparable) = a ** (scalar b)
+        static member ( *** ) (a: Expr, b: System.IComparable) = a ** (scalar b)
+        static member (====) (a: Expr, b: System.IComparable) = constructElementwise Equal a (scalar b)
+        static member (<<<<) (a: Expr, b: System.IComparable) = constructElementwise Less a (scalar b)
+        static member (<<==) (a: Expr, b: System.IComparable) = constructElementwise LessEqual a (scalar b)
+        static member (>>>>) (a: Expr, b: System.IComparable) = constructElementwise Greater a (scalar b)
+        static member (>>==) (a: Expr, b: System.IComparable) = constructElementwise GreaterEqual a (scalar b)
+        static member (<<>>) (a: Expr, b: System.IComparable) = constructElementwise NotEqual a (scalar b)
 
-        static member (+) (a: System.IComparable, b: ExprT) = (scalar a) + b
-        static member (-) (a: System.IComparable, b: ExprT) = (scalar a) - b
-        static member (*) (a: System.IComparable, b: ExprT) = (scalar a) * b
-        static member (/) (a: System.IComparable, b: ExprT) = (scalar a) / b
-        static member (%) (a: System.IComparable, b: ExprT) = (scalar a) % b
-        static member Pow (a: System.IComparable, b: ExprT) = (scalar a) ** b
-        static member ( *** ) (a: System.IComparable, b: ExprT) = (scalar a) ** b
-        static member (====) (a: System.IComparable, b: ExprT) = constructElementwise Equal (scalar a) b
-        static member (<<<<) (a: System.IComparable, b: ExprT) = constructElementwise Less (scalar a) b
-        static member (<<==) (a: System.IComparable, b: ExprT) = constructElementwise LessEqual (scalar a) b
-        static member (>>>>) (a: System.IComparable, b: ExprT) = constructElementwise Greater (scalar a) b
-        static member (>>==) (a: System.IComparable, b: ExprT) = constructElementwise GreaterEqual (scalar a) b
-        static member (<<>>) (a: System.IComparable, b: ExprT) = constructElementwise NotEqual (scalar a) b
+        static member (+) (a: System.IComparable, b: Expr) = (scalar a) + b
+        static member (-) (a: System.IComparable, b: Expr) = (scalar a) - b
+        static member (*) (a: System.IComparable, b: Expr) = (scalar a) * b
+        static member (/) (a: System.IComparable, b: Expr) = (scalar a) / b
+        static member (%) (a: System.IComparable, b: Expr) = (scalar a) % b
+        static member Pow (a: System.IComparable, b: Expr) = (scalar a) ** b
+        static member ( *** ) (a: System.IComparable, b: Expr) = (scalar a) ** b
+        static member (====) (a: System.IComparable, b: Expr) = constructElementwise Equal (scalar a) b
+        static member (<<<<) (a: System.IComparable, b: Expr) = constructElementwise Less (scalar a) b
+        static member (<<==) (a: System.IComparable, b: Expr) = constructElementwise LessEqual (scalar a) b
+        static member (>>>>) (a: System.IComparable, b: Expr) = constructElementwise Greater (scalar a) b
+        static member (>>==) (a: System.IComparable, b: Expr) = constructElementwise GreaterEqual (scalar a) b
+        static member (<<>>) (a: System.IComparable, b: Expr) = constructElementwise NotEqual (scalar a) b
 
         // transposition
         member this.T = transpose this
     
 
     /// sign keeping type
-    let signt (a: ExprT) =
-        ExprT.SignT a 
+    let signt (a: Expr) =
+        Expr.SignT a 
 
     /// square root
-    let sqrtt (a: ExprT) =
-        ExprT.Sqrt a
+    let sqrtt (a: Expr) =
+        Expr.Sqrt a
 
     /// elementwise uses elements from ifTrue if cond is true, 
     /// otherwise elements from ifFalse
@@ -1578,11 +1568,11 @@ module Expr =
         a |> argMinAxis ax |> insertBroadcastAxis ax
 
     /// mean over all elements
-    let mean (a: ExprT) = 
+    let mean (a: Expr) = 
         sum a / sizeValueOfSameType a a.NElems
 
     /// mean over given dimension
-    let meanAxis ax (a: ExprT) =
+    let meanAxis ax (a: Expr) =
         sumAxis ax a / sizeValueOfSameType a a.Shape.[ax]
 
     /// mean over given dimension, while keeping the axis with one (broadcastable) element
@@ -1663,7 +1653,7 @@ module Expr =
     /// (2, 2) -> matrix-matrix dot product resulting in a matrix
     /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
     /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-    let dot (a: ExprT) (b: ExprT) =
+    let dot (a: Expr) (b: Expr) =
         let sa, sb = shapeOf a, shapeOf b
         match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 1, 1 -> 
@@ -1693,13 +1683,13 @@ module Expr =
         |> check
 
     /// tensor product
-    let tensorProduct (a: ExprT) (b: ExprT) =
+    let tensorProduct (a: Expr) (b: Expr) =
         let sa, sb = shapeOf a, shapeOf b
         let psa, psb = ShapeSpec.padToSame sa sb
         let a, b = reshapeIfNecessary psa a, reshapeIfNecessary psb b
         Binary(TensorProduct, a, b) |> check
 
-    type ExprT with
+    type Expr with
         // tensor binary
 
         /// Dot product.
@@ -1710,8 +1700,8 @@ module Expr =
         /// (2, 2) -> matrix-matrix dot product resulting in a matrix
         /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
         /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-        static member (.*) (a: ExprT, b: ExprT) = dot a b
-        static member (%*) (a: ExprT, b: ExprT) = tensorProduct a b
+        static member (.*) (a: Expr, b: Expr) = dot a b
+        static member (%*) (a: Expr, b: Expr) = tensorProduct a b
 
     /// extract VarSpec from variable expression
     let extractVar expr = 
@@ -1741,7 +1731,7 @@ module Expr =
         | _ ->
             invalidArg "a" "the first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]"
 
-    type ExprT with
+    type Expr with
         // item / slicing
         member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
 
@@ -1768,7 +1758,7 @@ module Expr =
                     RangeSpec.SymStartSymEnd (so, None) :: parseArgs rest
                 | null                           :: (:? (SizeSpec option) as fo)    :: rest ->
                     RangeSpec.SymStartSymEnd (None, fo) :: parseArgs rest
-                | (:? (ExprT option) as so)      :: (:? (PlusElems option) as fo)    :: rest ->
+                | (:? (Expr option) as so)      :: (:? (PlusElems option) as fo)    :: rest ->
                     if typename so.Value <> TypeName.ofType<int> then
                         failwith "need int expression for range start"
                     RangeSpec.DynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
@@ -1777,16 +1767,16 @@ module Expr =
 
                 // items
                 | (:? SizeSpec as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
-                | (:? int64 as s)         :: rest when s = NewAxis -> RangeSpec.NewAxis :: parseArgs rest
-                | (:? int64 as s)         :: rest when s = Fill ->    RangeSpec.AllFill :: parseArgs rest
-                | (:? ExprT as e)         :: rest -> if typename e <> TypeName.ofType<int> then
+                | (:? int64 as s)         :: rest when s = Tensor.TensorVal.NewAxis -> RangeSpec.NewAxis :: parseArgs rest
+                | (:? int64 as s)         :: rest when s = Tensor.TensorVal.Fill ->    RangeSpec.AllFill :: parseArgs rest
+                | (:? Expr as e)         :: rest -> if typename e <> TypeName.ofType<int> then
                                                          failwith "need int expression for element"               
-                                                     RangeSpec.DynElem e :: parseArgs rest
+                                                    RangeSpec.DynElem e :: parseArgs rest
                 | []                              -> []
                 | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
             /// converts a full range specification into a simple range specification
-            let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpec) (simpleRs: ExprRngsSpecT) (newShape: ShapeSpec) =
+            let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpec) (simpleRs: ExprRngsSpec) (newShape: ShapeSpec) =
                 match rngs, shps with
                 | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
                 | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
@@ -1808,7 +1798,7 @@ module Expr =
 
             let srs, reshp = 
                 match argList with
-                | [:? ExprRngsSpecT as srs] -> 
+                | [:? ExprRngsSpec as srs] -> 
                     // simplified range specification was specified, use directly
                     srs, shapeOf (Unary (Subtensor srs, this))
                 | [:? FullExprRngsSpecT as frs] ->
@@ -1928,7 +1918,7 @@ module Expr =
     /// The function `loop` performs automatic lifting of constants and thus allows for easy
     /// usage of variables external to the loop.
     let loopNoLift spec channel args =
-        Nary (Channel (Loop spec, channel), args) |> check
+        Nary (NaryOp.Channel (Loop spec, channel), args) |> check
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
     let loop spec channel args =       
@@ -1936,7 +1926,7 @@ module Expr =
         let mutable vars = spec.Vars
 
         /// adds an argument and returns its index
-        let addArg (expr: ExprT) =
+        let addArg (expr: Expr) =
             match args |> List.tryFindIndex ((=) expr) with
             | Some argIdx -> argIdx
             | None ->
@@ -1945,7 +1935,7 @@ module Expr =
                 argIdx
 
         /// adds a constant variable, its required argument and returns the associated VarSpecT
-        let addConstVar (expr: ExprT) =
+        let addConstVar (expr: Expr) =
             match vars |> Map.tryFindKey (fun vs lv ->
                                            match lv with
                                            | ConstArg argIdx when args.[argIdx] = expr -> true
@@ -1963,7 +1953,7 @@ module Expr =
                 vs
 
         let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
-        let lifted = Dictionary<ExprT, ExprT> ()
+        let lifted = Dictionary<Expr, Expr> ()
 
         let rec lift expr =
             match lifted.TryFind expr with
@@ -2000,11 +1990,11 @@ module Expr =
         loopNoLift spec channel args
 
     /// reverses the tensor in the given dimension 
-    let reverseAxis dim (a: ExprT) : ExprT =
+    let reverseAxis dim (a: Expr) : Expr =
         Unary (ReverseAxis dim, a) |> check
 
     /// concatenates the sequence of tensors in the specified dimension
-    let concat dim (es: ExprT seq) =
+    let concat dim (es: Expr seq) =
         // check that arguments are correctly sized
         let es = List.ofSeq es
         let shps = es |> List.map shapeOf
@@ -2045,18 +2035,18 @@ module Expr =
 
 [<AutoOpen>]
 module ExprTypes =
-    type ArityT = Expr.ArityT
-    type LeafOpT = Expr.LeafOpT
-    type UnaryOpT = Expr.UnaryOpT
-    type BinaryOpT = Expr.BinaryOpT
-    type NaryOpT = Expr.NaryOpT
+    type Arity = Expr.Arity
+    type LeafOpT = Expr.LeafOp
+    type UnaryOpT = Expr.UnaryOp
+    type BinaryOpT = Expr.BinaryOp
+    type NaryOpT = Expr.NaryOp
     type IOp = Expr.IOp
-    type ExprT = Expr.ExprT
-    type MultiChannelOpT = Expr.MultiChannelOpT
-    type ChannelT = Expr.ChannelT
-    type UnaryHeldOpT = Expr.UnaryHeldOpT
-    type SequenceArgSliceT = Expr.SequenceArgSliceT
-    type PreviousChannelT = Expr.PreviousChannelT
-    type LoopInputT = Expr.LoopInputT
-    type LoopValueT = Expr.LoopValueT
-    type LoopSpecT = Expr.LoopSpecT
+    type ExprT = Expr.Expr
+    type MultiChannelOpT = Expr.MultiChannelOp
+    type ChannelT = Expr.Channel
+    type UnaryHeldOpT = Expr.UnaryHeldOp
+    type SequenceArgSliceT = Expr.SequenceArgSlice
+    type PreviousChannelT = Expr.PreviousChannel
+    type LoopInputT = Expr.LoopInput
+    type LoopValueT = Expr.LoopValue
+    type LoopSpecT = Expr.LoopSpec

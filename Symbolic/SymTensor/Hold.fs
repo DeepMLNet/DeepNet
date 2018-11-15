@@ -9,10 +9,10 @@ open Expr
 module Hold =
 
     /// Cache of released expressions.
-    let private released = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+    let private released = Dictionary<Expr, Expr> (HashIdentity.Reference)
  
     /// tries to release all ops that are "held" (via UnaryOp.Held) in the expression
-    let rec tryRelease (expr: ExprT) : ExprT =
+    let rec tryRelease (expr: Expr) : Expr =
         match released.LockedTryFind expr with
         | Some rel -> rel
         | None ->
@@ -30,7 +30,7 @@ module Hold =
                             else nTrgt / nSrc + 1L, true
                         let aRep = a |> replicate dim (SizeSpec.fix nReps)
                         if haveRemaining then
-                            let slice : ExprRngsSpecT = 
+                            let slice : ExprRngsSpec = 
                                 [0 .. aRep.NDims-1]
                                 |> List.map (fun d -> 
                                     if d = dim then SimpleRangeSpec.SymStartSymEnd (SizeSpec.zero, Some (size - 1L))
@@ -77,7 +77,7 @@ module Hold =
                     let spec = 
                         {spec with Channels = spec.Channels 
                                               |> Map.map (fun _ lv -> {lv with Expr=tryRelease lv.Expr})}
-                    Nary (Channel (Loop spec, channel), es |> List.map tryRelease)
+                    Nary (NaryOp.Channel (Loop spec, channel), es |> List.map tryRelease)
                 | Nary (op, es) -> Nary (op, es |> List.map tryRelease)
             
             released.[expr] <- rel

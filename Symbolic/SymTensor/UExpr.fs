@@ -16,7 +16,7 @@ module UExprTypes =
     let private uExprHashCache = Dictionary<obj, int> (HashIdentity.Reference)
 
     /// default channel
-    let dfltChId : ChannelT = "#"
+    let dfltChId : Channel = "#"
 
     // int holds the position of the subuexpr that has the dynamic value
     type UExprRngSpecT = SimpleRangeSpec<int>
@@ -29,11 +29,11 @@ module UExprTypes =
     /// metadata for an unified expression
     type UMetadata = {
         /// the data type of the result channels
-        ChannelType:   Map<ChannelT, TypeName>
+        ChannelType:   Map<Channel, TypeName>
         /// the numeric shape of the result channels
-        ChannelShape:  Map<ChannelT, NShapeSpec>
+        ChannelShape:  Map<Channel, NShapeSpec>
         /// the generating expression, if created from one
-        Expr:          Expr.ExprT option
+        Expr:          Expr.Expr option
     }
 
     type ULoopValueT = {
@@ -44,8 +44,8 @@ module UExprTypes =
 
     and ULoopSpecT = {
         Length:     int64
-        Vars:       Map<Var, LoopInputT>
-        Channels:   Map<ChannelT, ULoopValueT>
+        Vars:       Map<Var, LoopInput>
+        Channels:   Map<Channel, ULoopValueT>
     }
 
     and IndexArgs = int option list
@@ -57,17 +57,17 @@ module UExprTypes =
         | Elements of ShapeSpec * Elem.Unified.UFunc
         | IfThenElse
         | Loop of ULoopSpecT
-        | Channel of ChannelT
+        | Channel of Channel
         | Gather of IndexArgs
         | Scatter of IndexArgs
         | ExtensionExtraOp of IUOp        
 
     /// unified op of any arity and type    
     and UOpT =
-        | ULeafOp of Expr.LeafOpT
-        | UUnaryOp of Expr.UnaryOpT
-        | UBinaryOp of Expr.BinaryOpT
-        | UNaryOp of Expr.NaryOpT
+        | ULeafOp of Expr.LeafOp
+        | UUnaryOp of Expr.UnaryOp
+        | UBinaryOp of Expr.BinaryOp
+        | UNaryOp of Expr.NaryOp
         | UExtraOp of UExtraOpT
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    
@@ -129,7 +129,7 @@ module UExprTypes =
         /// This op is always the root of the passed expression.
         /// If there is a one-to-one relationship to a unified op, call the makeOneUop function
         /// with the corresponding Uop. It will generate the apropriate unified expression.
-        abstract ToUExpr: expr:ExprT -> makeOneUop:(IUOp -> UExprT) -> UExprT
+        abstract ToUExpr: expr:Expr -> makeOneUop:(IUOp -> UExprT) -> UExprT
 
 
 module UExprRngsSpec =
@@ -142,7 +142,7 @@ module UExprRngsSpec =
     // but how does this work with SetSubtensor?
 
     /// converts a ExprRngsSpecT to a UExprRngSpecT
-    let ofExprRngsSpec (sr: ExprRngsSpecT) =
+    let ofExprRngsSpec (sr: ExprRngsSpec) =
         ([], sr)
         ||> List.mapFold (fun dynExprs rng ->
             let idx = List.length dynExprs 
@@ -151,7 +151,7 @@ module UExprRngsSpec =
             | SimpleRangeSpec.DynStartSymSize (s, size)   -> SimpleRangeSpec.DynStartSymSize (idx, size),  dynExprs @ [s])
 
     /// converts a UExprRngSpecT to a ExprRngsSpecT
-    let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: ExprT list)  =
+    let rec toExprRngsSpec (srs: UExprRngsSpecT) (drs: Expr list)  =
         if drs |> List.exists (fun dr -> Expr.typename dr <> TypeName.ofType<int>) then
             failwith "need inttype for range spec"
         match srs, drs with
@@ -181,9 +181,9 @@ module UExprRngsSpec =
 module UExpr =
 
     type private UExprCaches = {
-        UExprForExpr:       Dictionary<ExprT, UExprT>
+        UExprForExpr:       Dictionary<Expr, UExprT>
         UExprs:             Dictionary<UExprT, UExprT>
-        ULoopSpecs:         Dictionary<LoopSpecT, ULoopSpecT>
+        ULoopSpecs:         Dictionary<LoopSpec, ULoopSpecT>
     }
 
     /// extracts all variables from the unified expression
@@ -202,7 +202,7 @@ module UExpr =
         let idxArgs = indices |> List.choose id
         idxArgNos, idxArgs
 
-    let rec private toUExprRec (caches: UExprCaches) (expr: ExprT) =
+    let rec private toUExprRec (caches: UExprCaches) (expr: Expr) =
         match caches.UExprForExpr.TryFind expr with
         | Some cached -> cached
         | None ->
@@ -284,11 +284,11 @@ module UExpr =
             uExpr       
 
     /// converts a list of expressions to a list of unified expressions
-    and toUExprs (exprs: ExprT list) =
+    and toUExprs (exprs: Expr list) =
         let caches = {
-            UExprForExpr    = Dictionary<ExprT, UExprT> () 
+            UExprForExpr    = Dictionary<Expr, UExprT> () 
             UExprs          = Dictionary<UExprT, UExprT> ()        
-            ULoopSpecs      = Dictionary<LoopSpecT, ULoopSpecT> () 
+            ULoopSpecs      = Dictionary<LoopSpec, ULoopSpecT> () 
         }     
         exprs 
         |> List.map Expr.check
@@ -296,11 +296,11 @@ module UExpr =
         |> trimULoops
 
     /// converts an expression to a unified expression
-    and toUExpr (expr: ExprT) =
+    and toUExpr (expr: Expr) =
         toUExprs [expr] |> List.exactlyOne        
 
     /// converts a loop specification to an unified loop specification
-    and private loopSpecToULoopSpec (caches: UExprCaches) (loopSpec: LoopSpecT) = 
+    and private loopSpecToULoopSpec (caches: UExprCaches) (loopSpec: LoopSpec) = 
         match caches.ULoopSpecs.TryFind loopSpec with
         | Some uLoopSpec -> uLoopSpec
         | None ->
@@ -322,7 +322,7 @@ module UExpr =
     and private trimULoops (uexprs: UExprT list) =
         // build set of used channels and slices
         let loopChFirst = 
-            Dictionary<UExprT, Dictionary<ChannelT, int64>> (HashIdentity.Reference)
+            Dictionary<UExprT, Dictionary<Channel, int64>> (HashIdentity.Reference)
 
         let regLoopChSlice loopExpr channel first =
             if not (loopChFirst.ContainsKey loopExpr) then
@@ -456,7 +456,7 @@ module UExpr =
 
     /// Converts a unified expression to an expression if the unified expression
     /// was created using the toUExpr function. Otherwise returns None.
-    let tryToExpr (UExpr (_, _, {Expr=exprOpt})) : ExprT option =
+    let tryToExpr (UExpr (_, _, {Expr=exprOpt})) : Expr option =
         match exprOpt with
         | Some exprObj -> Some (unbox exprObj)
         | None -> None

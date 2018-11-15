@@ -20,11 +20,11 @@ module HostEval =
     /// evaluation functions
     type private EvalT =       
 
-        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: ExprT) : ITensor =
+        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: Expr) : ITensor =
              callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
 
-        static member Eval<'R> (evalEnv: EvalEnvT, expr: ExprT) : Tensor<'R> =
+        static member Eval<'R> (evalEnv: EvalEnvT, expr: Expr) : Tensor<'R> =
             let retType = expr.Type
             if retType <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
@@ -49,7 +49,7 @@ module HostEval =
             callGeneric<EvalT, Tensor<'R>> "DoEval" [argType; retType] (evalEnv, expr)
 
 
-        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: ExprT) : Tensor<'R> =
+        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: Expr) : Tensor<'R> =
             if expr.Type <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
                     expr.Type typeof<'R>
@@ -58,7 +58,7 @@ module HostEval =
             let shapeEval symShape = ShapeSpec.eval symShape
             let sizeEval symSize = SizeSpec.eval symSize
             let subEval subExpr : Tensor<'T> = EvalT.Eval<'T> (evalEnv, subExpr) 
-            let subEvalTypeNeutral (subExpr: ExprT) : ITensor = 
+            let subEvalTypeNeutral (subExpr: Expr) : ITensor = 
                 EvalT.EvalTypeNeutral (evalEnv, subExpr)
             let rngEval = 
                 SimpleRangesSpec.eval 
@@ -222,8 +222,8 @@ module HostEval =
             res
 
         /// evaluates all channels of a loop
-        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpecT, args: ITensor list) 
-                               : Map<ChannelT, ITensor> =
+        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpec, args: ITensor list) 
+                               : Map<Channel, ITensor> =
 
             // iteration index variables
             let nIters = SizeSpec.eval spec.Length

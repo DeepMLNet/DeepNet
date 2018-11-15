@@ -15,12 +15,12 @@ module DerivTypes =
         /// the number of elements of the function the derivative is taken of
         FunElems:   SizeSpec
         /// the Jacobians w.r.t. the variables occuring in the expression
-        Jacobians:  Map<Var, ExprT>
+        Jacobians:  Map<Var, Expr>
     }
 
 
     type internal LoopDerivT = {
-        Port:        ChannelT
+        Port:        Channel
         Slice:       FullExprRngsSpecT
         ReverseAxis: int option
     }
@@ -54,7 +54,7 @@ module Deriv =
 
 
     /// calculates the Jacobian of all arguments of an expression given the Jacobian of the expression
-    let rec private reverseDiffStep (expr: ExprT) (eg: ExprT) : List<ExprT * ExprT> =    
+    let rec private reverseDiffStep (expr: Expr) (eg: Expr) : List<Expr * Expr> =    
         let exprShp = expr.Shape
         let funElems = eg.Shape.[0]  
 
@@ -237,7 +237,7 @@ module Deriv =
 
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
-                let mxWrtX (m: ExprT) x y dy =
+                let mxWrtX (m: Expr) x y dy =
                     let xShp, yShp, dyShp = shapeOf x, shapeOf y, shapeOf dy
                     let nd = ShapeSpec.nDim xShp
                     let batchShp = xShp.[0..nd-3]
@@ -297,7 +297,7 @@ module Deriv =
             | Discard -> failwith "cannot propagate derivative thorugh Discard op"
 
     /// derivative of loop expression
-    and private loopDeriv (dOutputs: Map<ChannelT, ExprT>) (originalArgs: ExprT list) (spec: LoopSpecT) =
+    and private loopDeriv (dOutputs: Map<Channel, Expr>) (originalArgs: Expr list) (spec: LoopSpec) =
 
         /// number of elments of the function we take the derivative of
         let funElems = 
@@ -310,7 +310,7 @@ module Deriv =
             | [] -> failwith "output derivatives invalid"
 
         /// argument of the derivative loop expression
-        let args = ResizeArray<ExprT> originalArgs
+        let args = ResizeArray<Expr> originalArgs
 
         /// adds an argument to the derivative loop expression and returns its index
         let addArg expr =
@@ -328,16 +328,16 @@ module Deriv =
             addArg zeroExpr
 
         /// map from variable representing a derivative to the loop input specification
-        let varInputSpecs = Dictionary<Var, LoopInputT> ()
+        let varInputSpecs = Dictionary<Var, LoopInput> ()
 
         /// map from a loop output to the variable representing its derivative
-        let dOutputVars = Dictionary<ChannelT, Var> ()
+        let dOutputVars = Dictionary<Channel, Var> ()
 
         /// map from a loop PreviousPort to the variables representing its derivative sources
-        let dPreviousVars = Dictionary<PreviousChannelT, Var> ()
+        let dPreviousVars = Dictionary<PreviousChannel, Var> ()
 
         /// map from a loop port to the value it must contain
-        let portContents = Dictionary<ChannelT, PortContentsT> ()
+        let portContents = Dictionary<Channel, PortContentsT> ()
 
         /// map from argument index to the loop ports containing its derivative summands
         let argIdxDerivs = Dictionary<int, HashSet<LoopDerivT>> ()
@@ -595,26 +595,26 @@ module Deriv =
         
     /// computes the Jacobians of the arguments of a multi-channel op given the Jacobians
     /// w.r.t. all channels of the multi-channel op
-    and private multiChannelDiffStep (mcOp: MultiChannelOpUsageT) (eg: Map<ChannelT, ExprT>) : List<ExprT * ExprT> =
+    and private multiChannelDiffStep (mcOp: MultiChannelOpUsageT) (eg: Map<Channel, Expr>) : List<Expr * Expr> =
         match mcOp with
         | Loop spec, args -> loopDeriv eg args spec
 
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    and computeWithRootJacobian (rootJacobian: ExprT) (rootExpr: ExprT) : DerivT =
+    and computeWithRootJacobian (rootJacobian: Expr) (rootExpr: Expr) : DerivT =
 
         // build expression info and unify common subexpressions
         let exprInfo = ExprInfoT [rootExpr]
         let rootExpr = List.exactlyOne exprInfo.Exprs
 
         /// map from an expression to the sum of incoming Jacobians
-        let incomingJacobian = Dictionary<ExprT, ExprT> (HashIdentity.Reference)
+        let incomingJacobian = Dictionary<Expr, Expr> (HashIdentity.Reference)
         /// map from an expression to the set of dependants that transmitted Jacobian to the expression
-        let receivedJacobiansFrom = Dictionary<ExprT, HashSet<ExprT>> (HashIdentity.Reference)
+        let receivedJacobiansFrom = Dictionary<Expr, HashSet<Expr>> (HashIdentity.Reference)
         /// expressions that have received Jacobians from all their dependants
-        let exprsWithFullJacobian = Queue<ExprT> ()
+        let exprsWithFullJacobian = Queue<Expr> ()
 
         let multiChannelOpJacobians = 
-            Dictionary<MultiChannelOpUsageT, Dictionary<ChannelT, ExprT>> (HashIdentity.Structural) 
+            Dictionary<MultiChannelOpUsageT, Dictionary<Channel, Expr>> (HashIdentity.Structural) 
         let multiChannelOpsWithFullJacobians = Queue<MultiChannelOpUsageT> ()
 
         /// adds the specified Jacobian coming from `source` to `target`
@@ -628,7 +628,7 @@ module Deriv =
 
             // add to received set
             if not (receivedJacobiansFrom.ContainsKey target) then
-                receivedJacobiansFrom.[target] <- HashSet<ExprT> (HashIdentity.Structural)
+                receivedJacobiansFrom.[target] <- HashSet<Expr> (HashIdentity.Structural)
             match source with
             | Choice1Of2 exprSource -> 
                 if receivedJacobiansFrom.[target].Contains exprSource then
@@ -657,7 +657,7 @@ module Deriv =
         let transmitMultiChannelOpJacobian mcOp channel jacobian =
             // add jacobian
             if not (multiChannelOpJacobians.ContainsKey mcOp) then
-                multiChannelOpJacobians.[mcOp] <- Dictionary<ChannelT, ExprT> (HashIdentity.Structural)
+                multiChannelOpJacobians.[mcOp] <- Dictionary<Channel, Expr> (HashIdentity.Structural)
             let mcoj = multiChannelOpJacobians.[mcOp]
             mcoj.[channel] <- jacobian
 
@@ -700,7 +700,7 @@ module Deriv =
         }    
 
     /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    and compute (rootExpr: ExprT) : DerivT =
+    and compute (rootExpr: Expr) : DerivT =
         if Debug.TraceCompile then printfn "Computing derivatives..."
         let sw = Stopwatch.StartNew()
         let rootJac = shapeOf rootExpr |> ShapeSpec.nElem |> identityOfSameType rootExpr

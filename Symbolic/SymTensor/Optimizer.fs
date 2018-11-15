@@ -8,8 +8,8 @@ open Expr
 module Optimizer =
    
     /// Cache of optimized expressions.
-    let private optimized = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
-    let private combined = Dictionary<ExprT, ExprT> (HashIdentity.Reference) 
+    let private optimized = Dictionary<Expr, Expr> (HashIdentity.Reference) 
+    let private combined = Dictionary<Expr, Expr> (HashIdentity.Reference) 
 
     /// Broadcast information
     type BroadcastInfoT =
@@ -246,7 +246,7 @@ module Optimizer =
         | _         -> None
 
     /// combines elemwise and elements operations into one elements operation
-    and combineIntoElementsRec (exprInfo: ExprInfoT) (expr: ExprT) : ExprT =
+    and combineIntoElementsRec (exprInfo: ExprInfoT) (expr: Expr) : Expr =
         let subComb = combineIntoElementsRec exprInfo
 
         /// Gets the element expression for the argument, or starts a
@@ -369,7 +369,7 @@ module Optimizer =
             comb
 
     /// Optimizes an expression.
-    and private optRec (expr: ExprT) : ExprT =
+    and private optRec (expr: Expr) : Expr =
         match optimized.LockedTryFind expr with
         | Some opt -> opt 
         | None ->
@@ -518,7 +518,7 @@ module Optimizer =
                         |> List.map (fun (optExpr, (ch, lv)) -> ch, {lv with Expr=optExpr})
                         |> Map.ofList
                     let loopSpec = {loopSpec with Channels=channels}
-                    Nary (Channel (Loop loopSpec, ch), args)
+                    Nary (NaryOp.Channel (Loop loopSpec, ch), args)
 
                 // pass through
                 | Leaf _ -> expr
@@ -537,7 +537,7 @@ module Optimizer =
             opt
 
     /// Optimizes a group of expressions.
-    and optimize (exprs: ExprT list) : ExprT list =
+    and optimize (exprs: Expr list) : Expr list =
         for expr in exprs do
             Expr.checkExpr expr
         let exprs = exprs |> List.map (optRec >> Expr.check)

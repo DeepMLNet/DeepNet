@@ -5,13 +5,13 @@ open DeepNet.Utils
 
 open Expr
 
-type MultiChannelOpUsageT = MultiChannelOpT * List<ExprT>
+type MultiChannelOpUsageT = MultiChannelOp * List<Expr>
 
 /// Provides information about a set of expressions (dependencies, channel usage).
-type ExprInfoT (exprs: ExprT list) =
+type ExprInfoT (exprs: Expr list) =
     
     /// expression cache
-    let knownExprs = Dictionary<ExprT, ExprT> () 
+    let knownExprs = Dictionary<Expr, Expr> () 
 
     // rebuilt expression so that equal subtrees point to the same object instance
     let exprs =
@@ -37,11 +37,11 @@ type ExprInfoT (exprs: ExprT list) =
     
     // build sets of dependants for each subexpression
     let dependants = 
-        let processed = HashSet<ExprT> (HashIdentity.Reference)
-        let dependants = Dictionary<ExprT, HashSet<ExprT>> (HashIdentity.Reference)              
+        let processed = HashSet<Expr> (HashIdentity.Reference)
+        let dependants = Dictionary<Expr, HashSet<Expr>> (HashIdentity.Reference)              
         let addDependant node dependant =
             if not (dependants.ContainsKey node) then
-                dependants.[node] <- HashSet<ExprT> (HashIdentity.Reference)
+                dependants.[node] <- HashSet<Expr> (HashIdentity.Reference)
             dependants.[node].Add dependant |> ignore
         let rec doBuild expr =
             if not (processed.Contains expr) then
@@ -69,11 +69,11 @@ type ExprInfoT (exprs: ExprT list) =
 
     // build sets of used channels
     let usedChannels = lazy (
-        let processed = HashSet<ExprT> (HashIdentity.Reference)
-        let usedChannels = Dictionary<MultiChannelOpUsageT, HashSet<ChannelT>> (HashIdentity.Structural)      
+        let processed = HashSet<Expr> (HashIdentity.Reference)
+        let usedChannels = Dictionary<MultiChannelOpUsageT, HashSet<Channel>> (HashIdentity.Structural)      
         let addUsedChannel key channel =
             if not (usedChannels.ContainsKey key) then
-                usedChannels.[key] <- HashSet<ChannelT> (HashIdentity.Structural)
+                usedChannels.[key] <- HashSet<Channel> (HashIdentity.Structural)
             usedChannels.[key].Add channel |> ignore
         let rec doBuild expr =
             if not (processed.Contains expr) then
