@@ -17,12 +17,12 @@ module Adam =
     } 
 
     type CfgExpr = {
-        Step:           ExprT
-        Momentum:       ExprT
-        Decay:          ExprT
-        DecayMom1:      ExprT
-        DecayMom2:      ExprT
-        Offset:         ExprT
+        Step:           Expr
+        Momentum:       Expr
+        Decay:          Expr
+        DecayMom1:      Expr
+        DecayMom2:      Expr
+        Offset:         Expr
     }
 
     type State<'T> = {
@@ -35,18 +35,18 @@ module Adam =
     } 
 
     type StateExpr = {
-        Iter:           ExprT
-        LastStep:       ExprT
-        EstMom1:        ExprT
-        EstMom2:        ExprT
-        EstMom1B:       ExprT
-        EstMom2B:       ExprT
+        Iter:           Expr
+        LastStep:       Expr
+        EstMom1:        Expr
+        EstMom2:        Expr
+        EstMom1B:       Expr
+        EstMom2B:       Expr
     }
 
 open Adam
 
 type Adam<'T when 'T: equality and 'T: comparison> 
-        (loss:  ExprT, pars:  ExprT, dev:   IDevice) =
+        (loss:  Expr, pars:  Expr, dev:   IDevice) =
 
     do Util.checkProperType<'T> ()
     do if loss.NDims <> 0 then failwith "loss must be a scalar"
@@ -95,7 +95,7 @@ type Adam<'T when 'T: equality and 'T: comparison>
             EstMom2B    = HostTensor.zeros shp |> dev.ToDev
         }
 
-    member this.Minimize : ExprT =
+    member this.Minimize : Expr =
         let gradient = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars) 
         //let gradient = gradient |> Expr.checkFinite "gradient"
 

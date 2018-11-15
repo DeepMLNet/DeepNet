@@ -56,8 +56,8 @@ module CudaRecipeTypes =
 
     /// CUDA execution recipe
     type CudaRecipeT = {
-        ChannelVars:        Map<ChannelT, Var option>
-        ChannelAllocators:  Map<ChannelT, unit -> ITensor>
+        ChannelVars:        Map<Channel, Var option>
+        ChannelAllocators:  Map<Channel, unit -> ITensor>
         VarStrides:         VarStridesT
         VarStorLoc:         VarLocsT
         KernelCode:         string

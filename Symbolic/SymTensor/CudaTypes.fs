@@ -50,7 +50,7 @@ module Types =
     /// description of how to build a CUDA recipe
     type CudaRecipeDescT = {
         CompileEnv:                 CompileEnvT
-        UExprs:                     Map<ChannelT, UExprT>
+        UExprs:                     Map<Channel, UExprT>
         OwnerUExpr:                 UExprT option
     }
     
@@ -63,9 +63,9 @@ module Types =
     /// additional environment informations for CUDA
     type CudaCompileEnvT = {
         /// variables storing the results of the expressions
-        ChannelVars:                Map<ChannelT, Var option>
+        ChannelVars:                Map<Channel, Var option>
         /// function to allocate new storage for the result
-        ChannelAllocators:          Map<ChannelT, unit -> ITensor>
+        ChannelAllocators:          Map<Channel, unit -> ITensor>
         /// storage location of variables
         VarStorLoc:                 Map<Var, ITensorDevice>
         /// optional stride specification for variables

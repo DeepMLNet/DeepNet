@@ -88,7 +88,7 @@ module ExecUnitsTypes =
         TargetRequest:      ChannelReqsT
         Op:                 UOpT
         Metadata:           UMetadata
-        SrcShapes:          Map<ChannelT, NShapeSpec> list 
+        SrcShapes:          Map<Channel, NShapeSpec> list 
     }
 
     /// record containing functions called by the ExecUnitT generator

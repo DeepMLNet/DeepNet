@@ -25,18 +25,18 @@ module GRULang =
     }
 
     type Pars = {        
-        WordToEmb:       ExprT    // [word, embDim]
-        EmbToUpdate:     ExprT    // [recUnit, embDim]
-        EmbToReset:      ExprT    // [recUnit, embDim]
-        EmbToHidden:     ExprT    // [recUnit, embDim]
-        StateToUpdate:   ExprT    // [recUnit, recUnit]
-        StateToReset:    ExprT    // [recUnit, recUnit]
-        StateToHidden:   ExprT    // [recUnit, recUnit]
-        UpdateBias:      ExprT    // [recUnit]
-        ResetBias:       ExprT    // [recUnit]
-        HiddenBias:      ExprT    // [recUnit]
-        StateToWord:     ExprT    // [word, recUnit]
-        WordBias:        ExprT    // [word]
+        WordToEmb:       Expr    // [word, embDim]
+        EmbToUpdate:     Expr    // [recUnit, embDim]
+        EmbToReset:      Expr    // [recUnit, embDim]
+        EmbToHidden:     Expr    // [recUnit, embDim]
+        StateToUpdate:   Expr    // [recUnit, recUnit]
+        StateToReset:    Expr    // [recUnit, recUnit]
+        StateToHidden:   Expr    // [recUnit, recUnit]
+        UpdateBias:      Expr    // [recUnit]
+        ResetBias:       Expr    // [recUnit]
+        HiddenBias:      Expr    // [recUnit]
+        StateToWord:     Expr    // [word, recUnit]
+        WordBias:        Expr    // [word]
         HyperPars:       HyperPars
     }
 
@@ -65,17 +65,17 @@ module GRULang =
         HyperPars     = hp
     }
 
-    let sigmoid (z: ExprT) = (tanh (z/2.0f) + 1.0f) / 2.0f
-    let softmax (z: ExprT) =
+    let sigmoid (z: Expr) = (tanh (z/2.0f) + 1.0f) / 2.0f
+    let softmax (z: Expr) =
         let c = z |> Expr.maxKeepingAxis 1
         let y = exp (z - c)
         y / Expr.sumKeepingAxis 1 y
-    let negLogSoftmax (z: ExprT) =
+    let negLogSoftmax (z: Expr) =
         let c = z |> Expr.maxKeepingAxis 1
         c - z + log (Expr.sumKeepingAxis 1 (exp (z - c)) + 1e-6f)
         
 
-    let build (pars: Pars) (initialSlice: ExprT) (words: ExprT) (genFirstWord: ExprT) =
+    let build (pars: Pars) (initialSlice: Expr) (words: Expr) (genFirstWord: Expr) =
         // words            [smpl, pos]
         // input            [smpl, step]           
         // initial          [smpl, recUnit]
@@ -125,9 +125,9 @@ module GRULang =
                                  Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}
                                  Expr.extractVar step, Expr.IterationIndex]
-                Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
-                                     chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}
-                                     chOutput,      {LoopValueT.Expr=output;      LoopValueT.SliceDim=1}]    
+                Expr.Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
+                                     chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}
+                                     chOutput,      {LoopValue.Expr=output;      LoopValue.SliceDim=1}]    
               } 
             else 
               {
@@ -135,8 +135,8 @@ module GRULang =
                 Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                                  Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-                Expr.Channels = Map [chState,       {LoopValueT.Expr=state;       LoopValueT.SliceDim=1}
-                                     chLogWordProb, {LoopValueT.Expr=logWordProb; LoopValueT.SliceDim=1}]
+                Expr.Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
+                                     chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}]
               }
         let input         = words.[*, 0L .. nSteps-1L]
         let initialOutput = Expr.zeros<single> [nBatch; SizeSpec.fix 1L; nWords]
@@ -156,8 +156,8 @@ module GRULang =
                                     Expr.PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1L; InitialArg=0}
                              Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-            Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
-                                 chPred,   {LoopValueT.Expr=pred;   LoopValueT.SliceDim=1}]    
+            Expr.Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
+                                 chPred,   {LoopValue.Expr=pred;   LoopValue.SliceDim=1}]    
         }
         let states        = Expr.loop genLoopSpec chState  [genFirstWord; initial; initialSlice]
         let generated     = Expr.loop genLoopSpec chPred   [genFirstWord; initial; initialSlice]

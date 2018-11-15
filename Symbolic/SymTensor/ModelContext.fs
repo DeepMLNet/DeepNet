@@ -15,7 +15,7 @@ module ModelContextTypes =
 
     /// model parameter
     type ParameterInfo<'T> = {
-        Expr:           ExprT 
+        Expr:           Expr 
         Initializer:    Initializer<'T>
     }
 
@@ -59,7 +59,7 @@ module ModelContextTypes =
                 SizeSpec.zero
 
         /// variable containing all parameters
-        let flatVar : ExprT = Expr.var<'T> (flatVarName) [totalElems]
+        let flatVar : Expr = Expr.var<'T> (flatVarName) [totalElems]
 
         /// parameter variables
         let parameterSubstExprs =
@@ -160,8 +160,8 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : Tensor<'T> = this.[Expr.extractVar par]
-            and set (par: ExprT) (value: Tensor<'T>) = this.[Expr.extractVar par] <- value
+            with get (par: Expr) : Tensor<'T> = this.[Expr.extractVar par]
+            and set (par: Expr) (value: Tensor<'T>) = this.[Expr.extractVar par] <- value
 
         /// Uses the values of this ParameterStorageT for the the corresponding
         /// ParameterSetT in the given variable environment.
@@ -245,7 +245,7 @@ module ModelContextTypes =
 
         /// Creates and returns a model variable.
         [<RequiresExplicitTypeArguments>]
-        member this.Var<'V> (name: string) (shape: ShapeSpec) : ExprT =
+        member this.Var<'V> (name: string) (shape: ShapeSpec) : Expr =
             let v = Expr.var<'V> (context + "." + name) shape
             vars <- vars |> Set.add (Expr.extractVar v)
             v
@@ -521,66 +521,66 @@ module ModelContextTypes =
 
         /// value for a given parameter
         member this.Item
-            with get (par: ExprT) : Tensor<'T> = this.ParameterStorage.[par]
-            and set (par: ExprT) (value: Tensor<'T>) = this.ParameterStorage.[par] <- value
+            with get (par: Expr) : Tensor<'T> = this.ParameterStorage.[par]
+            and set (par: Expr) (value: Tensor<'T>) = this.ParameterStorage.[par] <- value
 
-        member this.Func (resultLoc: ITensorDevice, exprs: ExprT list) =
+        member this.Func (resultLoc: ITensorDevice, exprs: Expr list) =
             let exprs = exprs |> List.map this.Use 
             Func.makeMany<'T> (compileSpec resultLoc) exprs << useParStorage
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the specified result location.
-        member this.Func<'T0> (resultLoc: ITensorDevice, expr0: ExprT) =
+        member this.Func<'T0> (resultLoc: ITensorDevice, expr0: Expr) =
             let expr0 = this.Use expr0
             Func.make<'T0> (compileSpec resultLoc) expr0 << useParStorage
 
-        member this.Func (resultLoc: ITensorDevice, expr0: ExprT) = 
+        member this.Func (resultLoc: ITensorDevice, expr0: Expr) = 
             this.Func<'T> (resultLoc, expr0)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func<'T0, 'T1> (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT) =
+        member this.Func<'T0, 'T1> (resultLoc: ITensorDevice, expr0: Expr, expr1: Expr) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             Func.make2<'T0, 'T1> (compileSpec resultLoc) expr0 expr1 << useParStorage
 
-        member this.Func (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT) =
+        member this.Func (resultLoc: ITensorDevice, expr0: Expr, expr1: Expr) =
             this.Func<'T, 'T> (resultLoc, expr0, expr1)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func<'T0, 'T1, 'T2> (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func<'T0, 'T1, 'T2> (resultLoc: ITensorDevice, expr0: Expr, expr1: Expr, expr2: Expr) =
             let expr0 = this.Use expr0
             let expr1 = this.Use expr1
             let expr2 = this.Use expr2
             Func.make3<'T0, 'T1, 'T2> (compileSpec resultLoc) expr0 expr1 expr2 << useParStorage
 
-        member this.Func (resultLoc: ITensorDevice, expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func (resultLoc: ITensorDevice, expr0: Expr, expr1: Expr, expr2: Expr) =
             this.Func<'T, 'T, 'T> (resultLoc, expr0, expr1, expr2)
 
-        member this.Func (exprs: ExprT list) =
+        member this.Func (exprs: Expr list) =
             this.Func (device.DefaultLoc, exprs)
 
         /// Creates a function from the given expression using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func<'T0> (expr0: ExprT) =
+        member this.Func<'T0> (expr0: Expr) =
             this.Func<'T0> (device.DefaultLoc, expr0)
 
-        member this.Func (expr0: ExprT) =
+        member this.Func (expr0: Expr) =
             this.Func (device.DefaultLoc, expr0)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (expr0: ExprT, expr1: ExprT) =
+        member this.Func (expr0: Expr, expr1: Expr) =
             this.Func (device.DefaultLoc, expr0, expr1)
 
-        member this.Func<'T0, 'T1> (expr0: ExprT, expr1: ExprT) =
+        member this.Func<'T0, 'T1> (expr0: Expr, expr1: Expr) =
             this.Func<'T0, 'T1> (device.DefaultLoc, expr0, expr1)
 
         /// Creates a function from the given expressions using the model's ParameterSet and ParameterStorage
         /// using the devices default result location.
-        member this.Func (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func (expr0: Expr, expr1: Expr, expr2: Expr) =
             this.Func (device.DefaultLoc, expr0, expr1, expr2)
         
-        member this.Func<'T0, 'T1, 'T2> (expr0: ExprT, expr1: ExprT, expr2: ExprT) =
+        member this.Func<'T0, 'T1, 'T2> (expr0: Expr, expr1: Expr, expr2: Expr) =
             this.Func<'T0, 'T1, 'T2> (device.DefaultLoc, expr0, expr1, expr2)

@@ -35,34 +35,34 @@ module ActivationFuncTypes =
 module ActivationFunc = 
 
     /// identity activation function
-    let id (x: ExprT) =
+    let id (x: Expr) =
         x
 
     /// tanh activation function
-    let tanh (x: ExprT) =
+    let tanh (x: Expr) =
         tanh x
 
     /// sigmoid activation function
-    let sigmoid (x: ExprT) =
+    let sigmoid (x: Expr) =
         let one = Expr.scalarOfSameType x 1
         let two = Expr.scalarOfSameType x 2
         (tanh (x / two) + one) / two
 
     /// Soft-max activation function.
     /// The second dimension enumerates the possible classes.
-    let softmax (x: ExprT) =
+    let softmax (x: Expr) =
         let c = x |> Expr.maxKeepingAxis 1
         let y = exp (x - c)
         y / Expr.sumKeepingAxis 1 y
 
     /// Natural logarithm of soft-max activation function.
     /// The second dimension enumerates the possible classes.
-    let logSoftmax (x: ExprT) =
+    let logSoftmax (x: Expr) =
         let c = x |> Expr.maxKeepingAxis 1
         x - c - log (Expr.sumKeepingAxis 1 (exp (x - c))) 
 
     /// Rectifier Unit function: max(x, 0)
-    let relu (x: ExprT) =
+    let relu (x: Expr) =
         x |> Expr.zerosLike |> Expr.maxElemwise x
 
     /// applies the specified activation function
@@ -78,7 +78,7 @@ module ActivationFunc =
 /// Regularization expressions.
 module Regularization =
 
-    let lqRegularization (weights:ExprT) (q:int) =
+    let lqRegularization (weights:Expr) (q:int) =
         Expr.sum (abs(weights) *** (single q))
 
     let l1Regularization weights =
@@ -91,13 +91,13 @@ module Regularization =
 module NormalDistribution =
     
     /// PDF of standard normal distribution
-    let pdf (x:ExprT) (mu:ExprT) (cov:ExprT)=
+    let pdf (x:Expr) (mu:Expr) (cov:Expr)=
         let fact = 1.0f / sqrt( 2.0f * (single System.Math.PI)*cov)
         fact * exp( - ((x - mu) *** 2.0f) / (2.0f * cov))
     
     /// Computes approximate gaussian error 
     /// with maximum approximation error of 1.2 * 10 ** -7
-    let gaussianErrorFkt (x:ExprT) = 
+    let gaussianErrorFkt (x:Expr) = 
         
         let t = 1.0f/  (1.0f + 0.5f * abs(x))
         let sum = -1.26551233f + 1.00002368f * t + 0.37409196f * t *** 2.0f +
@@ -108,11 +108,11 @@ module NormalDistribution =
         Expr.ifThenElse (x>>==0.0f) (1.0f - tau) (tau - 1.0f)
     
     ///CDF of standard normal distribution
-    let cdf (x:ExprT) (mu:ExprT) (cov:ExprT) =
+    let cdf (x:Expr) (mu:Expr) (cov:Expr) =
         (1.0f + gaussianErrorFkt((x- mu) / sqrt(2.0f * cov))) / 2.0f
     
     /// Normalizes 
-    let normalize (x:ExprT) =
+    let normalize (x:Expr) =
         let mean = Expr.mean x
         let cov = (Expr.mean (x * x)) - (mean * mean)
         let stdev = sqrt cov

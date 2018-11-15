@@ -12,7 +12,7 @@ module OptimizerTypes =
     type IOptimizer<'T, 'OptCfg, 'OptState> =
 
         /// Expression performing one optimization step.
-        abstract member OptStepExpr: ExprT
+        abstract member OptStepExpr: Expr
 
         abstract member Use: (VarEnvT -> 'A) -> (VarEnvT -> 'OptCfg -> 'OptState -> 'A)
 

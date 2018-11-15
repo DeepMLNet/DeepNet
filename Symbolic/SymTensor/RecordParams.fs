@@ -11,14 +11,14 @@ open DeepNet.Utils
 
 type private VarRecordHelpers () =
     static member PublishLocStride<'T when 'T: equality and 'T: comparison> 
-            (expr: ExprT, loc: ITensorDevice, stride: int64 list option, mi: ModelInstance<'T>) =
+            (expr: Expr, loc: ITensorDevice, stride: int64 list option, mi: ModelInstance<'T>) =
         mi.SetLoc expr loc
         match stride with
         | Some stride -> mi.SetStride expr stride
         | None -> ()
     static member ValueArrayOnDev<'T> (value: 'T, dev: IDevice) = 
         HostTensor.scalar value |> dev.ToDev :> ITensor
-    static member UVarSpecOfExpr<'T> (expr: ExprT) =
+    static member UVarSpecOfExpr<'T> (expr: Expr) =
         Expr.extractVar expr
     static member WriteArrayToHDF<'T> (hdf: HDF5, dev: IDevice, name: string, value: Tensor<'T>) =
         value |> dev.ToHost |> HostTensor.write hdf name
@@ -66,11 +66,11 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
                             valField.PropertyType.GetGenericTypeDefinition() = typedefof<Tensor<_>> then
                         // ArrayNDT<'T> => ExprT
                         let bt = valField.PropertyType.GetGenericArguments().[0]
-                        bt, Array bt, typeof<ExprT>
+                        bt, Array bt, typeof<Expr>
                     else
                         // 'T => ExprT (scalar)
                         let bt = valField.PropertyType
-                        bt, Scalar bt, typeof<ExprT>
+                        bt, Scalar bt, typeof<Expr>
 
                 if exprField.PropertyType <> exprType then
                     failwithf "type mismatch for field %s: 'PVal type %A requires 'PExpr type %A but got %A"

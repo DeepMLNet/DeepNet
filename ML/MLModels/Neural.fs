@@ -27,7 +27,7 @@ module LossLayer =
     /// pred.[smpl, cls] must be the predicted probability that the sample
     /// belong to class cls and target.[smpl, cls] must be 1 if the sample
     /// actually belongs to class cls and 0 otherwise.
-    let loss lm (pred: ExprT) (target: ExprT) =
+    let loss lm (pred: Expr) (target: Expr) =
         // pred   [smpl, cls]
         // target [smpl, cls]
         let one = Expr.oneOfSameType pred
@@ -82,9 +82,9 @@ module NeuralLayer =
     /// Neural layer parameters.
     type Pars<'T> = {
         /// expression for the weights
-        Weights:        ExprT 
+        Weights:        Expr 
         /// expression for the biases
-        Bias:           ExprT 
+        Bias:           Expr 
         /// hyper-parameters
         HyperPars:      HyperPars
     }
@@ -115,7 +115,7 @@ module NeuralLayer =
     /// neural layer with parameters `pars` given the input `input`.
     /// If the soft-max transfer function is used, the normalization
     /// is performed over axis 0.
-    let pred pars (input: ExprT) =
+    let pred pars (input: Expr) =
         // weights [outUnit, inUnit]
         // bias    [outUnit]
         // input   [smpl, inUnit]

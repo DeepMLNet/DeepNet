@@ -12,7 +12,7 @@ module GradientDescent =
     }
 
     type CfgExpr = {
-        Step:           ExprT
+        Step:           Expr
     }
 
     type State<'T> = {
@@ -20,13 +20,13 @@ module GradientDescent =
     }
 
     type StateExpr = {
-        LastStep:       ExprT
+        LastStep:       Expr
     }
 
 open GradientDescent
 
 type GradientDescent<'T when 'T: equality and 'T: comparison> 
-        (loss:   ExprT, pars:   ExprT, dev:    IDevice) =
+        (loss:   Expr, pars:   Expr, dev:    IDevice) =
 
     do Util.checkProperType<'T> ()
     do if loss.NDims <> 0 then failwith "loss must be a scalar"

@@ -22,7 +22,7 @@ module VarEnvTypes =
     type VarStridesT = Map<Var, int64 list>
 
     /// specification of channel strides
-    type ChannelStridesT = Map<ChannelT, int64 list>
+    type ChannelStridesT = Map<Channel, int64 list>
 
 
 /// Variable value collection.
@@ -125,7 +125,7 @@ module VarEnv =
         varEnv |> Map.map (fun _ vVal -> vVal.Layout.Stride)
 
     /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (ExprT * #ITensor) seq) =
+    let ofSeq (entries: (Expr * #ITensor) seq) =
         (empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
@@ -222,7 +222,7 @@ module CompileEnv =
 module Func =
 
     type private UExprGenT = {
-        Generate:               SymSizeEnv -> ExprT
+        Generate:               SymSizeEnv -> Expr
         UVarSpecsAndEvalable:   bool -> SymSizeEnv -> Set<Var> * bool       
     }
 
@@ -402,7 +402,7 @@ module Func =
                 performEval variants.[compileEnv] varEnv
 
     [<RequiresExplicitTypeArguments>]
-    let private checkType<'T> pos (expr: ExprT) =
+    let private checkType<'T> pos (expr: Expr) =
         if typeof<'T> = typeof<obj> then
             failwith "The result type of the function was not inferred (is ArrayNDT<obj>) and \
                       therefore must be specified manually."
@@ -411,7 +411,7 @@ module Func =
                 pos expr.Type typeof<'T>
 
     /// makes a function that evaluates the given expression 
-    let make<'T0> factory (expr0: ExprT)  =
+    let make<'T0> factory (expr0: Expr)  =
         checkType<'T0> "" expr0
         let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let evalAll = evalWrapper factory [expr0gen]        
@@ -419,7 +419,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>
 
-    let make2<'T0, 'T1> factory (expr0: ExprT) (expr1: ExprT) =    
+    let make2<'T0, 'T1> factory (expr0: Expr) (expr1: Expr) =    
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
         let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
@@ -429,7 +429,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>
 
-    let make3<'T0, 'T1, 'T2> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) =    
+    let make3<'T0, 'T1, 'T2> factory (expr0: Expr) (expr1: Expr) (expr2: Expr) =    
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
         checkType<'T2> "third" expr2
@@ -441,7 +441,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>
 
-    let make4<'T0, 'T1, 'T2, 'T3> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) =    
+    let make4<'T0, 'T1, 'T2, 'T3> factory (expr0: Expr) (expr1: Expr) (expr2: Expr) (expr3: Expr) =    
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
         checkType<'T2> "third" expr2
@@ -455,7 +455,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>
 
-    let make5<'T0, 'T1, 'T2, 'T3, 'T4> factory (expr0: ExprT) (expr1: ExprT) (expr2: ExprT) (expr3: ExprT) (expr4: ExprT) =    
+    let make5<'T0, 'T1, 'T2, 'T3, 'T4> factory (expr0: Expr) (expr1: Expr) (expr2: Expr) (expr3: Expr) (expr4: Expr) =    
         checkType<'T0> "first" expr0
         checkType<'T1> "second" expr1
         checkType<'T2> "third" expr2
@@ -471,7 +471,7 @@ module Func =
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>, res.[4] :?> Tensor<'T4>
 
-    let makeMany<'T> factory (exprs: ExprT list) =
+    let makeMany<'T> factory (exprs: Expr list) =
         exprs |> List.iter (checkType<'T> "all")
         let exprsGen =
             exprs
@@ -492,41 +492,41 @@ module FuncTypes =
             VarEnv.empty |> f
 
     type Arg1Func<'T0, 'TR> = Tensor<'T0> -> 'TR
-    let arg1<'T0, 'TR> (vs0: ExprT) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
+    let arg1<'T0, 'TR> (vs0: Expr) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
         fun (val0: Tensor<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
     type Arg2Func<'T0, 'T1, 'TR> = Tensor<'T0> -> Tensor<'T1> -> 'TR
-    let arg2<'T0, 'T1, 'TR> (vs0: ExprT) (vs1: ExprT) (f: VarEnvT -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
+    let arg2<'T0, 'T1, 'TR> (vs0: Expr) (vs1: Expr) (f: VarEnvT -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
     type Arg3Func<'T0, 'T1, 'T2, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> 'TR
-    let arg3<'T0, 'T1, 'T2, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) f : Arg3Func<'T0, 'T1, 'T2, 'TR> =
+    let arg3<'T0, 'T1, 'T2, 'TR> (vs0: Expr) (vs1: Expr) (vs2: Expr) f : Arg3Func<'T0, 'T1, 'T2, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f           
 
     type Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> 'TR
-    let arg4<'T0, 'T1, 'T2, 'T3, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) f : Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> =
+    let arg4<'T0, 'T1, 'T2, 'T3, 'TR> (vs0: Expr) (vs1: Expr) (vs2: Expr) (vs3: Expr) f : Arg4Func<'T0, 'T1, 'T2, 'T3, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> f           
    
     type Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> 'TR
-    let arg5<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT)f : Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> =
+    let arg5<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> (vs0: Expr) (vs1: Expr) (vs2: Expr) (vs3: Expr) (vs4: Expr)f : Arg5Func<'T0, 'T1, 'T2, 'T3, 'T4, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> f  
     
     type Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> Tensor<'T5> -> 'TR
-    let arg6<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) f : Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> =
+    let arg6<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> (vs0: Expr) (vs1: Expr) (vs2: Expr) (vs3: Expr) (vs4: Expr) (vs5: Expr) f : Arg6Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) (val5: Tensor<'T5>)  -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> f  
 
     type Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> = Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> Tensor<'T4> -> Tensor<'T5> -> Tensor<'T6> -> 'TR
-    let arg7<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> (vs0: ExprT) (vs1: ExprT) (vs2: ExprT) (vs3: ExprT) (vs4: ExprT) (vs5: ExprT) (vs6: ExprT) f : Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> =
+    let arg7<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> (vs0: Expr) (vs1: Expr) (vs2: Expr) (vs3: Expr) (vs4: Expr) (vs5: Expr) (vs6: Expr) f : Arg7Func<'T0, 'T1, 'T2, 'T3, 'T4, 'T5, 'T6, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) (val5: Tensor<'T5>) (val6: Tensor<'T6>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> VarEnv.add vs6 val6 |> f  
 
-    let addArg<'T, 'TR> (vs: ExprT) (f: VarEnvT -> 'TR) =
+    let addArg<'T, 'TR> (vs: Expr) (f: VarEnvT -> 'TR) =
         fun (ve: VarEnvT) (value: Tensor<'T>) ->
             f (ve |> VarEnv.add vs value)
 

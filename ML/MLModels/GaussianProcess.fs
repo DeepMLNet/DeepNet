@@ -18,7 +18,7 @@ module GaussianProcess =
     [<CustomEquality; NoComparison>]
     type HyperPars = {
         Kernel:             Kernel
-        MeanFunction:       ExprT -> ExprT
+        MeanFunction:       Expr -> Expr
         CutOutsideRange:    bool
     } with
         override x.Equals(yobj) =
@@ -49,8 +49,8 @@ module GaussianProcess =
 
     /// Gaussian Process parameters with squared exponential kernel.
     type ParsSE = {
-        Lengthscale:    ExprT
-        SignalVariance: ExprT
+        Lengthscale:    Expr
+        SignalVariance: Expr
         HyperPars:  HyperPars
         }
 
@@ -80,7 +80,7 @@ module GaussianProcess =
     
 
     /// Calculates covariance matrix between two vectors using linear kernel.
-    let linearCovariance (x:ExprT) (y:ExprT) =
+    let linearCovariance (x:Expr) (y:Expr) =
         let x_smpl, y_smpl  = Elem.Expr.idx2
         let xvec, yvec = Elem.Expr.arg2<single>
         let klin = xvec[x_smpl] * yvec[y_smpl]
@@ -90,7 +90,7 @@ module GaussianProcess =
 
 
     /// Calculates covariance matrix between two vectors using linear kernel.
-    let squaredExpCovariance (l:ExprT, sigf:ExprT) (x:ExprT) (y:ExprT) =
+    let squaredExpCovariance (l:Expr, sigf:Expr) (x:Expr) (y:Expr) =
         let x_smpl, y_smpl  = Elem.Expr.idx2
         let xvec, yvec,len,sigmaf = Elem.Expr.arg4<single>
         let kse = sigmaf[] * exp  (-( (xvec[x_smpl] - yvec[y_smpl]) *** 2.0f) / (2.0f * len[] *** 2.0f) )
@@ -99,7 +99,7 @@ module GaussianProcess =
 
         let kse = Expr.elements [sizeX;sizeY] kse [x; y;l;sigf]
         kse
-    let predict (pars:Pars) x (y:ExprT) sigmaNs xStar =
+    let predict (pars:Pars) x (y:Expr) sigmaNs xStar =
         let covMat z z' =
             match pars with
             | LinPars _ -> linearCovariance z z'

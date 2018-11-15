@@ -13,8 +13,8 @@ module RMSprop =
     } 
 
     type CfgExpr = {
-        Step:           ExprT
-        Offset:         ExprT
+        Step:           Expr
+        Offset:         Expr
     }
 
     type State<'T> = {
@@ -22,13 +22,13 @@ module RMSprop =
     } 
 
     type StateExpr = {
-        EstMomSq:       ExprT
+        EstMomSq:       Expr
     }
 
 open RMSprop
 
 type RMSprop<'T when 'T: equality and 'T: comparison> 
-        (loss:  ExprT, pars:  ExprT, dev:   IDevice) =
+        (loss:  Expr, pars:  Expr, dev:   IDevice) =
 
     do Util.checkProperType<'T> ()
     do if loss.NDims <> 0 then failwith "loss must be a scalar"
@@ -59,7 +59,7 @@ type RMSprop<'T when 'T: equality and 'T: comparison>
             EstMomSq     = HostTensor.zeros shp |> dev.ToDev
         }
 
-    member this.Minimize : ExprT =
+    member this.Minimize : Expr =
         let gradient = Deriv.compute loss |> Deriv.ofVar pars |> Expr.reshape (Expr.shapeOf pars) 
 
         let oneHalf         = Expr.scalarOfSameType loss 0.5

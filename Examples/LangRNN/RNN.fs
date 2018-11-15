@@ -56,15 +56,15 @@ module RecurrentLayer =
     /// Neural layer parameters.
     type Pars = {
         /// expression for input-to-recurrent weights 
-        InputWeights:      ExprT 
+        InputWeights:      Expr 
         /// expression for recurrent-to-recurrent weights
-        RecurrentWeights:  ExprT 
+        RecurrentWeights:  Expr 
         /// expression for recurrent-to-output weights
-        OutputWeights:     ExprT
+        OutputWeights:     Expr
         /// expression for the recurrent bias
-        RecurrentBias:     ExprT 
+        RecurrentBias:     Expr 
         /// expression for the output bias
-        OutputBias:        ExprT 
+        OutputBias:        Expr 
         /// hyper-parameters
         HyperPars:         HyperPars
     }
@@ -93,7 +93,7 @@ module RecurrentLayer =
     /// Predicts an output sequence by running the RNN over the input sequence.
     /// Argument shapes: initial[smpl, recUnit],  input[smpl, step, inUnit].
     /// Output shapes:     final[smpl, recUnit], output[smpl, step, outUnit].
-    let pred (pars: Pars) (initial: ExprT) (input: ExprT) =
+    let pred (pars: Pars) (initial: Expr) (input: Expr) =
         // inputWeights     [recUnit, inUnit]
         // recurrentWeights [recUnit, recUnit]
         // outputWeights    [outUnit, recUnit]
@@ -149,8 +149,8 @@ module RecurrentLayer =
             Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
                              Expr.extractVar prevState, 
                                     Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-            Expr.Channels = Map [chState,  {LoopValueT.Expr=state;  LoopValueT.SliceDim=1}
-                                 chOutput, {LoopValueT.Expr=output; LoopValueT.SliceDim=1}]    
+            Expr.Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
+                                 chOutput, {LoopValue.Expr=output; LoopValue.SliceDim=1}]    
         }
 
         let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1L; nRecurrent]

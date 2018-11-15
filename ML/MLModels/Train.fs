@@ -236,10 +236,10 @@ module Train =
     /// Constructs an ITrainable<_> from expressions.
     let internal newTrainable
             (modelInstance: ModelInstance<'T>) 
-            (losses: ExprT list) 
-            (nextStateExpr: ExprT option)
+            (losses: Expr list) 
+            (nextStateExpr: Expr option)
             (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnvT)
-            (optNew: ExprT -> ExprT -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
+            (optNew: Expr -> Expr -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    
         let usingState = Option.isSome nextStateExpr
