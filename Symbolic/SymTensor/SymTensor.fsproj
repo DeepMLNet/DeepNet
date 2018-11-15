@@ -33,11 +33,13 @@
     <Compile Include="SymShape.fs" />
     <Compile Include="SymSizeEnv.fs" />
     <Compile Include="Vars.fs" />
-    <Compile Include="ElemExpr.fs" />
+    <Compile Include="Elem\Expr.fs" />
+    <Compile Include="Elem\Unified.fs" />
+    <Compile Include="Elem\Interpreter.fs" />
+    <Compile Include="Elem\Deriv.fs" />
     <Compile Include="Interpolator.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="ExprInfo.fs" />
-    <Compile Include="ElemExprDeriv.fs" />
     <Compile Include="Deriv.fs" />
     <Compile Include="Hold.fs" />
     <Compile Include="Optimizer.fs" />

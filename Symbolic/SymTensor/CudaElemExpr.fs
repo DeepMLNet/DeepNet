@@ -6,8 +6,8 @@ open DeepNet.Utils
 
 open SymTensor
 open SymTensor.Compiler
-open Elem
-open Elem.Unified
+open SymTensor.Elem
+open SymTensor.Elem.Unified
 
 
 module CudaElemExpr =

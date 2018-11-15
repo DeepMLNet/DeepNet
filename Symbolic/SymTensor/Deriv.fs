@@ -272,7 +272,7 @@ module Deriv =
             | BuildTensor _ ->
                 failwith "BuildTensor is used for optimization only and cannot be derived"
             | Elements (resShape, elemExpr) ->
-                let desElemExprs = ElemExprDeriv.buildDerivElemExpr elemExpr resShape es.Length
+                let desElemExprs = Elem.Deriv.buildDerivElemExpr elemExpr resShape es.Length
                 List.zip es desElemExprs
                 |> List.map (fun (e, deElemExpr) -> 
                     let deShp = funElems :: (shapeOf e)
