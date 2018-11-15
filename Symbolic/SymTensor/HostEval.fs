@@ -121,17 +121,17 @@ module HostEval =
                         | DoBroadcast ss -> Tensor.broadcastTo (shapeEval ss) av
                         | PermuteAxes perm -> Tensor.permuteAxes perm av
                         | ReverseAxis ax -> Tensor.reverseAxis ax av
-                        | Gather indices ->
+                        | UnaryOp.Gather indices ->
                             let vIndices = 
                                 indices 
                                 |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
                             Tensor.gather vIndices av
-                        | Scatter (indices, trgtShp) ->
+                        | UnaryOp.Scatter (indices, trgtShp) ->
                             let vIndices = 
                                 indices 
                                 |> List.map (Option.map (fun idx -> EvalT.Eval<int64> (evalEnv, idx)))
                             Tensor.scatter vIndices (shapeEval trgtShp) av                        
-                        | Subtensor sr -> av.[rngEval sr]
+                        | UnaryOp.Subtensor sr -> av.[rngEval sr]
                         | StoreToVar vs -> 
                             // TODO: stage variable write to avoid overwrite of used variables
                             let tv : Tensor<'T> = VarEnv.getVarSpec vs evalEnv.VarEnv
@@ -180,10 +180,10 @@ module HostEval =
                         | TensorProduct -> Tensor.tensorProduct av bv
                         | And -> (toBool av) &&&& (toBool bv) |> toT
                         | Or -> (toBool av) |||| (toBool bv) |> toT
-                        | IfThenElse cond ->
+                        | BinaryOp.IfThenElse cond ->
                             let condVal = EvalT.Eval<bool> (evalEnv, cond) 
                             Tensor.ifThenElse condVal av bv
-                        | SetSubtensor sr -> 
+                        | BinaryOp.SetSubtensor sr -> 
                             let v = Tensor.copy av
                             v.[rngEval sr] <- bv
                             v                        
@@ -201,13 +201,13 @@ module HostEval =
                                 Rng.Rng (Some (sizeEval first), Some (sizeEval last)))
                             trgt.[aryRng] <- subEval e |> toR
                         trgt |> box
-                    | Elements (resShape, elemExpr) -> 
+                    | NaryOp.Elements (resShape, elemExpr) -> 
                         let esv = es |> List.map subEval 
                         let nResShape = shapeEval resShape
                         Elem.Interpreter.eval elemExpr esv nResShape |> box
                     | Interpolate ip ->  
                         es |> List.map subEval |> Interpolator.interpolate ip |> box
-                    | Channel (Loop spec, channel) -> 
+                    | NaryOp.Channel (MultiChannelOp.Loop spec, channel) -> 
                         let esv = es |> List.map subEvalTypeNeutral
                         if Trace.isActive () then Trace.enteringLoop (expr |> UExpr.toUExpr |> Trace.extractLoop)
                         let channelValues = EvalT.LoopEval (evalEnv, spec, esv)
@@ -293,7 +293,7 @@ module HostEvalTypes =
 
         // build diagnostics information
         let joinedExpr = 
-            UExpr (UNaryOp Expr.Discard, uexprs, {ChannelType=Map.empty; ChannelShape=Map.empty; Expr=None})
+            UExpr (UNaryOp NaryOp.Discard, uexprs, {ChannelType=Map.empty; ChannelShape=Map.empty; Expr=None})
         let diag : CompileDiagnosticsT = {
             UExpr          = joinedExpr
             ExecUnits      = []

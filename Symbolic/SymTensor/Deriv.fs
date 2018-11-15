@@ -2,13 +2,11 @@
 
 open System.Diagnostics
 
-open Tensor.Utils
 open DeepNet.Utils
 
 
 [<AutoOpen>]
 module DerivTypes =
-    open Expr
 
     /// Jacobians for each variable
     type DerivT = {
@@ -34,7 +32,6 @@ module DerivTypes =
 
 /// derivative calculation
 module Deriv =
-    open Expr
 
     /// merges two derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
@@ -66,15 +63,15 @@ module Deriv =
             printfn "expr=\n%A" expr
             printfn "eg=\n%A" eg
             failwithf "Jacobian with %A wrt elements was specified for expression with %A elements"
-                (shapeOf eg).[1] (ShapeSpec.nElem (shapeOf expr))
+                (Expr.shapeOf eg).[1] (ShapeSpec.nElem (Expr.shapeOf expr))
 
         /// expands the second dimension of the the Jacobian into the shape of this expression
-        let egExp = eg |> reshape (funElems :: (shapeOf expr))
+        let egExp = eg |> Expr.reshape (funElems :: (Expr.shapeOf expr))
 
         /// flattens all but the first dimension into one dimension
         let collapse g =
-            let wrtElems = (shapeOf g).[1..] |> ShapeSpec.nElem
-            g |> reshape [funElems; wrtElems]
+            let wrtElems = (Expr.shapeOf g).[1..] |> ShapeSpec.nElem
+            g |> Expr.reshape [funElems; wrtElems]
 
         // non differentiable op failures
         let failLogic op = failwithf "cannot calculate derivative of logic or comparison operation %A" op
@@ -97,21 +94,21 @@ module Deriv =
         | Unary(op, a) ->
             match op with
             | Negate -> -eg 
-            | Abs -> egExp * padLeft (signt a) |> collapse 
+            | Abs -> egExp * Expr.padLeft (Expr.signt a) |> collapse 
             | SignT -> zeroJacobian a
-            | Log -> egExp * padLeft (a ** (-one)) |> collapse 
-            | Log10 -> egExp * padLeft (a ** (-one) / log (scalar 10)) |> collapse
-            | Exp -> egExp * padLeft (exp a) |> collapse 
-            | Sin -> egExp * padLeft (cos a) |> collapse 
-            | Cos -> egExp * padLeft (-sin a) |> collapse 
-            | Tan -> egExp * padLeft (one + (tan a)**two) |> collapse 
-            | Asin -> egExp * padLeft (one / sqrtt (one - a**two)) |> collapse 
-            | Acos -> egExp * padLeft (-one / sqrtt (one - a**two)) |> collapse 
-            | Atan -> egExp * padLeft (one / (one + a**two)) |> collapse 
-            | Sinh -> egExp * padLeft (cosh a) |> collapse 
-            | Cosh -> egExp * padLeft (sinh a) |> collapse 
-            | Tanh -> egExp * padLeft (one - (tanh a)**two) |> collapse 
-            | Sqrt -> egExp * padLeft (one / (two * sqrtt a)) |> collapse 
+            | Log -> egExp * Expr.padLeft (a ** (-one)) |> collapse 
+            | Log10 -> egExp * Expr.padLeft (a ** (-one) / log (scalar 10)) |> collapse
+            | Exp -> egExp * Expr.padLeft (exp a) |> collapse 
+            | Sin -> egExp * Expr.padLeft (cos a) |> collapse 
+            | Cos -> egExp * Expr.padLeft (-sin a) |> collapse 
+            | Tan -> egExp * Expr.padLeft (one + (tan a)**two) |> collapse 
+            | Asin -> egExp * Expr.padLeft (one / Expr.sqrtt (one - a**two)) |> collapse 
+            | Acos -> egExp * Expr.padLeft (-one / Expr.sqrtt (one - a**two)) |> collapse 
+            | Atan -> egExp * Expr.padLeft (one / (one + a**two)) |> collapse 
+            | Sinh -> egExp * Expr.padLeft (cosh a) |> collapse 
+            | Cosh -> egExp * Expr.padLeft (sinh a) |> collapse 
+            | Tanh -> egExp * Expr.padLeft (one - (tanh a)**two) |> collapse 
+            | Sqrt -> egExp * Expr.padLeft (one / (two * Expr.sqrtt a)) |> collapse 
             | Ceil -> zeroJacobian a
             | Floor -> zeroJacobian a
             | Round -> zeroJacobian a
@@ -119,61 +116,61 @@ module Deriv =
             
             | Not -> zeroJacobian a
 
-            | Diag (ax1, ax2) -> egExp |> diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
-            | DiagMat (ax1, ax2) -> egExp |> diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
-            | Invert -> -(padLeft expr.T) .* egExp .* (padLeft expr.T) |> collapse 
+            | Diag (ax1, ax2) -> egExp |> Expr.diagMatAxis (ax1 + 1) (ax2 + 1) |> collapse 
+            | DiagMat (ax1, ax2) -> egExp |> Expr.diagAxis (ax1 + 1) (ax2 + 1) |> collapse 
+            | Invert -> -(Expr.padLeft expr.T) .* egExp .* (Expr.padLeft expr.T) |> collapse 
             | PermuteAxes perm -> 
                 let backPerm = Permutation.invert perm
                 let egePerm = 
                     0 :: List.map (fun p -> p + 1) backPerm
-                egExp |> permuteAxes egePerm |> collapse 
+                egExp |> Expr.permuteAxes egePerm |> collapse 
             | Subtensor srs ->
-                let agExpanded = zeros (funElems :: (shapeOf a))
-                setSubtensor agExpanded.[SimpleRangeSpec.All :: srs] egExp
+                let agExpanded = zeros (funElems :: (Expr.shapeOf a))
+                Expr.setSubtensor agExpanded.[SimpleRangeSpec.All :: srs] egExp
                 |> collapse 
             | Reshape ss -> eg 
             | DoBroadcast ss -> 
                 let mutable egUnbroadcasted = egExp
-                for ax, (eSize, aSize) in List.indexed (List.zip ss (shapeOf a)) do
+                for ax, (eSize, aSize) in List.indexed (List.zip ss (Expr.shapeOf a)) do
                     match eSize, aSize with
                     | SizeSpec.Broadcast, SizeSpec.Broadcast -> ()
                     | _, SizeSpec.Broadcast ->
-                        egUnbroadcasted <- egUnbroadcasted |> sumKeepingAxis (ax + 1)
+                        egUnbroadcasted <- egUnbroadcasted |> Expr.sumKeepingAxis (ax + 1)
                     | _ -> ()
                 egUnbroadcasted |> collapse 
             | ReverseAxis ax ->
-                egExp |> reverseAxis (ax + 1) |> collapse
+                egExp |> Expr.reverseAxis (ax + 1) |> collapse
             | Gather indices ->
-                let dIndices = indices |> List.map (Option.map padLeft)
-                egExp |> scatter (None::dIndices) (funElems::shapeOf a) |> collapse
+                let dIndices = indices |> List.map (Option.map Expr.padLeft)
+                egExp |> Expr.scatter (None::dIndices) (funElems::Expr.shapeOf a) |> collapse
             | Scatter (indices, shp) ->
                 let dIndices = indices |> List.map (Option.map (fun idx -> 
-                    idx |> broadcastToShape (funElems::idx.Shape)))                   
-                egExp |> gather (None::dIndices) |> collapse
+                    idx |> Expr.broadcastToShape (funElems::idx.Shape)))                   
+                egExp |> Expr.gather (None::dIndices) |> collapse
             | Held (derivsShp, heldOp) -> 
-                Unary(Held (shapeOf a :: derivsShp, heldOp), eg)       
+                Unary(Held (Expr.shapeOf a :: derivsShp, heldOp), eg)       
                      
-            | Sum -> eg |> enableBroadcast 1 |> broadcast (funElems :: ShapeSpec.flatten (shapeOf a)) 
+            | Sum -> eg |> Expr.enableBroadcast 1 |> Expr.broadcast (funElems :: ShapeSpec.flatten (Expr.shapeOf a)) 
                         |> collapse 
             | SumAxis ax -> 
-                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                bcEgExp |> broadcast (shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
+                let bcEgExp = egExp |> Expr.reshape (Expr.shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                bcEgExp |> Expr.broadcast (Expr.shapeOf bcEgExp |> ShapeSpec.set (ax + 1) a.Shape.[ax]) |> collapse 
             | Product -> 
                 // This division method incorrectly returns NaN for zero elements.
                 // But currently I do not see any efficient alternative.
-                let aBc = a |> reshape (SizeSpec.broadcastable :: ShapeSpec.flatten (shapeOf a))
-                let pBc = expr |> reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
-                (eg |> enableBroadcast 1) * (pBc / aBc)
+                let aBc = a |> Expr.reshape (SizeSpec.broadcastable :: ShapeSpec.flatten (Expr.shapeOf a))
+                let pBc = expr |> Expr.reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
+                (eg |> Expr.enableBroadcast 1) * (pBc / aBc)
             | ProductAxis ax ->
-                let bcEgExp = egExp |> reshape (shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                let aBc = padLeft a
-                let pBc = a |> productKeepingAxis ax |> padLeft
+                let bcEgExp = egExp |> Expr.reshape (Expr.shapeOf egExp |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                let aBc = Expr.padLeft a
+                let pBc = a |> Expr.productKeepingAxis ax |> Expr.padLeft
                 bcEgExp * (pBc / aBc) |> collapse
             | MaxAxis ax 
             | MinAxis ax ->
-                let bcExpr = expr |> reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
-                let bcEgExp = egExp |> reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
-                Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (zerosLike bcEgExp) |> collapse
+                let bcExpr = expr |> Expr.reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis ax)
+                let bcEgExp = egExp |> Expr.reshape (egExp.Shape |> ShapeSpec.insertBroadcastAxis (ax + 1))
+                Expr.ifThenElse (Expr.padLeft (a ==== bcExpr)) bcEgExp (Expr.zerosLike bcEgExp) |> collapse
             | ArgMaxAxis ax
             | ArgMinAxis ax -> zeroJacobian a
 
@@ -191,16 +188,16 @@ module Deriv =
             | Dump _ -> eg 
             | Annotated _ -> eg 
             | CheckFinite name ->
-                eg |> checkFinite (sprintf "(partial) Jacobian wrt %s" name) 
+                eg |> Expr.checkFinite (sprintf "(partial) Jacobian wrt %s" name) 
 
             |> fun da -> [a, da]
 
         | Binary(op, a, b) ->
 
             let ifThenElseJac cond a b =
-                let egZeros = zerosLike egExp
-                let da = ifThenElse (padLeft cond) egExp egZeros |> collapse
-                let db = ifThenElse (padLeft cond) egZeros egExp |> collapse
+                let egZeros = Expr.zerosLike egExp
+                let da = Expr.ifThenElse (Expr.padLeft cond) egExp egZeros |> collapse
+                let db = Expr.ifThenElse (Expr.padLeft cond) egZeros egExp |> collapse
                 [a, da; b, db]
 
             let inline (.+) da db = [a, da; b, db]
@@ -208,15 +205,15 @@ module Deriv =
             match op with            
             | Add -> eg .+ eg
             | Substract -> eg .+ (-eg)
-            | Multiply -> ((egExp * (padLeft b)) |> collapse) .+
-                          ((egExp * (padLeft a)) |> collapse)
-            | Divide -> ((egExp * padLeft (b**(-one))) |> collapse) .+
-                        ((egExp * padLeft (-a * b**(-two))) |> collapse)
+            | Multiply -> ((egExp * (Expr.padLeft b)) |> collapse) .+
+                          ((egExp * (Expr.padLeft a)) |> collapse)
+            | Divide -> ((egExp * Expr.padLeft (b**(-one))) |> collapse) .+
+                        ((egExp * Expr.padLeft (-a * b**(-two))) |> collapse)
             | Modulo -> 
                 failwith "Modulo gradient is broken"
-                eg .+ (egExp * padLeft (-truncate (a / b)) |> collapse) 
-            | Power -> (egExp * padLeft (b * a**(b - one)) |> collapse) .+ 
-                       (egExp * padLeft (a**b * log a) |> collapse)
+                eg .+ (egExp * Expr.padLeft (-truncate (a / b)) |> collapse) 
+            | Power -> (egExp * Expr.padLeft (b * a**(b - one)) |> collapse) .+ 
+                       (egExp * Expr.padLeft (a**b * log a) |> collapse)
             
             | MaxElemwise -> ifThenElseJac (a >>>> b) a b
             | MinElemwise -> ifThenElseJac (a <<<< b) a b
@@ -238,33 +235,33 @@ module Deriv =
             | Dot -> 
                 /// Jacobian of y = m .* x wrt x
                 let mxWrtX (m: Expr) x y dy =
-                    let xShp, yShp, dyShp = shapeOf x, shapeOf y, shapeOf dy
+                    let xShp, yShp, dyShp = Expr.shapeOf x, Expr.shapeOf y, Expr.shapeOf dy
                     let nd = ShapeSpec.nDim xShp
                     let batchShp = xShp.[0..nd-3]
                     let batchElems = ShapeSpec.nElem batchShp
                     let xSmplShp, ySmplShp = xShp.[nd-2..], yShp.[nd-2..]
                     let funElems = dyShp.[0]
-                    let dyMat = dy |> swapDim 0 1 |> reshape (batchShp @ [ySmplShp.[0]; ySmplShp.[1] * funElems])
+                    let dyMat = dy |> Expr.swapDim 0 1 |> Expr.reshape (batchShp @ [ySmplShp.[0]; ySmplShp.[1] * funElems])
                     let dxMat = m.T .* dyMat
-                    let dx = dxMat |> reshape [batchElems * xSmplShp.[0] * xSmplShp.[1]; funElems] |> swapDim 1 0
+                    let dx = dxMat |> Expr.reshape [batchElems * xSmplShp.[0] * xSmplShp.[1]; funElems] |> Expr.swapDim 1 0
                     dx
 
                 // Jacobian wrt b
                 let db = mxWrtX a b expr eg
 
                 // calculate Jacobian wrt a by transposing expression and resulting Jacobian
-                let aShp = shapeOf a
+                let aShp = Expr.shapeOf a
                 let nd = ShapeSpec.nDim aShp
                 let batchShp = aShp.[0..nd-3]
                 let egT = egExp.T |> collapse
                 let daT = mxWrtX (b.T) (a.T) (expr.T) egT
-                let da = daT |> reshape ([funElems] @ batchShp @ [aShp.[nd-1]; aShp.[nd-2]]) |> transpose |> collapse
+                let da = daT |> Expr.reshape ([funElems] @ batchShp @ [aShp.[nd-1]; aShp.[nd-2]]) |> Expr.transpose |> collapse
 
                 da .+ db
             | TensorProduct -> failwith "not implemented"
             | SetSubtensor sr ->
                 let bgExpanded = egExp.[SimpleRangeSpec.All::sr]
-                let agExpanded = setSubtensor egExp.[SimpleRangeSpec.All::sr] (zerosLike bgExpanded)
+                let agExpanded = Expr.setSubtensor egExp.[SimpleRangeSpec.All::sr] (Expr.zerosLike bgExpanded)
                 (agExpanded |> collapse) .+ (bgExpanded |> collapse)
 
         | Nary(op, es) ->
@@ -275,7 +272,7 @@ module Deriv =
                 let desElemExprs = Elem.Deriv.buildDerivElemExpr elemExpr resShape es.Length
                 List.zip es desElemExprs
                 |> List.map (fun (e, deElemExpr) -> 
-                    let deShp = funElems :: (shapeOf e)
+                    let deShp = funElems :: (Expr.shapeOf e)
                     let deArgs = es @ [egExp]
                     e, Expr.elements deShp deElemExpr deArgs |> collapse)
             | Interpolate ip -> 
@@ -284,7 +281,7 @@ module Deriv =
                     List.indexed es
                     |> List.map (fun (d, e) ->
                         let ipd = ip |> Interpolator.getDerivative d 
-                        e, egExp * padLeft (Expr.interpolate ipd es) |> collapse)
+                        e, egExp * Expr.padLeft (Expr.interpolate ipd es) |> collapse)
                 | InterpolationMode.ToLeft -> 
                     es |> List.map (fun e -> e, zeroJacobian e)
 
@@ -703,7 +700,7 @@ module Deriv =
     and compute (rootExpr: Expr) : DerivT =
         if Debug.TraceCompile then printfn "Computing derivatives..."
         let sw = Stopwatch.StartNew()
-        let rootJac = shapeOf rootExpr |> ShapeSpec.nElem |> identityOfSameType rootExpr
+        let rootJac = Expr.shapeOf rootExpr |> ShapeSpec.nElem |> Expr.identityOfSameType rootExpr
         let deriv = computeWithRootJacobian rootJac rootExpr
         if Debug.Timing then printfn "Computing derivatives took %A" sw.Elapsed
         deriv
@@ -720,6 +717,6 @@ module Deriv =
 
     /// extracts the Jacobian of the given variable
     and ofVar var deriv =
-        ofVarSpec (extractVar var) deriv                  
+        ofVarSpec (Expr.extractVar var) deriv                  
 
 

@@ -462,7 +462,7 @@ module CudaRecipe =
                         Expr         = None
                     }
                     {
-                        TransferUExpr = UExpr (UUnaryOp (Expr.StoreToVar resVar), [uexpr], metadata)
+                        TransferUExpr = UExpr (UUnaryOp (UnaryOp.StoreToVar resVar), [uexpr], metadata)
                         Var           = Some resVar
                         Stride        = compileEnv.ChannelStrides |> Map.tryFind channel
                         Allocator     = resAllocator
@@ -496,7 +496,7 @@ module CudaRecipe =
         let mergedUexpr =
             match resInfos |> Map.toList with
             // no expressions
-            | [] -> UExpr (UNaryOp Expr.Discard, [], 
+            | [] -> UExpr (UNaryOp NaryOp.Discard, [], 
                            {ChannelType  = Map [dfltChId, TypeName.ofType<int>]
                             ChannelShape = Map [dfltChId, [0L]]
                             Expr         = None})
@@ -505,7 +505,7 @@ module CudaRecipe =
             // multiple expressions
             | _::_ ->
                 let allUExprs = resInfos |> Map.toList |> List.map (fun (ch, ri) -> ri.TransferUExpr)
-                UExpr (UNaryOp Expr.Discard, allUExprs,
+                UExpr (UNaryOp NaryOp.Discard, allUExprs,
                        {ChannelType  = Map [dfltChId, TypeName.ofType<int>]
                         ChannelShape = Map [dfltChId, [0L]]
                         Expr         = None})                       

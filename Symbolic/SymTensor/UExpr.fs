@@ -7,8 +7,6 @@ open System.Collections.Generic
 open Tensor
 open DeepNet.Utils
 
-open Expr
-
 
 [<AutoOpen>]
 module UExprTypes = 
@@ -33,7 +31,7 @@ module UExprTypes =
         /// the numeric shape of the result channels
         ChannelShape:  Map<Channel, NShapeSpec>
         /// the generating expression, if created from one
-        Expr:          Expr.Expr option
+        Expr:          Expr option
     }
 
     type ULoopValueT = {
@@ -64,10 +62,10 @@ module UExprTypes =
 
     /// unified op of any arity and type    
     and UOpT =
-        | ULeafOp of Expr.LeafOp
-        | UUnaryOp of Expr.UnaryOp
-        | UBinaryOp of Expr.BinaryOp
-        | UNaryOp of Expr.NaryOp
+        | ULeafOp of LeafOp
+        | UUnaryOp of UnaryOp
+        | UBinaryOp of BinaryOp
+        | UNaryOp of NaryOp
         | UExtraOp of UExtraOpT
 
     /// unified expression (combines all arities and types and ops cannot have expressions as parameters)    
@@ -189,7 +187,7 @@ module UExpr =
     /// extracts all variables from the unified expression
     let rec extractVars (UExpr (op, args, metadata)) = 
         match op with
-        | ULeafOp (Expr.Var vs) -> Set.singleton vs
+        | ULeafOp (Var vs) -> Set.singleton vs
         | _ -> args |> List.map extractVars |> Set.unionMany
 
     let internal indicesToIdxArgs indices =
@@ -217,23 +215,23 @@ module UExpr =
             let uExpr =
                 match expr with
                 // ops that need special handling
-                | Expr.Unary (Expr.Subtensor sr, a)  ->
+                | Expr.Unary (UnaryOp.Subtensor sr, a)  ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr    
                     usr |> UExprRngsSpec.checkCompatibility a.Shape
                     extra (Subtensor usr) (a :: dynExprs)
-                | Expr.Unary (Expr.NullifyJacobian, a) -> toUExprRec a
-                | Expr.Unary (Expr.AssumeJacobian _, a) -> toUExprRec a
-                | Expr.Binary (Expr.SetSubtensor sr, a, b) ->
+                | Expr.Unary (NullifyJacobian, a) -> toUExprRec a
+                | Expr.Unary (AssumeJacobian _, a) -> toUExprRec a
+                | Expr.Binary (BinaryOp.SetSubtensor sr, a, b) ->
                     let usr, dynExprs = UExprRngsSpec.ofExprRngsSpec sr   
                     usr |> UExprRngsSpec.checkCompatibility a.Shape
                     extra (SetSubtensor usr) (a :: b :: dynExprs)
-                | Expr.Binary (Expr.IfThenElse cond, ifTrue, ifFalse) ->
+                | Expr.Binary (BinaryOp.IfThenElse cond, ifTrue, ifFalse) ->
                     extra IfThenElse [ifTrue; ifFalse; cond]
-                | Expr.Nary (Expr.Elements (resShape, elemExpr), se) ->
+                | Expr.Nary (NaryOp.Elements (resShape, elemExpr), se) ->
                     let nDims = ShapeSpec.nDim resShape
                     let nArgs = List.length se
                     extra (Elements (resShape, Elem.Unified.toUFunc elemExpr nDims nArgs)) se
-                | Expr.Nary (Expr.Channel (Expr.Loop loopSpec, channel), se) ->
+                | Expr.Nary (NaryOp.Channel (MultiChannelOp.Loop loopSpec, channel), se) ->
                     // build separate loop op
                     let uLoopSpec = loopSpecToULoopSpec caches loopSpec
                     let uLoopMetadata = {
@@ -251,21 +249,21 @@ module UExpr =
 
                     // and separate op to extract referenced channel
                     UExpr (UExtraOp (Channel channel), [uLoop], metadata)
-                | Expr.Unary (Expr.Gather indices, a) ->                
+                | Expr.Unary (UnaryOp.Gather indices, a) ->                
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
                     extra (Gather idxArgNos) (a::idxArgs)
-                | Expr.Unary (Expr.Scatter (indices, _), a) ->
+                | Expr.Unary (UnaryOp.Scatter (indices, _), a) ->
                     let idxArgNos, idxArgs = indicesToIdxArgs indices
                     extra (Scatter idxArgNos) (a::idxArgs)
-                | Expr.Unary (Expr.Held (_, heldOp) as holdOp, a) ->
+                | Expr.Unary (UnaryOp.Held (_, heldOp) as holdOp, a) ->
                     failwithf "the held op %A must be expanded before conversion to UExpr \
                                (shape of argument is %A and Hold is %A)" heldOp a.Shape holdOp
-                | Expr.Nary (Expr.ExtensionOp eop, se) -> 
+                | Expr.Nary (ExtensionOp eop, se) -> 
                     match eop with
                     | :? ICompilableOp as eop ->
                         let makeOneUop uop = extra (ExtensionExtraOp uop) se
                         eop.ToUExpr expr makeOneUop
-                    | _ -> UExpr (UNaryOp (Expr.ExtensionOp eop), se |> List.map toUExprRec, metadata) 
+                    | _ -> UExpr (UNaryOp (ExtensionOp eop), se |> List.map toUExprRec, metadata) 
                     
                 // all other ops are just copied over
                 | Expr.Leaf op -> UExpr (ULeafOp op, [], metadata)

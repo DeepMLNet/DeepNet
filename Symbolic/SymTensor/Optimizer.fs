@@ -2,8 +2,6 @@
 
 open DeepNet.Utils
 
-open Expr
-
 
 module Optimizer =
    
@@ -381,11 +379,11 @@ module Optimizer =
                     optRec a
 
                 // remove unnecessary reshapes
-                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
+                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (Expr.shapeOf a) ->
                     optRec a            
 
                 // remove unnecessary broadcasts
-                | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (shapeOf a) ->
+                | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (Expr.shapeOf a) ->
                     optRec a
 
                 // combine subsequent axes permutations
@@ -418,9 +416,9 @@ module Optimizer =
                     Unary (PermuteAxes perm, Unary (DoBroadcast bcPerm, a)) |> optRec
 
                 // pull permute, broadcast and reshape through unary elementwise ops
-                | Unary (UnaryElemwiseOp as op, Unary (PermuteAxes _ as lop, a)) 
-                | Unary (UnaryElemwiseOp as op, Unary (Reshape _ as lop, a)) 
-                | Unary (UnaryElemwiseOp as op, Unary (DoBroadcast _ as lop, a)) ->
+                | Unary (Expr.UnaryElemwiseOp as op, Unary (PermuteAxes _ as lop, a)) 
+                | Unary (Expr.UnaryElemwiseOp as op, Unary (Reshape _ as lop, a)) 
+                | Unary (Expr.UnaryElemwiseOp as op, Unary (DoBroadcast _ as lop, a)) ->
                     Unary (lop, Unary (op, a)) |> optRec
 
                 // pull broadcast over batched dimensions through Diag
@@ -433,7 +431,7 @@ module Optimizer =
                                               | _, Broadcasted _ -> SizeSpec.broadcastable
                                               | _, NotBroadcasted s -> s)
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
-                    Unary (DoBroadcast (shapeOf expr), Unary (op, baOpt)) |> optRec
+                    Unary (DoBroadcast (Expr.shapeOf expr), Unary (op, baOpt)) |> optRec
 
                 // pull broadcast over batched dimensions through DiagMat 
                 | Unary ((DiagMat (ax1, _) as op), (Unary (DoBroadcast _, a) as ba))
@@ -445,16 +443,16 @@ module Optimizer =
                                               | _, Broadcasted _ -> SizeSpec.broadcastable
                                               | _, NotBroadcasted s -> s)
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
-                    Unary (DoBroadcast (shapeOf expr), Unary (op, baOpt)) |> optRec
+                    Unary (DoBroadcast (Expr.shapeOf expr), Unary (op, baOpt)) |> optRec
 
                 // pull matching permute, broadcast and reshape through binary elementwise ops
-                | Binary (BinaryElemwiseOp as op, Unary (PermuteAxes _ as lopa, a),
+                | Binary (Expr.BinaryElemwiseOp as op, Unary (PermuteAxes _ as lopa, a),
                                                   Unary (PermuteAxes _ as lopb, b))
-                | Binary (BinaryElemwiseOp as op, Unary (Reshape _ as lopa, a),
+                | Binary (Expr.BinaryElemwiseOp as op, Unary (Reshape _ as lopa, a),
                                                   Unary (Reshape _ as lopb, b))
-                | Binary (BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
+                | Binary (Expr.BinaryElemwiseOp as op, Unary (DoBroadcast _ as lopa, a),
                                                   Unary (DoBroadcast _ as lopb, b))
-                            when lopa = lopb && shapeOf a = shapeOf b ->
+                            when lopa = lopb && Expr.shapeOf a = Expr.shapeOf b ->
                     Unary (lopa, Binary (op, a, b)) |> optRec
 
                 // pull matching broadcasts over batched dimensions through dot op
@@ -472,7 +470,7 @@ module Optimizer =
                         |> List.unzip
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
                     let bbOpt = Unary (DoBroadcast bOptBc, b) |> optRec
-                    Unary (DoBroadcast (shapeOf expr), Binary (Dot, baOpt, bbOpt)) |> optRec
+                    Unary (DoBroadcast (Expr.shapeOf expr), Binary (Dot, baOpt, bbOpt)) |> optRec
 
                 // optimize gather and scatter index arguments
                 | Unary (Gather indices, a) ->
@@ -485,8 +483,8 @@ module Optimizer =
                     Binary (IfThenElse (optRec cond), optRec a, optRec b)
 
                 // tranform SetSubtensor(Zero, X) into BuildTensor(X)
-                | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), ZeroExpr, part) ->
-                    let shp = shapeOf expr
+                | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), Expr.ZeroExpr, part) ->
+                    let shp = Expr.shapeOf expr
                     Expr.buildTensor shp [SimpleRangesSpec.toBaseRangesSpec shp rngs] [optRec part]
 
                 // combine Add(BuildTensor, BuildTensor) into BuildTensor if ranges are not overlapping

@@ -11,7 +11,6 @@ open DeepNet.Utils
 
 open SymTensor
 open SymTensor.Compiler
-open Expr
 open UExprTypes
 
 
@@ -351,17 +350,17 @@ module CudaExecUnit =
             | _ -> dfltSrcWithNoViewReq ()            
 
         // extra
-        | UUnaryOp (Expr.Held _) -> needExtra op
+        | UUnaryOp (Held _) -> needExtra op
 
-        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UNaryOp (NaryOp.Channel _) -> needExtra op
         | UExtraOp (Channel ch) -> [Map [ch, trgtDfltChReq()]]
 
         | UExtraOp (Loop _) -> dfltSrcWithNoViewReq ()
 
-        | UUnaryOp (Expr.Subtensor _) -> needExtra op
+        | UUnaryOp (UnaryOp.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq ()
 
-        | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
+        | UBinaryOp (BinaryOp.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) -> 
             // "a" can be evaluated into requested manikin if it is not broadcasted, 
             // but "b" (the replacement value) must be placed
@@ -370,20 +369,20 @@ module CudaExecUnit =
             | Some req when not (TensorManikin.isBroadcasted req) -> inplaceFirstSrcReq ()
             | _ -> dfltSrcWithNoViewReq ()            
 
-        | UNaryOp (Expr.Elements _) -> needExtra op
+        | UNaryOp (NaryOp.Elements _) -> needExtra op
         | UExtraOp (Elements _) -> dfltSrcWithNoViewReq ()           
 
-        | UBinaryOp (Expr.IfThenElse _) -> needExtra op
+        | UBinaryOp (BinaryOp.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse -> inplaceFirstSrcReq ()
 
-        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UUnaryOp (UnaryOp.Gather _) -> needExtra op
         | UExtraOp (Gather idxArgs) -> dfltSrcWithNoViewReq ()
 
-        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UUnaryOp (UnaryOp.Scatter _) -> needExtra op
         | UExtraOp (Scatter idxArgs) -> dfltSrcWithNoViewReq ()
             
-        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
-        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+        | UUnaryOp (UnaryOp.NullifyJacobian) -> needExtra op
+        | UUnaryOp (UnaryOp.AssumeJacobian _) -> needExtra op
 
         // extension ops
         | UNaryOp (ExtensionOp eop) -> (toCudaUOp eop).SrcReqs cudaEnv args helpers
@@ -635,9 +634,9 @@ module CudaExecUnit =
             | _ -> newDfltChTrgt ()            
         
         // extra
-        | UUnaryOp (Expr.Held _) -> needExtra op
+        | UUnaryOp (Held _) -> needExtra op
 
-        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UNaryOp (NaryOp.Channel _) -> needExtra op
         | UExtraOp (Channel channel) ->
             if srcs.Length <> 1 then 
                 failwith "channel op requires exactly one source"     
@@ -655,7 +654,7 @@ module CudaExecUnit =
                 let strideOrder = [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
                 TensorManikin.newOrdered memAllocator trgtTypenames.[ch] shp strideOrder, false)
 
-        | UUnaryOp (Expr.Subtensor _) -> needExtra op
+        | UUnaryOp (UnaryOp.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) -> 
             if SimpleRangesSpec.isDynamic srs then 
                 // dynamic sub-tensors will be copied out of the src
@@ -665,25 +664,25 @@ module CudaExecUnit =
                 let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
                 dfltChTrgt (firstSrcDfltCh() |> TensorManikin.range rng) (firstSrcDfltChShared())
 
-        | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
+        | UBinaryOp (BinaryOp.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor _) ->
             if not (firstSrcDfltChShared()) && not (TensorManikin.isBroadcasted (firstSrcDfltCh())) then 
                 dfltChTrgt (firstSrcDfltCh()) false
             else dfltChOutplaceTrgt ()
 
-        | UNaryOp (Expr.Elements _) -> needExtra op
+        | UNaryOp (NaryOp.Elements _) -> needExtra op
         | UExtraOp (Elements _) -> dfltChOutplaceTrgt ()
 
-        | UBinaryOp (Expr.IfThenElse _) -> needExtra op
+        | UBinaryOp (BinaryOp.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse ->  dfltChInplaceOvrwrtTrgt ()  
 
-        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
-        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+        | UUnaryOp (UnaryOp.NullifyJacobian) -> needExtra op
+        | UUnaryOp (UnaryOp.AssumeJacobian _) -> needExtra op
 
-        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UUnaryOp (UnaryOp.Gather _) -> needExtra op
         | UExtraOp (Gather idxArgs) -> dfltChOutplaceTrgt ()
 
-        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UUnaryOp (UnaryOp.Scatter _) -> needExtra op
         | UExtraOp (Scatter idxArgs) -> dfltChOutplaceTrgt ()
 
         // extension        
@@ -1333,9 +1332,9 @@ module CudaExecUnit =
             zeroItems @ copyItems
 
         // extra
-        | UUnaryOp (Expr.Held _) -> needExtra op
+        | UUnaryOp (UnaryOp.Held _) -> needExtra op
 
-        | UNaryOp (Expr.Channel _) -> needExtra op
+        | UNaryOp (NaryOp.Channel _) -> needExtra op
         | UExtraOp (Channel _) -> []
 
         | UExtraOp (Loop loopSpec) ->
@@ -1398,7 +1397,7 @@ module CudaExecUnit =
             }
             copyItems @ [ExecLoop execLoopInfo]
 
-        | UUnaryOp (Expr.Subtensor _) -> needExtra op
+        | UUnaryOp (UnaryOp.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) ->
             if SimpleRangesSpec.isDynamic srs then 
                 // copy dynamic subtensor out of the src
@@ -1406,7 +1405,7 @@ module CudaExecUnit =
                     (firstSrcDfltCh()) srs (List.tail (srcsDfltCh()))
             else [] // symbolic subtensor uses a slice of the src view
 
-        | UBinaryOp (Expr.SetSubtensor _) -> needExtra op
+        | UBinaryOp (BinaryOp.SetSubtensor _) -> needExtra op
         | UExtraOp (SetSubtensor srs) ->
             // copy "a" if necessary
             let copyItems = 
@@ -1419,25 +1418,25 @@ module CudaExecUnit =
                     (List.skip 2 (srcsDfltCh())) (srcsDfltCh()).[1]
             copyItems @ setItems
 
-        | UNaryOp (Expr.Elements _) -> needExtra op
+        | UNaryOp (NaryOp.Elements _) -> needExtra op
         | UExtraOp (Elements (_, elemFunc)) ->
             execItemsForElements compileEnv (dfltChTrgt()) elemFunc (srcsDfltCh())
 
-        | UBinaryOp (Expr.IfThenElse _) -> needExtra op
+        | UBinaryOp (BinaryOp.IfThenElse _) -> needExtra op
         | UExtraOp IfThenElse ->  
             execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("IfThenElseEOp_t", false)) (srcsDfltCh())
 
-        | UUnaryOp (Expr.NullifyJacobian) -> needExtra op
-        | UUnaryOp (Expr.AssumeJacobian _) -> needExtra op
+        | UUnaryOp (UnaryOp.NullifyJacobian) -> needExtra op
+        | UUnaryOp (UnaryOp.AssumeJacobian _) -> needExtra op
 
-        | UUnaryOp (Expr.Gather _) -> needExtra op
+        | UUnaryOp (UnaryOp.Gather _) -> needExtra op
         | UExtraOp (Gather idxArgs) -> 
             let srcs = srcsDfltCh ()
             let idxArgs = idxArgs |> List.map (function | Some n -> Some srcs.[n]
                                                         | None   -> None)
             execItemsForGather (dfltChTrgt()) srcs.[0] idxArgs
 
-        | UUnaryOp (Expr.Scatter _) -> needExtra op
+        | UUnaryOp (UnaryOp.Scatter _) -> needExtra op
         | UExtraOp (Scatter idxArgs) -> 
             let trgt, srcs = dfltChTrgt(), srcsDfltCh()
             // set target to zero

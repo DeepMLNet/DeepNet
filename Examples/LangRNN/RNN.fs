@@ -144,13 +144,12 @@ module RecurrentLayer =
             state .* outputWeights.T //+ outputBias
             |> ActivationFunc.apply pars.HyperPars.OutputActivationFunc
         let chState, chOutput = "State", "Output"
-        let loopSpec = {
-            Expr.Length = nSteps
-            Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
-                             Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-            Expr.Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
-                                 chOutput, {LoopValue.Expr=output; LoopValue.SliceDim=1}]    
+        let loopSpec : LoopSpec = {
+            Length = nSteps
+            Vars = Map [Expr.extractVar inputSlice, SequenceArgSlice {ArgIdx=0; SliceDim=1}
+                        Expr.extractVar prevState, PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
+            Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
+                            chOutput, {LoopValue.Expr=output; LoopValue.SliceDim=1}]    
         }
 
         let initial = initial |> Expr.reshape [nBatch; SizeSpec.fix 1L; nRecurrent]

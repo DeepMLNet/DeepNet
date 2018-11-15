@@ -43,15 +43,15 @@ module VarEnv =
         | None -> failwithf "variable %A is not present in the specified VarEnv" vs
 
     /// add variable value to environment
-    let add (var: Expr.Expr) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
+    let add (var: Expr) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
         addVarSpec (Expr.extractVar var) value varEnv
 
     /// remove variable value from environment
-    let remove (var: Expr.Expr) (varEnv: VarEnvT) : VarEnvT =
+    let remove (var: Expr) (varEnv: VarEnvT) : VarEnvT =
         removeVarSpec (Expr.extractVar var) varEnv
 
     /// get variable value from environment
-    let get (var: Expr.Expr) (varEnv: VarEnvT) : #ITensor =
+    let get (var: Expr) (varEnv: VarEnvT) : #ITensor =
         getVarSpec (Expr.extractVar var) varEnv
 
     /// empty variable environment

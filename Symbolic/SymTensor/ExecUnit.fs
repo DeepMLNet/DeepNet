@@ -49,7 +49,7 @@ module ExecUnit =
             let build = Dictionary<Var, List<ExecUnitT>> ()
             for eu in eus do
                 match eu.Expr with
-                | UExpr (UUnaryOp (Expr.StoreToVar vs), _, _) ->
+                | UExpr (UUnaryOp (UnaryOp.StoreToVar vs), _, _) ->
                     if not (build.ContainsKey vs) then build.[vs] <- List ()
                     build.[vs].Add eu
                 | _ -> ()
@@ -236,7 +236,7 @@ module ExecUnit =
 
                 // If this execution unit is a variable read:
                 match eu.Expr with
-                | UExpr(ULeafOp (Expr.Var readVs), _, _) ->
+                | UExpr(ULeafOp (Var readVs), _, _) ->
                     // Find all StoreToVars to the same variable operations.
                     // We may only run again, after the previous variable write has been completed.
                     let stvs = coll.StoresToVar readVs                               
@@ -475,7 +475,7 @@ module ExecUnit =
         let eusByAccessMem = Dictionary<StorageManikin, HashSet<ExecUnitIdT>> ()
         for eu in execUnits do
             match eu.Expr with
-            | UExpr(ULeafOp (Expr.Var vs), _, _) -> 
+            | UExpr(ULeafOp (Var vs), _, _) -> 
                 if not (eusByReadVar.ContainsKey vs) then
                     eusByReadVar.[vs] <- HashSet<ExecUnitIdT> ()
                 eusByReadVar.[vs].Add eu.Id |> ignore
@@ -493,7 +493,7 @@ module ExecUnit =
             execUnits
             |> List.map (fun eu ->
                 match eu.Expr with
-                | UExpr(UUnaryOp (Expr.StoreToVar storeVs), _, _) ->
+                | UExpr(UUnaryOp (UnaryOp.StoreToVar storeVs), _, _) ->
                     // For every StoreToVar operation:
                     // Find all EUs that read from the variable's memory.
                     let readVarEus =

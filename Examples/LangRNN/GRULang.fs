@@ -115,28 +115,25 @@ module GRULang =
 
         // training loop
         let chState, chLogWordProb, chPred, chOutput = "State", "LogWordProb", "Pred", "Output"
-        let loopSpec = 
+        let loopSpec: LoopSpec = 
             if pars.HyperPars.MultiStepLoss then 
               {
-                Expr.Length = nSteps
-                Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
-                                 Expr.extractVar prevOutput,
-                                    Expr.PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1L; InitialArg=2}
-                                 Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}
-                                 Expr.extractVar step, Expr.IterationIndex]
-                Expr.Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
-                                     chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}
-                                     chOutput,      {LoopValue.Expr=output;      LoopValue.SliceDim=1}]    
+                Length = nSteps
+                Vars = Map [Expr.extractVar inputSlice, SequenceArgSlice {ArgIdx=0; SliceDim=1}
+                            Expr.extractVar prevOutput, PreviousChannel {Channel=chOutput; Delay=SizeSpec.fix 1L; InitialArg=2}
+                            Expr.extractVar prevState, PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}
+                            Expr.extractVar step, IterationIndex]
+                Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
+                                chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}
+                                chOutput,      {LoopValue.Expr=output;      LoopValue.SliceDim=1}]    
               } 
             else 
               {
-                Expr.Length = nSteps
-                Expr.Vars = Map [Expr.extractVar inputSlice, Expr.SequenceArgSlice {ArgIdx=0; SliceDim=1}
-                                 Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-                Expr.Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
-                                     chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}]
+                Length = nSteps
+                Vars = Map [Expr.extractVar inputSlice, SequenceArgSlice {ArgIdx=0; SliceDim=1}
+                            Expr.extractVar prevState, PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
+                Channels = Map [chState,       {LoopValue.Expr=state;       LoopValue.SliceDim=1}
+                                chLogWordProb, {LoopValue.Expr=logWordProb; LoopValue.SliceDim=1}]
               }
         let input         = words.[*, 0L .. nSteps-1L]
         let initialOutput = Expr.zeros<single> [nBatch; SizeSpec.fix 1L; nWords]
@@ -150,14 +147,12 @@ module GRULang =
 
         // generating loop
         let genSteps = SizeSpec.fix 200L
-        let genLoopSpec = {
-            Expr.Length = genSteps
-            Expr.Vars = Map [Expr.extractVar inputSlice, 
-                                    Expr.PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1L; InitialArg=0}
-                             Expr.extractVar prevState, 
-                                    Expr.PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
-            Expr.Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
-                                 chPred,   {LoopValue.Expr=pred;   LoopValue.SliceDim=1}]    
+        let genLoopSpec: LoopSpec = {
+            Length = genSteps
+            Vars = Map [Expr.extractVar inputSlice, PreviousChannel {Channel=chPred;  Delay=SizeSpec.fix 1L; InitialArg=0}
+                        Expr.extractVar prevState, PreviousChannel {Channel=chState; Delay=SizeSpec.fix 1L; InitialArg=1}]
+            Channels = Map [chState,  {LoopValue.Expr=state;  LoopValue.SliceDim=1}
+                            chPred,   {LoopValue.Expr=pred;   LoopValue.SliceDim=1}]    
         }
         let states        = Expr.loop genLoopSpec chState  [genFirstWord; initial; initialSlice]
         let generated     = Expr.loop genLoopSpec chPred   [genFirstWord; initial; initialSlice]

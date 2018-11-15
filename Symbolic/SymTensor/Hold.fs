@@ -2,8 +2,6 @@
 
 open DeepNet.Utils
 
-open Expr
-
 
 /// functions for working with held op
 module Hold =
@@ -28,7 +26,7 @@ module Hold =
                         let nReps, haveRemaining = 
                             if nTrgt % nSrc = 0L then nTrgt / nSrc, false
                             else nTrgt / nSrc + 1L, true
-                        let aRep = a |> replicate dim (SizeSpec.fix nReps)
+                        let aRep = a |> Expr.replicate dim (SizeSpec.fix nReps)
                         if haveRemaining then
                             let slice : ExprRngsSpec = 
                                 [0 .. aRep.NDims-1]
