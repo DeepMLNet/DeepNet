@@ -2,6 +2,7 @@
 
 open DeepNet.Utils
 
+
 /// Environment for resolving symbolic sizes.
 type SymSizeEnv = Map<SizeSymbol, SizeSpec>
 

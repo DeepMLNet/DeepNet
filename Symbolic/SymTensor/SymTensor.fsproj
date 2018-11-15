@@ -29,9 +29,15 @@
 
     <Compile Include="Debug.fs" />
 
-    <Compile Include="Frac.fs" />
-    <Compile Include="SymShape.fs" />
-    <Compile Include="SymSizeEnv.fs" />
+    <Compile Include="Sizes\Frac.fs" />
+
+    <Compile Include="Sizes\Size.fs" />
+
+    <Compile Include="Sizes\Shape.fs" />
+
+    <Compile Include="Sizes\Range.fs" />
+
+    <Compile Include="Sizes\Env.fs" />
     <Compile Include="Vars.fs" />
     <Compile Include="Elem\Expr.fs" />
     <Compile Include="Elem\Unified.fs" />
