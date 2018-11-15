@@ -21,11 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../../Utils/Utils.fs" />
-    <Compile Include="../../Utils/NativeLib.fs" />
-    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" />
-    <Compile Include="../../Utils/DiskMap.fs" />
-    <Compile Include="DiskMapOld.fs" />
+    <Compile Include="../../Utils/Utils.fs" Link="Common\Utils.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" Link="Common\NativeLib.fs" />
+    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Common\CudaUtils.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" Link="Common\DiskMap.fs" />
+    <Compile Include="Common\DiskMapOld.fs" />
 
     <Compile Include="Debug.fs" />
 
