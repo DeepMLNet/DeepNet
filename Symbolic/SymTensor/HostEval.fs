@@ -204,7 +204,7 @@ module HostEval =
                     | Elements (resShape, elemExpr) -> 
                         let esv = es |> List.map subEval 
                         let nResShape = shapeEval resShape
-                        ElemExprInterpreter.eval elemExpr esv nResShape |> box
+                        Elem.Interpreter.eval elemExpr esv nResShape |> box
                     | Interpolate ip ->  
                         es |> List.map subEval |> Interpolator.interpolate ip |> box
                     | Channel (Loop spec, channel) -> 
